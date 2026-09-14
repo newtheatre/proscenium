@@ -74,7 +74,7 @@ describe('the documented rehearsal sequence, identity then load then bookings, o
       // bookings needs, so this part of the pipeline was never broken).
       const core = await createCore(':memory:')
       const idMap = new Map<string, string>()
-      transformIdentity({ auth, mirrors: [], roleMap: {}, idMap, target: core })
+      transformIdentity({ auth, mirrors: [], decisions: new Map(), idMap, target: core })
 
       // Step: load.ts, applied to the real target. This is what the fix requires running before
       // transform-bookings.ts: without it, room_bookings.user_id has nothing to reference.
@@ -122,7 +122,7 @@ describe('the documented rehearsal sequence, identity then load then bookings, o
     try {
       const core = await createCore(':memory:')
       const idMap = new Map<string, string>()
-      transformIdentity({ auth, mirrors: [], roleMap: {}, idMap, target: core })
+      transformIdentity({ auth, mirrors: [], decisions: new Map(), idMap, target: core })
       applyLoad(buildLoad(core), target.raw)
 
       // A room-map pointing at a room this target does not have: the real foreign key refuses it,

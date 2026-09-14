@@ -3,7 +3,10 @@ import { z } from 'zod'
 // What a seat may be sold as. A type is global, its name is held once, and its base price is
 // integer pence (D-119 criterion 1, 0004).
 
+// The data vocabulary, not an officer's choice: every type an officer creates is SINGLE, and the
+// one PASS_ADMISSION row is the system's own, minted on first redemption or by the import (0074).
 export const TICKET_TYPE_KINDS = ['SINGLE', 'PASS_ADMISSION'] as const
+export const PASS_ADMISSION_TICKET_TYPE_NAME = 'Pass admission'
 export const TICKET_TYPE_ACCESS_KINDS = ['ACCESS', 'COMPANION'] as const
 // Concession has no committee-agreed eligibility evidence yet (docs/backlog/D-ticketing.md open
 // questions), so it is not a value here: it stays an ordinary, unrestricted type (D-109).
@@ -21,8 +24,8 @@ export const MAX_TICKET_PRICE_PENCE = 100_000
 
 const pence = z.number().int().nonnegative().max(MAX_TICKET_PRICE_PENCE)
 
-// Name, price and description are what an operator may change. Kind and access kind are what a
-// sold ticket was sold under, so they are set once (D-119 criterion 2).
+// Name, price and description are what an operator may change. Access kind is what a sold ticket
+// was sold under, so it is set once (D-119 criterion 2). Kind is not asked: every made type is SINGLE (0074).
 export const ticketTypeForm = z.object({
   // A rename is audited with both names, and audit detail refuses anything address-shaped (0011).
   name: z.string().trim().min(1, 'A ticket type needs a name').max(MAX_TICKET_TYPE_NAME)
@@ -33,7 +36,6 @@ export const ticketTypeForm = z.object({
 })
 
 export const newTicketTypeForm = ticketTypeForm.extend({
-  kind: z.enum(TICKET_TYPE_KINDS).default('SINGLE'),
   accessKind: z.enum(TICKET_TYPE_ACCESS_KINDS).nullish(),
   restrictedTo: z.enum(TICKET_TYPE_RESTRICTIONS).nullish(),
 }).refine(
@@ -87,8 +89,15 @@ export function publicTicketTypes(types: TicketType[]): PublicTicketType[] {
   }))
 }
 
-export function saysTicketTypeKind(kind: string): string {
-  return kind === 'PASS_ADMISSION' ? 'Pass admission' : 'Single ticket'
+export function isSystemTicketType(type: Pick<TicketType, 'kind'>): boolean {
+  return type.kind === 'PASS_ADMISSION'
+}
+
+// The one sentence every write route quotes when asked to touch the system's own row (0074): the
+// same shape a reserved pass type's refusal takes, and a 409 rather than a 404, since the row exists.
+export function systemTicketTypeRefusal(type: Pick<TicketType, 'kind' | 'name'>): string | null {
+  if (!isSystemTicketType(type)) return null
+  return `${type.name} is the system's own ticket type: a pass holder is seated under it automatically, so it cannot be edited, archived or deleted`
 }
 
 export function saysAccessKind(accessKind: string | null): string | null {

@@ -6,6 +6,8 @@ import { z } from 'zod'
 export interface BarReconciliation {
   night: string
   cardSalesPence: number
+  // Bookings collected and walk-ups sold at the bar, on the bar's reader (F-122, F-123).
+  ticketsPence: number
   tabSettlementsPence: number
   compsCount: number
   compsForegonePence: number

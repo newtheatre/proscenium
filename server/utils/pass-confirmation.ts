@@ -1,6 +1,6 @@
 import { notify } from './notify'
 import { passQrTokenFor } from './pass-qr-tokens'
-import { qrSvgBase64 } from './qr'
+import { qrPng } from './qr'
 import type { H3Event } from 'h3'
 
 // Kept apart from server/utils/pass-issue.ts, which `tests/` imports directly under Bun:
@@ -18,6 +18,7 @@ export interface PassConfirmationContext {
 export async function sendPassIssued(event: H3Event | undefined, context: PassConfirmationContext, passId: string): Promise<void> {
   const token = await passQrTokenFor(passId)
   const url = `${useRuntimeConfig(event).public.baseURL}/passes/${token}`
+  const { width } = qrPng(url)
   await notify(event, {
     userId: context.userId,
     type: 'pass.issued',
@@ -27,7 +28,8 @@ export async function sendPassIssued(event: H3Event | undefined, context: PassCo
       passType: context.passTypeName,
       priceLabel: context.priceLabel,
       url,
-      qrSvg: qrSvgBase64(url),
+      imageUrl: `${url}/image.png`,
+      qrWidth: width,
     },
   })
 }

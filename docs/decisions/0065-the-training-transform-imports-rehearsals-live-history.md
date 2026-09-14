@@ -35,7 +35,7 @@ G-127's resolution, is repurposed here as the mapping target for an old `ADMIN`-
 which has no unified equivalent; nothing writes a genuinely Heroku-era record, because
 `rehearsal` never held one to export in the first place.
 
-**The catalogue is not imported.** `departments` and `modules` are authored fresh in the unified
+**The catalogue is not imported.** (Amended 14 September 2026: superseded by 0075, which imports departments, modules and prerequisites by id in the same build; the paragraph below records the reasoning as it stood.) `departments` and `modules` are authored fresh in the unified
 system, the same way ticket types are (D-119), not migrated: several fields the unified schema
 carries (delivery mode, safety-critical, sign-off required, self-registrable) have no source in
 `rehearsal`'s catalogue to derive from, which is itself evidence the catalogue was always meant to

@@ -16,7 +16,9 @@ Open questions:
   high-demand performances release earlier? Enters the Phase 0 committee workshop as a
   configuration default to confirm.
 - Answered 26 August: SP-1 was refused access to the SumUp developer toolkit, so D-205 is
-  resolved as won't-build and the typed cross-check is permanent.
+  resolved as won't-build and the typed cross-check is permanent. Amended 14 September: the SumUp
+  app's Payment Switch hand-off needs no toolkit and is built on the till as F-124 (decision
+  0069); the desk keeps the typed cross-check.
 - Historical pass revenue: the old estate issued passes without writing ledger rows. Does the
   committee want a one-off backfill of pre-migration pass sales, or a dated note in the data
   dictionary that pass revenue starts at cutover?
@@ -201,7 +203,14 @@ Open questions:
      nothing saved earlier can go stale.
   2. The confirmation email is sent once at reservation with the QR and states UNPAID prominently
      with the amount due at the desk; the booker can request a resend at any time, rate limited,
-     and a resend carries the same QR.
+     and a resend carries the same QR. The email references the QR as a hosted PNG at
+     `/qr/<token>/image.png` (a pass's at `/passes/<token>/image.png`), wrapped in the booking
+     link, with the text link underneath as the fallback for an image-blocking client.
+     Context, 14 September 2026: the email originally embedded the QR as an inline SVG
+     `data:` URI, which Gmail renders as a blank; Gmail's image proxy fetches neither `data:`
+     images nor SVG at all, so the code must be a real `https` PNG. The image route answers a
+     forged or unknown token with the same 404, and the token is the credential the email
+     already carries, so the route exposes nothing the link did not.
   3. The QR can be saved to Apple Wallet and Google Wallet from the email and from the booking
      page.
   4. Opening the QR link in a browser exchanges its signed token for a short-lived httpOnly
@@ -377,8 +386,12 @@ Open questions:
   4. The expected-total cross-check (D-114) applies to walk-up payment exactly as to collection.
   5. Pre-migration reservations keep their known source blur, documented in the data dictionary;
      no historical reclassification is attempted.
+  6. Amended 14 September 2026 (Matt): a walk-up's name and email are encouraged, so the booker
+     gets the confirmation and its QR, and optional. A walk-up sold with neither is a reservation
+     with no account behind it, findable by reference alone; the till sells them that way from
+     F-123 and the desk's own form is unchanged until it is next touched.
 - Source: Prompt Book D-5; audit PR-5 (defect: walk-ins written as PENDING/WEB); Get-In part 2
-  (walk-ins: rebuild, fixed by construction)
+  (walk-ins: rebuild, fixed by construction); Matt's direction, 14 September 2026 (criterion 6)
 
 ## D-116: Refunds, in person, per ticket, race-safe
 
@@ -453,7 +466,10 @@ Open questions:
 - Depends on: none
 - Acceptance criteria:
   1. Ticket types (standard, member, concession, and any committee-defined type) are global with
-     globally unique names, each carrying a base price in integer pence.
+     globally unique names, each carrying a base price in integer pence. Amended 14 September
+     2026: a type's kind is not an officer's choice. Every type made here is a single ticket; the
+     one pass-admission type is the system's own, minted on first redemption or by the import,
+     hidden from the listing and the price screens, and refused by edit, archive and delete (0074).
   2. A ticket type that has ever been sold can only be archived, never deleted; an archived type
      stops appearing for new sales but resolves for every historical ticket, report and export.
   3. A ticket type that has never sold may be deleted outright.
@@ -548,7 +564,10 @@ Open questions:
 - Depends on: D-114, D-123
 - Acceptance criteria:
   1. A pass is sold at the desk with payment on the SumUp reader, under the expected-total
-     cross-check (D-114); issue attaches the pass to the buyer's account.
+     cross-check (D-114); issue attaches the pass to the buyer's account. Amended 14 September
+     2026: a pass issued here always names its issuer, and `issued_by` is NULL only on a pass the
+     import reconstructed from an old sale or admission, whose issuer the old estate never
+     recorded (0073).
   2. Issuing a pass writes a pass-sale ledger entry at the moment of payment, so pass revenue
      reaches reconciliation and the night's expected Z figure (fixing the old estate's missing
      PASS_SALE rows).
@@ -847,7 +866,10 @@ Open questions:
      wording and training material state it as such.
   2. Decision 0005 records the refusal. Revisit only if the SU changes its position, via a
      superseding decision record.
-- Source: SP-1 outcome in `../spikes.md`; decision 0005; Get-In constraint 1.
+  3. Amended 14 September 2026: decision 0069 supersedes the "no reader integration" clause for
+     the SumUp app's Payment Switch hand-off, built on the till as F-124. The API and SDK stay
+     refused; this story stays withdrawn.
+- Source: SP-1 outcome in `../spikes.md`; decisions 0005 and 0069; Get-In constraint 1.
 
 ## D-206: Sales, no-show and utilisation reporting exports
 

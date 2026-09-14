@@ -1405,22 +1405,23 @@ After ${releasesAt} the seats go back on sale and cannot be guaranteed back to y
 The Nottingham New Theatre`,
     }
   },
-  // The stable QR (D-108 criterion 1): embedded inline, never attached, so an image-blocking
-  // client still shows the text and the link underneath it.
+  // The stable QR (D-108 criteria 1, 2) is a hosted PNG, never a data: URI or SVG, which Gmail
+  // will not render; the text link underneath is what an image-blocking client shows.
   'reservation-confirmed': (context: TemplateContext): Rendered => {
     const reference = String(context.reference)
     const show = String(context.show)
     const when = String(context.when)
     const totalDue = String(context.totalDue)
     const url = String(context.url)
-    const qrSvg = String(context.qrSvg)
+    const imageUrl = String(context.imageUrl)
+    const qrWidth = String(context.qrWidth)
     return {
       subject: `Your reservation for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Reference <strong>${reference}</strong> for ${show}, ${when}.</p>
 <p><strong>UNPAID.</strong> ${totalDue} is due at the box office on the night; this reservation
 holds your seats and is not a purchase until then.</p>
-<p><img src="data:image/svg+xml;base64,${qrSvg}" alt="Booking QR code" width="200" height="200"></p>
+<p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
       text: `Hello ${context.name},
 
@@ -1430,6 +1431,31 @@ UNPAID. ${totalDue} is due at the box office on the night; this reservation hold
 is not a purchase until then.
 
 Open your booking: ${url}
+
+The Nottingham New Theatre`,
+    }
+  },
+  // A walk-up already paid for at the bar (F-123 criterion 2): the same QR as a reservation, and
+  // nothing about money due, because there is none.
+  'reservation-walk-up-paid': (context: TemplateContext): Rendered => {
+    const reference = String(context.reference)
+    const show = String(context.show)
+    const when = String(context.when)
+    const paid = String(context.paid)
+    const url = String(context.url)
+    const imageUrl = String(context.imageUrl)
+    const qrWidth = String(context.qrWidth)
+    return {
+      subject: `Your tickets for ${show}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Reference <strong>${reference}</strong> for ${show}, ${when}: ${paid}, paid at the bar.</p>
+<p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
+<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
+      text: `Hello ${context.name},
+
+Reference ${reference} for ${show}, ${when}: ${paid}, paid at the bar.
+
+Show this code at the door, or open it yourself: ${url}
 
 The Nottingham New Theatre`,
     }
@@ -1456,20 +1482,21 @@ Changed your mind? Book again from the show's page while seats remain.
 The Nottingham New Theatre`,
     }
   },
-  // D-124 criterion 5: a scannable QR inline, the same reasoning as the reservation confirmation
-  // (D-108 criterion 1), so an image-blocking client still shows the reference and the link.
+  // D-124 criterion 5: the same hosted PNG shape as the reservation confirmation, for the same
+  // reason (Gmail), with the reference and the text link as the fallback.
   'pass-issued': (context: TemplateContext): Rendered => {
     const reference = String(context.reference)
     const passType = String(context.passType)
     const priceLabel = String(context.priceLabel)
     const url = String(context.url)
-    const qrSvg = String(context.qrSvg)
+    const imageUrl = String(context.imageUrl)
+    const qrWidth = String(context.qrWidth)
     return {
       subject: `Your ${passType}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Reference <strong>${reference}</strong>: ${passType} (${priceLabel}), issued and paid for at
 the box office.</p>
-<p><img src="data:image/svg+xml;base64,${qrSvg}" alt="Pass QR code" width="200" height="200"></p>
+<p><a href="${url}"><img src="${imageUrl}" alt="Pass QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
       text: `Hello ${context.name},
 

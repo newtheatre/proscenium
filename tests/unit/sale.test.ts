@@ -105,3 +105,37 @@ describe('a basket may name a discount to apply (F-117 criterion 4)', () => {
     expect(parsed.success && parsed.data.discountId).toBe('disc-1')
   })
 })
+
+// F-122 and F-123: a booking's ticket money and a walk-up join the same basket, and credit never
+// carries either (criterion 5), so the form refuses that shape before any route sees it.
+describe('tickets and walk-ups in the basket (F-122, F-123)', () => {
+  const ticket = { reservationId: 'res-1' }
+  const walkUp = { performanceId: 'perf-1', ticketTypeId: 'tt-1', quantity: 2 }
+
+  test('a basket of bookings alone, with no bar line, is a sale', () => {
+    expect(saleForm.safeParse({ lines: [], tickets: [ticket], expectedTotalPence: 900 }).success).toBe(true)
+    expect(saleForm.safeParse({ lines: [], walkUps: [walkUp], expectedTotalPence: 1800 }).success).toBe(true)
+  })
+
+  test('an empty basket is still refused', () => {
+    expect(saleForm.safeParse({ lines: [], tickets: [], walkUps: [], expectedTotalPence: 0 }).success).toBe(false)
+  })
+
+  test('a booking appears once, and a walk-up type once per performance', () => {
+    expect(saleForm.safeParse({ lines: [], tickets: [ticket, ticket], expectedTotalPence: 1800 }).success).toBe(false)
+    expect(saleForm.safeParse({ lines: [], walkUps: [walkUp, walkUp], expectedTotalPence: 3600 }).success).toBe(false)
+  })
+
+  test('a tab refuses a basket holding a ticket line (criterion 5)', () => {
+    expect(saleForm.safeParse({ lines: [aLine], tickets: [ticket], expectedTotalPence: 1150, tabHolderId: 'user-1' }).success).toBe(false)
+    expect(saleForm.safeParse({ lines: [aLine], walkUps: [walkUp], expectedTotalPence: 2050, tabHolderId: 'user-1' }).success).toBe(false)
+    expect(saleForm.safeParse({ lines: [aLine], expectedTotalPence: 250, tabHolderId: 'user-1' }).success).toBe(true)
+  })
+
+  test('a walk-up guest is optional, and a partial one is refused (D-115 criterion 6)', () => {
+    const parsed = saleForm.parse({ lines: [], walkUps: [walkUp], expectedTotalPence: 1800 })
+    expect(parsed.walkUpGuest).toBeNull()
+    expect(saleForm.safeParse({ lines: [], walkUps: [walkUp], expectedTotalPence: 1800, walkUpGuest: { name: 'Sam', email: 'sam@example.invalid' } }).success).toBe(true)
+    expect(saleForm.safeParse({ lines: [], walkUps: [walkUp], expectedTotalPence: 1800, walkUpGuest: { name: 'Sam', email: 'not an address' } }).success).toBe(false)
+  })
+})

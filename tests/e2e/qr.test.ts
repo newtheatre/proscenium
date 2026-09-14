@@ -143,6 +143,22 @@ describe.skipIf(skip !== null)('opening the QR link exchanges the token for a co
     expect(opened.headers.get('set-cookie')).toBeNull()
   }, CASE_TIMEOUT_MS)
 
+  // D-108 criterion 2: the email's <img> points here, because Gmail renders neither data: nor SVG.
+  test('the hosted QR image answers a valid token with a PNG and a forged one with 404', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const { qrToken } = await bookedReservation(performanceId, ticketTypeId)
+
+    const image = await fetch(`${app.baseURL}/qr/${qrToken}/image.png`)
+    expect(image.status).toBe(200)
+    expect(image.headers.get('content-type')).toBe('image/png')
+    expect(image.headers.get('cache-control')).toBe('private, max-age=86400')
+    const bytes = new Uint8Array(await image.arrayBuffer())
+    expect([...bytes.subarray(1, 4)]).toEqual([0x50, 0x4E, 0x47])
+
+    const forged = await fetch(`${app.baseURL}/qr/not-a-real-token/image.png`)
+    expect(forged.status).toBe(404)
+  }, CASE_TIMEOUT_MS)
+
   test('with no cookie at all, the current-state read refuses rather than guessing', async () => {
     const current = await fetch(`${app.baseURL}/api/qr/current`)
     expect(current.status).toBe(401)

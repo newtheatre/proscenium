@@ -2,6 +2,7 @@
 // performances land in the past, tonight and the future, and in every status a screen shows.
 
 import { currentShowNight, showNightBounds, showNightOf } from '../../shared/utils/show-night'
+import { PASS_ADMISSION_TICKET_TYPE_NAME } from '../../shared/utils/ticket-types'
 import { ensure, holds, insert, insertOnly, seedId, seedReference } from './statements'
 import { personIn } from './people'
 import type { People } from './people'
@@ -18,7 +19,8 @@ export const TICKET_TYPES = [
   { slug: 'concession', name: 'Concession', description: 'Students, over-65s, and anybody on benefits.', price: 500, kind: 'SINGLE', accessKind: null, archived: false },
   { slug: 'access', name: 'Access', description: 'For a patron whose access needs bring a companion.', price: 700, kind: 'SINGLE', accessKind: 'ACCESS', archived: false },
   { slug: 'companion', name: 'Companion', description: 'The companion seat, free.', price: 0, kind: 'SINGLE', accessKind: 'COMPANION', archived: false },
-  { slug: 'pass', name: 'Season pass admission', description: 'A seat covered by a pass, taking no money.', price: 0, kind: 'PASS_ADMISSION', accessKind: null, archived: false },
+  // The system's own row, by the name the import and the first redemption both use (0074).
+  { slug: 'pass', name: PASS_ADMISSION_TICKET_TYPE_NAME, description: 'A seat covered by a pass, taking no money.', price: 0, kind: 'PASS_ADMISSION', accessKind: null, archived: false },
   // Retired rather than destroyed, because it has been sold before (D-119 criterion 2).
   { slug: 'preview', name: 'Preview', description: 'The old preview price, kept for the history that names it.', price: 400, kind: 'SINGLE', accessKind: null, archived: true },
 ]

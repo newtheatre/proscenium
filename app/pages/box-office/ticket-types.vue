@@ -2,18 +2,16 @@
 import { h, resolveComponent } from 'vue'
 import {
   TICKET_TYPE_ACCESS_KINDS,
-  TICKET_TYPE_KINDS,
   TICKET_TYPE_RESTRICTIONS,
   newTicketTypeForm,
   saysAccessKind,
   saysPrice,
   saysRestriction,
-  saysTicketTypeKind,
   ticketTypeForm,
 } from '#shared/utils/ticket-types'
 import { ticketTypesList } from '#shared/utils/ticket-types-list'
 import type { TableColumn } from '@nuxt/ui'
-import type { TicketType, TicketTypeAccessKind, TicketTypeKind, TicketTypeRestriction } from '#shared/utils/ticket-types'
+import type { TicketType, TicketTypeAccessKind, TicketTypeRestriction } from '#shared/utils/ticket-types'
 
 definePageMeta({ layout: 'console', title: 'Ticket types', middleware: 'console' })
 
@@ -60,7 +58,6 @@ interface FormState {
   name: string
   description?: string
   price: number
-  kind: TicketTypeKind
   accessKind: TicketTypeAccessKind | null
   restrictedTo: TicketTypeRestriction | null
   activeByDefault: boolean
@@ -69,7 +66,6 @@ interface FormState {
 const state = reactive<FormState>({
   name: '',
   price: 0,
-  kind: 'SINGLE',
   accessKind: null,
   restrictedTo: null,
   activeByDefault: true,
@@ -89,7 +85,6 @@ watch(() => state.accessKind, (accessKind) => {
   if (accessKind === 'COMPANION') state.price = 0
 })
 
-const kindOptions = TICKET_TYPE_KINDS.map(kind => ({ label: saysTicketTypeKind(kind), value: kind }))
 const accessOptions = [
   { label: 'Neither', value: null },
   ...TICKET_TYPE_ACCESS_KINDS.map(kind => ({ label: saysAccessKind(kind) ?? kind, value: kind })),
@@ -106,7 +101,6 @@ function edit(type: TicketType | null): void {
     name: type?.name ?? '',
     description: type?.description ?? undefined,
     price: type?.price ?? 0,
-    kind: type?.kind ?? 'SINGLE',
     accessKind: type?.accessKind ?? null,
     restrictedTo: type?.restrictedTo ?? null,
     activeByDefault: type?.activeByDefault ?? true,
@@ -115,7 +109,7 @@ function edit(type: TicketType | null): void {
 }
 
 // The body is built from the state rather than the submitted data, because the edit form does
-// not carry the kind or the access kind at all.
+// not carry the access kind at all. Kind is never sent: every type made here is SINGLE (0074).
 async function save(): Promise<void> {
   saving.value = true
   failure.value = null
@@ -132,7 +126,7 @@ async function save(): Promise<void> {
     else {
       await $fetch('/api/admin/ticket-types', {
         method: 'POST',
-        body: { ...body, kind: state.kind, accessKind: state.accessKind, restrictedTo: state.restrictedTo },
+        body: { ...body, accessKind: state.accessKind, restrictedTo: state.restrictedTo },
       })
     }
     toast.add({
@@ -199,9 +193,6 @@ const columns: TableColumn<TicketType>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', { class: 'flex flex-wrap items-center gap-2' }, [
         h('span', {}, row.original.name),
-        row.original.kind === 'PASS_ADMISSION'
-          ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => saysTicketTypeKind(row.original.kind))
-          : null,
         row.original.accessKind
           ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => saysAccessKind(row.original.accessKind))
           : null,
@@ -332,6 +323,17 @@ const columns: TableColumn<TicketType>[] = [
       </template>
     </UTable>
 
+    <p
+      data-test="pass-admission-note"
+      class="text-sm text-muted"
+    >
+      Pass holders are seated automatically through
+      <NuxtLink
+        to="/box-office/pass-types"
+        class="underline"
+      >pass types</NuxtLink>.
+    </p>
+
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p
         data-test="ticket-types-total"
@@ -350,7 +352,7 @@ const columns: TableColumn<TicketType>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Edit ${editing.name}` : 'Add a ticket type'"
-      description="The name is global and held once. What a type is, and whether it is an access or companion type, is fixed when it is created."
+      description="The name is global and held once. Whether a type is an access or companion type is fixed when it is created."
     >
       <template #body>
         <UForm
@@ -406,20 +408,6 @@ const columns: TableColumn<TicketType>[] = [
               v-model="state.description"
               :rows="2"
               class="w-full"
-            />
-          </UFormField>
-
-          <UFormField
-            v-if="!editing"
-            label="Kind"
-            name="kind"
-            description="A pass admission seats a pass holder rather than taking money at the desk."
-          >
-            <USelect
-              v-model="state.kind"
-              :items="kindOptions"
-              class="w-full"
-              data-test="ticket-type-kind"
             />
           </UFormField>
 

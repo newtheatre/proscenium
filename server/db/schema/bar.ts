@@ -267,6 +267,38 @@ export const tillSessions = sqliteTable('till_sessions', {
   check('till_sessions_closes_after_it_opens', sql`${table.closedAt} IS NULL OR ${table.closedAt} >= ${table.openedAt}`),
 ])
 
+// One hand-off of a basket to the SumUp app (F-124, 0069). The basket is held here as priced;
+// nothing posts until the app reports success, and every transition is a conditional write.
+export const sumupAttempts = sqliteTable('sumup_attempts', {
+  id: id(),
+  tillSessionId: text('till_session_id').notNull().references(() => tillSessions.id, { onDelete: 'restrict' }),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+  night: text('night').notNull(),
+  createdBy: text('created_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at').notNull().default(now),
+  basket: text('basket', { mode: 'json' }).notNull(),
+  expectedTotalPence: integer('expected_total_pence').notNull(),
+  status: text('status').notNull().default('STARTED'),
+  smpStatus: text('smp_status'),
+  smpTxCode: text('smp_tx_code'),
+  smpMessage: text('smp_message'),
+  smpFailureCause: text('smp_failure_cause'),
+  callbackAt: integer('callback_at'),
+  resolution: text('resolution'),
+  resolvedBy: text('resolved_by').references(() => users.id, { onDelete: 'restrict' }),
+  resolvedAt: integer('resolved_at'),
+  resolutionNote: text('resolution_note'),
+  // The entry the success posted. No foreign key, the same shape as comp_requests.entry_id.
+  entryId: text('entry_id'),
+  error: text('error'),
+}, table => [
+  index('sumup_attempts_night_status').on(table.night, table.status),
+  index('sumup_attempts_session').on(table.tillSessionId),
+  check('sumup_attempts_status_values', sql`${table.status} IN ('STARTED', 'COMPLETING', 'SUCCEEDED', 'FAILED', 'ABANDONED', 'MISMATCH')`),
+  check('sumup_attempts_resolution_values', sql`${table.resolution} IS NULL OR ${table.resolution} IN ('CALLBACK', 'KEY', 'STAFF', 'SWEEP')`),
+  check('sumup_attempts_entry_needs_success', sql`${table.entryId} IS NULL OR ${table.status} = 'SUCCEEDED'`),
+])
+
 // At most one open stocktake estate-wide: the unique value the partial index covers is always
 // 'OPEN', so a second one attempting to open collides with the first (F-115 criterion 1).
 export const stocktakes = sqliteTable('stocktakes', {

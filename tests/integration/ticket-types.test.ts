@@ -1,7 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { ticketTypesList } from '#shared/utils/ticket-types-list'
-import { TICKET_TYPE_REFERENCES, everSoldColumn, everSoldQuery, ticketTypesClause, ticketTypesQuery } from '#server/utils/ticket-types'
+import { PASS_ADMISSION_TICKET_TYPE_NAME } from '#shared/utils/ticket-types'
+import {
+  PASS_ADMISSION_TICKET_TYPE_QUERY,
+  TICKET_TYPE_REFERENCES,
+  everSoldColumn,
+  everSoldQuery,
+  passAdmissionTicketTypeInsert,
+  ticketTypesClause,
+  ticketTypesQuery,
+} from '#server/utils/ticket-types'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TicketTypeReference } from '#server/utils/ticket-types'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -276,6 +285,66 @@ describe('archiving keeps a type resolvable, deleting one that sold is refused (
       const id = standard(database)
       database.batch([['DELETE FROM ticket_types WHERE id = ?', id]])
       expect(rows<{ n: number }>(database, 'SELECT count(*) n FROM ticket_types')[0]!.n).toBe(0)
+    })
+  })
+})
+
+// 0074: the one PASS_ADMISSION row is the system's, minted on the first redemption unless the
+// import already wrote it, and never a second time whatever the first one is called.
+describe('the pass-admission ticket type is the system\'s own (0074)', () => {
+  function systemRows(database: TestDatabase): { id: string, name: string }[] {
+    return rows(database, 'SELECT id, name FROM ticket_types WHERE kind = ? ORDER BY id', 'PASS_ADMISSION')
+  }
+
+  function mint(database: TestDatabase, id: string): void {
+    const [query, ...parameters] = boundStatement(database, passAdmissionTicketTypeInsert(id))
+    database.batch([[query, ...parameters]])
+  }
+
+  function found(database: TestDatabase): string | undefined {
+    const [query, ...parameters] = boundStatement(database, PASS_ADMISSION_TICKET_TYPE_QUERY)
+    return rows<{ id: string }>(database, query, ...parameters)[0]?.id
+  }
+
+  test('an empty table gains exactly one row, under the shared name, at nought', async () => {
+    await withDatabase((database) => {
+      mint(database, 'tt-minted')
+      expect(systemRows(database)).toEqual([{ id: 'tt-minted', name: PASS_ADMISSION_TICKET_TYPE_NAME }])
+      expect(rows<{ price: number }>(database, 'SELECT price FROM ticket_types WHERE id = ?', 'tt-minted')[0]?.price).toBe(0)
+      expect(found(database)).toBe('tt-minted')
+    })
+  })
+
+  test('a row the import wrote is reused whatever its id or name, and no second one is minted', async () => {
+    await withDatabase((database) => {
+      insert(database, 'ticket_types', { id: 'tt-imported', name: 'Season pass admission', price: 0, kind: 'PASS_ADMISSION' })
+      mint(database, 'tt-minted')
+      expect(systemRows(database)).toEqual([{ id: 'tt-imported', name: 'Season pass admission' }])
+      expect(found(database)).toBe('tt-imported')
+    })
+  })
+
+  test('two first redemptions racing leave one row, not an error', async () => {
+    await withDatabase((database) => {
+      mint(database, 'tt-first')
+      expect(() => mint(database, 'tt-second')).not.toThrow()
+      expect(systemRows(database).map(row => row.id)).toEqual(['tt-first'])
+    })
+  })
+
+  test('the listing and its count never show it, so no officer is offered a row to administer', async () => {
+    await withDatabase((database) => {
+      standard(database)
+      mint(database, 'tt-minted')
+      const [query, ...parameters] = boundStatement(database, ticketTypesQuery(parsedTicketTypes({}), 50, 0))
+      expect(rows<{ id: string }>(database, query, ...parameters).map(row => row.id)).toEqual(['tt-1'])
+    })
+  })
+
+  test('the predicate binds a fixed number of parameters however many types exist', async () => {
+    await withDatabase((database) => {
+      const [, ...parameters] = boundStatement(database, passAdmissionTicketTypeInsert('tt-minted'))
+      expect(parameters).toEqual(['tt-minted', PASS_ADMISSION_TICKET_TYPE_NAME])
     })
   })
 })

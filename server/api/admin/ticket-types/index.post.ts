@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm'
 import { newTicketTypeForm } from '#shared/utils/ticket-types'
 
-// Add a ticket type. The name is global and held once, whatever the capitals.
+// Add a ticket type. The name is global and held once, whatever the capitals. Every type made
+// here is SINGLE: the one PASS_ADMISSION row is the system's own, never an officer's (0074).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
   const input = await readValidatedBodyOrThrow(event, newTicketTypeForm)
@@ -11,7 +12,7 @@ export default defineEventHandler(async (event) => {
   // type and a refusal rather than a constraint error (0003, 0006).
   const created = await db.all<{ id: string }>(sql`
     INSERT INTO ticket_types (id, name, description, price, kind, access_kind, restricted_to, archived, active_by_default)
-    SELECT ${id}, ${input.name}, ${input.description ?? null}, ${input.price}, ${input.kind},
+    SELECT ${id}, ${input.name}, ${input.description ?? null}, ${input.price}, 'SINGLE',
            ${input.accessKind ?? null}, ${input.restrictedTo ?? null}, 0, ${input.activeByDefault ? 1 : 0}
     WHERE NOT EXISTS (SELECT 1 FROM ticket_types WHERE name = ${input.name} COLLATE NOCASE)
     RETURNING id
@@ -27,7 +28,7 @@ export default defineEventHandler(async (event) => {
     action: 'ticket-type.created',
     target: `ticket-type:${id}`,
     detail: {
-      name: input.name, price: input.price, kind: input.kind,
+      name: input.name, price: input.price, kind: 'SINGLE',
       accessKind: input.accessKind ?? null, restrictedTo: input.restrictedTo ?? null,
     },
   }))

@@ -285,6 +285,22 @@ describe.skipIf(skip !== null)('a member views what they hold, and receives a sc
     expect(forged.status).toBe(302)
     expect(forged.headers.get('location')).toBe('/passes?refused=invalid')
   }, CASE_TIMEOUT_MS)
+
+  test('the hosted pass QR image answers a valid token with a PNG and a forged one with 404', async () => {
+    const { id: passTypeId, priceId } = await onSalePassType()
+    const buyer = await registerMember(app, 'buyer', generatePassword())
+    const issued = await send('POST', '/api/box-office/desk/passes', {
+      passTypeId, passTypePriceId: priceId, userId: buyer.id, expectedTotalPence: 4500,
+    })
+    const { qrToken } = await issued.json() as { qrToken: string }
+
+    const image = await fetch(`${app.baseURL}/passes/${qrToken}/image.png`)
+    expect(image.status).toBe(200)
+    expect(image.headers.get('content-type')).toBe('image/png')
+
+    const forged = await fetch(`${app.baseURL}/passes/not-a-real-token/image.png`)
+    expect(forged.status).toBe(404)
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('a buyer is chosen by name or email, never typed as an id (K-123 criterion 1)', () => {

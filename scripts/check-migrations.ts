@@ -29,6 +29,9 @@ const HAND_REVIEWED_REBUILDS = new Set<string>([
   // night_reports has two restrict dependents (night_report_addenda, night_report_deliveries),
   // rebuilt around it in the order verified against a real fixture in 0063, not reasoned about.
   '0093_auto_close_within_24_hours',
+  // passes has two restrict dependents (pass_admissions, pass_requests), held and recreated around
+  // it in the order 0063 sets out, verified against a real three-table fixture (0073).
+  '0103_an_imported_pass_has_no_issuer',
 ])
 
 function scan(dir: string, pattern: string): string[] {

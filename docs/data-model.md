@@ -83,6 +83,9 @@ handler can forget.
 The four `*_at` credential columns are what the account's own screen lists as when each way in
 was added and last used (A-113). They are NULL on a row that predates them, and on an imported
 one where the old estate never recorded it: the screen says so rather than inventing a date.
+A row with `password` NULL, `google_sub` NULL and no `passkeys` row is a shadow account: made from
+the console, as a ticket guest or by the import, never registered by its person, and hidden from
+the admin directory until looked for (0071).
 Indexed on `disabled`, `verified`, `anonymised_at`, `last_login_at` and `name`, which are what
 the admin directory filters and sorts on (A-121); without them every filter is a scan.
 
@@ -583,8 +586,13 @@ classified it. `pass_admissions` will be, when D-124 builds it. An integration t
 foreign keys and fails when a new referencing table is not classified, so the predicate cannot
 quietly stop covering a table.
 
-`kind` and `access_kind` are what a sold ticket was sold under, so they are set at creation and
-never edited. A type set up wrongly and never sold is deleted and made again.
+`access_kind` is what a sold ticket was sold under, so it is set at creation and never edited. A
+type set up wrongly and never sold is deleted and made again. `kind` is not an officer's choice at
+all (0074): every type made through the routes is `SINGLE`, and the one `PASS_ADMISSION` row is
+the system's own, minted by `passAdmissionTicketType()` in `server/utils/ticket-types.ts` on the
+first redemption unless the import or a seed already wrote it under `PASS_ADMISSION_TICKET_TYPE_NAME`.
+The listing hides it, the price screens filter it out, and `PUT`, archive and `DELETE` refuse it
+with a 409 quoting `systemTicketTypeRefusal()`.
 
 The base price is a column, not a superseding row: `tickets.price_paid` is the snapshot that
 makes a historical ticket immune to a later change (D-120 criterion 3), so the before and after
@@ -913,7 +921,9 @@ product with a live pass against it is gated for real, not vacuously.
 ### passes
 `id` PK · `reference` UNIQUE, the same no-look-alike shape a reservation's is · `pass_type_id`
 restrict · `pass_type_price_id` restrict · `user_id` → users restrict · `price_paid` snapshot ·
-`status` CHECK `ACTIVE|CANCELLED|EXPIRED` · `issued_by` restrict · `notes` scrub · timestamps.
+`status` CHECK `ACTIVE|CANCELLED|EXPIRED` · `issued_by` restrict, NULL only on a pass the import
+reconstructed from an old sale or admission, whose issuer the old estate never recorded (0073) ·
+`notes` scrub · timestamps.
 Issuing posts a `PASS_SALE` ledger entry in the same batch (fixing the old estate's silent
 pass money).
 
@@ -1464,6 +1474,25 @@ sets it before the `ledger_entries` row it names exists, since that row is only 
 claim has already won, so an immediate foreign key would refuse the very statement that makes the
 claim atomic. Do not add one back; the fix for a stale reference is a read-time check, not a
 constraint SQLite cannot enforce at the moment it is written.
+
+### sumup_attempts
+`id` PK, also the `foreign-tx-id` the SumUp app is given · `till_session_id` → till_sessions
+restrict · `venue_id` → venues restrict · `night` · `created_by` → users restrict · `created_at` ·
+`basket` JSON, the sale exactly as submitted plus the scope it resolved under, replayed at the
+answer and never resubmitted · `expected_total_pence` · `status` CHECK
+`STARTED|COMPLETING|SUCCEEDED|FAILED|ABANDONED|MISMATCH` · `smp_status`, `smp_tx_code`,
+`smp_message`, `smp_failure_cause`, `callback_at`, what the app sent back · `resolution` CHECK NULL
+or `CALLBACK|KEY|STAFF|SWEEP`, who answered · `resolved_by` NULL → users restrict · `resolved_at` ·
+`resolution_note`, required when a mismatch is abandoned · `entry_id`, the ledger entry a success
+posted, no foreign key for the same reason `comp_requests.entry_id` has none, and a CHECK that it
+is set only on `SUCCEEDED` · `error`, why a mismatch could not be recorded (F-124, 0069).
+
+One row per hand-off of a basket to the SumUp app. Nothing posts to the ledger and no booking
+moves until a row reaches `SUCCEEDED`; every transition is a conditional `UPDATE ... WHERE status
+= <from>`, so a callback and a staff answer racing each other advance the row once. `STARTED` and
+`COMPLETING` are open and refuse the till's close; `MISMATCH` is the reader holding money the ledger
+could not record, for a person to resolve, and does not. Indexes on (`night`, `status`) and
+`till_session_id`.
 
 ### stock_movements  APPEND-ONLY
 `id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own

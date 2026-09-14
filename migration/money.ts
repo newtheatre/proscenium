@@ -1,7 +1,7 @@
 // The old estate's ticket money, imported as opening ledger history (K-114, I-109). The source is
 // `tickets`, never `transactions`, which the old estate never used as a ledger (one row, six years).
 import { londonDayOf } from '../shared/utils/ledger'
-import { nanoid } from './lib'
+import { nanoid, parseStamp } from './lib'
 import type { Database } from 'bun:sqlite'
 
 export interface TicketRow {
@@ -33,7 +33,14 @@ export interface LedgerLineInsert {
   amount_pence: number
   qty: number
   unit_price_pence: number | null
+  // Set where the same build imported the seat (K-114, I-106); a pass sale names no performance.
+  reservation_id: string | null
+  performance_id: string | null
+  ticket_id: string | null
 }
+
+// What the reservations transform minted for an old ticket, so a ledger line can name it.
+export interface TicketLink { reservationId: string, performanceId: string, ticketId: string }
 
 export interface TransformMoneyResult {
   entries: LedgerEntryInsert[]
@@ -45,6 +52,8 @@ export interface TransformMoneyResult {
     salesPence: number
     refundsPence: number
     netPence: number
+    clampedPence: number
+    byConfidence: Record<string, number>
   }
   exceptions: string[]
 }
@@ -52,7 +61,8 @@ export interface TransformMoneyResult {
 // SQLite's CURRENT_TIMESTAMP has no zone; the dump is a UTC export, so the string is a UTC wall
 // clock with a space instead of a T.
 function parseUtc(stamp: string): Date {
-  return new Date(`${stamp.replace(' ', 'T')}Z`)
+  const seconds = parseStamp(stamp)
+  return new Date(seconds === null ? Number.NaN : seconds * 1000)
 }
 
 // The old estate's own unit, confirmed once and guarded here rather than assumed twice: a value
@@ -66,6 +76,7 @@ export function transformMoney(
   tickets: readonly TicketRow[],
   idMap: Map<string, string>,
   refundIdMap: Map<string, string>,
+  links: Map<string, TicketLink> = new Map(),
 ): TransformMoneyResult {
   const entries: LedgerEntryInsert[] = []
   const lines: LedgerLineInsert[] = []
@@ -76,6 +87,7 @@ export function transformMoney(
   let refunded = 0
   let salesPence = 0
   let refundsPence = 0
+  let clampedPence = 0
 
   for (const ticket of tickets) {
     if (ticket.price_confidence !== 'EXACT') {
@@ -90,15 +102,24 @@ export function transformMoney(
 
     const entryId = idMap.get(ticket.id) ?? nanoid()
     idMap.set(ticket.id, entryId)
+    const link = links.get(ticket.id)
 
-    const tender = ticket.price_paid === 0 ? 'NONE' : 'CARD'
+    // The seat table refuses a negative price and the estate holds two; the ledger clamps the
+    // same rows so the two agree, and the reconciliation allows for exactly that difference.
+    let pricePaid = ticket.price_paid
+    if (pricePaid < 0) {
+      clampedPence += -pricePaid
+      pricePaid = 0
+    }
+
+    const tender = pricePaid === 0 ? 'NONE' : 'CARD'
     entries.push({
       id: entryId,
       happened_at: Math.floor(soldAt.getTime() / 1000),
       london_day: londonDayOf(soldAt),
       source: 'IMPORT',
       tender,
-      total_pence: ticket.price_paid,
+      total_pence: pricePaid,
       reverses_entry_id: null,
       created_at: Math.floor(soldAt.getTime() / 1000),
     })
@@ -106,12 +127,15 @@ export function transformMoney(
       id: nanoid(),
       entry_id: entryId,
       kind: 'IMPORT',
-      amount_pence: ticket.price_paid,
+      amount_pence: pricePaid,
       qty: 1,
-      unit_price_pence: ticket.price_paid,
+      unit_price_pence: pricePaid,
+      reservation_id: link?.reservationId ?? null,
+      performance_id: link?.performanceId ?? null,
+      ticket_id: link?.ticketId ?? null,
     })
     sold++
-    salesPence += ticket.price_paid
+    salesPence += pricePaid
 
     // A refund is a second entry referencing the first, never a rewrite of it (0004, 0010): the
     // old estate's own total and the reversed net both stay reconstructable from ledger rows.
@@ -127,7 +151,7 @@ export function transformMoney(
         london_day: londonDayOf(refundedAt),
         source: 'IMPORT',
         tender,
-        total_pence: -ticket.price_paid,
+        total_pence: -pricePaid,
         reverses_entry_id: entryId,
         created_at: refundedAtSeconds,
       })
@@ -135,17 +159,16 @@ export function transformMoney(
         id: nanoid(),
         entry_id: refundEntryId,
         kind: 'IMPORT',
-        amount_pence: -ticket.price_paid,
+        amount_pence: -pricePaid,
         qty: 1,
-        unit_price_pence: ticket.price_paid,
+        unit_price_pence: pricePaid,
+        reservation_id: link?.reservationId ?? null,
+        performance_id: link?.performanceId ?? null,
+        ticket_id: link?.ticketId ?? null,
       })
       refunded++
-      refundsPence += ticket.price_paid
+      refundsPence += pricePaid
     }
-  }
-
-  for (const [value, count] of confidence) {
-    exceptions.push(`${count} ticket(s) imported with price_confidence "${value}", not EXACT: reconcile by hand`)
   }
 
   return {
@@ -158,6 +181,8 @@ export function transformMoney(
       salesPence,
       refundsPence,
       netPence: salesPence - refundsPence,
+      clampedPence,
+      byConfidence: Object.fromEntries(confidence),
     },
     exceptions,
   }
@@ -189,9 +214,9 @@ export function buildLoad(entries: readonly LedgerEntryInsert[], lines: readonly
   }
   for (const line of lines) {
     sql.push(
-      `INSERT OR IGNORE INTO ledger_lines (id, entry_id, kind, amount_pence, qty, unit_price_pence) VALUES (`
+      `INSERT OR IGNORE INTO ledger_lines (id, entry_id, kind, amount_pence, qty, unit_price_pence, reservation_id, performance_id, ticket_id) VALUES (`
       + `${literal(line.id)}, ${literal(line.entry_id)}, ${literal(line.kind)}, ${literal(line.amount_pence)}, `
-      + `${literal(line.qty)}, ${literal(line.unit_price_pence)});`,
+      + `${literal(line.qty)}, ${literal(line.unit_price_pence)}, ${literal(line.reservation_id)}, ${literal(line.performance_id)}, ${literal(line.ticket_id)});`,
     )
   }
 
@@ -212,8 +237,10 @@ export function reconcileMoney(source: Database, target: Database, summary: Tran
     'SELECT coalesce(sum(price_paid), 0) AS total FROM tickets WHERE refunded_at IS NULL',
   ).get() as { total: number }).total
 
-  if (sourceUnrefunded !== summary.netPence) {
-    problems.push(`source unrefunded total is ${sourceUnrefunded}p, transformed net is ${summary.netPence}p`)
+  // Unrefunded and clamped rows are disjoint in this estate; a source where they overlap would
+  // show up here as a mismatch, which is the right side to fail on.
+  if (sourceUnrefunded + summary.clampedPence !== summary.netPence) {
+    problems.push(`source unrefunded total is ${sourceUnrefunded}p (${summary.clampedPence}p clamped), transformed net is ${summary.netPence}p`)
   }
 
   const targetNet = (target.query(

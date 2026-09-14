@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { passAdmissionTicketInsert } from './capacity'
 import { postEntry, runLedgerBatch } from './ledger'
+import { passAdmissionTicketType } from './ticket-types'
 import { auditEntry } from '#shared/utils/audit'
 import { passRedemptionRefusal } from '#shared/utils/passes'
 import { generateReservationReference } from '#shared/utils/reservations'
@@ -166,21 +167,6 @@ export function passAdmissionAllows(passId: string, performanceId: string, showI
   `
 }
 
-// The one row every redeemed pass ticket shares, created once and read every time after
-// (`ON CONFLICT` on the same name D-119 already protects, so a race leaves exactly one).
-export async function ensurePassAdmissionTicketType(): Promise<string> {
-  const [existing] = await db.all<{ id: string }>(sql`SELECT id FROM ticket_types WHERE kind = 'PASS_ADMISSION' LIMIT 1`)
-  if (existing) return existing.id
-
-  const id = newId()
-  await db.run(sql`
-    INSERT INTO ticket_types (id, name, price, kind) VALUES (${id}, 'Pass admission', 0, 'PASS_ADMISSION')
-    ON CONFLICT (name) DO NOTHING
-  `)
-  const [row] = await db.all<{ id: string }>(sql`SELECT id FROM ticket_types WHERE kind = 'PASS_ADMISSION' LIMIT 1`)
-  return row!.id
-}
-
 export interface RedeemPassWriteInput {
   passId: string
   userId: string
@@ -212,7 +198,7 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
   const ticketId = newId()
   const admissionId = newId()
   const now = Math.floor(at.getTime() / 1000)
-  const ticketTypeId = await ensurePassAdmissionTicketType()
+  const ticketTypeId = await passAdmissionTicketType()
 
   const reservationInsert = sql`
     INSERT INTO reservations (id, reference, performance_id, user_id, status, source, window_bypassed, hold_expires_at)

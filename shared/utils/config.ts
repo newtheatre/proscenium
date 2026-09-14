@@ -95,6 +95,12 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Minutes a comp request stays open before it lapses.',
   },
+  SUMUP_ATTEMPT_TIMEOUT_MINUTES: {
+    schema: z.number().int().positive(),
+    default: 120,
+    workshop: 'money-and-box-office',
+    describes: 'Minutes a SumUp hand-off with no answer from the app waits before the sweep abandons it (F-124).',
+  },
   RESERVATION_RESEND_ATTEMPTS: {
     schema: z.number().int().positive(),
     default: 5,
@@ -754,6 +760,7 @@ export const ENFORCED_KEYS = [
   'BAR_TAB_CAP_MANAGER_OVERRIDE',
   'BAR_AUTHORISED_TAB_HOLDERS',
   'COMP_REQUEST_EXPIRY_MINUTES',
+  'SUMUP_ATTEMPT_TIMEOUT_MINUTES',
   'ROOM_NO_SHOW_WINDOW_DAYS',
   'ROOM_NO_SHOW_RECORD_AT',
   'ROOM_NO_SHOW_PREAPPROVAL_AT',

@@ -7,5 +7,6 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireNightAuthority(event, 'BAR', scope)
   const session = await openSessionFor(resolved.venueId, resolved.night)
 
-  return { night: resolved.night, venueId: resolved.venueId, session }
+  // Whether the hand-off is configured, never the keys themselves (F-124 criterion 1).
+  return { night: resolved.night, venueId: resolved.venueId, session, sumupEnabled: sumupEnabled(useRuntimeConfig(event).sumup) }
 })

@@ -11,10 +11,24 @@ import { isDutyOrBarManager } from '#server/utils/bar-authority'
 import { authorisedTabHolder, outstandingTabBalance } from '#server/utils/tab-holders'
 import { claimCompRequestForSale, compRequestById, compRequestLines, releaseCompRequestClaim } from '#server/utils/comps'
 import { priceRef, saysMoney } from '#shared/utils/bar'
+import { deskTicketsQuery } from '#server/utils/desk'
+import { tillBookingById } from '#server/utils/till-bookings'
+import { bookableTicketTypes, guestAccount, writeReservation } from '#server/utils/reservations'
+import { performanceById } from '#server/utils/programme'
+import { effectiveCapacity } from '#server/utils/performances'
+import { qrTokenFor } from '#server/utils/qr-tokens'
+import { qrSvgBase64 } from '#server/utils/qr'
+import { sendWalkUpPaid } from '#server/utils/reservation-confirmation'
+import { saleRefusal } from '#shared/utils/programme'
+import { holdExpiresAt, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { Discount } from '#shared/utils/discounts'
-import type { BasketLineInput, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
+import type { DeskTicketLine } from '#server/utils/desk'
+import type { ReservationLineToWrite } from '#server/utils/reservations'
+import type { BasketLineInput, CollectedTicketLine, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleInput, SaleProduct, SaleReceipt, SaleVariant, TicketLineInput, WalkUpGuestInput, WalkUpLineInput, WalkUpReceipt } from '#shared/utils/sale'
+import type { EntryInput } from '#shared/utils/ledger'
 import type { BatchItem } from 'drizzle-orm/batch'
+import type { H3Event } from 'h3'
 
 // What the till may sell right now, what pricing it costs, and the atomic commit once confirmed:
 // a reader, a tab or an approved comp, a Challenge 25 outcome and a discount, folded in as needed.
@@ -273,6 +287,123 @@ export interface SaleContext {
   venueId: string
   night: string
   performanceId: string | null
+  // Tonight's houses at this venue: what a walk-up may be sold for, and what "tonight" means
+  // when a found booking is flagged as another night's (F-122, F-123).
+  performanceIds?: string[]
+  // Where the door pass and the walk-up's email point (D-108); absent means no pass is minted.
+  baseURL?: string
+  // Present on a live request, so a walk-up's confirmation goes out through the real transport.
+  event?: H3Event
+}
+
+// The two things a basket may carry beyond drinks (F-122, F-123). Absent means a bar-only sale,
+// which is every caller before those stories.
+export interface SaleExtras {
+  tickets: TicketLineInput[]
+  walkUps: WalkUpLineInput[]
+  walkUpGuest: WalkUpGuestInput | null
+}
+
+const NO_EXTRAS: SaleExtras = { tickets: [], walkUps: [], walkUpGuest: null }
+
+interface ResolvedTicketBooking {
+  id: string
+  reference: string
+  performanceId: string
+  tickets: DeskTicketLine[]
+  owedPence: number
+}
+
+// Each booking read fresh, refused by its own status in the desk's words, and priced from what
+// its tickets snapshotted (F-122 criterion 2). Nothing here edits a booking.
+async function resolveTickets(tickets: TicketLineInput[], performanceIds: string[]): Promise<ResolvedTicketBooking[]> {
+  const bookings: ResolvedTicketBooking[] = []
+  for (const line of tickets) {
+    const booking = await tillBookingById(line.reservationId, performanceIds)
+    if (!booking) throw createError({ statusCode: 404, statusMessage: 'That booking no longer exists' })
+    if (booking.refusal) throw createError({ statusCode: 409, statusMessage: `${booking.reference}: ${booking.refusal}` })
+    const rows = await db.all<DeskTicketLine>(deskTicketsQuery(booking.id))
+    bookings.push({
+      id: booking.id,
+      reference: booking.reference,
+      performanceId: booking.performanceId,
+      tickets: rows,
+      owedPence: rows.reduce((sum, ticket) => sum + ticket.pricePaid, 0),
+    })
+  }
+  return bookings
+}
+
+interface ResolvedWalkUp {
+  performanceId: string
+  showTitle: string
+  startsAt: number
+  lines: ReservationLineToWrite[]
+  capacity: number | null
+  windowBypassed: boolean
+  holdExpiresAt: number
+  amountPence: number
+  partySize: number
+}
+
+// A walk-up is priced the way the desk prices one (D-115): tonight's houses at this venue only,
+// the desk's window bypass, no access types, and every refusal the programme would give.
+async function resolveWalkUps(walkUps: WalkUpLineInput[], performanceIds: string[], at: Date): Promise<ResolvedWalkUp[]> {
+  const byPerformance = new Map<string, WalkUpLineInput[]>()
+  for (const line of walkUps) {
+    byPerformance.set(line.performanceId, [...(byPerformance.get(line.performanceId) ?? []), line])
+  }
+
+  const resolved: ResolvedWalkUp[] = []
+  for (const [performanceId, lines] of byPerformance) {
+    if (!performanceIds.includes(performanceId)) {
+      throw createError({ statusCode: 409, statusMessage: 'The till sells walk-ups for tonight at this venue only; advance sales are on the desk' })
+    }
+    const performance = await performanceById(performanceId)
+    if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+    const refusal = saleRefusal(performance, at, 'DESK')
+    if (refusal) throw createError({ statusCode: 409, statusMessage: refusal.says })
+
+    const types = new Map((await bookableTicketTypes(performanceId, performance.showId, false, false))
+      .filter(type => type.accessKind === null)
+      .map(type => [type.id, type]))
+    const priced = lines.map((line) => {
+      const type = types.get(line.ticketTypeId)
+      if (!type) throw createError({ statusCode: 400, statusMessage: 'No such ticket type for this performance' })
+      return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source }
+    })
+
+    const releaseMinutes = resolveHoldReleaseMinutes(performance.holdReleaseMinutesBefore, await configValue(undefined, 'HOLD_RELEASE_MINUTES_BEFORE'))
+    resolved.push({
+      performanceId,
+      showTitle: performance.showTitle,
+      startsAt: performance.startsAt,
+      lines: priced,
+      capacity: effectiveCapacity(performance),
+      windowBypassed: saleRefusal(performance, at, 'CUSTOMER')?.reason === 'WINDOW_CLOSED',
+      holdExpiresAt: holdExpiresAt(performance.startsAt, releaseMinutes),
+      amountPence: priced.reduce((sum, line) => sum + line.pricePaid * line.quantity, 0),
+      partySize: priced.reduce((sum, line) => sum + line.quantity, 0),
+    })
+  }
+  return resolved
+}
+
+// The booking's move to COLLECTED rides the same batch as the money (D-114 criterion 6); the
+// predicate on the statement is what refuses a booking somebody else collected first.
+function collectionStatements(reservationId: string, actorId: string, totalPence: number): BatchItem<'sqlite'>[] {
+  return [
+    db.run(sql`
+      UPDATE reservations SET status = 'COLLECTED', hold_expires_at = NULL, updated_at = unixepoch()
+      WHERE id = ${reservationId} AND status = 'PENDING'
+    `),
+    db.insert(schema.auditLog).values(auditEntry({
+      actorId,
+      action: 'reservation.collected',
+      target: `reservation:${reservationId}`,
+      detail: { tender: 'CARD', totalPence, at: 'till' },
+    })),
+  ]
 }
 
 // A refused Challenge 25 outcome drops every restricted line rather than the whole basket: what
@@ -322,17 +453,44 @@ async function resolveTab(
 
 // The cross-check (F-104) and the one atomic write (F-105 criterion 1): the ledger entry, its
 // lines and stock, a Challenge 25 outcome and a tab charge when the basket needs them, and audit.
-export async function commitSale(
+interface PreparedSale {
+  resolved: ResolvedLine[]
+  priced: PricedLine[]
+  discount: Discount | null
+  restricted: number[]
+  soldResolved: ResolvedLine[]
+  soldPriced: PricedLine[]
+  refusedPriced: PricedLine[]
+  bookings: ResolvedTicketBooking[]
+  walkUps: ResolvedWalkUp[]
+  ticketsPence: number
+  walkUpsPence: number
+  soldTotalPence: number
+}
+
+// Everything the commit checks before it writes, so a SumUp hand-off can run the identical
+// cross-check at the start and again at the answer (F-104, F-124 criteria 2 and 4).
+async function prepareSale(
   lines: BasketLineInput[],
   on: string,
   expectedTotalPence: number,
   ageCheck: InlineAgeCheckInput | null,
   discountId: string | null,
-  tabHolderId: string | null,
   context: SaleContext,
-): Promise<SaleReceipt> {
-  const { resolved, priced, discount } = await resolveSale(lines, on, discountId)
+  extras: SaleExtras,
+): Promise<PreparedSale> {
+  const { resolved, priced, discount } = lines.length > 0
+    ? await resolveSale(lines, on, discountId)
+    : { resolved: [], priced: [], discount: await resolveDiscount(discountId) }
   const { restricted, sold } = saleableAfterAgeCheck(resolved, priced, ageCheck)
+
+  // Ticket money is read against the database as it stands now, never from what the screen
+  // showed, so a booking collected at the desk meanwhile refuses here (F-122, F-124 criterion 4).
+  const performanceIds = context.performanceIds ?? (context.performanceId ? [context.performanceId] : [])
+  const bookings = await resolveTickets(extras.tickets, performanceIds)
+  const walkUps = await resolveWalkUps(extras.walkUps, performanceIds, new Date())
+  const ticketsPence = bookings.reduce((sum, booking) => sum + booking.owedPence, 0)
+  const walkUpsPence = walkUps.reduce((sum, walkUp) => sum + walkUp.amountPence, 0)
 
   // No route sells a restricted line without an outcome on record first (F-106 criteria 1, 5).
   if (restricted.length > 0 && !ageCheck) {
@@ -346,7 +504,9 @@ export async function commitSale(
   const soldResolved = sold.map(index => resolved[index]!)
   const soldPriced = sold.map(index => priced[index]!)
   const refusedPriced = restricted.filter(index => !sold.includes(index)).map(index => priced[index]!)
-  const soldTotalPence = soldPriced.reduce((sum, line) => sum + line.amountPence - line.discountPence, 0)
+  const barPence = soldPriced.reduce((sum, line) => sum + line.amountPence - line.discountPence, 0)
+  // A discount never touches a ticket line (F-122 criterion 4): the bar subtotal is what it cut.
+  const soldTotalPence = barPence + ticketsPence + walkUpsPence
 
   if (soldTotalPence !== expectedTotalPence) {
     throw createError({
@@ -355,21 +515,91 @@ export async function commitSale(
     })
   }
 
+  return { resolved, priced, discount, restricted, soldResolved, soldPriced, refusedPriced, bookings, walkUps, ticketsPence, walkUpsPence, soldTotalPence }
+}
+
+// The cross-check alone, for a basket about to be handed to the SumUp app (F-124 criterion 2):
+// refused here means the app is never opened for it.
+export async function priceSaleForAttempt(input: SaleInput, on: string, context: SaleContext): Promise<number> {
+  const prepared = await prepareSale(input.lines, on, input.expectedTotalPence, input.ageCheck, input.discountId, context,
+    { tickets: input.tickets, walkUps: input.walkUps, walkUpGuest: input.walkUpGuest })
+  return prepared.soldTotalPence
+}
+
+export async function commitSale(
+  lines: BasketLineInput[],
+  on: string,
+  expectedTotalPence: number,
+  ageCheck: InlineAgeCheckInput | null,
+  discountId: string | null,
+  tabHolderId: string | null,
+  context: SaleContext,
+  extras: SaleExtras = NO_EXTRAS,
+): Promise<SaleReceipt> {
+  const { priced, discount, restricted, soldResolved, soldPriced, refusedPriced, bookings, walkUps, soldTotalPence }
+    = await prepareSale(lines, on, expectedTotalPence, ageCheck, discountId, context, extras)
+
   // Only relevant when there is something to charge: a full age-check refusal leaves nothing for
-  // any tender to apply to.
+  // any tender to apply to. The form already refused a tab over any ticket line (criterion 5).
   const tab = soldResolved.length > 0 ? await resolveTab(tabHolderId, context.actorId, context.night, soldTotalPence) : null
+
+  // A walk-up's reservation is its own write first, exactly as the desk's is (D-115, 0001): the
+  // capacity predicate on its tickets decides, and a refused house refuses the whole basket.
+  const booker = extras.walkUpGuest ? await guestAccount(extras.walkUpGuest.email, extras.walkUpGuest.name) : null
+  const written: Array<ResolvedWalkUp & { reservationId: string, reference: string, tickets: { id: string, pricePaid: number }[] }> = []
+  for (const walkUp of walkUps) {
+    const result = await writeReservation({
+      performanceId: walkUp.performanceId,
+      userId: booker?.id ?? null,
+      source: 'DOOR',
+      windowBypassed: walkUp.windowBypassed,
+      lines: walkUp.lines,
+      capacity: walkUp.capacity,
+      holdExpiresAt: walkUp.holdExpiresAt,
+    })
+    if (result.tickets.length < result.requested) {
+      throw createError({ statusCode: 409, statusMessage: `${walkUp.showTitle} no longer has room for that order. Nothing has been charged.` })
+    }
+    written.push({ ...walkUp, reservationId: result.id, reference: result.reference, tickets: result.tickets })
+  }
 
   const statements: BatchItem<'sqlite'>[] = []
   let entryId: string | null = null
 
-  if (soldResolved.length > 0) {
+  // Collections precede the lines that cite them: the ledger's trigger refuses a ticket line
+  // whose booking is not COLLECTED (0001, D-114 criterion 6).
+  for (const booking of bookings) statements.push(...collectionStatements(booking.id, context.actorId, booking.owedPence))
+  for (const walkUp of written) statements.push(...collectionStatements(walkUp.reservationId, context.actorId, walkUp.amountPence))
+
+  const ticketLines: EntryInput['lines'] = [
+    ...bookings.flatMap(booking => booking.tickets.map(ticket => ({
+      kind: 'TICKET_COLLECTION' as const,
+      amountPence: ticket.pricePaid,
+      qty: 1,
+      unitPricePence: ticket.pricePaid,
+      reservationId: booking.id,
+      ticketId: ticket.ticketId,
+      performanceId: booking.performanceId,
+    }))),
+    ...written.flatMap(walkUp => walkUp.tickets.map(ticket => ({
+      kind: 'WALK_UP' as const,
+      amountPence: ticket.pricePaid,
+      qty: 1,
+      unitPricePence: ticket.pricePaid,
+      reservationId: walkUp.reservationId,
+      ticketId: ticket.id,
+      performanceId: walkUp.performanceId,
+    }))),
+  ]
+
+  if (soldResolved.length > 0 || ticketLines.length > 0) {
     const posted = postEntry({
       source: 'TILL',
       tender: tab ? 'TAB' : 'CARD',
       actorId: context.actorId,
       tabDebtorId: tab?.holderId ?? null,
-      lines: soldResolved.map((line, index) => ({
-        kind: 'BAR_ITEM',
+      lines: [...soldResolved.map((line, index) => ({
+        kind: 'BAR_ITEM' as const,
         // Net of the discount: what actually moved, the ledger's own meaning for the column
         // (F-117 criterion 3). The gross figure and the cut that reached it are its own columns.
         amountPence: line.amountPence - soldPriced[index]!.discountPence,
@@ -383,7 +613,7 @@ export async function commitSale(
         discountPence: soldPriced[index]!.discountPence || null,
         // Without this a matinee sale is invisible to its own report (E-127 criterion 6).
         performanceId: context.performanceId,
-      })),
+      })), ...ticketLines],
     })
     statements.push(...posted.statements)
     // Every movement cites the sale line that caused it (F-105 criterion 3), which is only known
@@ -410,6 +640,7 @@ export async function commitSale(
         venueId: context.venueId,
         night: context.night,
         lines: soldResolved.length,
+        ticketLines: ticketLines.length,
         discountId: discount?.id ?? null,
         tender: tab ? 'TAB' : 'CARD',
       },
@@ -463,8 +694,42 @@ export async function commitSale(
       const refusal = ageCheckConstraintRefusal(error)
       if (refusal) throw createError(refusal)
     }
+    // A booking the desk collected between the read and the write: the guarded UPDATE matched
+    // nothing, so the trigger refused its line and the batch rolled back (0001).
+    if (error instanceof Error && error.message.includes('ledger_lines_ticket_collection_needs_collected_reservation')) {
+      throw createError({ statusCode: 409, statusMessage: 'One of those bookings was collected elsewhere just now. Nothing has been charged: look it up again.' })
+    }
     throw error
   }
+
+  // The door pass (F-123 criterion 4), and the email for a booker who gave an address (criterion 2).
+  const walkUpReceipts: WalkUpReceipt[] = []
+  for (const walkUp of written) {
+    const token = await qrTokenFor(walkUp.reservationId)
+    const url = `${context.baseURL ?? ''}/qr/${token}`
+    walkUpReceipts.push({
+      reservationId: walkUp.reservationId,
+      reference: walkUp.reference,
+      performanceId: walkUp.performanceId,
+      showTitle: walkUp.showTitle,
+      partySize: walkUp.partySize,
+      amountPence: walkUp.amountPence,
+      qrUrl: url,
+      qrSvg: qrSvgBase64(url),
+    })
+    if (booker) {
+      await sendWalkUpPaid(context.event, {
+        userId: booker.id,
+        reference: walkUp.reference,
+        showTitle: walkUp.showTitle,
+        startsAt: walkUp.startsAt,
+        paidPence: walkUp.amountPence,
+        qrToken: token,
+      })
+    }
+  }
+
+  const collected: CollectedTicketLine[] = bookings.map(booking => ({ reservationId: booking.id, reference: booking.reference, amountPence: booking.owedPence }))
 
   return {
     entryId,
@@ -475,6 +740,8 @@ export async function commitSale(
     discount: publicDiscount(discount),
     tab: tab ? { holderName: tab.holderName, outstandingPence: tab.outstandingPence + soldTotalPence, capOverridden: tab.capOverridden } : null,
     comp: null,
+    tickets: collected,
+    walkUps: walkUpReceipts,
   }
 }
 
@@ -525,7 +792,7 @@ export async function commitCompSale(
   }
 
   if (soldResolved.length === 0) {
-    return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: null, refusedLines: refusedPriced, tab: null, discount: null, comp: null }
+    return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: null, refusedLines: refusedPriced, tab: null, discount: null, comp: null, tickets: [], walkUps: [] }
   }
 
   const entryId = newId()
@@ -626,5 +893,7 @@ export async function commitCompSale(
     tab: null,
     discount: null,
     comp: { reason: request.reason, foregonePence },
+    tickets: [],
+    walkUps: [],
   }
 }

@@ -1,6 +1,6 @@
 // The old estate's programme, catalogue and schedule rather than a person (K-113). 0059's
 // NOT_ANONYMISED guard is unused: nothing here is keyed to a user.
-import { nanoid } from './lib'
+import { idFor, nanoid, parseStamp } from './lib'
 import { londonDayOf } from '../shared/utils/ledger'
 import type { Database } from 'bun:sqlite'
 
@@ -109,6 +109,10 @@ export interface TransformInput {
   showIds: Map<string, string>
   warningIds: Map<string, string>
   performanceIds: Map<string, string>
+  // Old show id to the poster's unified R2 key, written by copy-posters.ts; absent means null.
+  posterKeys?: Map<string, string>
+  // Old ticket type id to the unified one (catalogue.ts); absent means overrides are not imported.
+  ticketTypeIds?: Map<string, string>
   target: Database
 }
 
@@ -118,30 +122,27 @@ export interface Summary {
   categories: number
   shows: number
   droppedExternalUrls: number
+  postersLinked: number
+  showOverrides: number
+  performanceOverrides: number
   narrowedLatecomerPolicies: number
   contentWarnings: number
   showContentWarnings: number
   performances: number
 }
 
-function idFor(map: Map<string, string>, key: string): string {
-  const existing = map.get(key)
-  if (existing) return existing
-  const fresh = nanoid()
-  map.set(key, fresh)
-  return fresh
-}
-
 function parseUtc(stamp: string): number {
-  return toSeconds(new Date(`${stamp.replace(' ', 'T')}Z`).getTime())
+  return parseStamp(stamp) ?? 0
 }
 
 // One pass, dependency order throughout: venues and seasons before shows, shows before
 // performances and their warnings, because every later insert is a real foreign key (0043).
 export function transformProgramme(input: TransformInput): { summary: Summary, exceptions: string[] } {
   const { source, venueIds, seasonIds, categoryIds, showIds, warningIds, performanceIds, target } = input
+  const posterKeys = input.posterKeys ?? new Map<string, string>()
   const exceptions: string[] = []
   let droppedExternalUrls = 0
+  let postersLinked = 0
   let narrowedLatecomerPolicies = 0
 
   const venues = source.query('SELECT id, name, address, capacity, description, is_external FROM venues').all() as OldVenue[]
@@ -202,21 +203,26 @@ export function transformProgramme(input: TransformInput): { summary: Summary, e
       else if (show.latecomer_policy === 'SUITABLE_BREAK' || show.latecomer_policy === 'ANY_TIME') narrowedLatecomerPolicies++
     }
 
+    // A poster copied by copy-posters.ts lands by key; one uploaded through the app since is
+    // never overwritten by a rerun (COALESCE keeps the held key when the map has none).
+    const posterKey = posterKeys.get(show.id) ?? null
+    if (posterKey) postersLinked++
     target.query(`
       INSERT INTO shows
         (id, slug, title, subtitle, description, long_description, poster_key, category_id, season_id,
          age_guidance, latecomer_policy, warnings_confirmed_none, content_notes, booking_closes_hours_before,
          status, production_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?)
       ON CONFLICT (id) DO UPDATE SET
         slug = excluded.slug, title = excluded.title, subtitle = excluded.subtitle,
         description = excluded.description, long_description = excluded.long_description,
+        poster_key = COALESCE(excluded.poster_key, shows.poster_key),
         category_id = excluded.category_id, season_id = excluded.season_id, age_guidance = excluded.age_guidance,
         latecomer_policy = excluded.latecomer_policy, warnings_confirmed_none = excluded.warnings_confirmed_none,
         content_notes = excluded.content_notes, status = excluded.status, updated_at = excluded.updated_at
     `).run(
       idFor(showIds, show.id), show.slug, show.title, show.subtitle, show.description, show.long_description,
-      categoryId, seasonId, show.age_guidance, latecomerPolicy, show.warnings_confirmed_none,
+      posterKey, categoryId, seasonId, show.age_guidance, latecomerPolicy, show.warnings_confirmed_none,
       show.content_warning_notes, show.status, parseUtc(show.created_at), parseUtc(show.updated_at),
     )
   }
@@ -287,6 +293,39 @@ export function transformProgramme(input: TransformInput): { summary: Summary, e
     performancesWritten++
   }
 
+  // Price overrides ride the same run once ticket types exist (D-120's NULL-means-inherit shape).
+  let showOverrides = 0
+  let performanceOverrides = 0
+  if (input.ticketTypeIds) {
+    interface OldOverride { id: string, show_id?: string, performance_id?: string, ticket_type_id: string, price: number | null, active: number | null }
+    for (const row of source.query('SELECT id, show_id, ticket_type_id, price, active FROM show_ticket_type_overrides').all() as OldOverride[]) {
+      const showId = showIds.get(row.show_id!)
+      const typeId = input.ticketTypeIds.get(row.ticket_type_id)
+      if (!showId || !typeId) {
+        exceptions.push(`show override ${row.id}: show or ticket type did not import, dropped`)
+        continue
+      }
+      target.query(`
+        INSERT INTO show_ticket_overrides (id, show_id, ticket_type_id, price, active) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT (show_id, ticket_type_id) DO UPDATE SET price = excluded.price, active = excluded.active
+      `).run(nanoid(), showId, typeId, row.price === null ? null : Math.max(row.price, 0), row.active)
+      showOverrides++
+    }
+    for (const row of source.query('SELECT id, performance_id, ticket_type_id, price, active FROM performance_ticket_type_overrides').all() as OldOverride[]) {
+      const performanceId = performanceIds.get(row.performance_id!)
+      const typeId = input.ticketTypeIds.get(row.ticket_type_id)
+      if (!performanceId || !typeId) {
+        exceptions.push(`performance override ${row.id}: performance or ticket type did not import, dropped`)
+        continue
+      }
+      target.query(`
+        INSERT INTO performance_ticket_overrides (id, performance_id, ticket_type_id, price, active) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT (performance_id, ticket_type_id) DO UPDATE SET price = excluded.price, active = excluded.active
+      `).run(nanoid(), performanceId, typeId, row.price === null ? null : Math.max(row.price, 0), row.active)
+      performanceOverrides++
+    }
+  }
+
   return {
     summary: {
       venues: venues.length,
@@ -294,6 +333,9 @@ export function transformProgramme(input: TransformInput): { summary: Summary, e
       categories: categories.length,
       shows: shows.length,
       droppedExternalUrls,
+      postersLinked,
+      showOverrides,
+      performanceOverrides,
       narrowedLatecomerPolicies,
       contentWarnings: warnings.length,
       showContentWarnings: showContentWarningsWritten,

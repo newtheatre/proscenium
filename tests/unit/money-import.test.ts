@@ -74,17 +74,18 @@ describe('re-running over the same tickets writes nothing further (rehearsal saf
 })
 
 describe('a price the old estate itself was not sure of is imported, not silenced (K-114 criterion 1)', () => {
-  test('a non-EXACT confidence still posts the money, and surfaces as an exception', () => {
-    const { entries, exceptions } = transformMoney(
+  test('a non-EXACT confidence still posts the money, and is counted by value', () => {
+    const { entries, summary } = transformMoney(
       [ticket({ price_confidence: 'ESTIMATED' })], new Map(), new Map(),
     )
 
     expect(entries).toHaveLength(1)
-    expect(exceptions.some(line => line.includes('ESTIMATED'))).toBe(true)
+    expect(summary.byConfidence).toEqual({ ESTIMATED: 1 })
   })
 
-  test('an EXACT confidence raises no exception', () => {
-    const { exceptions } = transformMoney([ticket()], new Map(), new Map())
+  test('an EXACT confidence counts nothing', () => {
+    const { summary, exceptions } = transformMoney([ticket()], new Map(), new Map())
+    expect(summary.byConfidence).toEqual({})
     expect(exceptions).toEqual([])
   })
 })

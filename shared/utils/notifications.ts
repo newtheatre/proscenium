@@ -257,6 +257,16 @@ export const MESSAGE_TYPES = {
     sender: 'BOX_OFFICE',
   },
 
+  // Transactional: a walk-up sold and paid for at the bar, with the QR the door reads, to the
+  // address the booker chose to give (F-123 criterion 2).
+  'reservation.walk-up-paid': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'reservation-walk-up-paid',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
   // Transactional, same reach as the confirmation it undoes (D-110 criterion 3).
   'reservation.cancelled': {
     topic: null,

@@ -23,6 +23,7 @@ export const ROBOTS_DISALLOW = [
   '/money',
   '/my',
   '/passes',
+  '/pay',
   '/people',
   '/qr',
   '/register',

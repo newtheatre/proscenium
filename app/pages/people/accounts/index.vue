@@ -24,6 +24,7 @@ interface Account {
   hasPassword: boolean
   hasGoogle: boolean
   hasFactor: boolean
+  shadow: boolean
 }
 
 interface Listing {
@@ -33,6 +34,8 @@ interface Listing {
   total: number
   pages: number
   banners: { privilegedWithoutFactor: number, insideRetentionWindow: number }
+  // Shadow accounts the default listing left out (0071); 0 whenever they were not hidden.
+  shadowHidden: number
 }
 
 const request = useRequestFetch()
@@ -41,7 +44,7 @@ const toast = useToast()
 // Search, filters, sort and page live in the URL, so a triage list can be linked to (K-129).
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(accountsList)
 
-const empty = (): Listing => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1, banners: { privilegedWithoutFactor: 0, insideRetentionWindow: 0 } })
+const empty = (): Listing => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1, banners: { privilegedWithoutFactor: 0, insideRetentionWindow: 0 }, shadowHidden: 0 })
 
 const { data: listing, status, error, refresh } = await useAsyncData(
   'people-accounts',
@@ -74,6 +77,11 @@ async function invite(): Promise<void> {
   }
 }
 
+// Hidden shadow accounts are counted on the total line, so hidden never means lost (0071).
+const totalLine = computed(() => listing.value.shadowHidden
+  ? `${plural(listing.value.total, 'account')}, ${plural(listing.value.shadowHidden, 'shadow account')} hidden`
+  : plural(listing.value.total, 'account'))
+
 const seen = (at: number | null): string =>
   at ? formatLondon(new Date(at * 1000), { dateStyle: 'medium' }) : 'Never'
 
@@ -87,7 +95,9 @@ const columns: TableColumn<Account>[] = [
       const marks: { label: string, color: 'error' | 'warning' | 'neutral' | 'success' }[] = []
       if (row.original.anonymisedAt) marks.push({ label: 'Anonymised', color: 'neutral' })
       if (row.original.disabled) marks.push({ label: 'Disabled', color: 'error' })
-      if (!row.original.verified) marks.push({ label: 'Unverified', color: 'warning' })
+      // A shadow account never proved an address because nobody registered it (0071).
+      if (row.original.shadow) marks.push({ label: 'Shadow', color: 'neutral' })
+      else if (!row.original.verified) marks.push({ label: 'Unverified', color: 'warning' })
       if (row.original.hasFactor) marks.push({ label: 'Authenticator', color: 'success' })
       return h('div', { class: 'flex flex-wrap gap-1' }, marks.map(mark =>
         h(UBadge, { color: mark.color, variant: 'subtle', size: 'sm' }, () => mark.label)))
@@ -200,7 +210,16 @@ const columns: TableColumn<Account>[] = [
         data-test="directory-total"
         class="text-sm text-muted"
       >
-        {{ plural(listing.total, 'account') }}
+        {{ totalLine }}
+        <UButton
+          v-if="listing.shadowHidden"
+          data-test="show-shadow"
+          label="Show them"
+          variant="link"
+          size="sm"
+          class="p-0"
+          @click="show('shadow')"
+        />
       </p>
       <UPagination
         v-if="listing.pages > 1"

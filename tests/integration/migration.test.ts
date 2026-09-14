@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { buildLoad, applyLoad, loadedCounts } from '#migration/load'
 import { createCore, transformIdentity } from '#migration/identity'
+import { decideByMap } from '#migration/role-decisions'
 import { Scrypt } from '@adonisjs/hash/drivers/scrypt'
 import { erasureStatements, tombstoneEmail } from '#shared/utils/erasure'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -63,7 +64,7 @@ interface Run {
 async function importInto(source: Database, target: TestDatabase, ids = new Map<string, string>()): Promise<Run> {
   const core = await createCore(':memory:')
   try {
-    const { summary, exceptions } = transformIdentity({ auth: source, mirrors: [], roleMap: ROLE_MAP, idMap: ids, target: core })
+    const { summary, exceptions } = transformIdentity({ auth: source, mirrors: [], decisions: decideByMap(source.query('SELECT user_id, role FROM user_roles').all() as { user_id: string, role: string }[], ROLE_MAP, null), idMap: ids, target: core })
     applyLoad(buildLoad(core), target.raw)
     return { target, ids, exceptions, summary }
   }
