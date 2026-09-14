@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { reservationSeatsSubquery } from './capacity'
 import { uncollectableReason } from '#shared/utils/desk'
 import { looksLikeReference } from '#shared/utils/reservations'
 import type { SQL } from 'drizzle-orm'
@@ -24,7 +25,7 @@ interface TillBookingRow {
 const BOOKING_COLUMNS = sql`
   r.id AS id, r.reference AS reference, r.status AS status, r.performance_id AS performanceId,
   s.title AS showTitle, p.starts_at AS startsAt, v.name AS venueName, u.name AS bookerName,
-  (SELECT count(*) FROM tickets t WHERE t.reservation_id = r.id AND t.refunded_at IS NULL) AS partySize,
+  ${reservationSeatsSubquery(sql`r.id`)} AS partySize,
   (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id AND t.refunded_at IS NULL) AS owedPence
 `
 

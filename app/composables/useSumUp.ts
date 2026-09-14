@@ -1,9 +1,13 @@
 import { isHandheldUserAgent } from '#shared/utils/sumup'
+import { deviceNightCacheStore } from './useNightCache'
 
 // The till's side of a SumUp hand-off (F-124): what it remembers while the app has the screen,
 // so the basket comes back if the app says no and the answer is found if the tab was reloaded.
 
 const PENDING_KEY = 'nnt-till-sumup-attempt'
+
+// The device store belongs to the night cache (K-103); this borrows it rather than opening its own.
+const store = () => deviceNightCacheStore()
 
 export interface PendingAttempt<Basket> {
   id: string
@@ -23,7 +27,7 @@ export function useSumUp<Basket>() {
 
   function recall(): PendingAttempt<Basket> | null {
     try {
-      const raw = localStorage.getItem(PENDING_KEY)
+      const raw = store().getItem(PENDING_KEY)
       pending.value = raw ? JSON.parse(raw) as PendingAttempt<Basket> : null
     }
     catch {
@@ -35,7 +39,7 @@ export function useSumUp<Basket>() {
   function remember(attempt: PendingAttempt<Basket>): void {
     pending.value = attempt
     try {
-      localStorage.setItem(PENDING_KEY, JSON.stringify(attempt))
+      store().setItem(PENDING_KEY, JSON.stringify(attempt))
     }
     catch { /* a browser that will not keep it still gets the poll while the tab lives */ }
   }
@@ -43,7 +47,7 @@ export function useSumUp<Basket>() {
   function forget(): void {
     pending.value = null
     try {
-      localStorage.removeItem(PENDING_KEY)
+      store().removeItem(PENDING_KEY)
     }
     catch { /* nothing to forget */ }
   }
