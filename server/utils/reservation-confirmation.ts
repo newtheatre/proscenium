@@ -1,5 +1,5 @@
 import { notify } from './notify'
-import { qrSvgBase64 } from './qr'
+import { qrPng } from './qr'
 import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { H3Event } from 'h3'
@@ -20,6 +20,8 @@ export interface ConfirmationContext {
 // template with the same QR rather than a second, driftable copy (D-108 criteria 1, 2).
 export async function sendReservationConfirmation(event: H3Event | undefined, context: ConfirmationContext): Promise<void> {
   const url = `${useRuntimeConfig(event).public.baseURL}/qr/${context.qrToken}`
+  // The width is the bitmap's own, so the email never scales the code and blurs the modules.
+  const { width } = qrPng(url)
   await notify(event, {
     userId: context.userId,
     type: 'reservation.confirmed',
@@ -30,7 +32,8 @@ export async function sendReservationConfirmation(event: H3Event | undefined, co
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       totalDue: saysPrice(context.totalPence),
       url,
-      qrSvg: qrSvgBase64(url),
+      imageUrl: `${url}/image.png`,
+      qrWidth: width,
     },
   })
 }

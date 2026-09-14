@@ -765,6 +765,13 @@ whatever the lens or the keyboard produced, and answers with a reference:
 | --- | --- | --- |
 | `/qr/<token>` | What D-108's confirmation email and booking page encode | `verifyQrToken()`, then the reservation's own reference |
 | `/passes/<token>` | What D-124's pass QR encodes | `verifyPassQrToken()`, then the pass's own reference |
+
+The confirmation and pass-issued emails do not embed the code: they reference it as a hosted PNG at
+`/qr/<token>/image.png` and `/passes/<token>/image.png` (`server/routes/qr/[token]/image.png.get.ts`,
+`server/routes/passes/[token]/image.png.get.ts`), because Gmail renders neither a `data:` URI nor
+SVG. Each route verifies the token, answers a forged one with a plain 404, and renders `qrPng()`
+(`server/utils/qr.ts`, a hand-assembled greyscale PNG with no compression, since the Worker has no
+zlib) of exactly the URL the email links to, sized in the email to the bitmap's own width.
 | `/t/<ref>` | The form the show-night design names | the reference itself |
 | `K7M4PQ` | A reference read aloud, or typed by a hardware scanner | itself |
 

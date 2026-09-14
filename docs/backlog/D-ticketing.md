@@ -201,7 +201,14 @@ Open questions:
      nothing saved earlier can go stale.
   2. The confirmation email is sent once at reservation with the QR and states UNPAID prominently
      with the amount due at the desk; the booker can request a resend at any time, rate limited,
-     and a resend carries the same QR.
+     and a resend carries the same QR. The email references the QR as a hosted PNG at
+     `/qr/<token>/image.png` (a pass's at `/passes/<token>/image.png`), wrapped in the booking
+     link, with the text link underneath as the fallback for an image-blocking client.
+     Context, 14 September 2026: the email originally embedded the QR as an inline SVG
+     `data:` URI, which Gmail renders as a blank; Gmail's image proxy fetches neither `data:`
+     images nor SVG at all, so the code must be a real `https` PNG. The image route answers a
+     forged or unknown token with the same 404, and the token is the credential the email
+     already carries, so the route exposes nothing the link did not.
   3. The QR can be saved to Apple Wallet and Google Wallet from the email and from the booking
      page.
   4. Opening the QR link in a browser exchanges its signed token for a short-lived httpOnly

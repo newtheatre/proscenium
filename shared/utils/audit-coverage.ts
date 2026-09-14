@@ -205,6 +205,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/passes/current.get.ts', exempt: 'reads the pass the cookie names; nothing is written' },
   { route: 'server/routes/passes/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
+  { route: 'server/routes/passes/[token]/image.png.get.ts', exempt: 'renders the pass QR as a PNG for the email; nothing is written' },
   {
     route: 'server/api/passes/[id]/redeem.post.ts',
     actions: ['pass.redeemed'],
@@ -264,6 +265,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/performances/[id]/booking.get.ts', exempt: 'reads what the booking form needs; nothing is written' },
   { route: 'server/api/reservations/resend.post.ts', exempt: 'sends a message; the send is recorded in notification_log' },
   { route: 'server/routes/qr/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
+  { route: 'server/routes/qr/[token]/image.png.get.ts', exempt: 'renders the booking QR as a PNG for the email; nothing is written' },
   { route: 'server/routes/whats-on/[slug].get.ts', exempt: 'answers 301 for an old-site address; nothing is written' },
   { route: 'server/routes/whats-on/[slug]/[...rest].get.ts', exempt: 'answers 301 for an old-site address; nothing is written' },
   { route: 'server/routes/posters/[...key].get.ts', exempt: 'serves a poster from the blob store; nothing is written' },
