@@ -756,7 +756,10 @@ id and a screen opening cold starts on the house running now (E-127 criterion 2)
 and no booking history on screen (the show-night screen design, section 2.1). It opens the rear
 camera through `app/components/QrScanner.vue`, decoding with `BarcodeDetector` where the browser
 has it and jsQR everywhere else, and falls back to the typed reference field with one line when
-there is no camera or the permission is refused.
+there is no camera or the permission is refused. The box office desk opens the same component
+behind its "Scan with the camera" button (D-114 criterion 8); `shared/utils/desk.ts`'s
+`readDeskScan()` wraps `readScannedCode()` there, refusing a pass and accepting the bare token a
+wedge scanner types.
 
 `POST /api/tonight/door/resolve` is the one seam between a decoded code and an admission. It takes
 whatever the lens or the keyboard produced, and answers with a reference:

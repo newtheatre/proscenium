@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import {
   DESK_SALE_LINE_QUANTITY_CAP,
+  DESK_SCAN_PASS_REFUSAL,
+  DESK_SCAN_UNKNOWN_REFUSAL,
   REINSTATE_REASON_LIMIT,
   amountDueFor,
   collectForm,
   deskSaleForm,
   deskSearchForm,
+  readDeskScan,
   refundTicketForm,
   reinstateRefusal,
   reinstateReservationForm,
@@ -152,5 +155,40 @@ describe('a walk-up sale allows up to 20 a line and no order total cap (D-115 cr
   test('a name and an email are required, the same as a guest booking online', () => {
     const result = deskSaleForm.safeParse({ ...base, lines: [{ ticketTypeId: 'tt-1', quantity: 1 }], guest: undefined })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('a scanned code resolves to a token or a reference, whichever way it arrived (criterion 8)', () => {
+  const BASE = 'https://newtheatre.org.uk'
+  const TOKEN = 'r-abc123.sIgNaTuRe_-09'
+
+  test('the booking URL this build issues is a signed token for the route to verify', () => {
+    expect(readDeskScan(`${BASE}/qr/${TOKEN}`)).toEqual({ kind: 'BOOKING_TOKEN', value: TOKEN })
+  })
+
+  test('the bare token a hardware scanner types is the same token', () => {
+    expect(readDeskScan(TOKEN)).toEqual({ kind: 'BOOKING_TOKEN', value: TOKEN })
+  })
+
+  test('the /t/<ref> form the show-night design names is a reference', () => {
+    expect(readDeskScan(`${BASE}/t/k7m4pq`)).toEqual({ kind: 'REFERENCE', value: 'K7M4PQ' })
+  })
+
+  test('a bare reference is a reference, whatever its case', () => {
+    expect(readDeskScan('k7m4pq')).toEqual({ kind: 'REFERENCE', value: 'K7M4PQ' })
+  })
+
+  test('a pass is refused with the door named: the desk collects bookings', () => {
+    expect(readDeskScan(`${BASE}/passes/${TOKEN}`)).toEqual({ kind: 'REFUSED', reason: DESK_SCAN_PASS_REFUSAL })
+    expect(DESK_SCAN_PASS_REFUSAL).toContain('door')
+  })
+
+  test('a URL that is none of ours is refused as such, not looked up as a booking', () => {
+    expect(readDeskScan('https://example.com/somewhere-else')).toEqual({ kind: 'REFUSED', reason: DESK_SCAN_UNKNOWN_REFUSAL })
+  })
+
+  test('surrounding whitespace, which a scanner often appends, is ignored', () => {
+    expect(readDeskScan(`  ${BASE}/qr/${TOKEN}
+`)).toEqual({ kind: 'BOOKING_TOKEN', value: TOKEN })
   })
 })

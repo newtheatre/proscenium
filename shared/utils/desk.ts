@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { readScannedCode } from './door'
 import { guestDetailsForm } from './reservations'
 import { pageQuery } from './pagination'
 import { saysPrice } from './ticket-types'
@@ -126,4 +127,20 @@ export function reinstateRefusal(status: string, cancelledBy: string | null): st
     return 'This booking was refunded and cancelled at the desk: reinstating it would bring back a sale that was already handed back. Take a new booking instead.'
   }
   return `This booking is ${status.toLowerCase()} and cannot be reinstated.`
+}
+
+// What the desk's scan field resolves to (criterion 8): the door's four forms less the pass, plus
+// the bare token a hardware scanner types, which has no slash for `readScannedCode` to read.
+export type DeskScan = { kind: 'BOOKING_TOKEN' | 'REFERENCE', value: string } | { kind: 'REFUSED', reason: string }
+
+export const DESK_SCAN_PASS_REFUSAL = 'That is a pass; scan it at the door.'
+export const DESK_SCAN_UNKNOWN_REFUSAL = 'That code is not one of ours.'
+
+export function readDeskScan(raw: string): DeskScan {
+  const trimmed = raw.trim()
+  const code = readScannedCode(trimmed)
+  if (code?.kind === 'PASS_TOKEN') return { kind: 'REFUSED', reason: DESK_SCAN_PASS_REFUSAL }
+  if (code) return { kind: code.kind, value: code.value }
+  if (trimmed.length > 0 && !trimmed.includes('/')) return { kind: 'BOOKING_TOKEN', value: trimmed }
+  return { kind: 'REFUSED', reason: DESK_SCAN_UNKNOWN_REFUSAL }
 }
