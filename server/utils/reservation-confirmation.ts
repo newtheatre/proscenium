@@ -38,6 +38,36 @@ export async function sendReservationConfirmation(event: H3Event | undefined, co
   })
 }
 
+export interface WalkUpPaidContext {
+  userId: string
+  reference: string
+  showTitle: string
+  startsAt: number
+  paidPence: number
+  qrToken: string
+}
+
+// A walk-up sold at the bar to somebody who gave an address (F-123 criterion 2): the door reads
+// the same QR whether it arrived this way or was photographed off the till.
+export async function sendWalkUpPaid(event: H3Event | undefined, context: WalkUpPaidContext): Promise<void> {
+  const url = `${useRuntimeConfig(event).public.baseURL}/qr/${context.qrToken}`
+  const { width } = qrPng(url)
+  await notify(event, {
+    userId: context.userId,
+    type: 'reservation.walk-up-paid',
+    context: {
+      name: '',
+      reference: context.reference,
+      show: context.showTitle,
+      when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      paid: saysPrice(context.paidPence),
+      url,
+      imageUrl: `${url}/image.png`,
+      qrWidth: width,
+    },
+  })
+}
+
 export interface CancellationContext {
   userId: string
   reservationId: string

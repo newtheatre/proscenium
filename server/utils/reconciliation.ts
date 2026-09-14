@@ -24,6 +24,18 @@ export function cardSalesQuery(night: string): SQL {
   `
 }
 
+// Ticket money the bar took on its own reader (F-122 criterion 6, F-123): a booking collected
+// there and a walk-up sold there, both inside the figure the reader is expected to show.
+export function ticketsAtTheBarQuery(night: string): SQL {
+  const { fromAt, toAt } = windowOf(night)
+  return sql`
+    SELECT coalesce(sum(l.amount_pence), 0) AS ticketsPence
+    FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
+    WHERE e.source = 'TILL' AND e.tender = 'CARD' AND l.kind IN ('TICKET_COLLECTION', 'WALK_UP')
+      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+  `
+}
+
 export function tabSettlementsQuery(night: string): SQL {
   const { fromAt, toAt } = windowOf(night)
   return sql`
@@ -91,8 +103,9 @@ export function deskTakingsQuery(night: string): SQL {
 }
 
 export async function barReconciliation(night: string): Promise<BarReconciliation> {
-  const [[cardSales], [tabSettlements], [comps], [discounts], [refunds], [tabCharges]] = await Promise.all([
+  const [[cardSales], [tickets], [tabSettlements], [comps], [discounts], [refunds], [tabCharges]] = await Promise.all([
     db.all<{ cardSalesPence: number }>(cardSalesQuery(night)),
+    db.all<{ ticketsPence: number }>(ticketsAtTheBarQuery(night)),
     db.all<{ tabSettlementsPence: number }>(tabSettlementsQuery(night)),
     db.all<{ compsCount: number, compsForegonePence: number }>(compsQuery(night)),
     db.all<{ discountsPence: number }>(discountsQuery(night)),
@@ -101,18 +114,21 @@ export async function barReconciliation(night: string): Promise<BarReconciliatio
   ])
 
   const cardSalesPence = cardSales?.cardSalesPence ?? 0
+  const ticketsPence = tickets?.ticketsPence ?? 0
   const tabSettlementsPence = tabSettlements?.tabSettlementsPence ?? 0
   return {
     night,
     cardSalesPence,
+    ticketsPence,
     tabSettlementsPence,
     compsCount: comps?.compsCount ?? 0,
     compsForegonePence: comps?.compsForegonePence ?? 0,
     discountsPence: discounts?.discountsPence ?? 0,
     refundsPence: refunds?.refundsPence ?? 0,
     tabChargesPence: tabCharges?.tabChargesPence ?? 0,
-    // Criterion 1: the expected reader total is bar card sales plus tab settlements.
-    expectedPence: cardSalesPence + tabSettlementsPence,
+    // Criterion 1: the expected reader total is bar card sales, tickets taken at the bar
+    // (F-122 criterion 6) and tab settlements.
+    expectedPence: cardSalesPence + ticketsPence + tabSettlementsPence,
   }
 }
 

@@ -35,6 +35,16 @@ export default defineEventHandler(async (event) => {
 
   const account = await closerFor(event, session)
 
+  // Money may still be arriving on the reader for a hand-off nobody has answered for; the Z
+  // cannot be reconciled around it (F-124 criterion 6). A mismatch is a fact, not a wait.
+  const waiting = await openAttemptCount(session.night, session.venueId)
+  if (waiting > 0) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `${waiting} SumUp ${waiting === 1 ? 'payment is' : 'payments are'} still waiting for an answer. Resolve ${waiting === 1 ? 'it' : 'them'} on the till first.`,
+    })
+  }
+
   // Recomputed here, never trusted from an earlier preview read: the ledger may have gained a
   // sale between the officer opening the close screen and pressing confirm.
   const bar = await barReconciliation(session.night)

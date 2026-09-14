@@ -99,6 +99,12 @@ export default defineNuxtConfig({
     // Base64 HMAC key signing a waiting-list entry's claim and removal token (D-113). A worker
     // secret: nothing outside this app ever verifies one.
     waitingListTokenSecret: '',
+    // The SumUp app hand-off (F-124, 0069): both from the merchant dashboard, both worker secrets.
+    // Nested, so an installation that has not set them is not nagged; unset means the typed flow.
+    sumup: {
+      affiliateKey: '',
+      appId: '',
+    },
     public: {
       // Every emailed link is built from this. NUXT_PUBLIC_BASE_URL overrides it, and development
       // points at the local port so a verification link in .data/mail is one that works.
@@ -138,7 +144,7 @@ export default defineNuxtConfig({
     // Mirrored one-for-one by the cron triggers below; the two lists must not drift, and every
     // name here has a handler under server/tasks (docs/architecture.md, Scheduled tasks).
     scheduledTasks: {
-      '*/10 * * * *': ['holds:release', 'health:watch', 'notifications:retry', 'notifications:digest', 'waiting-list:sweep'],
+      '*/10 * * * *': ['holds:release', 'health:watch', 'notifications:retry', 'notifications:digest', 'waiting-list:sweep', 'payments:sweep'],
       '0 6 * * *': ['training:expiry-sweep'],
       '0 7 * * *': ['shifts:escalate'],
       '0 8 * * *': ['rooms:sweep'],

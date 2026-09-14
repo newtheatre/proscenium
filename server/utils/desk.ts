@@ -77,7 +77,7 @@ export function deskSearchQuery(performanceId: string, q: string | undefined, st
     SELECT r.id AS id, r.reference AS reference, r.status AS status, u.name AS bookerName,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id AND t.refunded_at IS NULL) AS totalPence
     FROM reservations r
-    JOIN users u ON u.id = r.user_id
+    LEFT JOIN users u ON u.id = r.user_id
     WHERE r.performance_id = ${performanceId}${searchPredicate(q)}${statusPredicate(status)}
     ORDER BY r.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
@@ -88,7 +88,7 @@ export function countDeskSearchQuery(performanceId: string, q: string | undefine
   return sql`
     SELECT count(*) AS total
     FROM reservations r
-    JOIN users u ON u.id = r.user_id
+    LEFT JOIN users u ON u.id = r.user_id
     WHERE r.performance_id = ${performanceId}${searchPredicate(q)}${statusPredicate(status)}
   `
 }
@@ -142,7 +142,7 @@ export function deskReservationQuery(id: string): SQL {
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
     JOIN shows s ON s.id = p.show_id
-    JOIN users u ON u.id = r.user_id
+    LEFT JOIN users u ON u.id = r.user_id
     WHERE r.id = ${id}
   `
 }

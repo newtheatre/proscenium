@@ -143,7 +143,7 @@ async function record(): Promise<void> {
               <td class="py-2">
                 Bar card sales
               </td>
-              <td>{{ saysMoney(data.expected.bar.cardSalesPence) }}</td>
+              <td>{{ saysMoney(data.expected.bar.cardSalesPence + data.expected.bar.ticketsPence) }}</td>
             </tr>
             <tr>
               <td class="py-2">

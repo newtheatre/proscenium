@@ -555,6 +555,16 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Who opened and closed a night\'s till is the accountable record the reconciliation reads (F-118); the tombstone still answers for it.',
   },
   {
+    name: 'sumup_attempts',
+    column: 'created_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // The basket names bookings and products by id and a walk-up's guest by nothing at all: the
+    // guest becomes an account row, which is where their name lives and is scrubbed (F-124).
+    why: 'Who handed a basket to the SumUp app and who answered for it is what a reader figure the ledger cannot explain audits to (F-124); the tombstone still answers for both.',
+  },
+  {
     name: 'stocktakes',
     column: 'opened_by',
     section: null,

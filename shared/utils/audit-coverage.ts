@@ -582,7 +582,27 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/discounts.get.ts', exempt: 'reads the active discounts the till may apply, writing nothing' },
   { route: 'server/api/till/tab-holders.get.ts', exempt: 'reads who the till may charge a sale to, writing nothing' },
   { route: 'server/api/till/price.post.ts', exempt: 'prices a basket against live prices; nothing is written until F-104 and F-105 land the sale write' },
-  { route: 'server/api/till/sale.post.ts', actions: ['bar.till.sale', 'age-check.logged', 'bar.tab.cap-overridden'], via: ['server/utils/sale.ts'] },
+  {
+    route: 'server/api/till/sale.post.ts',
+    actions: ['bar.till.sale', 'age-check.logged', 'bar.tab.cap-overridden', 'reservation.collected', 'account.created.guest'],
+    via: ['server/utils/sale.ts', 'server/utils/reservations.ts'],
+  },
+  { route: 'server/api/till/bookings/index.get.ts', exempt: 'reads a booking for the Tickets tab, writing nothing' },
+  { route: 'server/api/till/bookings/scan.post.ts', exempt: 'resolves a scanned code to a booking, writing nothing' },
+  { route: 'server/api/till/walk-up-options.get.ts', exempt: 'reads what a walk-up may be sold as, writing nothing' },
+  { route: 'server/api/till/payments/index.post.ts', actions: ['bar.sumup.started'], via: ['server/utils/sumup-attempts.ts'] },
+  { route: 'server/api/till/payments/index.get.ts', exempt: 'reads tonight\'s unresolved SumUp hand-offs, writing nothing' },
+  { route: 'server/api/till/payments/[id]/index.get.ts', exempt: 'reads one hand-off\'s state for the till to poll, writing nothing' },
+  {
+    route: 'server/api/till/payments/[id]/complete.post.ts',
+    actions: ['bar.sumup.claimed', 'bar.sumup.completed', 'bar.sumup.mismatched', 'bar.sumup.resolved', 'bar.till.sale', 'age-check.logged', 'reservation.collected', 'account.created.guest'],
+    via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/reservations.ts'],
+  },
+  {
+    route: 'server/api/till/payments/[id]/resolve.post.ts',
+    actions: ['bar.sumup.claimed', 'bar.sumup.completed', 'bar.sumup.mismatched', 'bar.sumup.resolved', 'bar.till.sale', 'age-check.logged', 'reservation.collected', 'account.created.guest'],
+    via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/reservations.ts'],
+  },
   { route: 'server/api/till/comp-requests/index.get.ts', exempt: 'reads tonight\'s pending comp requests, writing nothing' },
   { route: 'server/api/till/comp-requests/index.post.ts', actions: ['bar.comp-request.created'], via: ['server/utils/comps.ts'] },
   {

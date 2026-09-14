@@ -1435,6 +1435,31 @@ Open your booking: ${url}
 The Nottingham New Theatre`,
     }
   },
+  // A walk-up already paid for at the bar (F-123 criterion 2): the same QR as a reservation, and
+  // nothing about money due, because there is none.
+  'reservation-walk-up-paid': (context: TemplateContext): Rendered => {
+    const reference = String(context.reference)
+    const show = String(context.show)
+    const when = String(context.when)
+    const paid = String(context.paid)
+    const url = String(context.url)
+    const imageUrl = String(context.imageUrl)
+    const qrWidth = String(context.qrWidth)
+    return {
+      subject: `Your tickets for ${show}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>Reference <strong>${reference}</strong> for ${show}, ${when}: ${paid}, paid at the bar.</p>
+<p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
+<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
+      text: `Hello ${context.name},
+
+Reference ${reference} for ${show}, ${when}: ${paid}, paid at the bar.
+
+Show this code at the door, or open it yourself: ${url}
+
+The Nottingham New Theatre`,
+    }
+  },
   // D-110 criterion 3: the confirmation this undoes, so the wording answers the same three
   // questions (which booking, which show, who cancelled it) rather than inventing a fourth shape.
   'reservation-cancelled': (context: TemplateContext): Rendered => {

@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { londonClock } from '#shared/utils/london'
+import { formatLondon, londonClock } from '#shared/utils/london'
 import { ID_TYPES, REFUSAL_REASONS, saysIdType, saysRefusalReason } from '#shared/utils/age-checks'
 import { says, saysMoney } from '#shared/utils/bar'
 import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import { nightCacheKey } from '#shared/utils/night-cache'
 import { currentShowNight } from '#shared/utils/show-night'
+import { saysAttemptStatus } from '#shared/utils/sumup'
 import type { IdType, InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
 import type { Discount } from '#shared/utils/discounts'
-import type { PricedBasket, PricedLine, SaleCatalogue, SaleChoice, SaleProduct, SaleReceipt, SaleVariant } from '#shared/utils/sale'
+import type { PricedBasket, PricedLine, SaleCatalogue, SaleChoice, SaleProduct, SaleReceipt, SaleVariant, TillBooking, WalkUpOption } from '#shared/utils/sale'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
+import type { SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
 import type { TillSession } from '#shared/utils/till'
+import type { ScannerFailure } from '~/composables/useQrScanner'
 
 definePageMeta({ layout: 'tonight' })
 useSeoMeta({ title: 'Till' })
@@ -26,16 +29,18 @@ const failure = ref<string | null>(null)
 const busy = ref(false)
 const session = ref<TillSession | null>(null)
 const venueId = ref<string | null>(null)
+const sumupEnabled = ref(false)
 
 async function load(): Promise<void> {
   busy.value = true
   failure.value = null
   try {
-    const status = await request<{ night: string, venueId: string, session: TillSession | null }>('/api/till', {
+    const status = await request<{ night: string, venueId: string, session: TillSession | null, sumupEnabled: boolean }>('/api/till', {
       query: { venueId: requestedVenueId.value },
     })
     session.value = status.session
     venueId.value = status.venueId
+    sumupEnabled.value = status.sumupEnabled
     syncedAt.value = new Date()
   }
   catch (refused) {
@@ -226,6 +231,152 @@ function decrementLine(line: BasketLine): void {
   else line.qty -= 1
 }
 
+// Two panes over one basket (F-122): the drinks grid, and the bookings and walk-ups.
+const pane = ref<'bar' | 'tickets'>('bar')
+
+// The Tickets pane's lookup: the camera (E-129's scanner), a reference, or a name.
+const cameraOpen = ref(false)
+const cameraNote = ref<string | null>(null)
+const lookupTerm = ref('')
+const lookingUp = ref(false)
+const lookupFailure = ref<string | null>(null)
+const found = ref<TillBooking[]>([])
+
+const cameraSays: Record<ScannerFailure, string> = {
+  NO_CAMERA: 'No camera on this device, so type the reference or a name.',
+  REFUSED: 'Camera access refused, so type the reference or a name. Allow it in the site settings to scan.',
+  BROKEN: 'The camera would not start, so type the reference or a name.',
+}
+
+function openCamera(): void {
+  cameraNote.value = null
+  lookupFailure.value = null
+  cameraOpen.value = true
+}
+
+function fallBackToTyping(failure: ScannerFailure): void {
+  cameraOpen.value = false
+  cameraNote.value = cameraSays[failure]
+}
+
+async function lookUp(): Promise<void> {
+  const q = lookupTerm.value.trim()
+  if (q.length < 2 || !venueId.value) return
+  lookingUp.value = true
+  lookupFailure.value = null
+  found.value = []
+  try {
+    const answered = await $fetch<{ bookings: TillBooking[] }>('/api/till/bookings', { query: { venueId: venueId.value, q } })
+    found.value = answered.bookings
+    if (found.value.length === 0) lookupFailure.value = `Nothing matching "${q}" on tonight's performances here.`
+  }
+  catch (refused) {
+    lookupFailure.value = refusalText(refused)
+  }
+  finally {
+    lookingUp.value = false
+  }
+}
+
+async function scanDecoded(value: string): Promise<void> {
+  if (lookingUp.value || !venueId.value) return
+  cameraOpen.value = false
+  lookingUp.value = true
+  lookupFailure.value = null
+  found.value = []
+  try {
+    const answered = await $fetch<{ booking: TillBooking }>('/api/till/bookings/scan', {
+      method: 'POST',
+      body: { venueId: venueId.value, scanned: value.trim() },
+    })
+    found.value = [answered.booking]
+  }
+  catch (refused) {
+    lookupFailure.value = refusalText(refused)
+  }
+  finally {
+    lookingUp.value = false
+  }
+}
+
+// Bookings whose money is in the basket (F-122 criterion 2): each once, and only a pending one.
+const ticketLines = ref<TillBooking[]>([])
+const ticketsPence = computed(() => ticketLines.value.reduce((sum, booking) => sum + booking.owedPence, 0))
+
+function addBooking(booking: TillBooking): void {
+  if (booking.refusal || ticketLines.value.some(line => line.id === booking.id)) return
+  ticketLines.value.push(booking)
+  found.value = []
+  lookupTerm.value = ''
+}
+
+function removeBooking(id: string): void {
+  ticketLines.value = ticketLines.value.filter(line => line.id !== id)
+}
+
+// A walk-up (F-123): one of tonight's houses here, a type at a quantity, and an optional guest.
+const authority = useNightAuthority()
+const walkUpPerformanceId = ref<string | undefined>(undefined)
+const walkUpOptions = ref<WalkUpOption[]>([])
+const walkUpOptionsFailure = ref<string | null>(null)
+const walkUpQty = ref<Record<string, number>>({})
+const walkUpGuestName = ref('')
+const walkUpGuestEmail = ref('')
+
+interface WalkUpLine { performanceId: string, showTitle: string, ticketTypeId: string, typeName: string, quantity: number, unitPrice: number }
+const walkUpLines = ref<WalkUpLine[]>([])
+const walkUpsPence = computed(() => walkUpLines.value.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0))
+
+const tonightsPerformances = computed(() => authority.value.performances)
+watch(tonightsPerformances, (performances) => {
+  if (!walkUpPerformanceId.value && performances.length === 1) walkUpPerformanceId.value = performances[0]!.id
+}, { immediate: true })
+
+watch(walkUpPerformanceId, async (performanceId) => {
+  walkUpOptions.value = []
+  walkUpQty.value = {}
+  walkUpOptionsFailure.value = null
+  if (!performanceId || !venueId.value) return
+  try {
+    const answered = await $fetch<{ options: WalkUpOption[] }>('/api/till/walk-up-options', { query: { venueId: venueId.value, performanceId } })
+    walkUpOptions.value = answered.options
+  }
+  catch (refused) {
+    walkUpOptionsFailure.value = refusalText(refused)
+  }
+})
+
+function bumpWalkUp(typeId: string, by: number): void {
+  walkUpQty.value[typeId] = Math.max(0, Math.min(20, (walkUpQty.value[typeId] ?? 0) + by))
+}
+
+function addWalkUps(): void {
+  const performance = tonightsPerformances.value.find(one => one.id === walkUpPerformanceId.value)
+  if (!performance) return
+  for (const option of walkUpOptions.value) {
+    const quantity = walkUpQty.value[option.id] ?? 0
+    if (quantity === 0) continue
+    const existing = walkUpLines.value.find(line => line.performanceId === performance.id && line.ticketTypeId === option.id)
+    if (existing) existing.quantity = Math.min(20, existing.quantity + quantity)
+    else walkUpLines.value.push({ performanceId: performance.id, showTitle: performance.showTitle, ticketTypeId: option.id, typeName: option.name, quantity, unitPrice: option.price })
+  }
+  walkUpQty.value = {}
+}
+
+function removeWalkUp(line: WalkUpLine): void {
+  walkUpLines.value = walkUpLines.value.filter(entry => entry !== line)
+}
+
+const walkUpGuest = computed(() => {
+  const name = walkUpGuestName.value.trim()
+  const email = walkUpGuestEmail.value.trim()
+  return name && email ? { name, email } : null
+})
+const walkUpGuestIncomplete = computed(() => Boolean(walkUpGuestName.value.trim()) !== Boolean(walkUpGuestEmail.value.trim()))
+
+const hasTicketMoney = computed(() => ticketLines.value.length > 0 || walkUpLines.value.length > 0)
+const basketEmpty = computed(() => basket.value.length === 0 && !hasTicketMoney.value)
+
 const priced = ref<PricedBasket | null>(null)
 const pricing = ref(false)
 const priceFailure = ref<string | null>(null)
@@ -271,7 +422,21 @@ watch([basket, selectedDiscountId], () => {
 
 const charging = ref(false)
 const chargeFailure = ref<string | null>(null)
-const charged = ref<{ totalPence: number, refusedLines: PricedLine[], discount: SaleReceipt['discount'], tab: SaleReceipt['tab'] } | null>(null)
+const charged = ref<{
+  totalPence: number
+  refusedLines: PricedLine[]
+  discount: SaleReceipt['discount']
+  tab: SaleReceipt['tab']
+  tickets: SaleReceipt['tickets']
+  walkUps: SaleReceipt['walkUps']
+  viaSumup: boolean
+} | null>(null)
+
+// The one figure the reader takes (F-122 criterion 3): the bar net of any discount, plus every
+// booking's amount owed and every walk-up, none of which a discount touches (criterion 4).
+const grandTotalPence = computed(() => (basket.value.length ? priced.value?.totalPence ?? null : 0) === null
+  ? null
+  : (basket.value.length ? priced.value!.totalPence : 0) + ticketsPence.value + walkUpsPence.value)
 
 // A restricted line is the product's flag, already on the catalogue this screen holds: no second
 // lookup, and no route sells one without an outcome on record first (F-106 criteria 1, 5).
@@ -293,39 +458,67 @@ function resetAgeCheck(): void {
   ageCheckError.value = null
 }
 
+// What every charge sends, whichever way the money is taken: the same body the sale route and
+// the hand-off both cross-check (F-104, F-124 criterion 2).
+function saleBody(ageCheck: InlineAgeCheckInput | null, expectedTotalPence: number) {
+  return {
+    venueId: venueId.value,
+    lines: basket.value.map(line => ({ variantId: line.variantId, qty: line.qty, choiceItemId: line.choiceItemId })),
+    expectedTotalPence,
+    ageCheck,
+    discountId: selectedDiscountId.value,
+    tabHolderId: selectedTabHolderId.value,
+    tickets: ticketLines.value.map(booking => ({ reservationId: booking.id })),
+    walkUps: walkUpLines.value.map(line => ({ performanceId: line.performanceId, ticketTypeId: line.ticketTypeId, quantity: line.quantity })),
+    walkUpGuest: walkUpGuest.value,
+  }
+}
+
+// A refusal drops the restricted lines: what the screen expects to be charged has to shrink to
+// match, or the server's own cross-check would refuse a total nobody asked for (F-104, F-106).
+function expectedAfter(ageCheck: InlineAgeCheckInput | null): number {
+  const bar = basket.value.length === 0
+    ? 0
+    : ageCheck?.outcome === 'REFUSED'
+      ? priced.value!.lines.filter((_, index) => !isRestricted(basket.value[index]!)).reduce((sum, line) => sum + line.amountPence - line.discountPence, 0)
+      : priced.value!.totalPence
+  return bar + ticketsPence.value + walkUpsPence.value
+}
+
+function readyToCharge(): boolean {
+  if (!venueId.value || basketEmpty.value || walkUpGuestIncomplete.value) return false
+  return basket.value.length === 0 || priced.value !== null
+}
+
+type Snapshot = { bar: BasketLine[], tickets: TillBooking[], walkUps: WalkUpLine[], discountId: string | null }
+const sumup = useSumUp<Snapshot>()
+const sumupAvailable = computed(() => sumupEnabled.value && sumup.handheld.value && selectedTabHolderId.value === null)
+
+// Which path the Challenge 25 prompt was opened for, so its answer goes the same way.
+const chargeVia = ref<'reader' | 'sumup'>('reader')
+
 // The submission step (F-104, F-105, 0004). A restricted line with no outcome yet opens the
 // Challenge 25 prompt (F-106); a tab holder chosen below charges credit, not the reader (F-108).
 async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void> {
-  if (!priced.value || !venueId.value || basket.value.length === 0) return
+  if (!readyToCharge()) return
   if (!ageCheck && needsAgeCheck.value) {
+    chargeVia.value = 'reader'
     ageCheckStep.value = 'choose'
     return
   }
-  // A refusal drops the restricted lines: what the screen expects to be charged has to shrink to
-  // match, or the server's own cross-check would refuse a total nobody asked for (F-104, F-106).
-  const expectedTotalPence = ageCheck?.outcome === 'REFUSED'
-    ? priced.value.lines.filter((_, index) => !isRestricted(basket.value[index]!)).reduce((sum, line) => sum + line.amountPence - line.discountPence, 0)
-    : priced.value.totalPence
 
   charging.value = true
   chargeFailure.value = null
   try {
-    const answered = await $fetch<SaleReceipt>('/api/till/sale', {
-      method: 'POST',
-      body: {
-        venueId: venueId.value,
-        lines: basket.value.map(line => ({ variantId: line.variantId, qty: line.qty, choiceItemId: line.choiceItemId })),
-        expectedTotalPence,
-        ageCheck,
-        discountId: selectedDiscountId.value,
-        tabHolderId: selectedTabHolderId.value,
-      },
-    })
+    const answered = await $fetch<SaleReceipt>('/api/till/sale', { method: 'POST', body: saleBody(ageCheck, expectedAfter(ageCheck)) })
     charged.value = {
       totalPence: answered.totalPence,
       refusedLines: answered.refusedLines,
       discount: answered.discount,
       tab: answered.tab,
+      tickets: answered.tickets,
+      walkUps: answered.walkUps,
+      viaSumup: false,
     }
     resetAgeCheck()
   }
@@ -341,10 +534,190 @@ async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void
   }
 }
 
+// The hand-off (F-124 criterion 1): the basket is held on an attempt and the SumUp app opens;
+// what this screen remembers is enough to bring the basket back if the app says no.
+async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = null): Promise<void> {
+  if (!readyToCharge()) return
+  if (!ageCheck && needsAgeCheck.value) {
+    chargeVia.value = 'sumup'
+    ageCheckStep.value = 'choose'
+    return
+  }
+
+  charging.value = true
+  chargeFailure.value = null
+  try {
+    const expectedTotalPence = expectedAfter(ageCheck)
+    const started = await $fetch<{ id: string, launchUrl: string, totalPence: number }>('/api/till/payments', {
+      method: 'POST',
+      body: saleBody(ageCheck, expectedTotalPence),
+    })
+    sumup.remember({
+      id: started.id,
+      totalPence: started.totalPence,
+      startedAt: Date.now(),
+      basket: { bar: basket.value, tickets: ticketLines.value, walkUps: walkUpLines.value, discountId: selectedDiscountId.value },
+    })
+    resetAgeCheck()
+    startWatching()
+    sumup.launch(started.launchUrl)
+  }
+  catch (refused) {
+    chargeFailure.value = refusalText(refused)
+    resetAgeCheck()
+    await recomputeTotal()
+  }
+  finally {
+    charging.value = false
+  }
+}
+
+// While the app has the screen (criterion 5): asked on every return to the tab, and on a short
+// timer for a minute and a half, after which the "did it go through?" answers stay on offer.
+const waiting = ref<SumupAttemptView | null>(null)
+const waitingFailure = ref<string | null>(null)
+const resolving = ref(false)
+const smpTxCodeTyped = ref('')
+let watchTimer: ReturnType<typeof setInterval> | undefined
+let watchUntil = 0
+
+async function checkAttempt(): Promise<void> {
+  const pending = sumup.pending.value
+  if (!pending) return
+  try {
+    const answered = await $fetch<{ attempt: SumupAttemptView }>(`/api/till/payments/${pending.id}`)
+    waiting.value = answered.attempt
+    waitingFailure.value = null
+    settleAttempt(answered.attempt.status, pending)
+  }
+  catch (refused) {
+    waitingFailure.value = refusalText(refused)
+  }
+}
+
+// What the till does once an attempt has an answer: a success clears the basket, a failure or an
+// abandonment brings it back, a mismatch stays on screen with its reason (criteria 4, 5).
+function settleAttempt(status: SumupAttemptStatus, pending: NonNullable<typeof sumup.pending.value>): void {
+  if (status === 'SUCCEEDED') {
+    stopWatching()
+    charged.value = { totalPence: pending.totalPence, refusedLines: [], discount: null, tab: null, tickets: [], walkUps: [], viaSumup: true }
+    basket.value = []
+    ticketLines.value = []
+    walkUpLines.value = []
+    selectedDiscountId.value = null
+    sumup.forget()
+    waiting.value = null
+    void refreshOpenAttempts()
+  }
+  else if (status === 'FAILED' || status === 'ABANDONED') {
+    stopWatching()
+    basket.value = pending.basket.bar
+    ticketLines.value = pending.basket.tickets
+    walkUpLines.value = pending.basket.walkUps
+    selectedDiscountId.value = pending.basket.discountId
+    chargeFailure.value = status === 'FAILED' ? 'The SumUp app reported the payment did not go through. The basket is back.' : 'That hand-off was abandoned. The basket is back; if the reader did take the money, ring it up again.'
+    sumup.forget()
+    waiting.value = null
+    void refreshOpenAttempts()
+  }
+  else if (status === 'MISMATCH') {
+    stopWatching()
+    void refreshOpenAttempts()
+  }
+}
+
+function startWatching(): void {
+  stopWatching()
+  watchUntil = Date.now() + 90_000
+  watchTimer = setInterval(() => {
+    if (Date.now() > watchUntil) {
+      stopWatching()
+      return
+    }
+    void checkAttempt()
+  }, 3_000)
+}
+
+function stopWatching(): void {
+  if (watchTimer) clearInterval(watchTimer)
+  watchTimer = undefined
+}
+
+function onReturnToTab(): void {
+  if (document.visibilityState === 'visible' && sumup.pending.value) void checkAttempt()
+}
+
+onMounted(() => {
+  if (sumup.recall()) {
+    void checkAttempt()
+    startWatching()
+  }
+  document.addEventListener('visibilitychange', onReturnToTab)
+  window.addEventListener('focus', onReturnToTab)
+  window.addEventListener('pageshow', onReturnToTab)
+})
+
+onBeforeUnmount(() => {
+  stopWatching()
+  document.removeEventListener('visibilitychange', onReturnToTab)
+  window.removeEventListener('focus', onReturnToTab)
+  window.removeEventListener('pageshow', onReturnToTab)
+})
+
+// "Did it go through?" (criterion 5), for the attempt this screen started or one listed below.
+async function resolveAttempt(id: string, outcome: 'succeeded' | 'abandoned', note: string | null = null): Promise<void> {
+  resolving.value = true
+  waitingFailure.value = null
+  try {
+    const answered = await $fetch<{ status: SumupAttemptStatus, error: string | null }>(`/api/till/payments/${id}/resolve`, {
+      method: 'POST',
+      body: { outcome, smpTxCode: smpTxCodeTyped.value.trim() || null, note },
+    })
+    smpTxCodeTyped.value = ''
+    const pending = sumup.pending.value
+    if (pending && pending.id === id) {
+      waiting.value = { ...(waiting.value ?? { id, status: answered.status, createdAt: 0, createdByName: null, expectedTotalPence: pending.totalPence, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }), status: answered.status, error: answered.error }
+      settleAttempt(answered.status, pending)
+    }
+    else {
+      await refreshOpenAttempts()
+    }
+    if (answered.status === 'MISMATCH') waitingFailure.value = answered.error
+  }
+  catch (refused) {
+    waitingFailure.value = refusalText(refused)
+  }
+  finally {
+    resolving.value = false
+  }
+}
+
+// A mismatch abandoned needs a note: the reader has money the ledger does not (criterion 4).
+const abandonNote = ref('')
+
+// Tonight's open hand-offs (criterion 6), so the laptop can answer for a phone that left one.
+const openAttempts = ref<SumupAttemptView[]>([])
+async function refreshOpenAttempts(): Promise<void> {
+  if (!venueId.value || !sumupEnabled.value) return
+  try {
+    const answered = await $fetch<{ attempts: SumupAttemptView[] }>('/api/till/payments', { query: { venueId: venueId.value } })
+    openAttempts.value = answered.attempts.filter(attempt => attempt.id !== sumup.pending.value?.id)
+  }
+  catch { /* the strip is a convenience; the till still sells */ }
+}
+watch([session, sumupEnabled], () => {
+  if (session.value) void refreshOpenAttempts()
+})
+
+function timeOf(at: number): string {
+  return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
+}
+
 // Two taps for the routine pass case (F-106 criterion 2): the ID type button both records the
 // outcome and submits, with a description staff can edit before choosing it if it matters here.
 function acceptAgeCheck(idType: IdType): void {
-  void charge({ outcome: 'ACCEPTED', idType, reason: null, description: ageCheckDescription.value.trim() || 'Checked at the till', notes: null })
+  const outcome: InlineAgeCheckInput = { outcome: 'ACCEPTED', idType, reason: null, description: ageCheckDescription.value.trim() || 'Checked at the till', notes: null }
+  void (chargeVia.value === 'sumup' ? chargeOnSumUp(outcome) : charge(outcome))
 }
 
 function refuseAgeCheck(): void {
@@ -357,17 +730,30 @@ function refuseAgeCheck(): void {
     return
   }
   ageCheckError.value = null
-  void charge({ outcome: 'REFUSED', idType: null, reason: ageCheckReason.value, description: ageCheckDescription.value.trim(), notes: null })
+  const outcome: InlineAgeCheckInput = { outcome: 'REFUSED', idType: null, reason: ageCheckReason.value, description: ageCheckDescription.value.trim(), notes: null }
+  void (chargeVia.value === 'sumup' ? chargeOnSumUp(outcome) : charge(outcome))
 }
 
 function nextSale(): void {
   basket.value = []
+  ticketLines.value = []
+  walkUpLines.value = []
+  walkUpGuestName.value = ''
+  walkUpGuestEmail.value = ''
+  found.value = []
+  lookupTerm.value = ''
   priced.value = null
   charged.value = null
   chargeFailure.value = null
   selectedDiscountId.value = null
   selectedTabHolderId.value = null
+  pane.value = 'bar'
   resetAgeCheck()
+}
+
+// A walk-up's door pass, printed from the counter laptop (F-123 criterion 4).
+function printPass(): void {
+  window.print()
 }
 
 // Editing the basket after a refusal is the correction; the message it was reading no longer
@@ -432,9 +818,365 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           Nothing is on the till yet. Price a size in the catalogue, and it appears here.
         </p>
 
+        <!-- A hand-off the SumUp app has not answered for (F-124 criterion 5). -->
+        <NightBlock
+          v-if="sumup.pending.value && !charged"
+          title="Waiting for SumUp"
+          data-test="sumup-waiting"
+        >
+          <p class="text-lg font-semibold">
+            {{ saysMoney(sumup.pending.value.totalPence) }} handed to the SumUp app.
+          </p>
+          <p
+            class="mt-1 text-sm text-muted"
+            data-test="sumup-waiting-status"
+          >
+            {{ waiting ? saysAttemptStatus(waiting.status) : 'Not answered yet.' }}
+            <span v-if="waiting?.status === 'MISMATCH'">{{ waiting.error }}</span>
+          </p>
+          <UAlert
+            v-if="waitingFailure"
+            class="mt-2"
+            color="error"
+            variant="subtle"
+            :description="waitingFailure"
+            data-test="sumup-waiting-failure"
+          />
+          <p class="mt-3 text-sm">
+            Did the payment go through on the reader?
+          </p>
+          <UInput
+            v-model="smpTxCodeTyped"
+            placeholder="Transaction code from the SumUp app (optional)"
+            class="mt-2 w-full"
+            data-test="sumup-tx-code"
+          />
+          <UTextarea
+            v-if="waiting?.status === 'MISMATCH'"
+            v-model="abandonNote"
+            placeholder="If you are abandoning this: what happened to the money the reader took?"
+            class="mt-2 w-full"
+            data-test="sumup-abandon-note"
+          />
+          <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <UButton
+              color="primary"
+              class="min-h-12 justify-center"
+              :loading="resolving"
+              data-test="sumup-went-through"
+              @click="resolveAttempt(sumup.pending.value.id, 'succeeded')"
+            >
+              It went through
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="subtle"
+              class="min-h-12 justify-center"
+              :loading="resolving"
+              data-test="sumup-did-not"
+              @click="resolveAttempt(sumup.pending.value.id, 'abandoned', abandonNote.trim() || null)"
+            >
+              It did not
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              class="min-h-12 justify-center"
+              icon="i-lucide-refresh-cw"
+              data-test="sumup-check-again"
+              @click="checkAttempt"
+            >
+              Check again
+            </UButton>
+          </div>
+          <p class="mt-2 text-xs text-muted">
+            Nothing happened? The SumUp app is not on this device: say it did not, and key the figure into the reader.
+          </p>
+        </NightBlock>
+
+        <!-- Tonight's other hand-offs still waiting, so the laptop can answer for a phone (criterion 6). -->
+        <NightBlock
+          v-if="openAttempts.length && !charged"
+          title="Unanswered SumUp payments"
+          data-test="sumup-open-attempts"
+        >
+          <div
+            v-for="attempt in openAttempts"
+            :key="attempt.id"
+            class="border-b border-default py-2 last:border-b-0"
+            :data-test="`sumup-open-${attempt.id}`"
+          >
+            <p class="text-sm">
+              <span class="font-semibold">{{ saysMoney(attempt.expectedTotalPence) }}</span>
+              · {{ timeOf(attempt.createdAt) }}<span v-if="attempt.createdByName"> · {{ attempt.createdByName }}</span>
+              · {{ saysAttemptStatus(attempt.status) }}
+            </p>
+            <p
+              v-if="attempt.error"
+              class="text-xs text-muted"
+            >
+              {{ attempt.error }}
+            </p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <UButton
+                size="sm"
+                class="min-h-10"
+                :loading="resolving"
+                :data-test="`sumup-open-succeeded-${attempt.id}`"
+                @click="resolveAttempt(attempt.id, 'succeeded')"
+              >
+                It went through
+              </UButton>
+              <UButton
+                size="sm"
+                color="neutral"
+                variant="subtle"
+                class="min-h-10"
+                :loading="resolving"
+                :data-test="`sumup-open-abandoned-${attempt.id}`"
+                @click="resolveAttempt(attempt.id, 'abandoned', attempt.status === 'MISMATCH' ? (abandonNote.trim() || null) : null)"
+              >
+                It did not
+              </UButton>
+            </div>
+          </div>
+        </NightBlock>
+
         <template v-if="!charged">
+          <!-- Two panes over one basket (F-122 criterion 1). -->
+          <div
+            class="grid grid-cols-2 gap-2"
+            role="tablist"
+            data-test="till-panes"
+          >
+            <UButton
+              role="tab"
+              :aria-selected="pane === 'bar'"
+              :color="pane === 'bar' ? 'primary' : 'neutral'"
+              :variant="pane === 'bar' ? 'solid' : 'subtle'"
+              class="min-h-12 justify-center"
+              data-test="pane-bar"
+              @click="pane = 'bar'"
+            >
+              Bar
+            </UButton>
+            <UButton
+              role="tab"
+              :aria-selected="pane === 'tickets'"
+              :color="pane === 'tickets' ? 'primary' : 'neutral'"
+              :variant="pane === 'tickets' ? 'solid' : 'subtle'"
+              class="min-h-12 justify-center"
+              data-test="pane-tickets"
+              @click="pane = 'tickets'"
+            >
+              Tickets
+            </UButton>
+          </div>
+
+          <div
+            v-if="pane === 'tickets'"
+            class="space-y-4"
+            data-test="tickets-pane"
+          >
+            <NightBlock title="Find a booking">
+              <div class="flex flex-wrap gap-2">
+                <UInput
+                  v-model="lookupTerm"
+                  placeholder="Reference or name"
+                  autocapitalize="characters"
+                  class="min-w-0 grow"
+                  data-test="ticket-lookup"
+                  @keyup.enter="lookUp"
+                />
+                <UButton
+                  class="min-h-12"
+                  :loading="lookingUp"
+                  data-test="ticket-lookup-submit"
+                  @click="lookUp"
+                >
+                  Find
+                </UButton>
+                <UButton
+                  v-if="cameraOpen"
+                  color="neutral"
+                  variant="subtle"
+                  icon="i-lucide-camera-off"
+                  class="min-h-12"
+                  data-test="ticket-scan-close"
+                  @click="cameraOpen = false"
+                >
+                  Close the camera
+                </UButton>
+                <UButton
+                  v-else
+                  color="neutral"
+                  variant="subtle"
+                  icon="i-lucide-camera"
+                  class="min-h-12"
+                  data-test="ticket-scan-camera"
+                  @click="openCamera"
+                >
+                  Scan
+                </UButton>
+              </div>
+              <p
+                v-if="cameraNote"
+                class="mt-2 text-sm text-muted"
+                data-test="ticket-scan-camera-note"
+              >
+                {{ cameraNote }}
+              </p>
+              <QrScanner
+                v-if="cameraOpen"
+                class="mt-3 w-full"
+                @decoded="scanDecoded"
+                @unavailable="fallBackToTyping"
+              />
+              <UAlert
+                v-if="lookupFailure"
+                class="mt-3"
+                color="warning"
+                variant="subtle"
+                :description="lookupFailure"
+                data-test="ticket-lookup-failure"
+              />
+              <div
+                v-for="booking in found"
+                :key="booking.id"
+                class="mt-3 rounded-lg border border-default p-3"
+                :data-test="`found-${booking.id}`"
+              >
+                <p class="font-mono text-sm tracking-widest">
+                  {{ booking.reference }}
+                </p>
+                <p class="text-sm">
+                  {{ booking.bookerFirstName ?? 'Walk-up' }} · party of {{ booking.partySize }} · {{ booking.showTitle }}
+                </p>
+                <p
+                  class="text-sm"
+                  :class="booking.isTonight ? 'text-muted' : 'text-warning'"
+                >
+                  {{ formatLondon(new Date(booking.startsAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }) }}
+                  <template v-if="!booking.isTonight">
+                    · not tonight
+                  </template>
+                </p>
+                <p
+                  v-if="booking.refusal"
+                  class="mt-2 text-sm text-muted"
+                  :data-test="`found-refusal-${booking.id}`"
+                >
+                  {{ booking.refusal }}
+                </p>
+                <UButton
+                  v-else
+                  class="mt-2 min-h-12"
+                  :disabled="ticketLines.some(line => line.id === booking.id)"
+                  :data-test="`found-add-${booking.id}`"
+                  @click="addBooking(booking)"
+                >
+                  Add {{ saysMoney(booking.owedPence) }} to the basket
+                </UButton>
+              </div>
+            </NightBlock>
+
+            <NightBlock title="Walk-up">
+              <USelect
+                v-if="tonightsPerformances.length > 1"
+                v-model="walkUpPerformanceId"
+                :items="tonightsPerformances.map(one => ({ label: `${one.showTitle} · ${formatLondon(new Date(one.startsAt * 1000), { timeStyle: 'short' })}`, value: one.id }))"
+                placeholder="Which performance"
+                class="w-full"
+                data-test="walk-up-performance"
+              />
+              <UAlert
+                v-if="walkUpOptionsFailure"
+                class="mt-2"
+                color="warning"
+                variant="subtle"
+                :description="walkUpOptionsFailure"
+              />
+              <div
+                v-for="option in walkUpOptions"
+                :key="option.id"
+                class="mt-2 flex items-center justify-between gap-2"
+                :data-test="`walk-up-option-${option.id}`"
+              >
+                <span class="text-sm">{{ option.name }} · {{ saysMoney(option.price) }}</span>
+                <div class="flex items-center gap-1">
+                  <UButton
+                    size="sm"
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-lucide-minus"
+                    class="size-12"
+                    :aria-label="`One fewer ${option.name}`"
+                    :data-test="`walk-up-minus-${option.id}`"
+                    @click="bumpWalkUp(option.id, -1)"
+                  />
+                  <span
+                    class="w-6 text-center text-sm"
+                    :data-test="`walk-up-qty-${option.id}`"
+                  >{{ walkUpQty[option.id] ?? 0 }}</span>
+                  <UButton
+                    size="sm"
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-lucide-plus"
+                    class="size-12"
+                    :aria-label="`One more ${option.name}`"
+                    :data-test="`walk-up-plus-${option.id}`"
+                    @click="bumpWalkUp(option.id, 1)"
+                  />
+                </div>
+              </div>
+              <p
+                v-if="walkUpPerformanceId && walkUpOptions.length === 0 && !walkUpOptionsFailure"
+                class="mt-2 text-sm text-muted"
+              >
+                Nothing is on sale for this performance.
+              </p>
+              <UButton
+                v-if="walkUpOptions.length"
+                class="mt-3 min-h-12"
+                color="neutral"
+                variant="subtle"
+                :disabled="!Object.values(walkUpQty).some(qty => qty > 0)"
+                data-test="walk-up-add"
+                @click="addWalkUps"
+              >
+                Add to the basket
+              </UButton>
+              <p class="mt-4 text-xs text-muted">
+                Their name and email are optional. With them, the booking's QR is emailed; without, the pass on screen is theirs to photograph.
+              </p>
+              <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                <UInput
+                  v-model="walkUpGuestName"
+                  placeholder="Name"
+                  data-test="walk-up-name"
+                />
+                <UInput
+                  v-model="walkUpGuestEmail"
+                  type="email"
+                  autocapitalize="off"
+                  placeholder="Email"
+                  data-test="walk-up-email"
+                />
+              </div>
+              <p
+                v-if="walkUpGuestIncomplete"
+                class="mt-1 text-xs text-warning"
+                data-test="walk-up-guest-incomplete"
+              >
+                Both a name and an email, or neither.
+              </p>
+            </NightBlock>
+          </div>
+
           <div
             v-for="category in categories"
+            v-show="pane === 'bar'"
             :key="category.id"
           >
             <template v-if="productsIn(category.id).length">
@@ -480,13 +1222,64 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           </div>
 
           <div
-            v-if="basket.length"
+            v-if="!basketEmpty"
             class="space-y-3 border-t border-default pt-4"
             data-test="basket"
           >
             <h2 class="text-sm font-semibold text-muted">
               Basket
             </h2>
+            <!-- Ticket money beside the drinks, one basket (F-122 criterion 3). -->
+            <div
+              v-for="line in ticketLines"
+              :key="line.id"
+              class="flex items-center justify-between gap-2"
+              :data-test="`ticket-line-${line.id}`"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-secondary">
+                  Booking {{ line.reference }}<span v-if="line.bookerFirstName">, {{ line.bookerFirstName }}</span>
+                </p>
+                <p class="text-xs text-muted">
+                  {{ line.showTitle }} · {{ saysMoney(line.owedPence) }}
+                </p>
+              </div>
+              <UButton
+                size="sm"
+                color="error"
+                variant="ghost"
+                icon="i-lucide-x"
+                class="size-12"
+                :aria-label="`Remove booking ${line.reference}`"
+                :data-test="`ticket-line-remove-${line.id}`"
+                @click="removeBooking(line.id)"
+              />
+            </div>
+            <div
+              v-for="line in walkUpLines"
+              :key="`${line.performanceId}:${line.ticketTypeId}`"
+              class="flex items-center justify-between gap-2"
+              :data-test="`walk-up-line-${line.ticketTypeId}`"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-secondary">
+                  Walk-up · {{ line.quantity }} × {{ line.typeName }}
+                </p>
+                <p class="text-xs text-muted">
+                  {{ line.showTitle }} · {{ saysMoney(line.unitPrice * line.quantity) }}
+                </p>
+              </div>
+              <UButton
+                size="sm"
+                color="error"
+                variant="ghost"
+                icon="i-lucide-x"
+                class="size-12"
+                :aria-label="`Remove the ${line.typeName} walk-up`"
+                :data-test="`walk-up-line-remove-${line.ticketTypeId}`"
+                @click="removeWalkUp(line)"
+              />
+            </div>
             <div
               v-for="line in basket"
               :key="line.id"
@@ -577,7 +1370,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             </div>
 
             <div
-              v-if="tabHolders.data.value?.holders.length"
+              v-if="tabHolders.data.value?.holders.length && !hasTicketMoney"
               class="space-y-2"
               data-test="tab-holder-picker"
             >
@@ -638,7 +1431,14 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
                 data-test="basket-total"
               >
                 <span>Total</span>
-                <span data-test="basket-total-amount">{{ priced && !pricing ? saysMoney(priced.totalPence) : 'Pricing…' }}</span>
+                <span data-test="basket-total-amount">{{ grandTotalPence !== null && !pricing ? saysMoney(grandTotalPence) : 'Pricing…' }}</span>
+              </p>
+              <p
+                v-if="hasTicketMoney && basket.length"
+                class="text-xs text-muted"
+                data-test="basket-split"
+              >
+                Bar {{ priced && !pricing ? saysMoney(priced.totalPence) : '…' }} · tickets {{ saysMoney(ticketsPence + walkUpsPence) }}, in one reader transaction
               </p>
             </template>
           </div>
@@ -653,9 +1453,52 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             color="success"
             variant="subtle"
             icon="i-lucide-check"
-            :title="charged?.tab ? `On ${charged.tab.holderName}'s tab` : 'Key this into the reader'"
+            :title="charged?.tab ? `On ${charged.tab.holderName}'s tab` : charged?.viaSumup ? 'Taken on SumUp' : 'Key this into the reader'"
             :description="charged ? saysMoney(charged.totalPence) : ''"
           />
+          <UAlert
+            v-if="charged && charged.tickets.length"
+            data-test="tickets-collected-note"
+            color="info"
+            variant="subtle"
+            :description="`Collected: ${charged.tickets.map(ticket => ticket.reference).join(', ')}. The door now reads PAID.`"
+          />
+          <!-- The door pass (F-123 criterion 4): photographed off the screen, or printed. -->
+          <div
+            v-for="pass in charged?.walkUps ?? []"
+            :key="pass.reservationId"
+            class="print-pass rounded-xl border border-default bg-white p-4 text-center text-black"
+            :data-test="`door-pass-${pass.reservationId}`"
+          >
+            <p class="font-mono text-2xl tracking-[0.3em]">
+              {{ pass.reference }}
+            </p>
+            <p class="text-sm">
+              {{ pass.showTitle }} · party of {{ pass.partySize }} · paid
+            </p>
+            <img
+              :src="`data:image/svg+xml;base64,${pass.qrSvg}`"
+              alt="Booking QR code"
+              width="180"
+              height="180"
+              class="mx-auto my-2"
+            >
+            <p class="text-xs">
+              Show this at the door, or read out the reference.
+            </p>
+          </div>
+          <UButton
+            v-if="charged?.walkUps.length"
+            block
+            color="neutral"
+            variant="subtle"
+            class="min-h-12 print:hidden"
+            icon="i-lucide-printer"
+            data-test="door-pass-print"
+            @click="printPass"
+          >
+            Print the door pass
+          </UButton>
           <UAlert
             v-if="charged && charged.refusedLines.length"
             data-test="age-check-refused-note"
@@ -698,11 +1541,22 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
 
       <template #actions>
         <NightAction
-          v-if="session && !charged && basket.length && priced"
-          :label="selectedTabHolderId ? `Put ${saysMoney(priced.totalPence)} on the tab` : `Charge ${saysMoney(priced.totalPence)}`"
-          :icon="selectedTabHolderId ? 'i-lucide-book-user' : 'i-lucide-credit-card'"
-          :disabled="pricing"
+          v-if="session && !charged && !basketEmpty && grandTotalPence !== null && sumupAvailable && !sumup.pending.value"
+          :label="`Charge ${saysMoney(grandTotalPence)} on SumUp`"
+          icon="i-lucide-smartphone-nfc"
+          :disabled="pricing || walkUpGuestIncomplete"
           :loading="charging"
+          data-test="charge-sumup"
+          @press="() => chargeOnSumUp()"
+        />
+        <NightAction
+          v-if="session && !charged && !basketEmpty && grandTotalPence !== null && !sumup.pending.value"
+          :label="selectedTabHolderId ? `Put ${saysMoney(grandTotalPence)} on the tab` : sumupAvailable ? `Key ${saysMoney(grandTotalPence)} into the reader` : `Charge ${saysMoney(grandTotalPence)}`"
+          :icon="selectedTabHolderId ? 'i-lucide-book-user' : 'i-lucide-credit-card'"
+          :color="sumupAvailable ? 'neutral' : 'primary'"
+          :disabled="pricing || walkUpGuestIncomplete"
+          :loading="charging"
+          data-test="charge-reader"
           @press="() => charge()"
         />
         <NightAction
