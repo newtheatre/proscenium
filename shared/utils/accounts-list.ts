@@ -37,6 +37,8 @@ export const accountsList = {
     { key: 'privilegedWithoutFactor', label: 'Privileged, no authenticator', kind: 'yes-no', negated: 'Not privileged, or has an authenticator' },
     { key: 'approachingRetention', label: 'Approaching retention', kind: 'yes-no' },
     { key: 'neverSignedIn', label: 'Never signed in', kind: 'yes-no', negated: 'Has signed in' },
+    // No way to sign in at all: hidden from the directory until asked for (0071).
+    { key: 'shadow', label: 'Shadow account', kind: 'yes-no', negated: 'Has a way to sign in' },
     { key: 'lastLoginAt', label: 'Last seen', kind: 'date-range', column: 'last_login_at', dateAs: 'unix', icon: 'i-lucide-clock' },
   ],
   sort: {

@@ -3,6 +3,7 @@
 // runs end to end, including the parts no existing test exercises (epic #338 audit, 10 Sept).
 import { Database } from 'bun:sqlite'
 import { createCore, transformIdentity } from './identity'
+import { decideByMap } from './role-decisions'
 import { buildLoad, applyLoad } from './load'
 import { reconcile as reconcileBookings, transformBookings } from './bookings'
 import { buildLoad as buildMoneyLoad, reconcileMoney, transformMoney } from './money'
@@ -232,12 +233,13 @@ const roleMap = { 'ticketing:BOX_OFFICE': 'BOX_OFFICE' }
 const idMap = new Map<string, string>()
 const core = await createCore(':memory:')
 
-const identityResult = transformIdentity({ auth, mirrors, roleMap, idMap, target: core })
+const decisions = decideByMap(auth.query('SELECT user_id, role FROM user_roles').all() as { user_id: string, role: string }[], roleMap, null)
+const identityResult = transformIdentity({ auth, mirrors, decisions, idMap, target: core })
 
 check('every user imported', count(core, 'users') === 3, `${count(core, 'users')} of 3`)
 check('tombstone preserved', count(core, 'users', 'anonymised_at IS NOT NULL') === 1, `${identityResult.summary.tombstones}`)
 check('Workspace password wiped', count(core, 'users', 'email LIKE \'%@newtheatre.org.uk\' AND password IS NOT NULL') === 0, `wiped ${identityResult.summary.workspaceWiped}`)
-check('unmapped role caught, not silently dropped', identityResult.unmappedRoles.includes('legacy:GHOST_ROLE'), identityResult.unmappedRoles.join(', ') || 'none found')
+check('an undecided grant is caught, not silently dropped', identityResult.undecided.some(key => key.endsWith('\tlegacy:GHOST_ROLE')), identityResult.undecided.join(', ') || 'none found')
 check(
   'K-113: an orphaned mirror user is an exception, not a guess',
   identityResult.exceptions.some(exception => exception.includes('orphaned-mirror-user') && exception.includes('no auth row')),
@@ -314,9 +316,9 @@ for (const ticket of tickets) {
 const moneyCheck = reconcileMoney(ticketsDb, rehearsal.raw, moneyResult.summary)
 check('every ticket produced a ledger entry', count(rehearsal.raw, 'ledger_entries', 'source = \'IMPORT\'') === 4, `${count(rehearsal.raw, 'ledger_entries', 'source = \'IMPORT\'')} of 4 (3 sales, 1 refund)`)
 check(
-  'a non-EXACT price is an exception, not a silent trust',
-  moneyResult.exceptions.some(exception => exception.includes('ESTIMATED')),
-  moneyResult.exceptions.join('; ') || 'no such exception was raised',
+  'a non-EXACT price is counted, not silently trusted',
+  (moneyResult.summary.byConfidence.ESTIMATED ?? 0) === 1,
+  JSON.stringify(moneyResult.summary.byConfidence),
 )
 check('money reconciliation is green', moneyCheck.ok, moneyCheck.problems.join('; ') || 'no problems')
 

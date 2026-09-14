@@ -130,6 +130,25 @@ describe('every level of the chain comes back, so a screen can say why (D-120 cr
     })
   })
 
+  // 0074: the system's own row seats a pass holder at nought and is nobody's to price, so neither
+  // screen lists it, even where a stray override row names it.
+  test('the pass-admission type is absent from both screens, override or not', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      addType(database, 'tt-live', 'Standard', 900)
+      database.batch([['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, 0, ?)', 'tt-pass', 'Pass admission', 'PASS_ADMISSION']])
+
+      expect(read<Row>(database, showPricesQuery(seeded.showId)).map(one => one.ticketTypeId)).toEqual(['tt-live'])
+      expect(read<Row>(database, performancePricesQuery(seeded.performanceId)).map(one => one.ticketTypeId)).toEqual(['tt-live'])
+
+      database.batch([['INSERT INTO show_ticket_overrides (id, show_id, ticket_type_id, price) VALUES (?, ?, ?, ?)',
+        'so-pass', seeded.showId, 'tt-pass', 100]])
+
+      expect(read<Row>(database, showPricesQuery(seeded.showId)).map(one => one.ticketTypeId)).toEqual(['tt-live'])
+      expect(read<Row>(database, performancePricesQuery(seeded.performanceId)).map(one => one.ticketTypeId)).toEqual(['tt-live'])
+    })
+  })
+
   test('neither query binds a parameter per ticket type', async () => {
     await withDatabase((database) => {
       for (const statement of [showPricesQuery('show-a'), performancePricesQuery('performance-a')]) {

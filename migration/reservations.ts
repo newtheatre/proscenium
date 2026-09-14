@@ -1,4 +1,4 @@
-import { NOT_ANONYMISED, nanoid } from './lib'
+import { NOT_ANONYMISED, idFor, parseStamp } from './lib'
 import { generateReservationReference } from '../shared/utils/reservations'
 import type { Database } from 'bun:sqlite'
 
@@ -16,11 +16,13 @@ export const STATUS_MAP: Record<string, string> = {
   NO_SHOW: 'NO_SHOW',
 }
 
-// The old estate blurred a walk-up into an ordinary desk collection; DOOR is new, fixing that
-// blur (docs/architecture.md). History cannot be reclassified after the fact, so both map to DESK.
+// The old estate's first import stamped its own rows LEGACY_IMPORT; the desk is the nearest
+// honest channel for a booking whose channel nobody recorded (docs/known-issues.md).
 export const SOURCE_MAP: Record<string, string> = {
   WEB: 'WEB',
   DESK: 'DESK',
+  DOOR: 'DOOR',
+  LEGACY_IMPORT: 'DESK',
 }
 
 export interface OldReservation {
@@ -32,7 +34,7 @@ export interface OldReservation {
   customer_notes: string | null
   staff_notes: string | null
   cancelled_by: string | null
-  created_at: number
+  created_at: number | string
 }
 
 export interface OldTicket {
@@ -41,7 +43,7 @@ export interface OldTicket {
   ticket_type_id: string | null
   price_paid: number
   refunded_at: number | null
-  created_at: number
+  created_at: number | string
   price_confidence: string
 }
 
@@ -51,12 +53,37 @@ export interface ReservationSummary {
   skippedNoPerformance: number
   skippedUnknownStatus: number
   skippedUnknownSource: number
+  skippedPassSaleOnly: number
+  legacySourced: number
   anonymousAccount: number
   ticketsRead: number
   ticketsWritten: number
   ticketsSkippedNoType: number
+  passSales: number
+  passAdmissions: number
+  negativePriceClamped: number
   pricePaidPence: number
   byStatus: Record<string, number>
+  // Counted, not listed: a line per ticket naming its confidence would drown every real exception.
+  byConfidence: Record<string, number>
+}
+
+// What passes.ts reconstructs from (0073): a sale is not a seat, an admission is a seat spent.
+export interface PassSale {
+  oldTicketId: string
+  oldTicketTypeId: string
+  userId: string | null
+  pricePaid: number
+  soldAt: number
+}
+
+export interface PassAdmissionSeat {
+  oldTicketId: string
+  oldTicketTypeId: string
+  ticketId: string
+  performanceId: string
+  userId: string | null
+  admittedAt: number
 }
 
 export interface TransformInput {
@@ -68,28 +95,22 @@ export interface TransformInput {
   // Old performance id to a unified performance (the programme transform's own map, keyed on
   // its raw old id, not prefixed); empty until it exists, which every row here accounts for.
   performances: Map<string, string>
-  // Old ticket type id to a unified ticket type, a reference map like `room-map.tsv` (#843),
-  // since ticket types are authored fresh, not migrated; the same raw-id-keyed shape as performances.
+  // Old ticket type id to a unified ticket type, minted by the catalogue transform (0075).
   ticketTypes: Map<string, string>
   reservationIds: Map<string, string>
   ticketIds: Map<string, string>
+  // Old ticket types that were really pass sales or pass admissions, and the one unified row
+  // every admission lands on (0073, 0074). Empty means the estate sold no passes.
+  passSaleTypes?: Set<string>
+  passAdmissionTypes?: Set<string>
+  passAdmissionTicketTypeId?: string | null
   target: Database
 }
 
 // SQLite's CURRENT_TIMESTAMP has no zone; the dump is a UTC export, so the string is a UTC wall
 // clock with a space instead of a T, the same convention `money.ts` already found.
-function parseCreatedAt(value: number | string): number {
-  if (typeof value === 'number') return value
-  const parsed = new Date(`${value.replace(' ', 'T')}Z`)
-  return Math.floor(parsed.getTime() / 1000)
-}
-
-function idFor(map: Map<string, string>, key: string): string {
-  const existing = map.get(key)
-  if (existing) return existing
-  const fresh = nanoid(32).toLowerCase().replaceAll(/[^a-z0-9]/g, '0')
-  map.set(key, fresh)
-  return fresh
+export function parseCreatedAt(value: number | string): number {
+  return parseStamp(value) ?? 0
 }
 
 // Six characters from a small alphabet collides eventually across enough historical rows; a
@@ -101,10 +122,23 @@ function freshReference(used: Set<string>): string {
   return candidate
 }
 
-export function transformReservations(input: TransformInput): { summary: ReservationSummary, exceptions: string[] } {
+export interface ReservationResult {
+  summary: ReservationSummary
+  exceptions: string[]
+  passSales: PassSale[]
+  passAdmissions: PassAdmissionSeat[]
+}
+
+export function transformReservations(input: TransformInput): ReservationResult {
   const { source, accounts, performances, ticketTypes, reservationIds, ticketIds, target } = input
+  const passSaleTypes = input.passSaleTypes ?? new Set<string>()
+  const passAdmissionTypes = input.passAdmissionTypes ?? new Set<string>()
+  const passAdmissionTicketTypeId = input.passAdmissionTicketTypeId ?? null
   const exceptions: string[] = []
+  const passSales: PassSale[] = []
+  const passAdmissions: PassAdmissionSeat[] = []
   const byStatus: Record<string, number> = {}
+  const byConfidence: Record<string, number> = {}
   const usedReferences = new Set<string>(
     target.query<{ reference: string }, []>('SELECT reference FROM reservations').all().map(row => row.reference),
   )
@@ -124,12 +158,18 @@ export function transformReservations(input: TransformInput): { summary: Reserva
     skippedNoPerformance: 0,
     skippedUnknownStatus: 0,
     skippedUnknownSource: 0,
+    skippedPassSaleOnly: 0,
+    legacySourced: 0,
     anonymousAccount: 0,
     ticketsRead: oldTickets.length,
     ticketsWritten: 0,
     ticketsSkippedNoType: 0,
+    passSales: 0,
+    passAdmissions: 0,
+    negativePriceClamped: 0,
     pricePaidPence: 0,
     byStatus,
+    byConfidence,
   }
 
   const insertReservation = target.prepare(`
@@ -179,6 +219,7 @@ export function transformReservations(input: TransformInput): { summary: Reserva
       exceptions.push(`reservation ${row.id}: unknown source ${row.source}`)
       continue
     }
+    if (row.source === 'LEGACY_IMPORT') summary.legacySourced++
 
     // Nullable by design (docs/data-model.md): an old reservation naming nobody, or naming
     // somebody whose own account never came across, still holds real ticket history.
@@ -189,6 +230,28 @@ export function transformReservations(input: TransformInput): { summary: Reserva
         summary.anonymousAccount++
         exceptions.push(`reservation ${row.id}: account ${row.user_id} has no canonical id, imported without one`)
       }
+    }
+
+    const tickets = ticketsByReservation.get(row.id) ?? []
+    for (const ticket of tickets) {
+      if (ticket.price_confidence !== 'EXACT') byConfidence[ticket.price_confidence] = (byConfidence[ticket.price_confidence] ?? 0) + 1
+    }
+
+    // A pass sale held no seat at the performance the desk happened to key it against; it
+    // becomes a pass (passes.ts), and a reservation holding nothing else is not a reservation.
+    const sales = tickets.filter(ticket => ticket.ticket_type_id !== null && passSaleTypes.has(ticket.ticket_type_id))
+    for (const ticket of sales) {
+      passSales.push({
+        oldTicketId: ticket.id, oldTicketTypeId: ticket.ticket_type_id!, userId,
+        pricePaid: Math.max(ticket.price_paid, 0), soldAt: parseCreatedAt(ticket.created_at),
+      })
+      summary.passSales++
+      if (ticket.price_paid < 0) summary.negativePriceClamped++
+    }
+    const seats = tickets.filter(ticket => !sales.includes(ticket))
+    if (sales.length && !seats.length) {
+      summary.skippedPassSaleOnly++
+      continue
     }
 
     const id = idFor(reservationIds, String(row.id))
@@ -205,25 +268,41 @@ export function transformReservations(input: TransformInput): { summary: Reserva
     byStatus[status] = (byStatus[status] ?? 0) + 1
     summary.written++
 
-    for (const ticket of ticketsByReservation.get(row.id) ?? []) {
-      const ticketTypeId = ticket.ticket_type_id !== null ? ticketTypes.get(ticket.ticket_type_id) : undefined
+    for (const ticket of seats) {
+      const admission = ticket.ticket_type_id !== null && passAdmissionTypes.has(ticket.ticket_type_id)
+      const ticketTypeId = admission
+        ? passAdmissionTicketTypeId
+        : (ticket.ticket_type_id !== null ? ticketTypes.get(ticket.ticket_type_id) : undefined)
       if (!ticketTypeId) {
         summary.ticketsSkippedNoType++
         exceptions.push(`ticket ${ticket.id} (reservation ${row.id}): no ticket type (old id ${ticket.ticket_type_id ?? 'none recorded'})`)
         continue
       }
-      if (ticket.price_confidence !== 'EXACT') {
-        exceptions.push(`ticket ${ticket.id}: price_confidence "${ticket.price_confidence}", not EXACT: reconcile by hand`)
-      }
 
+      // The schema refuses a negative seat price; the estate holds two. Clamped and counted, and
+      // money.ts clamps the same rows so the ledger and the seats agree.
+      let pricePaid = ticket.price_paid
+      if (pricePaid < 0) {
+        summary.negativePriceClamped++
+        pricePaid = 0
+      }
       const refundedAt = ticket.refunded_at !== null ? parseCreatedAt(ticket.refunded_at) : null
-      insertTicket.run(idFor(ticketIds, String(ticket.id)), id, performanceId, ticketTypeId, ticket.price_paid, refundedAt)
+      const ticketId = idFor(ticketIds, String(ticket.id))
+      insertTicket.run(ticketId, id, performanceId, ticketTypeId, pricePaid, refundedAt)
       summary.ticketsWritten++
-      summary.pricePaidPence += ticket.price_paid
+      summary.pricePaidPence += pricePaid
+
+      if (admission) {
+        passAdmissions.push({
+          oldTicketId: ticket.id, oldTicketTypeId: ticket.ticket_type_id!, ticketId, performanceId, userId,
+          admittedAt: parseCreatedAt(ticket.created_at),
+        })
+        summary.passAdmissions++
+      }
     }
   }
 
-  return { summary, exceptions }
+  return { summary, exceptions, passSales, passAdmissions }
 }
 
 export interface Reconciliation {
@@ -236,7 +315,8 @@ export interface Reconciliation {
 export function reconcile(source: Database, target: Database, summary: ReservationSummary): Reconciliation {
   const problems: string[] = []
 
-  const accounted = summary.written + summary.skippedNoPerformance + summary.skippedUnknownStatus + summary.skippedUnknownSource
+  const accounted = summary.written + summary.skippedNoPerformance + summary.skippedUnknownStatus
+    + summary.skippedUnknownSource + summary.skippedPassSaleOnly
   if (accounted !== summary.read) {
     problems.push(`read ${summary.read} reservations but accounted for ${accounted}`)
   }

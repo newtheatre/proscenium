@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
-import { ticketTypeForm } from '#shared/utils/ticket-types'
+import { systemTicketTypeRefusal, ticketTypeForm } from '#shared/utils/ticket-types'
 
 // Edit a ticket type. Kind and access kind are what a sold ticket was sold under, so this does
 // not take them: a type set up wrongly and never sold is deleted and made again (D-119).
@@ -10,6 +10,8 @@ export default defineEventHandler(async (event) => {
 
   const held = await ticketTypeById(id)
   if (!held) throw createError({ statusCode: 404, statusMessage: 'No such ticket type' })
+  const reserved = systemTicketTypeRefusal(held)
+  if (reserved) throw createError({ statusCode: 409, statusMessage: reserved })
 
   const input = await readValidatedBodyOrThrow(event, ticketTypeForm)
   if (held.accessKind === 'COMPANION' && input.price !== 0) {

@@ -9,7 +9,7 @@ definePageMeta({ layout: 'console', title: 'Account', middleware: 'console' })
 interface Grant { role: string, expiresAt: number | null, grantedAt: number, live: boolean }
 
 interface View {
-  account: { id: string, name: string, email: string, verified: boolean, disabled: boolean, anonymisedAt: number | null }
+  account: { id: string, name: string, email: string, verified: boolean, disabled: boolean, anonymisedAt: number | null, shadow: boolean }
   methods: { password: boolean, google: boolean, passkeys: number, factor: boolean, recoveryCodesRemaining: number }
   grants: Grant[]
   memberships: { id: string, startsOn: string, expiresOn: string, source: string, confirmedAt: number | null }[]
@@ -238,7 +238,15 @@ onMounted(load)
             Disabled
           </UBadge>
           <UBadge
-            v-if="!view.account.verified"
+            v-if="view.account.shadow"
+            data-test="state-shadow"
+            color="neutral"
+            variant="subtle"
+          >
+            Shadow
+          </UBadge>
+          <UBadge
+            v-else-if="!view.account.verified"
             color="warning"
             variant="subtle"
           >

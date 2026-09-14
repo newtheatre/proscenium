@@ -81,6 +81,9 @@ const TYPE_COLUMNS = sql`
 
 const ORDER = sql` ORDER BY t.archived, t.price, t.name COLLATE NOCASE`
 
+// The system's own pass-admission row is never priced: a pass seats its holder at nought (0074).
+const PRICEABLE = sql`t.kind = 'SINGLE'`
+
 // A show screen has no performance level, so that half of the chain reads null throughout and the
 // resolution rule is still asked exactly once (D-120 criterion 1).
 export function showPricesQuery(showId: string): SQL {
@@ -88,7 +91,7 @@ export function showPricesQuery(showId: string): SQL {
     SELECT ${TYPE_COLUMNS}, NULL AS performancePrice, NULL AS performanceActive
     FROM ticket_types t
     LEFT JOIN show_ticket_overrides so ON so.show_id = ${showId} AND so.ticket_type_id = t.id
-    WHERE t.archived = 0 OR so.id IS NOT NULL${ORDER}
+    WHERE ${PRICEABLE} AND (t.archived = 0 OR so.id IS NOT NULL)${ORDER}
   `
 }
 
@@ -101,7 +104,7 @@ export function performancePricesQuery(performanceId: string): SQL {
     JOIN performances p ON p.id = ${performanceId}
     LEFT JOIN show_ticket_overrides so ON so.show_id = p.show_id AND so.ticket_type_id = t.id
     LEFT JOIN performance_ticket_overrides po ON po.performance_id = p.id AND po.ticket_type_id = t.id
-    WHERE t.archived = 0 OR so.id IS NOT NULL OR po.id IS NOT NULL${ORDER}
+    WHERE ${PRICEABLE} AND (t.archived = 0 OR so.id IS NOT NULL OR po.id IS NOT NULL)${ORDER}
   `
 }
 

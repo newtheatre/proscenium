@@ -81,12 +81,13 @@ function write(sql: string, ...parameters: unknown[]): void {
 }
 
 interface Listing {
-  items: { id: string, email: string, name: string, hasFactor: boolean, hasPassword: boolean }[]
+  items: { id: string, email: string, name: string, hasFactor: boolean, hasPassword: boolean, shadow: boolean }[]
   page: number
   pageSize: number
   total: number
   pages: number
   banners: { privilegedWithoutFactor: number, insideRetentionWindow: number }
+  shadowHidden: number
 }
 
 async function directory(query = ''): Promise<Listing> {
@@ -141,7 +142,10 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
 
   test('an unverified account is found by the filter and a verified one is not', async () => {
     const email = await member('unverified', false)
-    expect(emails(await directory('?verified=false'))).toContain(email)
+    const listing = await directory('?verified=false')
+    expect(emails(listing)).toContain(email)
+    // A registration with a password is unverified, never a shadow account (0071).
+    expect(listing.items.find(item => item.email === email)?.shadow).toBe(false)
 
     write('UPDATE users SET verified = 1 WHERE email = ?', email)
     expect(emails(await directory('?verified=false'))).not.toContain(email)
@@ -164,6 +168,27 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
     expect(emails(await directory(`?search=${encodeURIComponent(email)}`))).not.toContain(email)
     expect(emails(await directory('?anonymised=true'))).toContain(email)
     expect(emails(await directory(`?includeAnonymised=true&search=${encodeURIComponent(email)}`))).toContain(email)
+  })
+
+  // A shadow account is hidden the way a tombstone is, and counted rather than lost (0071).
+  test('a shadow account is hidden until searched for, filtered for or asked for', async () => {
+    const email = registrableAddress('shadow')
+    expect((await send('POST', '/api/admin/accounts', { email, name: 'Shadow Person (test)', roles: [] }, cookie)).status).toBe(200)
+
+    const bare = await directory()
+    expect(emails(bare)).not.toContain(email)
+    expect(bare.items.every(item => !item.shadow)).toBe(true)
+    expect(bare.shadowHidden).toBeGreaterThanOrEqual(1)
+
+    const filtered = await directory('?shadow=true')
+    expect(emails(filtered)).toContain(email)
+    expect(filtered.items.find(item => item.email === email)?.shadow).toBe(true)
+    expect(filtered.shadowHidden).toBe(0)
+
+    expect(emails(await directory(`?search=${encodeURIComponent(email)}`))).toContain(email)
+    expect(emails(await directory('?includeShadow=true'))).toContain(email)
+    expect(emails(await directory('?neverSignedIn=true'))).toContain(email)
+    expect(emails(await directory('?shadow=false'))).not.toContain(email)
   })
 
   test('role holders can be narrowed to one role', async () => {
@@ -243,7 +268,9 @@ describe.skipIf(skip !== null)('creating an account from the console (A-121 crit
     `, email)
     expect(sent).toMatchObject({ type: 'account.set-password', status: 'SENT' })
 
-    expect(emails(await directory('?role=is:BOX_OFFICE'))).toContain(email)
+    // Invited and not yet claimed is a shadow account, so the listing needs asking (0071).
+    expect(emails(await directory('?role=is:BOX_OFFICE'))).not.toContain(email)
+    expect(emails(await directory('?role=is:BOX_OFFICE&includeShadow=true'))).toContain(email)
   })
 
   test('the link sets a first password, and then signs the person in', async () => {
@@ -329,9 +356,17 @@ describe.skipIf(skip !== null)('the directory screen', () => {
       await fill(view, '[data-test="invite-name"]', 'Added By Hand (test)')
       await fill(view, '[data-test="invite-email"]', invitee)
       await click(view, '[data-test="invite-submit"]')
-      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(invitee)})`)
-
+      await waitFor(view, 'document.querySelector(\'[data-test="show-shadow"]\')')
       expect(read('SELECT id FROM users WHERE email = ?', invitee)).toBeDefined()
+
+      // The new account has no way to sign in yet, so the listing hides it until searched for,
+      // where it is badged as a shadow account rather than an unverified one (0071).
+      expect(await textOf(view, '[data-test="directory-total"]')).toContain('shadow account')
+      await fill(view, 'input[data-test="toolbar-search"]', invitee)
+      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(invitee)})`)
+      const rowText = await textOf(view, '[data-test="directory-table"]')
+      expect(rowText).toContain('Shadow')
+      expect(rowText).not.toContain('Unverified')
     }
     finally {
       view.close()

@@ -2,13 +2,14 @@ import { sql } from 'drizzle-orm'
 import { accountsList } from '#shared/utils/accounts-list'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { envelope, offsetFor } from '#shared/utils/pagination'
-import { accountsClause, directoryTotal, insideRetentionWindow, privilegedWithoutFactor } from '#server/utils/directory'
+import { accountsClause, directoryTotal, insideRetentionWindow, isShadow, privilegedWithoutFactor } from '#server/utils/directory'
 import type { AccountsContext } from '#server/utils/directory'
 
-// The picker's flag rides beside the declared fields: a tombstone is a valid target for some
-// things (A-121 criterion 4).
+// Two flags ride beside the declared fields: a tombstone is a valid target for some things
+// (A-121 criterion 4), and a shadow account is hidden until asked for (0071).
 const query = filterQuerySchema(accountsList).extend({
   includeAnonymised: yesOrNo.default(false),
+  includeShadow: yesOrNo.default(false),
 })
 
 // The account directory: search, filter and triage (A-121), through its declaration (K-129).
@@ -22,8 +23,9 @@ export default defineEventHandler(async (event) => {
     privilegedRoles: await configValue(event, 'PRIVILEGED_ROLES'),
     retentionYears: await configValue(event, 'RETENTION_FULL_ACCOUNT_YEARS'),
   }
-  const { where, orderBy } = accountsClause(input, context)
+  const { where, orderBy, hiddenShadow } = accountsClause(input, context)
   const total = await directoryTotal(where)
+  const shadowHidden = hiddenShadow ? await directoryTotal(hiddenShadow) : 0
 
   // An explicit column list: without one the ORM returns the password hash and the Google
   // subject alongside everything else.
@@ -40,6 +42,7 @@ export default defineEventHandler(async (event) => {
     hasGoogle: sql<boolean>`${schema.users.googleSub} is not null`,
     hasFactor: sql<boolean>`exists (select 1 from ${schema.totpSecrets}
       where ${schema.totpSecrets.userId} = ${schema.users.id} and ${schema.totpSecrets.confirmedAt} is not null)`,
+    shadow: sql<boolean>`(${isShadow()})`,
   })
     .from(schema.users)
     .where(where)
@@ -47,9 +50,11 @@ export default defineEventHandler(async (event) => {
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 
+  // SQLite answers a boolean expression as 0 or 1, and a row carries it as a boolean.
   return {
-    ...envelope(items, total, input.page, input.pageSize),
+    ...envelope(items.map(item => ({ ...item, shadow: Boolean(item.shadow) })), total, input.page, input.pageSize),
     banners: await banners(context),
+    shadowHidden,
   }
 })
 

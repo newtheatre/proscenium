@@ -258,7 +258,10 @@ Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
   1. All users import from stage-door with scrypt password hashes and TOTP secrets intact;
      nobody is forced to reset a password by the migration.
   2. Role grants map through a written vocabulary table agreed with the committee; provenance
-     and expiry dates carry. Amended 30 August 2026: the old audit log is not imported at all, in
+     and expiry dates carry. Amended 14 September 2026: the table is the suggestion shown at a
+     prompt, and each live grant crosses only as a recorded human decision in
+     `out/role-decisions.tsv`, accepted with the committee-year expiry, permanent, changed or
+     skipped; an undecided grant fails the build (0070). Amended 30 August 2026: the old audit log is not imported at all, in
      any shape. Its actions belong to features this system does not have and its details carry the
      free text the live trail refuses, so importing it would put a standing obligation on every
      later erasure (0030).
@@ -288,6 +291,10 @@ Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
      all four apps already share; no import ever matches on name or email.
   2. A row whose person id has no imported user fails into an exceptions report; nothing is
      silently skipped and nothing is guessed.
+     Amended 14 September 2026: the catalogues every history keys to (rooms, union venues,
+     departments, modules, ticket types) import by id in the same build rather than being
+     authored first and matched by name (0075); a room booking whose booker the old estate
+     no longer names lands on one named shadow account rather than being dropped.
   3. Imported rows take fresh ids and the live schema carries no legacy-id columns (decision
      0015, amended): the source-to-new id mapping lives only in the migration tooling's working
      artefacts, kept with the read-only old estate and archived with it, so historical

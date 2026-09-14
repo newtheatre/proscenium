@@ -55,6 +55,7 @@ export interface BookingSummary {
   externalWritten: number
   skippedNoRoom: number
   skippedNoAccount: number
+  unrecordedBooker: number
   series: number
   droppedPatterns: number
   byStatus: Record<string, number>
@@ -74,6 +75,9 @@ export interface TransformInput {
   bookingIds: Map<string, string>
   seriesIds: Map<string, string>
   externalIds: Map<string, string>
+  // The old rooms app lost every booker (user_id is NULL on all 258 rows, 13 September 2026). A
+  // booking naming nobody lands on this shadow account rather than being dropped; never a guess.
+  unrecordedBookerId?: string | null
   target: Database
 }
 
@@ -91,6 +95,15 @@ function idFor(map: Map<string, string>, key: string): string {
 
 export function transformBookings(input: TransformInput): { summary: BookingSummary, exceptions: string[] } {
   const { source, accounts, rooms, spaces, bookingIds, seriesIds, externalIds, target } = input
+  const unrecordedBookerId = input.unrecordedBookerId ?? null
+  const bookerOf = (userId: string | null): string | undefined => {
+    if (userId) return accounts.get(userId)
+    if (unrecordedBookerId) {
+      summary.unrecordedBooker++
+      return unrecordedBookerId
+    }
+    return undefined
+  }
   const exceptions: string[] = []
   const byStatus: Record<string, number> = {}
   const byExternalStatus: Record<string, number> = {}
@@ -112,6 +125,7 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
     externalWritten: 0,
     skippedNoRoom: 0,
     skippedNoAccount: 0,
+    unrecordedBooker: 0,
     series: 0,
     droppedPatterns: 0,
     byStatus,
@@ -138,7 +152,7 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
     }
 
     const roomId = rooms.get(`room:${head.room_id}`)
-    const userId = head.user_id ? accounts.get(head.user_id) : undefined
+    const userId = bookerOf(head.user_id)
     if (!roomId || !userId) continue
 
     const start = new Date(head.start_time)
@@ -166,7 +180,7 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
   }
 
   for (const row of old) {
-    const userIdEarly = row.user_id ? accounts.get(row.user_id) : undefined
+    const userIdEarly = bookerOf(row.user_id)
 
     // A booking at a union venue is a request, not a booking: it named a space we do not control
     // and held nothing here (C-120, 0036).
@@ -228,7 +242,7 @@ export function transformBookings(input: TransformInput): { summary: BookingSumm
 
     // A booking whose account never made it across has nobody to belong to. Never invented: an
     // import that mints an account resurrects somebody erasure removed (criterion 3).
-    const userId = row.user_id ? accounts.get(row.user_id) : undefined
+    const userId = userIdEarly
     if (!userId) {
       summary.skippedNoAccount++
       exceptions.push(`booking ${row.id}: no canonical account`)

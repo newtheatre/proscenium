@@ -127,80 +127,46 @@ already applied on its next run and does nothing further; it is not skipped, onl
 
 ## Importing the old estate
 
-The identity import is rehearsed weekly and applied once, at cutover. Everything but the export
-runs offline against dumps, and nothing in `migration/` can write to a remote database
-(`migration/README.md`). **The export reads the live serving database directly**
-(`wrangler d1 export --remote`, `migration/export.sh`), not a backup: there is no separate backup
-to read instead, and Time Travel is what stands in for one, which is why the cutover load below
-takes a bookmark first. Epic #338's first item said "backup" for a while; that was wrong, Matt has
-corrected it, and this document should not repeat the mistake.
+One command builds the whole unified database locally from fresh dumps, and one script replaces
+production's contents with it (0072, `migration/README.md`). **The export reads the live serving
+database directly** (`wrangler d1 export --remote`, `migration/export.sh`), not a backup: there is
+no separate backup to read instead, and Time Travel is what stands in for one, which is why the
+reset below takes a bookmark first. Epic #338's first item said "backup" for a while; that was
+wrong, Matt has corrected it, and this document should not repeat the mistake.
 
-### Pre-flight checklist for a rehearsal
-
-A target with the real application schema first, then the training and ticketing catalogues a
-rehearsal cannot invent (see "Two kinds of map" in `migration/README.md`): **rooms, union venues
-and ticket types must already be authored through their own admin screens before this runs.**
-Venues and seasons do not belong on that list; `transform-programme.ts` mints those itself, the
-same way `transform-identity.ts` mints a person. On the very first rehearsal, before anyone has
-touched the room or ticket type admin screens, the reference maps below draft mostly blank and
-the transforms that need them correctly refuse: that is the checklist working, not the pipeline
-being broken.
+### The run
 
 ```bash
-bun run migration:export                          # wrangler d1 export --remote, four databases
-bun migration/inventory.ts                         # per-table counts and checksums from the dumps
-bun migration/transform-identity.ts                # builds out/unified.sqlite; reuses out/id-map.tsv
-bun migration/reconcile.ts                         # exits non-zero on any failure: fix the transform, not the numbers
-bun migration/load.ts <target>                     # writes out/load.sql, applies it, reports row counts
-bun migration/generate-reference-maps.ts <target>  # drafts room, space and ticket-type maps
-bun migration/transform-bookings.ts <target>       # refuses if a reference map still has a blank line
-bun migration/transform-training.ts <target>       # refuses without a training catalogue
-bun migration/transform-programme.ts <target>      # venues, seasons, shows, performances
-bun migration/transform-reservations.ts <target>   # run early: see below
-bun migration/transform-money.ts <target>          # ticket revenue into the real ledger
+bun run migration:export          # four databases into migration/dumps/<date>/
+bun run migration:review-roles    # one prompt per live old grant (0070); resumable
+bun run migration:copy-posters    # posters into the unified R2 bucket, in a second terminal
+bun run migration:build           # out/target.sqlite, every step reconciled; rerun after the copy finishes
+bun run migration:dump -- --skip-ledger
 ```
 
-What a bad result looks like at each step, checked before moving to the next:
+What a bad result looks like, checked before moving on:
 
-- **`reconcile.ts` exits non-zero.** Read the printed problem, not just the exit code: it names
-  the invariant that broke (a Workspace password not wiped, an old role never mapped, a count
-  mismatch). Fix `migration/identity.ts`, never adjust the reconciliation to match what came out.
-- **A transform prints exceptions.** An exceptions file with a handful of rows naming a specific
-  orphaned reference (a booking whose room never came across, a record whose module did not
-  import) is normal: every transform is built to refuse a guess rather than invent one. **An
-  exceptions file that is unexpectedly large, or dominated by one message (`no performance`, `no
-  ticket type`, `no canonical account`), is a different thing and should be read as a key
-  convention mismatch before it is read as missing data.** `out/performance-map.tsv` keyed on the
-  wrong shape did exactly this on 10 September: every reservation "failed to resolve", and the
-  fix was a naming convention, not the data.
-- **`transform-bookings.ts` or `transform-training.ts` refuses outright**, naming a blank
-  reference map line or a missing catalogue. Author the missing room, venue or ticket type and
-  rerun `generate-reference-maps.ts`, or confirm the blank by hand if it already exists under a
-  different name (`migration/README.md`, "Two kinds of map"). Never edit a transform to skip the
-  refusal.
+- **`build.ts` prints `FAILED` under a step.** The line under it names the invariant that broke
+  (a Workspace password not wiped, a count mismatch, a live grant with no decision). Fix the
+  transform, or record the decision, never adjust a check to match what came out.
+- **A step prints exceptions.** `out/*-exceptions.txt` names each row the transform refused to
+  guess about (a booking naming no room, a module with an expiry the schema refuses, a session
+  with no times). A handful is normal. **A file that is unexpectedly large, or dominated by one
+  message, is a key or vocabulary mismatch before it is missing data**: `out/performance-map.tsv`
+  keyed on the wrong shape did exactly this on 10 September 2026, and the real `reservations.source`
+  vocabulary (`LEGACY_IMPORT`, `DOOR`) would have skipped 28,879 rows on 13 September had the map
+  not been widened. Counted totals (`byConfidence`, `negativePriceClamped`) are in the step's
+  summary JSON rather than one line per ticket.
+- **`build.ts` refuses a step outright** (no decisions file, no catalogue in the target). It says
+  which earlier step to run.
 
-**Run `transform-reservations.ts` early, not last.** Its old-estate column names are inferred,
-not confirmed against a real export, because nobody building it had one to check against
-(#840, "What I do not have"). `bun:sqlite` throws loudly and
-immediately on a column that does not exist; that is a cheap, obvious failure, and the first real
-export is the first time it can actually happen. Finding it in the second half of a long rehearsal
-sequence costs more than finding it third or fourth.
+Before the real review, delete any rehearsal `out/role-decisions.tsv`: the review only asks about
+grants with no line on file.
 
-**The first real export is the first genuine test of every cross-transform key convention, not
-only of column names.** Two transforms agreeing on a table's columns is not the same claim as two
-transforms agreeing on how a map file is keyed; nothing before a real export exercises the second
-kind of mismatch, because every existing test builds its own fixture to the convention its own
-author assumed.
-
-The load upserts on identity and **never deletes**: a person or a grant that disappeared upstream
-stays until somebody decides what should happen to them.
-
-**What a green rehearsal is actually proving.** In the 6 September 2026 export, 8,268 of 9,974
-`auth.users` are already anonymised and 8,274 are disabled: about five in six of what the identity
-rehearsal imports is a tombstone or a disabled account, not a live one. A rehearsal proving "an
-active account with roles and a second factor carries across" is exercising roughly one row in
-six; the tombstone-and-disabled path is the dominant case, not the edge case, whatever two
-consecutive green runs are read to demonstrate for the Phase 2 gate (`docs/roadmap.md`).
+What a green build is actually proving: in the 13 September 2026 export, 8,268 of 9,975
+`auth.users` are anonymised and 9,943 have no way to sign in (shadow accounts, 0071). A build
+proving "an active account with roles and a second factor carries across" is exercising a few
+dozen rows; the tombstone-and-shadow path is the dominant case, not the edge case.
 
 ### Memberships do not migrate: every member reads as lapsed on day one
 
@@ -252,21 +218,34 @@ has a named owner (K-108).
 Left as is: it is recorded here, and a migration tidy-up is not something to start days before the
 rehearsal.
 
-### At cutover
+### Resetting production from the build
 
-Applied by hand, like everything else destructive, and only after a green reconciliation:
+By hand, like everything else destructive, and only after a green build:
 
 ```bash
-bunx wrangler d1 time-travel info unified          # take the bookmark first
-bunx wrangler d1 execute unified --remote --file=migration/out/load.sql
+export NUXT_HUB_CLOUDFLARE_ACCOUNT_ID=... NUXT_HUB_CLOUDFLARE_API_TOKEN=... \
+       NUXT_HUB_CLOUDFLARE_DATABASE_ID=02c35a27-b6dc-47b0-8d9b-7a526324aca1
+./migration/reset-production.sh --i-mean-it unified
 ```
 
-`load.sql` is plain statements with no bound parameters, so D1's parameter limits do not apply. It
-is **not** one transaction: D1 executes the file statement by statement, which is why the Time
-Travel bookmark is taken first and why the load is safe to run again after a partial failure.
+The script takes the Time Travel bookmark and refuses without one, drops every application table
+(never Nuxt Content's), runs `nuxt-db migrate` and checks the ledger with
+`.github/scripts/pending-migrations.sh`, executes `out/publish/*.sql` in order recording each
+file in `out/publish/DONE`, and compares every table's row count with the build's. It is not one
+transaction: D1 executes each file statement by statement, which is why the bookmark comes first
+and why running it again after a partial failure resumes rather than repeats. The restore, if it
+comes to that:
 
-Keep `out/id-map.tsv` until cutover is complete. After that it is the key to an estate that no
-longer exists, and it goes with the archive rather than staying on anybody's laptop.
+```bash
+bunx wrangler d1 time-travel restore unified --bookmark=<bookmark>
+```
+
+The rows the migrations seed (`incident_severity_config`, `su_nominal_mappings`,
+`backstage_milestone_types`) are left to `nuxt-db migrate` and are not in the data files.
+
+Keep `out/id-map.tsv` and the other maps until cutover is complete. After that they are the key
+to an estate that no longer exists, and they go with the archive rather than staying on anybody's
+laptop.
 
 ### The cutover runbook: branches, DNS and workflows
 

@@ -30,7 +30,10 @@ function files(exts: string[]): string[] {
     if (SKIP.has(entry.name)) continue
     if (entry.isDirectory()) {
       for (const path of glob.scanSync({ cwd: join(ROOT, entry.name), dot: true, onlyFiles: true })) {
-        found.push(`${entry.name}/${path.replaceAll('\\', '/')}`)
+        const forward = path.replaceAll('\\', '/')
+        // migration/dumps and migration/out sit one level down and hold member data too.
+        if (forward.split('/').some(segment => SKIP.has(segment))) continue
+        found.push(`${entry.name}/${forward}`)
       }
     }
     else if (exts.some(ext => entry.name.endsWith(`.${ext}`))) {

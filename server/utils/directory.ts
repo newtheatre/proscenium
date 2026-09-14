@@ -75,6 +75,14 @@ const neverSignedIn = (): SQL => and(
   isNull(schema.users.lastLoginAt),
 )!
 
+// No password, no Google link and no passkey: made from the console, as a ticket guest or by
+// the import, and never anybody's registration. Not the same thing as unverified (0071).
+export const isShadow = (): SQL => and(
+  isNull(schema.users.password),
+  isNull(schema.users.googleSub),
+  sql`not exists (select 1 from ${schema.passkeys} where ${schema.passkeys.userId} = ${schema.users.id})`,
+)!
+
 // What the declaration's derived fields need, resolved by the endpoint from configuration so
 // this file stays free of Nitro and a test can drive it with plain values.
 export interface AccountsContext {
@@ -87,6 +95,13 @@ export interface AccountsContext {
 export interface AccountsQuery extends ListQuery {
   // The picker's flag: a tombstone is a valid target for some things, so it may ask for them.
   includeAnonymised?: boolean
+  // Shadow accounts are hidden the same way, and this asks for them without filtering to them.
+  includeShadow?: boolean
+}
+
+export interface AccountsClause extends ListClause {
+  // Counts what the default hiding took out of this listing; undefined when nothing was hidden.
+  hiddenShadow: SQL | undefined
 }
 
 function roleCondition(condition: FilterCondition, now: number): SQL {
@@ -106,7 +121,7 @@ function membershipCondition(condition: FilterCondition, grace: number): SQL {
   }
 }
 
-export function accountsClause(query: AccountsQuery, context: AccountsContext): ListClause {
+export function accountsClause(query: AccountsQuery, context: AccountsContext): AccountsClause {
   const clause = whereFrom(accountsList, query, {
     column: tableColumns(schema.users),
     search: [schema.users.name, schema.users.email, sql`coalesce(${schema.users.studentId}, '')`],
@@ -119,12 +134,23 @@ export function accountsClause(query: AccountsQuery, context: AccountsContext): 
       privilegedWithoutFactor: yesNo(privilegedWithoutFactor(context.privilegedRoles, context.now)),
       approachingRetention: yesNo(insideRetentionWindow(context.retentionYears, context.now)),
       neverSignedIn: yesNo(neverSignedIn()),
+      shadow: yesNo(isShadow()),
     },
   })
 
-  // Anonymised rows are hidden unless explicitly asked for (A-121 criterion 4).
-  const asked = query.includeAnonymised || conditionsOf(accountsList, query).some(condition => condition.key === 'anonymised')
-  return asked ? clause : { ...clause, where: and(isNull(schema.users.anonymisedAt), clause.where) }
+  // Anonymised rows are hidden unless explicitly asked for (A-121 criterion 4), and shadow rows
+  // the same way: a search, their own filter or the flag is asking (0071).
+  const conditions = conditionsOf(accountsList, query)
+  const askedAnonymised = query.includeAnonymised || conditions.some(condition => condition.key === 'anonymised')
+  const askedShadow = Boolean(query.includeShadow || query.search)
+    || conditions.some(condition => condition.key === 'shadow' || condition.key === 'neverSignedIn')
+
+  const notAnonymised = askedAnonymised ? undefined : isNull(schema.users.anonymisedAt)
+  return {
+    ...clause,
+    where: and(notAnonymised, askedShadow ? undefined : sql`not (${isShadow()})`, clause.where),
+    hiddenShadow: askedShadow ? undefined : and(isNull(schema.users.anonymisedAt), isShadow(), clause.where),
+  }
 }
 
 export async function directoryTotal(where: SQL | undefined): Promise<number> {

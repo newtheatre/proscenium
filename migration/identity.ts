@@ -3,11 +3,14 @@
 import { Database } from 'bun:sqlite'
 import { join } from 'node:path'
 import { ROOT, nanoid } from './lib'
+import { decisionKey } from './role-decisions'
+import type { RoleDecisions } from './role-decisions'
 
 export interface TransformInput {
   auth: Database
   mirrors: { source: string, db: Database }[]
-  roleMap: Record<string, string>
+  // One human decision per old grant (review-roles.ts, 0070); a grant with none is skipped and named.
+  decisions: RoleDecisions
   // Read before anything is minted, and extended in place with whoever is new.
   idMap: Map<string, string>
   target: Database
@@ -30,8 +33,8 @@ export interface TransformSummary {
 export interface TransformResult {
   summary: TransformSummary
   exceptions: string[]
-  // Old roles held by a live grant that the map has no key for. One is a failed rehearsal.
-  unmappedRoles: string[]
+  // Live old grants nobody has decided on yet, as decision keys. One is a failed rehearsal.
+  undecided: string[]
 }
 
 // The core is a subset of the application's schema, for rehearsals to reconcile against before
@@ -68,7 +71,7 @@ interface Grant {
 }
 
 export function transformIdentity(input: TransformInput): TransformResult {
-  const { auth, mirrors, roleMap, idMap, target } = input
+  const { auth, mirrors, decisions, idMap, target } = input
   const now = input.now ?? Date.now()
   const exceptions: string[] = []
 
@@ -133,20 +136,13 @@ export function transformIdentity(input: TransformInput): TransformResult {
 
   // Distinct old roles can collapse onto one unified role for one person; merge them, permanent
   // expiry winning over dated, latest date otherwise.
-  const merged = new Map<string, { userId: string, role: string, grant: Grant, collapsed: number }>()
-  const unmappedRoles = new Set<string>()
+  const merged = new Map<string, { userId: string, role: string, grant: Grant, expiresAt: number | null, collapsed: number }>()
+  const undecided = new Set<string>()
   let grantsSkipped = 0
   for (const grant of grants) {
-    const mapped = roleMap[grant.role]
     const userId = idMap.get(grant.user_id)
     if (!userId) {
       exceptions.push(`grant ${grant.role}: unknown user ${grant.user_id}`)
-      grantsSkipped++
-      continue
-    }
-    if (!mapped) {
-      unmappedRoles.add(grant.role)
-      exceptions.push(`grant ${grant.role} (user ${grant.user_id}): no mapping, not imported`)
       grantsSkipped++
       continue
     }
@@ -155,22 +151,36 @@ export function transformIdentity(input: TransformInput): TransformResult {
       grantsSkipped++
       continue
     }
-    const key = `${userId} ${mapped}`
+    const decision = decisions.get(decisionKey(grant.user_id, grant.role))
+    if (!decision) {
+      undecided.add(decisionKey(grant.user_id, grant.role))
+      exceptions.push(`grant ${grant.role} (user ${grant.user_id}): no decision recorded, not imported`)
+      grantsSkipped++
+      continue
+    }
+    if (decision === 'SKIP') {
+      grantsSkipped++
+      continue
+    }
+    const key = `${userId} ${decision.role}`
     const existing = merged.get(key)
     if (!existing) {
-      merged.set(key, { userId, role: mapped, grant, collapsed: 0 })
+      merged.set(key, { userId, role: decision.role, grant, expiresAt: decision.expiresAt, collapsed: 0 })
       continue
     }
     existing.collapsed++
-    const held = existing.grant.expires_at
-    const offered = grant.expires_at
-    if (offered === null || (held !== null && offered > held)) existing.grant = grant
+    const held = existing.expiresAt
+    const offered = decision.expiresAt
+    if (offered === null || (held !== null && offered > held)) {
+      existing.grant = grant
+      existing.expiresAt = offered
+    }
   }
 
   let grantsImported = 0
   let grantsCollapsed = 0
   target.exec('BEGIN')
-  for (const { userId, role, grant, collapsed } of merged.values()) {
+  for (const { userId, role, grant, expiresAt, collapsed } of merged.values()) {
     // granted_by has no foreign key to catch it, so an unmapped one would land in the live
     // database as an old estate identifier (0015).
     let grantedBy: string | null = null
@@ -180,7 +190,7 @@ export function transformIdentity(input: TransformInput): TransformResult {
         exceptions.push(`grant ${role} (user ${grant.user_id}): granted by an unknown ${grant.granted_by}, recorded without one`)
       }
     }
-    insertGrant.run(nanoid(), userId, role, grant.expires_at, grantedBy, grant.granted_at ?? now, grant.note, grant.expiry_warned_at)
+    insertGrant.run(nanoid(), userId, role, expiresAt, grantedBy, grant.granted_at ?? now, grant.note, grant.expiry_warned_at)
     grantsImported++
     grantsCollapsed += collapsed
     if (collapsed) exceptions.push(`note: ${collapsed + 1} old grants collapsed onto ${role} for one user; widest expiry kept`)
@@ -227,6 +237,6 @@ export function transformIdentity(input: TransformInput): TransformResult {
       recoveryCodes: codesImported,
     },
     exceptions,
-    unmappedRoles: [...unmappedRoles],
+    undecided: [...undecided],
   }
 }

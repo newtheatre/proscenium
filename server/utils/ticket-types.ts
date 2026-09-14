@@ -2,8 +2,10 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 // Safe to import at runtime: `capacity.ts` only imports types from this file, so no cycle exists
 // the way one would if this pulled a constant back from `programme.ts` (see that file's note).
+import { newId } from './accounts'
 import { TICKETS_ARE_A_SALE } from './capacity'
 import { aliasColumns, whereFrom } from './list-filters'
+import { PASS_ADMISSION_TICKET_TYPE_NAME } from '#shared/utils/ticket-types'
 import { ticketTypesList } from '#shared/utils/ticket-types-list'
 import type { SQL } from 'drizzle-orm'
 import type { ListClause } from './list-filters'
@@ -94,8 +96,34 @@ export function ticketTypesClause(query: ListQuery): ListClause {
   })
 }
 
-// The system row D-125's redemption ensures the first time any pass is redeemed is nobody's to
-// administer: this screen sells and archives SINGLE rows, never a pass's own admission type.
+// The system's own row, found by kind whatever its id or name: the import writes the same row
+// ahead of any redemption, so this must be content to find one it did not mint (0074).
+export const PASS_ADMISSION_TICKET_TYPE_QUERY = sql`SELECT id FROM ticket_types WHERE kind = 'PASS_ADMISSION' LIMIT 1`
+
+// Minted at most once: the predicate rides the INSERT (0003), and the name conflict is a no-op
+// rather than an error, so a race between two first redemptions leaves exactly one row.
+export function passAdmissionTicketTypeInsert(id: string): SQL {
+  return sql`
+    INSERT INTO ticket_types (id, name, price, kind)
+    SELECT ${id}, ${PASS_ADMISSION_TICKET_TYPE_NAME}, 0, 'PASS_ADMISSION'
+    WHERE NOT EXISTS (SELECT 1 FROM ticket_types WHERE kind = 'PASS_ADMISSION')
+    ON CONFLICT (name) DO NOTHING
+  `
+}
+
+// The one row every redeemed pass ticket shares, created on the first redemption and read every
+// time after. Nobody administers it: the admin routes refuse it by kind (0074).
+export async function passAdmissionTicketType(): Promise<string> {
+  const [existing] = await db.all<{ id: string }>(PASS_ADMISSION_TICKET_TYPE_QUERY)
+  if (existing) return existing.id
+
+  await db.run(passAdmissionTicketTypeInsert(newId()))
+  const [row] = await db.all<{ id: string }>(PASS_ADMISSION_TICKET_TYPE_QUERY)
+  if (!row) throw new Error(`A SINGLE ticket type already holds the name ${PASS_ADMISSION_TICKET_TYPE_NAME}, so the system row cannot be made`)
+  return row.id
+}
+
+// This screen sells and archives SINGLE rows, never the system's own pass-admission type (0074).
 const predicate = (clause: ListClause): SQL =>
   sql` WHERE ${sql.join([sql`kind = 'SINGLE'`, ...(clause.where ? [clause.where] : [])], sql` AND `)}`
 

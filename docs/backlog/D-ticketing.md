@@ -457,7 +457,10 @@ Open questions:
 - Depends on: none
 - Acceptance criteria:
   1. Ticket types (standard, member, concession, and any committee-defined type) are global with
-     globally unique names, each carrying a base price in integer pence.
+     globally unique names, each carrying a base price in integer pence. Amended 14 September
+     2026: a type's kind is not an officer's choice. Every type made here is a single ticket; the
+     one pass-admission type is the system's own, minted on first redemption or by the import,
+     hidden from the listing and the price screens, and refused by edit, archive and delete (0074).
   2. A ticket type that has ever been sold can only be archived, never deleted; an archived type
      stops appearing for new sales but resolves for every historical ticket, report and export.
   3. A ticket type that has never sold may be deleted outright.
@@ -552,7 +555,10 @@ Open questions:
 - Depends on: D-114, D-123
 - Acceptance criteria:
   1. A pass is sold at the desk with payment on the SumUp reader, under the expected-total
-     cross-check (D-114); issue attaches the pass to the buyer's account.
+     cross-check (D-114); issue attaches the pass to the buyer's account. Amended 14 September
+     2026: a pass issued here always names its issuer, and `issued_by` is NULL only on a pass the
+     import reconstructed from an old sale or admission, whose issuer the old estate never
+     recorded (0073).
   2. Issuing a pass writes a pass-sale ledger entry at the moment of payment, so pass revenue
      reaches reconciliation and the night's expected Z figure (fixing the old estate's missing
      PASS_SALE rows).

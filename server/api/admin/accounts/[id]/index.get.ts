@@ -63,6 +63,12 @@ export default defineEventHandler(async (event) => {
         .limit(RECENT_ENTRIES)
     : []
 
+  const methods = {
+    password: account.password !== null,
+    google: Boolean((account as { googleSub?: string | null }).googleSub),
+    passkeys: passkeys.length,
+  }
+
   return {
     account: {
       id: account.id,
@@ -71,11 +77,11 @@ export default defineEventHandler(async (event) => {
       verified: account.verified,
       disabled: account.disabled,
       anonymisedAt: account.anonymisedAt,
+      // The directory's isShadow, answered from what was already read (0071).
+      shadow: !methods.password && !methods.google && methods.passkeys === 0,
     },
     methods: {
-      password: account.password !== null,
-      google: Boolean((account as { googleSub?: string | null }).googleSub),
-      passkeys: passkeys.length,
+      ...methods,
       factor: Boolean(factor?.confirmedAt),
       recoveryCodesRemaining: codes.length,
     },

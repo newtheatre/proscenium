@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import { systemTicketTypeRefusal } from '#shared/utils/ticket-types'
 
 // Delete a ticket type that has never been sold. One that has can only be archived, and the
 // refusal says so (D-119 criteria 2 and 3).
@@ -8,6 +9,8 @@ export default defineEventHandler(async (event) => {
 
   const held = await ticketTypeById(id)
   if (!held) throw createError({ statusCode: 404, statusMessage: 'No such ticket type' })
+  const reserved = systemTicketTypeRefusal(held)
+  if (reserved) throw createError({ statusCode: 409, statusMessage: reserved })
 
   if (held.everSold) {
     throw createError({

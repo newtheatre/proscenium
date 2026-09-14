@@ -1,14 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 import {
   MAX_TICKET_PRICE_PENCE,
+  PASS_ADMISSION_TICKET_TYPE_NAME,
   archiveTicketTypeForm,
   isPublicTicketType,
+  isSystemTicketType,
   newTicketTypeForm,
   publicTicketTypes,
   saysAccessKind,
   saysPrice,
   saysRestriction,
-  saysTicketTypeKind,
+  systemTicketTypeRefusal,
   ticketTypeForm,
 } from '#shared/utils/ticket-types'
 import type { TicketType } from '#shared/utils/ticket-types'
@@ -53,9 +55,30 @@ describe('a ticket type carries a base price in integer pence (criterion 1)', ()
     expect(newTicketTypeForm.safeParse({ name: 'box@newtheatre.org.uk', price: 700 }).success).toBe(false)
   })
 
-  test('the kind defaults to a single ticket and takes nothing invented', () => {
-    expect(newTicketTypeForm.parse({ name: 'Standard', price: 700 }).kind).toBe('SINGLE')
-    expect(newTicketTypeForm.safeParse({ name: 'Standard', price: 700, kind: 'SEASON' }).success).toBe(false)
+  // Kind is the data vocabulary, not an officer's choice (0074): a client still sending one is
+  // neither refused nor obeyed, and the route writes SINGLE regardless.
+  test('the creation form does not ask for a kind, and one sent is dropped rather than refused', () => {
+    expect('kind' in newTicketTypeForm.parse({ name: 'Standard', price: 700 })).toBe(false)
+    expect('kind' in newTicketTypeForm.parse({ name: 'Standard', price: 700, kind: 'SINGLE' })).toBe(false)
+    expect('kind' in newTicketTypeForm.parse({ name: 'Standard', price: 700, kind: 'PASS_ADMISSION' })).toBe(false)
+    expect(newTicketTypeForm.safeParse({ name: 'Standard', price: 700, kind: 'SEASON' }).success).toBe(true)
+  })
+})
+
+describe('the pass-admission type is the system\'s own (0074)', () => {
+  test('it is told apart by kind, never by name or id', () => {
+    expect(isSystemTicketType({ kind: 'PASS_ADMISSION' })).toBe(true)
+    expect(isSystemTicketType({ kind: 'SINGLE' })).toBe(false)
+  })
+
+  test('every write route quotes the same plain sentence, and an ordinary type has nothing to say', () => {
+    const refusal = systemTicketTypeRefusal({ kind: 'PASS_ADMISSION', name: PASS_ADMISSION_TICKET_TYPE_NAME })
+    expect(refusal).toBe('Pass admission is the system\'s own ticket type: a pass holder is seated under it automatically, so it cannot be edited, archived or deleted')
+    expect(systemTicketTypeRefusal(type())).toBeNull()
+  })
+
+  test('the row goes by one name wherever it is written', () => {
+    expect(PASS_ADMISSION_TICKET_TYPE_NAME).toBe('Pass admission')
   })
 })
 
@@ -125,11 +148,6 @@ describe('an access or companion type is never in a public payload (criterion 4)
 })
 
 describe('what a screen says', () => {
-  test('a kind reads as English', () => {
-    expect(saysTicketTypeKind('SINGLE')).toBe('Single ticket')
-    expect(saysTicketTypeKind('PASS_ADMISSION')).toBe('Pass admission')
-  })
-
   test('an access kind reads as English, and an ordinary type has nothing to say', () => {
     expect(saysAccessKind('ACCESS')).toBe('Access')
     expect(saysAccessKind('COMPANION')).toBe('Companion')
