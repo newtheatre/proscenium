@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { boardJoinForm } from '#shared/utils/backstage'
-import { formatLondon } from '#shared/utils/london'
+import type { BoardSide } from '#shared/utils/backstage'
 
 definePageMeta({ layout: 'backstage' })
 
@@ -40,6 +40,7 @@ interface MilestoneType { id: string, label: string }
 interface Preset { id: string, label: string, body: string }
 interface Message {
   id: string
+  side: BoardSide
   posterLabel: string
   milestoneTypeId: string | null
   milestoneLabel: string | null
@@ -48,11 +49,14 @@ interface Message {
   composedAt: number
 }
 interface Acknowledgement { messageId: string, deviceId: string }
+interface Seen { messageId: string, seenAt: number }
 
 const milestoneTypes = ref<MilestoneType[]>([])
 const presets = ref<Preset[]>([])
 const messages = ref<Message[]>([])
 const acknowledgements = ref<Acknowledgement[]>([])
+const seen = ref<Seen[]>([])
+const deviceId = ref<string | null>(null)
 const boardFailure = ref<string | null>(null)
 const freeText = ref('')
 
@@ -68,9 +72,11 @@ async function loadConfig(): Promise<void> {
 
 async function loadMessages(): Promise<void> {
   try {
-    const answered = await $fetch<{ messages: Message[], acknowledgements: Acknowledgement[] }>('/api/board/messages')
+    const answered = await $fetch<{ messages: Message[], acknowledgements: Acknowledgement[], seen: Seen[], deviceId: string }>('/api/board/messages')
     messages.value = answered.messages
     acknowledgements.value = answered.acknowledgements
+    seen.value = answered.seen
+    deviceId.value = answered.deviceId
     boardFailure.value = null
   }
   catch (error) {
@@ -141,14 +147,11 @@ async function acknowledge(messageId: string): Promise<void> {
   catch { /* a tap that failed to record is a tap the crew member can try again */ }
 }
 
-// Only the latest event in a supersede chain is shown (E-121 criterion 5).
-const current = computed(() => {
-  const superseded = new Set(messages.value.map(message => message.supersedesId).filter((id): id is string => id !== null))
-  return messages.value.filter(message => !superseded.has(message.id))
-})
-
-function timeOf(at: number): string {
-  return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
+// A call from front of house waits for this device's own tick (criterion 4); another device's
+// tick is what the feed's "seen" reads, not a reason to hide the button here.
+function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
+  return message.side === 'FOH'
+    && !acknowledgements.value.some(ack => ack.messageId === message.id && ack.deviceId === deviceId.value)
 }
 </script>
 
@@ -239,80 +242,88 @@ function timeOf(at: number): string {
         :description="boardFailure"
       />
 
-      <div
-        v-if="milestoneTypes.length || presets.length"
-        class="grid grid-cols-2 gap-2"
+      <BoardFeed
+        side="BACKSTAGE"
+        :messages="messages"
+        :seen="seen"
       >
-        <UButton
-          v-for="type in milestoneTypes"
-          :key="type.id"
-          color="primary"
-          size="lg"
-          class="min-h-12"
-          :data-test="`milestone-${type.id}`"
-          @click="postMilestone(type.id)"
-        >
-          {{ type.label }}
-        </UButton>
-        <UButton
-          v-for="preset in presets"
-          :key="preset.id"
-          color="neutral"
-          variant="subtle"
-          size="lg"
-          class="min-h-12"
-          :data-test="`preset-${preset.id}`"
-          @click="postPreset(preset.id)"
-        >
-          {{ preset.label }}
-        </UButton>
-      </div>
-
-      <form
-        class="flex gap-2"
-        data-test="free-text-form"
-        @submit.prevent="postFreeText"
-      >
-        <UInput
-          v-model="freeText"
-          placeholder="Say something"
-          class="w-full"
-          data-test="free-text-input"
-        />
-        <UButton
-          type="submit"
-          data-test="free-text-submit"
-        >
-          Send
-        </UButton>
-      </form>
-
-      <div class="space-y-2">
-        <div
-          v-for="message in current"
-          :key="message.id"
-          class="rounded-lg border border-default p-3"
-          :data-test="`message-${message.id}`"
-        >
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-sm font-semibold">{{ message.milestoneLabel ?? message.body }}</span>
-            <span class="text-xs text-muted">{{ timeOf(message.composedAt) }}</span>
-          </div>
-          <p class="text-xs text-muted">
-            {{ message.posterLabel }}
-          </p>
+        <template #other-unseen="{ message }">
           <UButton
+            v-if="awaitsMyTick(message)"
             size="xs"
             color="neutral"
-            variant="ghost"
-            class="mt-1"
+            variant="subtle"
+            class="ml-1 min-h-8"
+            :data-test="`acknowledge-current-${message.id}`"
+            @click="acknowledge(message.id)"
+          >
+            Seen
+          </UButton>
+          <span v-else>· not seen yet</span>
+        </template>
+
+        <div
+          v-if="milestoneTypes.length || presets.length"
+          class="grid grid-cols-2 gap-2"
+        >
+          <UButton
+            v-for="type in milestoneTypes"
+            :key="type.id"
+            color="primary"
+            size="lg"
+            class="min-h-12"
+            :data-test="`milestone-${type.id}`"
+            @click="postMilestone(type.id)"
+          >
+            {{ type.label }}
+          </UButton>
+          <UButton
+            v-for="preset in presets"
+            :key="preset.id"
+            color="neutral"
+            variant="subtle"
+            size="lg"
+            class="min-h-12"
+            :data-test="`preset-${preset.id}`"
+            @click="postPreset(preset.id)"
+          >
+            {{ preset.label }}
+          </UButton>
+        </div>
+
+        <form
+          class="flex gap-2"
+          data-test="free-text-form"
+          @submit.prevent="postFreeText"
+        >
+          <UInput
+            v-model="freeText"
+            placeholder="Say something"
+            class="w-full"
+            data-test="free-text-input"
+          />
+          <UButton
+            type="submit"
+            data-test="free-text-submit"
+          >
+            Send
+          </UButton>
+        </form>
+
+        <template #row-actions="{ message }">
+          <UButton
+            v-if="awaitsMyTick(message)"
+            size="xs"
+            color="neutral"
+            variant="subtle"
+            class="shrink-0 min-h-8"
             :data-test="`acknowledge-${message.id}`"
             @click="acknowledge(message.id)"
           >
             Seen
           </UButton>
-        </div>
-      </div>
+        </template>
+      </BoardFeed>
     </div>
   </div>
 </template>

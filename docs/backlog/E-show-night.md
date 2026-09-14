@@ -318,7 +318,7 @@ Counts: 29 MVP stories (E-101 to E-129), 4 V2 stories (E-201 to E-204), 1 Later 
   4. Each message shows which joined devices have acknowledged it.
   5. A mistaken milestone is corrected by a superseding event; the report timeline shows the corrected value with the correction visible.
   6. The board tolerates connection loss: outgoing messages queue and send on reconnect carrying their original composed time.
-  7. Front of house holds the other end of the same board at `/tonight/board`, under shift authority rather than a join code: the same presets and free text send from there, and the screen leads with the current state, each side's own last call with the time it was sent and whether the other side has seen it. Tonight's join code is on the screen, grouped as two threes so it can be read out.
+  7. Front of house holds the other end of the same board at `/tonight/board`, under shift authority rather than a join code: the same presets and free text send from there, and the screen leads with the current state, each side's own last call with the time it was sent and whether the other side has seen it. Tonight's join code is on the screen, grouped as two threes so it can be read out. Amended 14 September 2026 (Matt's direction): both ends lead with the same current state and the same side-tagged history with a tick on every call the other side has seen; the crew's end keeps its milestone buttons, its supersede rule and its per-device acknowledgement, and reads FOH's ticks the way FOH reads the crew's.
 - Source: Prompt Book E-4, P8; audit PR-11 (milestones and presets carry; real-time replaces polling as an implementation detail); committee mockup `foh-backstage.png` (criterion 7).
 
 ## E-122: Board reset and retention

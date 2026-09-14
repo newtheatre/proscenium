@@ -101,6 +101,37 @@ export function currentBoardState<T extends { side: BoardSide, composedAt: numbe
   return { foh: latestOf('FOH'), backstage: latestOf('BACKSTAGE') }
 }
 
+// What either screen needs of a message to draw it: both ends carry more, neither needs it here.
+export interface BoardMessage {
+  id: string
+  side: BoardSide
+  milestoneLabel: string | null
+  body: string
+  supersedesId: string | null
+  composedAt: number
+}
+
+export function otherBoardSide(side: BoardSide): BoardSide {
+  return side === 'FOH' ? 'BACKSTAGE' : 'FOH'
+}
+
+// Both ends lead with the same two calls, read from their own side: own last call first, then
+// the other end's (criterion 7, amended 14 September 2026).
+export function boardStateFrom<T>(side: BoardSide, state: { foh: T | null, backstage: T | null }): { own: T | null, other: T | null } {
+  return side === 'FOH' ? { own: state.foh, other: state.backstage } : { own: state.backstage, other: state.foh }
+}
+
+export interface BoardFeedRow<T> { message: T, seenAt: number | null }
+
+// The history either end shows: live rows only, each carrying the other side's first tick.
+export function boardFeedRows<T extends { id: string, supersedesId: string | null }>(
+  messages: T[],
+  seen: { messageId: string, seenAt: number }[],
+): BoardFeedRow<T>[] {
+  const seenAt = new Map(seen.map(row => [row.messageId, row.seenAt]))
+  return liveBoardMessages(messages).map(message => ({ message, seenAt: seenAt.get(message.id) ?? null }))
+}
+
 // A correction names a different milestone; nothing else is ever superseded (criterion 5).
 export const supersedeMessageForm = z.object({
   milestoneTypeId: z.string().min(1, 'Say which milestone you mean'),

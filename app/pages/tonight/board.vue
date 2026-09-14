@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { currentBoardState, liveBoardMessages, saysBoardSide } from '#shared/utils/backstage'
-import { formatLondon } from '#shared/utils/london'
 import { groupedBoardCode } from '#shared/utils/night-hub'
 import type { BoardSide } from '#shared/utils/backstage'
 
@@ -109,23 +107,6 @@ async function markSeen(messageId: string): Promise<void> {
   catch { /* a tick that failed to record is a tick the duty manager can tap again */ }
 }
 
-const live = computed(() => liveBoardMessages(messages.value))
-const state = computed(() => currentBoardState(live.value))
-
-function seenAt(messageId: string): number | null {
-  return seen.value.find(row => row.messageId === messageId)?.seenAt ?? null
-}
-
-function timeOf(at: number): string {
-  return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
-}
-
-function saysMessage(message: Message): string {
-  return message.milestoneLabel ?? message.body
-}
-
-const sideTone: Record<BoardSide, string> = { FOH: 'text-secondary', BACKSTAGE: 'text-info' }
-
 const resetting = ref(false)
 const resetFailure = ref<string | null>(null)
 const confirmingReset = ref(false)
@@ -173,146 +154,77 @@ async function reset(): Promise<void> {
         {{ writeQueue.connection.value.queued }} message{{ writeQueue.connection.value.queued === 1 ? '' : 's' }} waiting to send.
       </p>
 
-      <NightBlock title="Current state">
-        <div
-          class="grid gap-4 sm:grid-cols-[3fr_2fr]"
-          data-test="board-current"
-        >
-          <div>
-            <p class="nnt-headline text-2xl font-bold">
-              {{ state.foh ? saysMessage(state.foh) : 'Nothing called yet' }}
-            </p>
-            <p
-              v-if="state.foh"
-              class="mt-1 text-sm text-muted"
-            >
-              sent {{ timeOf(state.foh.composedAt) }}
-              <span
-                v-if="seenAt(state.foh.id)"
-                class="text-success"
-              >· seen by backstage &#10003;</span>
-              <span v-else>· not seen yet</span>
-            </p>
-          </div>
-
-          <div class="sm:text-right">
-            <p class="text-lg">
-              Backstage:
-              <span class="font-semibold text-info">{{ state.backstage ? saysMessage(state.backstage) : 'nothing yet' }}</span>
-            </p>
-            <p
-              v-if="state.backstage"
-              class="mt-1 text-sm text-muted"
-            >
-              {{ timeOf(state.backstage.composedAt) }}
-              <span
-                v-if="seenAt(state.backstage.id)"
-                class="text-success"
-              >· seen &#10003;</span>
-              <UButton
-                v-else
-                size="xs"
-                color="neutral"
-                variant="subtle"
-                class="ml-1 min-h-8"
-                :data-test="`board-seen-${state.backstage.id}`"
-                @click="markSeen(state.backstage.id)"
-              >
-                Mark seen
-              </UButton>
-            </p>
-          </div>
-        </div>
-      </NightBlock>
-
-      <section>
-        <h2 class="mb-3 font-mono text-xs tracking-[0.2em] text-muted uppercase">
-          Send to backstage
-        </h2>
-        <div
-          v-if="presets.length"
-          class="grid grid-cols-2 gap-3"
-          data-test="board-presets"
-        >
+      <BoardFeed
+        side="FOH"
+        :messages="messages"
+        :seen="seen"
+      >
+        <template #other-unseen="{ message }">
           <UButton
-            v-for="preset in presets"
-            :key="preset.id"
+            size="xs"
             color="neutral"
-            variant="outline"
-            size="lg"
-            class="min-h-14 justify-center text-base font-semibold"
-            :data-test="`board-preset-${preset.id}`"
-            @click="sendPreset(preset.id)"
+            variant="subtle"
+            class="ml-1 min-h-8"
+            :data-test="`board-seen-${message.id}`"
+            @click="markSeen(message.id)"
           >
-            {{ preset.label }}
+            Mark seen
           </UButton>
-        </div>
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          No presets are configured yet.
-        </p>
+        </template>
 
-        <form
-          class="mt-3 flex gap-3"
-          data-test="board-free-text-form"
-          @submit.prevent="sendFreeText"
-        >
-          <UInput
-            v-model="freeText"
-            placeholder="Free text..."
-            size="xl"
-            class="w-full"
-            data-test="board-free-text-input"
-          />
-          <UButton
-            type="submit"
-            color="secondary"
-            icon="i-lucide-send"
-            size="xl"
-            aria-label="Send to backstage"
-            class="min-h-14 min-w-14 justify-center"
-            data-test="board-free-text-submit"
-          />
-        </form>
-      </section>
-
-      <section>
-        <h2 class="mb-3 font-mono text-xs tracking-[0.2em] text-muted uppercase">
-          History
-        </h2>
-        <div
-          class="space-y-2"
-          data-test="board-messages"
-        >
+        <section>
+          <h2 class="mb-3 font-mono text-xs tracking-[0.2em] text-muted uppercase">
+            Send to backstage
+          </h2>
+          <div
+            v-if="presets.length"
+            class="grid grid-cols-2 gap-3"
+            data-test="board-presets"
+          >
+            <UButton
+              v-for="preset in presets"
+              :key="preset.id"
+              color="neutral"
+              variant="outline"
+              size="lg"
+              class="min-h-14 justify-center text-base font-semibold"
+              :data-test="`board-preset-${preset.id}`"
+              @click="sendPreset(preset.id)"
+            >
+              {{ preset.label }}
+            </UButton>
+          </div>
           <p
-            v-if="live.length === 0"
+            v-else
             class="text-sm text-muted"
           >
-            Nothing posted yet.
+            No presets are configured yet.
           </p>
-          <div
-            v-for="message in live"
-            :key="message.id"
-            class="flex items-center gap-3 rounded-xl bg-elevated p-3"
-            :data-test="`board-message-${message.id}`"
+
+          <form
+            class="mt-3 flex gap-3"
+            data-test="board-free-text-form"
+            @submit.prevent="sendFreeText"
           >
-            <span
-              class="shrink-0 font-semibold"
-              :class="sideTone[message.side]"
-            >{{ saysBoardSide(message.side) }}</span>
-            <span class="min-w-0 grow">{{ saysMessage(message) }}</span>
-            <span class="shrink-0 font-mono text-xs text-muted">
-              {{ timeOf(message.composedAt) }}
-              <span v-if="seenAt(message.id)">&#10003;</span>
-            </span>
-          </div>
-        </div>
-        <p class="mt-3 text-center text-sm text-muted">
-          Every call is acknowledged: you see when backstage has read it.
-        </p>
-      </section>
+            <UInput
+              v-model="freeText"
+              placeholder="Free text..."
+              size="xl"
+              class="w-full"
+              data-test="board-free-text-input"
+            />
+            <UButton
+              type="submit"
+              color="secondary"
+              icon="i-lucide-send"
+              size="xl"
+              aria-label="Send to backstage"
+              class="min-h-14 min-w-14 justify-center"
+              data-test="board-free-text-submit"
+            />
+          </form>
+        </section>
+      </BoardFeed>
 
       <!-- Shown only on request, never polled or cached: a code sitting on screen is a code
            somebody else can read off it (E-120 criteria 2, 5). -->

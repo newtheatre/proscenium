@@ -1284,6 +1284,15 @@ in the story asks a "5 minutes please" tap to be retracted. Acknowledgement
 a repeated tap anywhere else in this codebase gets, and exempted from the audit trail: a
 high-volume presence fact is not the kind of privileged mutation the trail exists for.
 
+Both ends draw the same screen from `BoardFeed.vue` (`app/components/`): the current state
+(own last call, then the other end's, each with the time and whether the other end has seen it)
+and the side-tagged history with a tick per seen row, read from whichever `side` the page passes
+(criterion 7, amended 14 September 2026). What differs is slotted in: the FOH page's "Mark seen"
+and its presets, the crew page's milestone grid and its per-device "Seen" button, which shows only
+on a call from front of house this device has not yet acknowledged (`deviceId` comes back with the
+crew's read for exactly that). `GET /api/board/messages` and `GET /api/tonight/board/messages`
+both answer `seen` from `seenAcross()`.
+
 The board polls both the message feed and the duty manager's own read of it (`/tonight/board`)
 every five seconds, the contract criterion 3 states directly rather than a configuration key.
 Ordered by `composed_at`, not `created_at`: a message that queued offline and arrived late still

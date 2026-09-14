@@ -4,18 +4,22 @@ import {
   FREE_TEXT_LIMIT,
   MAX_FAILED_ATTEMPTS,
   MESSAGE_RETENTION_DAYS,
+  boardFeedRows,
   boardJoinForm,
+  boardStateFrom,
   currentBoardState,
   deriveBoardCode,
   deriveFohCredential,
   fohMessageForm,
   liveBoardMessages,
   milestoneTypeForm,
+  otherBoardSide,
   postMessageForm,
   presetForm,
   saysBoardSide,
   supersedeMessageForm,
 } from '#shared/utils/backstage'
+import type { BoardSide } from '#shared/utils/backstage'
 
 // E-120's pure derivation and validation. What the database holds is proved against the real
 // migrations in `tests/integration/backstage.test.ts`.
@@ -190,5 +194,50 @@ describe('each side is named for the reader, not by its code', () => {
   test('FOH and Backstage', () => {
     expect(saysBoardSide('FOH')).toBe('FOH')
     expect(saysBoardSide('BACKSTAGE')).toBe('Backstage')
+  })
+})
+
+describe('either end reads the board from its own side (criterion 7, amended 14 September 2026)', () => {
+  interface Call { id: string, side: BoardSide, composedAt: number }
+  const foh: Call = { id: 'm1', side: 'FOH', composedAt: 100 }
+  const backstage: Call = { id: 'm2', side: 'BACKSTAGE', composedAt: 120 }
+  const state = { foh, backstage }
+
+  test('front of house leads with its own call and reads the wings as the other side', () => {
+    expect(boardStateFrom('FOH', state)).toEqual({ own: foh, other: backstage })
+    expect(otherBoardSide('FOH')).toBe('BACKSTAGE')
+  })
+
+  test('the wings lead with their own call and read front of house as the other side', () => {
+    expect(boardStateFrom('BACKSTAGE', state)).toEqual({ own: backstage, other: foh })
+    expect(otherBoardSide('BACKSTAGE')).toBe('FOH')
+  })
+
+  test('a side that has said nothing yet reads as nothing on either end', () => {
+    expect(boardStateFrom('BACKSTAGE', { foh, backstage: null })).toEqual({ own: null, other: foh })
+  })
+})
+
+describe('the history is the live feed with the other side\'s tick on each row (criteria 4, 5, 7)', () => {
+  const messages = [
+    { id: 'm1', side: 'FOH' as const, supersedesId: null, composedAt: 100 },
+    { id: 'm2', side: 'BACKSTAGE' as const, supersedesId: null, composedAt: 120 },
+    { id: 'm3', side: 'BACKSTAGE' as const, supersedesId: 'm2', composedAt: 130 },
+  ]
+
+  test('a superseded row is gone, and a seen row carries when it was first seen', () => {
+    const rows = boardFeedRows(messages, [{ messageId: 'm1', seenAt: 110 }])
+    expect(rows.map(row => row.message.id)).toEqual(['m1', 'm3'])
+    expect(rows[0]?.seenAt).toBe(110)
+    expect(rows[1]?.seenAt).toBeNull()
+  })
+
+  test('a tick on a row nobody can see any more changes nothing', () => {
+    const rows = boardFeedRows(messages, [{ messageId: 'm2', seenAt: 125 }])
+    expect(rows.every(row => row.seenAt === null)).toBe(true)
+  })
+
+  test('nothing posted is an empty history, not a crash', () => {
+    expect(boardFeedRows([], [])).toEqual([])
   })
 })
