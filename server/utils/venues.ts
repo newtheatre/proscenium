@@ -27,6 +27,7 @@ export const VENUE_REFERENCES: VenueReference[] = [
   { table: 'backstage_nights', column: 'venue_id', why: 'the backstage board has run here' },
   { table: 'comp_requests', column: 'venue_id', why: 'a comp has been requested against it' },
   { table: 'till_sessions', column: 'venue_id', why: 'a bar till has traded here' },
+  { table: 'sumup_attempts', column: 'venue_id', why: 'a basket has been handed to the SumUp app here' },
 ]
 
 // A correlated EXISTS per referencing table, binding nothing: the parameter count is fixed
