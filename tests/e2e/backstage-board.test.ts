@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -248,4 +248,65 @@ describe.skipIf(skip !== null)('front of house holds the other end of the board 
     expect((await send('POST', '/api/tonight/board/messages', { body: 'Nope', composedAt }, member.cookie)).status).toBe(403)
     expect((await send('POST', '/api/tonight/board/seen', { messageId: 'whatever' }, member.cookie)).status).toBe(403)
   })
+})
+
+// Both ends read the board the same way (criterion 7, amended 14 September 2026): the crew's
+// feed carries front of house's ticks, and the joined screen leads with the current state.
+describe.skipIf(skip !== null)('the wings read the board the way front of house does (E-121 criterion 7)', () => {
+  test('the crew feed carries which of their calls front of house has seen, and the device\'s own id', async () => {
+    const { deviceCookie } = await joinAs('Fly floor')
+    const composedAt = Math.floor(Date.now() / 1000)
+    const posted = await request(app, 'POST', '/api/board/messages', { body: 'Flys standing by', composedAt }, deviceCookie)
+    const { id } = await posted.json() as { id: string }
+
+    const before = await (await request(app, 'GET', '/api/board/messages', undefined, deviceCookie)).json() as { seen: { messageId: string }[], deviceId: string }
+    expect(before.seen.some(row => row.messageId === id)).toBe(false)
+    expect(typeof before.deviceId).toBe('string')
+
+    expect((await send('POST', '/api/tonight/board/seen', { messageId: id }, foh.cookie)).status).toBe(200)
+
+    const after = await (await request(app, 'GET', '/api/board/messages', undefined, deviceCookie)).json() as { seen: { messageId: string, seenAt: number }[] }
+    expect(after.seen.find(row => row.messageId === id)?.seenAt).toBeGreaterThan(0)
+  })
+
+  test('the joined screen leads with the current state, and ticks a call once front of house has seen it', async () => {
+    const composedAt = Math.floor(Date.now() / 1000)
+    const called = await send('POST', '/api/tonight/board/messages', { body: 'Places in five', composedAt }, foh.cookie)
+    const { id: fohId } = await called.json() as { id: string }
+    const { code } = await (await send('GET', '/api/tonight/board/code', undefined, foh.cookie)).json() as { code: string }
+
+    const view = await openView()
+    try {
+      await visit(view, `${app.baseURL}/board`, '[data-test="board-join-form"]')
+      await fill(view, '[data-test="board-code-input"]', code)
+      await fill(view, '[data-test="board-label-input"]', 'Prompt desk screen')
+      await click(view, '[data-test="board-join-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="board-joined"]')`, 30_000)
+
+      // Front of house's last call, waiting for this device's own tick.
+      await waitFor(view, `document.querySelector('[data-test="board-current"]')?.innerText.includes('Places in five')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="acknowledge-current-${fohId}"]')`, 15_000)
+
+      // This device ticks it, and the tick reaches both the current state and the history row.
+      await click(view, `[data-test="acknowledge-${fohId}"]`)
+      await waitFor(view, `document.querySelector('[data-test="board-message-${fohId}"]')?.innerText.includes(${JSON.stringify('✓')})`, 30_000)
+      await waitFor(view, `!document.querySelector('[data-test="acknowledge-${fohId}"]')`, 15_000)
+
+      // The crew's own call, then front of house marking it seen, then the tick appearing here.
+      await fill(view, '[data-test="free-text-input"]', 'Standing by on the book')
+      await click(view, '[data-test="free-text-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="board-current"]')?.innerText.includes('Standing by on the book')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="board-current"]')?.innerText.includes('not seen yet')`, 15_000)
+
+      const listed = await (await send('GET', '/api/tonight/board/messages', undefined, foh.cookie)).json() as { messages: { id: string, body: string }[] }
+      const theirs = listed.messages.find(message => message.body === 'Standing by on the book')!
+      expect((await send('POST', '/api/tonight/board/seen', { messageId: theirs.id }, foh.cookie)).status).toBe(200)
+
+      await waitFor(view, `document.querySelector('[data-test="board-current"]')?.innerText.includes('seen by FOH')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="board-message-${theirs.id}"]')?.innerText.includes(${JSON.stringify('✓')})`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
 })

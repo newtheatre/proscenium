@@ -518,3 +518,31 @@ describe('a message carries the side it came from, and the other side\'s tick (c
     })
   })
 })
+
+// The crew's end reads the same projection the other way round (criterion 7, amended
+// 14 September 2026): a tick from front of house on a call from the wings is "seen by FOH".
+describe('the wings read front of house\'s tick on their own call (criterion 7)', () => {
+  test('front of house ticking a crew call is seen; a second crew device ticking it is not', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-seen-wings'))
+      const [night] = run(database, nightRowQuery(venue.id, NIGHT)) as { id: string }[]
+
+      run(database, joinDeviceStatement(night!.id, 'DSM', 'hash-w-a', 0, 'dev-w-a'))
+      run(database, joinDeviceStatement(night!.id, 'Flys', 'hash-w-b', 0, 'dev-w-b'))
+      run(database, ensureFohDeviceStatement(night!.id, 'credential-4', 0, 'dev-w-foh'))
+
+      run(database, postMessageStatement(night!.id, 'dev-w-a', null, 'Standing by', 2000, 'msg-w-crew'))
+      run(database, postMessageStatement(night!.id, 'dev-w-a', null, 'Clear', 2100, 'msg-w-crew-2'))
+
+      run(database, acknowledgeStatement('msg-w-crew', 'dev-w-b', 'ack-w-1'))
+      run(database, acknowledgeStatement('msg-w-crew-2', 'dev-w-b', 'ack-w-2'))
+      expect(run(database, seenAcrossQuery(night!.id))).toEqual([])
+
+      run(database, acknowledgeStatement('msg-w-crew', 'dev-w-foh', 'ack-w-3'))
+      const seen = run(database, seenAcrossQuery(night!.id)) as { messageId: string, seenAt: number }[]
+      expect(seen.map(row => row.messageId)).toEqual(['msg-w-crew'])
+      expect(seen[0]?.seenAt).toBeGreaterThan(0)
+    })
+  })
+})

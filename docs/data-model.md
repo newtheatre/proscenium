@@ -1291,9 +1291,12 @@ delete a row naming a milestone type, not only by the sweep's own predicate (E-1
 `id` PK · `message_id` → backstage_messages restrict · `device_id` → backstage_devices restrict ·
 `acknowledged_at`. UNIQUE (`message_id`, `device_id`): one acknowledgement per device per
 message, `ON CONFLICT DO NOTHING` makes a repeat harmless (E-121 criterion 4). `seenAcrossQuery()`
-reads the same rows from the other direction for the FOH screen's ticks: the first tick on a
-message from a device on the opposite `side`, which is what "seen by backstage" means and what
-front of house's own tick on a call from the wings means (criterion 7).
+reads the same rows from the other direction for both screens' ticks: the first tick on a
+message from a device on the opposite `side`, which is what "seen by backstage" means on the
+FOH screen and what "seen by FOH" means on a crew device (criterion 7). Both reads,
+`GET /api/tonight/board/messages` and `GET /api/board/messages`, carry that projection as `seen`;
+the crew's read also carries every per-device acknowledgement, since its own tick is the one
+its button hides on.
 
 ### foh_contacts
 `id` PK · `kind` CHECK `COMMITTEE|VENUE|SECURITY|TAXI|OTHER` · `label` · `phone` · `note` ·
