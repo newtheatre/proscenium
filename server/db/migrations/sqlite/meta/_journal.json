@@ -752,6 +752,13 @@
       "breakpoints": true
     },
     {
+      "idx": 107,
+      "version": "6",
+      "when": 1789487500000,
+      "tag": "0107_a_comp_never_takes_on_hand_negative",
+      "breakpoints": true
+    },
+    {
       "idx": 108,
       "version": "6",
       "when": 1789488784072,

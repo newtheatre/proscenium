@@ -5,6 +5,7 @@ import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
+import { expectOneWinner, race } from '#tests/helpers/race'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -487,5 +488,67 @@ describe.skipIf(skip !== null)('a single request is readable on its own, for the
     const { venueId, performanceId } = programme(`comps-single-missing-${crypto.randomUUID().slice(0, 6)}`)
     await openTill(venueId, performanceId)
     expect((await send('GET', '/api/till/comp-requests/nowhere', undefined, barStaff.cookie)).status).toBe(404)
+  })
+})
+
+// A product that actually pours something, so a comp has stock to take and the trigger has
+// something to refuse. Components attach after activation, which nothing refuses today.
+async function aStockedProduct(pricePence: number, delivered: number, perServing: number): Promise<{ variantId: string, itemId: string }> {
+  const { variantId } = await aSellableProduct(pricePence)
+  const itemAnswered = await send('POST', '/api/admin/bar/items', { name: named('Gin'), unit: 'ML', containerMl: 700 })
+  const { id: itemId } = await itemAnswered.json() as { id: string }
+  await send('POST', '/api/admin/bar/movements', { itemId, qty: delivered, kind: 'DELIVERY', unitCostPence: 1 })
+  await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: perServing }] })
+  return { variantId, itemId }
+}
+
+function onHandOfItem(itemId: string): number {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    const row = database.query('SELECT coalesce(sum(qty), 0) AS onHand FROM stock_movements WHERE item_id = ?').get(itemId) as { onHand: number }
+    return row.onHand
+  }
+  finally {
+    database.close()
+  }
+}
+
+describe.skipIf(skip !== null)('a comp depletes exactly as a paid sale would, refusal included (criterion 4)', () => {
+  test('a comp of more than is left is refused, and nothing is given', async () => {
+    const { venueId, performanceId } = programme(`comps-oversell-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId, itemId } = await aStockedProduct(500, 25, 50)
+    await openTill(venueId, performanceId)
+    confirmShift(performanceId, 'DUTY_MANAGER', barManager.id)
+
+    const asked = await ask({ venueId, lines: [{ variantId, qty: 1 }], reason: 'A round on the house' })
+    const { id } = await asked.json() as { id: string }
+    await approve(id, barManager.cookie)
+
+    const answered = await give(id, venueId, 500)
+    expect(answered.status).toBe(409)
+    expect(await message(answered)).toContain('Not enough left in stock')
+    expect(onHandOfItem(itemId)).toBe(25)
+
+    // The approval is freed rather than burned: a restock and a retry still spend it (F-110).
+    await send('POST', '/api/admin/bar/movements', { itemId, qty: 100, kind: 'DELIVERY', unitCostPence: 1 })
+    expect((await give(id, venueId, 500)).status).toBe(200)
+  })
+
+  test('a sale and a comp racing for the last serving leave exactly one winner', async () => {
+    const { venueId, performanceId } = programme(`comps-race-stock-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId, itemId } = await aStockedProduct(500, 50, 50)
+    await openTill(venueId, performanceId)
+    confirmShift(performanceId, 'DUTY_MANAGER', barManager.id)
+
+    const asked = await ask({ venueId, lines: [{ variantId, qty: 1 }], reason: 'A round on the house' })
+    const { id } = await asked.json() as { id: string }
+    await approve(id, barManager.cookie)
+
+    const answers = await race(2, index => index === 0
+      ? give(id, venueId, 500)
+      : send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500 }, barStaff.cookie))
+
+    expectOneWinner(answers)
+    expect(onHandOfItem(itemId)).toBe(0)
   })
 })

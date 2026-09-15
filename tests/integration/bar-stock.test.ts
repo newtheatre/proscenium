@@ -127,6 +127,58 @@ describe('on-hand is the sum of movements and nothing stores it (criterion 2)', 
   })
 })
 
+describe('neither a sale nor a comp takes on-hand below nothing (F-105 criterion 5, F-110 criterion 4)', () => {
+  test('a comp of more than is left is refused on the write, as a sale is', async () => {
+    await withDatabase((database) => {
+      const id = bottle(database)
+      move(database, { qty: 100, kind: 'DELIVERY', unit_cost_pence: 1 })
+
+      expect(() => move(database, { qty: -101, kind: 'COMP', ref_table: 'ledger_lines', ref_id: 'line-1' }))
+        .toThrow(/stock_movements_sale_exceeds_on_hand/)
+      expect(onHand(database, id)).toBe(100)
+    })
+  })
+
+  test('the refusal carries the name the sale raises, so one catch covers both paths', async () => {
+    await withDatabase((database) => {
+      bottle(database)
+      expect(() => move(database, { qty: -1, kind: 'COMP', ref_table: 'ledger_lines', ref_id: 'line-1' }))
+        .toThrow(/stock_movements_sale_exceeds_on_hand/)
+    })
+  })
+
+  test('a comp of exactly what is left is allowed: nothing owes the shelf anything', async () => {
+    await withDatabase((database) => {
+      const id = bottle(database)
+      move(database, { qty: 50, kind: 'DELIVERY', unit_cost_pence: 1 })
+      move(database, { qty: -50, kind: 'COMP', ref_table: 'ledger_lines', ref_id: 'line-1' })
+
+      expect(onHand(database, id)).toBe(0)
+    })
+  })
+
+  test('a sale and a comp of the same last unit cannot both land', async () => {
+    await withDatabase((database) => {
+      const id = bottle(database)
+      move(database, { qty: 50, kind: 'DELIVERY', unit_cost_pence: 1 })
+      move(database, { qty: -50, kind: 'SALE', ref_table: 'ledger_lines', ref_id: 'line-1' })
+
+      expect(() => move(database, { qty: -50, kind: 'COMP', ref_table: 'ledger_lines', ref_id: 'line-2' }))
+        .toThrow(/stock_movements_sale_exceeds_on_hand/)
+      expect(onHand(database, id)).toBe(0)
+    })
+  })
+
+  test('a wastage may still take the shelf negative: a bottle can go missing (F-114)', async () => {
+    await withDatabase((database) => {
+      const id = bottle(database)
+      move(database, { qty: -750, kind: 'WASTAGE', reason: 'BREAKAGE' })
+
+      expect(onHand(database, id)).toBe(-750)
+    })
+  })
+})
+
 describe('the movement kinds cover what the bar does (criterion 3)', () => {
   test('a kind outside the vocabulary is refused', async () => {
     await withDatabase((database) => {
