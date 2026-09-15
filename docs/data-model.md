@@ -1014,6 +1014,11 @@ both pass. Everything in that batch which depends on the entry, the stock moveme
 rows, carries `EXISTS (SELECT 1 FROM ledger_entries WHERE id = …)`, so a refused charge leaves
 nothing behind and the route reads the entry back to refuse in words. A charge a manager waved
 past the cap carries no guard: the override is the decision.
+A void credits each of the charge's stock movements with `reason = 'COUNT_CORRECTION'`, a value of
+`MOVEMENT_REASONS`, so the waste report F-204 builds can group on the column; the operator's own
+words for the void stay on `ledger_entries.void_reason`, which is where free text belongs (0011).
+The movements and the lines it reads are scoped by subquery from the charge and from the holder,
+never by a list of ids read back first (0003).
 
 A void credit carries the same `tab_debtor_id` as the charge it credits, and every balance
 (the account screen, the F-108 cap, the year-end list, the retention exemption) reads

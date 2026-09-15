@@ -110,12 +110,22 @@ const settle = (venueId: string, holderId: string, entryIds: string[], expectedT
 const voidCharge = (entryId: string, reason: string, as: string): Promise<Response> =>
   send('POST', `/api/admin/bar/tab-charges/${entryId}/void`, { reason }, as)
 
-interface StockMovementRow { qty: number, kind: string, reverses_id: string | null }
+interface StockMovementRow { qty: number, kind: string, reason: string | null, reverses_id: string | null }
 
 function movementsFor(itemId: string): StockMovementRow[] {
   const database = new Database(app.databaseFile, { readonly: true })
   try {
-    return database.query('SELECT qty, kind, reverses_id FROM stock_movements WHERE item_id = ? ORDER BY rowid').all(itemId) as StockMovementRow[]
+    return database.query('SELECT qty, kind, reason, reverses_id FROM stock_movements WHERE item_id = ? ORDER BY rowid').all(itemId) as StockMovementRow[]
+  }
+  finally {
+    database.close()
+  }
+}
+
+function voidReasonOn(entryId: string): string | null {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return (database.query('SELECT void_reason AS reason FROM ledger_entries WHERE void_of_entry_id = ?').get(entryId) as { reason: string | null } | null)?.reason ?? null
   }
   finally {
     database.close()
@@ -321,6 +331,12 @@ describe.skipIf(skip !== null)('a void credits stock exactly once (criterion 5)'
 
     const after = movementsFor(itemId)
     expect(after.reduce((sum, row) => sum + row.qty, 0)).toBe(700)
+
+    // The reason column is the waste vocabulary F-204 groups by, so the operator's prose stays on
+    // the entry that carries the void and never reaches the register (0011).
+    const credit = after.find(row => row.kind === 'REVERSAL')!
+    expect(credit.reason).toBe('COUNT_CORRECTION')
+    expect(voidReasonOn(entryId)).toBe('Charged in error')
 
     const second = await voidCharge(entryId, 'Trying again', barManager.cookie)
     expect(second.status).toBe(409)

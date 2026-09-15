@@ -8,6 +8,7 @@ import { postEntry, runLedgerBatch } from '#server/utils/ledger'
 import { auditEntry } from '#shared/utils/audit'
 import { saysMoney } from '#shared/utils/bar'
 import { MAX_SETTLEMENT_CHARGES } from '#shared/utils/tab-settlement'
+import type { MovementReason } from '#shared/utils/bar'
 import type { ItemisedTab, TabCharge } from '#shared/utils/tab-settlement'
 import type { LineKind } from '#shared/utils/ledger'
 import type { BatchItem } from 'drizzle-orm/batch'
@@ -73,17 +74,39 @@ export function unsettledTabsQuery(): SQL {
   `
 }
 
+// The register's own vocabulary, which F-204 groups waste by: the operator's prose has a column
+// of its own on the entry carrying the void and never lands here (0011, shared/utils/bar.ts).
+export const VOID_MOVEMENT_REASON: MovementReason = 'COUNT_CORRECTION'
+
 interface LineRow { entryId: string, productName: string, variantLabel: string, qty: number, unitPricePence: number }
 
-async function productLinesFor(entryIds: string[]): Promise<Map<string, LineRow[]>> {
-  if (entryIds.length === 0) return new Map()
-  const rows = await db.all<LineRow>(sql`
+// Scoped by subquery from the holder, never by a list of entry ids read back first (CLAUDE.md).
+// `scope` is the caller's own charge predicate, so the read is no wider than what it will render.
+export function productLinesQuery(holderId: string, scope: SQL): SQL {
+  return sql`
     SELECT l.entry_id AS entryId, p.name AS productName, v.label AS variantLabel, l.qty AS qty, l.unit_price_pence AS unitPricePence
     FROM ledger_lines l
     JOIN product_variants v ON v.id = l.product_variant_id
     JOIN bar_products p ON p.id = v.product_id
-    WHERE l.entry_id IN (${sql.join(entryIds.map(id => sql`${id}`), sql`, `)}) AND l.kind = 'BAR_ITEM'
-  `)
+    WHERE l.entry_id IN (SELECT e.id FROM ledger_entries e WHERE e.tab_debtor_id = ${holderId} AND ${scope})
+      AND l.kind = 'BAR_ITEM'
+  `
+}
+
+// What the account screen lists: every charge, settled or not, but never a credit or a reversal.
+export const LISTED_CHARGE = sql`e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL`
+
+// The movements a charge's own lines caused. Scoped the same way, which also answers empty for a
+// charge with no lines rather than rendering `IN ()` and failing outright.
+export function chargeMovementsQuery(entryId: string): SQL {
+  return sql`
+    SELECT id, item_id AS itemId, qty FROM stock_movements
+    WHERE ref_table = 'ledger_lines' AND ref_id IN (SELECT id FROM ledger_lines WHERE entry_id = ${entryId})
+  `
+}
+
+async function productLinesFor(holderId: string, scope: SQL): Promise<Map<string, LineRow[]>> {
+  const rows = await db.all<LineRow>(productLinesQuery(holderId, scope))
   const byEntry = new Map<string, LineRow[]>()
   for (const row of rows) byEntry.set(row.entryId, [...(byEntry.get(row.entryId) ?? []), row])
   return byEntry
@@ -111,11 +134,11 @@ export async function itemisedTab(holderId: string): Promise<ItemisedTab | null>
 
   const rows = await db.all<ChargeRow>(sql`
     SELECT ${CHARGE_COLUMNS} FROM ledger_entries e
-    WHERE e.tab_debtor_id = ${holderId} AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
+    WHERE e.tab_debtor_id = ${holderId} AND ${LISTED_CHARGE}
     ORDER BY e.happened_at DESC
   `)
   const [balance] = await db.all<{ total: number }>(tabBalanceQuery(holderId))
-  const linesByEntry = await productLinesFor(rows.map(row => row.entryId))
+  const linesByEntry = await productLinesFor(holderId, LISTED_CHARGE)
   const charges = rows.map(row => hydrate(row, linesByEntry.get(row.entryId) ?? []))
 
   return { holderId, holderName: holder.name, outstandingPence: balance?.total ?? 0, charges }
@@ -129,7 +152,7 @@ export async function outstandingTabCharges(holderId: string): Promise<TabCharge
     WHERE e.tab_debtor_id = ${holderId} AND ${OUTSTANDING_CHARGE}
     ORDER BY e.happened_at
   `)
-  const linesByEntry = await productLinesFor(rows.map(row => row.entryId))
+  const linesByEntry = await productLinesFor(holderId, OUTSTANDING_CHARGE)
   return rows.map(row => hydrate(row, linesByEntry.get(row.entryId) ?? []))
 }
 
@@ -229,9 +252,7 @@ export async function voidTabCharge(
     SELECT id, kind, amount_pence AS amountPence, qty, unit_price_pence AS unitPricePence, product_variant_id AS productVariantId, price_ref AS priceRef, performance_id AS performanceId
     FROM ledger_lines WHERE entry_id = ${entryId}
   `)
-  const movements = await db.all<{ id: string, itemId: string, qty: number }>(sql`
-    SELECT id, item_id AS itemId, qty FROM stock_movements WHERE ref_table = 'ledger_lines' AND ref_id IN (${sql.join(lines.map(line => sql`${line.id}`), sql`, `)})
-  `)
+  const movements = await db.all<{ id: string, itemId: string, qty: number }>(chargeMovementsQuery(entryId))
 
   // Still unsettled at the moment of insert, not just at the read above: a settlement racing
   // this refuses here rather than crediting stock for a charge that was just taken (criterion 4).
@@ -264,7 +285,7 @@ export async function voidTabCharge(
   for (const movement of movements) {
     statements.push(db.run(sql`
       INSERT INTO stock_movements (id, item_id, qty, kind, reason, reverses_id, actor_id)
-      SELECT ${newId()}, ${movement.itemId}, ${-movement.qty}, 'REVERSAL', ${reason}, ${movement.id}, ${actorId}
+      SELECT ${newId()}, ${movement.itemId}, ${-movement.qty}, 'REVERSAL', ${VOID_MOVEMENT_REASON}, ${movement.id}, ${actorId}
       WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})
     `))
   }
