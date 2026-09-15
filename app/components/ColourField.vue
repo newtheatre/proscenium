@@ -24,7 +24,7 @@ const swatch = computed(() => (model.value && HEX.test(model.value) ? model.valu
       />
       <template #content>
         <UColorPicker
-          :model-value="swatch ?? '#FFFFFF'"
+          :model-value="swatch"
           class="p-3"
           @update:model-value="model = $event"
         />
