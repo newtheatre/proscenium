@@ -169,6 +169,32 @@ describe.skipIf(skip !== null)('a cap applies per holder, refused quoting balanc
     expect(body.tab.outstandingPence).toBe(1000)
   })
 
+  // The defect the story was written to fix: both tills read the same balance and both pass a
+  // read-then-check, so the predicate has to ride the charge's own write (criterion 3).
+  test('two charges racing under one cap leave exactly one, and nothing is charged for the loser', async () => {
+    const { venueId, performanceId } = programme(`tabs-race-cap-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(1500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await setCap(2000)
+
+    const answers = await Promise.all([
+      charge(venueId, [{ variantId, qty: 1 }], 1500, member.id),
+      charge(venueId, [{ variantId, qty: 1 }], 1500, member.id),
+    ])
+
+    expect(answers.filter(answer => answer.status === 200)).toHaveLength(1)
+    const loser = answers.find(answer => answer.status !== 200)!
+    expect(loser.status).toBe(409)
+    expect(await message(loser)).toContain('Nothing has been charged')
+
+    const after = await send('GET', '/api/account/tab', undefined, member.cookie)
+    const body = await after.json() as { tab: { outstandingPence: number, charges: unknown[] } }
+    expect(body.tab.outstandingPence).toBe(1500)
+    expect(body.tab.charges).toHaveLength(1)
+  })
+
   test('a charge that would breach the cap is refused, naming the balance, the charge and the cap', async () => {
     const { venueId, performanceId } = programme(`tabs-over-cap-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aSellableProduct(2000)
