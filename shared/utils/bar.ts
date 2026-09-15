@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { daysAfter } from '#shared/utils/membership'
 
 // The bar's vocabulary: what is stocked, what is sold, and how stock moves. Quantities are whole
 // units of the item's own counting unit, exact for the same reason money is pence (0004).
@@ -214,9 +215,11 @@ export const variantChoiceForm = z.object({
   includedInPrice: z.boolean().default(false),
 })
 
-// A civil date, the Europe/London day a price takes effect on. A past one is allowed and already
-// applies; a future one waits (F-116 criterion 5).
-const civilDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date reads as YYYY-MM-DD')
+// A civil date, the Europe/London day a price takes effect on: a past one already applies, a
+// future one waits (F-116 criterion 5), and 2026-13-45 is refused rather than sorting first.
+const CIVIL_DAY = /^\d{4}-\d{2}-\d{2}$/
+const civilDate = z.string().trim().regex(CIVIL_DAY, 'A date reads as YYYY-MM-DD')
+  .refine(day => !CIVIL_DAY.test(day) || daysAfter(day, 0) === day, 'A date reads as YYYY-MM-DD')
 
 export const priceForm = z.object({
   pricePence: z.number().int().nonnegative().max(MAX_VARIANT_PRICE_PENCE),

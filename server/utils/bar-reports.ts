@@ -4,14 +4,20 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
 import { committeeYearEnd, fromLondonWallClock, startOfLondonDay } from '#shared/utils/london'
+import { daysAfter } from '#shared/utils/membership'
 import { showNightBounds } from '#shared/utils/show-night'
 import type { BarReport, CompRow, DiscountRow, GpReport, GpRow, ReportPeriodInput, SalesRow, VarianceRow } from '#shared/utils/bar-reports'
 
 // Every figure is a query over the ledger and the movement history, run fresh for the period
 // asked for; nothing here is a stored aggregate (F-119 criterion 4).
 
-const DAY_SECONDS = 24 * 60 * 60
 const WEEK_DAYS = 7
+
+// The instant a London day begins, counting whole calendar days from the one named: a week that
+// crosses a clock change is 169 or 167 hours, never seven fixed days (criterion 1, 0014).
+function londonDayStart(day: string, plusDays = 0): number {
+  return Math.floor(startOfLondonDay(daysAfter(day, plusDays)).getTime() / 1000)
+}
 
 // Resolves a period to [fromAt, toAt) in unix seconds, on the London calendar throughout
 // (criterion 1, 0014). A week is the seven London days starting on the day named.
@@ -21,8 +27,7 @@ export function resolveReportPeriod(period: ReportPeriodInput): { fromAt: number
     return { fromAt: Math.floor(from.getTime() / 1000), toAt: Math.floor(to.getTime() / 1000) }
   }
   if (period.kind === 'WEEK') {
-    const fromAt = Math.floor(startOfLondonDay(period.day).getTime() / 1000)
-    return { fromAt, toAt: fromAt + WEEK_DAYS * DAY_SECONDS }
+    return { fromAt: londonDayStart(period.day), toAt: londonDayStart(period.day, WEEK_DAYS) }
   }
   if (period.kind === 'SEASON') {
     // committeeYearEnd is the last instant of the year, inclusive; +1 makes the bound exclusive
@@ -31,8 +36,8 @@ export function resolveReportPeriod(period: ReportPeriodInput): { fromAt: number
     const fromAt = Math.floor(fromLondonWallClock(period.year - 1, 8, 1).getTime() / 1000)
     return { fromAt, toAt }
   }
-  const fromAt = Math.floor(startOfLondonDay(period.from).getTime() / 1000)
-  const toAt = Math.floor(startOfLondonDay(period.to).getTime() / 1000) + DAY_SECONDS
+  const fromAt = londonDayStart(period.from)
+  const toAt = londonDayStart(period.to, 1)
   if (toAt <= fromAt) throw createError({ statusCode: 400, statusMessage: 'A custom range must end after it starts' })
   return { fromAt, toAt }
 }
