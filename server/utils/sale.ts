@@ -283,7 +283,7 @@ export async function priceBasket(lines: BasketLineInput[], on: string, discount
 }
 
 // Prices a basket against a catalogue resolved elsewhere: one resolve for several baskets, not
-// one per basket (review-till 8, the comp queue). `on` goes unused once a catalogue is given.
+// one per basket, the same shape the comp queue needs (0003). `on` goes unused once given.
 export async function priceBasketAgainst(lines: BasketLineInput[], catalogue: Resolvable, discountId: string | null): Promise<PricedBasket> {
   const { priced, totalPence, discount } = await resolveSale(lines, '', discountId, catalogue)
   return { lines: priced, totalPence, discount: publicDiscount(discount) }
@@ -804,7 +804,7 @@ export async function commitCompSale(
     throw createError({ statusCode: 409, statusMessage: request.status === 'PENDING' ? 'That request has not been approved yet' : 'That request was declined' })
   }
   // A comp is spent where it was approved, never at another venue's session on a two-house night
-  // (review-till 13).
+  // (F-110).
   if (request.venueId !== context.venueId) {
     throw createError({ statusCode: 409, statusMessage: 'That request was approved for a different venue' })
   }
