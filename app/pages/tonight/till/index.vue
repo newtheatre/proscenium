@@ -3,15 +3,10 @@ import { formatLondon, londonClock } from '#shared/utils/london'
 import { ID_TYPES, REFUSAL_REASONS, saysIdType, saysRefusalReason } from '#shared/utils/age-checks'
 import { says, saysMoney } from '#shared/utils/bar'
 import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
-import { nightCacheKey } from '#shared/utils/night-cache'
-import { currentShowNight } from '#shared/utils/show-night'
 import { saysAttemptStatus } from '#shared/utils/sumup'
 import type { IdType, InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
-import type { Discount } from '#shared/utils/discounts'
-import type { PricedBasket, PricedLine, SaleCatalogue, SaleChoice, SaleProduct, SaleReceipt, SaleVariant, TillBooking, WalkUpOption } from '#shared/utils/sale'
-import type { NightReconciliation } from '#shared/utils/reconciliation'
+import type { PricedBasket, PricedLine, SaleChoice, SaleProduct, SaleReceipt, SaleVariant, TillBooking, WalkUpOption } from '#shared/utils/sale'
 import type { SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
-import type { TillSession } from '#shared/utils/till'
 import type { ScannerFailure } from '~/composables/useQrScanner'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/show-night/the-till' })
@@ -19,158 +14,39 @@ useSeoMeta({ title: 'Till' })
 
 // The guard is the route's, not this screen's: what a refusal says is written where it is
 // raised, so this only ever displays it (E-111 criterion 5).
-const request = useRequestFetch()
-const route = useRoute()
-// Optional: names which venue when more than one runs tonight, which the route already resolves
-// unaided on the (typical) night only one does. Multi-venue bars are their own story (F-202).
-const requestedVenueId = computed(() => (typeof route.query.venueId === 'string' ? route.query.venueId : undefined))
-const syncedAt = ref<Date | null>(null)
-const failure = ref<string | null>(null)
-const busy = ref(false)
-const session = ref<TillSession | null>(null)
-const venueId = ref<string | null>(null)
-const sumupEnabled = ref(false)
-
-async function load(): Promise<void> {
-  busy.value = true
-  failure.value = null
-  try {
-    const status = await request<{ night: string, venueId: string, session: TillSession | null, sumupEnabled: boolean }>('/api/till', {
-      query: { venueId: requestedVenueId.value },
-    })
-    session.value = status.session
-    venueId.value = status.venueId
-    sumupEnabled.value = status.sumupEnabled
-    syncedAt.value = new Date()
-  }
-  catch (refused) {
-    failure.value = refusalText(refused)
-    // A recognised refusal is still a completed sync, so NightStale is not left saying "not yet
-    // synced" forever (matching /tonight/index.vue's own shape).
-    if (refusalStatus(refused) === 401 || refusalStatus(refused) === 403) syncedAt.value = new Date()
-  }
-  finally {
-    busy.value = false
-  }
-}
-
-async function open(): Promise<void> {
-  busy.value = true
-  failure.value = null
-  try {
-    const opened = await request<{ session: TillSession }>('/api/till', {
-      method: 'POST',
-      body: { venueId: requestedVenueId.value },
-    })
-    session.value = opened.session
-    syncedAt.value = new Date()
-  }
-  catch (refused) {
-    failure.value = refusalText(refused)
-  }
-  finally {
-    busy.value = false
-  }
-}
-
-// The expected figure before anyone commits to closing (F-102 criterion 4, F-118 criterion 3).
-const closeModalOpen = ref(false)
-const reconciliation = ref<NightReconciliation | null>(null)
-const reconciliationLoading = ref(false)
-const reconciliationFailure = ref<string | null>(null)
-const actualZPounds = ref<number | undefined>(undefined)
-const varianceNote = ref('')
-const closingBusy = ref(false)
-const closeFailure = ref<string | null>(null)
-
-const actualZPence = computed(() => Math.round((actualZPounds.value ?? 0) * 100))
-const variancePreviewPence = computed(() => (reconciliation.value ? actualZPence.value - reconciliation.value.bar.expectedPence : 0))
-
-async function openCloseModal(): Promise<void> {
-  if (!session.value) return
-  closeModalOpen.value = true
-  reconciliation.value = null
-  reconciliationFailure.value = null
-  actualZPounds.value = undefined
-  varianceNote.value = ''
-  closeFailure.value = null
-  reconciliationLoading.value = true
-  try {
-    reconciliation.value = await request<NightReconciliation>(`/api/till/${session.value.id}/reconciliation`)
-  }
-  catch (refused) {
-    reconciliationFailure.value = refusalText(refused)
-  }
-  finally {
-    reconciliationLoading.value = false
-  }
-}
-
-async function confirmClose(): Promise<void> {
-  if (!session.value) return
-  closingBusy.value = true
-  closeFailure.value = null
-  try {
-    const closed = await request<{ session: TillSession }>('/api/till/close', {
-      method: 'POST',
-      body: {
-        id: session.value.id,
-        actualZPence: actualZPence.value,
-        varianceNote: varianceNote.value.trim() || undefined,
-      },
-    })
-    session.value = closed.session
-    syncedAt.value = new Date()
-    closeModalOpen.value = false
-  }
-  catch (refused) {
-    closeFailure.value = refusalText(refused)
-  }
-  finally {
-    closingBusy.value = false
-  }
-}
-
-onMounted(load)
+const {
+  syncedAt,
+  failure,
+  busy,
+  session,
+  venueId,
+  sumupEnabled,
+  open,
+  closeModalOpen,
+  reconciliation,
+  reconciliationLoading,
+  reconciliationFailure,
+  actualZPounds,
+  varianceNote,
+  closingBusy,
+  closeFailure,
+  variancePreviewPence,
+  openCloseModal,
+  confirmClose,
+} = useTillSession()
 
 // The catalogue, held on the device so venue Wi-Fi dropping mid-service never blanks the grid
-// (K-103). Whole-night, not venue-scoped: products, variants and prices are estate-wide (F-202).
-const catalogueKey = computed(() => nightCacheKey({ screen: 'till-products', night: currentShowNight(), wholeNight: true }))
-const catalogue = useNightCache<SaleCatalogue>(catalogueKey, () =>
-  request<SaleCatalogue>('/api/till/products', { query: { venueId: venueId.value ?? undefined } }), { immediate: false })
-
-watch([session, venueId], () => {
-  if (session.value && venueId.value) void catalogue.refresh()
-})
-
-const categories = computed(() => catalogue.data.value?.categories ?? [])
-const products = computed(() => catalogue.data.value?.products ?? [])
-const productsIn = (categoryId: string): SaleProduct[] => products.value.filter(product => product.categoryId === categoryId)
-
-// Active discounts only: a manager who retires one mid-service should not see it offered a
-// moment later (F-117).
-const discountsKey = computed(() => nightCacheKey({ screen: 'till-discounts', night: currentShowNight(), wholeNight: true }))
-const discounts = useNightCache<{ discounts: Discount[] }>(discountsKey, () =>
-  request<{ discounts: Discount[] }>('/api/till/discounts', { query: { venueId: venueId.value ?? undefined } }), { immediate: false })
-
-watch([session, venueId], () => {
-  if (session.value && venueId.value) void discounts.refresh()
-})
-
-const selectedDiscountId = ref<string | null>(null)
-
-// Who the till may charge a sale to instead of the reader (F-108). The allow-list is short by
-// nature, so this refreshes alongside the catalogue rather than needing its own trigger.
-interface TabHolder { id: string, name: string }
-const tabHoldersKey = computed(() => nightCacheKey({ screen: 'till-tab-holders', night: currentShowNight(), wholeNight: true }))
-const tabHolders = useNightCache<{ holders: TabHolder[] }>(tabHoldersKey, () =>
-  request<{ holders: TabHolder[] }>('/api/till/tab-holders', { query: { venueId: venueId.value ?? undefined } }), { immediate: false })
-
-watch([session, venueId], () => {
-  if (session.value && venueId.value) void tabHolders.refresh()
-})
-
-const selectedTabHolderId = ref<string | null>(null)
+// (K-103).
+const {
+  catalogue,
+  categories,
+  products,
+  productsIn,
+  discounts,
+  selectedDiscountId,
+  tabHolders,
+  selectedTabHolderId,
+} = useTillCatalogue(session, venueId)
 
 interface BasketLine {
   id: string
