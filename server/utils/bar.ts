@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { pouredByColumn, readPouredBy } from './bar-linkage'
 import type { SQL } from 'drizzle-orm'
 import { SERVING_KINDS, effectivePriceRow } from '#shared/utils/bar'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
@@ -367,9 +368,10 @@ export async function productById(id: string): Promise<BarProduct | undefined> {
   return row ? readProduct(row) : undefined
 }
 
-interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements'> {
+interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements' | 'pouredBy'> {
   ageRestricted: number
   hasMovements: number
+  pouredBy: string | null
 }
 
 const readItem = (row: ItemRow): StockItem => ({
@@ -377,6 +379,7 @@ const readItem = (row: ItemRow): StockItem => ({
   onHand: Number(row.onHand),
   ageRestricted: row.ageRestricted === 1,
   hasMovements: row.hasMovements === 1,
+  pouredBy: readPouredBy(row.pouredBy),
 })
 
 const ITEM_COLUMNS = sql`
@@ -403,7 +406,8 @@ export function itemsClause(query: ListQuery): ListClause {
 
 export function itemsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
-    SELECT ${ITEM_COLUMNS}, ${onHandColumn('i')} AS onHand, ${MOVED} AS hasMovements
+    SELECT ${ITEM_COLUMNS}, ${onHandColumn('i')} AS onHand, ${MOVED} AS hasMovements,
+           ${pouredByColumn('i')} AS pouredBy
     FROM bar_items i${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
@@ -420,7 +424,8 @@ export async function countItems(clause: ListClause): Promise<number> {
 
 export async function itemById(id: string): Promise<StockItem | undefined> {
   const [row] = await db.all<ItemRow>(sql`
-    SELECT ${ITEM_COLUMNS}, ${onHandColumn('i')} AS onHand, ${MOVED} AS hasMovements
+    SELECT ${ITEM_COLUMNS}, ${onHandColumn('i')} AS onHand, ${MOVED} AS hasMovements,
+           ${pouredByColumn('i')} AS pouredBy
     FROM bar_items i WHERE i.id = ${id}
   `)
   return row ? readItem(row) : undefined
@@ -456,6 +461,8 @@ const VARIANT_COLUMNS = sql`
 export function componentsQuery(scope: SQL): SQL {
   return sql`
     SELECT c.id AS id, c.variant_id AS variantId, c.item_id AS itemId, i.name AS itemName, i.unit AS unit,
+           i.status AS itemStatus,
+           (SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = c.item_id) AS onHand,
            c.choice_group_id AS choiceGroupId, g.name AS choiceGroupName,
            c.qty AS qty, c.included_in_price AS includedInPrice
     FROM variant_components c
@@ -471,6 +478,8 @@ const readComponent = (row: ComponentRow): VariantComponent => ({
   itemId: row.itemId,
   itemName: row.itemName,
   unit: row.unit,
+  itemStatus: row.itemStatus,
+  onHand: row.itemId === null ? null : Number(row.onHand ?? 0),
   choiceGroupId: row.choiceGroupId,
   choiceGroupName: row.choiceGroupName,
   qty: row.qty,

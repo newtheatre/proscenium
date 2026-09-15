@@ -205,18 +205,29 @@ async function record(): Promise<void> {
   }
 }
 
-async function setStatus(item: StockItem, status: 'ACTIVE' | 'RETIRED'): Promise<void> {
+// The refusal names the products that still pour it, and offers to retire the item and take them
+// off the till in one batch (F-128 criteria 5 and 6).
+const hiding = ref<{ item: StockItem, products: { id: string, name: string }[] } | null>(null)
+
+async function setStatus(item: StockItem, status: 'ACTIVE' | 'RETIRED', hideDependents = false): Promise<void> {
   failure.value = null
   try {
-    await $fetch(`/api/admin/bar/items/${item.id}/status`, { method: 'POST', body: { status } })
+    await $fetch(`/api/admin/bar/items/${item.id}/status`, { method: 'POST', body: { status, hideDependents } })
     toast.add({
       title: status === 'RETIRED' ? `${item.name} is retired` : `${item.name} is back in stock`,
       icon: 'i-lucide-check',
       color: 'success',
     })
+    hiding.value = null
     await reload()
   }
   catch (refused) {
+    const dependents = (refused as { data?: { data?: { dependents?: { id: string, name: string }[] } } })
+      .data?.data?.dependents
+    if (status === 'RETIRED' && !hideDependents && dependents?.length) {
+      hiding.value = { item, products: dependents }
+      return
+    }
     failure.value = refusalText(refused)
   }
 }
@@ -281,6 +292,20 @@ const columns: TableColumn<StockItem>[] = [
     header: 'Par level',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => (row.original.parQty === null ? 'Not set' : saysQuantity(row.original.parQty, row.original.unit)),
+  },
+  {
+    id: 'pouredBy',
+    header: 'Poured by',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
+    cell: ({ row }) => (row.original.pouredBy.length === 0
+      ? h('span', { class: 'text-muted' }, 'Nothing on the till')
+      : h('div', { 'class': 'flex flex-wrap gap-1', 'data-test': `poured-by-${row.original.id}` },
+          row.original.pouredBy.map(product => h(UButton, {
+            size: 'sm',
+            color: 'neutral',
+            variant: 'ghost',
+            to: `/bar/products/${product.id}`,
+          }, () => product.name)))),
   },
   {
     id: 'status',
@@ -687,6 +712,41 @@ const columns: TableColumn<StockItem>[] = [
             </UButton>
           </div>
         </UForm>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="hiding !== null"
+      :title="hiding ? `Retire ${hiding.item.name}` : ''"
+      description="The till still pours this. Retiring it takes what pours it off the till at the same time."
+      data-test="hide-dependents"
+      @update:open="hiding = null"
+    >
+      <template #body>
+        <p class="text-sm">
+          {{ hiding?.item.name }} is poured by
+          {{ hiding?.products.map(product => product.name).join(', ') }}.
+          Retiring it hides those products in the same write, so nothing is left on the till
+          pouring something the bar no longer stocks. Their recipes, prices and history are
+          untouched, and putting the item back is a separate decision.
+        </p>
+      </template>
+
+      <template #footer>
+        <UButton
+          color="error"
+          data-test="confirm-hide-dependents"
+          @click="hiding && setStatus(hiding.item, 'RETIRED', true)"
+        >
+          Retire it and hide them
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="hiding = null"
+        >
+          Back
+        </UButton>
       </template>
     </UModal>
 

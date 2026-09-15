@@ -81,6 +81,7 @@ export const bar: Shot[] = [
     width: CONSOLE_WIDTH,
     annotations: [
       { selector: '[data-test="add-item"]', label: 'Add a stocked item' },
+      { selector: '[data-test^="poured-by-"]', label: 'Poured by' },
       { selector: '[data-test^="move-"]', label: 'Record a movement' },
       { selector: '[data-test^="edit-"]', label: 'Edit' },
       { selector: '[data-test^="status-"]:not([data-test^="status-badge-"])', label: 'Retire' },

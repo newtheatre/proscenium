@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const held = await itemById(id)
   if (!held) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
 
-  const { status } = await readValidatedBodyOrThrow(event, stockItemStatusForm)
+  const { status, hideDependents } = await readValidatedBodyOrThrow(event, stockItemStatusForm)
   if (status === held.status) {
     throw createError({
       statusCode: 409,
@@ -24,6 +24,31 @@ export default defineEventHandler(async (event) => {
       statusCode: 409,
       statusMessage: `${held.name} still has stock on hand: write it off or count it out before retiring it`,
     })
+  }
+
+  if (status === 'RETIRED') {
+    const dependents = await dependentProducts(id)
+    if (dependents.length > 0 && !hideDependents) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${held.name} is poured by ${dependents.map(product => product.name).join(', ')}: change those recipes, or retire it and hide them together`,
+        data: { dependents },
+      })
+    }
+
+    // Every predicate rides its own statement, so a delivery or a recipe change landing between
+    // the reads above and the batch cannot slip past (known issues, 0006, 0049).
+    const statements = retireItemStatements(id, { actorId: resolved.account.id, hideDependents })
+    await db.batch(statements.map(statement => db.run(statement)) as unknown as Parameters<typeof db.batch>[0])
+
+    const now = await itemById(id)
+    if (now?.status !== 'RETIRED') {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${held.name} changed while you were editing it`,
+      })
+    }
+    return { ok: true, status, hidden: dependents.length }
   }
 
   const entry = auditEntry({
@@ -48,7 +73,7 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 409,
       statusMessage: now.status === status
-        ? (status === 'RETIRED' ? `${now.name} is already retired` : `${now.name} is not retired`)
+        ? `${now.name} is not retired`
         : `${now.name} changed while you were editing it`,
     })
   }

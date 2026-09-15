@@ -230,7 +230,12 @@ export const stockItemForm = z.object({
   { message: 'A container size belongs to something measured in millilitres', path: ['containerMl'] },
 )
 
-export const stockItemStatusForm = z.object({ status: z.enum(STOCK_ITEM_STATUSES) })
+// Retiring an item the till still pours is refused naming the products; `hideDependents` is the
+// answer to that refusal, taking them off the till in the same batch (F-128 criterion 6).
+export const stockItemStatusForm = z.object({
+  status: z.enum(STOCK_ITEM_STATUSES),
+  hideDependents: z.boolean().default(false),
+})
 
 // Signed: a delivery adds and wastage takes away, and the sign is the caller's to state rather
 // than something inferred from the kind (F-114 criterion 3).
@@ -457,6 +462,10 @@ export interface VariantComponent {
   itemId: string | null
   itemName: string | null
   unit: StockUnit | null
+  // What the stocked item is and what is on hand, so a size can badge an ingredient that has been
+  // retired or run out; both are null on a choice group, which is not itself stocked (F-128).
+  itemStatus: StockItemStatus | null
+  onHand: number | null
   choiceGroupId: string | null
   choiceGroupName: string | null
   qty: number
@@ -546,6 +555,9 @@ export interface StockItem {
   status: StockItemStatus
   onHand: number
   hasMovements: boolean
+  // The active products that deplete this item, derived from their components rather than stored
+  // (F-128 criterion 7). Empty means nothing on the till pours it.
+  pouredBy: { id: string, name: string }[]
 }
 
 export interface StockMovement {

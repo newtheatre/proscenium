@@ -183,6 +183,22 @@ describe('retiring a stocked item the bar still pours (F-128 criteria 5 and 6)',
     })
   })
 
+  // The trail says what happened to each product, not only to the item, and is written from the
+  // same predicate as the update rather than from a list of ids read first (0049, 0006).
+  test('every product taken off the till says so in the trail', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      run(database, retireItemStatements('item-crisps', { actorId: 'user-1', hideDependents: true }))
+
+      expect(rows(database, `
+        SELECT target, detail FROM audit_log WHERE action = 'bar.product.status.changed'
+      `)).toEqual([{
+        target: 'bar-product:prod-crisps',
+        detail: JSON.stringify({ changes: { status: { from: 'ACTIVE', to: 'HIDDEN' } } }),
+      }])
+    })
+  })
+
   // Known issues: the guard read on-hand before the write, so a delivery landing in the window
   // retired an item that had stock again. The sum rides the UPDATE's own predicate instead.
   test('a delivery landing between the decision and the write stops the retirement', async () => {

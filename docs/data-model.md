@@ -1400,6 +1400,13 @@ group silently) · `age_restricted` bool default true ·
 `ACTIVE|RETIRED` · `created_at`. Retired, never deleted once anything has moved: every movement
 restricts on the foreign key.
 
+Which products pour an item is a query over their components, not a column: `pouredByColumn`
+(`server/utils/bar-linkage.ts`) answers it on the row being read, and `servingsAvailableQuery`
+answers the other direction from the movement sum (F-128 criteria 3, 4 and 7). Retirement carries
+both its guards on its own `UPDATE`: the on-hand sum as a subquery, and no `ACTIVE` product still
+pouring it. The refusal names those products, and answering it with `hideDependents` hides them in
+the same batch, scoped by subquery over the components rather than by ids read first (0006).
+
 ### bar_categories
 `id` PK · `name` unique, case-insensitively · `sort`, which drives the till's layout and is read
 per request · `colour` CHECK six hexadecimal characters after a hash.
@@ -1430,7 +1437,10 @@ stocked item that has since been retired; the refusal names it (`retiredIngredie
 component of its own, an item directly or a choice group standing in for one, or activation names
 the sizes that lack one (`variantsWithoutRecipeQuery`, F-128 criteria 1 and 2); a retired variant
 is exempt, and emptying an `ACTIVE` variant's stocked-item components refuses unless a choice
-group still covers it. Deleting a product outright refuses when any of its variants has ever
+group still covers it. Guided set-up (`server/utils/bar-setup.ts`, F-127) deliberately keeps its
+own check rather than calling these: it decides `ACTIVE` or `HIDDEN` before the insert, so the
+status rides the same batch, while these answer about a product that already exists. Deleting a
+product outright refuses when any of its variants has ever
 priced or ever sold, the same predicate `variants/[id]/index.delete.ts` uses one at a time,
 because a cascade would otherwise reach the append-only `variant_prices` trigger.
 
