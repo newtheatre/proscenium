@@ -622,12 +622,15 @@ Open questions:
 - Depends on: F-111, F-112, F-113, F-116, F-121
 - Acceptance criteria:
   1. Set-up opens on three shapes stated in the bar's own words: sold as itself, sold by measure,
-     made from several things. The shape is derived from the variants a product holds, never
-     stored, so a product edited later cannot contradict the shape it was created under and no
-     set-up-only column exists.
-  2. Sold by measure offers measure presets (wine, spirits, draught, packaged) beside the serving
-     kinds, preselected from the category's name, with every size untickable before submission. A
-     preset may only emit a serving kind the vocabulary already holds, so category default prices
+     made from several things. The shape is derived from a product's live serving sizes and what
+     each one pours, never stored, so a product edited later cannot contradict the shape it was
+     created under and no set-up-only column exists. A serving pouring more than one stocked item,
+     or sizes pouring more than one between them, reads as a recipe; a mixer choice group is a
+     choice rather than a second ingredient, so attaching one leaves a measured spirit measured.
+  2. The measure presets (wine, spirits, draught, packaged) fill in the serving sizes, preselected
+     from the category's name, and any size may be unticked before submission. Packaged is the
+     one-size preset the "sold as itself" card fills from; the other three fill "sold by measure".
+     A preset may only emit a serving kind the vocabulary already holds, so category default prices
      keep resolving (0017, amended 15 September 2026).
   3. Prices pre-fill from the category defaults that resolve (F-121) and stay editable; a size
      whose price resolves nowhere does not block the submission.
@@ -658,9 +661,10 @@ Open questions:
      size, and badge a component whose stocked item is retired or out of stock.
   3. Retiring a stocked item that active products deplete is refused, and the refusal names those
      products rather than counting them.
-  4. The refusal offers to retire the item and hide its dependent products in one batch; both the
-     retirement and the hides carry their predicate on the UPDATE, so a delivery or a sale landing
-     in the window cannot slip past the guard.
+  4. The refusal offers to retire the item and hide its dependent products in one batch; the
+     retirement carries the on-hand sum as a subquery in its own UPDATE's predicate, and the hides
+     scope to the dependent products by subquery over the components, never by an id list read
+     first (0006), so a delivery or a recipe change landing in the window cannot slip past.
   5. Both views derive from the existing components: no link is stored in either direction, and
      the till's catalogue contract is untouched.
 - Source: bar review, 15 September 2026 (known issues: the retirement guard reads on-hand before

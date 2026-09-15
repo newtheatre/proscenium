@@ -31,9 +31,11 @@ the resolved price and which level supplied it.
 Amended 15 September 2026 at Matt's direction, after the bar review found the model sound and the
 set-up unusable (a can of cider took four screens and seven submissions, a house red fourteen).
 Adding a product is now guided by its **shape**, and a shape is **derived from the product's
-variants, never stored**: `productShape` in `shared/utils/bar.ts` reads the variants and answers
-SIMPLE (one serving), MEASURED (several sizes off one stocked item) or RECIPE (several
-components), or UNSET while a product has no variants yet. No column records it, so a product
+variants, never stored**: `productShape` in `shared/utils/bar.ts` reads a product's live variants
+and what each one pours, and answers SIMPLE (one serving of one stocked item), MEASURED (several
+sizes off one stocked item), RECIPE (a serving pouring more than one item, or sizes pouring more
+than one between them), or UNSET while a product has no live variants yet. A choice group is a
+choice rather than a second ingredient, so attaching a mixer leaves a measured spirit measured. No column records it, so a product
 edited afterwards cannot contradict the shape it was created under, and set-up creates nothing the
 existing screens cannot edit. **Measure presets** (wine 750, 250, 175 and 125; spirits 25 and 50;
 draught 568 and 284; packaged at quantity 1) are a constant over the existing serving-kind

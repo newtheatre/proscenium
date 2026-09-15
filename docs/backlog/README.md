@@ -21,8 +21,8 @@ first tracker import resolves them.
 | `K-platform.md` | Platform foundations and migration | 26 | 0 | 0 | 29 |
 | **Total** | | **223** | **43** | **20** | **297** |
 
-The show night row also takes a correction: E-128 and E-129 were added to their file without
-this table following, so its MVP count moves by four rather than by the two stories added here.
+The show night row also took a correction when E-130 and E-131 were added: E-128 and E-129 had
+reached their file without this table following, so its MVP count moved by four rather than two.
 
 Eleven stories are resolved and excluded from the phase counts above, keeping their ids and
 their resolution notes. Eight (A-106, A-202, D-205, F-201, G-127, K-115, K-117, K-118) were resolved as
