@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
-import { REPORT_PERIOD_KINDS } from '#shared/utils/bar-reports'
+import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
 import type { BarReport, ReportPeriodInput, ReportSection } from '#shared/utils/bar-reports'
 
 definePageMeta({ layout: 'console', title: 'Bar reports', middleware: 'console', docs: '/docs/bar/reports' })
@@ -41,6 +41,12 @@ const { data, status, error, refresh } = await useAsyncData(
 )
 
 const reportFailure = useListFailure(error, 'The report could not be read.')
+
+// Comps and variance are the two sections that page; the rest answer whole and say nothing.
+function saysMoreOf(section: ReportSection): string {
+  const paged = section === 'comps' ? data.value?.comps : section === 'variance' ? data.value?.variance : null
+  return paged && paged.pages > 1 ? saysPageOf(paged) : ''
+}
 
 function exportUrl(section: ReportSection): string {
   const params = new URLSearchParams({ ...query.value, section })
@@ -201,7 +207,7 @@ function exportUrl(section: ReportSection): string {
           </thead>
           <tbody>
             <tr
-              v-for="row in data.variance"
+              v-for="row in data.variance.items"
               :key="`${row.stocktakeId}-${row.itemName}`"
               class="border-b last:border-0"
             >
@@ -225,7 +231,7 @@ function exportUrl(section: ReportSection): string {
           </thead>
           <tbody>
             <tr
-              v-for="row in data.comps"
+              v-for="row in data.comps.items"
               :key="row.entryId"
               class="border-b last:border-0"
             >
@@ -260,6 +266,14 @@ function exportUrl(section: ReportSection): string {
             </tr>
           </tbody>
         </table>
+
+        <p
+          v-if="saysMoreOf(section[0])"
+          class="text-sm text-muted"
+          :data-test="`${section[0]}-more`"
+        >
+          {{ saysMoreOf(section[0]) }}
+        </p>
       </section>
     </template>
   </div>

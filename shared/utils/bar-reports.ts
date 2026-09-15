@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { londonDayField } from '#shared/utils/membership'
+import type { Page } from '#shared/utils/pagination'
 
 // Sales, GP, variance, comp and discount reports (F-119): a query over the ledger and the
 // movement history, never a stored aggregate, so a correction lands immediately (criterion 4).
@@ -23,6 +24,17 @@ export type ReportPeriodInput = z.output<typeof reportPeriodForm>
 
 export const REPORT_SECTIONS = ['sales', 'gp', 'variance', 'comps', 'discounts'] as const
 export type ReportSection = (typeof REPORT_SECTIONS)[number]
+
+// Comps and variance are one row per comp and per adjusted stocktake line, so a season is
+// unbounded in both: they page on the screen and in larger blocks in the export (criterion 2).
+export const REPORT_EXPORT_PAGE_ROWS = 1000
+
+// What a paged section says when it does not fit, so the first page is never read as the whole.
+export function saysPageOf(page: Page<unknown>): string {
+  if (page.items.length === 0) return `Nothing on this page. There are ${page.total} in the period.`
+  const first = (page.page - 1) * page.pageSize + 1
+  return `Showing ${first} to ${first + page.items.length - 1} of ${page.total}. Narrow the period to see the rest.`
+}
 
 export interface SalesRow {
   categoryName: string
@@ -74,7 +86,7 @@ export interface BarReport {
   toAt: number
   sales: SalesRow[]
   gp: GpReport
-  variance: VarianceRow[]
-  comps: CompRow[]
+  variance: Page<VarianceRow>
+  comps: Page<CompRow>
   discounts: DiscountRow[]
 }

@@ -30,6 +30,22 @@ describe('csvField guards a leading =, +, - or @ (D-129 criterion 2)', () => {
   test('a number is stringified before the guard runs', () => {
     expect(csvField(42)).toBe('"42"')
   })
+
+  // F-119 criterion 3: a negative on-hand or a negative variance is a number in the supplier's
+  // spreadsheet, not text. The guard is for what a person typed, and a figure is not that.
+  test('a negative figure exports as a number, not as guarded text', () => {
+    expect(csvField(-40)).toBe('"-40"')
+    expect(csvField('-40')).toBe('"-40"')
+    expect(csvField('-2.5')).toBe('"-2.5"')
+    expect(csvField('+7')).toBe('"+7"')
+  })
+
+  test('anything that only looks like a figure is still guarded', () => {
+    expect(csvField('-SUM(A1)')).toBe(`"'-SUM(A1)"`)
+    expect(csvField('=1+1')).toBe(`"'=1+1"`)
+    expect(csvField('-Infinity')).toBe(`"'-Infinity"`)
+    expect(csvField('@nnt')).toBe(`"'@nnt"`)
+  })
 })
 
 describe('toCsv builds one quoted, guarded row per record', () => {
