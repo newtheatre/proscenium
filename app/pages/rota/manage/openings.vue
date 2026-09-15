@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { fromLondonWallClock, formatLondon, londonClock } from '#shared/utils/london'
+import { daysAfter } from '#shared/utils/membership'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { can, manageRota } from '#shared/utils/abilities'
 import { BAR_OPENING_LABEL_LIMIT, saysBarOpeningStatus } from '#shared/utils/rota-openings'
@@ -80,25 +81,36 @@ const venueOptions = computed(() => templates.value.venues
 
 const plan = reactive({ venueId: '', evening: '', opensAt: '18:00', closesAt: '23:00', label: '' })
 
+// A wall-clock time as typed, or null: an empty field is a missing answer, never midnight.
+function clockParts(value: string): [number, number] | null {
+  const [hour, minute] = value.split(':').map(Number)
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null
+  return [hour!, minute!]
+}
+
 // The night is the evening's own show night, worked out from the instant rather than typed: a bar
 // opening at 00:30 belongs to the night before, and the write path refuses a pair that disagrees.
 function instantsFor(): { night: string, startsAt: number, endsAt: number } | null {
   const [year, month, day] = plan.evening.split('-').map(Number)
-  const [openHour, openMinute] = plan.opensAt.split(':').map(Number)
-  const [closeHour, closeMinute] = plan.closesAt.split(':').map(Number)
-  if (!year || !month || !day || openHour === undefined || closeHour === undefined) return null
+  const opensAt = clockParts(plan.opensAt)
+  const closesAt = clockParts(plan.closesAt)
+  if (!year || !month || !day || !opensAt || !closesAt) return null
 
-  const opens = fromLondonWallClock(year, month, day, openHour, openMinute ?? 0)
-  const closes = fromLondonWallClock(year, month, day, closeHour, closeMinute ?? 0)
-  // A bar closing earlier on the clock than it opened closes the next morning.
-  const endsAt = Math.floor(closes.getTime() / 1000) + (closes <= opens ? 24 * 3600 : 0)
-  return { night: showNightOf(opens), startsAt: Math.floor(opens.getTime() / 1000), endsAt }
+  const opens = fromLondonWallClock(year, month, day, opensAt[0], opensAt[1])
+  const sameDay = fromLondonWallClock(year, month, day, closesAt[0], closesAt[1])
+  // A bar closing earlier on the clock than it opened closes the next morning, on the next London
+  // day rather than this instant plus 86400: a clock-change night is not that long (0014).
+  const [nextYear, nextMonth, nextDay] = daysAfter(plan.evening, 1).split('-').map(Number)
+  const closes = sameDay <= opens
+    ? fromLondonWallClock(nextYear!, nextMonth!, nextDay!, closesAt[0], closesAt[1])
+    : sameDay
+  return { night: showNightOf(opens), startsAt: Math.floor(opens.getTime() / 1000), endsAt: Math.floor(closes.getTime() / 1000) }
 }
 
 async function submitPlan(): Promise<void> {
   const when = instantsFor()
   if (!when) {
-    failure.value = 'Give the evening, the time it opens and the time it closes'
+    failure.value = 'Give the evening, the time the bar opens and the time it closes'
     return
   }
   saving.value = true

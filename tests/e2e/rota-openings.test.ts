@@ -6,6 +6,7 @@ import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { daysAfter } from '#shared/utils/membership'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -21,7 +22,9 @@ let foh: TestMember
 let member: TestMember
 let venueId: string
 
-const night = currentShowNight()
+// A week out rather than tonight: the open-slot list and a member's own rota both filter on the
+// clock, so an opening that has already run would drop out of a suite running late in the evening.
+const night = daysAfter(currentShowNight(), 7)
 const nightStart = Math.floor(showNightBounds(night).from.getTime() / 1000)
 
 interface Opening { openingId: string, venueId: string, label: string, status: string }

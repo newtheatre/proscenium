@@ -528,6 +528,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rota/openings/shifts/[id]/claim.post.ts', actions: ['bar-opening-shift.claimed'] },
   { route: 'server/api/rota/openings/shifts/[id]/approve.post.ts', actions: ['bar-opening-shift.confirmed'] },
   { route: 'server/api/rota/openings/shifts/[id]/decline.post.ts', actions: ['bar-opening-shift.declined'] },
+  { route: 'server/api/rota/openings/shifts/[id]/release.post.ts', actions: ['bar-opening-shift.released'] },
+  { route: 'server/api/rota/openings/shifts/[id]/dismiss.post.ts', actions: ['bar-opening-shift.dismissed'] },
   { route: 'server/api/rota/openings/shifts/[id]/assign.post.ts', actions: ['bar-opening-shift.reassigned'] },
   { route: 'server/api/rota/openings/shifts/[id]/unconfirm.post.ts', actions: ['bar-opening-shift.unconfirmed'] },
 

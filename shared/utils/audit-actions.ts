@@ -225,6 +225,8 @@ const CATALOGUE = {
   'bar-opening-shift.claimed': { label: 'Bar opening slot claimed', module: 'show-night' },
   'bar-opening-shift.confirmed': { label: 'Bar opening claim approved', module: 'show-night' },
   'bar-opening-shift.declined': { label: 'Bar opening claim declined', module: 'show-night' },
+  'bar-opening-shift.released': { label: 'Bar opening slot released by its holder', module: 'show-night' },
+  'bar-opening-shift.dismissed': { label: 'Declined bar opening claim cleared by its claimant', module: 'show-night' },
   'bar-opening-shift.reassigned': { label: 'Bar opening slot assigned by an officer', module: 'show-night' },
   'bar-opening-shift.unconfirmed': { label: 'Bar opening slot stood down to open by an officer', module: 'show-night' },
   'age-check.logged': { label: 'Challenge 25 check logged', module: 'show-night' },

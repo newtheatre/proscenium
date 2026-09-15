@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
   // role's gate; they are their own list because an opening names no show to page alongside one.
   const openings = role !== undefined && role !== 'BAR'
     ? []
-    : await db.all<OpenOpeningShiftRow>(openOpeningShiftsQuery(now, OPENING_SLOT_CAP))
+    : await db.all<OpenOpeningShiftRow>(openOpeningShiftsQuery(filters, now, OPENING_SLOT_CAP))
 
   return {
     ...envelope(items.map(item => ({ ...item, ...eligibilities[item.role] })), totalRow?.total ?? 0, page, pageSize),
