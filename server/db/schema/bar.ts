@@ -264,8 +264,8 @@ export const tillSessions = sqliteTable('till_sessions', {
   night: text('night').notNull(),
   openedBy: text('opened_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
   openedAt: integer('opened_at').notNull().default(now),
-  // Append-only once closed: a trigger refuses every UPDATE while `closed_at` is set, so a
-  // correction is a new session rather than a rewrite (0010, F-118 criterion 3).
+  // Append-only once closed: a trigger refuses every UPDATE while `closed_at` is set. A mis-keyed
+  // Z is corrected by a superseding `z_readings` row, never here (0010, F-118 criterion 3).
   closedBy: text('closed_by').references(() => users.id, { onDelete: 'restrict' }),
   closedAt: integer('closed_at'),
   // Written once with the close (F-118 criterion 3); `close.post.ts` is the only writer. No CHECK

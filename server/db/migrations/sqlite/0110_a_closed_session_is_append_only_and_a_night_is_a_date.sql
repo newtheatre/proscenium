@@ -2,10 +2,13 @@
 -- each of the three tables gains a CHECK pinning `night` to a London civil date (0014): the GLOB
 -- `variant_prices.effective_from` carries, plus `date()`, which refuses a well-shaped impossible
 -- day such as 2026-13-45. `till_sessions` also gains the trigger that makes a closed session
--- append-only (0010). All three are mutable tables carrying no trigger
--- today, so nothing of theirs is lost. `sumup_attempts` holds a live restrict foreign key onto
+-- append-only (0010). All three are mutable tables carrying no trigger today, so nothing of
+-- theirs is lost. `sumup_attempts` holds a live restrict foreign key onto
 -- `till_sessions`, so it is held, dropped, and recreated under its own name after `till_sessions`
 -- exists in its new shape; the ordering follows the fixture 0063 verified, not a fresh argument.
+-- Only the three tables F-118 criterion 3 keys on are rebuilt. `z_readings`, `night_reports`,
+-- `bar_openings` and `backstage_nights` carry the same show-night label and are left alone: each
+-- is a rebuild of its own, and two of them are append-only registers 0010 refuses outright.
 CREATE TABLE `__hold_sumup_attempts` AS SELECT * FROM `sumup_attempts`;
 --> statement-breakpoint
 DROP TABLE `sumup_attempts`;
@@ -53,7 +56,7 @@ CREATE TRIGGER till_sessions_closed_is_append_only
 BEFORE UPDATE ON till_sessions
 WHEN OLD.closed_at IS NOT NULL
 BEGIN
-  SELECT RAISE(ABORT, 'a closed till session is append-only: a correction is a new session, not a rewrite');
+  SELECT RAISE(ABORT, 'a closed till session is append-only: a corrected Z supersedes in z_readings');
 END;
 --> statement-breakpoint
 CREATE TABLE `sumup_attempts` (

@@ -57,9 +57,18 @@ describe('a closed session is append-only, and a correction is a new fact (F-118
       const at = ground(database)
       session(database, at)
       const userId = at.userId
-      database.batch([['UPDATE till_sessions SET closed_by = ?, closed_at = 2000, actual_z_pence = 5000 WHERE id = ?', userId, 'ts-1']])
+      const close = (at: number, z: number): void => {
+        database.batch([[
+          'UPDATE till_sessions SET closed_by = ?, closed_at = ?, actual_z_pence = ? WHERE id = ? AND closed_at IS NULL',
+          userId, at, z, 'ts-1',
+        ]])
+      }
+      close(2000, 5000)
+      // The loser of a race matches no row, so the trigger never fires and its batch still commits.
+      close(3000, 9900)
 
-      expect(rows<{ closed_at: number }>(database, 'SELECT closed_at FROM till_sessions')[0]?.closed_at).toBe(2000)
+      expect(rows<{ closed_at: number, actual_z_pence: number }>(database, 'SELECT closed_at, actual_z_pence FROM till_sessions')[0])
+        .toEqual({ closed_at: 2000, actual_z_pence: 5000 })
     })
   })
 

@@ -1556,8 +1556,10 @@ scope and the close passes its own session (`server/utils/reconciliation.ts`), s
 running the same night each stamp their own total rather than the estate's combined one (F-202.3).
 Append-only from the close onwards: `till_sessions_closed_is_append_only` fires
 `BEFORE UPDATE` whenever `closed_at` is already set and refuses the write, so the Z figure, the
-variance and the close itself are facts once recorded and a correction is a new session rather
-than a rewrite (F-118 criterion 3, 0010). The close still runs, since its own predicate reads
+variance and the close itself are facts once recorded (F-118 criterion 3, 0010). A mis-keyed Z is
+corrected by a superseding `z_readings` row (`server/utils/night-reconciliation.ts`), never by a
+second session for the same night, which `requireNightAuthority` refuses to open once the night
+has passed. The close still runs, since its own predicate reads
 `closed_at IS NULL`, and no other write path updates the table at all.
 A session left open past its night is F-102's own query (`staleUnclosedSessionsQuery`). E-114's
 checklist criterion 3 names only two system-verified checks; a stale till session is not a third
