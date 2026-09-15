@@ -219,6 +219,59 @@ export function openingShiftsQuery(clause: ListClause, limit: number, offset: nu
   `
 }
 
+export interface MyOpeningShiftRow {
+  slotId: string
+  openingId: string
+  slot: number
+  status: ShiftStatus
+  label: string
+  venueName: string
+  startsAt: number
+  endsAt: number
+}
+
+// A member's own opening slots, upcoming and not cancelled, labelled by the opening rather than
+// by a show title (E-130 criterion 4). Bounded by LIMIT, as `myShiftsQuery` is.
+export function myOpeningShiftsQuery(userId: string, now: number): SQL {
+  return sql`
+    SELECT s.id AS slotId, o.id AS openingId, s.slot AS slot, s.status AS status,
+           o.label AS label, v.name AS venueName, o.starts_at AS startsAt, o.ends_at AS endsAt
+    FROM bar_opening_shifts s
+    JOIN bar_openings o ON o.id = s.opening_id
+    JOIN venues v ON v.id = o.venue_id
+    WHERE s.user_id = ${userId} AND s.status <> 'CANCELLED' AND o.status <> 'CANCELLED'
+      AND o.ends_at >= ${now}
+    ORDER BY o.starts_at, s.slot
+    LIMIT 100
+  `
+}
+
+export interface OpenOpeningShiftRow {
+  slotId: string
+  openingId: string
+  slot: number
+  label: string
+  venueId: string
+  venueName: string
+  startsAt: number
+  endsAt: number
+}
+
+// The open slots an opening still has, offered beside the rota's own open shifts (criterion 4).
+// Bounded by count rather than paged: a night holds a handful of openings, not a page of them.
+export function openOpeningShiftsQuery(now: number, limit: number): SQL {
+  return sql`
+    SELECT s.id AS slotId, o.id AS openingId, s.slot AS slot, o.label AS label,
+           v.id AS venueId, v.name AS venueName, o.starts_at AS startsAt, o.ends_at AS endsAt
+    FROM bar_opening_shifts s
+    JOIN bar_openings o ON o.id = s.opening_id
+    JOIN venues v ON v.id = o.venue_id
+    WHERE s.status = 'OPEN' AND o.status <> 'CANCELLED' AND o.starts_at >= ${now}
+    ORDER BY o.starts_at, s.slot
+    LIMIT ${limit}
+  `
+}
+
 export type BarOpeningDetail = BarOpeningRow
 
 export async function openingDetail(openingId: string): Promise<BarOpeningDetail | null> {

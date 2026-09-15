@@ -75,6 +75,20 @@ export const rota: Shot[] = [
     ],
   },
   {
+    name: 'rota/bar-opening-plan',
+    persona: foh,
+    url: '/rota/manage/openings',
+    marker: '[data-test="openings-table"]',
+    width: CONSOLE_WIDTH,
+    after: openFirst('[data-test="plan-opening"]'),
+    annotations: [
+      { selector: '[data-test="opening-venue"]', label: 'Venue' },
+      { selector: '[data-test="opening-evening"]', label: 'Evening' },
+      { selector: '[data-test="opening-opens"]', label: 'Hours' },
+      { selector: '[data-test="opening-label"]', label: 'What it is' },
+    ],
+  },
+  {
     name: 'rota/checklists',
     persona: foh,
     url: '/rota/manage/checklists',
