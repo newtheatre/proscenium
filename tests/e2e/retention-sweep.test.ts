@@ -269,6 +269,33 @@ describe.skipIf(skip !== null)('exemptions and the two caps (criteria 2, 4)', ()
     }
   })
 
+  test('a voided tab is no longer an exemption', async () => {
+    const id = await inactiveAccount(-10)
+    // A voided charge can never be settled, so without the void being read here the holder is
+    // exempt from erasure for ever (F-109 criterion 4, 0011).
+    const chargeId = crypto.randomUUID()
+    write(
+      `INSERT INTO ledger_entries (id, london_day, source, tender, total_pence, tab_debtor_id)
+       VALUES (?, date('now'), 'TILL', 'TAB', 500, ?)`,
+      chargeId, id,
+    )
+    write(
+      `INSERT INTO ledger_entries (id, london_day, source, tender, total_pence, tab_debtor_id, void_of_entry_id, void_reason)
+       VALUES (?, date('now'), 'TILL', 'TAB', -500, ?, ?, 'Charged in error')`,
+      crypto.randomUUID(), id, chargeId,
+    )
+    await arm(true)
+
+    try {
+      const run = await runSweep()
+      expect(run.anonymised).toBeGreaterThan(0)
+      expect(isAnonymised(id)).toBe(true)
+    }
+    finally {
+      await arm(false)
+    }
+  })
+
   test('a run anonymises no more than the configured cap', async () => {
     await setConfig('RETENTION_SWEEP_CAP', 1)
     const first = await inactiveAccount(-10)

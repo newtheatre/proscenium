@@ -81,6 +81,7 @@ function openTill(venueId: string, performanceId: string, as: string = barStaff.
 
 const aMember = (): Promise<TestMember> => registerMember(app, 'settle-member', generatePassword())
 const authorise = (userIds: string[]): Promise<Response> => send('PUT', '/api/admin/config/BAR_AUTHORISED_TAB_HOLDERS', { value: userIds })
+const setCap = (pence: number): Promise<Response> => send('PUT', '/api/admin/config/BAR_TAB_CAP_PENCE', { value: pence })
 
 async function aSellableProduct(pricePence = 500): Promise<{ variantId: string, productId: string }> {
   const categoryAnswered = await send('POST', '/api/admin/bar/categories', { name: named('Spirits') })
@@ -326,5 +327,65 @@ describe.skipIf(skip !== null)('a void credits stock exactly once (criterion 5)'
 
     const stillAfter = movementsFor(itemId)
     expect(stillAfter.reduce((sum, row) => sum + row.qty, 0)).toBe(700)
+  })
+})
+
+describe.skipIf(skip !== null)('a voided charge leaves the balance, the cap and the year-end list (criteria 1, 6)', () => {
+  test('the holder\'s balance returns to zero and the charge still shows, credited', async () => {
+    const { venueId, performanceId } = programme(`settle-void-balance-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member.id, 500)
+
+    const candidates = await settleCandidates(venueId, member.id)
+    const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
+    expect((await voidCharge(charges[0]!.entryId, 'Charged in error', barManager.cookie)).status).toBe(200)
+
+    const answered = await send('GET', '/api/account/tab', undefined, member.cookie)
+    const body = await answered.json() as { tab: { outstandingPence: number, charges: { voided: boolean }[] } }
+    expect(body.tab.outstandingPence).toBe(0)
+    expect(body.tab.charges.some(charge => charge.voided)).toBe(true)
+  })
+
+  test('the holder drops off the treasurer\'s unsettled list', async () => {
+    const { venueId, performanceId } = programme(`settle-void-yearend-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member.id, 500)
+
+    const listed = await send('GET', '/api/admin/bar/tabs')
+    const before = await listed.json() as { holders: { holderId: string }[] }
+    expect(before.holders.some(holder => holder.holderId === member.id)).toBe(true)
+
+    const candidates = await settleCandidates(venueId, member.id)
+    const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
+    await voidCharge(charges[0]!.entryId, 'Charged in error', barManager.cookie)
+
+    const after = await send('GET', '/api/admin/bar/tabs')
+    const body = await after.json() as { holders: { holderId: string }[] }
+    expect(body.holders.some(holder => holder.holderId === member.id)).toBe(false)
+  })
+
+  test('a charge for the whole cap is accepted again after a void', async () => {
+    const { venueId, performanceId } = programme(`settle-void-cap-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(2000)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await setCap(2000)
+
+    expect((await chargeToTab(venueId, variantId, member.id, 2000)).status).toBe(200)
+    const candidates = await settleCandidates(venueId, member.id)
+    const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
+    await voidCharge(charges[0]!.entryId, 'Charged in error', barManager.cookie)
+
+    const answered = await chargeToTab(venueId, variantId, member.id, 2000)
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { tab: { outstandingPence: number } }
+    expect(body.tab.outstandingPence).toBe(2000)
   })
 })
