@@ -25,6 +25,7 @@ not be a refusal at a desk (0031).
 | Route | Ability | Membership requirement | Sent to |
 | --- | --- | --- | --- |
 | `/account/access` | `signedIn` | None: access requirements are recorded whatever membership state the account is in. | n/a |
+| `/account/bar-tab` | `signedIn` | None: a tab charge is authorised per holder by the bar manager, not gated on membership here. | n/a |
 | `/account/membership` | `signedIn` | None: this is the page a lapsed member is sent to, so it has to render lapsed. | n/a |
 | `/account/notifications` | `signedIn` | None. | n/a |
 | `/account/passes` | `signedIn` | None: a pass is ticketing, sold to anybody, not a member benefit (0031, A-202). | n/a |
