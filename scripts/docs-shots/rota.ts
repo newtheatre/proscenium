@@ -33,7 +33,7 @@ export const rota: Shot[] = [
       { selector: '[data-test="slot-DUTY_MANAGER"]', label: 'Duty manager' },
       { selector: '[data-test="slot-DOOR"]', label: 'Door' },
       { selector: '[data-test="slot-BAR"]', label: 'Bar' },
-      { selector: '[data-test="starts-before-BAR"]', label: 'When it is worked' },
+      { selector: '[data-test="starts-before-DUTY_MANAGER"]', label: 'When it is worked' },
       { selector: '[data-test="template-submit"]', label: 'Save it' },
     ],
   },
