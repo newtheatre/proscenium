@@ -18,11 +18,13 @@ Open questions:
   (decision 0069). The typed cross-check stays as the laptop's flow and the fallback.
 - Who qualifies as an authorised tab holder in the unified system (committee only, as today, or a
   treasurer-approved list), and what is the default hard cap? The old estate's £20 was a soft nag.
-- For the migration: is the imported stock-movement history authoritative for opening on-hand, or
-  informational only, with the cutover physical stocktake establishing the trusted balance? And
-  which of the three documented data-damage repairs run as repairs versus explicit write-offs?
-- Are wastage reasons a fixed vocabulary or a bar-manager-managed list? Waste analytics (F-204)
-  needs structure; free text alone cannot be reported on.
+- Answered 15 September 2026: the imported stock-movement history is informational and never the
+  balance, the most recent applied stocktake is, and no documented data-damage repair runs as a
+  repair: damage is written off explicitly by a dated movement. A production export found nothing
+  to carry in any case (K-116). Decision 0080.
+- Answered 15 September 2026: wastage reasons are a fixed vocabulary in code
+  (`MOVEMENT_REASONS`), not a managed list, with optional free-text detail on the movement that
+  reports never group by and that holds no personal data. Decision 0079; story F-204.
 - Answered 15 September 2026: on a night with no performance (an external hire with the bar open),
   a bar opening is planned like a rota and a confirmed shift on it opens the till; the bar
   manager's officer role still opens it by naming the venue, recorded as any bypass is. Comp

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysMoney } from '#shared/utils/bar'
+import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
 import type { BarReport, ReportPeriodInput, ReportPeriodKind, ReportSection } from '#shared/utils/bar-reports'
 
@@ -140,7 +140,7 @@ function exportUrl(section: ReportSection): string {
       <section
         v-for="section in ([
           ['sales', 'Sales'], ['gp', 'Gross profit'], ['variance', 'Stocktake variance'],
-          ['comps', 'Comps'], ['discounts', 'Discounts'],
+          ['comps', 'Comps'], ['discounts', 'Discounts'], ['wastage', 'Wastage'],
         ] as const)"
         :key="section[0]"
         class="space-y-2"
@@ -213,7 +213,7 @@ function exportUrl(section: ReportSection): string {
               >
                 <td class="py-2">
                   {{ row.itemName }}
-                </td><td>{{ row.qtyDepleted }}</td><td>{{ saysMoney(row.costPence) }}</td>
+                </td><td>{{ saysQuantity(row.qtyDepleted, row.unit) }}</td><td>{{ saysMoney(row.costPence) }}</td>
               </tr>
             </tbody>
           </table>
@@ -263,6 +263,31 @@ function exportUrl(section: ReportSection): string {
               <td class="py-2">
                 {{ row.reason }}
               </td><td>{{ row.approvedByName }}</td><td>{{ saysMoney(row.foregonePence) }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table
+          v-else-if="section[0] === 'wastage'"
+          class="w-full text-sm"
+        >
+          <thead>
+            <tr class="border-b text-left text-muted">
+              <th class="py-2">
+                Reason
+              </th><th>Item</th><th>Category</th><th>Qty</th><th>At cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in data.wastage"
+              :key="`${row.reason}-${row.itemName}`"
+              class="border-b last:border-0"
+            >
+              <td class="py-2">
+                {{ says(row.reason) }}
+              </td><td>{{ row.itemName }}</td><td>{{ row.categoryName }}</td>
+              <td>{{ saysQuantity(row.qtyWasted, row.unit) }}</td><td>{{ saysMoney(row.costPence) }}</td>
             </tr>
           </tbody>
         </table>

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { compsCountQuery, compsQuery, gpDepletionQuery, gpRevenueQuery, varianceCountQuery, varianceQuery } from '#server/utils/bar-reports'
+import { compsCountQuery, compsQuery, gpDepletionQuery, gpRevenueQuery, varianceCountQuery, varianceQuery, wastageQuery } from '#server/utils/bar-reports'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -85,7 +85,7 @@ function depletion(database: TestDatabase, id: string, itemId: string, qty: numb
   insert(database, 'stock_movements', { id, item_id: itemId, qty: -qty, kind, ref_table: 'ledger_lines', ref_id: lineId, created_at: createdAt })
 }
 
-interface GpRow { itemName: string, qtyDepleted: number, costPence: number }
+interface GpRow { itemName: string, unit: string, qtyDepleted: number, costPence: number }
 
 const depleted = (database: TestDatabase): GpRow[] => read<GpRow>(database, gpDepletionQuery(FROM_AT, TO_AT))
 
@@ -100,7 +100,7 @@ describe('gross profit counts what a comp poured (F-110 criterion 4, F-119 crite
       depletion(database, 'm-2', itemId, 50, 'COMP', comp, INSIDE)
 
       // Half of it given away and counted all the same.
-      expect(depleted(database)).toEqual([{ itemName: 'Gin 1', qtyDepleted: 100, costPence: 100 }])
+      expect(depleted(database)).toEqual([{ itemName: 'Gin 1', unit: 'ML', qtyDepleted: 100, costPence: 100 }])
     })
   })
 
@@ -125,9 +125,9 @@ describe('gross profit counts what a comp poured (F-110 criterion 4, F-119 crite
       // Voided a week later: the credit is its own entry, in its own period.
       reversePour(database, 'r-1', itemId, 50, 'm-1', TO_AT + 86_400)
 
-      expect(depleted(database)).toEqual([{ itemName: 'Gin 1', qtyDepleted: 50, costPence: 50 }])
+      expect(depleted(database)).toEqual([{ itemName: 'Gin 1', unit: 'ML', qtyDepleted: 50, costPence: 50 }])
       const [later] = read<GpRow>(database, gpDepletionQuery(TO_AT, TO_AT + 604_800))
-      expect(later).toEqual({ itemName: 'Gin 1', qtyDepleted: -50, costPence: -50 })
+      expect(later).toEqual({ itemName: 'Gin 1', unit: 'ML', qtyDepleted: -50, costPence: -50 })
     })
   })
 
@@ -176,7 +176,7 @@ describe('the cost basis is the weighted average of the deliveries that stand (F
       const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
       depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
 
-      expect(depleted(database)[0]).toEqual({ itemName: 'Gin 1', qtyDepleted: 50, costPence: 0 })
+      expect(depleted(database)[0]).toEqual({ itemName: 'Gin 1', unit: 'ML', qtyDepleted: 50, costPence: 0 })
     })
   })
 })
@@ -192,7 +192,7 @@ describe('revenue and cost run on one clock (F-119 criterion 1, 0014)', () => {
 
       const [revenue] = read<{ revenuePence: number }>(database, gpRevenueQuery(FROM_AT, TO_AT))
       expect(revenue?.revenuePence).toBe(500)
-      expect(depleted(database)).toEqual([{ itemName: 'Gin 1', qtyDepleted: 50, costPence: 50 }])
+      expect(depleted(database)).toEqual([{ itemName: 'Gin 1', unit: 'ML', qtyDepleted: 50, costPence: 50 }])
     })
   })
 
@@ -287,6 +287,75 @@ describe('an unbounded section pages rather than truncating silently (F-119 crit
       const [counted] = read<{ total: number }>(database, varianceCountQuery(FROM_AT, TO_AT))
       expect(counted?.total).toBe(2)
       expect(read<{ itemName: string }>(database, varianceQuery(FROM_AT, TO_AT, 1, 1)).map(row => row.itemName)).toEqual(['Gin 2'])
+    })
+  })
+})
+
+// Wastage is typed in on the stock screen and has no ledger entry, so its own clock is all there is.
+function wastage(database: TestDatabase, id: string, itemId: string, qty: number, reason: string, createdAt = INSIDE): void {
+  insert(database, 'stock_movements', { id, item_id: itemId, qty: -qty, kind: 'WASTAGE', reason, created_at: createdAt })
+}
+
+interface WastageRow { reason: string, itemName: string, unit: string, categoryName: string, qtyWasted: number, costPence: number }
+
+describe('wastage groups by reason, item and category (0079, F-204 criterion 2)', () => {
+  test('two spillages of one item are one row, and a second reason is its own', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
+      wastage(database, 'w-1', itemId, 25, 'SPILLAGE')
+      wastage(database, 'w-2', itemId, 25, 'SPILLAGE')
+      wastage(database, 'w-3', itemId, 10, 'BREAKAGE')
+
+      const rows = read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))
+      expect(rows.map(row => [row.reason, row.qtyWasted, row.costPence])).toEqual([['SPILLAGE', 50, 50], ['BREAKAGE', 10, 10]])
+    })
+  })
+
+  test('the item carries its category, so a season groups by what the bar buys', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      database.batch([['UPDATE bar_items SET category = ? WHERE id = ?', 'Spirits', itemId]])
+      wastage(database, 'w-1', itemId, 10, 'OUT_OF_DATE')
+
+      expect(read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))[0]?.categoryName).toBe('Spirits')
+    })
+  })
+
+  test('a wastage outside the period, and one a reversal names, are both absent', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      wastage(database, 'w-1', itemId, 10, 'BREAKAGE', BEFORE)
+      wastage(database, 'w-2', itemId, 10, 'BREAKAGE')
+      // Typed in against the wrong item and corrected: it never happened, and there is no
+      // money on the other side of it to keep in step.
+      insert(database, 'stock_movements', { id: 'r-1', item_id: itemId, qty: 10, kind: 'REVERSAL', reverses_id: 'w-2', created_at: INSIDE })
+
+      expect(read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))).toEqual([])
+    })
+  })
+
+  test('a write-off typed in as an adjustment counts, and a recount does not', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
+      insert(database, 'stock_movements', { id: 'a-1', item_id: itemId, qty: -20, kind: 'ADJUST', reason: 'OUT_OF_DATE', created_at: INSIDE })
+      insert(database, 'stock_movements', { id: 'a-2', item_id: itemId, qty: -5, kind: 'ADJUST', reason: 'COUNT_CORRECTION', created_at: INSIDE })
+      insert(database, 'stock_movements', { id: 'a-3', item_id: itemId, qty: 30, kind: 'ADJUST', reason: 'OPENING_BALANCE', created_at: INSIDE })
+
+      const rows = read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))
+      expect(rows.map(row => [row.reason, row.qtyWasted])).toEqual([['OUT_OF_DATE', 20]])
+    })
+  })
+
+  test('a sale is not wastage, whatever it did to the shelf', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
+      const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
+      depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
+
+      expect(read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))).toEqual([])
     })
   })
 })

@@ -496,7 +496,7 @@ function seedStock(target: SeedTarget, items: Map<string, string>, keeper: strin
       item_id: items.get('house-red')!,
       qty: -750,
       kind: 'WASTAGE',
-      reason: 'A bottle went over behind the bar during the get-in.',
+      reason: 'BREAKAGE',
       actor_id: keeper,
       created_at: now - 5 * DAY,
     }))
@@ -510,7 +510,7 @@ function seedStock(target: SeedTarget, items: Map<string, string>, keeper: strin
       item_id: items.get('crisps')!,
       qty: -6,
       kind: 'ADJUST',
-      reason: 'Six bags out of date and binned.',
+      reason: 'OUT_OF_DATE',
       actor_id: keeper,
       created_at: now - 4 * DAY,
     }))
@@ -527,7 +527,7 @@ function seedStock(target: SeedTarget, items: Map<string, string>, keeper: strin
       item_id: items.get('lemonade')!,
       qty: -2000,
       kind: 'ADJUST',
-      reason: 'Recorded against the wrong bottle.',
+      reason: 'COUNT_CORRECTION',
       actor_id: keeper,
       created_at: now - 3 * DAY,
     }))
@@ -536,7 +536,7 @@ function seedStock(target: SeedTarget, items: Map<string, string>, keeper: strin
       item_id: items.get('lemonade')!,
       qty: 2000,
       kind: 'REVERSAL',
-      reason: 'Reversing the miscount above.',
+      reason: 'COUNT_CORRECTION',
       reverses_id: reversedId,
       actor_id: keeper,
       created_at: now - 3 * DAY + 600,
