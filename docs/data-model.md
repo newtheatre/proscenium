@@ -1149,6 +1149,28 @@ restamps the open ones from the new venue's template; a held shift in a role the
 template does not staff at all is cancelled rather than left stranded, and its holder is
 told either way (E-101, E-102, committee direction 4 September 2026).
 
+### bar_openings
+`id` PK · `venue_id` → venues restrict · `night` (the London show-night date, 0014) · `label`
+(what the evening is called, standing in for a show title) · `starts_at` · `ends_at` · `status`
+CHECK `PLANNED|CANCELLED` · `created_by` NULL → users set null · `created_at`. INDEX
+(`venue_id`, `night`). CHECK `bar_openings_ends_after_start`: the bar closes after it opens.
+A bar opening is a planned event in its own right, for a hire, a society social or a get-in
+night: it names no performance and no show because there is none, and nothing public, no
+attendance figure and no night report derives from one (0077, E-130 criterion 6).
+
+### bar_opening_shifts
+`id` PK · `opening_id` → bar_openings cascade · `slot` (the ordinal within the opening, from 1)
+· `user_id` NULL → users restrict · `status` CHECK as `shifts` · `assigned_by` NULL → users set
+null · `claimed_at` · `confirmed_at` · `notes` (describes the slot, safe) · `decline_reason`
+NULL. UNIQUE (`opening_id`, `slot`), which is what makes a second stamping a no-op. CHECK
+`bar_opening_shifts_open_names_nobody`, word for word the rule `shifts` holds. There is no role
+column: every slot on a bar opening is a bar slot. Creating an opening stamps one slot per head
+of the venue template's `BAR` count in the same batch, and a venue with no bar row stamps
+nothing and is told so rather than given a slot the theatre never asked for. Claims run through
+`claimSlotStatement()`, the rota's own conditional write parameterised by table, so two
+simultaneous claims settle to one winner and one member holds one slot on an opening (E-104,
+0003). Cancelling an opening cancels its slots in the same batch, keeping whoever held one.
+
 ### shift_contact_preferences
 `user_id` PK → users cascade · `visible` bool default false · `updated_at`. Consent, not a fact
 recorded about somebody: whether tonight's duty manager sees this phone number on the team

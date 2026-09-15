@@ -90,6 +90,13 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     [`INSERT INTO shifts (id, performance_id, role, slot, user_id, status, notes, assigned_by)
       VALUES (?, ?, ?, 1, ?, 'CONFIRMED', ?, ?)`,
     `sh-${id}`, `perf-${id}`, 'DUTY_MANAGER', id, `${NAME} has the keys`, id],
+    // The same staffing record on an evening with no performance to key to (E-130, 0077).
+    [`INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, created_by)
+      VALUES (?, ?, '2026-09-01', ?, ?, ?, ?)`,
+    `bo-${id}`, `venue-${id}`, 'A society social', now + 3600, now + 7200, id],
+    [`INSERT INTO bar_opening_shifts (id, opening_id, slot, user_id, status, notes, assigned_by)
+      VALUES (?, ?, 1, ?, 'CONFIRMED', ?, ?)`,
+    `bos-${id}`, `bo-${id}`, id, `${NAME} has the keys`, id],
     // Consent, not a fact recorded about them, so it goes rather than being scrubbed (E-112).
     ['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', id],
     // A price this person set. Append-only and free of anything but a figure and a date, which is

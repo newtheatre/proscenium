@@ -325,6 +325,14 @@ export const MESSAGE_TYPES = {
     template: 'shift-performance-cancelled',
     sender: 'ANNOUNCEMENTS',
   },
+  // The same reasoning for an evening with no performance to cancel: the bar is not opening, so
+  // a rota preference cannot silence it (E-130 criterion 5, 0077).
+  'shift.opening-cancelled': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-opening-cancelled',
+    sender: 'ANNOUNCEMENTS',
+  },
   // Transactional for the same reason: a held shift moved with the performance, and the holder
   // needs to know before the night rather than at the door (E-102, venue move interpretation).
   'shift.venue-changed': {

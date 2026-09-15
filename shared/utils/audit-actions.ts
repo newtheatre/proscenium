@@ -218,6 +218,15 @@ const CATALOGUE = {
   'shift.reassigned': { label: 'Shift assigned or reassigned by an officer', module: 'show-night' },
   'shift.added': { label: 'Ad hoc shift added to a performance', module: 'show-night' },
   'shift.unconfirmed': { label: 'Confirmed shift stood down to open by an officer', module: 'show-night' },
+  // A bar opening is its own planned event, so its entries are its own rather than a shift's
+  // (0077, E-130).
+  'bar-opening.created': { label: 'Bar opening planned', module: 'show-night' },
+  'bar-opening.cancelled': { label: 'Bar opening cancelled', module: 'show-night' },
+  'bar-opening-shift.claimed': { label: 'Bar opening slot claimed', module: 'show-night' },
+  'bar-opening-shift.confirmed': { label: 'Bar opening claim approved', module: 'show-night' },
+  'bar-opening-shift.declined': { label: 'Bar opening claim declined', module: 'show-night' },
+  'bar-opening-shift.reassigned': { label: 'Bar opening slot assigned by an officer', module: 'show-night' },
+  'bar-opening-shift.unconfirmed': { label: 'Bar opening slot stood down to open by an officer', module: 'show-night' },
   'age-check.logged': { label: 'Challenge 25 check logged', module: 'show-night' },
   'age-check.superseded': { label: 'Challenge 25 entry corrected', module: 'show-night' },
   'incident.logged': { label: 'Incident or near miss logged', module: 'show-night' },
