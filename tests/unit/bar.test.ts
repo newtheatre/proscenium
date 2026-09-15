@@ -72,6 +72,20 @@ describe('a movement is signed, explained and costed where it should be', () => 
     expect(aMovement({ kind: 'WASTAGE', qty: -750, reason: 'BREAKAGE' }).success).toBe(true)
   })
 
+  // A wastage reason on a correction is a real vocabulary value, so it is the pairing that
+  // refuses it, not the enum (F-204, stock review).
+  test('a reason pairs with its kind: wastage reasons for wastage, correction reasons for a correction', () => {
+    expect(aMovement({ kind: 'WASTAGE', qty: -750, reason: 'BREAKAGE' }).success).toBe(true)
+    expect(aMovement({ kind: 'ADJUST', qty: -750, reason: 'COUNT_CORRECTION' }).success).toBe(true)
+    expect(aMovement({ kind: 'ADJUST', qty: 750, reason: 'OPENING_BALANCE' }).success).toBe(true)
+
+    const mismatched = aMovement({ kind: 'ADJUST', qty: -750, reason: 'OUT_OF_DATE' })
+    expect(mismatched.success).toBe(false)
+    expect(mismatched.success ? '' : mismatched.error.issues[0]?.message).toContain('Adjustment')
+
+    expect(aMovement({ kind: 'WASTAGE', qty: -750, reason: 'COUNT_CORRECTION' }).success).toBe(false)
+  })
+
   test('the kinds a person types in are the ones that have to be explained', () => {
     expect([...KINDS_NEEDING_A_REASON]).toEqual(['WASTAGE', 'ADJUST', 'REVERSAL'])
   })

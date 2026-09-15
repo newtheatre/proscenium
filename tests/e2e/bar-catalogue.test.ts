@@ -558,6 +558,14 @@ describe.skipIf(skip !== null)('on hand is the sum of the movements (F-114 crite
     expect(answered.status).toBe(400)
   })
 
+  // A real reason from the vocabulary, on the wrong kind, is still refused (F-204); the message
+  // itself is pinned at the schema in tests/unit/bar.test.ts.
+  test('a reason from the vocabulary is refused when it does not pair with the kind', async () => {
+    const id = await addItem()
+    const answered = await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'ADJUST', qty: -750, reason: 'OUT_OF_DATE' })
+    expect(answered.status).toBe(400)
+  })
+
   test('a delivery records its cost, and nothing else may carry one', async () => {
     const id = await addItem()
     await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 750, unitCostPence: 480 })

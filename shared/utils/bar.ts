@@ -66,6 +66,14 @@ export type MovementReason = (typeof MOVEMENT_REASONS)[number]
 // The kinds a person types in and therefore has to explain. A delivery explains itself.
 export const KINDS_NEEDING_A_REASON: readonly StockMovementKind[] = ['WASTAGE', 'ADJUST', 'REVERSAL']
 
+// Which reasons pair with which kind, so a wastage reason cannot land on a correction where no
+// wastage report would ever find it (F-204, stock review). A kind absent here takes none.
+export const REASONS_BY_KIND: Partial<Record<StockMovementKind, readonly MovementReason[]>> = {
+  WASTAGE: ['BREAKAGE', 'SPILLAGE', 'OUT_OF_DATE', 'LINE_CLEANING', 'QUALITY', 'TRAINING', 'OTHER'],
+  ADJUST: ['COUNT_CORRECTION', 'OPENING_BALANCE', 'OTHER'],
+  REVERSAL: ['COUNT_CORRECTION', 'OPENING_BALANCE', 'OTHER'],
+}
+
 // The size a variant sells at, and the key a category default resolves on (F-121). A list rather
 // than a CHECK: a new size must not need a rebuild of a table an append-only one points at.
 export const SERVING_KINDS = [
@@ -226,7 +234,7 @@ export const stockItemStatusForm = z.object({ status: z.enum(STOCK_ITEM_STATUSES
 
 // Signed: a delivery adds and wastage takes away, and the sign is the caller's to state rather
 // than something inferred from the kind (F-114 criterion 3).
-export const movementForm = z.object({
+const movementFields = z.object({
   itemId: z.string().trim().min(1, 'A movement is about a stocked item'),
   kind: z.enum(STOCK_MOVEMENT_KINDS),
   qty: z.number().int().refine(value => value !== 0, 'A movement of nothing is not a movement')
@@ -236,12 +244,29 @@ export const movementForm = z.object({
   reversesId: z.string().trim().min(1, 'Say which movement it reverses').nullish(),
 })
 
+// A reason belongs to its kind, so wastage's reasons cannot land on a correction where no
+// wastage report would ever find them (F-204, stock review).
+function refuseUnpairedReason(value: { kind: StockMovementKind, reason?: MovementReason | null }, ctx: z.RefinementCtx): void {
+  if (!value.reason) return
+  const allowed = REASONS_BY_KIND[value.kind]
+  if (!allowed?.includes(value.reason)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['reason'],
+      message: `${says(value.kind)} does not give ${says(value.reason).toLowerCase()} as a reason: `
+        + `${allowed ? allowed.map(says).join(', ') : 'it takes none'}`,
+    })
+  }
+}
+
+export const movementForm = movementFields.superRefine(refuseUnpairedReason)
+
 // What the stock screen's own modal holds. A form validates its whole state, so a screen that is
 // not about one stocked item cannot be validated against the schema that names one.
-export const movementEntryForm = movementForm.omit({ itemId: true, reversesId: true }).refine(
+export const movementEntryForm = movementFields.omit({ itemId: true, reversesId: true }).refine(
   value => !KINDS_NEEDING_A_REASON.includes(value.kind) || Boolean(value.reason),
   { message: 'That needs a reason', path: ['reason'] },
-)
+).superRefine(refuseUnpairedReason)
 
 export const variantForm = z.object({
   productId: z.string().trim().min(1, 'A serving size belongs to a product'),
