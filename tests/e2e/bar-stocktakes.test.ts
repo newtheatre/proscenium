@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
-import { click, fillNumber, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
@@ -268,6 +268,69 @@ describe.skipIf(skip !== null)('the screen', () => {
     const posted = movementsFor(item.id).filter(m => m.kind === 'STOCKTAKE')
     expect(posted).toHaveLength(1)
     expect(posted[0]!.qty).toBe(-3)
+  }, 120_000)
+})
+
+describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 2)', () => {
+  test('a full-width numeric input, no steppers, a blank badge, a filter and Enter advancing', async () => {
+    const first = await anItem()
+    const second = await anItem()
+    const third = await anItem()
+    // Sorts after every "Gin ..." item this file creates, so a next row always exists to focus.
+    // anItem() cannot take a custom name: its own search-by-name lookup would then miss it.
+    const guardResponse = await send('POST', '/api/admin/bar/items', { name: named('Zzz guard'), unit: 'ML' })
+    expect(guardResponse.status).toBe(200)
+    await deliver(first.id, 10)
+    await deliver(second.id, 10)
+    const opened = await open()
+    void third
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${first.id}"]`)
+
+    // A count of 750 or 1750 needs more than thirty pixels: no steppers, filling the cell.
+    await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]').getAttribute('placeholder') === 'Uncounted'`)
+    await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]').closest('td').querySelectorAll('button').length === 0`)
+    expect(await textOf(view, `[data-test="uncounted-badge-${first.id}"]`)).toContain('Uncounted')
+
+    await fillNumber(view, `[data-test="counted-${first.id}"]`, '7')
+    await waitFor(view, `!document.querySelector('[data-test="uncounted-badge-${first.id}"]')`)
+
+    // The uncounted-only filter drops the line just counted and keeps the one still blank.
+    await click(view, '[data-test="uncounted-only-filter"]')
+    await waitFor(view, `!document.querySelector('[data-test="counted-${first.id}"]')`)
+    expect(await textOf(view, '[data-test="stocktake-lines"]')).toContain(second.name)
+    await click(view, '[data-test="uncounted-only-filter"]')
+    await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]')`)
+
+    // Enter moves on to a different row. Which one depends on the random names' sort order, so
+    // that is read back rather than assumed; only a next row's existence is pinned, by the guard.
+    await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').focus()`)
+    await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
+    await waitFor(view, `document.activeElement?.getAttribute('data-test')?.startsWith('counted-') && document.activeElement.getAttribute('data-test') !== 'counted-${first.id}'`)
+
+    // With the filter on, Enter on a row that is not first must not jump back to whatever the
+    // filter now puts first: typing drops that row out of the filtered list before Enter runs.
+    await click(view, '[data-test="uncounted-only-filter"]')
+    const beforeTyping = await view.evaluate(
+      `[...document.querySelectorAll('[data-test^="counted-"]')].map(el => el.getAttribute('data-test'))`,
+    ) as string[]
+    expect(beforeTyping.length).toBeGreaterThanOrEqual(3)
+    const [, typedInto, expectedNext] = beforeTyping
+
+    await fillNumber(view, `[data-test="${typedInto}"]`, '3')
+    await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').focus()`)
+    await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
+    await waitFor(view, `document.activeElement?.getAttribute('data-test') === '${expectedNext}'`)
+
+    view.close()
+    await apply(opened.stocktake.id)
   }, 120_000)
 })
 
