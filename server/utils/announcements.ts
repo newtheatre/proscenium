@@ -154,6 +154,12 @@ export interface AnnouncementOutcome {
   status: Outcome
 }
 
+// A plain announcement writes no send-log row of its own, so the composer must say it was held
+// rather than sent, and an officer is not sent to the send log to look for nothing (0061, H-104).
+export function heldForDigest(outcomes: AnnouncementOutcome[]): number {
+  return outcomes.filter(outcome => outcome.status === 'HELD_FOR_DIGEST').length
+}
+
 // One `notify()` call per recipient (criterion 2): every provider send carries one address, so no
 // recipient's header or body ever names another. Outcomes land in the send log by that call alone.
 export async function sendAnnouncement(event: H3Event, actorId: string, input: ComposeAnnouncementInput): Promise<{ count: number, outcomes: AnnouncementOutcome[] }> {

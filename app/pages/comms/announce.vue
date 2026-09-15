@@ -60,13 +60,21 @@ async function send(): Promise<void> {
   sending.value = true
   failure.value = null
   try {
-    const result = await $fetch<{ count: number }>('/api/admin/comms/announcements', {
+    const result = await $fetch<{ count: number, held: number }>('/api/admin/comms/announcements', {
       method: 'POST',
       body: { audience: audience.value, subject: subject.value, body: body.value, safetyNotice: safetyNotice.value },
     })
+    // Held means the send log has nothing to show yet, so saying sent would send an officer
+    // looking for rows that only appear with the next digest (0061).
+    const queued = result.held > 0
     toast.add({
-      title: `Sent to ${plural(result.count, 'recipient')}`,
-      icon: 'i-lucide-send',
+      title: queued
+        ? `Queued for ${plural(result.count, 'recipient')}`
+        : `Sent to ${plural(result.count, 'recipient')}`,
+      description: queued
+        ? 'Each one has an in-app entry now; the email goes out with the next announcements digest.'
+        : undefined,
+      icon: queued ? 'i-lucide-clock' : 'i-lucide-send',
       color: 'success',
     })
     subject.value = ''

@@ -314,6 +314,7 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'shift-performance-cancelled',
+    sender: 'ANNOUNCEMENTS',
   },
   // Transactional for the same reason: a held shift moved with the performance, and the holder
   // needs to know before the night rather than at the door (E-102, venue move interpretation).
@@ -321,12 +322,14 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'shift-venue-changed',
+    sender: 'ANNOUNCEMENTS',
   },
   // The new venue does not staff this role at all, so the shift went rather than moved.
   'shift.role-not-needed': {
     topic: null,
     channels: ['EMAIL'],
     template: 'shift-role-not-needed',
+    sender: 'ANNOUNCEMENTS',
   },
   // Transactional: an officer administering the rota must not be able to mute the one warning
   // that a duty manager gap makes the night unable to run legally (E-108 criterion 2).
@@ -334,6 +337,7 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'shift-rota-unstaffed',
+    sender: 'ANNOUNCEMENTS',
   },
   // Transactional: the claim was theirs, so the decision is not a preference to silence
   // (E-105 criterion 3).
@@ -341,11 +345,13 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'shift-approved',
+    sender: 'ANNOUNCEMENTS',
   },
   'shift.declined': {
     topic: null,
     channels: ['EMAIL'],
     template: 'shift-declined',
+    sender: 'ANNOUNCEMENTS',
   },
   // Transactional: chasing an unstaffed slot ahead of the night is operational, not a
   // preference an officer administering the rota can switch off (E-107 criterion 2).
@@ -353,6 +359,7 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'shift-released',
+    sender: 'ANNOUNCEMENTS',
   },
   // The officer's assignment is confirmed by definition, so it reads exactly like an approval
   // to the person it lands on (E-107 criterion 3).
@@ -360,11 +367,13 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'shift-assigned',
+    sender: 'ANNOUNCEMENTS',
   },
   'shift.removed': {
     topic: null,
     channels: ['EMAIL'],
     template: 'shift-removed',
+    sender: 'ANNOUNCEMENTS',
   },
   // The one shift message that is a courtesy rather than an outcome, so it carries the shifts
   // topic rather than going out regardless of preference (E-109 criterion 4).
@@ -379,12 +388,14 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'incident-follow-up-required',
+    sender: 'ANNOUNCEMENTS',
   },
   // Says a reset happened, never the new code, which travels by voice only (E-122 criterion 2).
   'board.reset': {
     topic: null,
     channels: ['EMAIL'],
     template: 'board-reset',
+    sender: 'ANNOUNCEMENTS',
   },
   // Drift is a defect, not a chore, so it is transactional like an incident's follow-up rather
   // than a preference the IT Manager could mute (J-109 criterion 4).
@@ -399,6 +410,7 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'night-auto-closed',
+    sender: 'ANNOUNCEMENTS',
   },
 
   // Module F: bar
@@ -434,6 +446,7 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'training-session-promoted',
+    sender: 'TRAINING',
   },
 
   // Transactional, so no preference can silence it: the alternative to hearing this is a locked
@@ -442,6 +455,7 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL'],
     template: 'training-session-cancelled',
+    sender: 'TRAINING',
   },
 
   // Two warnings at different urgencies, neither suppressing the other (G-125 criterion 1).
@@ -479,6 +493,7 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL', 'INBOX'],
     template: 'admin-announcement',
+    sender: 'ANNOUNCEMENTS',
   },
 
   // One per topic, never coalesced itself: `topic: null` keeps a digest out of `notify()`'s own

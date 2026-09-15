@@ -6,7 +6,8 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'comms.announce')
   const input = await readValidatedBodyOrThrow(event, composeAnnouncementForm)
 
-  const { count } = await sendAnnouncement(event, resolved.account.id, input)
+  const { count, outcomes } = await sendAnnouncement(event, resolved.account.id, input)
 
-  return { count }
+  // `held` is what lets the composer say queued rather than sent for a message the digest carries.
+  return { count, held: heldForDigest(outcomes) }
 })

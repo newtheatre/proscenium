@@ -2,10 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import {
   allCurrentMembersQuery,
   announceSessionsQuery,
+  heldForDigest,
   roleHoldersQuery,
   sessionSignupsQuery,
   tonightsRotaQuery,
 } from '#server/utils/announcements'
+import { joinsDigest, messageType } from '#shared/utils/notifications'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -117,6 +119,48 @@ describe('a session\'s sign-ups (criterion 1)', () => {
 
       const ids = read<{ id: string }>(database, sessionSignupsQuery('ts-1')).map(row => row.id)
       expect(ids).toEqual([signedUp])
+    })
+  })
+})
+
+// H-104 criterion 1, 0061: the two types the composer sends take different paths, and the screen
+// must say which one happened rather than claiming a send the log has no row for.
+describe('a plain announcement is held for the digest, a safety notice is sent', () => {
+  test('the catalogue holds the plain type and never the safety notice', () => {
+    expect(joinsDigest(messageType('admin.announcement'), false, false)).toBe(true)
+    expect(joinsDigest(messageType('admin.safety-notice'), false, false)).toBe(false)
+  })
+
+  test('the tally counts the held outcomes, and a safety notice leaves it at zero', () => {
+    expect(heldForDigest([
+      { recipientId: 'u-a', status: 'HELD_FOR_DIGEST' },
+      { recipientId: 'u-b', status: 'HELD_FOR_DIGEST' },
+      { recipientId: 'u-c', status: 'SUPPRESSED_PREFERENCE' },
+    ])).toBe(2)
+    expect(heldForDigest([
+      { recipientId: 'u-a', status: 'SENT' },
+      { recipientId: 'u-b', status: 'SENT' },
+    ])).toBe(0)
+  })
+
+  test('a held announcement is a digest entry with no send-log row; a safety notice is a SENT row', async () => {
+    await withDatabase((database) => {
+      const held = person(database)
+      const sent = person(database)
+
+      database.batch([
+        [`INSERT INTO notification_digest_entries (id, user_id, topic, type, subject, body, created_at)
+          VALUES (?, ?, 'ANNOUNCEMENTS', 'admin.announcement', 'A notice', 'It happened.', ?)`,
+        'de-1', held, 1_700_000_000],
+        [`INSERT INTO notification_log (id, user_id, type, channel, status, sent_at)
+          VALUES (?, ?, 'admin.safety-notice', 'EMAIL', 'SENT', ?)`, 'nl-1', sent, 1_700_000_000],
+      ])
+
+      expect(rows(database, `SELECT user_id FROM notification_log WHERE type = 'admin.announcement'`)).toEqual([])
+      expect(rows(database, `SELECT user_id FROM notification_log WHERE type = 'admin.safety-notice'`))
+        .toEqual([{ user_id: sent }])
+      expect(rows(database, `SELECT user_id, digest_log_id FROM notification_digest_entries`))
+        .toEqual([{ user_id: held, digest_log_id: null }])
     })
   })
 })
