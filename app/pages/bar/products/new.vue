@@ -2,7 +2,6 @@
 import {
   ALLERGEN_STATES,
   MEASURE_PRESETS,
-  SERVING_KINDS,
   STOCK_UNITS,
   measurePreset,
   presetForCategory,
@@ -45,9 +44,19 @@ const { data: stock } = await useAsyncData(
 )
 
 const categoryOptions = computed(() => categories.value.items.map(item => ({ label: item.name, value: item.id })))
-const itemOptions = computed(() => stock.value.items
-  .filter(item => item.status === 'ACTIVE')
+const activeItems = computed(() => stock.value.items.filter(item => item.status === 'ACTIVE'))
+
+const itemOptions = computed(() => activeItems.value
   .map(item => ({ label: `${item.name} (${says(item.unit).toLowerCase()})`, value: item.id })))
+
+// A thing sold as itself leaves the shelf whole, so it comes out of something counted in whole
+// items: a measured item picked here would pour one millilitre a sale (F-127 criterion 1).
+const sellableItemOptions = computed(() => (shape.value === 'SIMPLE'
+  ? activeItems.value.filter(item => item.unit === 'ITEM')
+  : activeItems.value).map(item => ({ label: `${item.name} (${says(item.unit).toLowerCase()})`, value: item.id })))
+
+// The register is read a page at a time, so a bar past the cap would silently miss items.
+const moreStockThanListed = computed(() => stock.value.total > stock.value.items.length)
 
 const shape = ref<ProductShape>('UNSET')
 
@@ -63,7 +72,7 @@ const product = reactive({
 
 const itemMode = ref<'NEW' | 'EXISTING'>('NEW')
 const existingItemId = ref('')
-const newItem = reactive({ name: '', unit: 'ITEM' as StockUnit, containerMl: null as number | null, parQty: null as number | null })
+const newItem = reactive({ name: '', unit: 'ITEM' as StockUnit, containerMl: null as number | null })
 
 interface SizeRow {
   servingKind: ServingKind
@@ -105,26 +114,41 @@ async function readDefaults(categoryId: string): Promise<void> {
   }
 }
 
+// Refilling writes the rows itself, so the deep watch below has to tell that apart from a person
+// typing in them: a category corrected before anything is typed refills, afterwards it does not.
+const touched = ref(false)
+let refilling = false
+
+watch(sizes, () => {
+  if (!refilling) touched.value = true
+}, { deep: true })
+
 // A simple product sells as one of the packaged kinds, so the preset fills the choices and only
 // the first is ticked; a recipe sells as itself and pours its components rather than a measure.
 function fillFrom(id: MeasurePresetId | null): void {
+  refilling = true
+  touched.value = false
   preset.value = id
   if (shape.value === 'RECIPE') {
     sizes.value = [{ servingKind: 'item', label: says('item'), qty: 0, pricePounds: asPounds(defaults.value.get('item')), chosen: true }]
-    return
   }
-  const chosen = id ? measurePreset(id) : null
-  sizes.value = (chosen?.sizes ?? []).map((size, index) => ({
-    servingKind: size.servingKind,
-    label: says(size.servingKind),
-    qty: size.qty,
-    pricePounds: asPounds(defaults.value.get(size.servingKind)),
-    chosen: shape.value !== 'SIMPLE' || index === 0,
-  }))
-  if (chosen && itemMode.value === 'NEW') {
-    newItem.unit = chosen.unit
-    newItem.containerMl = chosen.containerMl
+  else {
+    const chosen = id ? measurePreset(id) : null
+    sizes.value = (chosen?.sizes ?? []).map((size, index) => ({
+      servingKind: size.servingKind,
+      label: says(size.servingKind),
+      qty: size.qty,
+      pricePounds: asPounds(defaults.value.get(size.servingKind)),
+      chosen: shape.value !== 'SIMPLE' || index === 0,
+    }))
+    if (chosen && itemMode.value === 'NEW' && newItem.name === '') {
+      newItem.unit = shape.value === 'SIMPLE' ? 'ITEM' : chosen.unit
+      newItem.containerMl = shape.value === 'SIMPLE' ? null : chosen.containerMl
+    }
   }
+  void nextTick(() => {
+    refilling = false
+  })
 }
 
 function suggestedFor(id: string): MeasurePresetId | null {
@@ -132,8 +156,11 @@ function suggestedFor(id: string): MeasurePresetId | null {
   return category ? presetForCategory(category.name) : null
 }
 
+// The reads race each other when somebody arrows through the list, so a stale answer is dropped
+// rather than filling one category's sizes under another's name.
 watch(() => product.categoryId, async (id) => {
   await readDefaults(id)
+  if (id !== product.categoryId || touched.value) return
   if (shape.value === 'MEASURED') fillFrom(suggestedFor(id) ?? preset.value)
   if (shape.value === 'SIMPLE') fillFrom('PACKAGED')
   if (shape.value === 'RECIPE') fillFrom(null)
@@ -147,7 +174,12 @@ function start(chosen: ProductShape): void {
   shape.value = chosen
   failure.value = null
   product.categoryId = product.categoryId || categoryOptions.value[0]?.value || ''
-  if (chosen === 'SIMPLE') fillFrom('PACKAGED')
+  if (chosen === 'SIMPLE') {
+    // Whole items only: the shape is about a thing that leaves the shelf, not a measure of one.
+    Object.assign(newItem, { unit: 'ITEM', containerMl: null })
+    existingItemId.value = ''
+    fillFrom('PACKAGED')
+  }
   if (chosen === 'MEASURED') fillFrom(suggestedFor(product.categoryId))
   if (chosen === 'RECIPE') fillFrom(null)
 }
@@ -164,7 +196,44 @@ const unpriced = computed(() => chosenSizes.value
   .filter(size => size.pricePounds === null && !defaults.value.has(size.servingKind))
   .map(size => says(size.servingKind)))
 
-const servingKindOptions = SERVING_KINDS.map(value => ({ label: says(value), value }))
+// The kind is what a category default resolves on, so changing it takes the new kind's default
+// rather than leaving the old kind's price under a new name (F-121, 0017).
+function soldAs(size: SizeRow, kind: ServingKind): void {
+  size.servingKind = kind
+  size.label = says(kind)
+  size.pricePounds = asPounds(defaults.value.get(kind))
+}
+
+// What the screen can say before the route would: an empty measure set, an empty recipe and a
+// choice with nothing in it are all refusals worth making without a round trip.
+const blocked = computed<string | null>(() => {
+  if (!product.name.trim()) return 'It needs a name.'
+  if (!product.categoryId) return 'It needs a category.'
+  if (shape.value === 'MEASURED' && chosenSizes.value.length === 0) {
+    return 'Pick the measures it is poured at, and tick at least one size.'
+  }
+  if (shape.value !== 'RECIPE' && itemMode.value === 'NEW' && !newItem.name.trim()) {
+    return 'The stocked item it comes out of needs a name.'
+  }
+  if (shape.value !== 'RECIPE' && itemMode.value === 'EXISTING' && !existingItemId.value) {
+    return 'Say which stocked item it comes out of.'
+  }
+  if (shape.value === 'RECIPE') {
+    if (components.value.filter(component => component.itemId).length === 0) {
+      return 'A recipe is made of at least one stocked item.'
+    }
+    if (choice.offered && !choice.name.trim()) return 'The choice it comes with needs a name.'
+    if (choice.offered && choiceOptions.value.filter(option => option.itemId).length === 0) {
+      return 'A choice needs at least one option.'
+    }
+  }
+  return null
+})
+
+// The kinds a thing sold as itself comes in. A measure belongs to the measured shape, where the
+// size states what it pours: offered here it would write a bottle that depletes one millilitre.
+const servingKindOptions = (measurePreset('PACKAGED')?.sizes ?? [])
+  .map(size => ({ label: says(size.servingKind), value: size.servingKind }))
 const unitOptions = STOCK_UNITS.map(value => ({ label: says(value), value }))
 const allergenOptions = ALLERGEN_STATES.map(value => ({ label: says(value), value }))
 const presetOptions = MEASURE_PRESETS.map(option => ({ label: option.name, value: option.id }))
@@ -177,7 +246,6 @@ function itemPayload(): Record<string, unknown> {
       name: newItem.name.trim(),
       unit: newItem.unit,
       containerMl: newItem.unit === 'ML' ? newItem.containerMl : null,
-      parQty: newItem.parQty,
       ageRestricted: product.ageRestricted,
     },
   }
@@ -461,6 +529,7 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
             </UFormField>
 
             <UFormField
+              v-if="shape !== 'SIMPLE'"
               label="Counted in"
               description="Millilitres for anything poured by measure, whole items for anything sold as it comes."
             >
@@ -473,7 +542,7 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
             </UFormField>
 
             <UFormField
-              v-if="newItem.unit === 'ML'"
+              v-if="newItem.unit === 'ML' && shape !== 'SIMPLE'"
               label="Container size in millilitres"
               description="What one bottle, keg or cask holds. A serving cannot pour more than this."
             >
@@ -493,11 +562,19 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
           >
             <USelect
               v-model="existingItemId"
-              :items="itemOptions"
+              :items="sellableItemOptions"
               class="w-full"
               data-test="setup-existing-item"
             />
           </UFormField>
+
+          <p
+            v-if="moreStockThanListed"
+            class="text-xs text-muted"
+          >
+            The first {{ stock.items.length }} stocked items of {{ stock.total }} are listed here.
+            Anything further down the register is reached from the stock screen.
+          </p>
 
           <USwitch
             v-model="opening.offered"
@@ -610,11 +687,11 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
               description="What the till button says it is."
             >
               <USelect
-                v-model="simpleSize.servingKind"
+                :model-value="simpleSize.servingKind"
                 :items="servingKindOptions"
                 class="w-full"
                 data-test="setup-serving-kind"
-                @update:model-value="simpleSize.label = says(simpleSize.servingKind)"
+                @update:model-value="soldAs(simpleSize, $event as ServingKind)"
               />
             </UFormField>
             <UFormField label="Label">
@@ -778,10 +855,19 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
         :description="`Nothing prices ${unpriced.join(', ')} yet, so it will be set up hidden. Fill the price in, or set a category default, and put it on the till after.`"
       />
 
+      <p
+        v-if="blocked"
+        class="text-sm text-muted"
+        data-test="blocked"
+      >
+        {{ blocked }}
+      </p>
+
       <div class="flex flex-wrap gap-2">
         <UButton
           type="submit"
           :loading="saving"
+          :disabled="blocked !== null"
           data-test="setup-submit"
         >
           Set it up

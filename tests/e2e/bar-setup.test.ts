@@ -209,7 +209,6 @@ describe.skipIf(skip !== null)('a size nothing prices hides the product rather t
       await fill(view, '[data-test="setup-name"]', productName)
       await pickOption(view, '[data-test="setup-category"]', categoryName)
       await fill(view, '[data-test="setup-item-name"]', named('Crisps'))
-      await pickOption(view, '[data-test="setup-item-unit"]', 'Whole items')
 
       await waitFor(view, `document.querySelector('[data-test="unpriced"]')`)
       expect(await textOf(view, '[data-test="unpriced"]')).toContain('hidden')
