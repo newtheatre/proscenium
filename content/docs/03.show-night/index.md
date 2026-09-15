@@ -99,8 +99,8 @@ required pre-show checklist item that is still not done.
 ## If something goes wrong
 
 - **"This needs a confirmed door shift on one of tonight's performances, or the front of house
-  manager's role"** (or the same for a bar shift and the bar manager, or a duty manager shift):
-  nothing tonight gives you this screen. Find the person named, or ask the officer to assign you the shift on
+  manager's role"** (or the same for a bar shift and the bar manager, or for a duty manager
+  shift): nothing tonight gives you this screen. Find the person named, or ask the officer to assign you the shift on
   the rota. An administrator is never the answer offered, on purpose.
 - **"Nothing is running tonight, so there is nothing to take charge of"**: no performance at
   any venue tonight, or the only one is cancelled. Check the programme.

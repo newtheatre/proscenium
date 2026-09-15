@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
 
   // Both predicates ride the write, so a second close attempt and a hand-off started since the
   // count above change nothing and write no second audit row for one closure (0001, 0003).
-  await auditedWrite(db.all(closeSessionStatement({
+  const closed = await auditedWrite(db.all(closeSessionStatement({
     id,
     venueId: session.venueId,
     night: session.night,
@@ -57,12 +57,17 @@ export default defineEventHandler(async (event) => {
   })), entry)
 
   const after = await sessionById(id)
-  if (!after || isOpen(after)) {
+  // This caller's own answer, not what the row happens to say: a loser here had their Z figure
+  // and their note thrown away, and must not be told the close went through (F-118 criterion 3).
+  if (!closed) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'That session could not be closed: it was closed by someone else, or a SumUp payment landed while this close was in flight. Read the till and try again.',
+      statusMessage: after && !isOpen(after)
+        ? 'Somebody else closed this session first, so this reading was not recorded. Read the till before recording anything.'
+        : 'A SumUp payment landed while this close was in flight, so nothing was recorded. Answer it on the till and close again.',
     })
   }
+  if (!after) throw createError({ statusCode: 409, statusMessage: 'That session is no longer there' })
 
   return { ok: true, session: after }
 })

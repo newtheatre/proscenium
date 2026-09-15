@@ -241,12 +241,12 @@ describe('a close is refused while a hand-off is open, on the write (F-124 crite
     })
   }
 
+  // The route's readable count is a pre-read: here it sees nothing, and the hand-off lands
+  // afterwards, so only a predicate carried on the write can still refuse the close.
   test('a hand-off started after the close read its count still refuses the close', async () => {
     await withDatabase((database) => {
       const { venueId, night } = sessionWithAttempt(database, null)
 
-      // The pre-read the route keeps for a readable message sees nothing; the hand-off lands
-      // between that read and the write, which is the whole point of the predicate.
       insert(database, 'sumup_attempts', {
         id: 'att-late', till_session_id: 't-1', venue_id: venueId, night, created_by: 'u-1',
         basket: '{}', expected_total_pence: 250, status: 'STARTED',
