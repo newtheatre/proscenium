@@ -172,7 +172,11 @@ const columns: TableColumn<BarCategory>[] = [
     header: 'Category',
     cell: ({ row }) => h('div', { class: 'flex items-center gap-2' }, [
       row.original.colour
-        ? h('span', { class: 'size-3 rounded-full border border-default', style: { backgroundColor: row.original.colour } })
+        ? h('span', {
+            'class': 'size-3 rounded-full border border-default',
+            'style': { backgroundColor: row.original.colour },
+            'data-test': `category-swatch-${row.original.id}`,
+          })
         : null,
       h('span', {}, row.original.name),
     ]),
@@ -198,7 +202,7 @@ const columns: TableColumn<BarCategory>[] = [
         'data-test': `edit-${row.original.id}`,
         'onClick': () => edit(row.original),
       }, () => 'Edit'),
-      row.original.productCount > 0
+      row.original.productCount > 0 || row.original.hasPriceHistory
         ? null
         : h(resolveComponent('UButton'), {
             'size': 'sm',
@@ -341,14 +345,9 @@ const columns: TableColumn<BarCategory>[] = [
             label="Colour"
             name="colour"
             hint="Optional"
-            description="Six hexadecimal characters after a hash, which the till uses to tell the groups apart."
+            description="Picked or typed as six hexadecimal characters after a hash, which the till uses to tell the groups apart."
           >
-            <UInput
-              v-model="state.colour"
-              class="w-full"
-              placeholder="Six characters after a hash"
-              data-test="category-colour"
-            />
+            <ColourField v-model="state.colour" />
           </UFormField>
 
           <div class="flex flex-wrap gap-2">

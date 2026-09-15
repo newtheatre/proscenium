@@ -441,6 +441,9 @@ export interface BarCategory {
   sort: number
   colour: string | null
   productCount: number
+  // The delete route's own other refusal (append-only price rows, 0010): the console needs both
+  // facts to decide whether Delete belongs on the row at all.
+  hasPriceHistory: boolean
 }
 
 export interface BarProduct {
