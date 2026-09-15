@@ -84,6 +84,78 @@ export type ServingKind = (typeof SERVING_KINDS)[number]
 export const VARIANT_STATUSES = ['ACTIVE', 'RETIRED'] as const
 export type VariantStatus = (typeof VARIANT_STATUSES)[number]
 
+// How a product sells, read from its variants and never stored, so an edit cannot contradict the
+// shape it was created under (0017, amended 15 September 2026). UNSET is a product with no sizes.
+export const PRODUCT_SHAPES = ['SIMPLE', 'MEASURED', 'RECIPE'] as const
+export type ProductShape = (typeof PRODUCT_SHAPES)[number] | 'UNSET'
+
+export const MEASURE_PRESET_IDS = ['WINE', 'SPIRITS', 'DRAUGHT', 'PACKAGED'] as const
+export type MeasurePresetId = (typeof MEASURE_PRESET_IDS)[number]
+
+export interface MeasurePresetSize {
+  servingKind: ServingKind
+  qty: number
+}
+
+export interface MeasurePreset {
+  id: MeasurePresetId
+  name: string
+  unit: StockUnit
+  // What the container usually holds, or null where it varies and the person has to say (a keg).
+  containerMl: number | null
+  sizes: readonly MeasurePresetSize[]
+  // Words in a category's name that preselect this preset; matched on the start of a word.
+  words: readonly string[]
+}
+
+// The sizes the bar actually pours, over the serving kinds the vocabulary already holds: a preset
+// may not invent a kind, or a category's default prices would stop resolving (F-121, F-127).
+export const MEASURE_PRESETS: readonly MeasurePreset[] = [
+  {
+    id: 'WINE',
+    name: 'Wine',
+    unit: 'ML',
+    containerMl: 750,
+    sizes: [
+      { servingKind: 'bottle', qty: 750 },
+      { servingKind: '250ml', qty: 250 },
+      { servingKind: '175ml', qty: 175 },
+      { servingKind: '125ml', qty: 125 },
+    ],
+    words: ['wine', 'red', 'white', 'rose', 'prosecco', 'champagne', 'fizz'],
+  },
+  {
+    id: 'SPIRITS',
+    name: 'Spirits',
+    unit: 'ML',
+    containerMl: 700,
+    sizes: [
+      { servingKind: 'single', qty: 25 },
+      { servingKind: 'double', qty: 50 },
+    ],
+    words: ['spirit', 'gin', 'vodka', 'rum', 'whisky', 'whiskey', 'tequila', 'brandy', 'liqueur'],
+  },
+  {
+    id: 'DRAUGHT',
+    name: 'Draught',
+    unit: 'ML',
+    containerMl: null,
+    sizes: [
+      { servingKind: 'pint', qty: 568 },
+      { servingKind: 'half', qty: 284 },
+    ],
+    words: ['draught', 'draft', 'keg', 'cask', 'tap', 'pint'],
+  },
+  {
+    id: 'PACKAGED',
+    name: 'Bottles and cans',
+    unit: 'ITEM',
+    containerMl: null,
+    sizes: [{ servingKind: 'item', qty: 1 }],
+    words: ['can', 'bottle', 'packaged', 'soft', 'mixer', 'juice', 'water'],
+  },
+]
+
 export const MAX_BAR_NAME = 80
 export const MAX_ALLERGEN_NOTE = 500
 
@@ -230,6 +302,82 @@ export const categoryPriceForm = z.object({
   pricePence: z.number().int().nonnegative().max(MAX_VARIANT_PRICE_PENCE),
   effectiveFrom: civilDate,
 })
+
+// One serving a price hangs off. A null price leaves it to the category default, which is what
+// lets a size the bar has not priced yet hold the product HIDDEN rather than refuse the set-up.
+const setupServingForm = z.object({
+  servingKind: z.enum(SERVING_KINDS),
+  label: z.string().trim().min(1, 'A serving size needs a label').max(MAX_BAR_NAME),
+  pricePence: z.number().int().nonnegative().max(MAX_VARIANT_PRICE_PENCE).nullish(),
+})
+
+const setupSizeForm = setupServingForm.extend({
+  qty: z.number().int().positive('A serving depletes a quantity of something').max(MAX_MOVEMENT_QTY),
+})
+
+// The stocked item a product pours: one already on the list, or one created in the same
+// submission, which is what turns a can of cider from four screens into one (F-127 criterion 4).
+const setupItemForm = z.discriminatedUnion('mode', [
+  z.object({
+    mode: z.literal('EXISTING'),
+    itemId: z.string().trim().min(1, 'Say which stocked item it pours'),
+  }),
+  z.object({ mode: z.literal('NEW'), item: stockItemForm }),
+])
+
+const setupDeliveryForm = z.object({
+  qty: z.number().int().positive('A delivery is a quantity of something').max(MAX_MOVEMENT_QTY),
+  unitCostPence: z.number().int().nonnegative().max(MAX_UNIT_COST_PENCE).nullish(),
+})
+
+const setupChoiceForm = z.object({
+  group: choiceGroupForm,
+  qty: z.number().int().positive('A depletion is a quantity of something').max(MAX_MOVEMENT_QTY).default(1),
+  includedInPrice: z.boolean().default(false),
+})
+
+const DEFAULT_SERVING = { servingKind: 'item', label: 'Each', pricePence: null } as const
+
+// What the set-up wizard submits, discriminated on the shape the person chose (F-127). The
+// product, item and recipe halves are the existing forms: a wizard accepts nothing a screen would not.
+export const productSetupForm = z.discriminatedUnion('shape', [
+  z.object({
+    shape: z.literal('SIMPLE'),
+    product: productForm,
+    item: setupItemForm,
+    serving: setupSizeForm.default({ ...DEFAULT_SERVING, qty: 1 }),
+    opening: setupDeliveryForm.nullish(),
+  }),
+  z.object({
+    shape: z.literal('MEASURED'),
+    product: productForm,
+    item: setupItemForm,
+    sizes: z.array(setupSizeForm).min(1, 'Tick at least one serving size').max(SERVING_KINDS.length),
+    opening: setupDeliveryForm.nullish(),
+  }),
+  z.object({
+    shape: z.literal('RECIPE'),
+    product: productForm,
+    serving: setupServingForm.default(DEFAULT_SERVING),
+    components: z.array(componentForm).min(1, 'A recipe is made of at least one stocked item').max(20),
+    choice: setupChoiceForm.nullish(),
+  }),
+]).superRefine((value, ctx) => {
+  if (value.shape === 'MEASURED') {
+    const kinds = value.sizes.map(size => size.servingKind)
+    if (new Set(kinds).size !== kinds.length) {
+      ctx.addIssue({ code: 'custom', message: 'Each serving size is set up once, at the quantity it pours', path: ['sizes'] })
+    }
+  }
+  if (value.shape === 'RECIPE') {
+    const items = value.components.map(component => component.itemId)
+    if (new Set(items).size !== items.length) {
+      ctx.addIssue({ code: 'custom', message: 'A stocked item appears once in a recipe, at the quantity a serving uses', path: ['components'] })
+    }
+  }
+})
+
+export type ProductSetupInput = z.output<typeof productSetupForm>
 
 export type CategoryInput = z.output<typeof categoryForm>
 export type ProductInput = z.output<typeof productForm>
@@ -425,6 +573,38 @@ export function effectivePriceRow<T extends { effectiveFrom: string, createdAt: 
     if (price.createdAt !== winner.createdAt) return price.createdAt > winner.createdAt ? price : winner
     return price.seq > winner.seq ? price : winner
   })
+}
+
+export function measurePreset(id: MeasurePresetId): MeasurePreset | null {
+  return MEASURE_PRESETS.find(preset => preset.id === id) ?? null
+}
+
+// A suggestion, not a rule: the wizard preselects a preset from the category's name and the person
+// can pick another. Nothing matched means nothing preselected, never a guessed set of sizes.
+export function presetForCategory(name: string): MeasurePresetId | null {
+  const words = name.toLowerCase().split(/[^a-z]+/).filter(Boolean)
+  const found = MEASURE_PRESETS.find(preset =>
+    words.some(word => preset.words.some(match => word.startsWith(match))))
+  return found?.id ?? null
+}
+
+// Shape is a reading of the variants, so nothing stores it and an edit cannot contradict it (0017,
+// amended 15 September 2026). A choice group is a choice, not a second ingredient.
+export function productShape(variants: readonly {
+  status: VariantStatus
+  components: readonly { itemId: string | null }[]
+}[]): ProductShape {
+  const live = variants.filter(variant => variant.status === 'ACTIVE')
+  if (live.length === 0) return 'UNSET'
+  const items = new Set<string>()
+  let severalPerServing = false
+  for (const variant of live) {
+    const poured = variant.components.filter(component => component.itemId !== null)
+    if (poured.length > 1) severalPerServing = true
+    for (const component of poured) items.add(component.itemId!)
+  }
+  if (severalPerServing || items.size > 1) return 'RECIPE'
+  return live.length > 1 ? 'MEASURED' : 'SIMPLE'
 }
 
 export function says(value: string | null): string {
