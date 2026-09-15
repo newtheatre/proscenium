@@ -2,9 +2,11 @@ import { sql } from 'drizzle-orm'
 import { formatLondon } from '#shared/utils/london'
 import { calendarFor } from '#shared/utils/ics'
 import { saysShiftRole } from '#shared/utils/rota'
+import { offsetsFor, shiftWindow } from '#shared/utils/rota-times'
 import { showNightBounds } from '#shared/utils/show-night'
 import { tomorrowsShiftNight } from '#shared/utils/shift-reminders'
 import type { ShiftRole } from '#shared/utils/rota'
+import type { ShiftOffsets, ShiftWindow } from '#shared/utils/rota-times'
 import type { H3Event } from 'h3'
 
 // The database half of E-109's day-before reminder; `tomorrowsShiftNight` is the pure boundary
@@ -12,15 +14,21 @@ import type { H3Event } from 'h3'
 
 export interface ShiftReminderRun { shifts: number, sent: number, skipped: number }
 
-// No column holds a call time distinct from the curtain, so the door time stands in where a
-// venue has set one; a night with none falls back to curtain itself.
-function callTimeOf(row: { startsAt: number, doorsAt: number | null }): number {
-  return row.doorsAt ?? row.startsAt
-}
-
-// Nothing records how long a shift itself runs, so the calendar block is the show plus this
-// margin either side of it when no performance duration is known.
+// How long a shift runs where the programme records nothing: the old margin, kept for the one
+// case the window arithmetic cannot answer.
 const DEFAULT_SHIFT_MINUTES = 180
+
+// The shift's own window where it is stamped, and the same arithmetic where it is not: a shift
+// stamped before shifts had windows is filled by the backfill, not guessed at here (0078, E-131).
+function windowFor(row: ShiftReminderRow, defaults: ShiftOffsets): ShiftWindow {
+  if (row.shiftStartsAt !== null && row.shiftEndsAt !== null) {
+    return { startsAt: row.shiftStartsAt, endsAt: row.shiftEndsAt }
+  }
+  // A calendar block has to end somewhere, so a performance with no recorded running time takes
+  // this rather than a block that frees itself at curtain up.
+  const durationMinutes = row.durationMinutes ?? DEFAULT_SHIFT_MINUTES
+  return shiftWindow({ ...row, durationMinutes }, offsetsFor(row, defaults))
+}
 
 interface ShiftReminderRow {
   shiftId: string
@@ -31,6 +39,12 @@ interface ShiftReminderRow {
   startsAt: number
   doorsAt: number | null
   durationMinutes: number | null
+  intervalCount: number | null
+  intervalMinutes: number | null
+  shiftStartsAt: number | null
+  shiftEndsAt: number | null
+  startsBeforeDoorsMinutes: number | null
+  endsAfterEndMinutes: number | null
   confirmedAt: number | null
 }
 
@@ -39,11 +53,15 @@ async function confirmedShiftsOn(night: string): Promise<ShiftReminderRow[]> {
   return await db.all<ShiftReminderRow>(sql`
     SELECT s.id AS shiftId, s.user_id AS userId, s.role AS role, s.confirmed_at AS confirmedAt,
            v.name AS venueName, sh.title AS showTitle,
-           p.starts_at AS startsAt, p.doors_at AS doorsAt, p.duration_minutes AS durationMinutes
+           p.starts_at AS startsAt, p.doors_at AS doorsAt, p.duration_minutes AS durationMinutes,
+           p.interval_count AS intervalCount, p.interval_minutes AS intervalMinutes,
+           s.starts_at AS shiftStartsAt, s.ends_at AS shiftEndsAt,
+           t.starts_before_doors_minutes AS startsBeforeDoorsMinutes, t.ends_after_end_minutes AS endsAfterEndMinutes
     FROM shifts s
     JOIN performances p ON p.id = s.performance_id
     JOIN venues v ON v.id = p.venue_id
     JOIN shows sh ON sh.id = p.show_id
+    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = s.role
     WHERE s.status = 'CONFIRMED' AND p.status <> 'CANCELLED'
       AND p.starts_at >= ${Math.floor(from.getTime() / 1000)} AND p.starts_at < ${Math.floor(to.getTime() / 1000)}
     ORDER BY p.starts_at, s.role, s.slot
@@ -55,6 +73,7 @@ async function confirmedShiftsOn(night: string): Promise<ShiftReminderRow[]> {
 export async function remindShiftsTomorrow(event: H3Event | undefined, at = new Date()): Promise<ShiftReminderRun> {
   const rows = await confirmedShiftsOn(tomorrowsShiftNight(at))
   const base = useRuntimeConfig(event).public.baseURL
+  const defaults = await shiftOffsetDefaults(event)
 
   let sent = 0
   let skipped = 0
@@ -67,8 +86,7 @@ export async function remindShiftsTomorrow(event: H3Event | undefined, at = new 
       continue
     }
 
-    const callTime = callTimeOf(row)
-    const endsAt = row.startsAt + (row.durationMinutes ?? DEFAULT_SHIFT_MINUTES) * 60
+    const worked = windowFor(row, defaults)
 
     await notify(event, {
       userId: row.userId,
@@ -79,7 +97,7 @@ export async function remindShiftsTomorrow(event: H3Event | undefined, at = new 
         show: row.showTitle,
         venue: row.venueName,
         role: saysShiftRole(row.role).toLowerCase(),
-        when: formatLondon(new Date(callTime * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+        when: formatLondon(new Date(worked.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       },
       attachments: [{
         filename: 'shift.ics',
@@ -88,8 +106,8 @@ export async function remindShiftsTomorrow(event: H3Event | undefined, at = new 
           id: row.shiftId,
           title: `${saysShiftRole(row.role)}, ${row.showTitle}`,
           room: row.venueName,
-          startsAt: callTime,
-          endsAt,
+          startsAt: worked.startsAt,
+          endsAt: worked.endsAt,
           status: 'CONFIRMED',
           updatedAt: row.confirmedAt ?? row.startsAt,
         }], { name: 'New Theatre shifts', host: new URL(base).hostname }),

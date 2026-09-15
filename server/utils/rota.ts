@@ -616,10 +616,14 @@ export function countPendingApprovalsQuery(clause: ListClause): SQL {
 // What shift-scoped authority resolves against (E-111 criterion 1, 0044). A fixed number of
 // parameters however many shifts a night holds, never one per row (0003, 0006).
 
+// The window is nullable because a shift stamped before shifts had one carries none, and an
+// unknown window bounds nobody (0078, E-131 criterion 3).
 export interface ConfirmedShiftTonight {
   shiftId: string
   performanceId: string
   venueId: string
+  startsAt: number | null
+  endsAt: number | null
 }
 
 export interface ConfirmedShiftScope {
@@ -649,7 +653,8 @@ export function confirmedShiftsTonightQuery(
   if (scope.performanceId) terms.push(sql`p.id = ${scope.performanceId}`)
 
   return sql`
-    SELECT s.id AS shiftId, s.performance_id AS performanceId, p.venue_id AS venueId
+    SELECT s.id AS shiftId, s.performance_id AS performanceId, p.venue_id AS venueId,
+           s.starts_at AS startsAt, s.ends_at AS endsAt
     FROM shifts s
     JOIN performances p ON p.id = s.performance_id
     JOIN users u ON u.id = s.user_id

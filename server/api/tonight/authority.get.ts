@@ -38,5 +38,7 @@ export default defineEventHandler(async (event) => {
     })),
     via: resolved.via,
     shiftId: resolved.shiftId ?? null,
+    // Named where the evening is a bar opening rather than a performance (0077).
+    openingId: resolved.openingId ?? null,
   }
 })

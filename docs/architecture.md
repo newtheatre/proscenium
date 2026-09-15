@@ -741,16 +741,21 @@ enforcement (E-111 criterion 5, restated in 0040): the three abilities in
 | --- | --- |
 | `NightRole` | `DUTY_MANAGER`, `DOOR` or `BAR`. A door shift does not open the till, and neither does the front of house officer's role. |
 | `NightScope` | `{ night?, venueId?, performanceId? }`. All optional: the common case is tonight, at the one venue running. |
-| The resolution | `{ account, night, role, venueId, performanceIds, via, shiftId? }`, where `via` is `SHIFT` or `OFFICER`. |
-| A refusal | 403 naming both ways in, the shift and the officer role. An administrator is never offered as the way out. |
+| The resolution | `{ account, night, role, venueId, performanceIds, via, shiftId?, openingId? }`, where `via` is `SHIFT` or `OFFICER`. |
+| A refusal | 403 naming both ways in, the shift and the officer role, or the hours the shift is worked. An administrator is never offered as the way out. |
 
 `night` comes from `currentShowNight()` and nothing else, so authority expires at 04:00 with
 nothing to revoke. A caller may name the night it believes it is working, which is how a screen
 left open past the boundary is refused rather than quietly resolved against a new one. The venue is
 always resolved to exactly one: a night running two venues with nothing to narrow it is a 400
 asking for the venue, because an officer covering two houses at once is not a thing to invent.
-`performanceIds` is what the request covers, and it is never empty: a cancelled performance is
-filtered out, so a venue whose only performance tonight is cancelled resolves no authority at all.
+`performanceIds` is what the request covers. A cancelled performance is filtered out, so a venue
+whose only performance tonight is cancelled resolves no authority for the door or the duty manager
+at all. It is empty for the one case 0077 added: the bar opens on an evening with no performance,
+so `BAR` with nothing running and a venue named resolves that venue and no performance, and `BAR`
+with nothing running and no venue named is a 400 asking which bar is opening. `DOOR` and
+`DUTY_MANAGER` keep the 403, because with no house there is no admission to take and no evening to
+run.
 
 `SHIFT` is tried first: `confirmedShiftsTonight()` in `server/utils/rota.ts` reads a confirmed
 shift of the asked-for role, held by the caller, on a performance inside the night's own bounds
@@ -758,6 +763,15 @@ shift of the asked-for role, held by the caller, on a performance inside the nig
 re-checks the holder's own `disabled` and `anonymised_at` rather than trusting the shift row: a
 disabled account's session already ends on its next request (`sessionIsCurrent`, 0007), but
 authority built on a shift should not depend on a reader tracing that path to believe it (0009).
+A confirmed shift is authority only between its own `starts_at` and `ends_at`, widened at both
+ends by `SHIFT_AUTHORITY_GRACE_MINUTES` (0078, E-131 criterion 4). The refusal quotes the window in
+London wall clock rather than naming the ways in, because somebody holding tonight's shift at the
+wrong hour is not somebody without one. A shift stamped before shifts carried a window bounds
+nobody: an unknown window is not evidence of being off shift, and the backfill is what fills it.
+For `BAR` and for `BAR` alone, a second fact is tried when no performance shift covers the request:
+a confirmed slot on a planned `bar_openings` row at tonight's venue, which resolves `via: 'SHIFT'`
+with an empty `performanceIds` and the `openingId` named (0077). The performance branch is tried
+first, so somebody holding both keeps their performance ids.
 A shift never needs the second-factor gate the officer branch carries, because a shift is not a
 standing grant to begin with (0044); it also writes no audit row of its own, because the rota's own
 `shift.claimed` and `shift.confirmed` entries are already the record of how the account came to
@@ -768,7 +782,8 @@ administrative only (0009, 0044). Planning the rota is not one of them: `rota.re
 `rota.write` are ordinary administrative permissions, held by `FOH_MANAGER` and `ADMIN`, and they
 are what open `/rota/manage/**` (0046). Every officer resolution writes `night.officer-bypass`
 once per account, night, venue and role, held by a partial unique index rather than by reading
-before writing; the row's detail carries every performance that venue ran that night. Holding one
+before writing; the row's detail carries every performance that venue ran that night, and on a
+bar opening an empty list and the `openingId` the officer let themselves into (0077). Holding one
 of the three does not admit anybody to the console: `reachConsole` reads the standing permissions
 that are not in `OPERATIONAL_PERMISSIONS`, or an officer would be shown a sidebar in which every
 screen answers 403 (0040, 0044).
