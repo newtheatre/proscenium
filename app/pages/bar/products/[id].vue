@@ -166,6 +166,10 @@ function editRecipe(variant: ProductVariant): void {
     .map(component => ({ itemId: component.itemId!, qty: component.qty }))
 }
 
+// Read-only here: a choice group is F-113's own screen to attach or clear. The server already
+// leaves it alone on a recipe save; showing it stops a save looking like it might remove it.
+const pouringChoiceGroup = computed(() => pouring.value?.components.find(component => component.itemId === null) ?? null)
+
 const addLine = (): void => {
   recipe.components.push({ itemId: itemOptions.value[0]?.value ?? '', qty: 1 })
 }
@@ -554,6 +558,22 @@ const priceColumns: TableColumn<VariantPrice>[] = [
             variant="subtle"
             :description="failure"
           />
+
+          <div
+            v-if="pouringChoiceGroup"
+            class="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-default px-3 py-2 text-sm"
+            data-test="recipe-choice-group"
+          >
+            <UBadge
+              color="neutral"
+              variant="subtle"
+              size="sm"
+            >
+              Choice group
+            </UBadge>
+            <span>{{ pouringChoiceGroup.choiceGroupName }}, {{ pouringChoiceGroup.qty }}</span>
+            <span class="text-xs text-muted">Set from the serving size's own choice, not here. Saving below leaves it as it is.</span>
+          </div>
 
           <p
             v-if="recipe.components.length === 0"
