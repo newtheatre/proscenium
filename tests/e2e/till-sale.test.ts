@@ -335,6 +335,39 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect(await textOf(view, '[data-test="basket"]')).toContain('Screen note')
     view.close()
   }, 120_000)
+
+  // F-107 criterion 1: the affordance is on every basket line too, not only the tile above it,
+  // since the question usually comes after the round is rung up.
+  test('the allergen affordance is also on the basket line', async () => {
+    const { venueId } = programme('sale-allergen-line')
+    const categoryId = await aCategory()
+    const productId = await aProductIn(categoryId, {
+      name: named('Basket line note'),
+      allergenState: 'RECORDED',
+      allergenNote: 'Contains gluten',
+    })
+    const variantId = await addVariant(productId)
+    await priceVariant(variantId, 250)
+    await activate(productId)
+    await openTill(venueId)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
+    await click(view, `[data-test="variant-${variantId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket"]')`)
+
+    await view.evaluate(`document.querySelector('[data-test="basket"] [aria-label^="Allergens for"]').click()`)
+    await waitFor(view, `document.querySelector('[data-test="allergen-note"]')`)
+    expect(await textOf(view, '[data-test="allergen-state"]')).toContain('Allergens recorded')
+    expect(await textOf(view, '[data-test="allergen-note"]')).toContain('Contains gluten')
+    view.close()
+  }, 120_000)
 })
 
 // The choice modal's option buttons are keyed by the option row's own id, read back from the

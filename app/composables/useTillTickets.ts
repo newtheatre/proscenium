@@ -6,7 +6,7 @@ import type { ScannerFailure } from './useQrScanner'
 import type { WalkUpLine } from './useTillBasket'
 
 // The Tickets pane (F-122, F-123): a booking found by camera, reference or name, and a walk-up
-// built from tonight's houses here. Held apart from the drinks basket, per review-ui.md.
+// built from tonight's houses here. Held apart from the drinks basket, unit-testable on its own.
 
 export function useTillTickets(venueId: Ref<string | null>) {
   const cameraOpen = ref(false)

@@ -5,8 +5,8 @@ import type { TillBasketDeps } from '#composables/useTillBasket'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { PricedBasket, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
 
-// The hardest part of the till to reason about (review-ui.md, "Splitting the till"): what a tap
-// puts in the basket, what a charge submits, and what an age-check refusal takes back out.
+// F-103, F-104, F-106: what a tap puts in the basket, what a charge submits, and what an
+// age-check refusal takes back out.
 
 function aVariant(over: Partial<SaleVariant> = {}): SaleVariant {
   return {
@@ -187,8 +187,8 @@ describe('expectedAfter shrinks to match a refusal, so the server\'s cross-check
   })
 })
 
-// review-ui.md finding 15: the charge button reads grandTotalPence, which reads priced; a
-// failure that leaves the last good price in place is a wrong figure shown as a right one.
+// The charge button reads grandTotalPence, which reads priced: a failure that left the last
+// good price in place would show a wrong figure as a right one.
 describe('a pricing failure clears the total rather than leaving the last good figure (F-103 criterion 3)', () => {
   test('recomputeTotal nulls priced on a refused request', async () => {
     const { basket, scope } = setup([aProduct()], {
