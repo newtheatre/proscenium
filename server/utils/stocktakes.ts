@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { stocktakesList } from '#shared/utils/stocktakes-list'
-import { aliasColumns, whereFrom } from './list-filters'
+import { aliasColumns, count, predicate, whereFrom } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
 import type { ListQuery } from '#shared/utils/list-filters'
@@ -47,7 +47,7 @@ const STOCKTAKE_LIST_COLUMNS = sql`
 export function stocktakesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${STOCKTAKE_LIST_COLUMNS}
-    FROM stocktakes t${clause.where ? sql` WHERE ${clause.where}` : sql``}
+    FROM stocktakes t${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
@@ -58,10 +58,7 @@ export async function listStocktakes(clause: ListClause, limit: number, offset: 
 }
 
 export async function countStocktakes(clause: ListClause): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`
-    SELECT count(*) AS total FROM stocktakes t${clause.where ? sql` WHERE ${clause.where}` : sql``}
-  `)
-  return Number(row?.total ?? 0)
+  return count(sql`SELECT count(*) AS total FROM stocktakes t${predicate(clause)}`)
 }
 
 // The delivered cost a variance is valued at, or null if the item has never been delivered

@@ -1349,7 +1349,9 @@ for each listing:
 whole items, **immutable once movements exist**, as is `unit`, both by trigger · `par_qty` in the
 item's own unit (F-120) · `category` free text, for grouping the order list; not a foreign key to
 `bar_categories`, because a stocked ingredient can feed several sold products across several till
-categories and has no one sale category to inherit · `age_restricted` bool default true ·
+categories and has no one sale category to inherit (F-203 is expected to normalise this free text
+into its own lookup table, for a supplier and a pack size to attach to; until then a typo splits a
+group silently) · `age_restricted` bool default true ·
 `allergen_notes`, the reference a product's own note is written from · `status` CHECK
 `ACTIVE|RETIRED` · `created_at`. Retired, never deleted once anything has moved: every movement
 restricts on the foreign key.

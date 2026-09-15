@@ -6,7 +6,7 @@ import { barCategoriesList } from '#shared/utils/bar-categories-list'
 import { barItemsList } from '#shared/utils/bar-items-list'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
 import { barProductsList } from '#shared/utils/bar-products-list'
-import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { aliasColumns, count, predicate, whereFrom, yesNo } from './list-filters'
 import type { BarCategory, BarProduct, CategoryPrice, ChoiceGroup, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { ListClause, Reference } from './list-filters'
@@ -231,13 +231,6 @@ export async function onHand(itemId: string): Promise<number> {
   return Number(row?.onHand ?? 0)
 }
 
-interface Counted { total: number }
-
-const count = async (statement: SQL): Promise<number> =>
-  Number((await db.all<Counted>(statement))[0]?.total ?? 0)
-
-const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
-
 // The declaration's predicates and order, through the `c` alias the raw SQL below uses (K-129).
 export function categoriesClause(query: ListQuery): ListClause {
   return whereFrom(barCategoriesList, query, { column: aliasColumns('c'), search: [sql`c.name`] })
@@ -271,11 +264,13 @@ export async function categoryById(id: string): Promise<BarCategory | undefined>
   return row
 }
 
-export async function categoryNamed(name: string, exceptId?: string): Promise<BarCategory | undefined> {
-  const except = exceptId ? sql` AND c.id <> ${exceptId}` : sql``
-  const [row] = await db.all<BarCategory>(sql`
-    SELECT c.id AS id, c.name AS name, c.sort AS sort, c.colour AS colour, 0 AS productCount
-    FROM bar_categories c WHERE c.name = ${name} COLLATE NOCASE${except} LIMIT 1
+// Who already holds a name, for the refusal a losing create or rename gives (0047). `table` and
+// `column` are written here, never taken from a request, so raw interpolation is safe.
+export async function claimName(table: string, column: string, name: string, exceptId?: string): Promise<{ id: string, name: string } | undefined> {
+  const except = exceptId ? sql` AND id <> ${exceptId}` : sql``
+  const [row] = await db.all<{ id: string, name: string }>(sql`
+    SELECT id, ${sql.raw(column)} AS name FROM ${sql.raw(table)}
+    WHERE ${sql.raw(column)} = ${name} COLLATE NOCASE${except} LIMIT 1
   `)
   return row
 }
@@ -350,16 +345,6 @@ export async function productById(id: string): Promise<BarProduct | undefined> {
   return row ? readProduct(row) : undefined
 }
 
-export async function productNamed(name: string, exceptId?: string): Promise<BarProduct | undefined> {
-  const except = exceptId ? sql` AND p.id <> ${exceptId}` : sql``
-  const [row] = await db.all<ProductRow>(sql`
-    SELECT ${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold
-    FROM bar_products p JOIN bar_categories c ON c.id = p.category_id
-    WHERE p.name = ${name} COLLATE NOCASE${except} LIMIT 1
-  `)
-  return row ? readProduct(row) : undefined
-}
-
 interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements'> {
   ageRestricted: number
   hasMovements: number
@@ -415,15 +400,6 @@ export async function itemById(id: string): Promise<StockItem | undefined> {
   const [row] = await db.all<ItemRow>(sql`
     SELECT ${ITEM_COLUMNS}, ${onHandColumn('i')} AS onHand, ${MOVED} AS hasMovements
     FROM bar_items i WHERE i.id = ${id}
-  `)
-  return row ? readItem(row) : undefined
-}
-
-export async function itemNamed(name: string, exceptId?: string): Promise<StockItem | undefined> {
-  const except = exceptId ? sql` AND i.id <> ${exceptId}` : sql``
-  const [row] = await db.all<ItemRow>(sql`
-    SELECT ${ITEM_COLUMNS}, ${onHandColumn('i')} AS onHand, ${MOVED} AS hasMovements
-    FROM bar_items i WHERE i.name = ${name} COLLATE NOCASE${except} LIMIT 1
   `)
   return row ? readItem(row) : undefined
 }

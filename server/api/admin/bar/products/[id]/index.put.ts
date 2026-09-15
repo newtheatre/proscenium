@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
   )
 
   if (!applied) {
-    const taken = await productNamed(input.name, id)
+    const taken = await claimName('bar_products', 'name', input.name, id)
     if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such product' })
     throw createError({ statusCode: 409, statusMessage: `A product is already called ${taken.name}` })
   }

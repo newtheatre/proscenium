@@ -1,3 +1,4 @@
+import { db } from '@nuxthub/db'
 import { and, getTableColumns, sql } from 'drizzle-orm'
 // Named rather than auto-imported: `tests/` typechecks this file under Bun (CONTRIBUTING, 0055).
 import { MAX_SEARCH_COLUMNS, capOf, conditionsOf, fieldOf } from '#shared/utils/list-filters'
@@ -24,6 +25,15 @@ export interface ListClause {
   where: SQL | undefined
   orderBy: SQL[]
 }
+
+// A clause's WHERE, or nothing: every raw-SQL list query appends this after its FROM (K-129).
+export const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
+
+interface Counted { total: number }
+
+// The scalar out of a `count(*) AS total` statement, however the caller built it.
+export const count = async (statement: SQL): Promise<number> =>
+  Number((await db.all<Counted>(statement))[0]?.total ?? 0)
 
 export const seconds = (at: Date): number => Math.floor(at.getTime() / 1000)
 

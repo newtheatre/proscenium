@@ -412,6 +412,38 @@ describe.skipIf(skip !== null)('a race for a name is refused, and the loser logs
   })
 })
 
+// claimName (0047) subsumes the per-table named lookups: proved once per table it now covers.
+describe.skipIf(skip !== null)('a name is held once whatever the capitals, and the refusal names the holder', () => {
+  test('a category name collides case-insensitively', async () => {
+    const name = named('Spirits')
+    await addCategory({ name })
+    const again = await send('POST', '/api/admin/bar/categories', { name: name.toUpperCase(), sort: 5 })
+    expect(again.status).toBe(409)
+    expect((await again.json() as { message?: string }).message).toContain(name)
+  })
+
+  test('a stocked item name collides case-insensitively', async () => {
+    const name = named('Gin')
+    await addItem({ name })
+    const again = await send('POST', '/api/admin/bar/items', { name: name.toUpperCase(), unit: 'ML' })
+    expect(again.status).toBe(409)
+    expect((await again.json() as { message?: string }).message).toContain(name)
+  })
+
+  test('renaming onto a held category name refuses, and a 404 still wins when the row itself is gone', async () => {
+    const categoryId = await addCategory()
+    const name = named('Wine')
+    await addCategory({ name })
+
+    const collided = await send('PUT', `/api/admin/bar/categories/${categoryId}`, { name: name.toUpperCase(), sort: 1 })
+    expect(collided.status).toBe(409)
+    expect((await collided.json() as { message?: string }).message).toContain(name)
+
+    await send('DELETE', `/api/admin/bar/categories/${categoryId}`)
+    expect((await send('PUT', `/api/admin/bar/categories/${categoryId}`, { name: named('Gone'), sort: 1 })).status).toBe(404)
+  })
+})
+
 describe.skipIf(skip !== null)('a stocked item is counted in its own unit (F-114 criterion 1)', () => {
   test('an item carries a name and a real counting unit', async () => {
     const name = named('House red')
