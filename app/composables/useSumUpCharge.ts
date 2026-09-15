@@ -1,4 +1,5 @@
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { usePendingPoll } from './usePendingPoll'
 import { useSumUp } from './useSumUp'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
@@ -50,8 +51,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
   const waitingFailure = ref<string | null>(null)
   const resolving = ref(false)
   const smpTxCodeTyped = ref('')
-  let watchTimer: ReturnType<typeof setInterval> | undefined
-  let watchUntil = 0
+  const pendingPoll = usePendingPoll()
 
   async function checkAttempt(): Promise<void> {
     const pending = sumup.pending.value
@@ -98,25 +98,14 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     }
   }
 
+  // The short timer for a minute and a half, after which the "did it go through?" answers stay
+  // on offer; a return to the tab checks again straight away regardless of the interval.
   function startWatching(): void {
-    stopWatching()
-    watchUntil = Date.now() + 90_000
-    watchTimer = setInterval(() => {
-      if (Date.now() > watchUntil) {
-        stopWatching()
-        return
-      }
-      void checkAttempt()
-    }, 3_000)
+    pendingPoll.start(checkAttempt, 3_000, 90_000)
   }
 
   function stopWatching(): void {
-    if (watchTimer) clearInterval(watchTimer)
-    watchTimer = undefined
-  }
-
-  function onReturnToTab(): void {
-    if (document.visibilityState === 'visible' && sumup.pending.value) void checkAttempt()
+    pendingPoll.stop()
   }
 
   onMounted(() => {
@@ -124,16 +113,6 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       void checkAttempt()
       startWatching()
     }
-    document.addEventListener('visibilitychange', onReturnToTab)
-    window.addEventListener('focus', onReturnToTab)
-    window.addEventListener('pageshow', onReturnToTab)
-  })
-
-  onBeforeUnmount(() => {
-    stopWatching()
-    document.removeEventListener('visibilitychange', onReturnToTab)
-    window.removeEventListener('focus', onReturnToTab)
-    window.removeEventListener('pageshow', onReturnToTab)
   })
 
   // "Did it go through?" (criterion 5), for the attempt this screen started or one listed below.
