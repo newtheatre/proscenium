@@ -5,7 +5,7 @@ import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
-import { currentShowNight } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { daysAfter } from '#shared/utils/membership'
 import { londonClock } from '#shared/utils/london'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -344,7 +344,10 @@ function barOpening(venueId: string, status = 'PLANNED'): string {
   const database = new Database(app.databaseFile)
   try {
     const id = `opening-${(nextOpening += 1)}`
-    const opensAt = Math.floor(Date.now() / 1000) - 3600
+    // Anchored to the night's own 04:00 start, so a run just after it does not seed an opening
+    // that falls outside the night it belongs to (0014).
+    const nightStart = Math.floor(showNightBounds(night).from.getTime() / 1000)
+    const opensAt = Math.max(nightStart + 60, Math.floor(Date.now() / 1000) - 3600)
     database.query(`INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status)
                     VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .run(id, venueId, night, 'A society social', opensAt, opensAt + 6 * 3600, status)

@@ -296,18 +296,21 @@ export function confirmedOpeningShiftsTonightQuery(
 
 export interface OpeningVenueTonight { venueId: string, venueName: string, label: string }
 
-// The venues a caller may open a till at because they are working an opening there tonight: the
-// till's own picker, which is what a request naming no venue is answered with (F-125, 0077).
+// The venues a caller works an opening at tonight: the till's own picker (F-125, 0077). Disabled
+// and anonymised are re-checked, so it never offers what the guard is about to refuse.
 export async function openingVenuesTonight(userId: string, from: number, to: number): Promise<OpeningVenueTonight[]> {
   return await db.all<OpeningVenueTonight>(sql`
     SELECT o.venue_id AS venueId, v.name AS venueName, o.label AS label
     FROM bar_opening_shifts s
     JOIN bar_openings o ON o.id = s.opening_id
     JOIN venues v ON v.id = o.venue_id
+    JOIN users u ON u.id = s.user_id
     WHERE s.user_id = ${userId}
       AND s.status = 'CONFIRMED'
       AND o.status <> 'CANCELLED'
       AND o.starts_at >= ${from} AND o.starts_at < ${to}
+      AND u.disabled = 0
+      AND u.anonymised_at IS NULL
     ORDER BY o.starts_at
   `)
 }

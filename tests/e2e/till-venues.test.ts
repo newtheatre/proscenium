@@ -5,7 +5,7 @@ import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
-import { currentShowNight } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { TillVenueOption } from '#shared/utils/till'
@@ -45,10 +45,17 @@ beforeAll(async () => {
     for (const [id, name] of [[HIRE, 'The Hire Room'], [DARK, 'The Dark Room']]) {
       database.query('INSERT OR IGNORE INTO venues (id, name, capacity) VALUES (?, ?, ?)').run(id, name, 60)
     }
-    const opensAt = Math.floor(Date.now() / 1000) - 3600
+    // Anchored to the night's own 04:00 start, so a run just after it does not seed an opening
+    // that falls outside the night it belongs to (0014).
+    const nightStart = Math.floor(showNightBounds(night).from.getTime() / 1000)
+    const opensAt = Math.max(nightStart + 60, Math.floor(Date.now() / 1000) - 3600)
     database.query(`INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at)
                     VALUES (?, ?, ?, ?, ?, ?)`)
       .run('opening-social', HIRE, night, 'A society social', opensAt, opensAt + 6 * 3600)
+    // A confirmed bar shift at the house as well, which is what makes this caller's night
+    // ambiguous and so what puts the picker in front of them in the first place.
+    database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('shift-venues-bar', house.performanceId, 'BAR', 1, member.id, 'CONFIRMED')
     // One slot worked and one only claimed: a queued claim is not yet a place to open a till.
     database.query('INSERT INTO bar_opening_shifts (id, opening_id, slot, user_id, status) VALUES (?, ?, ?, ?, ?)')
       .run('opening-social-1', 'opening-social', 1, member.id, 'CONFIRMED')
@@ -71,7 +78,7 @@ async function venuesFor(as?: string): Promise<TillVenueOption[]> {
 }
 
 describe.skipIf(skip !== null)('the till names the venues a caller may open one at (F-125)', () => {
-  test('a venue running tonight is offered, named by the show rather than by its id', async () => {
+  test('a venue the caller works tonight is offered, named by the show rather than by its id', async () => {
     const offered = await venuesFor(member.cookie)
     const running = offered.find(venue => venue.venueId === house.venueId)
     expect(running).toBeDefined()
@@ -85,8 +92,16 @@ describe.skipIf(skip !== null)('the till names the venues a caller may open one 
   })
 
   // The same fact the authority guard turns on: a claim awaiting approval is not authority.
-  test('a queued claim on an opening offers nothing', async () => {
-    expect((await venuesFor(claimant.cookie)).map(venue => venue.venueId)).not.toContain(HIRE)
+  test('a queued claim on an opening offers nothing at all', async () => {
+    expect(await venuesFor(claimant.cookie)).toEqual([])
+  })
+
+  // The picker is what a caller may open, not what the theatre is doing tonight: offering a house
+  // somebody is not working would be a tap that lands on a 403.
+  test('a house the caller is not working is not offered, and its show title is not readable', async () => {
+    const offered = await venuesFor(claimant.cookie)
+    expect(offered.map(venue => venue.venueId)).not.toContain(house.venueId)
+    expect(JSON.stringify(offered)).not.toContain('A Test Show')
   })
 
   // A venue with nothing on and nobody rostered is still somewhere the bar manager may open a

@@ -7,7 +7,12 @@ export default defineEventHandler(async (event) => {
 
   // A `night.till` holder may open a session anywhere, which is what lets the bar manager open a
   // hire night the rota never covered; everybody else sees only where they are working.
-  const venues = await tillVenuesFor(resolved.account.id, night, resolved.permissions.has('night.till'))
+  const officer = resolved.permissions.has('night.till')
+  // The same gate the bypass itself carries: a standing grant being used needs the second factor,
+  // and reading the estate list is the first half of using it (A-112, 0044).
+  if (officer) await requireSecondFactorIfPrivileged(event, resolved)
+
+  const venues = await tillVenuesFor(resolved.account.id, night, officer)
 
   return { night, venues }
 })

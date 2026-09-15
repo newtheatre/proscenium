@@ -291,6 +291,13 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         <p class="text-sm text-muted">
           Which bar are you opening tonight?
         </p>
+        <UAlert
+          v-if="venuesFailure"
+          data-test="till-venues-failure"
+          color="error"
+          variant="subtle"
+          :description="venuesFailure"
+        />
         <UButton
           v-for="venue in venues"
           :key="venue.venueId"
@@ -305,13 +312,6 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           <span>{{ venue.venueName }}</span>
           <span class="text-xs text-muted">{{ venue.what }}</span>
         </UButton>
-        <UAlert
-          v-if="venuesFailure"
-          data-test="till-venues-failure"
-          color="error"
-          variant="subtle"
-          :description="venuesFailure"
-        />
       </div>
 
       <UAlert

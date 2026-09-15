@@ -2,6 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { openingVenuesTonight } from './bar-openings'
 import { performancesOnNight } from './performances'
+import { confirmedShiftsTonight } from './rota'
 import { showNightBounds } from '#shared/utils/show-night'
 import type { TillVenueOption } from '#shared/utils/till'
 
@@ -13,14 +14,21 @@ const VENUE_CAP = 50
 
 export async function tillVenuesFor(userId: string, night: string, everyVenue: boolean): Promise<TillVenueOption[]> {
   const { from, to } = showNightBounds(night)
-  const [running, openings] = await Promise.all([
+  const bounds: [number, number] = [Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)]
+  const [running, shifts, openings] = await Promise.all([
     performancesOnNight(night),
-    openingVenuesTonight(userId, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)),
+    confirmedShiftsTonight(userId, 'BAR', bounds[0], bounds[1], {}),
+    openingVenuesTonight(userId, bounds[0], bounds[1]),
   ])
+
+  // Only where the caller is working, unless they hold the bypass: a picker offering what the
+  // guard then refuses is a tap that lands on a 403, and a draft title is not theirs to read.
+  const worked = new Set(shifts.map(shift => shift.performanceId))
 
   const found = new Map<string, TillVenueOption>()
   for (const performance of running) {
     if (performance.status === 'CANCELLED' || found.has(performance.venueId)) continue
+    if (!everyVenue && !worked.has(performance.id)) continue
     found.set(performance.venueId, { venueId: performance.venueId, venueName: performance.venueName, what: performance.showTitle })
   }
   for (const opening of openings) {
