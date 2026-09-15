@@ -3,7 +3,7 @@ import { formatLondon } from '#shared/utils/london'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
-definePageMeta({ layout: 'console', title: 'Rota', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Rota', middleware: 'console', docs: '/docs/rota/unfilled-shifts' })
 
 interface RosterShift {
   shiftId: string

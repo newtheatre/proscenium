@@ -3,7 +3,7 @@ import { saysMoney } from '#shared/utils/bar'
 import { saysAccessKind } from '#shared/utils/ticket-types'
 import type { FinanceForegoneReport } from '#shared/utils/finance-reports'
 
-definePageMeta({ layout: 'console', title: 'Comps and discounts', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Comps and discounts', middleware: 'console', docs: '/docs/money/comps-and-discounts' })
 
 interface ShowOption { id: string, title: string, status: string }
 

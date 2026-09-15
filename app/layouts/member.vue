@@ -17,6 +17,7 @@ const links = MY_NAV.map(entry => ({ label: entry.label, icon: entry.icon, to: e
           <SiteWordmark />
         </template>
         <template #right>
+          <DocsLink />
           <AuthStatus />
         </template>
         <template #body>

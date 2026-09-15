@@ -3,7 +3,7 @@ import { saysPrice } from '#shared/utils/ticket-types'
 import { saysPassStatus } from '#shared/utils/passes'
 import type { PassRequestStatus, PassStatus } from '#shared/utils/passes'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/passes' })
 
 interface SellablePassType {
   id: string
@@ -95,7 +95,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
     />
 
     <div class="mt-6 space-y-6">
-      <UCard>
+      <UCard data-test="account-passes-held">
         <template #header>
           <h2 class="nnt-headline text-lg">
             Your passes
@@ -146,7 +146,10 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
         </ul>
       </UCard>
 
-      <UCard v-if="data.sellable.length > 0">
+      <UCard
+        v-if="data.sellable.length > 0"
+        data-test="account-passes-sellable"
+      >
         <template #header>
           <h2 class="nnt-headline text-lg">
             Request a pass

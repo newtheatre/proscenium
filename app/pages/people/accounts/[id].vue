@@ -4,7 +4,7 @@ import { can, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abi
 import { ROLES, saysRole } from '#shared/utils/roles'
 import type { Role } from '#shared/utils/roles'
 
-definePageMeta({ layout: 'console', title: 'Account', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Account', middleware: 'console', docs: '/docs/people/accounts' })
 
 interface Grant { role: string, expiresAt: number | null, grantedAt: number, live: boolean }
 

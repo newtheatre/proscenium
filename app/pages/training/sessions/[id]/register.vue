@@ -4,7 +4,7 @@ import { londonDay } from '#shared/utils/membership'
 
 // A trainer on a door, holding a phone in one hand. Big targets, no hover, nothing that needs a
 // wide viewport: the tonight shell, which 0040 named for exactly this (G-116 criterion 6).
-definePageMeta({ layout: 'tonight', title: 'Register', middleware: 'signed-in' })
+definePageMeta({ layout: 'tonight', title: 'Register', middleware: 'signed-in', docs: '/docs/training/sessions' })
 
 interface Attendee {
   userId: string

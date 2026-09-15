@@ -2,7 +2,7 @@
 import { boardJoinForm } from '#shared/utils/backstage'
 import type { BoardSide } from '#shared/utils/backstage'
 
-definePageMeta({ layout: 'backstage' })
+definePageMeta({ layout: 'backstage', docs: '/docs/show-night/backstage-board' })
 
 // No account, no personal data: the code and a display label are the whole of the form
 // (E-120 criterion 1). A cookie, never the device store, which is `useNightCache`'s alone.

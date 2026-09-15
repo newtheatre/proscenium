@@ -11,7 +11,7 @@ import { contentWarningsList } from '#shared/utils/content-warnings-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { ContentWarning, ContentWarningKind } from '#shared/utils/content-warnings'
 
-definePageMeta({ layout: 'console', title: 'Content warnings', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Content warnings', middleware: 'console', docs: '/docs/box-office/content-warnings' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

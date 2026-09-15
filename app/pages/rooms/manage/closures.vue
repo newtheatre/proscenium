@@ -6,7 +6,7 @@ import { blackoutsList } from '#shared/utils/blackouts-list'
 import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Closures', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Closures', middleware: 'console', docs: '/docs/spaces/closures' })
 
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')

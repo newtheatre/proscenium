@@ -6,7 +6,7 @@ import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { describePurpose } from '#shared/utils/bookings'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Other rooms', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Other rooms', middleware: 'console', docs: '/docs/spaces/other-rooms' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

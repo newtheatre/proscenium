@@ -32,11 +32,13 @@ export default defineContentConfig({
         quote: z.string().optional(),
       }),
     }),
-    // Operator documentation, one page per module (J-109). Edited by editing the file and
-    // merging, the same interim pipeline 0051 established: no in-app editor exists yet.
+    // Operator documentation, one page per screen in a numbered tree (J-109, 0076). Edited by
+    // editing the file and merging, the same interim pipeline 0051 established.
     docs: defineCollection({
       type: 'page',
-      source: 'docs/**/*.md',
+      // `docs/**`, not `*.md`: a folder's `.navigation.yml` has to be in the collection for
+      // queryCollectionNavigation to read its title and icon.
+      source: 'docs/**',
       schema: z.object({
         module: z.string(),
         // Set by whoever edits the page, since there is no in-app editor to stamp this

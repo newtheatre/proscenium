@@ -5,7 +5,7 @@ import { saysCategory, saysSeverity, SEVERITIES } from '#shared/utils/incidents'
 import { formatLondon } from '#shared/utils/london'
 import type { Category, Severity } from '#shared/utils/incidents'
 
-definePageMeta({ layout: 'console', title: 'Safety', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Safety', middleware: 'console', docs: '/docs/rota/safety' })
 
 interface SeverityRow { severity: Severity, requiresFollowUp: boolean }
 interface OpenItem { id: string, performanceId: string, reportedByName: string, category: Category, severity: Severity, body: string, happenedAt: number }

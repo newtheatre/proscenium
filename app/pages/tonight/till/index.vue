@@ -14,7 +14,7 @@ import type { SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
 import type { TillSession } from '#shared/utils/till'
 import type { ScannerFailure } from '~/composables/useQrScanner'
 
-definePageMeta({ layout: 'tonight' })
+definePageMeta({ layout: 'tonight', docs: '/docs/show-night/the-till' })
 useSeoMeta({ title: 'Till' })
 
 // The guard is the route's, not this screen's: what a refusal says is written where it is

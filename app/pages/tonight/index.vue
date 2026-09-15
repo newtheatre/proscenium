@@ -4,7 +4,7 @@ import { hubKpis, nightHeaderLine } from '#shared/utils/night-hub'
 import { activePerformanceId } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 
-definePageMeta({ layout: 'tonight' })
+definePageMeta({ layout: 'tonight', docs: '/docs/show-night' })
 useSeoMeta({ title: 'Tonight' })
 
 interface Performance {

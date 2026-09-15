@@ -5,7 +5,7 @@ import { showCategoriesList } from '#shared/utils/show-categories-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { AdminShowCategory } from '#shared/utils/show-categories'
 
-definePageMeta({ layout: 'console', title: 'Show categories', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Show categories', middleware: 'console', docs: '/docs/box-office/show-categories' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// The six invariant checkers behind one command. Every one runs, so a developer sees all the
+// The invariant checkers behind one command. Every one runs, so a developer sees all the
 // failures at once rather than the first; the summary and the exit code name which failed.
 
 interface Check {
@@ -40,10 +40,15 @@ export const CHECKS: Check[] = [
     script: 'scripts/check-audit.ts',
     describes: 'A privileged mutation that records nothing is a gap nobody sees until it matters (J-101 criterion 5).',
   },
+  {
+    name: 'docs',
+    script: 'scripts/check-docs.ts',
+    describes: 'A documentation page missing its provenance, a picture or link that resolves to nothing, or a section with no navigation entry (J-109, 0076).',
+  },
 ]
 
 // An annotation is surfaced at the top of a run rather than buried in a step's log, so collapsing
-// six steps into one makes a failure more visible rather than less.
+// the steps into one makes a failure more visible rather than less.
 const ANNOTATE = Boolean(process.env.GITHUB_ACTIONS)
 
 function annotate(check: Check): void {

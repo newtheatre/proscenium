@@ -7,7 +7,7 @@ import type { MembershipClaimInput } from '#shared/utils/membership-claims'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { PolicyValues } from '#shared/utils/policy-tokens'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
 
 interface OwnClaim {
   id: string

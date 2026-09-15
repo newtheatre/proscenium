@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysSessionStatus } from '#shared/utils/training'
 
-definePageMeta({ layout: 'console', title: 'Session', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Session', middleware: 'console', docs: '/docs/training/sessions' })
 
 interface Attendee {
   userId: string

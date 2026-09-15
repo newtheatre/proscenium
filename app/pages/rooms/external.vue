@@ -2,7 +2,7 @@
 import { describePurpose } from '#shared/utils/bookings'
 import { fromLondonWallClock } from '#shared/utils/london'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/other-rooms' })
 
 interface Failure { reason: string, says: string }
 

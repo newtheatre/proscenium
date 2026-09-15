@@ -7,7 +7,7 @@ import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import type { ShiftRole, TemplateSlot } from '#shared/utils/rota'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Shift templates', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Shift templates', middleware: 'console', docs: '/docs/rota/shift-templates' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

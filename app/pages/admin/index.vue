@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
 
-definePageMeta({ layout: 'console', title: 'Overview', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Overview', middleware: 'console', docs: '/docs/system' })
 
 // Route middleware is rendering convenience only; the server guard is what actually refuses
 // (docs/architecture.md). A 403 here means the guard did its job.

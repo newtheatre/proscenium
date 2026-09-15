@@ -4,7 +4,7 @@ import { saysShiftRole, saysShiftStatus, SHIFT_ROLES } from '#shared/utils/rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { Page } from '#shared/utils/pagination'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/your-rota' })
 
 interface MyShift {
   shiftId: string

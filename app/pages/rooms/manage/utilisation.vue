@@ -5,7 +5,7 @@ import { utilisationList } from '#shared/utils/utilisation-list'
 import type { UtilisationRow } from '#shared/utils/utilisation'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Utilisation', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Utilisation', middleware: 'console', docs: '/docs/spaces/utilisation' })
 
 const UBadge = resolveComponent('UBadge')
 

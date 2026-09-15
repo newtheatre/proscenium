@@ -14,6 +14,7 @@ withDefaults(defineProps<{
   <UPageCard
     :title="title"
     :highlight="highlight"
+    :data-test="`my-tile-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`"
     highlight-color="primary"
     :ui="{ container: 'h-full', body: 'flex-1' }"
   >

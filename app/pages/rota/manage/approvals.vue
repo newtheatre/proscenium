@@ -6,7 +6,7 @@ import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
 import type { ShiftRole } from '#shared/utils/rota'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Approvals', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Approvals', middleware: 'console', docs: '/docs/rota/approvals' })
 
 const UButton = resolveComponent('UButton')
 

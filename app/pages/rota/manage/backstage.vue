@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { can, manageBoardConfig } from '#shared/utils/abilities'
 
-definePageMeta({ layout: 'console', title: 'Backstage board', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Backstage board', middleware: 'console', docs: '/docs/rota/backstage-board-setup' })
 
 interface MilestoneType { id: string, label: string, sort: number, active: boolean }
 interface Preset { id: string, label: string, body: string, sort: number, active: boolean }

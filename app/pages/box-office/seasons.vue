@@ -5,7 +5,7 @@ import { seasonsList } from '#shared/utils/seasons-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { AdminSeason } from '#shared/utils/seasons'
 
-definePageMeta({ layout: 'console', title: 'Seasons', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Seasons', middleware: 'console', docs: '/docs/box-office/seasons' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

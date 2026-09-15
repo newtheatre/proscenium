@@ -6,7 +6,7 @@ import { fellowshipsList } from '#shared/utils/fellowships-list'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { AwardFellowship } from '#shared/utils/admin-forms'
 
-definePageMeta({ layout: 'console', title: 'Fellows', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Fellows', middleware: 'console', docs: '/docs/people/fellows' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

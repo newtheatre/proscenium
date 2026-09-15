@@ -5,7 +5,7 @@ import { formatLondon } from '#shared/utils/london'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Emergency cards', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Emergency cards', middleware: 'console', docs: '/docs/rota/emergency-cards' })
 
 const UButton = resolveComponent('UButton')
 

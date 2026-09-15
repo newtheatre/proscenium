@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { H3Event } from 'h3'
 import { queryCollection } from '@nuxt/content/nitro'
 import { hasDefault, isConfigKey, isEnforced, isSensitive, CONFIG_KEYS } from '#shared/utils/config'
 import { policyValueFor, tokensInTree } from '#shared/utils/policy-tokens'
@@ -9,13 +10,20 @@ const query = z.object({
   path: z.string().min(1).max(200).regex(/^\/[a-z0-9\-/]*$/),
 })
 
+// Operator documentation quotes thresholds the same way, behind the session its route needs.
+async function docsPage(event: H3Event, path: string) {
+  if (path !== '/docs' && !path.startsWith('/docs/')) return null
+  await requireAccount(event)
+  return queryCollection(event, 'docs').path(path).first()
+}
+
 // The live value of every setting one policy page quotes (J-110, 0012).
 export default defineEventHandler(async (event) => {
   const { path } = await getValidatedQueryOrThrow(event, query)
 
   // Keyed on the page, never on a list of keys from the caller: a request may only read the
   // settings that page already publishes, so this cannot become a way to read the whole surface.
-  const page = await queryCollection(event, 'content').path(path).first()
+  const page = await queryCollection(event, 'content').path(path).first() ?? await docsPage(event, path)
   if (!page) throw createError({ statusCode: 404, statusMessage: 'Page not found' })
 
   const overrides = await configOverrides(event)

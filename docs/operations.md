@@ -876,9 +876,10 @@ query with types, dates and outcomes only, never a message body; every such view
 
 ## Not built yet
 
-Named here so nobody looks for it: the operator documentation published in-app (J-109), which is
-where the restore drill procedure belongs once it exists (J-107 criterion 5). The retention sweep
-is built and documented above; what it still waits on is a warning cadence and, in December, an
+The restore drill procedure now lives in the in-app operator documentation at
+`/docs/system/backups-and-restore` (J-109, J-107 criterion 5, 0076); the scratch-database step is
+only as precise as the paragraph above, which the IT Manager should verify against wrangler before
+the first drill. The retention sweep is built and documented above; what it still waits on is a warning cadence and, in December, an
 arming (A-126, K-111).
 
 H-106's own criterion 2, the manual re-send action, still waits: `retry_payload` is cleared by

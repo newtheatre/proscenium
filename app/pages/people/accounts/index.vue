@@ -7,7 +7,7 @@ import type { FieldKey } from '#shared/utils/list-filters'
 import type { Role } from '#shared/utils/roles'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Accounts', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Accounts', middleware: 'console', docs: '/docs/people/accounts' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

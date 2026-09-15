@@ -163,6 +163,9 @@ export default defineNuxtConfig({
       nodeCompat: true,
       wrangler: {
         name: 'nnt-unified',
+        // The docs collection's dump is emitted as a static asset; without this it is served
+        // before the worker's session gate runs (0076).
+        assets: { run_worker_first: ['/dump.docs.sql', '/__nuxt_content/docs/*'] },
         d1_databases: [
           {
             binding: 'DB',

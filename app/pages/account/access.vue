@@ -3,7 +3,7 @@ import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, declareAccessProfileForm, saysAccessP
 import type { AccessFlag, DeclareAccessProfileInput, OwnAccessProfile } from '#shared/utils/access-profiles'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/access-requirements' })
 
 const toast = useToast()
 const loading = ref(true)

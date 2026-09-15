@@ -3,7 +3,7 @@ import { AUDIENCES, PROFILE_FIELDS, profileForm } from '#shared/utils/profile'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { z } from 'zod'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
 
 type Profile = z.output<typeof profileForm> & { email: string }
 

@@ -5,7 +5,7 @@ import { formatLondon, startOfLondonDay } from '#shared/utils/london'
 import type { PrerequisiteGap } from '#shared/utils/training'
 import type { ClosureReason } from '#shared/utils/training-signup'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/your-training' })
 
 interface Session {
   id: string

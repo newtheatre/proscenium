@@ -3,7 +3,7 @@ import { saysMoney } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS } from '#shared/utils/bar-reports'
 import type { BarReport, ReportPeriodInput, ReportSection } from '#shared/utils/bar-reports'
 
-definePageMeta({ layout: 'console', title: 'Bar reports', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Bar reports', middleware: 'console', docs: '/docs/bar/reports' })
 
 const request = useRequestFetch()
 

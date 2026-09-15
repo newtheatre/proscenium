@@ -5,7 +5,7 @@ import { stocktakesList } from '#shared/utils/stocktakes-list'
 import type { Stocktake } from '#shared/utils/stocktakes'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Stocktakes', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Stocktakes', middleware: 'console', docs: '/docs/bar/stocktakes' })
 
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')

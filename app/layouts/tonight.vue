@@ -42,7 +42,8 @@ onMounted(async () => {
 
 <template>
   <div class="dark flex min-h-screen flex-col bg-default text-default [color-scheme:dark]">
-    <div class="mx-auto flex h-10 w-full max-w-md items-center justify-end px-2">
+    <div class="mx-auto flex h-10 w-full max-w-md items-center justify-end gap-1 px-2">
+      <DocsLink />
       <AuthStatus />
     </div>
     <header class="border-b border-default">

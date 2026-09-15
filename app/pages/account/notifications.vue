@@ -3,7 +3,7 @@ import { formatLondon } from '#shared/utils/london'
 import { TOPIC_DESCRIPTIONS, TOPIC_LABELS } from '#shared/utils/notifications'
 import type { NotificationTopic } from '#shared/utils/senders'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
 
 interface Cell {
   topic: NotificationTopic

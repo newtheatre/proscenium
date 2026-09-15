@@ -19,7 +19,7 @@ import type {
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Serving sizes', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Serving sizes', middleware: 'console', docs: '/docs/bar/products' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

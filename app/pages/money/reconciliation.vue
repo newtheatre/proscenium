@@ -4,7 +4,7 @@ import { can, recordZReadings } from '#shared/utils/abilities'
 import { currentShowNight } from '#shared/utils/show-night'
 import type { NightExpected, OutstandingNight, ZReading } from '#shared/utils/night-reconciliation'
 
-definePageMeta({ layout: 'console', title: 'Daily reconciliation', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Daily reconciliation', middleware: 'console', docs: '/docs/money/reconciliation' })
 
 const request = useRequestFetch()
 const toast = useToast()

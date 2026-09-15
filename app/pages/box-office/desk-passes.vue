@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysPrice } from '#shared/utils/ticket-types'
 
-definePageMeta({ layout: 'console', title: 'Issue passes', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Issue passes', middleware: 'console', docs: '/docs/box-office/issuing-passes' })
 
 interface PassPrice {
   id: string

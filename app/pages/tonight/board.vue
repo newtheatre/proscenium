@@ -2,7 +2,7 @@
 import { groupedBoardCode } from '#shared/utils/night-hub'
 import type { BoardSide } from '#shared/utils/backstage'
 
-definePageMeta({ layout: 'tonight' })
+definePageMeta({ layout: 'tonight', docs: '/docs/show-night/backstage-board' })
 useSeoMeta({ title: 'Backstage' })
 
 interface Message {

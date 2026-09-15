@@ -5,7 +5,7 @@ import type { EntrySource } from '#shared/utils/ledger'
 import type { NominalMapping } from '#shared/utils/su-export'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Exports', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Exports', middleware: 'console', docs: '/docs/money/exports' })
 
 const SOURCE_LABELS: Record<EntrySource, string> = {
   DESK: 'Desk',

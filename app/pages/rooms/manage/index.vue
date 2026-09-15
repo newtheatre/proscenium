@@ -6,7 +6,7 @@ import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
 import type { z } from 'zod'
 
-definePageMeta({ layout: 'console', title: 'Rooms', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Rooms', middleware: 'console', docs: '/docs/spaces/rooms' })
 
 interface Room {
   id: string

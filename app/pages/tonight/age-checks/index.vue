@@ -5,7 +5,7 @@ import { londonClock } from '#shared/utils/london'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
 
-definePageMeta({ layout: 'tonight' })
+definePageMeta({ layout: 'tonight', docs: '/docs/show-night/age-checks' })
 useSeoMeta({ title: 'Challenge 25 register' })
 
 interface Entry {

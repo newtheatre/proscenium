@@ -2,7 +2,7 @@
 import { saysQuantity } from '#shared/utils/bar'
 import type { OrderListRow, UnconfiguredRow } from '#shared/utils/ordering'
 
-definePageMeta({ layout: 'console', title: 'Order list', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Order list', middleware: 'console', docs: '/docs/bar/order-list' })
 
 const request = useRequestFetch()
 
