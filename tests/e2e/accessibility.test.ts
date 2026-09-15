@@ -166,6 +166,8 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
       await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
 
       expect(await violationsOn(view, '/rooms/manage', '[data-test="rooms-table"]')).toEqual([])
+      // review-ui.md finding 11: raw enum values and unlabelled period fields.
+      expect(await violationsOn(view, '/bar/reports', '[data-test="period-kind"]')).toEqual([])
     }
     finally {
       view.close()
