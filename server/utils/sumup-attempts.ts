@@ -176,7 +176,6 @@ interface Move {
   resolution?: SumupResolution
   resolvedBy?: string | null
   note?: string | null
-  entryId?: string | null
   error?: string | null
 }
 
@@ -208,7 +207,6 @@ async function move(id: string, from: SumupAttemptStatus, to: SumupAttemptStatus
       resolved_by = coalesce(${change.resolvedBy ?? null}, resolved_by),
       resolved_at = coalesce(${resolvedAt}, resolved_at),
       resolution_note = coalesce(${change.note ?? null}, resolution_note),
-      entry_id = coalesce(${change.entryId ?? null}, entry_id),
       error = ${change.error ?? null}
     WHERE id = ${id} AND status = ${from} AND ${unposted}
     RETURNING id
@@ -217,15 +215,19 @@ async function move(id: string, from: SumupAttemptStatus, to: SumupAttemptStatus
 
 // Not a transition the state machine offers a caller: this is the commit's own bookkeeping, and
 // it lands on SUCCEEDED from wherever the row drifted to while the sale was being written.
-async function recordPostedSale(id: string, entryId: string | null, actorId: string | null): Promise<void> {
+async function recordPostedSale(id: string, entryId: string | null, actorId: string | null): Promise<boolean> {
   const now = Math.floor(Date.now() / 1000)
-  await auditedWrite(db.all(recordPostedSaleStatement(id, entryId, now)), auditEntry({
+  return auditedWrite(db.all(recordPostedSaleStatement(id, entryId, now)), auditEntry({
     actorId,
     action: 'bar.sumup.completed',
     target: `sumup-attempt:${id}`,
-    detail: { to: 'SUCCEEDED', entryId },
+    detail: { claimedFrom: 'COMPLETING', to: 'SUCCEEDED', entryId },
   }))
 }
+
+// Nothing to record means the row already named an entry of its own, so this attempt has posted
+// twice: the receipt is real and so is the other one, and a person has to reconcile the pair.
+const DUPLICATE = 'This payment was recorded twice: check the reader and both ledger entries before taking anything else'
 
 export interface CompletionOutcome {
   status: SumupAttemptStatus
@@ -261,9 +263,10 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
   }
 
   const basket = basketOf(row)
+  let receipt: SaleReceipt
   try {
     const session = requireOpenSession(await openSessionFor(basket.venueId, basket.night))
-    const receipt = await commitSale(
+    receipt = await commitSale(
       basket.sale.lines, londonDayOf(new Date()), basket.sale.expectedTotalPence, basket.sale.ageCheck, basket.sale.discountId, null,
       {
         actorId: row.createdBy,
@@ -277,8 +280,6 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
       },
       { tickets: basket.sale.tickets, walkUps: basket.sale.walkUps, walkUpGuest: basket.sale.walkUpGuest },
     )
-    await recordPostedSale(row.id, receipt.entryId, by.actorId)
-    return { status: 'SUCCEEDED', receipt, error: null }
   }
   catch (error) {
     const statusCode = (error as { statusCode?: number }).statusCode
@@ -292,6 +293,11 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
     await move(row.id, 'COMPLETING', 'STARTED', {}, by.actorId)
     throw error
   }
+
+  // Outside the catch above: a recording that fails must never reset the row, or the sale it
+  // posted would be committed again by the next answer (criterion 5).
+  const recorded = await recordPostedSale(row.id, receipt.entryId, by.actorId)
+  return { status: 'SUCCEEDED', receipt, error: recorded ? null : DUPLICATE }
 }
 
 // Staff answering for an attempt the app never answered for (criterion 5): "it went through" is a

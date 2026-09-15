@@ -142,7 +142,7 @@ describe('a completion posts once, whatever the sweep did meanwhile (F-124 crite
 })
 
 // The stuck clock runs from the answer, not from the hand-off: an attempt answered a moment ago
-// is still in flight however long ago it was started (F-124 criterion 6).
+// is still in flight however long ago it was started (F-124 criterion 5).
 describe('a completion is stuck when its answer is old, not when its hand-off is', () => {
   const NOW = 1_789_000_000
   const minutes = (count: number): number => count * 60
