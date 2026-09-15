@@ -61,6 +61,19 @@ async function saveCounts(): Promise<void> {
   }
 }
 
+// A draft differs from what the server last held: Apply must save these before posting, or the
+// confirmation and the movements it posts would both be reading stale counts (F-115 criterion 3).
+const dirty = computed(() =>
+  data.value?.lines.some(line => (drafts.value[line.itemId] ?? null) !== line.countedQty) ?? false)
+
+async function openApply(): Promise<void> {
+  if (dirty.value) {
+    await saveCounts()
+    if (failure.value) return
+  }
+  confirming.value = true
+}
+
 async function apply(): Promise<void> {
   applying.value = true
   failure.value = null
@@ -92,6 +105,12 @@ function variance(line: StocktakeLine): number | null {
 }
 
 const uncounted = computed(() => data.value?.lines.filter(line => drafts.value[line.itemId] === undefined).length ?? 0)
+
+// Read after openApply's save, so these name what is about to post, not what was last typed.
+const applyCounted = computed(() => data.value?.lines.filter(line => line.countedQty !== null).length ?? 0)
+const applyUncounted = computed(() => data.value?.lines.filter(line => line.countedQty === null).length ?? 0)
+const applyNetVarianceCostPence = computed(() =>
+  data.value?.lines.reduce((total, line) => total + (line.varianceCostPence ?? 0), 0) ?? 0)
 </script>
 
 <template>
@@ -142,7 +161,8 @@ const uncounted = computed(() => data.value?.lines.filter(line => drafts.value[l
           </UButton>
           <UButton
             data-test="open-apply"
-            @click="confirming = true"
+            :loading="saving"
+            @click="openApply"
           >
             Apply
           </UButton>
@@ -238,6 +258,38 @@ const uncounted = computed(() => data.value?.lines.filter(line => drafts.value[l
       description="Posts one adjustment movement per item that counted differently, then freezes the stocktake for good."
       @update:open="confirming = false"
     >
+      <template #body>
+        <dl
+          class="space-y-1 text-sm"
+          data-test="apply-summary"
+        >
+          <div class="flex justify-between">
+            <dt class="text-muted">
+              Counted
+            </dt>
+            <dd data-test="apply-counted">
+              {{ plural(applyCounted, 'item') }}
+            </dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-muted">
+              Not counted
+            </dt>
+            <dd data-test="apply-uncounted">
+              {{ plural(applyUncounted, 'item') }}
+            </dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-muted">
+              Net variance at cost
+            </dt>
+            <dd data-test="apply-net-variance">
+              {{ saysMoney(applyNetVarianceCostPence) }}
+            </dd>
+          </div>
+        </dl>
+      </template>
+
       <template #footer>
         <UButton
           data-test="confirm-apply"
