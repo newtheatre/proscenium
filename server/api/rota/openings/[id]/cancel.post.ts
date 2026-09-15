@@ -16,18 +16,21 @@ export default defineEventHandler(async (event) => {
   const active = await activeOpeningShifts(id)
   const holders = active.filter(slot => COMMITTED_SHIFT_STATUSES.includes(slot.status) && slot.userId !== null)
 
-  // The predicate rides the UPDATE, so two officers cancelling at once write one cancellation and
-  // one audit entry rather than two (0003).
-  await db.batch([
-    db.run(cancelOpeningStatement(id)),
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'bar-opening.cancelled',
+    target: `bar-opening:${id}`,
+    detail: { venueId: held.venueId, night: held.night, shiftsCancelled: active.length },
+  })
+
+  // The predicate rides the UPDATE and the entry rides `changes()`, so two officers cancelling at
+  // once write one cancellation and one audit row (0003). The slots go in the same batch (E-130).
+  const applied = await auditedWrite(
+    db.all<{ id: string }>(cancelOpeningStatement(id)),
+    entry,
     db.run(cancelOpeningShiftsStatement(id)),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'bar-opening.cancelled',
-      target: `bar-opening:${id}`,
-      detail: { venueId: held.venueId, night: held.night, shiftsCancelled: active.length },
-    })),
-  ])
+  )
+  if (!applied) throw createError({ statusCode: 409, statusMessage: openingCancelRefusal('CANCELLED') })
 
   // The bar is not opening, so no shift preference can silence this: somebody would turn up.
   const when = formatLondon(new Date(held.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })

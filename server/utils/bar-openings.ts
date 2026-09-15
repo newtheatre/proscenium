@@ -21,22 +21,34 @@ import type { SQL } from 'drizzle-orm'
 // conditional write a claim on a performance does (0077).
 export const OPENING_CLAIM_SCOPE: ClaimScope = { table: 'bar_opening_shifts', event: 'opening_id' }
 
+// Conditional on the venue's bar row, so a template emptied between the read and the write
+// leaves no opening at all rather than one nobody can claim a slot on (E-130 criterion 2).
 export function createOpeningStatement(openingId: string, input: BarOpeningInput, actorId: string): SQL {
   return sql`
     INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status, created_by)
-    VALUES (${openingId}, ${input.venueId}, ${input.night}, ${input.label},
-            ${input.startsAt}, ${input.endsAt}, 'PLANNED', ${actorId})
+    SELECT ${openingId}, ${input.venueId}, ${input.night}, ${input.label},
+           ${input.startsAt}, ${input.endsAt}, 'PLANNED', ${actorId}
+    WHERE EXISTS (SELECT 1 FROM shift_templates WHERE venue_id = ${input.venueId} AND role = 'BAR')
+    RETURNING id
   `
 }
 
 // Every slot the venue's bar row asks for, numbered from one. The ordinals come out of a
 // recursive count rather than out of the request, so this binds one parameter (0006).
 export function stampOpeningShiftsStatement(openingId: string): SQL {
+  // Bounded by this venue's own bar count, so a house with twenty door staff does not make every
+  // other venue's opening walk twenty rows (0006).
+  const barCount = sql`(
+    SELECT coalesce(t."count", 0)
+    FROM bar_openings o
+    JOIN shift_templates t ON t.venue_id = o.venue_id AND t.role = 'BAR'
+    WHERE o.id = ${openingId}
+  )`
   return sql`
     WITH RECURSIVE slot(i) AS (
       SELECT 1
       UNION ALL
-      SELECT i + 1 FROM slot WHERE i < (SELECT coalesce(max("count"), 0) FROM shift_templates)
+      SELECT i + 1 FROM slot WHERE i < ${barCount}
     )
     INSERT INTO bar_opening_shifts (id, opening_id, slot, status)
     SELECT lower(hex(randomblob(16))), o.id, slot.i, 'OPEN'
@@ -120,11 +132,14 @@ export function assignOpeningShiftStatement(slotId: string, userId: string, acto
   `
 }
 
+// A declined slot is included, because nothing else reopens one: an opening has no approvals
+// queue of its own, so a decline would otherwise strand the slot with a name on it (E-107).
 export function unconfirmOpeningShiftStatement(slotId: string): SQL {
   return sql`
     UPDATE bar_opening_shifts
-    SET status = 'OPEN', user_id = NULL, assigned_by = NULL, claimed_at = NULL, confirmed_at = NULL
-    WHERE id = ${slotId} AND status IN ('CLAIMED', 'CONFIRMED')
+    SET status = 'OPEN', user_id = NULL, assigned_by = NULL, claimed_at = NULL, confirmed_at = NULL,
+        decline_reason = NULL
+    WHERE id = ${slotId} AND status IN ('CLAIMED', 'CONFIRMED', 'DECLINED')
     RETURNING id
   `
 }
@@ -183,10 +198,14 @@ export function countOpeningsQuery(clause: ListClause): SQL {
 
 // The slots of the openings the page holds, scoped by the same predicate read a second time
 // rather than by an id list carried back from a result set (0006).
-export function openingShiftsQuery(clause: ListClause, limit: number, offset: number): SQL {
+
+// Who holds a slot is an officer's view: the member-facing open-shift list carries no person
+// column at all, and a declined claim names somebody who is owed no audience (E-103, 0011).
+export function openingShiftsQuery(clause: ListClause, limit: number, offset: number, withHolders: boolean): SQL {
+  const holder = withHolders ? sql`s.user_id AS userId, u.name AS holderName` : sql`NULL AS userId, NULL AS holderName`
   return sql`
     SELECT s.id AS slotId, s.opening_id AS openingId, s.slot AS slot, s.status AS status,
-           s.user_id AS userId, u.name AS holderName
+           ${holder}
     FROM bar_opening_shifts s
     LEFT JOIN users u ON u.id = s.user_id
     WHERE s.opening_id IN (

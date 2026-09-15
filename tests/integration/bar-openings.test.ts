@@ -6,7 +6,9 @@ import {
   claimOpeningShiftStatement,
   confirmedOpeningShiftsTonightQuery,
   createOpeningStatement,
+  declineOpeningShiftStatement,
   stampOpeningShiftsStatement,
+  unconfirmOpeningShiftStatement,
 } from '#server/utils/bar-openings'
 import { replaceTemplateStatements } from '#server/utils/rota'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
@@ -89,6 +91,7 @@ describe('an opening records its own window and status (E-130 criterion 1)', () 
   test('the database refuses an end at or before the start', async () => {
     await withDatabase(async (database) => {
       const venue = testVenue(database)
+      template(database, venue.id, TWO_BAR)
       const actorId = person(database, 'officer')
       const closesFirst = createOpeningStatement('opening-backwards', {
         venueId: venue.id,
@@ -134,13 +137,14 @@ describe('creating an opening stamps bar slots from the template (E-130 criterio
     })
   })
 
-  test('a venue with no bar row in its template stamps nothing', async () => {
+  test('a venue with no bar row in its template stamps nothing, and plans no opening either', async () => {
     await withDatabase(async (database) => {
       const { openingId } = opening(database, [
         { role: 'DUTY_MANAGER', count: 1 },
         { role: 'DOOR', count: 2 },
       ])
 
+      expect(rows(database, 'SELECT id FROM bar_openings WHERE id = ?', openingId)).toHaveLength(0)
       expect(slotsOn(database, openingId)).toHaveLength(0)
     })
   })
@@ -226,6 +230,23 @@ describe('a slot is claimed through the rota\'s own race-safe write (E-130 crite
 
       expect(run(database, approveOpeningShiftStatement(slot!.id))).toHaveLength(1)
       expect(authority()).toHaveLength(1)
+    })
+  })
+
+  // An opening has no approvals queue of its own, so nothing else would ever reopen the slot.
+  test('a declined claim is stood back down to open, naming nobody', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      person(database, 'one')
+      const [slot] = slotsOn(database, openingId)
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CLAIMED'))
+      run(database, declineOpeningShiftStatement(slot!.id, 'Not trained yet'))
+
+      expect(run(database, unconfirmOpeningShiftStatement(slot!.id))).toHaveLength(1)
+
+      const reopened = slotsOn(database, openingId)[0]!
+      expect(reopened).toMatchObject({ status: 'OPEN', user_id: null })
+      expect(run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))).toHaveLength(1)
     })
   })
 

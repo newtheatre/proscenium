@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { constraintRefusal } from './constraint-refusal'
 import { londonDayField } from './membership'
+import { showNightOf } from './show-night'
 import type { ShiftStatus } from './rota'
 
 // What a bar opening is, and what a slot on one is (E-130, 0077). A bar opening names no
@@ -21,6 +22,11 @@ export const barOpeningForm = z.object({
 }).refine(input => input.endsAt > input.startsAt, {
   message: 'A bar opening closes after it opens',
   path: ['endsAt'],
+// The night is what the list filters and what authority resolves against, so one disagreeing
+// with the opening's own clock would file under one night and let people in on another (0014).
+}).refine(input => showNightOf(new Date(input.startsAt * 1000)) === input.night, {
+  message: 'That opening time falls on a different show night',
+  path: ['night'],
 })
 
 export type BarOpeningInput = z.output<typeof barOpeningForm>
@@ -49,11 +55,11 @@ export function openingReassignRefusal(status: ShiftStatus): string {
   return 'That member already holds a slot on this opening'
 }
 
-// Standing a slot down accepts a claimed or a confirmed one, so anything else names what it is.
+// Standing a slot down accepts anything with a name on it, a declined claim included, so only
+// the two statuses that name nobody are refused.
 export function openingUnconfirmRefusal(status: ShiftStatus): string {
   if (status === 'CANCELLED') return 'This slot has been cancelled'
-  if (status === 'OPEN') return 'This slot is already open'
-  return 'Only a claimed or confirmed slot can be stood down'
+  return 'This slot is already open'
 }
 
 export function openingCancelRefusal(status: BarOpeningStatus): string {
