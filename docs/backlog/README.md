@@ -1,6 +1,6 @@
 # Backlog index
 
-295 stories across 11 modules. Detailed stories carry testable acceptance criteria; Later
+297 stories across 11 modules. Detailed stories carry testable acceptance criteria; Later
 entries are epic stubs awaiting their own definition pass. Story ids are stable once merged:
 MVP stories number from x-101, V2 from x-201, Later from x-301. Cross-module dependencies are
 named by module (or by the specification's story ids) until all files' numbering is final; the
@@ -13,13 +13,13 @@ first tracker import resolves them.
 | `C-spaces.md` | Spaces and equipment | 24 | 6 | 2 | 32 |
 | `D-ticketing.md` | Box office and ticketing | 32 | 5 | 2 | 40 |
 | `E-show-night.md` | Show night operations | 31 | 4 | 1 | 36 |
-| `F-bar.md` | Bar | 26 | 3 | 1 | 31 |
+| `F-bar.md` | Bar | 28 | 3 | 1 | 33 |
 | `G-training.md` | Training and safety records | 26 | 11 | 2 | 42 |
 | `H-communications.md` | Communications | 9 | 4 | 1 | 14 |
 | `I-finance.md` | Finance | 9 | 3 | 1 | 13 |
 | `J-governance.md` | Governance and handover | 10 | 3 | 0 | 14 |
 | `K-platform.md` | Platform foundations and migration | 26 | 0 | 0 | 29 |
-| **Total** | | **221** | **43** | **20** | **295** |
+| **Total** | | **223** | **43** | **20** | **297** |
 
 The show night row also takes a correction: E-128 and E-129 were added to their file without
 this table following, so its MVP count moves by four rather than by the two stories added here.
@@ -32,7 +32,7 @@ expiry is now final (0041), and practice windows because nothing ever read one (
 superseded on 30 August by 0030, which refuses the old estate's audit history in any shape.
 
 Each file opens with its scope, its counts and its open questions; the open questions across
-all files are the agenda feed for the workshops in `../workshops.md`. MVP totals 221 stories,
+all files are the agenda feed for the workshops in `../workshops.md`. MVP totals 223 stories,
 which at the compressed timeline's pace means ruthless review at the gate: a story the
 committee cannot defend cutting is in; anything argued about for more than five minutes moves
 to V2 and the argument is recorded in its open questions.
