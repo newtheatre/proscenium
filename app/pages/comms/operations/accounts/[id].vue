@@ -5,7 +5,7 @@ import type { PersonHistoryRow } from '#shared/utils/notification-log'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Send history', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Send history', middleware: 'console', docs: '/docs/communications/send-log' })
 
 const UBadge = resolveComponent('UBadge')
 

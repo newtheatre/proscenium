@@ -5,7 +5,7 @@ import { can, viewFinanceReports } from '#shared/utils/abilities'
 import { currentSeasonYear } from '#shared/utils/season'
 import type { PeriodInput, SeasonSummary } from '#shared/utils/season-dashboard'
 
-definePageMeta({ layout: 'console', title: 'Season dashboard', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Season dashboard', middleware: 'console', docs: '/docs/money' })
 
 const request = useRequestFetch()
 

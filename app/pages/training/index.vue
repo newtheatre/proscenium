@@ -2,7 +2,7 @@
 import { REQUEST_NOTE_LIMIT, saysKind, saysRequestStatus, saysSource, saysState } from '#shared/utils/training'
 import type { RecordState } from '#shared/utils/training'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/your-training' })
 
 interface Record {
   id: string

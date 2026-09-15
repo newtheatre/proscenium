@@ -9,7 +9,7 @@ import { roomsQueueList } from '#shared/utils/rooms-queue-list'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Room requests', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Room requests', middleware: 'console', docs: '/docs/spaces/room-requests' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

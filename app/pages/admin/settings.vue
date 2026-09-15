@@ -4,7 +4,7 @@ import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-da
 import { confirmationOptions } from '#shared/utils/blast-radius'
 import type { BlastRadiusPreview } from '#shared/utils/blast-radius'
 
-definePageMeta({ layout: 'console', title: 'Settings', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Settings', middleware: 'console', docs: '/docs/system/settings' })
 
 // A holiday list that has run out refuses requests near the horizon, so it says how far it
 // reaches before anybody is refused rather than at the moment they are (C-121, 0038).

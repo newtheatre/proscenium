@@ -20,7 +20,7 @@ repository at speed. Read this before your first change.
 
 ## CI gates (all green before merge, no exemptions)
 
-Eleven steps, in `.github/workflows/ci.yml`. Run all of them before opening a pull request.
+Twelve steps, in `.github/workflows/ci.yml`. Run all of them before opening a pull request.
 
 1. `build`.
 2. `typecheck`, the Nuxt application, and `typecheck:bun`, a separate compiler over `tests/`,
@@ -40,15 +40,19 @@ Eleven steps, in `.github/workflows/ci.yml`. Run all of them before opening a pu
 9. `check notifications`: a notification type with no template, or a template nothing sends.
 10. `check audit`: a privileged route with no audit write, or an action written but never
     registered.
+11. `check docs`: an operator documentation page missing its provenance, a picture or a link that
+    resolves to nothing, or a section with no navigation entry (0076).
 
 `test:e2e` is **not** a CI gate. It runs nightly and on demand (0029), and a full run takes minutes
 rather than seconds.
 
 Documentation drift is a defect and fails review, but no script checks it: a change to behaviour
 without a change to its document is caught by a person. That includes the in-app operator
-documentation under `content/docs/` (J-109): a screen's behaviour changing without its matching
-page changing is the same defect as an engineering document falling behind. The old rooms
-application is the cautionary tale.
+documentation under `content/docs/` (J-109, 0076): one page per screen, and a screen's behaviour
+changing without its page changing is the same defect as an engineering document falling behind.
+A change to a screen updates its page, the `docs:` entry in its `definePageMeta` if the page moved,
+and its picture (`bun run docs:shots <name>` against a seeded dev server, then commit the PNG). The
+old rooms application is the cautionary tale.
 
 ## Scripts and tooling
 

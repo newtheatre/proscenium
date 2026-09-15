@@ -6,7 +6,7 @@ import { venuesList } from '#shared/utils/venues-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { AdminVenue } from '#shared/utils/venues'
 
-definePageMeta({ layout: 'console', title: 'Venues', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Venues', middleware: 'console', docs: '/docs/box-office/venues' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

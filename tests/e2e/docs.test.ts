@@ -7,7 +7,7 @@ import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // J-109: the docs are reachable signed in with no standing permission, and reporting drift
-// reaches the IT Manager. The collection and its frontmatter schema are Nuxt Content's own job.
+// reaches the IT Manager. The tree's own conventions are `bun run check docs`'s job (0076).
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -51,6 +51,27 @@ describe.skipIf(skip !== null)('operator documentation is reachable with no stan
 
   test('a page with no matching file 404s rather than rendering something blank', async () => {
     expect((await send('GET', '/docs/no-such-module', undefined, member.cookie)).status).toBe(404)
+  })
+
+  test('a page inside a section answers, and a threshold on it quotes the live value', async () => {
+    const answered = await send('GET', '/docs/box-office/the-desk', undefined, member.cookie)
+    expect(answered.status).toBe(200)
+    expect(await answered.text()).toContain('data-test="policy-value"')
+  })
+})
+
+describe.skipIf(skip !== null)('the docs collection is not readable anonymously (0076)', () => {
+  test('the dump and the query route refuse a visitor with no session', async () => {
+    expect((await request(app, 'GET', '/__nuxt_content/docs/sql_dump.txt', undefined, undefined)).status).toBe(401)
+    expect((await request(app, 'POST', '/__nuxt_content/docs/query', {}, undefined)).status).toBe(401)
+  })
+
+  test('the dump answers a signed-in member, so client-side navigation still works', async () => {
+    expect((await send('GET', '/__nuxt_content/docs/sql_dump.txt', undefined, member.cookie)).status).toBe(200)
+  })
+
+  test('the public collection is untouched', async () => {
+    expect((await request(app, 'GET', '/__nuxt_content/content/sql_dump.txt', undefined, undefined)).status).toBe(200)
   })
 })
 

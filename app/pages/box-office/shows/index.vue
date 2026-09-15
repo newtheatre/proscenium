@@ -8,7 +8,7 @@ import type { TableColumn } from '@nuxt/ui'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { AdminShow, ShowsStandingCounts } from '#shared/utils/programme'
 
-definePageMeta({ layout: 'console', title: 'Shows', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Shows', middleware: 'console', docs: '/docs/box-office/shows-and-performances' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

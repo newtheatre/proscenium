@@ -4,7 +4,7 @@ import type { AuthFormField, ButtonProps, FormSubmitEvent } from '@nuxt/ui'
 
 // Somebody already signed in has nothing to do here, and typing a second set of details would
 // make a second account by mistake (issue 925).
-definePageMeta({ middleware: 'signed-out' })
+definePageMeta({ middleware: 'signed-out', docs: '/docs/getting-started/signing-in' })
 
 const route = useRoute()
 const { refresh } = useAccount()

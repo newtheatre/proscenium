@@ -16,7 +16,7 @@ const STATUS_PILL_LABELS: Record<DeskStatusFilter, string> = {
   DOOR: 'Door',
 }
 
-definePageMeta({ layout: 'console', title: 'Desk', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Desk', middleware: 'console', docs: '/docs/box-office/the-desk' })
 
 interface DeskPerformance {
   id: string

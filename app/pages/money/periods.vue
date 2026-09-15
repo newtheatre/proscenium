@@ -5,7 +5,7 @@ import { formatLondon } from '#shared/utils/london'
 import type { TableColumn } from '@nuxt/ui'
 import type { BlockingConditions, PeriodLock } from '#shared/utils/period-locks'
 
-definePageMeta({ layout: 'console', title: 'Periods', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Periods', middleware: 'console', docs: '/docs/money/periods' })
 
 const columns: TableColumn<PeriodLock>[] = [
   { id: 'range', header: 'Range' },

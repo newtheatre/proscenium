@@ -8,7 +8,7 @@ import type { ManualEntryForm } from '#shared/utils/admin-forms'
 import type { AuditActionName } from '#shared/utils/audit-actions'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Audit trail', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Audit trail', middleware: 'console', docs: '/docs/system/audit-trail' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

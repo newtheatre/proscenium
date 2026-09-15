@@ -53,8 +53,8 @@ not be a refusal at a desk (0031).
 
 | Route | Ability | Membership requirement | Sent to |
 | --- | --- | --- | --- |
-| `/docs` | `signedIn` | None. | n/a |
-| `/docs/[...slug]` | `signedIn` | None. | n/a |
+| `/docs` | `signedIn` | None. Served by the catch-all from `content/docs/index.md`. | n/a |
+| `/docs/[...slug]` | `signedIn` | None. Every page in the tree; the collection's own query and dump routes carry the same gate (0076). | n/a |
 
 ## Reached without an account
 

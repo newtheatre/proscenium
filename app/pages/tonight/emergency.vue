@@ -3,7 +3,7 @@ import { formatLondon } from '#shared/utils/london'
 import { nightCacheKey } from '#shared/utils/night-cache'
 import { currentShowNight } from '#shared/utils/show-night'
 
-definePageMeta({ layout: 'tonight' })
+definePageMeta({ layout: 'tonight', docs: '/docs/show-night/emergency-card' })
 useSeoMeta({ title: 'Emergency card' })
 
 interface Card {

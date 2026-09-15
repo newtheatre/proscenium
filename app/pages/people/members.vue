@@ -11,7 +11,7 @@ import type { ClaimDeclineInput } from '#shared/utils/membership-claims'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Members', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Members', middleware: 'console', docs: '/docs/people/members' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

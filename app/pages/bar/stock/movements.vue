@@ -6,7 +6,7 @@ import type { FilterOption } from '#shared/utils/list-filters'
 import type { MovementReason, StockItem, StockMovement } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Stock movements', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Stock movements', middleware: 'console', docs: '/docs/bar/movements' })
 
 const UBadge = resolveComponent('UBadge')
 

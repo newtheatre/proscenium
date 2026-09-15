@@ -2,7 +2,7 @@
 import { formatLondon, startOfLondonDay } from '#shared/utils/london'
 import type { MySummary } from '#shared/utils/my-summary'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
 
 const request = useRequestFetch()
 const { account } = useAccount()

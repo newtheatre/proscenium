@@ -2,7 +2,7 @@
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import type { CatalogueModule } from '~/components/training/CatalogueTable.vue'
 
-definePageMeta({ layout: 'console', title: 'Training catalogue', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Training catalogue', middleware: 'console', docs: '/docs/training/catalogue' })
 
 interface Department { code: string, name: string }
 interface Listing { items: CatalogueModule[], total: number, pageSize: number, pages: number }

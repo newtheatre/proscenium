@@ -5,7 +5,7 @@ import { sendLogList } from '#shared/utils/send-log-list'
 import type { DailyCount, SendLogRow } from '#shared/utils/notification-log'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Send log', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Send log', middleware: 'console', docs: '/docs/communications/send-log' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

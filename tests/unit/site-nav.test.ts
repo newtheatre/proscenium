@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 import { ABILITY_PERMISSIONS } from '#shared/utils/abilities'
+import { contentPathOf } from '#shared/utils/docs-paths'
 import { PERMISSIONS } from '#shared/utils/roles'
 import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor } from '#shared/utils/site-nav'
 
@@ -33,12 +34,12 @@ async function pages(): Promise<{ path: string, source: string }[]> {
 const consolePages = async (): Promise<string[]> =>
   (await pages()).filter(page => page.source.includes('layout: \'console\'')).map(page => page.path)
 
-// A route with no page file of its own may still resolve through the site-wide content catch-all
-// (`app/pages/[...slug].vue`, D-103), provided a markdown page exists for it at that path.
+// A route with no page file of its own may still resolve through a content catch-all (D-103,
+// 0076), provided a markdown page exists at that path by Nuxt Content's own rules.
 async function contentRoutes(): Promise<Set<string>> {
   const found = new Set<string>()
   for (const entry of new Bun.Glob('**/*.md').scanSync({ cwd: 'content', onlyFiles: true })) {
-    found.add(`/${entry.replace(/\.md$/, '')}`)
+    found.add(contentPathOf(entry))
   }
   return found
 }

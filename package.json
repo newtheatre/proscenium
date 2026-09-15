@@ -15,6 +15,7 @@
     "seed": "bun scripts/seed.ts",
     "grant-admin": "bun scripts/grant-admin.ts",
     "shots": "bun scripts/shots.ts",
+    "docs:shots": "bun scripts/docs-shots.ts",
     "migration:export": "./migration/export.sh",
     "migration:review-roles": "bun migration/review-roles.ts",
     "migration:copy-posters": "bun migration/copy-posters.ts",

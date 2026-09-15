@@ -3,7 +3,7 @@ import { saysMoney } from '#shared/utils/bar'
 import { currentSeasonYear } from '#shared/utils/season'
 import type { RevenueByShowReport } from '#shared/utils/revenue-by-show'
 
-definePageMeta({ layout: 'console', title: 'Revenue by show', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Revenue by show', middleware: 'console', docs: '/docs/money/revenue-by-show' })
 
 const request = useRequestFetch()
 

@@ -6,7 +6,7 @@ import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import type { Phase, SystemCheck } from '#shared/utils/checklist'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Checklists', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Checklists', middleware: 'console', docs: '/docs/rota/checklists' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

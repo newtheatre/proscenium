@@ -13,7 +13,7 @@ import { ticketTypesList } from '#shared/utils/ticket-types-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { TicketType, TicketTypeAccessKind, TicketTypeRestriction } from '#shared/utils/ticket-types'
 
-definePageMeta({ layout: 'console', title: 'Ticket types', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Ticket types', middleware: 'console', docs: '/docs/box-office/ticket-types' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

@@ -616,29 +616,62 @@ status it gains, and a cascading dependent on a table `check:migrations` already
 exactly what that check refuses. `daily:sweeps` prunes an entry whose log row is gone instead,
 by `NOT EXISTS`, capped and scoped like every other sweep (0061).
 
-## Operator documentation (J-109)
+## Operator documentation (J-109, 0076)
 
-One page per module under `content/docs/`, a second Nuxt Content collection (`content.config.ts`)
-alongside the public one D-103 built, excluded from its glob so operator documentation is never
-reachable through the public catch-all. `/docs` lists every page; `/docs/[...slug]` renders one,
-gated on nothing but a session (`signed-in` middleware), so an operational-only shift with no
-standing permission can still read the page for the screen in front of them (criterion 1). Both
-routes sit in `SHELL_NAV` alongside Tonight and Manage.
+A wiki under `content/docs/`, one page per screen or task, a second Nuxt Content collection
+(`content.config.ts`) alongside the public one D-103 built and excluded from its glob, so operator
+documentation is never reachable through the public catch-all. The tree is numbered folders, one
+per section (`04.box-office/`), each with a `.navigation.yml` naming it and an `index.md` overview,
+and pages `<n>.<slug>.md` inside; Nuxt Content's own rules give the URL, dropping the ordering
+prefix and the index file (`/docs/box-office/the-desk`). `shared/utils/docs-paths.ts` holds that
+rule once, for the tests and the check. Every page carries `title`, `description`, `module`,
+`updatedOn` and `updatedBy`.
+
+`app/layouts/docs.vue` is the reading surface: the member shell's header with a search button,
+`UPage` with the collection's navigation tree in a `UPageAside`, and `UContentSearch` loaded in
+the browser. `app/pages/docs/[...slug].vue` renders every page, the index included, inside it:
+`UPageHeader` with the section as its headline and the "Report as out of date" action, the
+provenance line, the body through the same policy-token resolver the public policy pages use
+(`/api/policies/values` looks in the docs collection for a `/docs` path, behind a session), previous
+and next links, and a table of contents from three headings up. Both routes are gated on nothing
+but a session (`signed-in` middleware), so an operational-only shift with no standing permission can
+still read the page for the screen in front of them (criterion 1).
+
+**A screen names its page.** `definePageMeta({ docs: '/docs/box-office/the-desk' })`, typed by
+`shared/types/page-meta.d.ts`, and `DocsLink.vue` renders the help link in the console navbar, the
+member header and the show-night top bar. `tests/unit/docs-links.test.ts` fails a console, member
+or show-night screen that names no page, and a page named that does not exist.
+
+**Pictures are captured and committed.** `bun run docs:shots` (`scripts/docs-shots.ts`) drives a
+seeded dev server as the persona each screen needs, enrolling its authenticator through the real
+routes on first use, draws numbered badges over the elements the page's legend names, and writes
+PNGs under `public/images/docs/<section>/`. The manifest is one file per section under
+`scripts/docs-shots/`. Nothing gates on it and CI never runs it (0032). `bun run check docs`
+(`scripts/check-docs.ts`) refuses a page missing its provenance, a picture nothing shows or that is
+not there, a link to no page, a section with no navigation entry, and two files resolving to one URL.
+
+**The collection is not readable anonymously.** Nuxt Content serves `/__nuxt_content/docs/query`
+and `/__nuxt_content/docs/sql_dump.txt` with no authentication of its own, and the Cloudflare
+preset also emits the dump as the static asset `/dump.docs.sql`, which Workers Assets would serve
+before the worker runs. `server/middleware/docs-content.ts` requires a session on all three paths,
+and `nuxt.config.ts` sets `assets.run_worker_first` for them; `tests/unit/docs-content-gate.test.ts`
+reads the built `wrangler.json` to prove the rule survived the build. The public collection is
+untouched. First client-side navigation inside `/docs` loads Nuxt Content's WASM SQLite and the
+docs dump, prose only; if that grows too heavy for a phone, server routes behind `requireAccount`
+replace the client database without touching a page.
 
 **The in-app editor criterion 2 asks for does not exist,** the same interim state 0051 left the
-public pages in: a page is edited by editing the file and merging, and `updatedOn`/`updatedBy`
-frontmatter is set by whoever makes that edit rather than stamped by a system that does not exist
-yet (criterion 3's display half). What criterion 3 asks of an in-app edit, being audited, has
-nothing to audit until that editor is built; `docs/known-issues.md` names this rather than the
-route pretending to satisfy it.
+public pages in: a page is edited by editing the file and merging, and `updatedOn`/`updatedBy` is
+set by whoever makes that edit rather than stamped by a system that does not exist yet. What
+criterion 3 asks of an in-app edit, being audited, has nothing to audit until that editor is built;
+`docs/known-issues.md` names this rather than the route pretending to satisfy it.
 
-**Reporting drift is real.** Every page carries a "Report this page as out of date" action,
-`POST /api/docs/report-drift` (`server/api/docs/report-drift.post.ts`): a `docs.drift-reported`
-audit entry naming the page, and a transactional notification to every live `ADMIN`
-(`liveAdmins()`, the same audience `health:watch` already reaches) through the same `notify()`
-every other message goes through. There is no open-items list yet, the way safety's incidents or
-health's own alerting have one; today "visible to the IT Manager" means an immediate notification
-and a permanent line in the trail, not a triaged, closeable queue (criterion 4, `known-issues.md`).
+**Reporting drift is real.** Every page carries the action, `POST /api/docs/report-drift`
+(`server/api/docs/report-drift.post.ts`): a `docs.drift-reported` audit entry naming the page, and
+a transactional notification to every live `ADMIN` (`liveAdmins()`, the same audience
+`health:watch` already reaches) through the same `notify()` every other message goes through. There
+is no open-items list yet; today "visible to the IT Manager" means an immediate notification and a
+permanent line in the trail, not a triaged, closeable queue (criterion 4, `known-issues.md`).
 
 ## Settings, and a wide-blast-radius save (J-104, J-105)
 

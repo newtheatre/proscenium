@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'console', title: 'Age-check register', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Age-check register', middleware: 'console', docs: '/docs/rota/age-check-register' })
 
 const today = new Date().toISOString().slice(0, 10)
 const from = ref(today)

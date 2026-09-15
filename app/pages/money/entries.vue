@@ -8,7 +8,7 @@ import type { TableColumn } from '@nuxt/ui'
 import type { EntrySource, Tender } from '#shared/utils/ledger'
 import type { Page } from '#shared/utils/pagination'
 
-definePageMeta({ layout: 'console', title: 'Ledger entries', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Ledger entries', middleware: 'console', docs: '/docs/money/ledger-entries' })
 
 interface LedgerEntry { id: string, happenedAt: number, source: EntrySource, tender: Tender, totalPence: number }
 

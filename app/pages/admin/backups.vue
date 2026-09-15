@@ -4,7 +4,7 @@ import { restoreDrillForm } from '#shared/utils/backup'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { RestoreDrillForm } from '#shared/utils/backup'
 
-definePageMeta({ layout: 'console', title: 'Backups', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Backups', middleware: 'console', docs: '/docs/system/backups-and-restore' })
 
 interface Status {
   lastDrillAt: string | null

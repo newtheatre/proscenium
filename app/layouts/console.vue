@@ -76,6 +76,9 @@ const items = computed<NavigationMenuItem[][]>(() => {
           <template #leading>
             <UDashboardSidebarCollapse />
           </template>
+          <template #right>
+            <DocsLink />
+          </template>
         </UDashboardNavbar>
       </template>
       <template #body>

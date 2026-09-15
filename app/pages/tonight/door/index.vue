@@ -4,7 +4,7 @@ import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { DoorVerdict } from '#shared/utils/door'
 import type { ScannerFailure } from '~/composables/useQrScanner'
 
-definePageMeta({ layout: 'tonight' })
+definePageMeta({ layout: 'tonight', docs: '/docs/show-night/the-door' })
 useSeoMeta({ title: 'Door' })
 
 interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }

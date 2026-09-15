@@ -2,7 +2,7 @@
 import { saysMoney, saysQuantity } from '#shared/utils/bar'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
 
-definePageMeta({ layout: 'console', title: 'Stocktake', middleware: 'console' })
+definePageMeta({ layout: 'console', title: 'Stocktake', middleware: 'console', docs: '/docs/bar/stocktakes' })
 
 const route = useRoute()
 const id = route.params.id as string
