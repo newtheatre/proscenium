@@ -319,6 +319,33 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     expect(forged.status).toBe(401)
   })
 
+  // The stuck clock runs from the answer, not from the hand-off (criterion 5). A basket keyed in
+  // at seven o'clock and answered at nine is not stuck the moment the answer lands.
+  test('a completion answered a moment ago survives the sweep, however old the hand-off', async () => {
+    const { venueId, performanceId } = programme('sumup-stuck-clock')
+    if (!await sumupOn(venueId)) return
+    const ticketTypeId = await aTicketType()
+    const booking = await pendingBooking(performanceId, ticketTypeId)
+    await openTill(venueId)
+
+    const started = await (await send('POST', '/api/till/payments', { venueId, lines: [], tickets: [{ reservationId: booking.id }], expectedTotalPence: 900 }, barManager.cookie)).json() as AttemptAnswer
+
+    const now = Math.floor(Date.now() / 1000)
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('UPDATE sumup_attempts SET status = ?, created_at = ?, callback_at = ? WHERE id = ?')
+        .run('COMPLETING', now - 3 * 60 * 60, now, started.id)
+    }
+    finally {
+      database.close()
+    }
+
+    const swept = await fetch(`${app.baseURL}/_nitro/tasks/payments:sweep`, { method: 'POST' })
+    expect(swept.status).toBe(200)
+
+    expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', started.id)!.status).toBe('COMPLETING')
+  })
+
   test('a failure restores nothing but the basket; a booking collected meanwhile makes a mismatch; the close waits for an open attempt', async () => {
     const { venueId, performanceId } = programme('sumup-outcomes')
     if (!await sumupOn(venueId)) return

@@ -1503,6 +1503,17 @@ moves until a row reaches `SUCCEEDED`; every transition is a conditional `UPDATE
 could not record, for a person to resolve, and does not. Indexes on (`night`, `status`) and
 `till_session_id`.
 
+Two rules narrow the window in which one answer could post two sales. The stuck-completion clock
+runs from `callback_at`, the answer that began the recording, falling back to `created_at`, so a
+basket handed over at seven and answered at nine is measured from nine rather than being eligible
+for the sweep the moment it is claimed. And once a commit has posted, its entry is recorded on the
+row whatever the sweep did meanwhile, taking it to `SUCCEEDED`, while a claim into `COMPLETING`
+requires `entry_id IS NULL`: a row that already names an entry can never be replayed into a second
+one. What remains is the gap between the sale's own batch and that recording. A worker that dies
+inside it leaves a posted sale on a row that does not name it, and the next answer commits the
+basket again. Closing that needs the attempt's `entry_id` to ride the sale's own batch, alongside
+`ledger_entries.till_session_id` (F-105 criterion 1, F-202), which is where it will land.
+
 ### stock_movements  APPEND-ONLY
 `id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own
 counting unit · `kind` CHECK `DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJUST|REVERSAL` ·
