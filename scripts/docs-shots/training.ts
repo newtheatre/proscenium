@@ -147,13 +147,12 @@ export const training: Shot[] = [
     url: '/training/manage/sessions',
     marker: '[data-test="sessions-table"]',
     width: PHONE_WIDTH,
+    // The seed's only register that can be opened today is the delivered one, already marked and
+    // past its window, so the picture shows the settled state rather than the marking list.
     after: deliveredRegister,
     annotations: [
-      { selector: '[data-test="register-list"]', label: 'The register' },
-      { selector: '[data-test^="mark-"]', label: 'Tap to mark present' },
-      { selector: '[data-test="add-someone"]', label: 'Add someone' },
-      { selector: '[data-test="absentee-warning"]', label: 'Absentees' },
-      { selector: '[data-test="submit-register"]', label: 'Submit' },
+      { selector: '[data-test="already-marked"]', label: 'The register has been marked' },
+      { selector: '[data-test="settled-register"]', label: 'Settled' },
     ],
   },
 ]
