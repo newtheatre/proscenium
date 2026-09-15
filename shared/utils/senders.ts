@@ -25,8 +25,8 @@ export const SENDER_ADDRESSES: string[] = Object.values(SENDERS).map(sender => s
 
 export type NotificationTopic = 'BOOKINGS' | 'SHIFTS' | 'TRAINING' | 'ROOMS' | 'ANNOUNCEMENTS'
 
-// Rota mail has no identity of its own yet and speaks as the theatre; H-101's message
-// catalogue assigns senders properly (0020).
+// Rota mail has no identity of its own and speaks as the theatre. A transactional type carries
+// no topic, so the catalogue names its sender outright rather than falling here (0020, H-101).
 const TOPIC_SENDERS: Record<NotificationTopic, SenderKey> = {
   BOOKINGS: 'BOX_OFFICE',
   SHIFTS: 'ANNOUNCEMENTS',
