@@ -15,10 +15,23 @@ export const bar: Shot[] = [
     marker: '[data-test="bar-products-table"]',
     width: CONSOLE_WIDTH,
     annotations: [
+      { selector: '[data-test="set-up-product"]', label: 'Set up a product' },
       { selector: '[data-test="add-product"]', label: 'Add a product' },
       { selector: '[data-test^="sizes-"]', label: 'Serving sizes' },
       { selector: '[data-test^="edit-"]', label: 'Edit' },
       { selector: '[data-test^="retire-"]', label: 'Retire' },
+    ],
+  },
+  {
+    name: 'bar/product-setup',
+    persona,
+    url: '/bar/products/new',
+    marker: '[data-test="shape-cards"]',
+    width: CONSOLE_WIDTH,
+    annotations: [
+      { selector: '[data-test="shape-simple"]', label: 'Sold as itself' },
+      { selector: '[data-test="shape-measured"]', label: 'Sold by measure' },
+      { selector: '[data-test="shape-recipe"]', label: 'Made from several things' },
     ],
   },
   {

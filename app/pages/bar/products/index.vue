@@ -312,6 +312,16 @@ const columns: TableColumn<BarProduct>[] = [
       <template #actions>
         <UButton
           :disabled="categoryOptions.length === 0"
+          data-test="set-up-product"
+          icon="i-lucide-wand-sparkles"
+          to="/bar/products/new"
+        >
+          Set up a product
+        </UButton>
+        <UButton
+          :disabled="categoryOptions.length === 0"
+          color="neutral"
+          variant="subtle"
           data-test="add-product"
           icon="i-lucide-plus"
           @click="edit(null)"
