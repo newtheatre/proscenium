@@ -724,7 +724,7 @@ describe.skipIf(skip !== null)('who may administer the bar (F-111 criterion 5)',
   })
 })
 
-describe.skipIf(skip !== null)('a bar refusal held to a missing second factor names the way out (0040, review-ui finding 9)', () => {
+describe.skipIf(skip !== null)('a bar refusal held to a missing second factor names the way out (0040)', () => {
   function override(key: string, value: unknown): void {
     const database = new Database(app.databaseFile)
     try {

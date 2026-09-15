@@ -1,6 +1,11 @@
 <script setup lang="ts">
+import { h, resolveComponent } from 'vue'
 import { saysMoney, saysQuantity } from '#shared/utils/bar'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
+import type { TableColumn } from '@nuxt/ui'
+
+const UBadge = resolveComponent('UBadge')
+const UInputNumber = resolveComponent('UInputNumber')
 
 definePageMeta({ layout: 'console', title: 'Stocktake', middleware: 'console', docs: '/docs/bar/stocktakes' })
 
@@ -133,6 +138,73 @@ function focusNext(itemId: string): void {
   if (!next) return
   document.querySelector<HTMLInputElement>(`[data-test="counted-${next.itemId}"]`)?.focus()
 }
+
+const columns: TableColumn<StocktakeLine>[] = [
+  { id: 'item', header: 'Stocked item', cell: ({ row }) => row.original.itemName },
+  {
+    id: 'expected',
+    header: 'Expected',
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => saysQuantity(row.original.expectedQty, row.original.unit),
+  },
+  {
+    id: 'counted',
+    header: 'Counted',
+    cell: ({ row }) => {
+      const line = row.original
+      if (!open.value) {
+        return line.countedQty === null ? 'Uncounted' : saysQuantity(line.countedQty, line.unit)
+      }
+      return h('div', { class: 'flex items-center gap-2' }, [
+        h(UInputNumber, {
+          'modelValue': drafts.value[line.itemId],
+          'onUpdate:modelValue': (value: number | undefined) => {
+            drafts.value[line.itemId] = value
+          },
+          'min': 0,
+          'increment': false,
+          'decrement': false,
+          'placeholder': 'Uncounted',
+          'inputmode': 'numeric',
+          'class': 'w-full',
+          'aria-label': `Counted, ${line.itemName}`,
+          'data-test': `counted-${line.itemId}`,
+          'onKeydown': (event: KeyboardEvent) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            focusNext(line.itemId)
+          },
+        }),
+        drafts.value[line.itemId] === undefined
+          ? h(UBadge, {
+              'color': 'neutral',
+              'variant': 'subtle',
+              'size': 'sm',
+              'data-test': `uncounted-badge-${line.itemId}`,
+            }, () => 'Uncounted')
+          : null,
+      ])
+    },
+  },
+  {
+    id: 'variance',
+    header: 'Variance',
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => {
+      const line = row.original
+      const text = open.value
+        ? (variance(line) === null ? '' : saysQuantity(variance(line)!, line.unit))
+        : (line.variance === null ? '' : saysQuantity(line.variance, line.unit))
+      return h('span', { 'data-test': `variance-${line.itemId}` }, text)
+    },
+  },
+  {
+    id: 'atCost',
+    header: 'At cost',
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => (row.original.varianceCostPence === null ? '' : saysMoney(row.original.varianceCostPence)),
+  },
+]
 </script>
 
 <template>
@@ -208,89 +280,19 @@ function focusNext(itemId: string): void {
         label="Only uncounted"
       />
 
-      <table
-        class="w-full text-sm"
+      <UTable
+        :data="visibleLines"
+        :columns="columns"
         data-test="stocktake-lines"
       >
-        <thead>
-          <tr class="border-b text-left text-muted">
-            <th class="py-2">
-              Stocked item
-            </th>
-            <th class="py-2">
-              Expected
-            </th>
-            <th class="py-2">
-              Counted
-            </th>
-            <th class="py-2">
-              Variance
-            </th>
-            <th class="py-2">
-              At cost
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="line in visibleLines"
-            :key="line.id"
-            class="border-b last:border-0"
-          >
-            <td class="py-2">
-              {{ line.itemName }}
-            </td>
-            <td class="py-2">
-              {{ saysQuantity(line.expectedQty, line.unit) }}
-            </td>
-            <td class="py-2">
-              <div
-                v-if="open"
-                class="flex items-center gap-2"
-              >
-                <UInputNumber
-                  v-model="drafts[line.itemId]"
-                  :min="0"
-                  :increment="false"
-                  :decrement="false"
-                  placeholder="Uncounted"
-                  inputmode="numeric"
-                  class="w-full"
-                  :aria-label="`Counted, ${line.itemName}`"
-                  :data-test="`counted-${line.itemId}`"
-                  @keydown.enter.prevent="focusNext(line.itemId)"
-                />
-                <UBadge
-                  v-if="drafts[line.itemId] === undefined"
-                  color="neutral"
-                  variant="subtle"
-                  size="sm"
-                  :data-test="`uncounted-badge-${line.itemId}`"
-                >
-                  Uncounted
-                </UBadge>
-              </div>
-              <span v-else>
-                {{ line.countedQty === null ? 'Uncounted' : saysQuantity(line.countedQty, line.unit) }}
-              </span>
-            </td>
-            <td
-              class="py-2"
-              :data-test="`variance-${line.itemId}`"
-            >
-              <template v-if="open">
-                {{ variance(line) === null ? '' : saysQuantity(variance(line)!, line.unit) }}
-              </template>
-              <template v-else>
-                {{ line.variance === null ? '' : saysQuantity(line.variance, line.unit) }}
-              </template>
-            </td>
-            <td class="py-2">
-              {{ line.varianceCostPence === null ? '' : saysMoney(line.varianceCostPence) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            <!-- "Nothing to count" would read as an empty stocktake when the filter, not the
+            stocktake, is why the table is empty (F-115 criterion 2). -->
+            {{ uncountedOnly ? 'Everything is counted.' : 'Nothing to count.' }}
+          </p>
+        </template>
+      </UTable>
     </template>
     <p
       v-else-if="status === 'pending'"

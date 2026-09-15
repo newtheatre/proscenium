@@ -659,7 +659,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     view.close()
   }, 120_000)
 
-  test('the recipe editor shows an attached choice group and round-trips it (review-ui finding 2)', async () => {
+  test('the recipe editor shows an attached choice group and round-trips it (F-113)', async () => {
     const productId = await aProduct()
     const mixerId = await anItem({ name: named('Screen tonic') })
     const variantId = await addVariant(productId, { label: 'Gin and tonic' })

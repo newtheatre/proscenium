@@ -61,7 +61,7 @@ async function save(): Promise<void> {
     await refresh()
   }
   catch (refused) {
-    // Verbatim: the cap and both figures are the route's own words, not softened here (review-ui.md finding 5).
+    // Verbatim: the cap and both figures are the route's own words, not softened here (issue 1051).
     failure.value = refusalText(refused)
   }
   finally {

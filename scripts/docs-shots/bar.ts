@@ -119,7 +119,7 @@ export const bar: Shot[] = [
     annotations: [
       { selector: '[data-test="uncounted-count"]', label: 'Not yet counted' },
       { selector: '[data-test="stocktake-lines"]', label: 'The lines' },
-      { selector: '[data-test^="variance-"]', label: 'Variance' },
+      { selector: '[data-test^="variance-"]:not(:empty)', label: 'Variance' },
     ],
   },
   {

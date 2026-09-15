@@ -358,6 +358,27 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
     view.close()
     await apply(opened.stocktake.id)
   }, 120_000)
+
+  test('filtering to only uncounted once every line is counted reads as done, not empty', async () => {
+    const item = await anItem()
+    await deliver(item.id, 10)
+    const opened = await open()
+    await count(opened.stocktake.id, [{ itemId: item.id, counted: 10 }])
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+    await click(view, '[data-test="uncounted-only-filter"]')
+    await waitFor(view, `document.querySelector('[data-test="stocktake-lines"]').textContent.includes('Everything is counted')`)
+
+    view.close()
+    await apply(opened.stocktake.id)
+  }, 120_000)
 })
 
 describe.skipIf(skip !== null)('the suggested order list compares live on-hand to par (F-120)', () => {
@@ -404,4 +425,29 @@ describe.skipIf(skip !== null)('the suggested order list compares live on-hand t
   test('an ordinary member may not read the order list', async () => {
     expect((await send('GET', '/api/admin/bar/order-list', undefined, member.cookie)).status).toBe(403)
   })
+
+  // 0032, K-101: a bare table with no scope="col" and no right-aligned numbers.
+  test('the screen shows shortfalls in a scoped, right-aligned table', async () => {
+    const category = named('Screen spirits')
+    const item = await anItem({ category })
+    await send('PUT', `/api/admin/bar/items/${item.id}`, { name: item.name, unit: item.unit, parQty: 20, category })
+    await deliver(item.id, 5)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock/order-list`, '[data-test="order-list-group"]')
+    // Scoped to this test's own group: other tests in this shared app leave permanent
+    // shortfalls behind, so more than one group renders on the page.
+    const ownGroup = `[...document.querySelectorAll('[data-test="order-list-group"]')].find(el => el.textContent.includes(${JSON.stringify(category)}))`
+    await waitFor(view, `!!(${ownGroup})`)
+    expect(await view.evaluate<string>(`(${ownGroup}).textContent`)).toContain(item.name)
+    expect(await view.evaluate<number>(`(${ownGroup}).querySelectorAll('th[scope="col"]').length`)).toBe(4)
+    expect(await view.evaluate<string>(`(${ownGroup}).querySelector('th:last-child').textContent`)).toBe('Shortfall')
+    view.close()
+  }, 120_000)
 })

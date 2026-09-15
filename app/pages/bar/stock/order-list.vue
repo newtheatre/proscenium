@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysQuantity } from '#shared/utils/bar'
 import type { OrderListRow, UnconfiguredRow } from '#shared/utils/ordering'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Order list', middleware: 'console', docs: '/docs/bar/order-list' })
 
@@ -27,6 +28,19 @@ const grouped = computed(() => {
   }
   return [...groups.values()].map(group => [group.label, group.rows] as const)
 })
+
+const columns: TableColumn<OrderListRow>[] = [
+  { id: 'name', header: 'Stocked item', cell: ({ row }) => row.original.name },
+  { id: 'onHand', header: 'On hand', meta: RIGHT_ALIGNED, cell: ({ row }) => saysQuantity(row.original.onHand, row.original.unit) },
+  { id: 'par', header: 'Par', meta: RIGHT_ALIGNED, cell: ({ row }) => saysQuantity(row.original.parQty, row.original.unit) },
+  {
+    id: 'shortfall',
+    header: 'Shortfall',
+    // The one figure a supplier order actually needs, weighted against On hand and Par beside it.
+    meta: { class: { td: 'text-right whitespace-nowrap font-medium' } },
+    cell: ({ row }) => saysQuantity(row.original.shortfall, row.original.unit),
+  },
+]
 </script>
 
 <template>
@@ -79,44 +93,19 @@ const grouped = computed(() => {
       <h3 class="font-semibold">
         {{ category }}
       </h3>
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b text-left text-muted">
-            <th class="py-2">
-              Stocked item
-            </th>
-            <th class="py-2">
-              On hand
-            </th>
-            <th class="py-2">
-              Par
-            </th>
-            <th class="py-2">
-              Shortfall
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="row in rows"
-            :key="row.id"
-            class="border-b last:border-0"
-          >
-            <td class="py-2">
-              {{ row.name }}
-            </td>
-            <td class="py-2">
-              {{ saysQuantity(row.onHand, row.unit) }}
-            </td>
-            <td class="py-2">
-              {{ saysQuantity(row.parQty, row.unit) }}
-            </td>
-            <td class="py-2 font-medium">
-              {{ saysQuantity(row.shortfall, row.unit) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <!-- Never reached: a group exists only because grouped (above) put a row in it. Said
+      anyway, so the convention every table states its empty case (0032) holds if that changes. -->
+      <UTable
+        :data="rows"
+        :columns="columns"
+        :loading="status === 'pending'"
+      >
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            Nothing here.
+          </p>
+        </template>
+      </UTable>
     </div>
 
     <div
