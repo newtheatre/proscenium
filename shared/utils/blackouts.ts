@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { overlaps } from './bookings'
+import { formatLondon } from './london'
 import type { Span } from './bookings'
 
 // A room shut for a reason everybody can read (C-114). The old app had no way to say a room was
@@ -27,6 +28,17 @@ export function blackoutOver(blackouts: Blackout[], roomId: string, span: Span):
 // mystery, which is the one deliberate exception to conflict masking (criterion 4, C-103).
 export function saysClosed(blackout: { reason: string }): string {
   return `The room is closed then: ${blackout.reason}`
+}
+
+const LONDON_DAY: Intl.DateTimeFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit' }
+
+// Both ends carry a date when they fall on different London days, so a five-day get-in stops
+// reading as nine hours (issue 1050).
+export function saysSpan(startsAt: Date, endsAt: Date): string {
+  const sameDay = formatLondon(startsAt, LONDON_DAY) === formatLondon(endsAt, LONDON_DAY)
+  const from = formatLondon(startsAt, { dateStyle: 'medium', timeStyle: 'short' })
+  const to = formatLondon(endsAt, sameDay ? { timeStyle: 'short' } : { dateStyle: 'medium', timeStyle: 'short' })
+  return `${from} to ${to}`
 }
 
 const instant = z.string().datetime()

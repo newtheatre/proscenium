@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
-import { BLACKOUT_REASON_LIMIT } from '#shared/utils/blackouts'
+import { BLACKOUT_REASON_LIMIT, saysSpan } from '#shared/utils/blackouts'
 import { blackoutsList } from '#shared/utils/blackouts-list'
-import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
+import { fromLondonWallClock } from '#shared/utils/london'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Closures', middleware: 'console', docs: '/docs/spaces/closures' })
@@ -39,8 +39,15 @@ const form = reactive({
   roomId: EVERY_ROOM,
   reason: '',
   day: '',
+  untilDay: '',
   from: '09:00',
   to: '18:00',
+})
+
+// A closure may run over days (C-114 criterion 1), so the day it ends on follows the day it
+// starts on until an officer moves it later.
+watch(() => form.day, (day) => {
+  if (!form.untilDay || form.untilDay < day) form.untilDay = day
 })
 
 // Search, filter and sort live in the URL (K-129).
@@ -67,7 +74,10 @@ function instantOf(day: string, clock: string): string {
   return fromLondonWallClock(year!, month!, date!, hour!, minute!).toISOString()
 }
 
-const ready = computed(() => Boolean(form.reason.trim() && form.day && form.to > form.from))
+const endsOn = computed(() => form.untilDay || form.day)
+const ready = computed(() => Boolean(
+  form.reason.trim() && form.day && endsOn.value >= form.day
+  && (endsOn.value > form.day || form.to > form.from)))
 
 async function close(): Promise<void> {
   working.value = true
@@ -79,7 +89,7 @@ async function close(): Promise<void> {
         roomId: form.roomId === EVERY_ROOM ? null : form.roomId,
         reason: form.reason,
         startsAt: instantOf(form.day, form.from),
-        endsAt: instantOf(form.day, form.to),
+        endsAt: instantOf(endsOn.value, form.to),
       },
     })
 
@@ -127,12 +137,6 @@ async function remove(): Promise<void> {
   }
 }
 
-function spanOf(closure: Closure): string {
-  const from = formatLondon(new Date(closure.startsAt * 1000), { dateStyle: 'medium', timeStyle: 'short' })
-  const to = formatLondon(new Date(closure.endsAt * 1000), { timeStyle: 'short' })
-  return `${from} to ${to}`
-}
-
 const columns: TableColumn<Closure>[] = [
   {
     id: 'room',
@@ -145,7 +149,7 @@ const columns: TableColumn<Closure>[] = [
     id: 'span',
     header: 'When',
     meta: { class: { td: 'whitespace-nowrap text-sm' } },
-    cell: ({ row }) => spanOf(row.original),
+    cell: ({ row }) => saysSpan(new Date(row.original.startsAt * 1000), new Date(row.original.endsAt * 1000)),
   },
   { accessorKey: 'reason', header: 'Why' },
   { accessorKey: 'by', header: 'Closed by', meta: { class: { td: 'text-sm text-muted' } } },
@@ -270,15 +274,28 @@ onMounted(loadRooms)
             />
           </UFormField>
 
-          <UFormField
-            label="Day"
-            required
-          >
-            <DateField
-              v-model="form.day"
-              data-test="close-day"
-            />
-          </UFormField>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <UFormField
+              label="Day"
+              required
+            >
+              <DateField
+                v-model="form.day"
+                data-test="close-day"
+              />
+            </UFormField>
+            <UFormField
+              label="Until day"
+              required
+              help="The same day for one afternoon, a later one for a get-in."
+            >
+              <DateField
+                v-model="form.untilDay"
+                :min="form.day || undefined"
+                data-test="close-until-day"
+              />
+            </UFormField>
+          </div>
 
           <div class="grid gap-4 sm:grid-cols-2">
             <UFormField
@@ -330,7 +347,7 @@ onMounted(loadRooms)
     <UModal
       :open="removing !== null"
       title="Reopen this room?"
-      :description="removing ? `${removing.room ?? 'Every room'}, ${spanOf(removing)}` : ''"
+      :description="removing ? `${removing.room ?? 'Every room'}, ${saysSpan(new Date(removing.startsAt * 1000), new Date(removing.endsAt * 1000))}` : ''"
       @update:open="removing = null"
     >
       <template #body>

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { saysSpan } from '#shared/utils/blackouts'
 import {
   WEEKDAYS,
   closedOn,
@@ -104,5 +105,29 @@ describe('capacity warns and does not refuse', () => {
 
   test('a booking that names no attendee count is not a breach', () => {
     expect(overCapacity(20, null)).toBeNull()
+  })
+})
+
+// C-114 criterion 1: a closure is a span, and a span over days has to read as one (issue 1050).
+describe('a closure reads back as the span it is', () => {
+  const at = (iso: string): Date => new Date(iso)
+
+  test('one afternoon names its day once', () => {
+    const said = saysSpan(at('2026-09-15T08:00:00Z'), at('2026-09-15T17:00:00Z'))
+    expect(said.match(/2026/g)).toHaveLength(1)
+    expect(said).toContain('09:00 to 18:00')
+  })
+
+  test('a five-day get-in names the day it ends on too', () => {
+    const said = saysSpan(at('2026-09-15T08:00:00Z'), at('2026-09-19T17:00:00Z'))
+    expect(said).toContain('15 Sept 2026, 09:00')
+    expect(said).toContain('19 Sept 2026, 18:00')
+  })
+
+  // The London day is what changes here, not a whole calendar date typed by anybody (0014).
+  test('a closure running past London midnight names both days', () => {
+    const said = saysSpan(at('2026-09-15T21:00:00Z'), at('2026-09-15T23:30:00Z'))
+    expect(said).toContain('15 Sept 2026, 22:00')
+    expect(said).toContain('16 Sept 2026, 00:30')
   })
 })

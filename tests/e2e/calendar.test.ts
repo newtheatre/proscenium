@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, readTime, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, openView, readTime, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -71,6 +71,27 @@ function placeBooking(roomId: string, userId: string, startsAt: Date, hours: num
     crypto.randomUUID().replaceAll('-', ''), roomId, userId,
     over.title ?? 'Rehearsal', start, start + hours * 3600, over.status ?? 'CONFIRMED',
   )
+}
+
+const PHONE = { width: 390, height: 844 }
+
+// A booking inside the week the calendar opens on, whatever day the suite runs.
+function todayAt(hour: number): Date {
+  const when = new Date()
+  when.setUTCHours(hour, 0, 0, 0)
+  return when
+}
+
+// One browser backs every view, so a signed-in session has to be ended before another begins.
+async function signInOn(view: Bun.WebView, email: string, password: string): Promise<void> {
+  await view.navigate(`${app.baseURL}/`)
+  await waitFor(view, 'document.body')
+  await view.evaluate(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', email)
+  await fill(view, 'form input[type="password"]', password)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 }
 
 interface Availability {
@@ -236,6 +257,55 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       expect(free).toBeGreaterThan(0)
     }
     finally {
+      view.close()
+    }
+  }, 120_000)
+
+  // Issue 1048: a phone flips to the day view after hydration, which moves the data key. The day
+  // it moves to has to be asked for rather than read back as an empty success.
+  test('a phone shows the day it flipped to, with slots on it', async () => {
+    const password = generatePassword()
+    const planner = await registerMember(app, 'phone-planner', password)
+    giveMembership(planner.id)
+    await makeRoom()
+
+    const view = await openView(PHONE)
+    try {
+      await signInOn(view, planner.email, password)
+
+      await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="slot-"]').length > 0`, 30_000)
+
+      // The day view is the only one a phone offers, so there is no Day button to press first.
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="calendar-day"]'))`)).toBe(false)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="calendar-empty"]'))`)).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  // Issue 1048, the class #898 closed for the console lists: a refusal is not an empty estate.
+  test('a refused sweep says so rather than claiming no rooms exist', async () => {
+    const password = generatePassword()
+    const planner = await registerMember(app, 'refused-calendar', password)
+    giveMembership(planner.id)
+    const room = await makeRoom()
+    placeBooking(room, planner.id, todayAt(9), 1)
+    placeBooking(room, planner.id, todayAt(11), 1)
+
+    await send('PUT', '/api/admin/config/ROOM_AVAILABILITY_ROW_BOUND', { value: 1 }, officer)
+    const view = await openView()
+    try {
+      await signInOn(view, planner.email, password)
+      await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
+      await waitFor(view, `document.querySelector('[data-test="calendar-failure"]')`, 30_000)
+
+      expect(await textOf(view, '[data-test="calendar-failure"]')).toContain('shorter')
+      expect(await textOf(view, 'body')).not.toContain('No rooms are bookable yet')
+    }
+    finally {
+      await send('PUT', '/api/admin/config/ROOM_AVAILABILITY_ROW_BOUND', { value: 1000 }, officer)
       view.close()
     }
   }, 120_000)

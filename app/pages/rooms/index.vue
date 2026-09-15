@@ -63,9 +63,9 @@ const span = computed(() => {
   return { from: monday, to: addDays(monday, 6) }
 })
 
-// Only the visible span is ever asked for. The old app fetched every page of every booking to the
-// browser, and that defect must not recur (C-102 criterion 3).
-const { data, status, refresh } = await useAsyncData(
+// Only the visible span is ever asked for (C-102 criterion 3). No default: a default makes the
+// un-fetched state look fetched, and the key the narrow flip moves to is then never asked for.
+const { data, status, error, refresh } = await useAsyncData(
   () => `availability-${span.value.from}-${span.value.to}-${roomId.value}`,
   () => request<Availability>('/api/rooms/availability', {
     query: {
@@ -74,15 +74,18 @@ const { data, status, refresh } = await useAsyncData(
       ...(everyRoom.value ? {} : { roomId: roomId.value }),
     },
   }),
-  { watch: [span, roomId], default: (): Availability => ({ from: '', to: '', rooms: [] }) },
+  { watch: [span, roomId] },
 )
+
+const failure = useListFailure(error, 'The calendar could not be loaded.')
+const rooms = computed(() => data.value?.rooms ?? [])
 
 const days = computed(() =>
   Array.from({ length: shown.value === 'day' ? 1 : 7 }, (_, index) => addDays(span.value.from, index)))
 
 const roomOptions = computed(() => [
   { label: 'Every room', value: EVERY_ROOM },
-  ...data.value.rooms.map(room => ({ label: room.name, value: room.id })),
+  ...rooms.value.map(room => ({ label: room.name, value: room.id })),
 ])
 
 function labelFor(day: string): string {
@@ -93,16 +96,16 @@ function labelFor(day: string): string {
 // is "what is free tonight"; within one room, they are days and it is "when is the studio free".
 const columns = computed<GridColumn[]>(() => {
   if (shown.value === 'day') {
-    return data.value.rooms.map(room => ({ key: room.id, label: room.name, room, day: anchor.value }))
+    return rooms.value.map(room => ({ key: room.id, label: room.name, room, day: anchor.value }))
   }
-  const room = data.value.rooms[0]
+  const room = rooms.value[0]
   if (!room) return []
   return days.value.map(day => ({ key: day, label: labelFor(day), room, day }))
 })
 
 // A week across every room would be seven days by ten rooms of quarter hours, which nobody can
 // read. It becomes a count per room per day, and a cell opens that room on that day.
-const summary = computed(() => data.value.rooms.map(room => ({
+const summary = computed(() => rooms.value.map(room => ({
   room,
   days: days.value.map(day => ({
     day,
@@ -230,11 +233,24 @@ useSeoMeta({ title: 'Rooms' })
       {{ labelFor(span.from) }}<span v-if="span.from !== span.to"> to {{ labelFor(span.to) }}</span>
     </p>
 
+    <UAlert
+      v-if="failure"
+      class="mt-6"
+      data-test="calendar-failure"
+      color="error"
+      variant="subtle"
+      :description="failure.message"
+      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
+    />
+
     <p
-      v-if="data.rooms.length === 0"
+      v-if="status === 'success' && rooms.length === 0"
       class="mt-8 text-sm text-muted"
+      data-test="calendar-empty"
     >
-      No rooms are bookable yet. An officer adds them under Rooms in the admin screens.
+      No rooms are bookable yet. An officer adds them under <ULink to="/rooms/manage">
+        Rooms
+      </ULink>.
     </p>
 
     <!-- Rooms down, days across, and a count in each: which room is quiet on Thursday. -->
@@ -297,10 +313,10 @@ useSeoMeta({ title: 'Rooms' })
 
     <template v-else>
       <h2
-        v-if="!everyRoom && data.rooms[0]"
+        v-if="!everyRoom && rooms[0]"
         class="nnt-headline mt-6 text-lg"
       >
-        {{ data.rooms[0].name }}
+        {{ rooms[0]?.name }}
       </h2>
 
       <RoomGrid

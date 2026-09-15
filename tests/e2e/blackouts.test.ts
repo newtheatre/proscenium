@@ -265,6 +265,32 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     expect(after - before).toBe(1)
   })
 
+  // C-114 criterion 1: a closure is a span, so a get-in that runs over days takes every day of it
+  // and tells each member once (issue 1050).
+  test('a closure over several days cancels each day, and tells the member once', async () => {
+    const room = await makeRoom()
+    await send('PUT', '/api/admin/config/ROOM_ACTIVE_BOOKINGS_PER_MEMBER', { value: 500 }, officer)
+    for (const day of [80, 81, 82, 83, 84]) expect((await book(room, span(day))).status).toBe(200)
+
+    const before = read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.blackout.cancelled'`,
+      member.id)?.n ?? 0
+
+    const answered = await closeRoom(room, {
+      startsAt: span(80, 0).startsAt,
+      endsAt: span(84, 23).endsAt,
+    }, 'Get-in for the autumn show')
+    const body = await answered.json() as { cancelled: number, told: number }
+
+    expect(body.cancelled).toBe(5)
+    expect(body.told).toBe(1)
+
+    const after = read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.blackout.cancelled'`,
+      member.id)?.n ?? 0
+    expect(after - before).toBe(1)
+  })
+
   // A get-in on one Monday must not take a whole term with it.
   test('only the overlapping occurrences of a series are cancelled', async () => {
     const room = await makeRoom()
