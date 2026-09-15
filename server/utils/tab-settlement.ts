@@ -76,21 +76,25 @@ export function unsettledTabsQuery(): SQL {
 
 // The register's own vocabulary, which F-204 groups waste by: the operator's prose has a column
 // of its own on the entry carrying the void and never lands here (0011, shared/utils/bar.ts).
-const VOID_MOVEMENT_REASON: MovementReason = 'COUNT_CORRECTION'
+export const VOID_MOVEMENT_REASON: MovementReason = 'COUNT_CORRECTION'
 
 interface LineRow { entryId: string, productName: string, variantLabel: string, qty: number, unitPricePence: number }
 
-// Scoped by subquery from the holder, never by a list of entry ids read back first: a tab is
-// unbounded in principle, and an IN list from a result set is the rule this breaks (CLAUDE.md).
-export function productLinesQuery(holderId: string): SQL {
+// Scoped by subquery from the holder, never by a list of entry ids read back first (CLAUDE.md).
+// `scope` is the caller's own charge predicate, so the read is no wider than what it will render.
+export function productLinesQuery(holderId: string, scope: SQL): SQL {
   return sql`
     SELECT l.entry_id AS entryId, p.name AS productName, v.label AS variantLabel, l.qty AS qty, l.unit_price_pence AS unitPricePence
     FROM ledger_lines l
     JOIN product_variants v ON v.id = l.product_variant_id
     JOIN bar_products p ON p.id = v.product_id
-    WHERE l.entry_id IN (SELECT id FROM ledger_entries WHERE tab_debtor_id = ${holderId}) AND l.kind = 'BAR_ITEM'
+    WHERE l.entry_id IN (SELECT e.id FROM ledger_entries e WHERE e.tab_debtor_id = ${holderId} AND ${scope})
+      AND l.kind = 'BAR_ITEM'
   `
 }
+
+// What the account screen lists: every charge, settled or not, but never a credit or a reversal.
+export const LISTED_CHARGE = sql`e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL`
 
 // The movements a charge's own lines caused. Scoped the same way, which also answers empty for a
 // charge with no lines rather than rendering `IN ()` and failing outright.
@@ -101,8 +105,8 @@ export function chargeMovementsQuery(entryId: string): SQL {
   `
 }
 
-async function productLinesFor(holderId: string): Promise<Map<string, LineRow[]>> {
-  const rows = await db.all<LineRow>(productLinesQuery(holderId))
+async function productLinesFor(holderId: string, scope: SQL): Promise<Map<string, LineRow[]>> {
+  const rows = await db.all<LineRow>(productLinesQuery(holderId, scope))
   const byEntry = new Map<string, LineRow[]>()
   for (const row of rows) byEntry.set(row.entryId, [...(byEntry.get(row.entryId) ?? []), row])
   return byEntry
@@ -130,11 +134,11 @@ export async function itemisedTab(holderId: string): Promise<ItemisedTab | null>
 
   const rows = await db.all<ChargeRow>(sql`
     SELECT ${CHARGE_COLUMNS} FROM ledger_entries e
-    WHERE e.tab_debtor_id = ${holderId} AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
+    WHERE e.tab_debtor_id = ${holderId} AND ${LISTED_CHARGE}
     ORDER BY e.happened_at DESC
   `)
   const [balance] = await db.all<{ total: number }>(tabBalanceQuery(holderId))
-  const linesByEntry = await productLinesFor(holderId)
+  const linesByEntry = await productLinesFor(holderId, LISTED_CHARGE)
   const charges = rows.map(row => hydrate(row, linesByEntry.get(row.entryId) ?? []))
 
   return { holderId, holderName: holder.name, outstandingPence: balance?.total ?? 0, charges }
@@ -148,7 +152,7 @@ export async function outstandingTabCharges(holderId: string): Promise<TabCharge
     WHERE e.tab_debtor_id = ${holderId} AND ${OUTSTANDING_CHARGE}
     ORDER BY e.happened_at
   `)
-  const linesByEntry = await productLinesFor(holderId)
+  const linesByEntry = await productLinesFor(holderId, OUTSTANDING_CHARGE)
   return rows.map(row => hydrate(row, linesByEntry.get(row.entryId) ?? []))
 }
 

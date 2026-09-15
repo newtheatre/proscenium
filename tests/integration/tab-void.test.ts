@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { chargeMovementsQuery, productLinesQuery } from '#server/utils/tab-settlement'
+import { LISTED_CHARGE, OUTSTANDING_CHARGE, VOID_MOVEMENT_REASON, chargeMovementsQuery, productLinesQuery } from '#server/utils/tab-settlement'
 import { MOVEMENT_REASONS } from '#shared/utils/bar'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -41,10 +41,21 @@ function item(database: TestDatabase, id = 'item-1'): string {
   return id
 }
 
+// A sold size, so a line's join to its product actually resolves: the read under test names the
+// product and the size, which only exist through `product_variants`.
+function variant(database: TestDatabase): string {
+  database.batch([
+    ['INSERT INTO bar_categories (id, name) VALUES (?, ?)', 'cat-1', 'Spirits'],
+    ['INSERT INTO bar_products (id, name, category_id, status) VALUES (?, ?, ?, ?)', 'prod-1', 'Gin', 'cat-1', 'ACTIVE'],
+    ['INSERT INTO product_variants (id, product_id, serving_kind, label, status) VALUES (?, ?, ?, ?, ?)', 'var-1', 'prod-1', 'single', 'Single', 'ACTIVE'],
+  ])
+  return 'var-1'
+}
+
 let seq = 0
 
 // A charge and, when asked, the one bar line and stock movement a sale of a stocked drink writes.
-function charge(database: TestDatabase, id: string, options: { lines?: number, itemId?: string } = {}): void {
+function charge(database: TestDatabase, id: string, options: { lines?: number, itemId?: string, variantId?: string } = {}): void {
   const lines = options.lines ?? 1
   database.batch([[`
     INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence, tab_debtor_id)
@@ -52,8 +63,8 @@ function charge(database: TestDatabase, id: string, options: { lines?: number, i
   for (let index = 0; index < lines; index++) {
     const lineId = `${id}-line-${index}`
     database.batch([[`
-      INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, unit_price_pence)
-      VALUES (?, ?, 'BAR_ITEM', 500, 1, 500)`, lineId, id]])
+      INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, unit_price_pence, product_variant_id)
+      VALUES (?, ?, 'BAR_ITEM', 500, 1, 500, ?)`, lineId, id, options.variantId ?? null]])
     if (options.itemId) {
       database.batch([[`
         INSERT INTO stock_movements (id, item_id, qty, kind, ref_table, ref_id, actor_id)
@@ -98,25 +109,52 @@ describe('a void reads its own charge, scoped by subquery (F-109 criterion 5)', 
   test('a holder\'s lines are read through their own charges, not through a list of ids', async () => {
     await withDatabase((database) => {
       people(database)
-      charge(database, 'charge-1', { lines: 2 })
-      charge(database, 'charge-2', { lines: 1 })
+      const variantId = variant(database)
+      charge(database, 'charge-1', { lines: 2, variantId })
+      charge(database, 'charge-2', { lines: 1, variantId })
       database.batch([[`
         INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence)
         VALUES ('other', ?, '2026-09-09', 'TILL', 'CARD', 'u-staff', 500)`, 1_788_951_000]])
       database.batch([[`
-        INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, unit_price_pence)
-        VALUES ('other-line', 'other', 'BAR_ITEM', 500, 1, 500)`]])
+        INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, unit_price_pence, product_variant_id)
+        VALUES ('other-line', 'other', 'BAR_ITEM', 500, 1, 500, ?)`, variantId]])
 
-      const found = read<{ entryId: string }>(database, productLinesQuery('u-member'))
+      const found = read<{ entryId: string, productName: string, variantLabel: string }>(database, productLinesQuery('u-member', LISTED_CHARGE))
       expect(found.map(row => row.entryId).sort()).toEqual(['charge-1', 'charge-1', 'charge-2'])
+      expect(found[0]).toMatchObject({ productName: 'Gin', variantLabel: 'Single' })
+    })
+  })
+
+  // The read is no wider than what the caller will draw: a settled charge is not on the till's
+  // settlement screen, so its lines have no business being fetched for it.
+  test('a settled charge\'s lines are outside the settlement screen\'s own read', async () => {
+    await withDatabase((database) => {
+      people(database)
+      const variantId = variant(database)
+      charge(database, 'charge-1', { lines: 1, variantId })
+      charge(database, 'charge-2', { lines: 1, variantId })
+      database.batch([
+        [`INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence)
+          VALUES ('settlement-1', ?, '2026-09-09', 'TILL', 'CARD', 'u-staff', 500)`, 1_788_951_000],
+        [`INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, unit_price_pence, settles_entry_id)
+          VALUES ('settlement-1-line', 'settlement-1', 'TAB_SETTLEMENT', 500, 1, 500, 'charge-1')`],
+      ])
+
+      const outstanding = read<{ entryId: string }>(database, productLinesQuery('u-member', OUTSTANDING_CHARGE))
+      expect(outstanding.map(row => row.entryId)).toEqual(['charge-2'])
+
+      // The account screen lists it all the same: a settled charge is history, not a gap.
+      const listed = read<{ entryId: string }>(database, productLinesQuery('u-member', LISTED_CHARGE))
+      expect(listed.map(row => row.entryId).sort()).toEqual(['charge-1', 'charge-2'])
     })
   })
 
   test('a holder with no charges reads no lines', async () => {
     await withDatabase((database) => {
       people(database)
+      variant(database)
 
-      expect(read(database, productLinesQuery('u-member'))).toEqual([])
+      expect(read(database, productLinesQuery('u-member', LISTED_CHARGE))).toEqual([])
     })
   })
 })
@@ -124,7 +162,8 @@ describe('a void reads its own charge, scoped by subquery (F-109 criterion 5)', 
 // 0011 and F-204: the vocabulary is what the waste report groups by, so an operator's prose may
 // not land in it. The prose has a column of its own on the entry that carries the void.
 describe('a void credit writes a vocabulary reason, not the operator\'s prose', () => {
-  test('COUNT_CORRECTION is the reason a credit uses, and it is in the vocabulary', () => {
-    expect(MOVEMENT_REASONS).toContain('COUNT_CORRECTION')
+  test('the reason a credit writes is one the register admits', () => {
+    expect(MOVEMENT_REASONS).toContain(VOID_MOVEMENT_REASON)
+    expect(VOID_MOVEMENT_REASON).toBe('COUNT_CORRECTION')
   })
 })
