@@ -16,10 +16,14 @@ export default defineEventHandler(async (event) => {
   const night = currentShowNight()
   const from = Math.floor(showNightBounds(night).from.getTime() / 1000)
 
+  // The same action fills the window of any shift stamped before a shift had one (E-131).
+  const defaults = await shiftOffsetDefaults(event)
+
   // The entry records the action and its scope; how many shifts it added is a screen figure, and
   // the rows themselves carry when they were stamped.
-  const [stamped] = await withShiftConstraints(() => db.batch([
-    db.all<{ id: string }>(backfillVenueStatement(venueId, from)),
+  const [stamped, filled] = await withShiftConstraints(() => db.batch([
+    db.all<{ id: string }>(backfillVenueStatement(venueId, from, defaults)),
+    db.all<{ id: string }>(backfillShiftTimesStatement(defaults, venueId)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'shift.stamped',
@@ -28,5 +32,5 @@ export default defineEventHandler(async (event) => {
     })),
   ]))
 
-  return { ok: true, stamped: stamped.length }
+  return { ok: true, stamped: stamped.length, filled: filled.length }
 })

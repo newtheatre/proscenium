@@ -89,7 +89,9 @@ describe('authority holds inside the window with a grace period (E-131 criterion
 
   test('a shift with no window bounds nobody', () => {
     expect(insideWindow(null, at(2026, 10, 17, 5, 0), 30)).toBe(true)
-    expect(insideWindow({ startsAt: at(2026, 10, 17, 18, 0), endsAt: undefined }, at(2026, 10, 17, 5, 0), 30)).toBe(true)
+    expect(insideWindow({ startsAt: at(2026, 10, 17, 18, 0), endsAt: null }, at(2026, 10, 17, 5, 0), 30)).toBe(true)
+    expect(insideWindow({ startsAt: null, endsAt: at(2026, 10, 17, 22, 30) }, at(2026, 10, 17, 5, 0), 30)).toBe(true)
+    expect(insideWindow({ startsAt: undefined, endsAt: undefined }, at(2026, 10, 17, 5, 0), 30)).toBe(true)
   })
 
   test('the refusal quotes the window in London wall clock', () => {
@@ -104,8 +106,8 @@ describe('the clock changes are absolute seconds, not wall clock (E-131 criterio
     const window = shiftWindow({ startsAt: curtain, doorsAt: at(2026, 10, 25, 0, 0), durationMinutes: 120 }, DEFAULTS)
     expect(window.startsAt).toBe(at(2026, 10, 25, 0, 0) - 30 * 60)
     expect(window.endsAt - window.startsAt).toBe((30 + 30 + 120 + 30) * 60)
-    // The window opened at 23:30 BST on the 24th and closed at 02:00 GMT, three wall-clock hours
-    // later by the clock on the wall and two and a half by the clock that counts.
+    // It opened at 23:30 BST on the 24th and closed at 02:00 GMT: two and a half hours by the
+    // clock on the wall, three and a half by the clock that counts.
     expect(clock(window.endsAt)).toBe('02:00')
   })
 

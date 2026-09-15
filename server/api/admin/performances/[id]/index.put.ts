@@ -38,6 +38,12 @@ export default defineEventHandler(async (event) => {
   // Moving a house means moving the rota: a held shift travels, an open one is restamped fresh.
   // A held shift in a role the new venue does not staff at all cannot travel, so it is cancelled.
   const moved = input.venueId !== held.venueId
+  // The clock a shift window is computed from (0078): any of these moving moves the window.
+  const retimed = input.startsAt !== held.startsAt
+    || (input.doorsAt ?? null) !== held.doorsAt
+    || (input.durationMinutes ?? null) !== held.durationMinutes
+    || input.intervalCount !== held.intervalCount
+    || (input.intervalMinutes ?? null) !== held.intervalMinutes
   const active = moved ? await activeShifts(id) : []
   const heldShifts = active.filter(shift => COMMITTED_SHIFT_STATUSES.includes(shift.status) && shift.userId !== null)
   const newRoles = moved ? new Set((await templateSlotsFor(input.venueId)).map(slot => slot.role)) : new Set<ShiftRole>()
@@ -103,15 +109,19 @@ export default defineEventHandler(async (event) => {
   const run = await offerWaitingList(event, id, new Date(), offerCap)
   await notifyWaitingListOffers(event, run.offered)
 
+  const offsets = await shiftOffsetDefaults(event)
+
   // Only once the move is real: restamping a rota for an edit that was refused would cancel held
   // shifts against a venue the performance never went to.
   if (moved) {
     await db.batch([
       db.run(cancelOrphanedShiftsStatement(id, input.venueId)),
       db.run(clearOpenShiftsStatement(id)),
-      db.run(stampPerformanceStatement(id)),
+      db.run(stampPerformanceStatement(id, offsets)),
     ])
   }
+  // A window says when the shift is worked, so a curtain at a new time is a new window (0078).
+  if (moved || retimed) await db.run(restampShiftTimesStatement(id, offsets))
 
   // The batch committed, so every holder below is real: tell them after, never before (0003).
   if (moved) {

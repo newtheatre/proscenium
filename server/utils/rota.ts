@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
+import { configValue } from './configuration'
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
@@ -12,7 +13,9 @@ import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { AddShiftInput, ShiftRole, ShiftStatus, TemplateSlot } from '#shared/utils/rota'
+import type { ShiftOffsets } from '#shared/utils/rota-times'
 import type { SQL } from 'drizzle-orm'
+import type { H3Event } from 'h3'
 
 // Reading and writing the rota (E-101, E-102, E-106). Every statement here binds a fixed number
 // of parameters however many performances or slots it covers (0003, 0006).
@@ -30,7 +33,7 @@ export interface VenueTemplate {
 }
 
 // `role` is null for a venue with no template, which is what the LEFT JOIN is for.
-interface TemplateRow { venueId: string, venueName: string, role: ShiftRole | null, count: number }
+interface TemplateRow extends Omit<TemplateSlot, 'role'> { venueId: string, venueName: string, role: ShiftRole | null }
 
 // Search and "staffed" through the declaration (K-129); paging scopes the outer join by a
 // subquery over the venues it covers, never by an id list read back from a result set (0006).
@@ -46,7 +49,8 @@ export function venueTemplatesClause(query: ListQuery): ListClause {
 
 export function venueTemplatesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
-    SELECT v.id AS venueId, v.name AS venueName, t.role AS role, t."count" AS "count"
+    SELECT v.id AS venueId, v.name AS venueName, t.role AS role, t."count" AS "count",
+           t.starts_before_doors_minutes AS startsBeforeDoorsMinutes, t.ends_after_end_minutes AS endsAfterEndMinutes
     FROM venues v
     LEFT JOIN shift_templates t ON t.venue_id = v.id
     WHERE v.id IN (
@@ -66,7 +70,14 @@ export async function listVenueTemplates(clause: ListClause, limit: number, offs
   const templates = new Map<string, VenueTemplate>()
   for (const row of rows) {
     const held = templates.get(row.venueId) ?? { venueId: row.venueId, venueName: row.venueName, slots: [] }
-    if (row.role !== null) held.slots.push({ role: row.role, count: row.count })
+    if (row.role !== null) {
+      held.slots.push({
+        role: row.role,
+        count: row.count,
+        startsBeforeDoorsMinutes: row.startsBeforeDoorsMinutes ?? null,
+        endsAfterEndMinutes: row.endsAfterEndMinutes ?? null,
+      })
+    }
     templates.set(row.venueId, held)
   }
   return [...templates.values()]
@@ -79,7 +90,9 @@ export async function countVenueTemplates(clause: ListClause): Promise<number> {
 
 export async function templateSlotsFor(venueId: string): Promise<TemplateSlot[]> {
   return await db.all<TemplateSlot>(sql`
-    SELECT role, "count" FROM shift_templates WHERE venue_id = ${venueId} ORDER BY role
+    SELECT role, "count",
+           starts_before_doors_minutes AS startsBeforeDoorsMinutes, ends_after_end_minutes AS endsAfterEndMinutes
+    FROM shift_templates WHERE venue_id = ${venueId} ORDER BY role
   `)
 }
 
@@ -87,23 +100,66 @@ export async function templateSlotsFor(venueId: string): Promise<TemplateSlot[]>
 // would leave a venue with a role it had already taken off the list.
 export function replaceTemplateStatements(venueId: string, slots: TemplateSlot[], actorId: string): [SQL, ...SQL[]] {
   const written = slots.map(slot => sql`
-    INSERT INTO shift_templates (id, venue_id, role, "count", updated_by, updated_at)
-    VALUES (lower(hex(randomblob(16))), ${venueId}, ${slot.role}, ${slot.count}, ${actorId}, unixepoch())
+    INSERT INTO shift_templates (id, venue_id, role, "count", starts_before_doors_minutes, ends_after_end_minutes, updated_by, updated_at)
+    VALUES (lower(hex(randomblob(16))), ${venueId}, ${slot.role}, ${slot.count},
+            ${slot.startsBeforeDoorsMinutes ?? null}, ${slot.endsAfterEndMinutes ?? null}, ${actorId}, unixepoch())
   `)
   return [sql`DELETE FROM shift_templates WHERE venue_id = ${venueId}`, ...written]
 }
 
+// The house defaults, which a venue's template overrides per role (0078, E-131 criterion 2).
+export async function shiftOffsetDefaults(event?: H3Event): Promise<ShiftOffsets> {
+  return {
+    startBeforeDoorsMinutes: await configValue(event, 'SHIFT_START_BEFORE_DOORS_MINUTES'),
+    endAfterEndMinutes: await configValue(event, 'SHIFT_END_AFTER_CURTAIN_DOWN_MINUTES'),
+  }
+}
+
+// The window a shift is worked in, computed in SQL so a stamp of forty slots still binds the two
+// defaults once (0006). `shiftWindow()` is the same arithmetic in TypeScript (0078).
+const windowStart = (defaults: ShiftOffsets): SQL =>
+  sql`coalesce(p.doors_at, p.starts_at) - coalesce(t.starts_before_doors_minutes, ${defaults.startBeforeDoorsMinutes}) * 60`
+
+const windowEnd = (defaults: ShiftOffsets): SQL => sql`
+  p.starts_at
+  + (coalesce(p.duration_minutes, 0) + coalesce(p.interval_count, 0) * coalesce(p.interval_minutes, 0)) * 60
+  + coalesce(t.ends_after_end_minutes, ${defaults.endAfterEndMinutes}) * 60
+`
+
+// A performance's own clock moving takes its shifts with it: the window says when the shift is
+// worked, so a curtain at a new time is a new window (0078). A template edit is not this.
+export function restampShiftTimesStatement(performanceId: string, defaults: ShiftOffsets): SQL {
+  return sql`
+    UPDATE shifts AS target
+    SET starts_at = (
+          SELECT ${windowStart(defaults)}
+          FROM performances p
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          WHERE p.id = target.performance_id
+        ),
+        ends_at = (
+          SELECT ${windowEnd(defaults)}
+          FROM performances p
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          WHERE p.id = target.performance_id
+        )
+    WHERE target.performance_id = ${performanceId}
+    RETURNING id
+  `
+}
+
 // Stamping. The slot ordinals come out of a recursive count rather than out of the request, so
 // the statement binds only what `scope` binds however many slots a template holds (0006).
-function stampStatement(scope: SQL): SQL {
+function stampStatement(scope: SQL, defaults: ShiftOffsets): SQL {
   return sql`
     WITH RECURSIVE slot(i) AS (
       SELECT 1
       UNION ALL
       SELECT i + 1 FROM slot WHERE i < (SELECT coalesce(max("count"), 0) FROM shift_templates)
     )
-    INSERT INTO shifts (id, performance_id, role, slot, status)
-    SELECT lower(hex(randomblob(16))), p.id, t.role, slot.i, 'OPEN'
+    INSERT INTO shifts (id, performance_id, role, slot, status, starts_at, ends_at)
+    SELECT lower(hex(randomblob(16))), p.id, t.role, slot.i, 'OPEN',
+           ${windowStart(defaults)}, ${windowEnd(defaults)}
     FROM performances p
     JOIN shift_templates t ON t.venue_id = p.venue_id
     JOIN slot ON slot.i <= t."count"
@@ -115,14 +171,39 @@ function stampStatement(scope: SQL): SQL {
 
 // One performance, for the batch that creates it: the performance row is inserted first in the
 // same batch, so this reads it (E-102 criterion 1).
-export function stampPerformanceStatement(performanceId: string): SQL {
-  return stampStatement(sql`p.id = ${performanceId}`)
+export function stampPerformanceStatement(performanceId: string, defaults: ShiftOffsets): SQL {
+  return stampStatement(sql`p.id = ${performanceId}`, defaults)
 }
 
 // The backfill: every performance at a venue whose night has not started yet. Running it twice
 // stamps nothing the second time, held by the uniqueness rule (E-102 criterion 2).
-export function backfillVenueStatement(venueId: string, from: number): SQL {
-  return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from}`)
+export function backfillVenueStatement(venueId: string, from: number, defaults: ShiftOffsets): SQL {
+  return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from}`, defaults)
+}
+
+// The fill for shifts stamped before a shift had times. Idempotent because it writes only where a
+// column is null, so a window already stamped is never recomputed (E-131 criterion 3).
+export function backfillShiftTimesStatement(defaults: ShiftOffsets, venueId?: string): SQL {
+  const atVenue = venueId
+    ? sql` AND EXISTS (SELECT 1 FROM performances p WHERE p.id = target.performance_id AND p.venue_id = ${venueId})`
+    : sql``
+  return sql`
+    UPDATE shifts AS target
+    SET starts_at = (
+          SELECT ${windowStart(defaults)}
+          FROM performances p
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          WHERE p.id = target.performance_id
+        ),
+        ends_at = (
+          SELECT ${windowEnd(defaults)}
+          FROM performances p
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          WHERE p.id = target.performance_id
+        )
+    WHERE (target.starts_at IS NULL OR target.ends_at IS NULL)${atVenue}
+    RETURNING id
+  `
 }
 
 // A cancelled performance is not a night's work, so its shifts are cancelled with it. Whoever
@@ -383,15 +464,20 @@ export function assignShiftStatement(shiftId: string, userId: string, actorId: s
 
 // An officer's ad hoc shift: a repeat entry collides on the same uniqueness a stamped one would
 // (E-107 criterion 5). The id is the caller's own, since this write is audited by `changes()`.
-export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId: string): SQL {
+export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId: string, defaults: ShiftOffsets): SQL {
   const confirmed = input.userId !== undefined
+  // The window comes from the performance and the template the same way a stamp's does: a shift
+  // added by hand with no window would hold authority for the whole night (0078).
   return sql`
-    INSERT INTO shifts (id, performance_id, role, slot, user_id, status, assigned_by, claimed_at, confirmed_at)
-    VALUES (
-      ${shiftId}, ${input.performanceId}, ${input.role}, ${input.slot},
+    INSERT INTO shifts (id, performance_id, role, slot, user_id, status, assigned_by, claimed_at, confirmed_at, starts_at, ends_at)
+    SELECT
+      ${shiftId}, p.id, ${input.role}, ${input.slot},
       ${input.userId ?? null}, ${confirmed ? 'CONFIRMED' : 'OPEN'}, ${confirmed ? actorId : null},
-      ${confirmed ? sql`unixepoch()` : sql`NULL`}, ${confirmed ? sql`unixepoch()` : sql`NULL`}
-    )
+      ${confirmed ? sql`unixepoch()` : sql`NULL`}, ${confirmed ? sql`unixepoch()` : sql`NULL`},
+      ${windowStart(defaults)}, ${windowEnd(defaults)}
+    FROM performances p
+    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = ${input.role}
+    WHERE p.id = ${input.performanceId}
   `
 }
 

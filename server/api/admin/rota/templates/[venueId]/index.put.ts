@@ -17,7 +17,8 @@ export default defineEventHandler(async (event) => {
 
   const held = await templateSlotsFor(venueId)
   const said = (slots: TemplateSlot[]): string =>
-    orderedSlots(slots).map(slot => `${slot.role}:${slot.count}`).join(', ')
+    orderedSlots(slots).map(slot =>
+      `${slot.role}:${slot.count}:${slot.startsBeforeDoorsMinutes ?? 'default'}:${slot.endsAfterEndMinutes ?? 'default'}`).join(', ')
 
   const [cleared, ...written] = replaceTemplateStatements(venueId, input.slots, resolved.account.id)
 

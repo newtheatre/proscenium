@@ -743,6 +743,13 @@
       "when": 1789484268727,
       "tag": "0105_old_wild_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "6",
+      "when": 1789486136691,
+      "tag": "0106_shift_windows",
+      "breakpoints": true
     }
   ]
 }
