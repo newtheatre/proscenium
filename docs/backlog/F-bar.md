@@ -7,7 +7,7 @@ computes, cross-checks and records; it never initiates an online charge and neve
 data. Every sale, tab charge, comp and settlement posts to the unified ledger in integer pence, and
 on-hand stock is always the sum of movements, never a stored figure.
 
-Counts: 31 stories (26 MVP, 3 V2, 1 Later, 1 resolved won't-build).
+Counts: 33 stories (28 MVP, 3 V2, 1 Later, 1 resolved won't-build).
 
 Open questions:
 
@@ -611,6 +611,64 @@ Open questions:
      which house a second way.
 - Source: E-127 criterion 5 (one session, two houses); the 15 September 2026 bar review; decision
   0078.
+
+## F-127: Guided product set-up by shape
+
+- Role: Bar manager
+- Phase: MVP
+- Story: As the bar manager, I want to add a product by saying what shape it is, so that a can of
+  cider, a house red and a cocktail each take one screen and one submission instead of four
+  screens and seven.
+- Depends on: F-111, F-112, F-113, F-116, F-121
+- Acceptance criteria:
+  1. Set-up opens on three shapes stated in the bar's own words: sold as itself, sold by measure,
+     made from several things. The shape is derived from a product's live serving sizes and what
+     each one pours, never stored, so a product edited later cannot contradict the shape it was
+     created under and no set-up-only column exists. A serving pouring more than one stocked item,
+     or sizes pouring more than one between them, reads as a recipe; a mixer choice group is a
+     choice rather than a second ingredient, so attaching one leaves a measured spirit measured.
+  2. The measure presets (wine, spirits, draught, packaged) fill in the serving sizes, preselected
+     from the category's name, and any size may be unticked before submission. Packaged is the
+     one-size preset the "sold as itself" card fills from; the other three fill "sold by measure".
+     A preset may only emit a serving kind the vocabulary already holds, so category default prices
+     keep resolving (0017, amended 15 September 2026).
+  3. Prices pre-fill from the category defaults that resolve (F-121) and stay editable; a size
+     whose price resolves nowhere does not block the submission.
+  4. One submission writes the stocked item (new, or an existing one chosen by name), the product,
+     its variants, its components, any choice-group attachment and the opening price rows in one
+     batch, with one audit row per object created. A name collision, or any other refusal, leaves
+     nothing behind.
+  5. The product goes ACTIVE when every active size resolves a price and every component resolves
+     to an active stocked item, and HIDDEN otherwise, with the reason naming the sizes or
+     ingredients that did not resolve.
+  6. A product created this way is indistinguishable from one built screen by screen: the till's
+     catalogue contract is unchanged, and the product page edits it with no special case.
+- Source: bar review, 15 September 2026 (set-up cost: a can of cider is four screens and seven
+  submissions, house red fourteen); Matt's direction, 15 September 2026; decision 0017.
+
+## F-128: Stock and products linked both ways
+
+- Role: Bar manager
+- Phase: MVP
+- Story: As the bar manager, I want to see which products pour each stocked item and what each
+  product's stock supports, so that I can retire an item or judge a shortage without holding the
+  recipes in my head.
+- Depends on: F-111, F-112, F-113, F-114
+- Acceptance criteria:
+  1. The stocked-item list carries a "Poured by" cell naming the active products that deplete the
+     item, each linking to that product.
+  2. A product's component rows say how many more servings the current on-hand supports at each
+     size, and badge a component whose stocked item is retired or out of stock.
+  3. Retiring a stocked item that active products deplete is refused, and the refusal names those
+     products rather than counting them.
+  4. The refusal offers to retire the item and hide its dependent products in one batch; the
+     retirement carries the on-hand sum as a subquery in its own UPDATE's predicate, and the hides
+     scope to the dependent products by subquery over the components, never by an id list read
+     first (0006), so a delivery or a recipe change landing in the window cannot slip past.
+  5. Both views derive from the existing components: no link is stored in either direction, and
+     the till's catalogue contract is untouched.
+- Source: bar review, 15 September 2026 (known issues: the retirement guard reads on-hand before
+  the write); Matt's direction, 15 September 2026.
 
 ## F-201: Reader-initiated checkout
 
