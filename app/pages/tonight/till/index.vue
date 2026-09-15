@@ -285,12 +285,28 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         v-else-if="session"
         class="space-y-6"
       >
-        <p
-          data-test="till-open"
-          class="text-xs text-muted"
-        >
-          Open since {{ londonClock(new Date(session.openedAt * 1000)) }}.
-        </p>
+        <div class="flex items-center justify-between gap-2">
+          <p
+            data-test="till-open"
+            class="text-xs text-muted"
+          >
+            Open since {{ londonClock(new Date(session.openedAt * 1000)) }}.
+          </p>
+          <!-- Not a per-sale action, so it lives here rather than under the thumb (K-102
+               criterion 2, review-ui.md finding 6). -->
+          <UDropdownMenu
+            :items="[[{ label: 'Close till', icon: 'i-lucide-lock', onSelect: openCloseModal }]]"
+          >
+            <UButton
+              icon="i-lucide-ellipsis-vertical"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              aria-label="More till actions"
+              data-test="till-overflow-menu"
+            />
+          </UDropdownMenu>
+        </div>
 
         <UAlert
           v-if="catalogue.error.value"
@@ -532,15 +548,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           @press="() => charge()"
         />
         <NightAction
-          v-if="session"
-          label="Close till"
-          icon="i-lucide-lock"
-          color="error"
-          data-test="open-close-till"
-          @press="openCloseModal"
-        />
-        <NightAction
-          v-else
+          v-if="!session"
           label="Open till"
           icon="i-lucide-lock-open"
           :loading="busy"
