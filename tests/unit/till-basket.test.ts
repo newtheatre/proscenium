@@ -186,3 +186,20 @@ describe('expectedAfter shrinks to match a refusal, so the server\'s cross-check
     scope.stop()
   })
 })
+
+// review-ui.md finding 15: the charge button reads grandTotalPence, which reads priced; a
+// failure that leaves the last good price in place is a wrong figure shown as a right one.
+describe('a pricing failure clears the total rather than leaving the last good figure (F-103 criterion 3)', () => {
+  test('recomputeTotal nulls priced on a refused request', async () => {
+    const { basket, scope } = setup([aProduct()], {
+      requestPrice: () => Promise.reject(new Error('the price changed under this basket')),
+    })
+    basket.tapVariant('Lager', aVariant())
+    basket.priced.value = aPriced({ totalPence: 500 })
+    await basket.recomputeTotal()
+    expect(basket.priced.value).toBeNull()
+    expect(basket.priceFailure.value).toBeTruthy()
+    expect(basket.grandTotalPence.value).toBeNull()
+    scope.stop()
+  })
+})

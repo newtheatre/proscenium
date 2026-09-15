@@ -100,6 +100,7 @@ const {
   saleBody,
   expectedAfter,
   resetBasket,
+  resetSelections,
 } = useTillBasket({
   venueId,
   products,
@@ -147,6 +148,7 @@ const {
   selectedDiscountId,
   charged,
   chargeFailure,
+  resetSelections,
 })
 
 // Which path the Challenge 25 prompt was opened for, so its answer goes the same way.
@@ -178,7 +180,9 @@ async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void
     ageCheckStep.value = 'closed'
   }
   catch (refused) {
-    chargeFailure.value = refusalText(refused)
+    // K-103 protects reads, not writes: a transport failure needs different words from an
+    // ordinary refusal, since whether the sale landed is unknown rather than settled (finding 16).
+    chargeFailure.value = writeFailureText(refused, 'Check the last sale before ringing it up again.')
     ageCheckStep.value = 'closed'
     // The refusal already names the true figure; catch the total up to it too, so what is shown
     // under the message is the one a retry would now send (F-104 criterion 3, no bypass).
@@ -218,7 +222,8 @@ async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = null): Promi
     sumup.launch(started.launchUrl)
   }
   catch (refused) {
-    chargeFailure.value = refusalText(refused)
+    // This only starts a hand-off, not a sale, so the ambiguity is whether that start landed.
+    chargeFailure.value = writeFailureText(refused, 'Check the open SumUp hand-offs before trying again.')
     ageCheckStep.value = 'closed'
     await recomputeTotal()
   }
@@ -239,10 +244,9 @@ function submitAgeCheck(outcome: InlineAgeCheckInput): void {
 function nextSale(): void {
   resetBasket()
   resetTickets()
+  resetSelections()
   charged.value = null
   chargeFailure.value = null
-  selectedDiscountId.value = null
-  selectedTabHolderId.value = null
   pane.value = 'bar'
   ageCheckStep.value = 'closed'
 }

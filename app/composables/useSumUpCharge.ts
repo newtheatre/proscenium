@@ -33,10 +33,13 @@ export interface SumUpChargeDeps {
   selectedDiscountId: Ref<string | null>
   charged: Ref<ChargedReceipt | null>
   chargeFailure: Ref<string | null>
+  // The one place that knows what a fresh sale's discount and tab holder are (none), so this
+  // does not keep its own copy of that rule (useTillBasket.ts).
+  resetSelections: () => void
 }
 
 export function useSumUpCharge(deps: SumUpChargeDeps) {
-  const { venueId, sumupEnabled, selectedTabHolderId, session, basket, ticketLines, walkUpLines, selectedDiscountId, charged, chargeFailure } = deps
+  const { venueId, sumupEnabled, selectedTabHolderId, session, basket, ticketLines, walkUpLines, selectedDiscountId, charged, chargeFailure, resetSelections } = deps
 
   const sumup = useSumUp<SumUpSnapshot>()
   const sumupAvailable = computed(() => sumupEnabled.value && sumup.handheld.value && selectedTabHolderId.value === null)
@@ -73,7 +76,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       basket.value = []
       ticketLines.value = []
       walkUpLines.value = []
-      selectedDiscountId.value = null
+      resetSelections()
       sumup.forget()
       waiting.value = null
       void refreshOpenAttempts()

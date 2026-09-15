@@ -106,7 +106,7 @@ const selectedTabHolderId = defineModel<string | null>('selectedTabHolderId', { 
           class="text-xs text-muted"
           :data-test="`line-amount-${line.id}`"
         >
-          {{ lineAmount(line) ?? 'Pricing…' }}
+          {{ lineAmount(line) ?? (priceFailure ? 'Not priced' : 'Pricing…') }}
         </p>
       </div>
       <div class="flex items-center gap-1">
