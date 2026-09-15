@@ -111,6 +111,28 @@ const applyCounted = computed(() => data.value?.lines.filter(line => line.counte
 const applyUncounted = computed(() => data.value?.lines.filter(line => line.countedQty === null).length ?? 0)
 const applyNetVarianceCostPence = computed(() =>
   data.value?.lines.reduce((total, line) => total + (line.varianceCostPence ?? 0), 0) ?? 0)
+
+// A real count is a real number of millilitres or units, not a stepper twitch: the whole cell is
+// the field, and only what was actually typed distinguishes counted from blank (F-115 criterion 2).
+const uncountedOnly = ref(false)
+
+const visibleLines = computed(() => {
+  if (!data.value) return []
+  return uncountedOnly.value
+    ? data.value.lines.filter(line => drafts.value[line.itemId] === undefined)
+    : data.value.lines
+})
+
+function focusNext(itemId: string): void {
+  // Walks the stable, unfiltered order rather than visibleLines: by the time this runs, typing
+  // has already dropped the just-counted row out of an active "Only uncounted" filter.
+  if (!data.value) return
+  const all = data.value.lines
+  const start = all.findIndex(line => line.itemId === itemId) + 1
+  const next = all.slice(start).find(line => !uncountedOnly.value || drafts.value[line.itemId] === undefined)
+  if (!next) return
+  document.querySelector<HTMLInputElement>(`[data-test="counted-${next.itemId}"]`)?.focus()
+}
 </script>
 
 <template>
@@ -178,6 +200,13 @@ const applyNetVarianceCostPence = computed(() =>
         description="A mistake is corrected by a new stocktake or a reversing movement, never an edit here."
       />
 
+      <USwitch
+        v-if="open"
+        v-model="uncountedOnly"
+        data-test="uncounted-only-filter"
+        label="Only uncounted"
+      />
+
       <table
         class="w-full text-sm"
         data-test="stocktake-lines"
@@ -203,7 +232,7 @@ const applyNetVarianceCostPence = computed(() =>
         </thead>
         <tbody>
           <tr
-            v-for="line in data.lines"
+            v-for="line in visibleLines"
             :key="line.id"
             class="border-b last:border-0"
           >
@@ -214,15 +243,32 @@ const applyNetVarianceCostPence = computed(() =>
               {{ saysQuantity(line.expectedQty, line.unit) }}
             </td>
             <td class="py-2">
-              <UInputNumber
+              <div
                 v-if="open"
-                v-model="drafts[line.itemId]"
-                :min="0"
-                size="sm"
-                class="w-24"
-                :aria-label="`Counted, ${line.itemName}`"
-                :data-test="`counted-${line.itemId}`"
-              />
+                class="flex items-center gap-2"
+              >
+                <UInputNumber
+                  v-model="drafts[line.itemId]"
+                  :min="0"
+                  :increment="false"
+                  :decrement="false"
+                  placeholder="Uncounted"
+                  inputmode="numeric"
+                  class="w-full"
+                  :aria-label="`Counted, ${line.itemName}`"
+                  :data-test="`counted-${line.itemId}`"
+                  @keydown.enter.prevent="focusNext(line.itemId)"
+                />
+                <UBadge
+                  v-if="drafts[line.itemId] === undefined"
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                  :data-test="`uncounted-badge-${line.itemId}`"
+                >
+                  Uncounted
+                </UBadge>
+              </div>
               <span v-else>
                 {{ line.countedQty === null ? 'Uncounted' : saysQuantity(line.countedQty, line.unit) }}
               </span>
