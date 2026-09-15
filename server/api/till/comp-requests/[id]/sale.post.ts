@@ -19,6 +19,7 @@ export default defineEventHandler(async (event) => {
     // The bar's windows say which house a comp belongs to, exactly as they do for a sale (F-126).
     performanceId: null,
     performanceIds: resolved.performanceIds,
+    event,
   })
 
   return { ok: true, ...committed }

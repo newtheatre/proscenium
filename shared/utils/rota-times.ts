@@ -91,17 +91,24 @@ export function pickByWindow(windows: WindowedPerformance[], at: number): string
   return nearestWindow(windows, at)?.performanceId ?? null
 }
 
-// The window containing the instant, else the nearest, with a tie going to the earlier one. A
-// refusal quotes this rather than the first row, which on a two-house day is the one already past.
+// The window containing the instant, else the nearest, tie to the earlier. Where an early-opening,
+// late-shutting bar makes two contain it, the later house wins: the drink is for the show going in.
 export function nearestWindow<T extends ShiftWindow>(windows: T[], at: number): T | null {
   let best: T | null = null
   let bestDistance = Number.POSITIVE_INFINITY
   for (const window of [...windows].sort((one, two) => one.startsAt - two.startsAt)) {
     const away = distance(window, at)
-    if (away < bestDistance) {
+    if (away < bestDistance || (away === 0 && bestDistance === 0)) {
       best = window
       bestDistance = away
     }
   }
   return best
+}
+
+// Which of the houses a caller covers a sale belongs to (F-126). A window outside their authority
+// is not theirs to resolve on, and one house is one house whatever the clock says.
+export function houseForSale(covered: string[], windows: WindowedPerformance[], at: number): string | null {
+  if (covered.length <= 1) return covered[0] ?? null
+  return pickByWindow(windows.filter(window => covered.includes(window.performanceId)), at)
 }

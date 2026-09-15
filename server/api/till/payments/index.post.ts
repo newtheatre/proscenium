@@ -25,12 +25,11 @@ export default defineEventHandler(async (event) => {
     night: resolved.night,
     performanceId: null,
     performanceIds: resolved.performanceIds,
+    event,
   }
-  await priceSaleForAttempt(input, londonDayOf(new Date()), scope)
-
-  // Pinned when the basket was handed over, not when the app answers: the reader may take minutes,
-  // and by then the bar's window may have moved on to the next house (F-126, F-124).
-  const performanceId = await performanceForSale(scope, Math.floor(Date.now() / 1000))
+  // The cross-check hands back the house it resolved, so the hand-off pins the one the basket was
+  // built against rather than resolving again minutes later when the app answers (F-126).
+  const { performanceId } = await priceSaleForAttempt(input, londonDayOf(new Date()), scope)
 
   const id = await startAttempt({
     basket: {

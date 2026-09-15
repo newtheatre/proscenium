@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { barWindowsTonightQuery, replaceTemplateStatements } from '#server/utils/rota'
-import { pickByWindow } from '#shared/utils/rota-times'
+import { houseForSale, pickByWindow } from '#shared/utils/rota-times'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
@@ -91,9 +91,9 @@ describe('the bar\'s windows say which house a sale belongs to (F-126 criteria 1
     await withDatabase(async (database) => {
       const windows = windowsFor(database, twoHouseNight(database))
 
-      // 17:10, twenty minutes after the matinee's bar shut and fifty before the evening's opens.
+      // 17:10: ten minutes after the matinee's bar shut, eighty before the evening's opens.
       expect(pickByWindow(windows, at(13.17))).toBe('performance-matinee')
-      // 18:20, an hour and fifty after the matinee and forty before the evening.
+      // 18:20: eighty minutes after the matinee's bar shut, ten before the evening's opens.
       expect(pickByWindow(windows, at(14.33))).toBe('performance-evening')
     })
   })
@@ -114,6 +114,30 @@ describe('the bar\'s windows say which house a sale belongs to (F-126 criteria 1
       expect(windows[0]).toMatchObject({ startsAt: MATINEE - 90 * 60, endsAt: MATINEE + 240 * 60 })
       // 23:00, inside the evening's widened window rather than merely nearest to it.
       expect(pickByWindow(windows, at(19))).toBe('performance-evening')
+
+      // 18:15, inside both: the matinee's bar shuts at 18:30 and the evening's opened at 18:00.
+      // The pint is for the house about to go in, not the one whose audience has left.
+      expect(pickByWindow(windows, at(14.25))).toBe('performance-evening')
+    })
+  })
+})
+
+describe('a sale resolves only against the houses its caller covers (F-126)', () => {
+  test('a window the caller has no authority over is not one of their houses', async () => {
+    await withDatabase(async (database) => {
+      const windows = windowsFor(database, twoHouseNight(database))
+
+      // Confirmed on the evening alone: a sale at the matinee's hour is still the evening's.
+      expect(houseForSale(['performance-evening'], windows, at(10.5))).toBe('performance-evening')
+      expect(houseForSale(['performance-matinee', 'performance-evening'], windows, at(10.5))).toBe('performance-matinee')
+    })
+  })
+
+  test('one house is one house, whatever the clock says', async () => {
+    await withDatabase(async (database) => {
+      const windows = windowsFor(database, twoHouseNight(database))
+      expect(houseForSale(['performance-matinee'], windows, at(23))).toBe('performance-matinee')
+      expect(houseForSale([], windows, at(15))).toBeNull()
     })
   })
 })

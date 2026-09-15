@@ -21,7 +21,7 @@ import { qrTokenFor } from '#server/utils/qr-tokens'
 import { qrSvgBase64 } from '#server/utils/qr'
 import { sendWalkUpPaid } from '#server/utils/reservation-confirmation'
 import { barWindowsTonight, shiftOffsetDefaults } from '#server/utils/rota'
-import { pickByWindow } from '#shared/utils/rota-times'
+import { houseForSale } from '#shared/utils/rota-times'
 import { saleRefusal } from '#shared/utils/programme'
 import { holdExpiresAt, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
@@ -501,8 +501,12 @@ export async function performanceForSale(context: SaleContext, at: number): Prom
   if (covered.length <= 1) return covered[0] ?? null
 
   const windows = await barWindowsTonight(context.venueId, context.night, await shiftOffsetDefaults(context.event))
-  return pickByWindow(windows.filter(window => covered.includes(window.performanceId)), at)
+  return houseForSale(covered, windows, at)
 }
+
+// What the cross-check answers a hand-off with: the figure it agreed, and the house it resolved,
+// so the hand-off pins one rather than resolving it a second time (F-124 criterion 2, F-126).
+export interface PricedAttempt { soldTotalPence: number, performanceId: string | null }
 
 // Everything the commit checks before it writes, so a SumUp hand-off can run the identical
 // cross-check at the start and again at the answer (F-104, F-124 criteria 2 and 4).
@@ -560,10 +564,10 @@ async function prepareSale(
 
 // The cross-check alone, for a basket about to be handed to the SumUp app (F-124 criterion 2):
 // refused here means the app is never opened for it.
-export async function priceSaleForAttempt(input: SaleInput, on: string, context: SaleContext): Promise<number> {
+export async function priceSaleForAttempt(input: SaleInput, on: string, context: SaleContext): Promise<PricedAttempt> {
   const prepared = await prepareSale(input.lines, on, input.expectedTotalPence, input.ageCheck, input.discountId, context,
     { tickets: input.tickets, walkUps: input.walkUps, walkUpGuest: input.walkUpGuest })
-  return prepared.soldTotalPence
+  return { soldTotalPence: prepared.soldTotalPence, performanceId: prepared.performanceId }
 }
 
 export async function commitSale(
