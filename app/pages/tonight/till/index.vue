@@ -4,10 +4,8 @@ import { ID_TYPES, REFUSAL_REASONS, saysIdType, saysRefusalReason } from '#share
 import { says, saysMoney } from '#shared/utils/bar'
 import { saysAttemptStatus } from '#shared/utils/sumup'
 import type { IdType, InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
-import type { PricedBasket, PricedLine, SaleProduct, SaleReceipt, TillBooking, WalkUpOption } from '#shared/utils/sale'
-import type { SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
-import type { BasketLine, WalkUpLine } from '~/composables/useTillBasket'
-import type { ScannerFailure } from '~/composables/useQrScanner'
+import type { PricedBasket, SaleProduct, SaleReceipt } from '#shared/utils/sale'
+import type { ChargedReceipt } from '~/composables/useSumUpCharge'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/show-night/the-till' })
 useSeoMeta({ title: 'Till' })
@@ -51,144 +49,37 @@ const {
 // Two panes over one basket (F-122): the drinks grid, and the bookings and walk-ups.
 const pane = ref<'bar' | 'tickets'>('bar')
 
-// The Tickets pane's lookup: the camera (E-129's scanner), a reference, or a name.
-const cameraOpen = ref(false)
-const cameraNote = ref<string | null>(null)
-const lookupTerm = ref('')
-const lookingUp = ref(false)
-const lookupFailure = ref<string | null>(null)
-const found = ref<TillBooking[]>([])
-
-const cameraSays: Record<ScannerFailure, string> = {
-  NO_CAMERA: 'No camera on this device, so type the reference or a name.',
-  REFUSED: 'Camera access refused, so type the reference or a name. Allow it in the site settings to scan.',
-  BROKEN: 'The camera would not start, so type the reference or a name.',
-}
-
-function openCamera(): void {
-  cameraNote.value = null
-  lookupFailure.value = null
-  cameraOpen.value = true
-}
-
-function fallBackToTyping(failure: ScannerFailure): void {
-  cameraOpen.value = false
-  cameraNote.value = cameraSays[failure]
-}
-
-async function lookUp(): Promise<void> {
-  const q = lookupTerm.value.trim()
-  if (q.length < 2 || !venueId.value) return
-  lookingUp.value = true
-  lookupFailure.value = null
-  found.value = []
-  try {
-    const answered = await $fetch<{ bookings: TillBooking[] }>('/api/till/bookings', { query: { venueId: venueId.value, q } })
-    found.value = answered.bookings
-    if (found.value.length === 0) lookupFailure.value = `Nothing matching "${q}" on tonight's performances here.`
-  }
-  catch (refused) {
-    lookupFailure.value = refusalText(refused)
-  }
-  finally {
-    lookingUp.value = false
-  }
-}
-
-async function scanDecoded(value: string): Promise<void> {
-  if (lookingUp.value || !venueId.value) return
-  cameraOpen.value = false
-  lookingUp.value = true
-  lookupFailure.value = null
-  found.value = []
-  try {
-    const answered = await $fetch<{ booking: TillBooking }>('/api/till/bookings/scan', {
-      method: 'POST',
-      body: { venueId: venueId.value, scanned: value.trim() },
-    })
-    found.value = [answered.booking]
-  }
-  catch (refused) {
-    lookupFailure.value = refusalText(refused)
-  }
-  finally {
-    lookingUp.value = false
-  }
-}
-
-// Bookings whose money is in the basket (F-122 criterion 2): each once, and only a pending one.
-const ticketLines = ref<TillBooking[]>([])
-const ticketsPence = computed(() => ticketLines.value.reduce((sum, booking) => sum + booking.owedPence, 0))
-
-function addBooking(booking: TillBooking): void {
-  if (booking.refusal || ticketLines.value.some(line => line.id === booking.id)) return
-  ticketLines.value.push(booking)
-  found.value = []
-  lookupTerm.value = ''
-}
-
-function removeBooking(id: string): void {
-  ticketLines.value = ticketLines.value.filter(line => line.id !== id)
-}
-
-// A walk-up (F-123): one of tonight's houses here, a type at a quantity, and an optional guest.
-const authority = useNightAuthority()
-const walkUpPerformanceId = ref<string | undefined>(undefined)
-const walkUpOptions = ref<WalkUpOption[]>([])
-const walkUpOptionsFailure = ref<string | null>(null)
-const walkUpQty = ref<Record<string, number>>({})
-const walkUpGuestName = ref('')
-const walkUpGuestEmail = ref('')
-
-const walkUpLines = ref<WalkUpLine[]>([])
-const walkUpsPence = computed(() => walkUpLines.value.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0))
-
-const tonightsPerformances = computed(() => authority.value.performances)
-watch(tonightsPerformances, (performances) => {
-  if (!walkUpPerformanceId.value && performances.length === 1) walkUpPerformanceId.value = performances[0]!.id
-}, { immediate: true })
-
-watch(walkUpPerformanceId, async (performanceId) => {
-  walkUpOptions.value = []
-  walkUpQty.value = {}
-  walkUpOptionsFailure.value = null
-  if (!performanceId || !venueId.value) return
-  try {
-    const answered = await $fetch<{ options: WalkUpOption[] }>('/api/till/walk-up-options', { query: { venueId: venueId.value, performanceId } })
-    walkUpOptions.value = answered.options
-  }
-  catch (refused) {
-    walkUpOptionsFailure.value = refusalText(refused)
-  }
-})
-
-function bumpWalkUp(typeId: string, by: number): void {
-  walkUpQty.value[typeId] = Math.max(0, Math.min(20, (walkUpQty.value[typeId] ?? 0) + by))
-}
-
-function addWalkUps(): void {
-  const performance = tonightsPerformances.value.find(one => one.id === walkUpPerformanceId.value)
-  if (!performance) return
-  for (const option of walkUpOptions.value) {
-    const quantity = walkUpQty.value[option.id] ?? 0
-    if (quantity === 0) continue
-    const existing = walkUpLines.value.find(line => line.performanceId === performance.id && line.ticketTypeId === option.id)
-    if (existing) existing.quantity = Math.min(20, existing.quantity + quantity)
-    else walkUpLines.value.push({ performanceId: performance.id, showTitle: performance.showTitle, ticketTypeId: option.id, typeName: option.name, quantity, unitPrice: option.price })
-  }
-  walkUpQty.value = {}
-}
-
-function removeWalkUp(line: WalkUpLine): void {
-  walkUpLines.value = walkUpLines.value.filter(entry => entry !== line)
-}
-
-const walkUpGuest = computed(() => {
-  const name = walkUpGuestName.value.trim()
-  const email = walkUpGuestEmail.value.trim()
-  return name && email ? { name, email } : null
-})
-const walkUpGuestIncomplete = computed(() => Boolean(walkUpGuestName.value.trim()) !== Boolean(walkUpGuestEmail.value.trim()))
+const {
+  cameraOpen,
+  cameraNote,
+  lookupTerm,
+  lookingUp,
+  lookupFailure,
+  found,
+  openCamera,
+  fallBackToTyping,
+  lookUp,
+  scanDecoded,
+  ticketLines,
+  ticketsPence,
+  addBooking,
+  removeBooking,
+  walkUpPerformanceId,
+  walkUpOptions,
+  walkUpOptionsFailure,
+  walkUpQty,
+  walkUpGuestName,
+  walkUpGuestEmail,
+  walkUpLines,
+  walkUpsPence,
+  tonightsPerformances,
+  bumpWalkUp,
+  addWalkUps,
+  removeWalkUp,
+  walkUpGuest,
+  walkUpGuestIncomplete,
+  resetTickets,
+} = useTillTickets(venueId)
 
 const {
   basket,
@@ -225,15 +116,7 @@ const {
 
 const charging = ref(false)
 const chargeFailure = ref<string | null>(null)
-const charged = ref<{
-  totalPence: number
-  refusedLines: PricedLine[]
-  discount: SaleReceipt['discount']
-  tab: SaleReceipt['tab']
-  tickets: SaleReceipt['tickets']
-  walkUps: SaleReceipt['walkUps']
-  viaSumup: boolean
-} | null>(null)
+const charged = ref<ChargedReceipt | null>(null)
 
 type AgeCheckStep = 'closed' | 'choose' | 'refuse'
 const ageCheckStep = ref<AgeCheckStep>('closed')
@@ -253,9 +136,30 @@ function readyToCharge(): boolean {
   return basket.value.length === 0 || priced.value !== null
 }
 
-type Snapshot = { bar: BasketLine[], tickets: TillBooking[], walkUps: WalkUpLine[], discountId: string | null }
-const sumup = useSumUp<Snapshot>()
-const sumupAvailable = computed(() => sumupEnabled.value && sumup.handheld.value && selectedTabHolderId.value === null)
+const {
+  sumup,
+  sumupAvailable,
+  waiting,
+  waitingFailure,
+  resolving,
+  smpTxCodeTyped,
+  abandonNote,
+  openAttempts,
+  startWatching,
+  checkAttempt,
+  resolveAttempt,
+} = useSumUpCharge({
+  venueId,
+  sumupEnabled,
+  selectedTabHolderId,
+  session,
+  basket,
+  ticketLines,
+  walkUpLines,
+  selectedDiscountId,
+  charged,
+  chargeFailure,
+})
 
 // Which path the Challenge 25 prompt was opened for, so its answer goes the same way.
 const chargeVia = ref<'reader' | 'sumup'>('reader')
@@ -335,143 +239,6 @@ async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = null): Promi
   }
 }
 
-// While the app has the screen (criterion 5): asked on every return to the tab, and on a short
-// timer for a minute and a half, after which the "did it go through?" answers stay on offer.
-const waiting = ref<SumupAttemptView | null>(null)
-const waitingFailure = ref<string | null>(null)
-const resolving = ref(false)
-const smpTxCodeTyped = ref('')
-let watchTimer: ReturnType<typeof setInterval> | undefined
-let watchUntil = 0
-
-async function checkAttempt(): Promise<void> {
-  const pending = sumup.pending.value
-  if (!pending) return
-  try {
-    const answered = await $fetch<{ attempt: SumupAttemptView }>(`/api/till/payments/${pending.id}`)
-    waiting.value = answered.attempt
-    waitingFailure.value = null
-    settleAttempt(answered.attempt.status, pending)
-  }
-  catch (refused) {
-    waitingFailure.value = refusalText(refused)
-  }
-}
-
-// What the till does once an attempt has an answer: a success clears the basket, a failure or an
-// abandonment brings it back, a mismatch stays on screen with its reason (criteria 4, 5).
-function settleAttempt(status: SumupAttemptStatus, pending: NonNullable<typeof sumup.pending.value>): void {
-  if (status === 'SUCCEEDED') {
-    stopWatching()
-    charged.value = { totalPence: pending.totalPence, refusedLines: [], discount: null, tab: null, tickets: [], walkUps: [], viaSumup: true }
-    basket.value = []
-    ticketLines.value = []
-    walkUpLines.value = []
-    selectedDiscountId.value = null
-    sumup.forget()
-    waiting.value = null
-    void refreshOpenAttempts()
-  }
-  else if (status === 'FAILED' || status === 'ABANDONED') {
-    stopWatching()
-    basket.value = pending.basket.bar
-    ticketLines.value = pending.basket.tickets
-    walkUpLines.value = pending.basket.walkUps
-    selectedDiscountId.value = pending.basket.discountId
-    chargeFailure.value = status === 'FAILED' ? 'The SumUp app reported the payment did not go through. The basket is back.' : 'That hand-off was abandoned. The basket is back; if the reader did take the money, ring it up again.'
-    sumup.forget()
-    waiting.value = null
-    void refreshOpenAttempts()
-  }
-  else if (status === 'MISMATCH') {
-    stopWatching()
-    void refreshOpenAttempts()
-  }
-}
-
-function startWatching(): void {
-  stopWatching()
-  watchUntil = Date.now() + 90_000
-  watchTimer = setInterval(() => {
-    if (Date.now() > watchUntil) {
-      stopWatching()
-      return
-    }
-    void checkAttempt()
-  }, 3_000)
-}
-
-function stopWatching(): void {
-  if (watchTimer) clearInterval(watchTimer)
-  watchTimer = undefined
-}
-
-function onReturnToTab(): void {
-  if (document.visibilityState === 'visible' && sumup.pending.value) void checkAttempt()
-}
-
-onMounted(() => {
-  if (sumup.recall()) {
-    void checkAttempt()
-    startWatching()
-  }
-  document.addEventListener('visibilitychange', onReturnToTab)
-  window.addEventListener('focus', onReturnToTab)
-  window.addEventListener('pageshow', onReturnToTab)
-})
-
-onBeforeUnmount(() => {
-  stopWatching()
-  document.removeEventListener('visibilitychange', onReturnToTab)
-  window.removeEventListener('focus', onReturnToTab)
-  window.removeEventListener('pageshow', onReturnToTab)
-})
-
-// "Did it go through?" (criterion 5), for the attempt this screen started or one listed below.
-async function resolveAttempt(id: string, outcome: 'succeeded' | 'abandoned', note: string | null = null): Promise<void> {
-  resolving.value = true
-  waitingFailure.value = null
-  try {
-    const answered = await $fetch<{ status: SumupAttemptStatus, error: string | null }>(`/api/till/payments/${id}/resolve`, {
-      method: 'POST',
-      body: { outcome, smpTxCode: smpTxCodeTyped.value.trim() || null, note },
-    })
-    smpTxCodeTyped.value = ''
-    const pending = sumup.pending.value
-    if (pending && pending.id === id) {
-      waiting.value = { ...(waiting.value ?? { id, status: answered.status, createdAt: 0, createdByName: null, expectedTotalPence: pending.totalPence, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }), status: answered.status, error: answered.error }
-      settleAttempt(answered.status, pending)
-    }
-    else {
-      await refreshOpenAttempts()
-    }
-    if (answered.status === 'MISMATCH') waitingFailure.value = answered.error
-  }
-  catch (refused) {
-    waitingFailure.value = refusalText(refused)
-  }
-  finally {
-    resolving.value = false
-  }
-}
-
-// A mismatch abandoned needs a note: the reader has money the ledger does not (criterion 4).
-const abandonNote = ref('')
-
-// Tonight's open hand-offs (criterion 6), so the laptop can answer for a phone that left one.
-const openAttempts = ref<SumupAttemptView[]>([])
-async function refreshOpenAttempts(): Promise<void> {
-  if (!venueId.value || !sumupEnabled.value) return
-  try {
-    const answered = await $fetch<{ attempts: SumupAttemptView[] }>('/api/till/payments', { query: { venueId: venueId.value } })
-    openAttempts.value = answered.attempts.filter(attempt => attempt.id !== sumup.pending.value?.id)
-  }
-  catch { /* the strip is a convenience; the till still sells */ }
-}
-watch([session, sumupEnabled], () => {
-  if (session.value) void refreshOpenAttempts()
-})
-
 function timeOf(at: number): string {
   return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
 }
@@ -499,12 +266,7 @@ function refuseAgeCheck(): void {
 
 function nextSale(): void {
   resetBasket()
-  ticketLines.value = []
-  walkUpLines.value = []
-  walkUpGuestName.value = ''
-  walkUpGuestEmail.value = ''
-  found.value = []
-  lookupTerm.value = ''
+  resetTickets()
   charged.value = null
   chargeFailure.value = null
   selectedDiscountId.value = null

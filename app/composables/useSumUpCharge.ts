@@ -1,0 +1,194 @@
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useSumUp } from './useSumUp'
+import { refusalText } from '../utils/refusal'
+import type { Ref } from 'vue'
+import type { PricedLine, SaleReceipt, TillBooking } from '#shared/utils/sale'
+import type { SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
+import type { TillSession } from '#shared/utils/till'
+import type { BasketLine, WalkUpLine } from './useTillBasket'
+
+// The screen-side half of a SumUp hand-off (F-124): the attempt lifecycle, the poll, the
+// visibility listeners and what happens once an answer lands. `useSumUp` holds the device state.
+
+export interface ChargedReceipt {
+  totalPence: number
+  refusedLines: PricedLine[]
+  discount: SaleReceipt['discount']
+  tab: SaleReceipt['tab']
+  tickets: SaleReceipt['tickets']
+  walkUps: SaleReceipt['walkUps']
+  viaSumup: boolean
+}
+
+export type SumUpSnapshot = { bar: BasketLine[], tickets: TillBooking[], walkUps: WalkUpLine[], discountId: string | null }
+
+export interface SumUpChargeDeps {
+  venueId: Ref<string | null>
+  sumupEnabled: Ref<boolean>
+  selectedTabHolderId: Ref<string | null>
+  session: Ref<TillSession | null>
+  basket: Ref<BasketLine[]>
+  ticketLines: Ref<TillBooking[]>
+  walkUpLines: Ref<WalkUpLine[]>
+  selectedDiscountId: Ref<string | null>
+  charged: Ref<ChargedReceipt | null>
+  chargeFailure: Ref<string | null>
+}
+
+export function useSumUpCharge(deps: SumUpChargeDeps) {
+  const { venueId, sumupEnabled, selectedTabHolderId, session, basket, ticketLines, walkUpLines, selectedDiscountId, charged, chargeFailure } = deps
+
+  const sumup = useSumUp<SumUpSnapshot>()
+  const sumupAvailable = computed(() => sumupEnabled.value && sumup.handheld.value && selectedTabHolderId.value === null)
+
+  // While the app has the screen (criterion 5): asked on every return to the tab, and on a short
+  // timer for a minute and a half, after which the "did it go through?" answers stay on offer.
+  const waiting = ref<SumupAttemptView | null>(null)
+  const waitingFailure = ref<string | null>(null)
+  const resolving = ref(false)
+  const smpTxCodeTyped = ref('')
+  let watchTimer: ReturnType<typeof setInterval> | undefined
+  let watchUntil = 0
+
+  async function checkAttempt(): Promise<void> {
+    const pending = sumup.pending.value
+    if (!pending) return
+    try {
+      const answered = await $fetch<{ attempt: SumupAttemptView }>(`/api/till/payments/${pending.id}`)
+      waiting.value = answered.attempt
+      waitingFailure.value = null
+      settleAttempt(answered.attempt.status, pending)
+    }
+    catch (refused) {
+      waitingFailure.value = refusalText(refused)
+    }
+  }
+
+  // What the till does once an attempt has an answer: a success clears the basket, a failure or an
+  // abandonment brings it back, a mismatch stays on screen with its reason (criteria 4, 5).
+  function settleAttempt(status: SumupAttemptStatus, pending: NonNullable<typeof sumup.pending.value>): void {
+    if (status === 'SUCCEEDED') {
+      stopWatching()
+      charged.value = { totalPence: pending.totalPence, refusedLines: [], discount: null, tab: null, tickets: [], walkUps: [], viaSumup: true }
+      basket.value = []
+      ticketLines.value = []
+      walkUpLines.value = []
+      selectedDiscountId.value = null
+      sumup.forget()
+      waiting.value = null
+      void refreshOpenAttempts()
+    }
+    else if (status === 'FAILED' || status === 'ABANDONED') {
+      stopWatching()
+      basket.value = pending.basket.bar
+      ticketLines.value = pending.basket.tickets
+      walkUpLines.value = pending.basket.walkUps
+      selectedDiscountId.value = pending.basket.discountId
+      chargeFailure.value = status === 'FAILED' ? 'The SumUp app reported the payment did not go through. The basket is back.' : 'That hand-off was abandoned. The basket is back; if the reader did take the money, ring it up again.'
+      sumup.forget()
+      waiting.value = null
+      void refreshOpenAttempts()
+    }
+    else if (status === 'MISMATCH') {
+      stopWatching()
+      void refreshOpenAttempts()
+    }
+  }
+
+  function startWatching(): void {
+    stopWatching()
+    watchUntil = Date.now() + 90_000
+    watchTimer = setInterval(() => {
+      if (Date.now() > watchUntil) {
+        stopWatching()
+        return
+      }
+      void checkAttempt()
+    }, 3_000)
+  }
+
+  function stopWatching(): void {
+    if (watchTimer) clearInterval(watchTimer)
+    watchTimer = undefined
+  }
+
+  function onReturnToTab(): void {
+    if (document.visibilityState === 'visible' && sumup.pending.value) void checkAttempt()
+  }
+
+  onMounted(() => {
+    if (sumup.recall()) {
+      void checkAttempt()
+      startWatching()
+    }
+    document.addEventListener('visibilitychange', onReturnToTab)
+    window.addEventListener('focus', onReturnToTab)
+    window.addEventListener('pageshow', onReturnToTab)
+  })
+
+  onBeforeUnmount(() => {
+    stopWatching()
+    document.removeEventListener('visibilitychange', onReturnToTab)
+    window.removeEventListener('focus', onReturnToTab)
+    window.removeEventListener('pageshow', onReturnToTab)
+  })
+
+  // "Did it go through?" (criterion 5), for the attempt this screen started or one listed below.
+  async function resolveAttempt(id: string, outcome: 'succeeded' | 'abandoned', note: string | null = null): Promise<void> {
+    resolving.value = true
+    waitingFailure.value = null
+    try {
+      const answered = await $fetch<{ status: SumupAttemptStatus, error: string | null }>(`/api/till/payments/${id}/resolve`, {
+        method: 'POST',
+        body: { outcome, smpTxCode: smpTxCodeTyped.value.trim() || null, note },
+      })
+      smpTxCodeTyped.value = ''
+      const pending = sumup.pending.value
+      if (pending && pending.id === id) {
+        waiting.value = { ...(waiting.value ?? { id, status: answered.status, createdAt: 0, createdByName: null, expectedTotalPence: pending.totalPence, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }), status: answered.status, error: answered.error }
+        settleAttempt(answered.status, pending)
+      }
+      else {
+        await refreshOpenAttempts()
+      }
+      if (answered.status === 'MISMATCH') waitingFailure.value = answered.error
+    }
+    catch (refused) {
+      waitingFailure.value = refusalText(refused)
+    }
+    finally {
+      resolving.value = false
+    }
+  }
+
+  // A mismatch abandoned needs a note: the reader has money the ledger does not (criterion 4).
+  const abandonNote = ref('')
+
+  // Tonight's open hand-offs (criterion 6), so the laptop can answer for a phone that left one.
+  const openAttempts = ref<SumupAttemptView[]>([])
+  async function refreshOpenAttempts(): Promise<void> {
+    if (!venueId.value || !sumupEnabled.value) return
+    try {
+      const answered = await $fetch<{ attempts: SumupAttemptView[] }>('/api/till/payments', { query: { venueId: venueId.value } })
+      openAttempts.value = answered.attempts.filter(attempt => attempt.id !== sumup.pending.value?.id)
+    }
+    catch { /* the strip is a convenience; the till still sells */ }
+  }
+  watch([session, sumupEnabled], () => {
+    if (session.value) void refreshOpenAttempts()
+  })
+
+  return {
+    sumup,
+    sumupAvailable,
+    waiting,
+    waitingFailure,
+    resolving,
+    smpTxCodeTyped,
+    abandonNote,
+    openAttempts,
+    checkAttempt,
+    startWatching,
+    resolveAttempt,
+  }
+}
