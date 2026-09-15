@@ -239,6 +239,9 @@ describe.skipIf(skip !== null)('the screen', () => {
     const item = await anItem()
     await deliver(item.id, 10, 480)
     const opened = await open()
+    // A stocktake snapshots every active item in the catalogue, not just this test's own, so the
+    // uncounted total after counting one line is whatever is left over from earlier tests.
+    const uncountedAfter = opened.lines.length - 1
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -254,7 +257,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, '[data-test="open-apply"]')
     await waitFor(view, `document.querySelector('[data-test="apply-summary"]')`)
     expect(await textOf(view, '[data-test="apply-counted"]')).toContain('1')
-    expect(await textOf(view, '[data-test="apply-uncounted"]')).toContain('0')
+    expect(await textOf(view, '[data-test="apply-uncounted"]')).toContain(String(uncountedAfter))
     // 7 counted against 10 expected, at 480 pence each: -3 * 480.
     expect(await textOf(view, '[data-test="apply-net-variance"]')).toContain('14.40')
 
