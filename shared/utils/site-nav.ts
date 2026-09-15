@@ -121,6 +121,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     items: [
       { label: 'Products', icon: 'i-lucide-beer', to: '/bar/products', ability: viewBarCatalogue },
       { label: 'Categories', icon: 'i-lucide-layout-grid', to: '/bar/categories', ability: viewBarCatalogue },
+      { label: 'Discounts', icon: 'i-lucide-percent', to: '/bar/discounts', ability: viewBarCatalogue },
       // Shortened from "Stocked items" and "Stock movements": both truncated at the sidebar's
       // default width (issue 921).
       { label: 'Stock', icon: 'i-lucide-package', to: '/bar/stock', ability: viewBarStock, exact: true },
