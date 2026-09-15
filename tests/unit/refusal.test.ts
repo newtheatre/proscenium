@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { enrolPath, needsReauthentication, refusalText } from '../../app/utils/refusal'
+import { enrolPath, needsReauthentication, refusalText, writeFailureText } from '../../app/utils/refusal'
 
 // $fetch's own shape for an h3 createError: the response body lands whole on .data, and a
 // route's own `data:` payload (createError's second-level data) nests one level further under it.
@@ -60,5 +60,20 @@ describe('refusalText still prefers the route-written message alongside enrolPat
     const error = refusal('This role needs an authenticator app before it can be used', { enrol: '/account/security' })
     expect(refusalText(error)).toBe('This role needs an authenticator app before it can be used')
     expect(enrolPath(error)).toBe('/account/security')
+  })
+})
+
+// review-ui.md finding 16: a write is unprotected by design (K-103 protects reads only), so a
+// network drop mid-write needs its own words, not the generic "did not work" fallback.
+describe('writeFailureText tells a transport failure apart from an ordinary refusal', () => {
+  test('an ordinary refusal, with a statusCode, reads as normal', () => {
+    const error = { statusCode: 409, data: { statusMessage: 'The total has changed: £5.00 now, was £4.50' } }
+    expect(writeFailureText(error, 'Check the last sale.')).toBe('The total has changed: £5.00 now, was £4.50')
+  })
+
+  test('a transport failure, no statusCode at all, says the write may or may not have landed', () => {
+    const error = new TypeError('Failed to fetch')
+    expect(writeFailureText(error, 'Check the last sale before ringing it up again.'))
+      .toBe('The connection dropped, so it may or may not have gone through. Check the last sale before ringing it up again.')
   })
 })

@@ -91,11 +91,18 @@ export function useTillBasket(deps: TillBasketDeps) {
   const hasTicketMoney = computed(() => ticketLines.value.length > 0 || walkUpLines.value.length > 0)
   const basketEmpty = computed(() => basket.value.length === 0 && !hasTicketMoney.value)
 
-  // Credit cannot pay for a ticket (F-122 criterion 5): the holder itself has to let go, not
-  // just its picker, or the pinned action keeps naming a tab the server would then refuse.
-  watch(hasTicketMoney, (has) => {
-    if (has) selectedTabHolderId.value = null
-  })
+  // Every rule that makes a chosen discount or tab holder impossible lands here, so the next
+  // one changes this function rather than adding another watch (F-122 criterion 5).
+  function resetInvalidSelections(): void {
+    if (hasTicketMoney.value) selectedTabHolderId.value = null
+  }
+  watch(hasTicketMoney, resetInvalidSelections)
+
+  // A fresh sale starts with neither chosen, unconditionally rather than only when invalid.
+  function resetSelections(): void {
+    selectedDiscountId.value = null
+    selectedTabHolderId.value = null
+  }
 
   const priced = ref<PricedBasket | null>(null)
   const pricing = ref(false)
@@ -120,6 +127,9 @@ export function useTillBasket(deps: TillBasketDeps) {
     }
     catch (refused) {
       priceFailure.value = refusalText(refused)
+      // The pinned charge button reads this too: a failure leaving the last good figure in
+      // place would show a wrong total as a right one (F-103 criterion 3).
+      priced.value = null
     }
     finally {
       pricing.value = false
@@ -211,5 +221,7 @@ export function useTillBasket(deps: TillBasketDeps) {
     saleBody,
     expectedAfter,
     resetBasket,
+    resetInvalidSelections,
+    resetSelections,
   }
 }

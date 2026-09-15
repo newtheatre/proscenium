@@ -28,3 +28,11 @@ export function needsReauthentication(error: unknown): boolean {
 export function enrolPath(error: unknown): string | null {
   return refusalData<{ enrol?: string }>(error)?.enrol ?? null
 }
+
+// K-103 protects reads; a write is unprotected by design, so a transport failure (no response at
+// all, not even a refusal) needs its own words: whether it landed is unknown, not merely refused.
+export function writeFailureText(error: unknown, whatToCheck: string): string {
+  return refusalStatus(error) === undefined
+    ? `The connection dropped, so it may or may not have gone through. ${whatToCheck}`
+    : refusalText(error)
+}
