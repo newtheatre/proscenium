@@ -70,8 +70,8 @@ export const showNight: Shot[] = [
     width: PHONE_WIDTH,
     annotations: [
       { selector: '[data-test="till-open"]', label: 'Open since' },
-      { selector: '[data-test="pane-bar"]', label: 'Bar' },
-      { selector: '[data-test="pane-tickets"]', label: 'Tickets' },
+      { selector: '[data-test="till-panes"] button[role="tab"]:nth-of-type(1)', label: 'Bar' },
+      { selector: '[data-test="till-panes"] button[role="tab"]:nth-of-type(2)', label: 'Tickets' },
       { selector: '[data-test^="variant-"]', label: 'A size' },
       { selector: '[data-test^="allergen-"]', label: 'Allergens' },
       { selector: '[data-test="till-overflow-menu"]', label: 'Close till (not a per-sale action)' },
