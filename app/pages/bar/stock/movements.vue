@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
+import { REASONS_BY_KIND, says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { MovementReason, StockItem, StockMovement } from '#shared/utils/bar'
@@ -40,7 +40,8 @@ const { data, status, error, refresh } = await useAsyncData(
   { watch: [query], default: noMovements },
 )
 
-const reasonOptions = MOVEMENT_REASONS.map(value => ({ label: says(value), value }))
+// A reversal always posts REVERSAL, so only that kind's own reasons are offered (F-204, 3.5).
+const reasonOptions = (REASONS_BY_KIND.REVERSAL ?? []).map(value => ({ label: says(value), value }))
 
 // Pinned to Europe/London, because the worker runs in UTC and half the year would read wrong.
 const when = (at: number): string =>

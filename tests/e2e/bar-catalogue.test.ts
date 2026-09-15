@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, menuOptions, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -832,6 +832,39 @@ describe.skipIf(skip !== null)('the screens', () => {
 
     // A delivery is the modal's default, so what the screen wrote adds to what the API delivered.
     expect(await onHand(itemId)).toBe(3250)
+    view.close()
+  }, 120_000)
+
+  // The picker offers only what the write path accepts for the chosen kind, and forgets a
+  // choice that stops making sense when the kind changes under it (F-204, 3.5).
+  test('the reason picker is filtered by kind, and resets when the kind changes', async () => {
+    const itemId = await addItem({ name: named('Reason bottle') })
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock?search=Reason`, `[data-test="move-${itemId}"]`)
+    await click(view, `[data-test="move-${itemId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
+
+    await pickOption(view, '[data-test="movement-kind"]', 'Wastage')
+    await waitFor(view, `document.querySelector('[data-test="movement-reason"]')`)
+    expect(await menuOptions(view, '[data-test="movement-reason"]')).toEqual([
+      'Breakage', 'Spillage', 'Out of date', 'Line cleaning', 'Quality', 'Training', 'Other',
+    ])
+    await pickOption(view, '[data-test="movement-reason"]', 'Breakage')
+
+    // Adjustment's own reasons replace wastage's, and the reason chosen a moment ago does not survive.
+    await pickOption(view, '[data-test="movement-kind"]', 'Adjustment')
+    expect(await menuOptions(view, '[data-test="movement-reason"]')).toEqual([
+      'Count correction', 'Opening balance', 'Other',
+    ])
+    expect(await textOf(view, '[data-test="movement-reason"]')).not.toContain('Breakage')
+
     view.close()
   }, 120_000)
 })
