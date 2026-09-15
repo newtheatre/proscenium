@@ -1136,7 +1136,8 @@ UNIQUE (`venue_id`, `role`). CHECK: a `DUTY_MANAGER` row has `count` 1.
 The two offsets are this role's own window at this venue, in minutes (0078). NULL is the honest
 starting state and takes `SHIFT_START_BEFORE_DOORS_MINUTES` and
 `SHIFT_END_AFTER_CURTAIN_DOWN_MINUTES`: a venue nobody has asked the question of is not claiming an
-answer. They are read at stamp time and never again, so editing them changes nothing already
+answer. They are read when a shift is stamped, and again only when its performance is restamped
+after a curtain change or filled by the backfill; editing them alone changes nothing already
 stamped.
 There is no venue-wide fallback template. A venue with no rows has no template and its
 performances stamp nothing, which is what E-101 criterion 4 asks to be visible rather than
@@ -1182,7 +1183,7 @@ template edit does not, because it is not.
 The bar's own window is also what says which house a sale belongs to on a two-performance day:
 `barWindowsTonight()` computes one per performance at the venue, and a sale takes the window
 containing it, else the nearest, ties to the earlier, later house first where two contain it
-(F-126). A comp request records the same answer on `comp_requests.performance_id` when it is asked.
+(F-126). A comp resolves its house the same way.
 
 Moving a performance to another venue carries a claimed or confirmed shift with it and
 restamps the open ones from the new venue's template; a held shift in a role the new venue's
