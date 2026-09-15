@@ -38,7 +38,7 @@ bun run migration:review-roles    # one prompt per live old grant; answers land 
 bun run migration:copy-posters    # copies show posters between R2 buckets; can run alongside the build
 bun run migration:build           # schema, identity, catalogue, every history, reconciled; out/target.sqlite
 bun run migration:dump -- --skip-ledger   # out/publish/NNN-data.sql plus counts.json
-./migration/reset-production.sh --i-mean-it unified   # production, by hand, with the NUXT_HUB_* triplet set
+bun run build && bash ./migration/reset-production.sh --i-mean-it unified   # production, by hand, on the wrangler login
 ```
 
 `build.ts` prints one line per step (`ok` or `FAILED` with each problem) and a row count per
@@ -114,8 +114,9 @@ file is quadratic and did not finish in ten minutes; this takes under a second.
 
 ## Publishing
 
-`dump-data.ts` writes INSERT files parents-first, twenty thousand statements each, leaving out the
-rows the migrations themselves seed (recognised by any unique key: their ids differ per database).
+`dump-data.ts` writes INSERT files parents-first, twenty thousand statements each, with no `PRAGMA`
+(D1's file import refuses one), leaving out the rows the migrations themselves seed (recognised by
+any unique key: their ids differ per database), and a children-first `000-drop.sql` beside them.
 `reset-production.sh` records each loaded file in `out/publish/DONE`, so a run that stops halfway
 picks up where it stopped, and ends by comparing every table's count with `out/publish/counts.json`.
 The bookmark it prints first is the way back: `docs/operations.md` has the restore command.

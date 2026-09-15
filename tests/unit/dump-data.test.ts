@@ -62,7 +62,8 @@ describe('dumpData writes INSERT files that reload into the same schema', () => 
     expect(statements).toBe(4)
     expect(counts).toEqual({ parents: 2, children: 1, grandchildren: 1 })
     expect(files).toEqual(['001-data.sql'])
-    expect(readdirSync(dir)).toEqual(files)
+    // The drop script sits beside the data files for reset-production.sh, children first.
+    expect(readdirSync(dir)).toEqual(['000-drop.sql', ...files])
 
     const reloaded = new Database(':memory:')
     reloaded.exec('PRAGMA foreign_keys = ON;')
