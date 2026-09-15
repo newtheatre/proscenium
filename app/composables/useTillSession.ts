@@ -71,15 +71,21 @@ export function useTillSession() {
   const actualZPence = computed(() => Math.round((actualZPounds.value ?? 0) * 100))
   const variancePreviewPence = computed(() => (reconciliation.value ? actualZPence.value - reconciliation.value.bar.expectedPence : 0))
 
-  async function openCloseModal(): Promise<void> {
-    if (!session.value) return
-    closeModalOpen.value = true
-    reconciliation.value = null
-    reconciliationFailure.value = null
-    actualZPounds.value = undefined
+  // A note explains one variance, not a different one: it clears on either side changing, a
+  // corrected Z figure or a refetched expected figure (F-118 criterion 3). The only reset.
+  watch([actualZPounds, () => reconciliation.value?.bar.expectedPence], () => {
     varianceNote.value = ''
-    closeFailure.value = null
-    reconciliationLoading.value = true
+  })
+
+  // reconciliationLoading blanks the modal, fine on the first open with nothing else to show; a
+  // retry after a refusal keeps the form mounted and dims it with refreshing instead.
+  const refreshing = ref(false)
+
+  async function refreshReconciliation(showLoadingScreen = false): Promise<void> {
+    if (!session.value) return
+    reconciliationFailure.value = null
+    refreshing.value = true
+    if (showLoadingScreen) reconciliationLoading.value = true
     try {
       reconciliation.value = await request<NightReconciliation>(`/api/till/${session.value.id}/reconciliation`)
     }
@@ -87,8 +93,18 @@ export function useTillSession() {
       reconciliationFailure.value = refusalText(refused)
     }
     finally {
-      reconciliationLoading.value = false
+      refreshing.value = false
+      if (showLoadingScreen) reconciliationLoading.value = false
     }
+  }
+
+  async function openCloseModal(): Promise<void> {
+    if (!session.value) return
+    closeModalOpen.value = true
+    reconciliation.value = null
+    actualZPounds.value = undefined
+    closeFailure.value = null
+    await refreshReconciliation(true)
   }
 
   async function confirmClose(): Promise<void> {
@@ -110,6 +126,9 @@ export function useTillSession() {
     }
     catch (refused) {
       closeFailure.value = refusalText(refused)
+      // The server's own expected figure may have moved since the modal opened (a sale landed
+      // elsewhere): refetch so the preview and the note field answer to the same figure it does.
+      await refreshReconciliation()
     }
     finally {
       closingBusy.value = false
@@ -132,6 +151,7 @@ export function useTillSession() {
     reconciliation,
     reconciliationLoading,
     reconciliationFailure,
+    refreshing,
     actualZPounds,
     varianceNote,
     closingBusy,

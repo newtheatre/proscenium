@@ -369,7 +369,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, `[data-test="tab-holder-${member.id}"]`)
     await waitFor(view, `document.querySelector('[aria-label^="Put"]')`)
 
-    await click(view, '[data-test="pane-tickets"]')
+    await view.evaluate(`[...document.querySelectorAll('[role="tab"]')].find(el => el.textContent.includes('Tickets')).click()`)
     await fill(view, '[data-test="ticket-lookup"]', booking.reference)
     await click(view, '[data-test="ticket-lookup-submit"]')
     await waitFor(view, `document.querySelector('[data-test="found-add-${booking.id}"]')`)

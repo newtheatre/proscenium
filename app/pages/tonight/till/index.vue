@@ -23,6 +23,7 @@ const {
   reconciliation,
   reconciliationLoading,
   reconciliationFailure,
+  refreshing,
   actualZPounds,
   varianceNote,
   closingBusy,
@@ -45,8 +46,10 @@ const {
   selectedTabHolderId,
 } = useTillCatalogue(session, venueId)
 
-// Two panes over one basket (F-122): the drinks grid, and the bookings and walk-ups.
+// Two panes over one basket (F-122). UTabs' own panel markup does not fit the basket sitting
+// under both, so this only renders the trigger list (:content="false") and the panes below it.
 const pane = ref<'bar' | 'tickets'>('bar')
+const PANE_TABS: { value: 'bar' | 'tickets', label: string }[] = [{ value: 'bar', label: 'Bar' }, { value: 'tickets', label: 'Tickets' }]
 
 const {
   cameraOpen,
@@ -297,7 +300,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             Open since {{ londonClock(new Date(session.openedAt * 1000)) }}.
           </p>
           <!-- Not a per-sale action, so it lives here rather than under the thumb (K-102
-               criterion 2, review-ui.md finding 6). -->
+               criterion 2). -->
           <UDropdownMenu
             :items="[[{ label: 'Close till', icon: 'i-lucide-lock', onSelect: openCloseModal }]]"
           >
@@ -343,43 +346,25 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         />
 
         <template v-if="!charged">
-          <!-- Two panes over one basket (F-122 criterion 1). -->
-          <div
-            class="grid grid-cols-2 gap-2"
-            role="tablist"
+          <UTabs
+            v-model="pane"
+            :items="PANE_TABS"
+            :content="false"
+            class="w-full"
             data-test="till-panes"
-          >
-            <UButton
-              role="tab"
-              :aria-selected="pane === 'bar'"
-              :color="pane === 'bar' ? 'primary' : 'neutral'"
-              :variant="pane === 'bar' ? 'solid' : 'subtle'"
-              class="min-h-12 justify-center"
-              data-test="pane-bar"
-              @click="pane = 'bar'"
-            >
-              Bar
-            </UButton>
-            <UButton
-              role="tab"
-              :aria-selected="pane === 'tickets'"
-              :color="pane === 'tickets' ? 'primary' : 'neutral'"
-              :variant="pane === 'tickets' ? 'solid' : 'subtle'"
-              class="min-h-12 justify-center"
-              data-test="pane-tickets"
-              @click="pane = 'tickets'"
-            >
-              Tickets
-            </UButton>
-          </div>
+          />
 
           <TillTicketsPane
             v-if="pane === 'tickets'"
+            id="pane-tickets-panel"
             v-model:lookup-term="lookupTerm"
             v-model:camera-open="cameraOpen"
             v-model:walk-up-performance-id="walkUpPerformanceId"
             v-model:walk-up-guest-name="walkUpGuestName"
             v-model:walk-up-guest-email="walkUpGuestEmail"
+            role="tabpanel"
+            aria-label="Tickets"
+            tabindex="0"
             :looking-up="lookingUp"
             :camera-note="cameraNote"
             :lookup-failure="lookupFailure"
@@ -401,6 +386,10 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
 
           <TillProductGrid
             v-show="pane === 'bar'"
+            id="pane-bar-panel"
+            role="tabpanel"
+            aria-label="Bar"
+            tabindex="0"
             :categories="categories"
             :products-in="productsIn"
             :choosing="choosing"
@@ -580,6 +569,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
       :reconciliation-loading="reconciliationLoading"
       :reconciliation-failure="reconciliationFailure"
       :reconciliation="reconciliation"
+      :refreshing="refreshing"
       :variance-preview-pence="variancePreviewPence"
       :close-failure="closeFailure"
       :closing-busy="closingBusy"

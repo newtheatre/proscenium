@@ -1,12 +1,15 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
+import { sqliteTarget } from '#tests/helpers/database'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
+import { adminSession, forgetSpentStep, markVerified, registerMember, request } from '#tests/helpers/accounts'
+import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
-// K-101 criterion 1, over the screens that exist. The booking flow, the door and the till are
-// named in the story and have no code yet; this list grows with them.
+// K-101 criterion 1, over the screens that exist. The booking flow and the door are named in
+// the story and have no code yet; this list grows with them.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -36,7 +39,12 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
 async function violationsOn(view: Bun.WebView, path: string, marker?: string): Promise<Violation[]> {
   await visit(view, `${app.baseURL}${path}`, marker)
+  return violationsHere(view)
+}
 
+// For a state reached by interaction rather than a URL (a modal, say): scans the page as it
+// currently stands, with no navigation to lose it.
+async function violationsHere(view: Bun.WebView): Promise<Violation[]> {
   // Injected as a script element rather than evaluated: axe is a UMD bundle, and an expression
   // is not what it is.
   await view.evaluate(`(() => {
@@ -166,8 +174,47 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
       await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
 
       expect(await violationsOn(view, '/rooms/manage', '[data-test="rooms-table"]')).toEqual([])
-      // review-ui.md finding 11: raw enum values and unlabelled period fields.
+      // 0032's says() treatment and labelled fields apply to a period picker too.
       expect(await violationsOn(view, '/bar/reports', '[data-test="period-kind"]')).toEqual([])
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // K-101 criterion 1 over the close dialogue too (F-118 criterion 3): its own fields and its
+  // own tab pattern.
+  test('the till has none either, mid-sale and in the close dialogue', async () => {
+    const barPassword = generatePassword()
+    const bar = await registerMember(app, 'a11y-till-bar', barPassword)
+    const officer = await adminSession(app)
+    await request(app, 'POST', '/api/admin/roles', { userId: bar.id, role: 'BAR_MANAGER' }, officer.cookie)
+
+    const database = new Database(app.databaseFile)
+    let venueId: string
+    try {
+      venueId = tonightsPerformance(sqliteTarget(database), { suffix: 'a11y-till' }).venueId
+    }
+    finally {
+      database.close()
+    }
+    await request(app, 'POST', '/api/till', { venueId }, bar.cookie)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', bar.email)
+      await fill(view, 'form input[type="password"]', barPassword)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+
+      expect(await violationsOn(view, `/tonight/till?venueId=${venueId}`, '[data-test="till-panes"]')).toEqual([])
+
+      await click(view, '[data-test="till-overflow-menu"]')
+      await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
+      await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+      await waitFor(view, `document.querySelector('[data-test="reconciliation-breakdown"]')`)
+      expect(await violationsHere(view)).toEqual([])
     }
     finally {
       view.close()

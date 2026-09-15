@@ -5,10 +5,11 @@ import type { NightReconciliation } from '#shared/utils/reconciliation'
 // What the ledger expects, and what the reader actually shows (F-102 criterion 4, F-118
 // criterion 3): closing mid-service is not a per-sale action, so this stays behind a modal.
 
-defineProps<{
+const props = defineProps<{
   reconciliationLoading: boolean
   reconciliationFailure: string | null
   reconciliation: NightReconciliation | null
+  refreshing: boolean
   variancePreviewPence: number
   closeFailure: string | null
   closingBusy: boolean
@@ -18,6 +19,12 @@ const emit = defineEmits<{ confirm: [] }>()
 const open = defineModel<boolean>('open', { required: true })
 const actualZPounds = defineModel<number | undefined>('actualZPounds')
 const varianceNote = defineModel<string>('varianceNote', { required: true })
+
+// A blank field defaults to nought pence, which a night with nothing sold would agree with by
+// accident: Confirm close waits for a reading actually typed in, not the default it started at.
+const hasReading = computed(() => typeof actualZPounds.value === 'number' && Number.isFinite(actualZPounds.value))
+// No reading yet means no variance to explain, whatever the untyped field would compute to.
+const needsVarianceNote = computed(() => hasReading.value && props.variancePreviewPence !== 0)
 </script>
 
 <template>
@@ -44,6 +51,7 @@ const varianceNote = defineModel<string>('varianceNote', { required: true })
       <div
         v-else-if="reconciliation"
         class="space-y-4"
+        :class="{ 'opacity-50': refreshing }"
       >
         <dl
           data-test="reconciliation-breakdown"
@@ -85,28 +93,34 @@ const varianceNote = defineModel<string>('varianceNote', { required: true })
           </div>
         </dl>
 
-        <UInputNumber
-          v-model="actualZPounds"
-          :min="0"
-          :step="0.5"
-          :format-options="{ style: 'currency', currency: 'GBP' }"
-          data-test="actual-z-input"
-        />
+        <UFormField label="What the reader's Z actually reads">
+          <UInputNumber
+            v-model="actualZPounds"
+            :min="0"
+            :step="0.5"
+            :format-options="{ style: 'currency', currency: 'GBP' }"
+            data-test="actual-z-input"
+          />
+        </UFormField>
 
         <UAlert
-          v-if="variancePreviewPence !== 0"
+          v-if="needsVarianceNote"
           data-test="variance-preview"
           color="warning"
           variant="subtle"
           :description="`${saysMoney(Math.abs(variancePreviewPence))} ${variancePreviewPence > 0 ? 'over' : 'under'} what the ledger expects. A note is needed before this can be recorded.`"
         />
 
-        <UTextarea
-          v-if="variancePreviewPence !== 0"
-          v-model="varianceNote"
-          placeholder="Why does the reader disagree with the ledger?"
-          data-test="variance-note"
-        />
+        <UFormField
+          v-if="needsVarianceNote"
+          label="Why the reader and the ledger disagree"
+        >
+          <UTextarea
+            v-model="varianceNote"
+            placeholder="Why does the reader disagree with the ledger?"
+            data-test="variance-note"
+          />
+        </UFormField>
 
         <UAlert
           v-if="closeFailure"
@@ -121,6 +135,7 @@ const varianceNote = defineModel<string>('varianceNote', { required: true })
           color="error"
           class="min-h-12"
           :loading="closingBusy"
+          :disabled="!hasReading || (needsVarianceNote && !varianceNote.trim())"
           data-test="confirm-close-till"
           @click="emit('confirm')"
         >

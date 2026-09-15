@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { currentShowNight } from '#shared/utils/show-night'
 import { officerBypassTarget } from '#shared/utils/night-authority'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -332,6 +332,130 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
     await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
     await waitFor(view, `document.querySelector('[data-test="confirm-close-till"]')`)
+    await click(view, '[data-test="confirm-close-till"]')
+    await waitFor(view, `document.querySelector('[data-test="till-closed"]')`)
+    view.close()
+  }, 120_000)
+
+  // F-118 criterion 3: a disagreeing reading needs a note before it can be recorded, so the
+  // control that records it waits for one.
+  test('Confirm close is disabled while a variance has no note, and enables once one is typed', async () => {
+    const screenPassword = generatePassword()
+    const screenBar = await registerMember(app, 'till-screen-variance', screenPassword)
+    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    const closing = programme('till-screen-variance')
+    await openTill(closing.venueId, screenBar.cookie)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', screenBar.email)
+    await fill(view, 'form input[type="password"]', screenPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
+    await click(view, '[data-test="till-overflow-menu"]')
+    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
+    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
+
+    // A blank field is not a reading, even though it prices as nought (finding 13 follow-up).
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="confirm-close-till"]').disabled`)).toBe(true)
+
+    // Nothing sold, so any figure keyed in disagrees with the nought the ledger expects.
+    await fillNumber(view, '[data-test="actual-z-input"]', '5')
+    await waitFor(view, `document.querySelector('[data-test="variance-note"]')`)
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="confirm-close-till"]').disabled`)).toBe(true)
+
+    await fill(view, '[data-test="variance-note"]', 'Counted twice, definitely £5 over')
+    await waitFor(view, `!document.querySelector('[data-test="confirm-close-till"]').disabled`)
+
+    await click(view, '[data-test="confirm-close-till"]')
+    await waitFor(view, `document.querySelector('[data-test="till-closed"]')`)
+    view.close()
+  }, 120_000)
+
+  // A note explains a figure; a figure it was never written for gets no say (finding 13 follow-up).
+  test('correcting the Z figure clears a note written for the old one', async () => {
+    const screenPassword = generatePassword()
+    const screenBar = await registerMember(app, 'till-screen-correct', screenPassword)
+    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    const closing = programme('till-screen-correct')
+    await openTill(closing.venueId, screenBar.cookie)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', screenBar.email)
+    await fill(view, 'form input[type="password"]', screenPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
+    await click(view, '[data-test="till-overflow-menu"]')
+    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
+    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
+
+    await fillNumber(view, '[data-test="actual-z-input"]', '5')
+    await waitFor(view, `document.querySelector('[data-test="variance-note"]')`)
+    await fill(view, '[data-test="variance-note"]', 'Counted twice, definitely £5 over')
+    await waitFor(view, `!document.querySelector('[data-test="confirm-close-till"]').disabled`)
+
+    await fillNumber(view, '[data-test="actual-z-input"]', '6')
+    await waitFor(view, `document.querySelector('[data-test="confirm-close-till"]').disabled`)
+    expect(await view.evaluate<string>(`document.querySelector('[data-test="variance-note"]').value`)).toBe('')
+    view.close()
+  }, 120_000)
+
+  const today = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+
+  async function aSellableProduct(pricePence: number): Promise<{ variantId: string }> {
+    const categoryAnswered = await request(app, 'POST', '/api/admin/bar/categories', { name: `Variance ${crypto.randomUUID().slice(0, 6)}` }, admin.cookie)
+    const { id: categoryId } = await categoryAnswered.json() as { id: string }
+    const productAnswered = await request(app, 'POST', '/api/admin/bar/products', { name: `Variance ${crypto.randomUUID().slice(0, 6)}`, categoryId }, admin.cookie)
+    const { id: productId } = await productAnswered.json() as { id: string }
+    const variantAnswered = await request(app, 'POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' }, admin.cookie)
+    const { id: variantId } = await variantAnswered.json() as { id: string }
+    await request(app, 'POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() }, admin.cookie)
+    await request(app, 'POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' }, admin.cookie)
+    return { variantId }
+  }
+
+  // F-118 criterion 3: the server's own recomputed figure is the one that governs, so a sale
+  // landing elsewhere while the modal sat open must not leave the note unreachable.
+  test('a sale landing after the modal opens is caught by the refusal, and the note field catches up', async () => {
+    const screenPassword = generatePassword()
+    const screenBar = await registerMember(app, 'till-screen-refresh', screenPassword)
+    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    const closing = programme('till-screen-refresh')
+    await openTill(closing.venueId, screenBar.cookie)
+    const { variantId } = await aSellableProduct(250)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', screenBar.email)
+    await fill(view, 'form input[type="password"]', screenPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
+    await click(view, '[data-test="till-overflow-menu"]')
+    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
+    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
+
+    // The modal opened on a nought expectation; a sale elsewhere then moves it to £2.50.
+    await fillNumber(view, '[data-test="actual-z-input"]', '0')
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="variance-note"]')`)).toBe(false)
+
+    await request(app, 'POST', '/api/till/sale', { venueId: closing.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, screenBar.cookie)
+
+    await click(view, '[data-test="confirm-close-till"]')
+    await waitFor(view, `document.querySelector('[data-test="close-failure"]')`)
+    await waitFor(view, `document.querySelector('[data-test="variance-note"]')`)
+    expect(await textOf(view, '[data-test="expected-pence"]')).toContain('£2.50')
+
+    await fill(view, '[data-test="variance-note"]', 'A sale landed while the till was closing')
     await click(view, '[data-test="confirm-close-till"]')
     await waitFor(view, `document.querySelector('[data-test="till-closed"]')`)
     view.close()
