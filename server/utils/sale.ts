@@ -20,6 +20,8 @@ import { effectiveCapacity } from '#server/utils/performances'
 import { qrTokenFor } from '#server/utils/qr-tokens'
 import { qrSvgBase64 } from '#server/utils/qr'
 import { sendWalkUpPaid } from '#server/utils/reservation-confirmation'
+import { barWindowsTonight, shiftOffsetDefaults } from '#server/utils/rota'
+import { houseForSale } from '#shared/utils/rota-times'
 import { saleRefusal } from '#shared/utils/programme'
 import { holdExpiresAt, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
@@ -474,6 +476,8 @@ async function resolveTab(
 // The cross-check (F-104) and the one atomic write (F-105 criterion 1): the ledger entry, its
 // lines and stock, a Challenge 25 outcome and a tab charge when the basket needs them, and audit.
 interface PreparedSale {
+  // Which house this basket belongs to, resolved once and used by every row the commit writes.
+  performanceId: string | null
   resolved: ResolvedLine[]
   priced: PricedLine[]
   discount: Discount | null
@@ -487,6 +491,22 @@ interface PreparedSale {
   walkUpsPence: number
   soldTotalPence: number
 }
+
+// Which house a bar sale belongs to on a night running more than one: the window containing the
+// sale, else the nearest, with a tie to the earlier; no window resolves nothing (F-126).
+export async function performanceForSale(context: SaleContext, at: number): Promise<string | null> {
+  // A caller naming a performance was already narrowed to it by the guard.
+  if (context.performanceId) return context.performanceId
+  const covered = context.performanceIds ?? []
+  if (covered.length <= 1) return covered[0] ?? null
+
+  const windows = await barWindowsTonight(context.venueId, context.night, await shiftOffsetDefaults(context.event))
+  return houseForSale(covered, windows, at)
+}
+
+// What the cross-check answers a hand-off with: the figure it agreed, and the house it resolved,
+// so the hand-off pins one rather than resolving it a second time (F-124 criterion 2, F-126).
+export interface PricedAttempt { soldTotalPence: number, performanceId: string | null }
 
 // Everything the commit checks before it writes, so a SumUp hand-off can run the identical
 // cross-check at the start and again at the answer (F-104, F-124 criteria 2 and 4).
@@ -535,15 +555,19 @@ async function prepareSale(
     })
   }
 
-  return { resolved, priced, discount, restricted, soldResolved, soldPriced, refusedPriced, bookings, walkUps, ticketsPence, walkUpsPence, soldTotalPence }
+  return {
+    performanceId: await performanceForSale(context, Math.floor(Date.now() / 1000)),
+    resolved, priced, discount, restricted, soldResolved, soldPriced, refusedPriced,
+    bookings, walkUps, ticketsPence, walkUpsPence, soldTotalPence,
+  }
 }
 
 // The cross-check alone, for a basket about to be handed to the SumUp app (F-124 criterion 2):
 // refused here means the app is never opened for it.
-export async function priceSaleForAttempt(input: SaleInput, on: string, context: SaleContext): Promise<number> {
+export async function priceSaleForAttempt(input: SaleInput, on: string, context: SaleContext): Promise<PricedAttempt> {
   const prepared = await prepareSale(input.lines, on, input.expectedTotalPence, input.ageCheck, input.discountId, context,
     { tickets: input.tickets, walkUps: input.walkUps, walkUpGuest: input.walkUpGuest })
-  return prepared.soldTotalPence
+  return { soldTotalPence: prepared.soldTotalPence, performanceId: prepared.performanceId }
 }
 
 export async function commitSale(
@@ -556,7 +580,7 @@ export async function commitSale(
   context: SaleContext,
   extras: SaleExtras = NO_EXTRAS,
 ): Promise<SaleReceipt> {
-  const { priced, discount, restricted, soldResolved, soldPriced, refusedPriced, bookings, walkUps, soldTotalPence }
+  const { performanceId, priced, discount, restricted, soldResolved, soldPriced, refusedPriced, bookings, walkUps, soldTotalPence }
     = await prepareSale(lines, on, expectedTotalPence, ageCheck, discountId, context, extras)
 
   // Only relevant when there is something to charge: a full age-check refusal leaves nothing for
@@ -632,7 +656,7 @@ export async function commitSale(
         discountPercent: discount?.percent ?? null,
         discountPence: soldPriced[index]!.discountPence || null,
         // Without this a matinee sale is invisible to its own report (E-127 criterion 6).
-        performanceId: context.performanceId,
+        performanceId: performanceId,
       })), ...ticketLines],
     }, new Date(), tab?.guard ?? undefined)
     statements.push(...posted.statements)
@@ -690,7 +714,7 @@ export async function commitSale(
     const id = newId()
     const restrictedNames = [...new Set(restricted.map(index => priced[index]!.productName))]
     const write = recordAgeCheck(context.actorId, {
-      performanceId: context.performanceId,
+      performanceId: performanceId,
       outcome: ageCheck.outcome,
       idType: ageCheck.idType,
       reason: ageCheck.reason,
@@ -816,6 +840,9 @@ export async function commitCompSale(
   const lines = await compRequestLines(requestId)
   if (!lines) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
 
+  // A comp is given at a house exactly as a sale is sold at one (F-126).
+  const performanceId = await performanceForSale(context, Math.floor(Date.now() / 1000))
+
   // A comp is never discounted on top: it is already free (F-110's own criterion 4).
   const { resolved, priced } = await resolveSale(lines, on, null)
   const { restricted, sold } = saleableAfterAgeCheck(resolved, priced, ageCheck)
@@ -869,7 +896,7 @@ export async function commitCompSale(
       productVariantId: line.variant.id,
       priceRef: priceRef(line.variant.priceSource, line.variant.priceRowId),
       choices: line.choiceItemId ? { choiceItemId: line.choiceItemId, choiceItemName: line.choiceItemName } : null,
-      performanceId: context.performanceId,
+      performanceId: performanceId,
     })),
   })
   statements.push(...posted.statements)
@@ -899,7 +926,7 @@ export async function commitCompSale(
     const id = newId()
     const restrictedNames = [...new Set(restricted.map(index => priced[index]!.productName))]
     const write = recordAgeCheck(context.actorId, {
-      performanceId: context.performanceId,
+      performanceId: performanceId,
       outcome: ageCheck.outcome,
       idType: ageCheck.idType,
       reason: ageCheck.reason,

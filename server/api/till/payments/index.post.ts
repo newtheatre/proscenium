@@ -18,15 +18,18 @@ export default defineEventHandler(async (event) => {
 
   // The same cross-check the sale runs, without the write: a basket the till could not sell is
   // refused here, before the app is ever opened (criterion 2).
-  const performanceId = resolved.performanceIds.length === 1 ? resolved.performanceIds[0]! : null
-  await priceSaleForAttempt(input, londonDayOf(new Date()), {
+  const scope = {
     actorId: resolved.account.id,
     sessionId: session.id,
     venueId: resolved.venueId,
     night: resolved.night,
-    performanceId,
+    performanceId: null,
     performanceIds: resolved.performanceIds,
-  })
+    event,
+  }
+  // The cross-check hands back the house it resolved, so the hand-off pins the one the basket was
+  // built against rather than resolving again minutes later when the app answers (F-126).
+  const { performanceId } = await priceSaleForAttempt(input, londonDayOf(new Date()), scope)
 
   const id = await startAttempt({
     basket: {
