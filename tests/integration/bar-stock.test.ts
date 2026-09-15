@@ -138,7 +138,7 @@ describe('neither a sale nor a comp takes on-hand below nothing (F-105 criterion
     })
   })
 
-  test('the refusal is the sale's, so one catch covers both paths', async () => {
+  test('the refusal carries the name the sale raises, so one catch covers both paths', async () => {
     await withDatabase((database) => {
       bottle(database)
       expect(() => move(database, { qty: -1, kind: 'COMP', ref_table: 'ledger_lines', ref_id: 'line-1' }))
