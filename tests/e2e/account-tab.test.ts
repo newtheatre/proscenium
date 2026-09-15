@@ -74,6 +74,12 @@ async function aSellableProduct(pricePence: number): Promise<{ variantId: string
 const charge = (venueId: string, variantId: string, pricePence: number, tabHolderId: string): Promise<Response> =>
   send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence, tabHolderId }, barManager.cookie)
 
+const settle = (venueId: string, holderId: string, entryIds: string[], expectedTotalPence: number): Promise<Response> =>
+  send('POST', '/api/till/tab-settlements', { venueId, holderId, entryIds, expectedTotalPence }, barManager.cookie)
+
+const voidCharge = (entryId: string, reason: string): Promise<Response> =>
+  send('POST', `/api/admin/bar/tab-charges/${entryId}/void`, { reason }, barManager.cookie)
+
 describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live (F-109 criterion 1)', () => {
   test('nothing charged reads as nothing owed, not a blank screen', async () => {
     const password = generatePassword()
@@ -113,6 +119,62 @@ describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live 
     await visit(view, `${app.baseURL}/account/bar-tab`, `[data-test="account-tab-page"]`)
     expect(await textOf(view, '[data-test="account-tab-outstanding"]')).toContain('£6.50')
     expect(await textOf(view, '[data-test="account-tab-charges"]')).toContain('£6.50')
+    view.close()
+  }, 120_000)
+
+  test('a settled charge reads Settled, and no longer counts against the outstanding balance', async () => {
+    const { venueId } = programme(`account-tab-settled-${crypto.randomUUID().slice(0, 6)}`)
+    const password = generatePassword()
+    const holder = await registerMember(app, 'account-tab-settled', password)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId)
+    await authorise([holder.id])
+    await setCap(2000)
+
+    const charged = await charge(venueId, variantId, 500, holder.id)
+    expect(charged.status).toBe(200)
+    const { entryId } = await charged.json() as { entryId: string }
+
+    expect((await settle(venueId, holder.id, [entryId], 500)).status).toBe(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', holder.email)
+    await fill(view, 'form input[type="password"]', password)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/account/bar-tab`, `[data-test="account-tab-page"]`)
+    expect(await textOf(view, '[data-test="account-tab-outstanding"]')).toContain('£0.00')
+    expect(await textOf(view, `[data-test="charge-${entryId}"]`)).toContain('Settled')
+    view.close()
+  }, 120_000)
+
+  test('a voided charge reads Voided, and no longer counts against the outstanding balance', async () => {
+    const { venueId } = programme(`account-tab-voided-${crypto.randomUUID().slice(0, 6)}`)
+    const password = generatePassword()
+    const holder = await registerMember(app, 'account-tab-voided', password)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId)
+    await authorise([holder.id])
+    await setCap(2000)
+
+    const charged = await charge(venueId, variantId, 500, holder.id)
+    expect(charged.status).toBe(200)
+    const { entryId } = await charged.json() as { entryId: string }
+
+    expect((await voidCharge(entryId, 'Rung up against the wrong holder')).status).toBe(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', holder.email)
+    await fill(view, 'form input[type="password"]', password)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/account/bar-tab`, `[data-test="account-tab-page"]`)
+    expect(await textOf(view, '[data-test="account-tab-outstanding"]')).toContain('£0.00')
+    expect(await textOf(view, `[data-test="charge-${entryId}"]`)).toContain('Voided')
     view.close()
   }, 120_000)
 })

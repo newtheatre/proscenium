@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import type { ItemisedTab } from '#shared/utils/tab-settlement'
 
@@ -8,13 +9,38 @@ const request = useRequestFetch()
 
 // A bare $fetch here carries no session cookie on a full page load, so the tab read back as the
 // empty default and never refetched (issue 1005, same class as issue 899).
-const { data, error } = await useAsyncData<{ ok: true, tab: ItemisedTab }>(
+const { data, error, refresh } = await useAsyncData<{ ok: true, tab: ItemisedTab }>(
   'account-tab',
   () => request<{ ok: true, tab: ItemisedTab }>('/api/account/tab'),
 )
 const listFailure = useListFailure(error, 'Your tab could not be read.')
 
 const tab = computed(() => data.value?.tab)
+
+// The bar settles and voids from its own screen: re-reads on return to the tab, the same wake
+// this app's SumUp watch uses, so a balance left open here does not silently drift.
+const lastChecked = ref(new Date())
+
+async function reread(): Promise<void> {
+  await refresh()
+  lastChecked.value = new Date()
+}
+
+function onReturnToTab(): void {
+  if (document.visibilityState === 'visible') void reread()
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', onReturnToTab)
+  window.addEventListener('focus', onReturnToTab)
+  window.addEventListener('pageshow', onReturnToTab)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onReturnToTab)
+  window.removeEventListener('focus', onReturnToTab)
+  window.removeEventListener('pageshow', onReturnToTab)
+})
 
 // What a charge was for, read off its own lines rather than a total alone.
 function describe(charge: ItemisedTab['charges'][number]): string {
@@ -49,15 +75,33 @@ function describe(charge: ItemisedTab['charges'][number]): string {
     >
       <UCard data-test="account-tab-balance">
         <template #header>
-          <h2 class="nnt-headline text-lg">
-            Outstanding
-          </h2>
+          <div class="flex items-center justify-between">
+            <h2 class="nnt-headline text-lg">
+              Outstanding
+            </h2>
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-refresh-cw"
+              data-test="account-tab-refresh"
+              @click="reread"
+            >
+              Refresh
+            </UButton>
+          </div>
         </template>
         <p
           class="text-2xl font-semibold"
           data-test="account-tab-outstanding"
         >
           {{ saysMoney(tab.outstandingPence) }}
+        </p>
+        <p
+          class="mt-1 text-xs text-muted"
+          data-test="account-tab-checked"
+        >
+          Checked {{ formatLondon(lastChecked, { hour: '2-digit', minute: '2-digit' }) }}
         </p>
       </UCard>
 
