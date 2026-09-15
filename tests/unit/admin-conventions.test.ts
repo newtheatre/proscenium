@@ -13,7 +13,8 @@ const CONSOLE_LAYOUT = /layout:\s*['"`]console['"`]/
 async function screens(): Promise<{ path: string, source: string }[]> {
   const found: { path: string, source: string }[] = []
   for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: PAGES, onlyFiles: true })) {
-    const path = join(PAGES, entry)
+    // One spelling whatever the platform separates directories with, so an allow-list matches.
+    const path = join(PAGES, entry).replaceAll('\\', '/')
     const source = await Bun.file(path).text()
     if (CONSOLE_LAYOUT.test(source)) found.push({ path, source })
   }
@@ -40,7 +41,13 @@ async function tables(): Promise<{ path: string, source: string }[]> {
 
 // A fixed report of one thing's own rows, with nothing to search or filter: the toolbar would be
 // an empty row of controls. Everything else answers to the rule.
-const REPORTS_WITHOUT_A_TOOLBAR = ['app/components/box-office/show/Sales.vue']
+const REPORTS_WITHOUT_A_TOOLBAR = [
+  'app/components/box-office/show/Sales.vue',
+  // A fixed report of one order's own rows, and one stocktake's own lines: nothing to search or
+  // filter by name across other rows, so the shared toolbar would sit empty (0032).
+  'app/pages/bar/stock/order-list.vue',
+  'app/pages/bar/stock/stocktakes/[id].vue',
+]
 
 describe('an input is the component for its value (0032)', () => {
   test('a date is UInputDate, never a native date input', async () => {

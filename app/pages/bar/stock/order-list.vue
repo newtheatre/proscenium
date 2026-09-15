@@ -93,12 +93,19 @@ const columns: TableColumn<OrderListRow>[] = [
       <h3 class="font-semibold">
         {{ category }}
       </h3>
-      <!-- Never empty: a group exists only because grouped (above) put a row in it. -->
+      <!-- Never reached: a group exists only because grouped (above) put a row in it. Said
+      anyway, so the convention every table states its empty case (0032) holds if that changes. -->
       <UTable
         :data="rows"
         :columns="columns"
         :loading="status === 'pending'"
-      />
+      >
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            Nothing here.
+          </p>
+        </template>
+      </UTable>
     </div>
 
     <div
