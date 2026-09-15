@@ -75,8 +75,8 @@ export function gpRevenueQuery(fromAt: number, toAt: number): SQL {
   `
 }
 
-// Both halves window on the entry's own clock, so a sale recorded late keeps its revenue and its
-// cost together; a comp pours stock exactly as a paid sale does (F-110 criterion 4).
+// Both halves window on the entry's own clock, so a late sale keeps revenue and cost together; a
+// comp pours like a paid sale (F-110 criterion 4) and a pour a REVERSAL names leaves the cost.
 export function gpDepletionQuery(fromAt: number, toAt: number): SQL {
   return sql`
     SELECT i.name AS itemName, -sum(m.qty) AS qtyDepleted,
@@ -86,6 +86,7 @@ export function gpDepletionQuery(fromAt: number, toAt: number): SQL {
     JOIN ledger_lines l ON l.id = m.ref_id AND m.ref_table = 'ledger_lines'
     JOIN ledger_entries e ON e.id = l.entry_id
     WHERE m.kind IN ('SALE', 'COMP') AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND NOT EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = m.id)
     GROUP BY i.id
     ORDER BY i.name COLLATE NOCASE
   `

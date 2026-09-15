@@ -96,6 +96,19 @@ describe('gross profit counts what a comp poured (F-110 criterion 4, F-119 crite
     })
   })
 
+  test('a pour a reversal names leaves the cost side, the way a void nets its revenue away', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 700, 700)
+      const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
+      depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
+      // The credit carries no ledger line of its own, so the original is what has to drop out.
+      insert(database, 'stock_movements', { id: 'r-1', item_id: itemId, qty: 50, kind: 'REVERSAL', reverses_id: 'm-1', created_at: INSIDE })
+
+      expect(depleted(database)).toEqual([])
+    })
+  })
+
   test('a stocktake adjustment is not a depletion and stays out of the cost side', async () => {
     await withDatabase((database) => {
       const itemId = bottle(database)
