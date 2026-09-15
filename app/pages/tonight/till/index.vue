@@ -2,7 +2,8 @@
 import { formatLondon, londonClock } from '#shared/utils/london'
 import { saysMoney } from '#shared/utils/bar'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
-import type { SaleProduct, SaleReceipt } from '#shared/utils/sale'
+import type { CompRequest } from '#shared/utils/comps'
+import type { PricedBasket, SaleProduct, SaleReceipt } from '#shared/utils/sale'
 import type { ChargedReceipt } from '~/composables/useSumUpCharge'
 import type { AgeCheckStep } from '~/components/till/Challenge25Modal.vue'
 
@@ -102,6 +103,7 @@ const {
   priceFailure,
   recomputeTotal,
   grandTotalPence,
+  isVariantRestricted,
   needsAgeCheck,
   lineAmount,
   saleBody,
@@ -165,7 +167,69 @@ const {
 })
 
 // Which path the Challenge 25 prompt was opened for, so its answer goes the same way.
-const chargeVia = ref<'reader' | 'sumup'>('reader')
+const chargeVia = ref<'reader' | 'sumup' | 'comp'>('reader')
+
+// A comp is bar lines only, at whatever it is, never on a tab, and never asked twice over a
+// SumUp hand-off already in flight for the same basket (F-110 criteria 1, 4).
+const compEligible = computed(() => !hasTicketMoney.value && !selectedTabHolderId.value && !selectedDiscountId.value && basket.value.length > 0 && priced.value !== null && !sumup.pending.value)
+
+const {
+  open: compOpen,
+  reason: compReason,
+  sending: compSending,
+  sendFailure: compSendFailure,
+  requestId: compRequestId,
+  request: compRequest,
+  sentPriced: compSentPriced,
+  needsAgeCheck: compNeedsAgeCheck,
+  canGive: compCanGive,
+  declined: compDeclined,
+  lapsed: compLapsed,
+  locked: compLocked,
+  pollFailure: compPollFailure,
+  givingBusy: compGivingBusy,
+  giveFailure: compGiveFailure,
+  given: compGiven,
+  openModal: openCompModal,
+  reset: resetComp,
+  send: sendCompRequest,
+  give: giveCompRequest,
+} = useTillComp({
+  venueId,
+  isVariantRestricted,
+  requestComp: body => $fetch<{ id: string, priced: PricedBasket }>('/api/till/comp-requests', { method: 'POST', body }),
+  pollRequest: id => $fetch<{ request: CompRequest }>(`/api/till/comp-requests/${id}`),
+  giveComp: (id, body) => $fetch<SaleReceipt>(`/api/till/comp-requests/${id}/sale`, { method: 'POST', body }),
+})
+
+// The frozen total once a request exists, the same figure the server holds; the live basket
+// total only while there is nothing to freeze yet.
+const compTotalPence = computed(() => compSentPriced.value?.totalPence ?? grandTotalPence.value ?? 0)
+
+function sendComp(): void {
+  void sendCompRequest(basket.value.map(line => ({ variantId: line.variantId, qty: line.qty, choiceItemId: line.choiceItemId })))
+}
+
+function giveComp(ageCheck: InlineAgeCheckInput | null = null): void {
+  if (!ageCheck && compNeedsAgeCheck.value) {
+    chargeVia.value = 'comp'
+    ageCheckStep.value = 'choose'
+    return
+  }
+  ageCheckStep.value = 'closed'
+  void giveCompRequest(ageCheck)
+}
+
+function nextSaleFromComp(): void {
+  resetComp()
+  nextSale()
+}
+
+// Declined or lapsed frees the basket on its own (useTillComp's `locked`); dismissing just
+// clears the request so the chip and a fresh ask are available again.
+function dismissComp(): void {
+  resetComp()
+}
 
 // The submission step (F-104, F-105, 0004). A restricted line with no outcome yet opens the
 // Challenge 25 prompt (F-106); a tab holder chosen below charges credit, not the reader (F-108).
@@ -249,9 +313,10 @@ function timeOf(at: number): string {
   return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
 }
 
-// Whichever the modal answers with, the same submission the reader or SumUp path already had.
+// Whichever the modal answers with, the same submission the reader, SumUp or comp path already had.
 function submitAgeCheck(outcome: InlineAgeCheckInput): void {
-  void (chargeVia.value === 'sumup' ? chargeOnSumUp(outcome) : charge(outcome))
+  if (chargeVia.value === 'comp') giveComp(outcome)
+  else void (chargeVia.value === 'sumup' ? chargeOnSumUp(outcome) : charge(outcome))
 }
 
 function nextSale(): void {
@@ -390,85 +455,91 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         />
 
         <template v-if="!charged">
-          <UTabs
-            v-model="pane"
-            :items="PANE_TABS"
-            :content="false"
-            class="w-full"
-            data-test="till-panes"
-          />
+          <div
+            :inert="compLocked || sumup.pending.value !== null"
+            :class="{ 'opacity-50': compLocked || sumup.pending.value !== null }"
+            class="space-y-6"
+          >
+            <UTabs
+              v-model="pane"
+              :items="PANE_TABS"
+              :content="false"
+              class="w-full"
+              data-test="till-panes"
+            />
 
-          <TillTicketsPane
-            v-if="pane === 'tickets'"
-            id="pane-tickets-panel"
-            v-model:lookup-term="lookupTerm"
-            v-model:camera-open="cameraOpen"
-            v-model:walk-up-performance-id="walkUpPerformanceId"
-            v-model:walk-up-guest-name="walkUpGuestName"
-            v-model:walk-up-guest-email="walkUpGuestEmail"
-            role="tabpanel"
-            aria-label="Tickets"
-            tabindex="0"
-            :looking-up="lookingUp"
-            :camera-note="cameraNote"
-            :lookup-failure="lookupFailure"
-            :found="found"
-            :ticket-lines="ticketLines"
-            :tonights-performances="tonightsPerformances"
-            :walk-up-options-failure="walkUpOptionsFailure"
-            :walk-up-options="walkUpOptions"
-            :walk-up-qty="walkUpQty"
-            :walk-up-guest-incomplete="walkUpGuestIncomplete"
-            :look-up="lookUp"
-            :scan-decoded="scanDecoded"
-            :open-camera="openCamera"
-            :fall-back-to-typing="fallBackToTyping"
-            :add-booking="addBooking"
-            :bump-walk-up="bumpWalkUp"
-            :add-walk-ups="addWalkUps"
-          />
+            <TillTicketsPane
+              v-if="pane === 'tickets'"
+              id="pane-tickets-panel"
+              v-model:lookup-term="lookupTerm"
+              v-model:camera-open="cameraOpen"
+              v-model:walk-up-performance-id="walkUpPerformanceId"
+              v-model:walk-up-guest-name="walkUpGuestName"
+              v-model:walk-up-guest-email="walkUpGuestEmail"
+              role="tabpanel"
+              aria-label="Tickets"
+              tabindex="0"
+              :looking-up="lookingUp"
+              :camera-note="cameraNote"
+              :lookup-failure="lookupFailure"
+              :found="found"
+              :ticket-lines="ticketLines"
+              :tonights-performances="tonightsPerformances"
+              :walk-up-options-failure="walkUpOptionsFailure"
+              :walk-up-options="walkUpOptions"
+              :walk-up-qty="walkUpQty"
+              :walk-up-guest-incomplete="walkUpGuestIncomplete"
+              :look-up="lookUp"
+              :scan-decoded="scanDecoded"
+              :open-camera="openCamera"
+              :fall-back-to-typing="fallBackToTyping"
+              :add-booking="addBooking"
+              :bump-walk-up="bumpWalkUp"
+              :add-walk-ups="addWalkUps"
+            />
 
-          <TillProductGrid
-            v-show="pane === 'bar'"
-            id="pane-bar-panel"
-            role="tabpanel"
-            aria-label="Bar"
-            tabindex="0"
-            :categories="categories"
-            :products-in="productsIn"
-            :choosing="choosing"
-            :tap-variant="tapVariant"
-            :choose-option="chooseOption"
-            @open-allergens="allergenOpen = $event"
-            @close-choosing="choosing = null"
-          />
+            <TillProductGrid
+              v-show="pane === 'bar'"
+              id="pane-bar-panel"
+              role="tabpanel"
+              aria-label="Bar"
+              tabindex="0"
+              :categories="categories"
+              :products-in="productsIn"
+              :choosing="choosing"
+              :tap-variant="tapVariant"
+              :choose-option="chooseOption"
+              @open-allergens="allergenOpen = $event"
+              @close-choosing="choosing = null"
+            />
 
-          <TillBasket
-            v-if="!basketEmpty"
-            v-model:selected-discount-id="selectedDiscountId"
-            v-model:selected-tab-holder-id="selectedTabHolderId"
-            :ticket-lines="ticketLines"
-            :walk-up-lines="walkUpLines"
-            :basket="basket"
-            :products="products"
-            :line-amount="lineAmount"
-            :remove-booking="removeBooking"
-            :remove-walk-up="removeWalkUp"
-            :decrement-line="decrementLine"
-            :increment-line="incrementLine"
-            :remove-line="removeLine"
-            :discounts="discounts.data.value?.discounts ?? []"
-            :tab-holders="tabHolders.data.value?.holders ?? []"
-            :has-ticket-money="hasTicketMoney"
-            :charge-failure="chargeFailure"
-            :price-failure="priceFailure"
-            :priced="priced"
-            :grand-total-pence="grandTotalPence"
-            :pricing="pricing"
-            :tickets-pence="ticketsPence"
-            :walk-ups-pence="walkUpsPence"
-            @open-allergens="allergenOpen = $event"
-          />
+            <TillBasket
+              v-if="!basketEmpty"
+              v-model:selected-discount-id="selectedDiscountId"
+              v-model:selected-tab-holder-id="selectedTabHolderId"
+              :ticket-lines="ticketLines"
+              :walk-up-lines="walkUpLines"
+              :basket="basket"
+              :products="products"
+              :line-amount="lineAmount"
+              :remove-booking="removeBooking"
+              :remove-walk-up="removeWalkUp"
+              :decrement-line="decrementLine"
+              :increment-line="incrementLine"
+              :remove-line="removeLine"
+              :discounts="discounts.data.value?.discounts ?? []"
+              :tab-holders="tabHolders.data.value?.holders ?? []"
+              :has-ticket-money="hasTicketMoney"
+              :charge-failure="chargeFailure"
+              :price-failure="priceFailure"
+              :priced="priced"
+              :grand-total-pence="grandTotalPence"
+              :pricing="pricing"
+              :tickets-pence="ticketsPence"
+              :walk-ups-pence="walkUpsPence"
+              @open-allergens="allergenOpen = $event"
+            />
+          </div>
         </template>
 
         <div
@@ -575,8 +646,32 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           <span>{{ basketItemCount }} {{ basketItemCount === 1 ? 'item' : 'items' }}</span>
           <span data-test="basket-summary-total">{{ grandTotalPence !== null && !pricing ? saysMoney(grandTotalPence) : 'Pricing…' }}</span>
         </div>
+        <UButton
+          v-if="session && !charged && compRequestId === null && compEligible"
+          size="sm"
+          color="neutral"
+          variant="subtle"
+          class="min-h-10 self-start"
+          icon="i-lucide-gift"
+          data-test="till-comp-chip"
+          @click="openCompModal"
+        >
+          Ask for a comp
+        </UButton>
+        <UButton
+          v-else-if="session && !charged && compRequestId !== null"
+          size="sm"
+          :color="compDeclined ? 'error' : compLapsed ? 'warning' : 'neutral'"
+          variant="subtle"
+          class="min-h-10 self-start"
+          icon="i-lucide-gift"
+          data-test="till-comp-pending-chip"
+          @click="openCompModal"
+        >
+          {{ compDeclined ? 'Comp declined' : compLapsed ? 'Comp lapsed' : compCanGive ? 'Comp approved, give it' : compGiven ? 'Comp given' : 'Comp pending…' }}
+        </UButton>
         <NightAction
-          v-if="session && !charged && !basketEmpty && grandTotalPence !== null && sumupAvailable && !sumup.pending.value"
+          v-if="session && !charged && !basketEmpty && grandTotalPence !== null && sumupAvailable && !sumup.pending.value && !compLocked"
           :label="`Charge ${saysMoney(grandTotalPence)} on SumUp`"
           icon="i-lucide-smartphone-nfc"
           :disabled="pricing || walkUpGuestIncomplete"
@@ -585,7 +680,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           @press="() => chargeOnSumUp()"
         />
         <NightAction
-          v-if="session && !charged && !basketEmpty && grandTotalPence !== null && !sumup.pending.value"
+          v-if="session && !charged && !basketEmpty && grandTotalPence !== null && !sumup.pending.value && !compLocked"
           :label="selectedTabHolderId ? `Put ${saysMoney(grandTotalPence)} on the tab` : sumupAvailable ? `Key ${saysMoney(grandTotalPence)} into the reader` : `Charge ${saysMoney(grandTotalPence)}`"
           :icon="selectedTabHolderId ? 'i-lucide-book-user' : 'i-lucide-credit-card'"
           :color="sumupAvailable ? 'neutral' : 'primary'"
@@ -611,9 +706,30 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
 
     <TillChallenge25Modal
       v-model:step="ageCheckStep"
-      :charging="charging"
+      :charging="chargeVia === 'comp' ? compGivingBusy : charging"
       @accept="submitAgeCheck"
       @refuse="submitAgeCheck"
+    />
+
+    <TillCompRequestModal
+      v-model:open="compOpen"
+      v-model:reason="compReason"
+      :total-pence="compTotalPence"
+      :sending="compSending"
+      :send-failure="compSendFailure"
+      :request-id="compRequestId"
+      :request="compRequest"
+      :can-give="compCanGive"
+      :declined="compDeclined"
+      :lapsed="compLapsed"
+      :poll-failure="compPollFailure"
+      :giving-busy="compGivingBusy"
+      :give-failure="compGiveFailure"
+      :given="compGiven !== null"
+      @send="sendComp"
+      @give="giveComp()"
+      @done="nextSaleFromComp"
+      @dismiss="dismissComp"
     />
 
     <TillCloseModal

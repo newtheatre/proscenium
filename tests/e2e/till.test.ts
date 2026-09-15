@@ -116,6 +116,20 @@ function insertStaleSession(venueId: string, staleNight: string, openedBy: strin
   }
 }
 
+const today = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+
+async function aSellableProduct(pricePence: number, ageRestricted = false): Promise<{ variantId: string }> {
+  const categoryAnswered = await request(app, 'POST', '/api/admin/bar/categories', { name: `Variance ${crypto.randomUUID().slice(0, 6)}` }, admin.cookie)
+  const { id: categoryId } = await categoryAnswered.json() as { id: string }
+  const productAnswered = await request(app, 'POST', '/api/admin/bar/products', { name: `Variance ${crypto.randomUUID().slice(0, 6)}`, categoryId, ageRestricted }, admin.cookie)
+  const { id: productId } = await productAnswered.json() as { id: string }
+  const variantAnswered = await request(app, 'POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' }, admin.cookie)
+  const { id: variantId } = await variantAnswered.json() as { id: string }
+  await request(app, 'POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() }, admin.cookie)
+  await request(app, 'POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' }, admin.cookie)
+  return { variantId }
+}
+
 let nextSlot = 100
 
 function shiftFor(performanceId: string, role: string, userId: string, status = 'CONFIRMED'): string {
@@ -408,20 +422,6 @@ describe.skipIf(skip !== null)('the screen', () => {
     view.close()
   }, 120_000)
 
-  const today = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
-
-  async function aSellableProduct(pricePence: number): Promise<{ variantId: string }> {
-    const categoryAnswered = await request(app, 'POST', '/api/admin/bar/categories', { name: `Variance ${crypto.randomUUID().slice(0, 6)}` }, admin.cookie)
-    const { id: categoryId } = await categoryAnswered.json() as { id: string }
-    const productAnswered = await request(app, 'POST', '/api/admin/bar/products', { name: `Variance ${crypto.randomUUID().slice(0, 6)}`, categoryId }, admin.cookie)
-    const { id: productId } = await productAnswered.json() as { id: string }
-    const variantAnswered = await request(app, 'POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' }, admin.cookie)
-    const { id: variantId } = await variantAnswered.json() as { id: string }
-    await request(app, 'POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() }, admin.cookie)
-    await request(app, 'POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' }, admin.cookie)
-    return { variantId }
-  }
-
   // F-118 criterion 3: the server's own recomputed figure is the one that governs, so a sale
   // landing elsewhere while the modal sat open must not leave the note unreachable.
   test('a sale landing after the modal opens is caught by the refusal, and the note field catches up', async () => {
@@ -514,5 +514,133 @@ describe.skipIf(skip !== null)('a till refusal held to a missing second factor',
     finally {
       clearConfigOverride(app, 'PRIVILEGED_ROLES')
     }
+  }, 120_000)
+})
+
+describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-110, A10)', () => {
+  test('a bar-only basket can be asked, waited on and given once approved', async () => {
+    const screenPassword = generatePassword()
+    const screenBar = await registerMember(app, 'till-comp-ask', screenPassword)
+    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    const comping = programme('till-comp')
+    await openTill(comping.venueId, screenBar.cookie)
+    const { variantId } = await aSellableProduct(300)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', screenBar.email)
+    await fill(view, 'form input[type="password"]', screenPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${comping.venueId}`, `[data-test="till-open"]`)
+    await click(view, `[data-test="variant-${variantId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
+    await click(view, '[data-test="till-comp-chip"]')
+    await waitFor(view, `document.querySelector('[data-test="comp-reason"]')`)
+    await fill(view, '[data-test="comp-reason"]', 'Committee guest, cleared with the duty manager')
+    await click(view, '[data-test="comp-send"]')
+    await waitFor(view, `document.querySelector('[data-test="comp-waiting"]')`)
+
+    // The basket a request names cannot also be charged for money while it is in flight
+    // (F-110 criterion 4): neither charge control is on offer.
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="charge-reader"]')`)).toBe(false)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="charge-sumup"]')`)).toBe(false)
+
+    // Closing the modal never cancels the ask: the poll keeps running, and the pending chip
+    // reopens onto the same request once it is decided (Stream 6 A10, review finding).
+    await click(view, '[data-test="comp-keep-waiting"]')
+    await waitFor(view, `document.querySelector('[data-test="till-comp-pending-chip"]')`)
+
+    // Decided from elsewhere, exactly as an approving manager would on the glance screen, while
+    // the till itself only polls the single request it asked for (Stream 6 A10).
+    const listed = await request(app, 'GET', `/api/till/comp-requests?venueId=${comping.venueId}`, undefined, bar2.cookie)
+    const { requests } = await listed.json() as { requests: { request: { id: string } }[] }
+    const requestId = requests[0]!.request.id
+    await request(app, 'POST', `/api/till/comp-requests/${requestId}/approve`, {}, bar2.cookie)
+
+    await waitFor(view, `document.querySelector('[data-test="till-comp-pending-chip"]').textContent.includes('give it')`)
+    await click(view, '[data-test="till-comp-pending-chip"]')
+    await waitFor(view, `document.querySelector('[data-test="comp-give"]')`)
+    await click(view, '[data-test="comp-give"]')
+    await waitFor(view, `document.querySelector('[data-test="comp-given-confirmation"]')`)
+    view.close()
+  }, 120_000)
+
+  test('a declined request says why, rather than leaving the till waiting forever', async () => {
+    const screenPassword = generatePassword()
+    const screenBar = await registerMember(app, 'till-comp-decline', screenPassword)
+    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    const comping = programme('till-comp-decline')
+    await openTill(comping.venueId, screenBar.cookie)
+    const { variantId } = await aSellableProduct(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', screenBar.email)
+    await fill(view, 'form input[type="password"]', screenPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${comping.venueId}`, `[data-test="till-open"]`)
+    await click(view, `[data-test="variant-${variantId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
+    await click(view, '[data-test="till-comp-chip"]')
+    await waitFor(view, `document.querySelector('[data-test="comp-reason"]')`)
+    await fill(view, '[data-test="comp-reason"]', 'Asking anyway')
+    await click(view, '[data-test="comp-send"]')
+    await waitFor(view, `document.querySelector('[data-test="comp-waiting"]')`)
+
+    const listed = await request(app, 'GET', `/api/till/comp-requests?venueId=${comping.venueId}`, undefined, bar2.cookie)
+    const { requests } = await listed.json() as { requests: { request: { id: string } }[] }
+    const requestId = requests[0]!.request.id
+    await request(app, 'POST', `/api/till/comp-requests/${requestId}/decline`, { reason: 'Not tonight' }, bar2.cookie)
+
+    await waitFor(view, `document.querySelector('[data-test="comp-declined"]')`)
+    const shown = await textOf(view, '[data-test="comp-declined"]')
+    expect(shown).toContain('Not tonight')
+    view.close()
+  }, 120_000)
+
+  // A comp never skips Challenge 25 (F-106, even though nothing is taken), and the prompt has to
+  // close behind it, or a second tap on an ID button would fire the give again.
+  test('a restricted line still needs a Challenge 25 outcome, and the prompt closes once given', async () => {
+    const screenPassword = generatePassword()
+    const screenBar = await registerMember(app, 'till-comp-restricted', screenPassword)
+    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    const comping = programme('till-comp-restricted')
+    await openTill(comping.venueId, screenBar.cookie)
+    const { variantId } = await aSellableProduct(400, true)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', screenBar.email)
+    await fill(view, 'form input[type="password"]', screenPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${comping.venueId}`, `[data-test="till-open"]`)
+    await click(view, `[data-test="variant-${variantId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
+    await click(view, '[data-test="till-comp-chip"]')
+    await waitFor(view, `document.querySelector('[data-test="comp-reason"]')`)
+    await fill(view, '[data-test="comp-reason"]', 'Cast member, age checked at the door')
+    await click(view, '[data-test="comp-send"]')
+
+    const listed = await request(app, 'GET', `/api/till/comp-requests?venueId=${comping.venueId}`, undefined, bar2.cookie)
+    const { requests } = await listed.json() as { requests: { request: { id: string } }[] }
+    const requestId = requests[0]!.request.id
+    await request(app, 'POST', `/api/till/comp-requests/${requestId}/approve`, {}, bar2.cookie)
+
+    await waitFor(view, `document.querySelector('[data-test="till-comp-pending-chip"]').textContent.includes('give it')`)
+    await click(view, '[data-test="till-comp-pending-chip"]')
+    await waitFor(view, `document.querySelector('[data-test="comp-give"]')`)
+    await click(view, '[data-test="comp-give"]')
+    await waitFor(view, `document.querySelector('[data-test="age-check-id-passport"]')`)
+    await click(view, '[data-test="age-check-id-passport"]')
+
+    await waitFor(view, `document.querySelector('[data-test="comp-given-confirmation"]')`)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="age-check-id-passport"]')`)).toBe(false)
+    view.close()
   }, 120_000)
 })

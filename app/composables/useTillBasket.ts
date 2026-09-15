@@ -4,7 +4,16 @@ import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import { refusalText } from '../utils/refusal'
 import type { ComputedRef, Ref } from 'vue'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
-import type { PricedBasket, SaleChoice, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
+import type { PricedBasket, PricedLine, SaleChoice, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
+
+// A refusal drops the restricted lines from what is payable; shared by a reader charge
+// (expectedAfter below) and a comp's own give (useTillComp.ts), so the two never diverge.
+export function pencePayable(priced: PricedBasket, restricted: boolean[], ageCheck: InlineAgeCheckInput | null): number {
+  if (ageCheck?.outcome !== 'REFUSED') return priced.totalPence
+  return priced.lines
+    .filter((_: PricedLine, index: number) => !restricted[index])
+    .reduce((sum: number, line: PricedLine) => sum + line.amountPence - line.discountPence, 0)
+}
 
 // The basket, its server-recomputed price and what a charge submits, held apart from the
 // tickets pane so it can be unit-tested without a device or a network (0004, F-103 criterion 3).
@@ -157,8 +166,11 @@ export function useTillBasket(deps: TillBasketDeps) {
 
   // A restricted line is the product's flag, already on the catalogue this screen holds: no second
   // lookup, and no route sells one without an outcome on record first (F-106 criteria 1, 5).
+  function isVariantRestricted(variantId: string): boolean {
+    return products.value.some(product => product.ageRestricted && product.variants.some(variant => variant.id === variantId))
+  }
   function isRestricted(line: BasketLine): boolean {
-    return products.value.some(product => product.ageRestricted && product.variants.some(variant => variant.id === line.variantId))
+    return isVariantRestricted(line.variantId)
   }
   const needsAgeCheck = computed(() => basket.value.some(isRestricted))
 
@@ -187,11 +199,7 @@ export function useTillBasket(deps: TillBasketDeps) {
   // A refusal drops the restricted lines: what the screen expects to be charged has to shrink to
   // match, or the server's own cross-check would refuse a total nobody asked for (F-104, F-106).
   function expectedAfter(ageCheck: InlineAgeCheckInput | null): number {
-    const bar = basket.value.length === 0
-      ? 0
-      : ageCheck?.outcome === 'REFUSED'
-        ? priced.value!.lines.filter((_, index) => !isRestricted(basket.value[index]!)).reduce((sum, line) => sum + line.amountPence - line.discountPence, 0)
-        : priced.value!.totalPence
+    const bar = basket.value.length === 0 ? 0 : pencePayable(priced.value!, basket.value.map(isRestricted), ageCheck)
     return bar + ticketsPence.value + walkUpsPence.value
   }
 
@@ -216,6 +224,7 @@ export function useTillBasket(deps: TillBasketDeps) {
     recomputeTotal,
     grandTotalPence,
     isRestricted,
+    isVariantRestricted,
     needsAgeCheck,
     lineAmount,
     saleBody,

@@ -78,6 +78,23 @@ export const showNight: Shot[] = [
     ],
   },
   {
+    name: 'show-night/till-comp',
+    persona: bar,
+    url: '/tonight/till',
+    marker: '[data-test="till-panes"]',
+    width: PHONE_WIDTH,
+    // The first size on a seeded bar always offers a mixer, so the choice is answered before the
+    // line lands and the comp chip, which needs a priced basket, has anything to show for.
+    after: 'document.querySelector(\'[data-test^="variant-"]\')?.click(); '
+      + 'setTimeout(() => document.querySelector(\'[data-test^="choice-option-"]\')?.click(), 400); '
+      + 'setTimeout(() => document.querySelector(\'[data-test="till-comp-chip"]\')?.click(), 1100)',
+    annotations: [
+      { selector: '[data-test="comp-request-total"]', label: 'What is being given away' },
+      { selector: '[data-test="comp-reason"]', label: 'Why, on the record' },
+      { selector: '[data-test="comp-send"]', label: 'Ask' },
+    ],
+  },
+  {
     name: 'show-night/age-checks',
     persona: foh,
     url: '/tonight/age-checks',
