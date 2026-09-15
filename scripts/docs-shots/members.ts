@@ -153,4 +153,15 @@ export const members: Shot[] = [
       { selector: '[data-test="access-save"]', label: 'Submit' },
     ],
   },
+  {
+    name: 'members/tab',
+    persona,
+    url: '/account/bar-tab',
+    marker: '[data-test="account-tab-page"]',
+    width: PHONE_WIDTH,
+    annotations: [
+      { selector: '[data-test="account-tab-balance"]', label: 'Outstanding' },
+      { selector: '[data-test="account-tab-charges"]', label: 'Charges' },
+    ],
+  },
 ]
