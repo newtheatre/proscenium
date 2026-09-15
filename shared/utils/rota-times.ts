@@ -5,7 +5,6 @@ import { londonClock } from './london'
 
 export const SECONDS_PER_MINUTE = 60
 
-// Null means the venue's template says nothing and the configured default applies (0078).
 export interface ShiftOffsets {
   startBeforeDoorsMinutes: number
   endAfterEndMinutes: number
@@ -42,7 +41,8 @@ export function shiftWindow(performance: PerformanceTimes, offsets: ShiftOffsets
   }
 }
 
-// The template's own offsets where it holds them, the configured defaults where it does not.
+// The template's own offsets where it holds them, the configured defaults where it does not:
+// null on a template row means the venue has never been asked the question (0078).
 export function offsetsFor(
   template: { startsBeforeDoorsMinutes?: number | null, endsAfterEndMinutes?: number | null } | null,
   defaults: ShiftOffsets,
@@ -54,8 +54,12 @@ export function offsetsFor(
 }
 
 // Authority holds inside the window, widened by the grace at both ends (0078, E-131 criterion 4).
-// A shift with no window bounds nobody: an unknown window is not evidence of being off shift.
-export function insideWindow(window: Partial<ShiftWindow> | null, at: number, graceMinutes: number): boolean {
+// A window missing either end bounds nobody: an unknown window is not evidence of being off shift.
+export function insideWindow(
+  window: { startsAt?: number | null, endsAt?: number | null } | null,
+  at: number,
+  graceMinutes: number,
+): boolean {
   if (!window || window.startsAt == null || window.endsAt == null) return true
   const grace = graceMinutes * SECONDS_PER_MINUTE
   return at >= window.startsAt - grace && at <= window.endsAt + grace
@@ -80,6 +84,9 @@ function distance(window: ShiftWindow, at: number): number {
 
 // Which house a sale belongs to on a two-performance day (F-126 criteria 1 and 2): the window
 // containing it, else the nearest, with a tie going to the earlier performance.
+
+// Deliberately not `activePerformanceId` (shared/utils/tonight.ts), which asks what the screen
+// should be showing now; between houses the two differ, and a sale belongs to the nearer bar.
 export function pickByWindow(windows: WindowedPerformance[], at: number): string | null {
   let best: WindowedPerformance | null = null
   let bestDistance = Number.POSITIVE_INFINITY
