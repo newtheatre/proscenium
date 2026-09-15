@@ -81,16 +81,31 @@ export interface IncidentEntry {
   happenedAt: number
   supersedesId: string | null
   supersededBy: string | null
+  reviewed: boolean
   createdAt: number
 }
 
+// `reviewed` is the same acknowledgement the close-night check counts (`incidentsReviewedQuery`),
+// read per entry so the log can offer the action only where it is still wanted (E-114 criterion 3).
 const ENTRY_COLUMNS = sql`
   i.id AS id, i.performance_id AS performanceId, i.reported_by AS reportedBy, u.name AS reportedByName,
   i.category AS category, i.severity AS severity, i.body AS body, i.happened_at AS happenedAt,
   i.supersedes_id AS supersedesId,
   (SELECT s.id FROM incidents s WHERE s.supersedes_id = i.id) AS supersededBy,
+  EXISTS (
+    SELECT 1 FROM audit_log a WHERE a.action = 'incident.reviewed' AND a.target = 'incident:' || i.id
+  ) AS reviewed,
   i.created_at AS createdAt
 `
+
+type IncidentRow = Omit<IncidentEntry, 'reviewed'> & { reviewed: number }
+
+const asEntry = (row: IncidentRow): IncidentEntry => ({ ...row, reviewed: row.reviewed === 1 })
+
+export async function incidentsOn(from: number, to: number, limit: number, offset: number): Promise<IncidentEntry[]> {
+  const rows = await db.all<IncidentRow>(incidentsOnQuery(from, to, limit, offset))
+  return rows.map(asEntry)
+}
 
 // Tonight's log: every entry from a night's own bounds, superseded ones included, because the
 // chain has to stay visible (E-115 criterion 3).
@@ -119,6 +134,6 @@ export function incidentByIdQuery(id: string): SQL {
 }
 
 export async function incidentById(id: string): Promise<IncidentEntry | undefined> {
-  const [row] = await db.all<IncidentEntry>(incidentByIdQuery(id))
-  return row
+  const [row] = await db.all<IncidentRow>(incidentByIdQuery(id))
+  return row ? asEntry(row) : undefined
 }

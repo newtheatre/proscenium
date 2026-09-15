@@ -188,6 +188,39 @@ describe.skipIf(skip !== null)('asking for a comp (criterion 1)', () => {
   })
 })
 
+describe.skipIf(skip !== null)('the approver\'s queue, which is what the duty manager\'s screen reads', () => {
+  test('a pending request is listed to the decider, leaves the queue once decided, and collects at zero', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const { id } = await bookedReservation(performanceId, ticketTypeId)
+    const requestId = await requestedComp(id)
+
+    const dutyManager = await registerMember(app, 'comp-queue-duty', generatePassword())
+    confirmDutyManagerShift(performanceId, dutyManager.id)
+
+    const queued = await send('GET', `/api/box-office/desk/comp-requests?performanceId=${performanceId}`, undefined, dutyManager.cookie)
+    expect(queued.status).toBe(200)
+    const { items } = await queued.json() as { items: { id: string, reason: string, requestedByName: string }[] }
+    expect(items.find(one => one.id === requestId)?.reason).toBe('A guest of the show')
+
+    expect((await approve(requestId, dutyManager.cookie)).status).toBe(200)
+
+    const afterwards = await send('GET', `/api/box-office/desk/comp-requests?performanceId=${performanceId}`, undefined, dutyManager.cookie)
+    const { items: left } = await afterwards.json() as { items: { id: string }[] }
+    expect(left.find(one => one.id === requestId)).toBeUndefined()
+
+    expect((await send('POST', `/api/box-office/desk/reservations/${id}/collect`, { expectedTotalPence: 0, tender: 'COMP', compRequestId: requestId })).status).toBe(200)
+  }, CASE_TIMEOUT_MS)
+
+  test('the queue is refused to somebody who could not decide one anyway', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const { id } = await bookedReservation(performanceId, ticketTypeId)
+    await requestedComp(id)
+
+    const refused = await send('GET', `/api/box-office/desk/comp-requests?performanceId=${performanceId}`, undefined, boxOffice.cookie)
+    expect(refused.status).toBe(403)
+  })
+})
+
 describe.skipIf(skip !== null)('declining a comp (criterion 5)', () => {
   test('a decline is recorded and a subsequent approval is refused', async () => {
     const { performanceId, ticketTypeId } = await bookableShow()

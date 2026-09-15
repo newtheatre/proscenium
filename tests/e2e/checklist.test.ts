@@ -185,6 +185,54 @@ describe.skipIf(skip !== null)('reviewing an incident (E-114 criterion 3)', () =
   test('reviewing a missing incident 404s', async () => {
     expect((await send('POST', '/api/tonight/incidents/no-such-entry/review', undefined, foh.cookie)).status).toBe(404)
   })
+
+  test('a logged incident blocks the close until it is reviewed, and the log says which are', async () => {
+    const performanceId = (() => {
+      const database = new Database(app.databaseFile)
+      try {
+        return tonightsPerformance(sqliteTarget(database), { suffix: 'checklist-reviewed', venueId: house.venueId, curtainHoursAfterNightStart: 16.5 }).performanceId
+      }
+      finally {
+        database.close()
+      }
+    })()
+
+    const item = await send('POST', '/api/admin/checklist/items', { venueId: house.venueId, phase: 'POST', label: 'Incidents reviewed', sort: 8, required: true, systemCheck: 'INCIDENTS_REVIEWED' })
+    expect(item.status).toBe(200)
+    const { id: itemId } = await item.json() as { id: string }
+
+    const logged = await send('POST', '/api/tonight/incidents', { performanceId, category: 'SAFETY', severity: 'NOTE', body: 'A drink went over in the stalls.' }, foh.cookie)
+    const { id } = await logged.json() as { id: string }
+
+    const before = await send('GET', `/api/tonight/checklist?performanceId=${performanceId}`, undefined, foh.cookie)
+    const { items: beforeItems } = await before.json() as { items: { id: string, itemId: string, done: boolean, required: boolean, systemCheck: string | null }[] }
+    expect(beforeItems.find(entry => entry.itemId === itemId)?.done).toBe(false)
+
+    // Everything else settled first, so the close that follows is refused for the incident alone.
+    for (const entry of beforeItems) {
+      if (entry.systemCheck || entry.done) continue
+      await send('POST', `/api/tonight/checklist/${entry.id}/exempt`, { reason: 'Closing out the fixture' }, foh.cookie)
+    }
+    const blocked = await send('POST', '/api/tonight/checklist/close', { performanceId }, foh.cookie)
+    expect(blocked.status).toBe(409)
+
+    const unreviewed = await send('GET', '/api/tonight/incidents?pageSize=100', undefined, foh.cookie)
+    const { items: logBefore } = await unreviewed.json() as { items: { id: string, reviewed: boolean }[] }
+    expect(logBefore.find(entry => entry.id === id)?.reviewed).toBe(false)
+
+    expect((await send('POST', `/api/tonight/incidents/${id}/review`, undefined, foh.cookie)).status).toBe(200)
+
+    const relisted = await send('GET', '/api/tonight/incidents?pageSize=100', undefined, foh.cookie)
+    const { items: logAfter } = await relisted.json() as { items: { id: string, reviewed: boolean }[] }
+    expect(logAfter.find(entry => entry.id === id)?.reviewed).toBe(true)
+
+    const after = await send('GET', `/api/tonight/checklist?performanceId=${performanceId}`, undefined, foh.cookie)
+    const { items: afterItems } = await after.json() as { items: { itemId: string, done: boolean }[] }
+    expect(afterItems.find(entry => entry.itemId === itemId)?.done).toBe(true)
+
+    const closed = await send('POST', '/api/tonight/checklist/close', { performanceId }, foh.cookie)
+    expect(closed.status).toBe(200)
+  })
 })
 
 function write(statement: string, ...parameters: unknown[]): void {

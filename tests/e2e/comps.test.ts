@@ -207,6 +207,44 @@ describe.skipIf(skip !== null)('a comp sale requires a prior request with a reas
   })
 })
 
+describe.skipIf(skip !== null)('the approver\'s queue, which is what the duty manager\'s screen reads', () => {
+  test('a duty manager with no bar role reads the pending queue, priced, and it empties on approval', async () => {
+    const { venueId, performanceId } = programme(`comps-queue-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId, performanceId)
+
+    const asked = await ask({ venueId, lines: [{ variantId, qty: 1 }], reason: 'A round on the house' })
+    const { id } = await asked.json() as { id: string }
+
+    const dutyManager = await registerMember(app, `comps-queue-duty-${crypto.randomUUID().slice(0, 6)}`, generatePassword())
+    confirmShift(performanceId, 'DUTY_MANAGER', dutyManager.id)
+
+    const queued = await send('GET', `/api/till/comp-requests?performanceId=${performanceId}`, undefined, dutyManager.cookie)
+    expect(queued.status).toBe(200)
+    const { requests } = await queued.json() as { requests: { request: { id: string, reason: string }, priced: { totalPence: number } }[] }
+    const mine = requests.find(one => one.request.id === id)
+    expect(mine?.request.reason).toBe('A round on the house')
+    expect(mine?.priced.totalPence).toBe(500)
+
+    expect((await approve(id, dutyManager.cookie)).status).toBe(200)
+
+    const afterwards = await send('GET', `/api/till/comp-requests?performanceId=${performanceId}`, undefined, dutyManager.cookie)
+    const { requests: left } = await afterwards.json() as { requests: { request: { id: string } }[] }
+    expect(left.find(one => one.request.id === id)).toBeUndefined()
+  })
+
+  test('nobody on tonight at all is refused the queue', async () => {
+    const { venueId, performanceId } = programme(`comps-queue-nobody-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId, performanceId)
+    await ask({ venueId, lines: [{ variantId, qty: 1 }], reason: 'A round on the house' })
+
+    const stranger = await registerMember(app, `comps-queue-stranger-${crypto.randomUUID().slice(0, 6)}`, generatePassword())
+    const refused = await send('GET', `/api/till/comp-requests?performanceId=${performanceId}`, undefined, stranger.cookie)
+    expect(refused.status).toBe(403)
+  })
+})
+
 describe.skipIf(skip !== null)('approval is claimed atomically (criterion 2)', () => {
   test('two approvals racing the same request settle to one decision', async () => {
     const { venueId, performanceId } = programme(`comps-race-${crypto.randomUUID().slice(0, 6)}`)

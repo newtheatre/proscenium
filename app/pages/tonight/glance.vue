@@ -4,6 +4,7 @@ import { formatLondon } from '#shared/utils/london'
 import { groupedBoardCode, hubKpis, nightHeaderLine, passPressureAdvice, runningTimeLine } from '#shared/utils/night-hub'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { saysShiftRole } from '#shared/utils/rota'
+import { saysPrice } from '#shared/utils/ticket-types'
 import { activePerformanceId } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 import type { ShiftRole } from '#shared/utils/rota'
@@ -40,6 +41,7 @@ const POLL_MS = 20_000
 
 const route = useRoute()
 const request = useRequestFetch()
+const toast = useToast()
 const data = ref<DutyManagerTonight | null>(null)
 const syncedAt = ref<Date | null>(null)
 const failure = ref<string | null>(null)
@@ -50,6 +52,30 @@ const asked = ref(false)
 const chosenId = ref<string | null>(typeof route.query.performanceId === 'string' ? route.query.performanceId : null)
 
 let timer: ReturnType<typeof setInterval> | undefined
+
+// The two pending queues the duty manager decides (D-117, F-110): tickets at the box office and
+// drinks at the till. Each is hidden when its own route refuses this viewer, never pre-judged.
+interface PendingComp {
+  id: string
+  requestedBy: string
+  requestedByName: string
+  reason: string
+  expired: boolean
+}
+interface PendingBarComp { request: PendingComp, priced: { totalPence: number, lines: { productName: string, variantLabel: string, qty: number }[] } }
+
+const ticketComps = ref<PendingComp[] | null>(null)
+const barComps = ref<PendingBarComp[] | null>(null)
+const viewer = useViewer()
+
+async function loadComps(performanceId: string): Promise<void> {
+  const [tickets, bar] = await Promise.all([
+    request<{ items: PendingComp[] }>('/api/box-office/desk/comp-requests', { query: { performanceId } }).catch(() => null),
+    request<{ requests: PendingBarComp[] }>('/api/till/comp-requests', { query: { performanceId } }).catch(() => null),
+  ])
+  ticketComps.value = tickets?.items.filter(one => !one.expired) ?? null
+  barComps.value = bar?.requests.filter(one => !one.request.expired) ?? null
+}
 
 async function load(): Promise<void> {
   try {
@@ -71,6 +97,59 @@ const activeId = computed(() => activePerformanceId(performances.value, Date.now
 const selectedId = computed(() => chosenId.value ?? activeId.value)
 const selected = computed(() => performances.value.find(one => one.performanceId === selectedId.value) ?? null)
 const kpis = computed(() => selected.value ? hubKpis(selected.value.house) : null)
+
+const pendingComps = computed(() => [
+  ...(ticketComps.value ?? []).map(one => ({ queue: 'TICKET' as const, request: one, priced: null })),
+  ...(barComps.value ?? []).map(row => ({ queue: 'BAR' as const, request: row.request, priced: row.priced })),
+])
+
+const deciding = ref<string | null>(null)
+const declining = ref<{ queue: 'TICKET' | 'BAR', id: string } | null>(null)
+const declineReason = ref('')
+const declineFailure = ref<string | null>(null)
+
+const compRoute = (queue: 'TICKET' | 'BAR', id: string): string =>
+  (queue === 'TICKET' ? `/api/box-office/desk/comp-requests/${id}` : `/api/till/comp-requests/${id}`)
+
+async function approveComp(queue: 'TICKET' | 'BAR', id: string): Promise<void> {
+  deciding.value = id
+  try {
+    await $fetch(`${compRoute(queue, id)}/approve`, { method: 'POST' })
+    toast.add({ title: 'Comp approved', icon: 'i-lucide-check', color: 'success' })
+    if (selectedId.value) await loadComps(selectedId.value)
+  }
+  catch (refused) {
+    toast.add({ title: 'Not approved', description: refusalText(refused), icon: 'i-lucide-triangle-alert', color: 'error' })
+  }
+  finally {
+    deciding.value = null
+  }
+}
+
+function openDecline(queue: 'TICKET' | 'BAR', id: string): void {
+  declining.value = { queue, id }
+  declineReason.value = ''
+  declineFailure.value = null
+}
+
+async function declineComp(): Promise<void> {
+  const target = declining.value
+  if (!target || !declineReason.value.trim()) return
+  deciding.value = target.id
+  declineFailure.value = null
+  try {
+    await $fetch(`${compRoute(target.queue, target.id)}/decline`, { method: 'POST', body: { reason: declineReason.value.trim() } })
+    toast.add({ title: 'Comp declined', icon: 'i-lucide-check', color: 'success' })
+    declining.value = null
+    if (selectedId.value) await loadComps(selectedId.value)
+  }
+  catch (refused) {
+    declineFailure.value = refusalText(refused)
+  }
+  finally {
+    deciding.value = null
+  }
+}
 
 setNightSubject(() => ({
   title: selected.value?.showTitle ?? 'Tonight',
@@ -115,9 +194,20 @@ function hideCode(): void {
   boardCodeFailure.value = null
 }
 
+// The queues ride the same poll as the numbers, so a request asked for mid-interval appears
+// without the duty manager reloading anything.
+async function refresh(): Promise<void> {
+  await load()
+  if (selectedId.value) await loadComps(selectedId.value)
+}
+
+watch(selectedId, (id) => {
+  if (id) loadComps(id)
+})
+
 onMounted(() => {
-  load()
-  timer = setInterval(load, POLL_MS)
+  refresh()
+  timer = setInterval(refresh, POLL_MS)
 })
 onUnmounted(() => {
   if (timer) clearInterval(timer)
@@ -224,6 +314,68 @@ onUnmounted(() => {
           >
             This house is uncapped, so there is no percentage to read.
           </p>
+        </NightBlock>
+
+        <!-- Both queues in one place, because the person deciding is one person: the box office
+             asks for a ticket and the till asks for a round, and neither waits on the other. -->
+        <NightBlock
+          v-if="pendingComps.length"
+          title="Comp requests"
+          data-test="glance-comp-requests"
+        >
+          <ul class="space-y-3">
+            <li
+              v-for="pending in pendingComps"
+              :key="pending.request.id"
+              class="space-y-2 rounded-lg bg-default p-3"
+              :data-test="`comp-request-${pending.request.id}`"
+            >
+              <p class="font-semibold">
+                {{ pending.queue === 'TICKET' ? 'Ticket' : 'Bar' }}<span v-if="pending.priced"> · {{ saysPrice(pending.priced.totalPence) }}</span>
+              </p>
+              <p class="text-sm">
+                {{ pending.request.reason }}
+              </p>
+              <p
+                v-if="pending.priced"
+                class="text-sm text-muted"
+              >
+                {{ pending.priced.lines.map(line => `${line.qty} × ${line.productName}, ${line.variantLabel}`).join(' · ') }}
+              </p>
+              <p class="font-mono text-xs text-muted">
+                asked by {{ pending.request.requestedByName }}
+              </p>
+              <p
+                v-if="viewer && viewer.id === pending.request.requestedBy"
+                class="text-sm text-muted"
+              >
+                Your own request: somebody else decides it.
+              </p>
+              <div
+                v-else
+                class="flex flex-wrap gap-2"
+              >
+                <UButton
+                  color="secondary"
+                  class="min-h-12"
+                  :loading="deciding === pending.request.id"
+                  :data-test="`approve-comp-${pending.request.id}`"
+                  @click="approveComp(pending.queue, pending.request.id)"
+                >
+                  Approve
+                </UButton>
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  class="min-h-12"
+                  :data-test="`decline-comp-${pending.request.id}`"
+                  @click="openDecline(pending.queue, pending.request.id)"
+                >
+                  Decline
+                </UButton>
+              </div>
+            </li>
+          </ul>
         </NightBlock>
 
         <NightBlock
@@ -413,6 +565,60 @@ onUnmounted(() => {
         Nothing running tonight.
       </p>
     </div>
+
+    <UModal
+      :open="declining !== null"
+      title="Decline this comp"
+      description="The reason goes on the record and the person who asked sees it."
+      @update:open="declining = null"
+    >
+      <template #body>
+        <form
+          class="space-y-4"
+          data-test="decline-comp-form"
+          @submit.prevent="declineComp"
+        >
+          <UAlert
+            v-if="declineFailure"
+            data-test="decline-comp-failure"
+            color="error"
+            variant="subtle"
+            :description="declineFailure"
+          />
+
+          <UFormField
+            label="Why"
+            required
+          >
+            <UInput
+              v-model="declineReason"
+              class="w-full"
+              data-test="decline-comp-reason"
+            />
+          </UFormField>
+
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              type="submit"
+              class="min-h-12"
+              :loading="deciding !== null"
+              :disabled="!declineReason.trim()"
+              data-test="decline-comp-submit"
+            >
+              Decline it
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              class="min-h-12"
+              @click="declining = null"
+            >
+              Back
+            </UButton>
+          </div>
+        </form>
+      </template>
+    </UModal>
 
     <template #actions>
       <NightAction

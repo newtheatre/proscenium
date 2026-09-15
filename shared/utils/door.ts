@@ -84,7 +84,7 @@ export function doorVerdict(
       state: 'UNPAID',
       headline: 'UNPAID',
       line: 'Send to the bar to pay',
-      note: 'The bar takes card or cash and marks the booking paid.',
+      note: 'The bar takes card and marks the booking paid.',
     }
   }
   return { state: 'REFUSED', headline: outcome.headline.toUpperCase(), line: outcome.detail ?? outcome.headline, note: null }
