@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { compsQuery, gpDepletionQuery, gpRevenueQuery } from '#server/utils/bar-reports'
+import { compsCountQuery, compsQuery, gpDepletionQuery, gpRevenueQuery, varianceCountQuery, varianceQuery } from '#server/utils/bar-reports'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -218,10 +218,63 @@ describe('the comps section belongs to the bar (F-119 criterion 1)', () => {
       const desk = entry(database, 'e-2', INSIDE, { source: 'DESK', tender: 'COMP', compReason: 'A press ticket' })
       line(database, 'l-2', desk, 0, 2000)
 
-      const comps = read<{ entryId: string, reason: string, foregonePence: number }>(database, compsQuery(FROM_AT, TO_AT))
+      const comps = read<{ entryId: string, reason: string, foregonePence: number }>(database, compsQuery(FROM_AT, TO_AT, 25, 0))
       expect(comps.map(row => row.entryId)).toEqual(['e-1'])
       expect(comps[0]?.reason).toBe('A round on the house')
       expect(comps[0]?.foregonePence).toBe(500)
+    })
+  })
+})
+
+function person(database: TestDatabase, suffix = '1'): string {
+  const id = `u-${suffix}`
+  insert(database, 'users', { id, email: `person-${suffix}@example.invalid`, name: `Person ${suffix}` })
+  return id
+}
+
+// One applied stocktake line and the adjustment movement it posted, which is one variance row.
+function variance(database: TestDatabase, suffix: string, itemId: string, openedBy: string, qty: number): void {
+  insert(database, 'stocktakes', { id: `st-${suffix}`, status: 'APPLIED', opened_by: openedBy, opened_at: BEFORE, applied_by: openedBy, applied_at: INSIDE })
+  insert(database, 'stocktake_lines', { id: `sl-${suffix}`, stocktake_id: `st-${suffix}`, item_id: itemId, expected_qty: 100, counted_qty: 100 + qty })
+  insert(database, 'stock_movements', { id: `sm-${suffix}`, item_id: itemId, qty, kind: 'STOCKTAKE', ref_table: 'stocktake_lines', ref_id: `sl-${suffix}`, created_at: INSIDE })
+}
+
+const ids = (rows: { entryId: string }[]): string[] => rows.map(row => row.entryId)
+
+describe('an unbounded section pages rather than truncating silently (F-119 criterion 2)', () => {
+  test('a two-page comps section answers its second page, and the count answers the whole', async () => {
+    await withDatabase((database) => {
+      for (const n of [1, 2, 3]) {
+        line(database, `l-${n}`, entry(database, `e-${n}`, INSIDE + n, { tender: 'COMP', compReason: `Round ${n}` }), 0, 100 * n)
+      }
+
+      const [counted] = read<{ total: number }>(database, compsCountQuery(FROM_AT, TO_AT))
+      expect(counted?.total).toBe(3)
+      expect(ids(read(database, compsQuery(FROM_AT, TO_AT, 2, 0)))).toEqual(['e-1', 'e-2'])
+      expect(ids(read(database, compsQuery(FROM_AT, TO_AT, 2, 2)))).toEqual(['e-3'])
+    })
+  })
+
+  test('the count is of the period, not of the page, and a desk comp is in neither', async () => {
+    await withDatabase((database) => {
+      line(database, 'l-1', entry(database, 'e-1', INSIDE, { tender: 'COMP', compReason: 'A round' }), 0, 500)
+      line(database, 'l-2', entry(database, 'e-2', INSIDE, { source: 'DESK', tender: 'COMP', compReason: 'A press ticket' }), 0, 2000)
+      line(database, 'l-3', entry(database, 'e-3', BEFORE, { tender: 'COMP', compReason: 'Last week' }), 0, 500)
+
+      const [counted] = read<{ total: number }>(database, compsCountQuery(FROM_AT, TO_AT))
+      expect(counted?.total).toBe(1)
+    })
+  })
+
+  test('a two-page variance section pages the same way', async () => {
+    await withDatabase((database) => {
+      const openedBy = person(database)
+      variance(database, '1', bottle(database, '1'), openedBy, -5)
+      variance(database, '2', bottle(database, '2'), openedBy, 7)
+
+      const [counted] = read<{ total: number }>(database, varianceCountQuery(FROM_AT, TO_AT))
+      expect(counted?.total).toBe(2)
+      expect(read<{ itemName: string }>(database, varianceQuery(FROM_AT, TO_AT, 1, 1)).map(row => row.itemName)).toEqual(['Gin 2'])
     })
   })
 })
