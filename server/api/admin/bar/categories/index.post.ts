@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
   )
 
   if (!applied) {
-    const taken = await categoryNamed(input.name)
+    const taken = await claimName('category', input.name)
     throw createError({ statusCode: 409, statusMessage: `A category is already called ${taken?.name ?? input.name}` })
   }
 

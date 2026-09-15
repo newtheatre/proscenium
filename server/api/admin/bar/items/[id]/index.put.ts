@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
   )
 
   if (!applied) {
-    const taken = await itemNamed(input.name, id)
+    const taken = await claimName('item', input.name, id)
     if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
     throw createError({ statusCode: 409, statusMessage: `A stocked item is already called ${taken.name}` })
   }
