@@ -1512,7 +1512,7 @@ requires `entry_id IS NULL`: a row that already names an entry can never be repl
 one. What remains is the gap between the sale's own batch and that recording. A worker that dies
 inside it leaves a posted sale on a row that does not name it, and the next answer commits the
 basket again. Closing that needs the attempt's `entry_id` to ride the sale's own batch, alongside
-`ledger_entries.till_session_id` (F-105 criterion 1, F-202).
+`ledger_entries.till_session_id` (F-105 criterion 1, F-202), which is where it will land.
 
 ### stock_movements  APPEND-ONLY
 `id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own
