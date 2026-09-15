@@ -5,10 +5,9 @@ import { resolveSeasonBounds, TICKET_EXPORT_CAP } from '#shared/utils/ticket-exp
 import { RESERVATION_SOURCES } from '#shared/utils/reservations'
 import { saysReservationStatus } from '#shared/utils/capacity'
 import { saysMoney } from '#shared/utils/bar'
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { formatLondon, startOfLondonDayAfter } from '#shared/utils/london'
 import type { TicketExportFilter } from '#server/utils/ticket-export'
 
-const DAY_SECONDS = 24 * 60 * 60
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 const query = z.object({
@@ -44,8 +43,8 @@ export default defineEventHandler(async (event) => {
     filter.toAt = bounds.toAt
   }
   else if (input.from !== undefined && input.to !== undefined) {
-    filter.fromAt = Math.floor(startOfLondonDay(input.from).getTime() / 1000)
-    filter.toAt = Math.floor(startOfLondonDay(input.to).getTime() / 1000) + DAY_SECONDS
+    filter.fromAt = Math.floor(startOfLondonDayAfter(input.from, 0).getTime() / 1000)
+    filter.toAt = Math.floor(startOfLondonDayAfter(input.to, 1).getTime() / 1000)
   }
 
   const rows = await ticketExportRows(filter)

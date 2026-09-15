@@ -71,8 +71,15 @@ export function fromLondonWallClock(year: number, month: number, day: number, ho
 
 // A YYYY-MM-DD screen field turned into the instant its day begins, London time.
 export function startOfLondonDay(day: string): Date {
+  return startOfLondonDayAfter(day, 0)
+}
+
+// The same instant, counting whole calendar days on from the day named, so a window ending on a
+// clock change is a real 23 or 25 hours rather than a fixed 86400 seconds (0014).
+export function startOfLondonDayAfter(day: string, days: number): Date {
   const [year, month, date] = day.split('-').map(Number)
-  return fromLondonWallClock(year!, month!, date!)
+  const shifted = new Date(Date.UTC(year!, month! - 1, date! + days))
+  return fromLondonWallClock(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate())
 }
 
 // A window ending on this date still covers the whole of it, the way `committeeYearEnd` treats

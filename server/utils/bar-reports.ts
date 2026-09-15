@@ -3,8 +3,7 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { committeeYearEnd, fromLondonWallClock, startOfLondonDay } from '#shared/utils/london'
-import { daysAfter } from '#shared/utils/membership'
+import { committeeYearEnd, fromLondonWallClock, startOfLondonDayAfter } from '#shared/utils/london'
 import { showNightBounds } from '#shared/utils/show-night'
 import type { BarReport, CompRow, DiscountRow, GpReport, GpRow, ReportPeriodInput, SalesRow, VarianceRow } from '#shared/utils/bar-reports'
 
@@ -13,11 +12,8 @@ import type { BarReport, CompRow, DiscountRow, GpReport, GpRow, ReportPeriodInpu
 
 const WEEK_DAYS = 7
 
-// The instant a London day begins, counting whole calendar days from the one named: a week that
-// crosses a clock change is 169 or 167 hours, never seven fixed days (criterion 1, 0014).
-function londonDayStart(day: string, plusDays = 0): number {
-  return Math.floor(startOfLondonDay(daysAfter(day, plusDays)).getTime() / 1000)
-}
+const londonDayStart = (day: string, plusDays = 0): number =>
+  Math.floor(startOfLondonDayAfter(day, plusDays).getTime() / 1000)
 
 // Resolves a period to [fromAt, toAt) in unix seconds, on the London calendar throughout
 // (criterion 1, 0014). A week is the seven London days starting on the day named.

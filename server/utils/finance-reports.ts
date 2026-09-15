@@ -3,20 +3,18 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (0055).
 import { createError } from 'h3'
-import { startOfLondonDay } from '#shared/utils/london'
+import { startOfLondonDayAfter } from '#shared/utils/london'
 import type { AccessAdmissionRow, FinanceForegoneReport, FinanceScopeInput, ForegoneReport } from '#shared/utils/finance-reports'
 import type { SQL } from 'drizzle-orm'
 
 // Foregone value and access/companion admissions, run fresh from the ledger for the scope asked
 // for (I-103): nothing here is a stored total, the same discipline every other report keeps.
 
-const DAY_SECONDS = 24 * 60 * 60
-
 // A period is a London calendar range, exclusive at the end, the same convention F-119's bar
 // reports use (0014).
 function periodBounds(from: string, to: string): { fromAt: number, toAt: number } {
-  const fromAt = Math.floor(startOfLondonDay(from).getTime() / 1000)
-  const toAt = Math.floor(startOfLondonDay(to).getTime() / 1000) + DAY_SECONDS
+  const fromAt = Math.floor(startOfLondonDayAfter(from, 0).getTime() / 1000)
+  const toAt = Math.floor(startOfLondonDayAfter(to, 1).getTime() / 1000)
   if (toAt <= fromAt) throw createError({ statusCode: 400, statusMessage: 'A period must end after it starts' })
   return { fromAt, toAt }
 }
