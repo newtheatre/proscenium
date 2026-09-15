@@ -385,4 +385,20 @@ describe.skipIf(skip !== null)('the console screen (review-ui.md finding 5)', ()
     expect(shown).toContain(`${name} asked for 55%`)
     view.close()
   }, 120_000)
+
+  // Retire and Put back act straight from the table, with no modal open to carry the form's own
+  // alert: a code-review pass on this PR found the refusal had nowhere to show (issue #1051).
+  test('a status-change refusal shows on the page, not only inside a modal', async () => {
+    const { id, name } = await aDiscount(10)
+    const view = await signedInView()
+    await visit(view, `${app.baseURL}/bar/discounts`, `[data-test="status-${id}"]`)
+
+    // Somebody else retires it first, racing the click about to happen from the table.
+    expect((await send('POST', `/api/admin/bar/discounts/${id}/status`, { status: 'RETIRED' })).status).toBe(200)
+
+    await click(view, `[data-test="status-${id}"]`)
+    await waitFor(view, `document.querySelector('[data-test="failure"]')`)
+    expect(await textOf(view, '[data-test="failure"]')).toContain(`${name} is already retired`)
+    view.close()
+  }, 120_000)
 })

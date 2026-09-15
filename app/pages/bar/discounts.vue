@@ -132,6 +132,15 @@ const columns: TableColumn<Discount>[] = [
       :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
+    <!-- Retire and Put back act from the table, with no modal open to show the form's own alert. -->
+    <UAlert
+      v-if="failure && !open"
+      data-test="failure"
+      color="error"
+      variant="subtle"
+      :description="failure"
+    />
+
     <UAlert
       color="neutral"
       variant="subtle"
