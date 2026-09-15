@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { toCsv } from '#server/utils/csv'
 import { reportPeriodForm, REPORT_EXPORT_PAGE_ROWS, REPORT_SECTIONS } from '#shared/utils/bar-reports'
 import { formatLondon } from '#shared/utils/london'
-import { saysMoney } from '#shared/utils/bar'
+import { says, saysMoney } from '#shared/utils/bar'
 
 const query = reportPeriodForm.and(z.object({
   section: z.enum(REPORT_SECTIONS),
@@ -47,6 +47,13 @@ export default defineEventHandler(async (event) => {
           when: formatLondon(new Date(row.happenedAt * 1000), { dateStyle: 'short', timeStyle: 'short' }),
           reason: row.reason ?? '', approvedBy: row.approvedByName, foregone: saysMoney(row.foregonePence),
         })), pages: comps.pages }
+      }
+      case 'wastage': {
+        const rows = await wastageReport(fromAt, toAt)
+        return { rows: rows.map(row => ({
+          reason: says(row.reason), item: row.itemName, category: row.categoryName,
+          qtyWasted: row.qtyWasted, cost: saysMoney(row.costPence),
+        })), pages: 1 }
       }
       case 'discounts': {
         const rows = await discountsReport(fromAt, toAt)

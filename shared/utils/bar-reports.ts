@@ -22,7 +22,7 @@ export const reportPeriodForm = z.discriminatedUnion('kind', [
 
 export type ReportPeriodInput = z.output<typeof reportPeriodForm>
 
-export const REPORT_SECTIONS = ['sales', 'gp', 'variance', 'comps', 'discounts'] as const
+export const REPORT_SECTIONS = ['sales', 'gp', 'variance', 'comps', 'discounts', 'wastage'] as const
 export type ReportSection = (typeof REPORT_SECTIONS)[number]
 
 // Comps and variance are one row per comp and per adjusted stocktake line, so a season is
@@ -81,6 +81,16 @@ export interface DiscountRow {
   discountedPence: number
 }
 
+// One row per reason per item, so the catalogue bounds it the way the gross profit table is
+// bounded. Detail is never grouped by: it says which bottle, not which kind of loss (0079).
+export interface WastageRow {
+  reason: string
+  itemName: string
+  categoryName: string
+  qtyWasted: number
+  costPence: number
+}
+
 export interface BarReport {
   fromAt: number
   toAt: number
@@ -89,4 +99,5 @@ export interface BarReport {
   variance: Page<VarianceRow>
   comps: Page<CompRow>
   discounts: DiscountRow[]
+  wastage: WastageRow[]
 }

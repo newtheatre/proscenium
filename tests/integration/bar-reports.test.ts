@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { compsCountQuery, compsQuery, gpDepletionQuery, gpRevenueQuery, varianceCountQuery, varianceQuery } from '#server/utils/bar-reports'
+import { compsCountQuery, compsQuery, gpDepletionQuery, gpRevenueQuery, varianceCountQuery, varianceQuery, wastageQuery } from '#server/utils/bar-reports'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
