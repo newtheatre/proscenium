@@ -1587,8 +1587,9 @@ pours: `stock_movements_sale_exceeds_on_hand` for a `SALE` and
 (F-110 criterion 4). The predicate sits on the write itself rather than in a handler, so two
 attempts racing for the last serving resolve to one winner (0006); the comp trigger raises the
 sale's name, so `commitSale` and `commitCompSale` catch one string between them and their two
-wordings cannot drift apart. `WASTAGE` and `ADJUST` are deliberately not guarded: a bottle that
-has gone missing has gone missing, and a count that says so is the point of recording it.
+wordings cannot drift apart. `SALE` and `COMP` are the whole of the guarded set: every other kind
+may take the sum below nothing, deliberately, because a bottle that has gone missing has gone
+missing and a wastage, an adjustment or a stocktake that says so is the point of recording it.
 
 The kind vocabulary is complete from the first migration because widening a CHECK is a table
 rebuild, and a rebuild of an append-only table is refused (0010). `MOVEMENT_WRITERS` says which

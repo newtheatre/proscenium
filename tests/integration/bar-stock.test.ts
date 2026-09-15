@@ -133,7 +133,8 @@ describe('neither a sale nor a comp takes on-hand below nothing (F-105 criterion
       const id = bottle(database)
       move(database, { qty: 100, kind: 'DELIVERY', unit_cost_pence: 1 })
 
-      expect(() => move(database, { qty: -101, kind: 'COMP', ref_table: 'ledger_lines', ref_id: 'line-1' })).toThrow()
+      expect(() => move(database, { qty: -101, kind: 'COMP', ref_table: 'ledger_lines', ref_id: 'line-1' }))
+        .toThrow(/stock_movements_sale_exceeds_on_hand/)
       expect(onHand(database, id)).toBe(100)
     })
   })
@@ -162,7 +163,8 @@ describe('neither a sale nor a comp takes on-hand below nothing (F-105 criterion
       move(database, { qty: 50, kind: 'DELIVERY', unit_cost_pence: 1 })
       move(database, { qty: -50, kind: 'SALE', ref_table: 'ledger_lines', ref_id: 'line-1' })
 
-      expect(() => move(database, { qty: -50, kind: 'COMP', ref_table: 'ledger_lines', ref_id: 'line-2' })).toThrow()
+      expect(() => move(database, { qty: -50, kind: 'COMP', ref_table: 'ledger_lines', ref_id: 'line-2' }))
+        .toThrow(/stock_movements_sale_exceeds_on_hand/)
       expect(onHand(database, id)).toBe(0)
     })
   })

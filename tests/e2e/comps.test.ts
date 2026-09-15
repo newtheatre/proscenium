@@ -528,6 +528,10 @@ describe.skipIf(skip !== null)('a comp depletes exactly as a paid sale would, re
     expect(answered.status).toBe(409)
     expect(await message(answered)).toContain('Not enough left in stock')
     expect(onHandOfItem(itemId)).toBe(25)
+
+    // The approval is freed rather than burned: a restock and a retry still spend it (F-110).
+    await send('POST', '/api/admin/bar/movements', { itemId, qty: 100, kind: 'DELIVERY', unitCostPence: 1 })
+    expect((await give(id, venueId, 500)).status).toBe(200)
   })
 
   test('a sale and a comp racing for the last serving leave exactly one winner', async () => {
