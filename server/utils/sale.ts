@@ -691,6 +691,8 @@ export async function commitSale(
       product: restrictedNames.join(', '),
       notes: ageCheck.notes,
     }, id)
+    // Deliberately not conditional on the entry, unlike the sale's own writes above: the check is
+    // a conversation that happened, and it reaches the register whether a sale followed (F-106).
     statements.push(db.run(write.statement))
     statements.push(db.insert(schema.auditLog).values(auditEntry({
       actorId: context.actorId,
@@ -732,6 +734,10 @@ export async function commitSale(
     })
   }
 
+  // Summed after the batch rather than added to the figure read before it: another till may have
+  // charged the same holder in between, and the receipt is where staff read the balance (F-108).
+  const settledBalancePence = tab ? await outstandingTabBalance(tab.holderId) : 0
+
   // The door pass (F-123 criterion 4), and the email for a booker who gave an address (criterion 2).
   const walkUpReceipts: WalkUpReceipt[] = []
   for (const walkUp of written) {
@@ -768,7 +774,7 @@ export async function commitSale(
     ageCheck: ageCheckResult,
     refusedLines: refusedPriced,
     discount: publicDiscount(discount),
-    tab: tab ? { holderName: tab.holderName, outstandingPence: tab.outstandingPence + soldTotalPence, capOverridden: tab.capOverridden } : null,
+    tab: tab ? { holderName: tab.holderName, outstandingPence: settledBalancePence, capOverridden: tab.capOverridden } : null,
     comp: null,
     tickets: collected,
     walkUps: walkUpReceipts,

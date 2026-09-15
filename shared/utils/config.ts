@@ -153,8 +153,8 @@ export const CONFIG_KEYS = {
   // Empty is the honest starting state, not a guess: who qualifies is still open (F-bar.md), so
   // nobody is authorised until a committee decision adds them (F-108 criterion 1).
   BAR_AUTHORISED_TAB_HOLDERS: {
-    // Bounded at the D1 parameter limit, because every charge reads the whole list into one IN
-    // query: "committee-sized by nature" is a habit, and this key is edited from a screen (0003).
+    // Bounded at the D1 parameter limit, because the till's holder picker binds one parameter per
+    // id: "committee-sized by nature" is a habit, and this key is edited from a screen (0003).
     schema: z.array(z.string().trim().min(1, 'Say which person you mean'))
       .max(90, 'A tab allow-list holds at most ninety people'),
     default: [],

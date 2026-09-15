@@ -30,8 +30,8 @@ describe('configuration surface (0012, 0019)', () => {
     expect(CONFIG_KEYS.BAR_TAB_CAP_PENCE.default).toBe(2000)
   })
 
-  // The allow-list is read into one bounded IN query on every charge, so its own length is what
-  // keeps that query inside D1's parameter limit (0003). Committee-sized by nature is not a rule.
+  // The till's holder picker binds one parameter per id, so the list's own length is what keeps
+  // that query inside D1's limit (0003). Committee-sized by nature is a habit, not a rule.
   test('the tab allow-list is bounded at the parameter limit', () => {
     const ids = (count: number): string[] => Array.from({ length: count }, (_, index) => `user-${index}`)
     const schema = CONFIG_KEYS.BAR_AUTHORISED_TAB_HOLDERS.schema
