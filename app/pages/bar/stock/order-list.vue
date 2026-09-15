@@ -12,7 +12,7 @@ const { data, status, error } = await useAsyncData(
   { default: () => ({ shortfalls: [], unconfigured: [] }) },
 )
 
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The order list could not be read.') : null))
+const listingFailure = useListFailure(error, 'The order list could not be read.')
 
 const grouped = computed(() => {
   // Grouped case-insensitively, matching the server's own ordering: free text has no vocabulary
@@ -36,7 +36,8 @@ const grouped = computed(() => {
       data-test="listing-failure"
       color="error"
       variant="subtle"
-      :description="listingFailure"
+      :description="listingFailure.message"
+      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
     <div class="flex items-center justify-between gap-3">

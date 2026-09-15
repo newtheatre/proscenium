@@ -81,7 +81,7 @@ async function reverse(): Promise<void> {
   }
 }
 
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The movements could not be read.') : null))
+const listingFailure = useListFailure(error, 'The movements could not be read.')
 
 const columns: TableColumn<StockMovement>[] = [
   {
@@ -147,7 +147,8 @@ const columns: TableColumn<StockMovement>[] = [
       data-test="listing-failure"
       color="error"
       variant="subtle"
-      :description="listingFailure"
+      :description="listingFailure.message"
+      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
     <UAlert

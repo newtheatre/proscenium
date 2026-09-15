@@ -97,7 +97,7 @@ async function apply(): Promise<void> {
   }
 }
 
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'This stocktake could not be read.') : null))
+const listingFailure = useListFailure(error, 'This stocktake could not be read.')
 
 function variance(line: StocktakeLine): number | null {
   const typed = drafts.value[line.itemId]
@@ -120,7 +120,8 @@ const applyNetVarianceCostPence = computed(() =>
       data-test="listing-failure"
       color="error"
       variant="subtle"
-      :description="listingFailure"
+      :description="listingFailure.message"
+      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
     <UAlert
       v-if="failure"
