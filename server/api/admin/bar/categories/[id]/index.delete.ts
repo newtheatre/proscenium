@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 // Delete a category with no products and no price history; one with either stays. The refusal
 // says why, rather than raising the price table's own append-only trigger (0010).
@@ -16,8 +16,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const pricedRows = await db.all<{ priced: number }>(sql`SELECT count(*) AS priced FROM category_prices WHERE category_id = ${id}`)
-  if ((pricedRows[0]?.priced ?? 0) > 0) {
+  if (held.hasPriceHistory) {
     throw createError({
       statusCode: 409,
       statusMessage: `${held.name} has a price history, which is append-only, so it cannot be deleted: rename it instead`,

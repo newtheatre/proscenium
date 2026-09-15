@@ -249,11 +249,22 @@ export function categoriesClause(query: ListQuery): ListClause {
   return whereFrom(barCategoriesList, query, { column: aliasColumns('c'), search: [sql`c.name`] })
 }
 
+interface CategoryRow extends Omit<BarCategory, 'hasPriceHistory'> {
+  hasPriceHistory: number
+}
+
+const readCategory = (row: CategoryRow): BarCategory => ({ ...row, hasPriceHistory: row.hasPriceHistory === 1 })
+
+// The delete route's own second refusal, alongside productCount (0010): append-only price rows
+// survive an otherwise-empty category, and the console needs to know that before offering Delete.
+const CATEGORY_PRICED = sql`CASE WHEN EXISTS (SELECT 1 FROM category_prices cp WHERE cp.category_id = c.id) THEN 1 ELSE 0 END`
+
 // Allow-listed columns rather than a whole row, here as everywhere a payload leaves the database.
 export function categoriesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT c.id AS id, c.name AS name, c.sort AS sort, c.colour AS colour,
-           (SELECT count(*) FROM bar_products p WHERE p.category_id = c.id) AS productCount
+           (SELECT count(*) FROM bar_products p WHERE p.category_id = c.id) AS productCount,
+           ${CATEGORY_PRICED} AS hasPriceHistory
     FROM bar_categories c${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
@@ -261,7 +272,7 @@ export function categoriesQuery(clause: ListClause, limit: number, offset: numbe
 }
 
 export async function listCategories(clause: ListClause, limit: number, offset: number): Promise<BarCategory[]> {
-  return db.all<BarCategory>(categoriesQuery(clause, limit, offset))
+  return (await db.all<CategoryRow>(categoriesQuery(clause, limit, offset))).map(readCategory)
 }
 
 export async function countCategories(clause: ListClause): Promise<number> {
@@ -269,12 +280,13 @@ export async function countCategories(clause: ListClause): Promise<number> {
 }
 
 export async function categoryById(id: string): Promise<BarCategory | undefined> {
-  const [row] = await db.all<BarCategory>(sql`
+  const [row] = await db.all<CategoryRow>(sql`
     SELECT c.id AS id, c.name AS name, c.sort AS sort, c.colour AS colour,
-           (SELECT count(*) FROM bar_products p WHERE p.category_id = c.id) AS productCount
+           (SELECT count(*) FROM bar_products p WHERE p.category_id = c.id) AS productCount,
+           ${CATEGORY_PRICED} AS hasPriceHistory
     FROM bar_categories c WHERE c.id = ${id}
   `)
-  return row
+  return row ? readCategory(row) : undefined
 }
 
 // Every table and column claimName may look a name up against, so a caller names an entity
