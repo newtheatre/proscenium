@@ -56,6 +56,11 @@ async function coverage(night: string, role: NightRole, scope: NightScope): Prom
     if (!scope.venueId) {
       throw createError({ statusCode: 400, statusMessage: 'Nothing is running tonight: name the venue whose bar you are opening' })
     }
+    // Every other path takes its venue from the programme, which is what proves the venue exists;
+    // this one is handed one, so it reads it rather than recording a bypass against a typo.
+    const venue = await venueById(scope.venueId)
+    if (!venue) throw createError({ statusCode: 404, statusMessage: 'No such venue' })
+
     const openingId = await plannedOpeningTonight(scope.venueId, night)
     return { venueId: scope.venueId, performanceIds: [], venuePerformanceIds: [], openingId: openingId ?? undefined }
   }
@@ -65,6 +70,10 @@ async function coverage(night: string, role: NightRole, scope: NightScope): Prom
   return { venueId: venues[0]!, performanceIds: ids, venuePerformanceIds: ids }
 }
 
+// A shift held tonight but not now: the refusal the caller gets only if nothing else lets them
+// in, because an officer who also happens to be rostered keeps their bypass (0044, 0078).
+interface ShiftBranch { shiftId?: string, coverage?: NightCoverage, outsideWindow?: string }
+
 // The shift branch (0044): a confirmed shift of this role, held by this account, on one of
 // tonight's performances, refusing the same ambiguity the officer branch does (E-127 criterion 1).
 async function shiftHeldTonight(
@@ -73,22 +82,19 @@ async function shiftHeldTonight(
   role: NightRole,
   night: string,
   scope: NightScope,
-): Promise<{ shiftId: string, coverage: NightCoverage } | null> {
+): Promise<ShiftBranch> {
   const { from, to } = showNightBounds(night)
   const bounds: [number, number] = [Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)]
+  const grace = await configValue(event, 'SHIFT_AUTHORITY_GRACE_MINUTES')
+  const at = Math.floor(Date.now() / 1000)
+
   const rows = await confirmedShiftsTonight(
     accountId, role, bounds[0], bounds[1],
     { venueId: scope.venueId, performanceId: scope.performanceId },
   )
-  const grace = await configValue(event, 'SHIFT_AUTHORITY_GRACE_MINUTES')
-  const at = Math.floor(Date.now() / 1000)
+  const worked = rows.filter(row => insideWindow(row, at, grace))
 
-  if (rows.length > 0) {
-    const worked = rows.filter(row => insideWindow(row, at, grace))
-    // Holding tonight's shift outside the hours it is worked is its own refusal: telling somebody
-    // they hold no shift would send them to find an officer they do not need (0078).
-    if (worked.length === 0) throw createError(outsideWindowRefusal(saysWindow(windowOf(rows[0]!))))
-
+  if (worked.length > 0) {
     const venues = [...new Set(worked.map(row => row.venueId))]
     refuseAmbiguousVenue(venues)
 
@@ -99,29 +105,28 @@ async function shiftHeldTonight(
     }
   }
 
-  // The performance branch is tried first, so somebody holding both resolves through the
-  // performance and keeps their performance ids (0077).
-  if (role !== 'BAR') return null
-
-  const openings = await confirmedOpeningShiftsTonight(accountId, bounds[0], bounds[1], { venueId: scope.venueId })
-  if (openings.length === 0) return null
-
+  // Tried second, so somebody holding both resolves through the performance and keeps its ids;
+  // a performance shift out of window does not stand in the way of an opening in one (0077).
+  const openings = role === 'BAR'
+    ? await confirmedOpeningShiftsTonight(accountId, bounds[0], bounds[1], { venueId: scope.venueId })
+    : []
   const open = openings.filter(row => insideWindow(row, at, grace))
-  if (open.length === 0) throw createError(outsideWindowRefusal(saysWindow(openings[0]!)))
 
-  const venues = [...new Set(open.map(row => row.venueId))]
-  refuseAmbiguousVenue(venues)
+  if (open.length > 0) {
+    const venues = [...new Set(open.map(row => row.venueId))]
+    refuseAmbiguousVenue(venues)
 
-  return {
-    shiftId: open[0]!.shiftId,
-    coverage: { venueId: venues[0]!, performanceIds: [], venuePerformanceIds: [], openingId: open[0]!.openingId },
+    return {
+      shiftId: open[0]!.shiftId,
+      coverage: { venueId: venues[0]!, performanceIds: [], venuePerformanceIds: [], openingId: open[0]!.openingId },
+    }
   }
-}
 
-// A window with an end missing is no window at all, and `insideWindow` has already let it
-// through, so the refusal only ever quotes one that has both ends (0078).
-function windowOf(row: { startsAt: number | null, endsAt: number | null }): { startsAt: number, endsAt: number } {
-  return { startsAt: row.startsAt ?? 0, endsAt: row.endsAt ?? 0 }
+  // The window nearest now, never the first row: on a two-house day the earliest is the one
+  // already finished, and quoting it would send a volunteer away at the wrong hour (0078).
+  const held = [...rows, ...openings].filter(row => row.startsAt !== null && row.endsAt !== null)
+  const nearest = nearestWindow(held as { startsAt: number, endsAt: number }[], at)
+  return nearest ? { outsideWindow: saysWindow(nearest) } : {}
 }
 
 // Tolerates the conflict rather than reading first: the partial unique index is what holds "once
@@ -149,7 +154,7 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
   }
 
   const held = await shiftHeldTonight(event, resolved.account.id, role, tonight, scope)
-  if (held) {
+  if (held.coverage) {
     return {
       account: resolved.account,
       night: tonight,
@@ -162,7 +167,11 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
     }
   }
 
-  if (!resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) throw createError(nightAuthorityRefusal(role))
+  // Somebody holding tonight's shift at the wrong hour is told the hours, not sent to find an
+  // officer they do not need; an officer holding one keeps their bypass all the same (0078).
+  if (!resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) {
+    throw createError(held.outsideWindow ? outsideWindowRefusal(held.outsideWindow) : nightAuthorityRefusal(role))
+  }
   // A bypass is a standing grant being used, so it carries the gate that grant carries elsewhere
   // (A-112). A shift will not, because a shift is not a grant (0044).
   await requireSecondFactorIfPrivileged(event, resolved)

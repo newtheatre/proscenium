@@ -88,7 +88,13 @@ function distance(window: ShiftWindow, at: number): number {
 // Deliberately not `activePerformanceId` (shared/utils/tonight.ts), which asks what the screen
 // should be showing now; between houses the two differ, and a sale belongs to the nearer bar.
 export function pickByWindow(windows: WindowedPerformance[], at: number): string | null {
-  let best: WindowedPerformance | null = null
+  return nearestWindow(windows, at)?.performanceId ?? null
+}
+
+// The window containing the instant, else the nearest, with a tie going to the earlier one. A
+// refusal quotes this rather than the first row, which on a two-house day is the one already past.
+export function nearestWindow<T extends ShiftWindow>(windows: T[], at: number): T | null {
+  let best: T | null = null
   let bestDistance = Number.POSITIVE_INFINITY
   for (const window of [...windows].sort((one, two) => one.startsAt - two.startsAt)) {
     const away = distance(window, at)
@@ -97,5 +103,5 @@ export function pickByWindow(windows: WindowedPerformance[], at: number): string
       bestDistance = away
     }
   }
-  return best?.performanceId ?? null
+  return best
 }

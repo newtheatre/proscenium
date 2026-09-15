@@ -67,7 +67,7 @@ export function nightAuthorityRefusal(role: NightRole): { statusCode: 403, statu
 export function outsideWindowRefusal(window: string): { statusCode: 403, statusMessage: string } {
   return {
     statusCode: 403,
-    statusMessage: `Your shift opens this between ${window}, and it is outside those hours`,
+    statusMessage: `Your shift opens this from ${window}, and it is outside those hours`,
   }
 }
 

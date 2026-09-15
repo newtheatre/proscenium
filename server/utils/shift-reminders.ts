@@ -14,13 +14,20 @@ import type { H3Event } from 'h3'
 
 export interface ShiftReminderRun { shifts: number, sent: number, skipped: number }
 
+// How long a shift runs where the programme records nothing: the old margin, kept for the one
+// case the window arithmetic cannot answer.
+const DEFAULT_SHIFT_MINUTES = 180
+
 // The shift's own window where it is stamped, and the same arithmetic where it is not: a shift
 // stamped before shifts had windows is filled by the backfill, not guessed at here (0078, E-131).
 function windowFor(row: ShiftReminderRow, defaults: ShiftOffsets): ShiftWindow {
   if (row.shiftStartsAt !== null && row.shiftEndsAt !== null) {
     return { startsAt: row.shiftStartsAt, endsAt: row.shiftEndsAt }
   }
-  return shiftWindow(row, offsetsFor(row, defaults))
+  // A calendar block has to end somewhere, so a performance with no recorded running time takes
+  // this rather than a block that frees itself at curtain up.
+  const durationMinutes = row.durationMinutes ?? DEFAULT_SHIFT_MINUTES
+  return shiftWindow({ ...row, durationMinutes }, offsetsFor(row, defaults))
 }
 
 interface ShiftReminderRow {

@@ -7,6 +7,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { currentShowNight } from '#shared/utils/show-night'
 import { daysAfter } from '#shared/utils/membership'
+import { londonClock } from '#shared/utils/london'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -136,7 +137,7 @@ describe.skipIf(skip !== null)('the guard is the enforcement, not the navigation
     const response = await ask(`role=DOOR&venueId=${house.venueId}`, member.cookie)
     expect(response.status).toBe(403)
     const refusal = await message(response)
-    expect(refusal).toContain('DOOR')
+    expect(refusal).toContain('door shift')
     expect(refusal).toContain('front of house')
   })
 
@@ -480,6 +481,34 @@ describe.skipIf(skip !== null)('a shift is authority inside its own window (E-13
   // The officer's way in is a standing grant being used, not a shift, so no window bounds it.
   test('the officer bypass is unaffected by any window', async () => {
     expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, foh.cookie)).status).toBe(200)
+  })
+
+  // An officer who is also rostered would otherwise lose the bypass they hold all evening the
+  // moment they picked up a shift, which is not what the window is for.
+  test('an officer rostered on tonight still opens the screen outside their own shift window', async () => {
+    const shiftId = shiftFor(house.performanceId, 'DOOR', foh.id)
+    const now = Math.floor(Date.now() / 1000)
+    setShiftWindow(shiftId, now + 6 * 3600, now + 9 * 3600)
+
+    const resolved = await (await ask(`role=DOOR&performanceId=${house.performanceId}`, foh.cookie)).json() as Resolved
+    expect(resolved.via).toBe('OFFICER')
+    setShiftStatus(shiftId, 'OPEN', null)
+  })
+
+  // On a two-house day the earliest window is the one already finished, so quoting it would send
+  // a volunteer away at exactly the hour they are due.
+  test('the refusal quotes the window nearest now, not the first of the day', async () => {
+    const holder = await registerMember(app, 'door-two-houses', generatePassword())
+    const now = Math.floor(Date.now() / 1000)
+    const matinee = shiftFor(house.performanceId, 'DOOR', holder.id)
+    const evening = shiftFor(studio.performanceId, 'DOOR', holder.id)
+    setShiftWindow(matinee, now - 9 * 3600, now - 6 * 3600)
+    setShiftWindow(evening, now + 2 * 3600, now + 5 * 3600)
+
+    const response = await ask(`role=DOOR&performanceId=${studio.performanceId}`, holder.cookie)
+    expect(response.status).toBe(403)
+    const quoted = londonClock(new Date((now + 2 * 3600) * 1000))
+    expect(await message(response)).toContain(quoted)
   })
 })
 
