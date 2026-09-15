@@ -13,6 +13,7 @@ import {
   nightAuthorityRefusal,
   officerBypassEntry,
   officerBypassTarget,
+  outsideWindowRefusal,
 } from '#shared/utils/night-authority'
 import type { Viewer } from '#shared/utils/abilities'
 import type { NightRole } from '#shared/utils/night-authority'
@@ -90,6 +91,22 @@ describe('a refusal names what would unlock it (E-111, F-101 criterion 5)', () =
     for (const role of NIGHT_ROLES) {
       expect(nightAuthorityRefusal(role).statusMessage).not.toContain('ADMIN')
     }
+  })
+
+  // 0077: the bar has a third way in, and a volunteer refused on a hire night needs to hear it.
+  test('the bar names a shift on tonight\'s bar opening as well', () => {
+    expect(nightAuthorityRefusal('BAR').statusMessage).toContain('bar opening')
+    expect(nightAuthorityRefusal('DOOR').statusMessage).not.toContain('bar opening')
+    expect(nightAuthorityRefusal('DUTY_MANAGER').statusMessage).not.toContain('bar opening')
+  })
+
+  // 0078: a shift is authority inside its own window, so a refusal quotes the window rather than
+  // telling somebody holding tonight's shift that they do not hold one.
+  test('a shift outside its window is refused in London wall clock, naming the hours', () => {
+    const refusal = outsideWindowRefusal('18:00 to 22:30')
+    expect(refusal.statusCode).toBe(403)
+    expect(refusal.statusMessage).toContain('18:00 to 22:30')
+    expect(refusal.statusMessage).not.toContain('bar manager')
   })
 })
 

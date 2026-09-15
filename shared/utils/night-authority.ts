@@ -52,9 +52,22 @@ export function isNightRole(value: string): value is NightRole {
 // Names both ways in, because a volunteer refused at 19:20 needs to know which one to go and get.
 // The administrator is not offered: "become an administrator" is not advice (0044).
 export function nightAuthorityRefusal(role: NightRole): { statusCode: 403, statusMessage: string } {
+  // The bar has a third way in, because an evening with no performance still opens a bar (0077).
+  const tonight = role === 'BAR'
+    ? `on one of tonight's performances or on tonight's bar opening`
+    : `on one of tonight's performances`
   return {
     statusCode: 403,
-    statusMessage: `This needs ${NIGHT_ROLE_WORDS[role]} on one of tonight's performances, or ${NIGHT_ROLE_OFFICER[role].words}`,
+    statusMessage: `This needs ${NIGHT_ROLE_WORDS[role]} ${tonight}, or ${NIGHT_ROLE_OFFICER[role].words}`,
+  }
+}
+
+// Somebody holding tonight's shift outside the hours they work it is not somebody without one, so
+// the refusal quotes the window in London wall clock rather than the ways in (0078, E-131).
+export function outsideWindowRefusal(window: string): { statusCode: 403, statusMessage: string } {
+  return {
+    statusCode: 403,
+    statusMessage: `Your shift opens this between ${window}, and it is outside those hours`,
   }
 }
 
@@ -72,11 +85,13 @@ export function officerBypassEntry(
   venueId: string,
   role: NightRole,
   performanceIds: string[],
+  // Named where the evening was a bar opening, so the night report can say which one (0077).
+  openingId?: string,
 ): AuditRow {
   return auditEntry({
     actorId,
     action: OFFICER_BYPASS_ACTION,
     target: officerBypassTarget(night, venueId, role),
-    detail: { role, night, venueId, performanceIds },
+    detail: { role, night, venueId, performanceIds, ...(openingId ? { openingId } : {}) },
   })
 }

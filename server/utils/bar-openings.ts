@@ -294,6 +294,26 @@ export function confirmedOpeningShiftsTonightQuery(
   `
 }
 
+// What an officer let themselves into on a night with no performance, so the bypass row can say
+// which opening it was (0077). The earliest planned one, where a venue has more than one.
+export async function plannedOpeningTonight(venueId: string, night: string): Promise<string | null> {
+  const [row] = await db.all<{ openingId: string }>(sql`
+    SELECT id AS openingId FROM bar_openings
+    WHERE venue_id = ${venueId} AND night = ${night} AND status = 'PLANNED'
+    ORDER BY starts_at LIMIT 1
+  `)
+  return row?.openingId ?? null
+}
+
+export async function confirmedOpeningShiftsTonight(
+  userId: string,
+  from: number,
+  to: number,
+  scope: { venueId?: string } = {},
+): Promise<ConfirmedOpeningShift[]> {
+  return await db.all<ConfirmedOpeningShift>(confirmedOpeningShiftsTonightQuery(userId, from, to, scope))
+}
+
 // A raw constraint failure is never what a caller reads back; anything unrecognised is rethrown,
 // because swallowing it would turn a defect into a 409 nobody investigates (E-106 criterion 3).
 export async function withOpeningConstraints<T>(write: () => Promise<T>): Promise<T> {

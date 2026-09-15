@@ -15,11 +15,14 @@ export interface NightAuthority {
   performanceIds: string[]
   via: NightAuthorityVia
   shiftId?: string
+  // Named where the evening is a bar opening; `performanceIds` is then empty, which is what "this
+  // evening covers no performance" has always meant to a caller that iterates it (0077).
+  openingId?: string
 }
 
 // `performanceIds` is what the request covers; `venuePerformanceIds` is the venue's whole night,
 // which is what the audit row carries because it is written once (0044).
-interface NightCoverage { venueId: string, performanceIds: string[], venuePerformanceIds: string[] }
+interface NightCoverage { venueId: string, performanceIds: string[], venuePerformanceIds: string[], openingId?: string }
 
 // Narrowing is the caller's to do: resolving two venues at once hands out authority over a house
 // nobody asked about. Shared, so both branches refuse it the same way (E-127 criterion 1).
@@ -31,7 +34,7 @@ function refuseAmbiguousVenue(venues: string[]): void {
 
 // What the scope resolves to on the programme. Authority derives from a performance, so a venue
 // with nothing on tonight resolves none of it (0009, E-127 criterion 1).
-async function coverage(night: string, scope: NightScope): Promise<NightCoverage> {
+async function coverage(night: string, role: NightRole, scope: NightScope): Promise<NightCoverage> {
   // A cancelled performance is not a night's work: the house never opens, so nothing derives from
   // it and no bypass is recorded against it (D-121 criterion 5).
   const running = (await performancesOnNight(night, scope.venueId)).filter(one => one.status !== 'CANCELLED')
@@ -45,7 +48,16 @@ async function coverage(night: string, scope: NightScope): Promise<NightCoverage
 
   const venues = [...new Set(running.map(performance => performance.venueId))]
   if (venues.length === 0) {
-    throw createError({ statusCode: 403, statusMessage: 'Nothing is running tonight, so there is nothing to take charge of' })
+    // The bar opens on a hire night and the door does not: with no house there is no admission to
+    // take and no evening to run, but there is money to take at the bar (0077).
+    if (role !== 'BAR') {
+      throw createError({ statusCode: 403, statusMessage: 'Nothing is running tonight, so there is nothing to take charge of' })
+    }
+    if (!scope.venueId) {
+      throw createError({ statusCode: 400, statusMessage: 'Nothing is running tonight: name the venue whose bar you are opening' })
+    }
+    const openingId = await plannedOpeningTonight(scope.venueId, night)
+    return { venueId: scope.venueId, performanceIds: [], venuePerformanceIds: [], openingId: openingId ?? undefined }
   }
   refuseAmbiguousVenue(venues)
 
@@ -56,32 +68,66 @@ async function coverage(night: string, scope: NightScope): Promise<NightCoverage
 // The shift branch (0044): a confirmed shift of this role, held by this account, on one of
 // tonight's performances, refusing the same ambiguity the officer branch does (E-127 criterion 1).
 async function shiftHeldTonight(
+  event: H3Event,
   accountId: string,
   role: NightRole,
   night: string,
   scope: NightScope,
 ): Promise<{ shiftId: string, coverage: NightCoverage } | null> {
   const { from, to } = showNightBounds(night)
+  const bounds: [number, number] = [Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)]
   const rows = await confirmedShiftsTonight(
-    accountId, role, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000),
+    accountId, role, bounds[0], bounds[1],
     { venueId: scope.venueId, performanceId: scope.performanceId },
   )
-  if (rows.length === 0) return null
+  const grace = await configValue(event, 'SHIFT_AUTHORITY_GRACE_MINUTES')
+  const at = Math.floor(Date.now() / 1000)
 
-  const venues = [...new Set(rows.map(row => row.venueId))]
+  if (rows.length > 0) {
+    const worked = rows.filter(row => insideWindow(row, at, grace))
+    // Holding tonight's shift outside the hours it is worked is its own refusal: telling somebody
+    // they hold no shift would send them to find an officer they do not need (0078).
+    if (worked.length === 0) throw createError(outsideWindowRefusal(saysWindow(windowOf(rows[0]!))))
+
+    const venues = [...new Set(worked.map(row => row.venueId))]
+    refuseAmbiguousVenue(venues)
+
+    const performanceIds = worked.map(row => row.performanceId)
+    return {
+      shiftId: worked[0]!.shiftId,
+      coverage: { venueId: venues[0]!, performanceIds, venuePerformanceIds: performanceIds },
+    }
+  }
+
+  // The performance branch is tried first, so somebody holding both resolves through the
+  // performance and keeps their performance ids (0077).
+  if (role !== 'BAR') return null
+
+  const openings = await confirmedOpeningShiftsTonight(accountId, bounds[0], bounds[1], { venueId: scope.venueId })
+  if (openings.length === 0) return null
+
+  const open = openings.filter(row => insideWindow(row, at, grace))
+  if (open.length === 0) throw createError(outsideWindowRefusal(saysWindow(openings[0]!)))
+
+  const venues = [...new Set(open.map(row => row.venueId))]
   refuseAmbiguousVenue(venues)
 
-  const performanceIds = rows.map(row => row.performanceId)
   return {
-    shiftId: rows[0]!.shiftId,
-    coverage: { venueId: venues[0]!, performanceIds, venuePerformanceIds: performanceIds },
+    shiftId: open[0]!.shiftId,
+    coverage: { venueId: venues[0]!, performanceIds: [], venuePerformanceIds: [], openingId: open[0]!.openingId },
   }
+}
+
+// A window with an end missing is no window at all, and `insideWindow` has already let it
+// through, so the refusal only ever quotes one that has both ends (0078).
+function windowOf(row: { startsAt: number | null, endsAt: number | null }): { startsAt: number, endsAt: number } {
+  return { startsAt: row.startsAt ?? 0, endsAt: row.endsAt ?? 0 }
 }
 
 // Tolerates the conflict rather than reading first: the partial unique index is what holds "once
 // per officer per night, venue and role", so two simultaneous first requests write one row (0044).
 async function recordOfficerBypass(actorId: string, night: string, covered: NightCoverage, role: NightRole): Promise<void> {
-  const entry = officerBypassEntry(actorId, night, covered.venueId, role, covered.venuePerformanceIds)
+  const entry = officerBypassEntry(actorId, night, covered.venueId, role, covered.venuePerformanceIds, covered.openingId)
   await db.insert(schema.auditLog).values(entry).onConflictDoNothing()
 }
 
@@ -102,7 +148,7 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
     throw createError({ statusCode: 403, statusMessage: 'Show-night tools open for tonight only, and that night has ended' })
   }
 
-  const held = await shiftHeldTonight(resolved.account.id, role, tonight, scope)
+  const held = await shiftHeldTonight(event, resolved.account.id, role, tonight, scope)
   if (held) {
     return {
       account: resolved.account,
@@ -112,6 +158,7 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
       performanceIds: held.coverage.performanceIds,
       via: 'SHIFT',
       shiftId: held.shiftId,
+      openingId: held.coverage.openingId,
     }
   }
 
@@ -120,7 +167,7 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
   // (A-112). A shift will not, because a shift is not a grant (0044).
   await requireSecondFactorIfPrivileged(event, resolved)
 
-  const covered = await coverage(tonight, scope)
+  const covered = await coverage(tonight, role, scope)
   await recordOfficerBypass(resolved.account.id, tonight, covered, role)
 
   return {
@@ -130,6 +177,7 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
     venueId: covered.venueId,
     performanceIds: covered.performanceIds,
     via: 'OFFICER',
+    openingId: covered.openingId,
   }
 }
 

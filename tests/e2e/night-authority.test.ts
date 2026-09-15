@@ -324,6 +324,165 @@ describe.skipIf(skip !== null)('a confirmed shift is tonight\'s authority, tried
   })
 })
 
+// A venue with nothing on tonight, the evening 0077 exists for: an external hire, a society
+// social or a get-in, where money is taken and the bar is staffed but no house opens.
+function hireVenue(): string {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query('INSERT OR IGNORE INTO venues (id, name, capacity) VALUES (?, ?, ?)').run('venue-hire', 'The Hire Room', 80)
+    return 'venue-hire'
+  }
+  finally {
+    database.close()
+  }
+}
+
+let nextOpening = 0
+
+function barOpening(venueId: string, status = 'PLANNED'): string {
+  const database = new Database(app.databaseFile)
+  try {
+    const id = `opening-${(nextOpening += 1)}`
+    const opensAt = Math.floor(Date.now() / 1000) - 3600
+    database.query(`INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, venueId, night, 'A society social', opensAt, opensAt + 6 * 3600, status)
+    return id
+  }
+  finally {
+    database.close()
+  }
+}
+
+let nextOpeningSlot = 0
+
+function openingSlot(openingId: string, userId: string, status = 'CONFIRMED'): string {
+  const database = new Database(app.databaseFile)
+  try {
+    const id = `${openingId}-slot-${(nextOpeningSlot += 1)}`
+    database.query('INSERT INTO bar_opening_shifts (id, opening_id, slot, user_id, status) VALUES (?, ?, ?, ?, ?)')
+      .run(id, openingId, nextOpeningSlot, userId, status)
+    return id
+  }
+  finally {
+    database.close()
+  }
+}
+
+function setShiftWindow(shiftId: string, startsAt: number, endsAt: number): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query('UPDATE shifts SET starts_at = ?, ends_at = ? WHERE id = ?').run(startsAt, endsAt, shiftId)
+  }
+  finally {
+    database.close()
+  }
+}
+
+describe.skipIf(skip !== null)('the bar opens on a night with nothing running (F-125, E-130, 0077)', () => {
+  test('a confirmed slot on tonight\'s opening resolves the till, and names no performance', async () => {
+    const venueId = hireVenue()
+    const holder = await registerMember(app, 'opening-bar', generatePassword())
+    const openingId = barOpening(venueId)
+    const slotId = openingSlot(openingId, holder.id)
+
+    const response = await ask(`role=BAR&venueId=${venueId}`, holder.cookie)
+    expect(response.status).toBe(200)
+    const resolved = await response.json() as Resolved & { shiftId: string, openingId: string }
+    expect(resolved).toMatchObject({ night, role: 'BAR', venueId, via: 'SHIFT', shiftId: slotId, openingId })
+    expect(resolved.performanceIds).toEqual([])
+  })
+
+  test('a queued claim on an opening is not authority, and neither is a cancelled opening', async () => {
+    const venueId = hireVenue()
+    const claimant = await registerMember(app, 'opening-claimed', generatePassword())
+    openingSlot(barOpening(venueId), claimant.id, 'CLAIMED')
+    expect((await ask(`role=BAR&venueId=${venueId}`, claimant.cookie)).status).toBe(403)
+
+    const stoodDown = await registerMember(app, 'opening-cancelled', generatePassword())
+    openingSlot(barOpening(venueId, 'CANCELLED'), stoodDown.id)
+    expect((await ask(`role=BAR&venueId=${venueId}`, stoodDown.cookie)).status).toBe(403)
+  })
+
+  // The bar manager's own way in on a hire the rota never covered: the venue is what stands in
+  // for the performance, and the bypass records that there was none.
+  test('the bar manager opens the till at a named venue with nothing running, and it is recorded', async () => {
+    const venueId = hireVenue()
+    const response = await ask(`role=BAR&venueId=${venueId}`, bar.cookie)
+    expect(response.status).toBe(200)
+    const resolved = await response.json() as Resolved
+    expect(resolved).toMatchObject({ venueId, via: 'OFFICER' })
+    expect(resolved.performanceIds).toEqual([])
+
+    const written = bypasses(bar.id).filter(row => row.target.endsWith(`:${venueId}:BAR`))
+    expect(written.length).toBe(1)
+    expect(JSON.parse(written[0]!.detail)).toMatchObject({ role: 'BAR', night, venueId, performanceIds: [] })
+  })
+
+  test('the bar manager naming no venue at all is asked for one rather than refused', async () => {
+    const response = await ask('role=BAR', bar.cookie)
+    expect(response.status).toBe(400)
+    expect(await message(response)).toContain('venue')
+  })
+
+  // There is no house to work, so the door and the duty manager keep the refusal they had.
+  test('the door and the duty manager are still refused where nothing is running', async () => {
+    const venueId = hireVenue()
+    for (const role of ['DOOR', 'DUTY_MANAGER']) {
+      const response = await ask(`role=${role}&venueId=${venueId}`, foh.cookie)
+      expect(response.status).toBe(403)
+      expect(await message(response)).toContain('running')
+    }
+  })
+
+  test('an ordinary member is refused, and told the opening is a way in as well', async () => {
+    const venueId = hireVenue()
+    const response = await ask(`role=BAR&venueId=${venueId}`, member.cookie)
+    expect(response.status).toBe(403)
+    const refusal = await message(response)
+    expect(refusal).toContain('bar opening')
+    expect(refusal).toContain('bar manager')
+  })
+})
+
+describe.skipIf(skip !== null)('a shift is authority inside its own window (E-131 criterion 4, 0078)', () => {
+  test('a holder before their window is refused, and the refusal quotes the window', async () => {
+    const holder = await registerMember(app, 'door-too-early', generatePassword())
+    const shiftId = shiftFor(house.performanceId, 'DOOR', holder.id)
+    const now = Math.floor(Date.now() / 1000)
+    // Well clear of the configured grace at both ends, so the case is the window and not it.
+    setShiftWindow(shiftId, now + 6 * 3600, now + 9 * 3600)
+
+    const response = await ask(`role=DOOR&performanceId=${house.performanceId}`, holder.cookie)
+    expect(response.status).toBe(403)
+    expect(await message(response)).toMatch(/\d\d:\d\d to \d\d:\d\d/)
+  })
+
+  test('the same holder inside the window resolves, by shift', async () => {
+    const holder = await registerMember(app, 'door-in-window', generatePassword())
+    const shiftId = shiftFor(house.performanceId, 'DOOR', holder.id)
+    const now = Math.floor(Date.now() / 1000)
+    setShiftWindow(shiftId, now - 1800, now + 1800)
+
+    const resolved = await (await ask(`role=DOOR&performanceId=${house.performanceId}`, holder.cookie)).json() as Resolved
+    expect(resolved).toMatchObject({ via: 'SHIFT', venueId: house.venueId })
+  })
+
+  // A shift stamped before shifts had windows bounds nobody: an unknown window is not evidence
+  // of being off shift (0078).
+  test('a shift with no window stamped still resolves', async () => {
+    const holder = await registerMember(app, 'door-no-window', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', holder.id)
+
+    expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, holder.cookie)).status).toBe(200)
+  })
+
+  // The officer's way in is a standing grant being used, not a shift, so no window bounds it.
+  test('the officer bypass is unaffected by any window', async () => {
+    expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, foh.cookie)).status).toBe(200)
+  })
+})
+
 async function message(response: Response): Promise<string> {
   const body = await response.json() as { statusMessage?: string, message?: string }
   return body.statusMessage ?? body.message ?? ''
