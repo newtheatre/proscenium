@@ -10,8 +10,8 @@ export default defineEventHandler(async (event) => {
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
   const requests = await pendingCompRequests(resolved.venueId, resolved.night, expiryMinutes)
   const on = londonDayOf(new Date())
-  // Resolved once for the whole queue, not once per request (review-till 8): ten pending requests
-  // were forty catalogue reads for one screen.
+  // Resolved once for the whole queue, not once per request: a read that scales with an unrelated
+  // table's rows is the same shape an IN list is (0003).
   const catalogue = await activeVariantsWithChoices(on)
   const priced = await Promise.all(requests.map(async request => ({
     request,
