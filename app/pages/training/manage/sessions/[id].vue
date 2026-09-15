@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatLondon, startOfLondonDay } from '#shared/utils/london'
 import { saysSessionStatus } from '#shared/utils/training'
 
 definePageMeta({ layout: 'console', title: 'Session', middleware: 'console', docs: '/docs/training/sessions' })
@@ -29,6 +30,10 @@ interface Session {
   modules: { id: string, name: string, safetyCritical: boolean }[]
   attendees: Attendee[]
 }
+
+// The same short London day the member-facing list reads, so a date means one thing either side.
+const sessionDay = (heldOn: string): string =>
+  formatLondon(startOfLondonDay(heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
 
 const route = useRoute()
 const request = useRequestFetch()
@@ -121,7 +126,7 @@ const registerLabel = computed(() => {
             Sessions
           </UButton>
           <h1 class="text-xl font-semibold">
-            {{ data.heldOn }}
+            {{ sessionDay(data.heldOn) }}
           </h1>
           <p class="text-sm text-muted">
             {{ data.startsAt }} to {{ data.endsAt }}<template v-if="data.place">

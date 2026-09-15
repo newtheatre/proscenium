@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { londonParts } from '#shared/utils/london'
+import { formatLondon, londonParts, startOfLondonDay } from '#shared/utils/london'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillDate, fillNumber, fillPin, fillTime, menuOptions, openSignedOutView, pickOptions, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -107,6 +107,10 @@ function daysFrom(days: number): string {
   const now = londonParts(new Date())
   return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
 }
+
+// What a screen shows for a session's day: the short London form the member pages already use.
+const shortDay = (heldOn: string): string =>
+  formatLondon(startOfLondonDay(heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
 
 async function addModule(over: Record<string, unknown> = {}): Promise<string> {
   const id = `SES-${suffix()}`
@@ -275,6 +279,43 @@ describe.skipIf(skip !== null)('a session is scheduled (G-112)', () => {
       .toBe('PLANNED')
   })
 
+  // Criterion 4, and G-112 criterion 2. The ten-minute task is the only thing that moves a
+  // session out of PLANNED, and the asks it answers resolve when it opens rather than never.
+  test('a session that opens later is opened by the sweep, and resolves what it answers', async () => {
+    const module = await addModule()
+    const member = await adminSession(app, { roles: [] })
+    expect((await send('POST', '/api/training/requests', { moduleId: module }, member.cookie)).status).toBe(200)
+
+    const { id } = await (await schedule({
+      moduleIds: [module],
+      opensAt: Math.floor(Date.now() / 1000) + 86_400,
+    })).json() as { id: string }
+    expect(read<{ status: string }>('SELECT status FROM training_sessions WHERE id = ?', id)?.status)
+      .toBe('PLANNED')
+
+    write('UPDATE training_sessions SET opens_at = ? WHERE id = ?', Math.floor(Date.now() / 1000) - 60, id)
+    expect((await fetch(`${app.baseURL}/_nitro/tasks/training:open-sessions`, { method: 'POST' })).status)
+      .toBe(200)
+
+    expect(read<{ status: string }>('SELECT status FROM training_sessions WHERE id = ?', id)?.status)
+      .toBe('OPEN')
+    expect(read<{ status: string }>(
+      'SELECT status FROM module_requests WHERE module_id = ? AND user_id = ?', module, member.id,
+    )?.status).toBe('SCHEDULED')
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND session_id = ?
+        AND type = 'training.request.scheduled'`, member.id, id,
+    )?.n).toBe(1)
+
+    // Once only: a second run finds nothing left to open and tells nobody again.
+    expect((await fetch(`${app.baseURL}/_nitro/tasks/training:open-sessions`, { method: 'POST' })).status)
+      .toBe(200)
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND session_id = ?
+        AND type = 'training.request.scheduled'`, member.id, id,
+    )?.n).toBe(1)
+  })
+
   // Criterion 3, and question 4's answer: a certification is proved by experience, not taught.
   test('a retired, draft or sign-off-only module cannot be taught by session', async () => {
     const retired = await addModule({ status: 'RETIRED' })
@@ -369,7 +410,9 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
       await pickOptions(view, '[data-test="session-modules"]', [module])
       await click(view, '[data-test="session-submit"]')
 
-      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(day)})`, 30_000)
+      // The console reads a day the way the member pages do, never the raw stored form.
+      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(shortDay(day))})`, 30_000)
+      expect(await textOf(view, '[data-test="sessions-table"]')).not.toContain(day)
     }
     finally {
       view.close()
@@ -380,6 +423,23 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
       day,
     )
     expect(stored).toMatchObject({ starts: '18:30', capacity: 12, status: 'OPEN', place: 'The studio' })
+  }, CASE_TIMEOUT_MS)
+
+  test('a session\'s own page heads with the same short London day', async () => {
+    const module = await addModule()
+    const day = daysFrom(28)
+    const { id } = await (await schedule({ moduleIds: [module], heldOn: day })).json() as { id: string }
+
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage/sessions/${id}`, '[data-test="session-status"]')
+      const heading = await textOf(view, 'h1')
+      expect(heading).toContain(shortDay(day))
+      expect(heading).not.toContain(day)
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 
   test('a certification is absent from what the screen offers to teach', async () => {

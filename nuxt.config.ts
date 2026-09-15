@@ -144,7 +144,7 @@ export default defineNuxtConfig({
     // Mirrored one-for-one by the cron triggers below; the two lists must not drift, and every
     // name here has a handler under server/tasks (docs/architecture.md, Scheduled tasks).
     scheduledTasks: {
-      '*/10 * * * *': ['holds:release', 'health:watch', 'notifications:retry', 'notifications:digest', 'waiting-list:sweep', 'payments:sweep'],
+      '*/10 * * * *': ['holds:release', 'health:watch', 'notifications:retry', 'notifications:digest', 'waiting-list:sweep', 'payments:sweep', 'training:open-sessions'],
       '0 6 * * *': ['training:expiry-sweep'],
       '0 7 * * *': ['shifts:escalate'],
       '0 8 * * *': ['rooms:sweep'],

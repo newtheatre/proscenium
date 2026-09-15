@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { fromLondonWallClock, londonParts } from '#shared/utils/london'
+import { formatLondon, fromLondonWallClock, londonParts, startOfLondonDay } from '#shared/utils/london'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -54,6 +54,10 @@ interface Plan {
   creates: number
   blocked: boolean
 }
+
+// The same short London day the member-facing list reads, so a date means one thing either side.
+const sessionDay = (heldOn: string): string =>
+  formatLondon(startOfLondonDay(heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -296,7 +300,7 @@ async function log(): Promise<void> {
     })
     toast.add({
       title: 'Logged',
-      description: `${plural(answered.created, 'record')} awarded, dated ${heldOn.value}.`,
+      description: `${plural(answered.created, 'record')} awarded, dated ${sessionDay(heldOn.value)}.`,
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -344,7 +348,7 @@ const columns: TableColumn<Session>[] = [
     header: 'When',
     meta: { class: { td: 'whitespace-nowrap' } },
     cell: ({ row }) => h('div', {}, [
-      h('div', {}, row.original.heldOn),
+      h('div', {}, sessionDay(row.original.heldOn)),
       h('div', { class: 'text-xs text-muted' }, `${row.original.startsAt} to ${row.original.endsAt}`),
     ]),
   },
@@ -383,7 +387,7 @@ const columns: TableColumn<Session>[] = [
       'size': 'sm',
       'icon': 'i-lucide-chevron-right',
       'data-test': `open-${row.original.id}`,
-      'aria-label': `Open the session on ${row.original.heldOn}`,
+      'aria-label': `Open the session on ${sessionDay(row.original.heldOn)}`,
     }),
   },
 ]

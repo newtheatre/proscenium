@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull, not, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, not, or, sql } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
 import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, missingPrerequisites, saysGaps } from '#shared/utils/training'
 import type { AcademicYear, ExpiryMode, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
@@ -885,4 +885,31 @@ export async function resolveRequestsFor(
     told++
   }
   return told
+}
+
+// The one thing that moves a session out of PLANNED. Conditional on the statement, so a second
+// run opens nothing twice, and each session opened resolves the asks it answers (G-104, 0003).
+export async function openDueSessions(
+  event: H3Event | undefined,
+  now = new Date(),
+): Promise<{ opened: number, resolved: number }> {
+  const at = Math.floor(now.getTime() / 1000)
+  const opened = await db.update(schema.trainingSessions)
+    .set({ status: 'OPEN', updatedAt: at })
+    .where(and(
+      eq(schema.trainingSessions.status, 'PLANNED'),
+      isNotNull(schema.trainingSessions.opensAt),
+      lte(schema.trainingSessions.opensAt, at),
+    ))
+    .returning({ id: schema.trainingSessions.id })
+
+  let resolved = 0
+  for (const session of opened) {
+    const modules = await db.select({ moduleId: schema.sessionModules.moduleId })
+      .from(schema.sessionModules)
+      .where(eq(schema.sessionModules.sessionId, session.id))
+    resolved += await resolveRequestsFor(event, session.id, modules.map(one => one.moduleId))
+  }
+
+  return { opened: opened.length, resolved }
 }

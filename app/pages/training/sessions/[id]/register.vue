@@ -256,7 +256,7 @@ async function submit(): Promise<void> {
         title="This register has been marked"
         :description="data.correctable
           ? `The records are made. A mistake can still be put right for ${data.editWindowDays} days after the session.`
-          : 'The records are made, and the window for correcting them has closed. An administrator can revoke one and grant it again.'"
+          : 'The records are made, and the window for correcting them has closed.'"
       />
 
       <UButton
@@ -271,6 +271,15 @@ async function submit(): Promise<void> {
       >
         Correct it
       </UButton>
+
+      <p
+        v-else-if="marked"
+        class="text-sm text-muted"
+        data-test="settled-register"
+      >
+        The records for this session are settled. An administrator can revoke one and grant it
+        again.
+      </p>
 
       <template v-else-if="!open">
         <UAlert
