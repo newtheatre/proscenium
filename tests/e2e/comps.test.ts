@@ -422,6 +422,18 @@ describe.skipIf(skip !== null)('an approved request lapses too, not only a pendi
     expect(answered.status).toBe(409)
     expect(await message(answered)).toContain('lapsed')
   })
+
+  // A spent request now also reads as expired once it ages past the window; already-given must
+  // still win, or a retry after the window would misreport a genuine comp as never given.
+  test('a retry of an already-given comp says so, even once the request has since aged past the window', async () => {
+    const { id, venueId } = await approvedRequest(500)
+    expect((await give(id, venueId, 500)).status).toBe(200)
+    write('UPDATE comp_requests SET created_at = ? WHERE id = ?', Math.floor(Date.now() / 1000) - 11 * 60, id)
+
+    const retried = await give(id, venueId, 500)
+    expect(retried.status).toBe(409)
+    expect(await message(retried)).toContain('already been given')
+  })
 })
 
 describe.skipIf(skip !== null)('the approver\'s queue resolves the catalogue once for every pending request (review-till 8)', () => {

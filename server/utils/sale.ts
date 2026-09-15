@@ -808,8 +808,10 @@ export async function commitCompSale(
   if (request.venueId !== context.venueId) {
     throw createError({ statusCode: 409, statusMessage: 'That request was approved for a different venue' })
   }
-  if (request.expired) throw createError({ statusCode: 409, statusMessage: 'That request has lapsed; ask again' })
+  // Already given wins over lapsed: a retry of a spent request that has since aged past the
+  // window must say it was given, not that it lapsed (`expired` is now computed for APPROVED too).
   if (request.entryId) throw createError({ statusCode: 409, statusMessage: 'That comp has already been given' })
+  if (request.expired) throw createError({ statusCode: 409, statusMessage: 'That request has lapsed; ask again' })
 
   const lines = await compRequestLines(requestId)
   if (!lines) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
