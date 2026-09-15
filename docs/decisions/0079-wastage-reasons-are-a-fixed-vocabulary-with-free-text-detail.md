@@ -40,6 +40,13 @@ edited, and erasure anonymises a person in place rather than rewriting the rows 
 The form's help text and the wiki page both say so in as many words, which is the only enforcement
 free text can have.
 
+**Two of the nine reasons are not losses.** A count correction and an opening balance move the
+figure without anything leaving the shelf, so the wastage section counts every other reason and
+never those two. The same list serves `WASTAGE` and `ADJUST` on the stock screen, and nothing at
+the write path pairs a kind with a reason, so a write-off typed in as a negative adjustment naming
+a loss is counted as the write-off it plainly is. A new reason counts as a loss unless it is added
+to the pair, which is the safe default: a loss nobody reports is worse than one reported twice.
+
 **Reports group by reason, never by detail.** The bar report's wastage section groups by reason,
 item and category (F-204 criterion 2); detail is shown on the movement itself and nowhere else.
 

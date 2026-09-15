@@ -1,9 +1,11 @@
 import { z } from 'zod'
+import { MOVEMENT_REASONS } from '#shared/utils/bar'
 import { londonDayField } from '#shared/utils/membership'
+import type { MovementReason, StockUnit } from '#shared/utils/bar'
 import type { Page } from '#shared/utils/pagination'
 
-// Sales, GP, variance, comp and discount reports (F-119): a query over the ledger and the
-// movement history, never a stored aggregate, so a correction lands immediately (criterion 4).
+// Sales, GP, variance, comp, discount and wastage reports (F-119, 0079): a query over the ledger
+// and the movement history, never a stored aggregate, so a correction lands immediately (criterion 4).
 
 export const REPORT_PERIOD_KINDS = ['NIGHT', 'WEEK', 'SEASON', 'CUSTOM'] as const
 export type ReportPeriodKind = (typeof REPORT_PERIOD_KINDS)[number]
@@ -29,6 +31,11 @@ export type ReportSection = (typeof REPORT_SECTIONS)[number]
 // unbounded in both: they page on the screen and in larger blocks in the export (criterion 2).
 export const REPORT_EXPORT_PAGE_ROWS = 1000
 
+// Every reason except the two that mean the stock was never lost: a recount and an opening
+// balance move the figure without anything leaving the shelf (0079).
+const NOT_A_LOSS: MovementReason[] = ['COUNT_CORRECTION', 'OPENING_BALANCE']
+export const WASTAGE_REASONS: MovementReason[] = MOVEMENT_REASONS.filter(reason => !NOT_A_LOSS.includes(reason))
+
 // What a paged section says when it does not fit, so the first page is never read as the whole.
 export function saysPageOf(page: Page<unknown>): string {
   if (page.items.length === 0) return `Nothing on this page. There are ${page.total} in the period.`
@@ -46,6 +53,7 @@ export interface SalesRow {
 
 export interface GpRow {
   itemName: string
+  unit: StockUnit
   qtyDepleted: number
   costPence: number
 }
@@ -86,6 +94,7 @@ export interface DiscountRow {
 export interface WastageRow {
   reason: string
   itemName: string
+  unit: StockUnit
   categoryName: string
   qtyWasted: number
   costPence: number

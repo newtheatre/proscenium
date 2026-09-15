@@ -8,6 +8,7 @@ import { showNightBounds } from '#shared/utils/show-night'
 import { envelope, offsetFor } from '#shared/utils/pagination'
 import type { SQL } from 'drizzle-orm'
 import type { Page } from '#shared/utils/pagination'
+import { WASTAGE_REASONS } from '#shared/utils/bar-reports'
 import type { BarReport, CompRow, DiscountRow, GpReport, GpRow, ReportPeriodInput, SalesRow, VarianceRow, WastageRow } from '#shared/utils/bar-reports'
 
 // Every figure is a query over the ledger and the movement history, run fresh for the period
@@ -86,7 +87,7 @@ export function gpRevenueQuery(fromAt: number, toAt: number): SQL {
 // a new entry in a later period, so taking the cost out of the first one would flatter it.
 export function gpDepletionQuery(fromAt: number, toAt: number): SQL {
   return sql`
-    SELECT i.name AS itemName, -sum(m.qty) AS qtyDepleted,
+    SELECT i.name AS itemName, i.unit AS unit, -sum(m.qty) AS qtyDepleted,
            round(-sum(m.qty) * coalesce(${unitCostPence}, 0)) AS costPence
     FROM stock_movements m
     JOIN bar_items i ON i.id = m.item_id
@@ -172,15 +173,21 @@ export async function compsReport(fromAt: number, toAt: number, paging: ReportPa
   return envelope(items, counted?.total ?? 0, paging.page, paging.pageSize)
 }
 
+const lossReasons = sql.join(WASTAGE_REASONS.map(reason => sql`${reason}`), sql`, `)
+
 // Wastage is typed in on the stock screen and has no ledger entry, so `created_at` is the only
 // clock it has. A wastage a REVERSAL names never happened, and no money moves to keep in step.
+
+// A write-off typed in as an adjustment is still a write-off: the same reason list serves both
+// kinds, so the section counts a negative ADJUST that names a loss (0079).
 export function wastageQuery(fromAt: number, toAt: number): SQL {
   return sql`
-    SELECT m.reason AS reason, i.name AS itemName, coalesce(i.category, '') AS categoryName,
-           -sum(m.qty) AS qtyWasted, round(-sum(m.qty) * ${unitCostPence}) AS costPence
+    SELECT m.reason AS reason, i.name AS itemName, i.unit AS unit, coalesce(i.category, '') AS categoryName,
+           -sum(m.qty) AS qtyWasted, round(-sum(m.qty) * coalesce(${unitCostPence}, 0)) AS costPence
     FROM stock_movements m
     JOIN bar_items i ON i.id = m.item_id
-    WHERE m.kind = 'WASTAGE' AND m.created_at >= ${fromAt} AND m.created_at < ${toAt}
+    WHERE m.created_at >= ${fromAt} AND m.created_at < ${toAt}
+      AND (m.kind = 'WASTAGE' OR (m.kind = 'ADJUST' AND m.qty < 0 AND m.reason IN (${lossReasons})))
       AND NOT EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = m.id)
     GROUP BY m.reason, i.id
     ORDER BY costPence DESC, qtyWasted DESC, i.name COLLATE NOCASE

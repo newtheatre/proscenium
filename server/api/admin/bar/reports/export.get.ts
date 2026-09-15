@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
       }
       case 'gp': {
         const gp = await grossProfitReport(fromAt, toAt)
-        return { rows: gp.byItem.map(row => ({ item: row.itemName, qtyDepleted: row.qtyDepleted, cost: saysMoney(row.costPence) })), pages: 1 }
+        return { rows: gp.byItem.map(row => ({ item: row.itemName, unit: says(row.unit), qtyDepleted: row.qtyDepleted, cost: saysMoney(row.costPence) })), pages: 1 }
       }
       case 'variance': {
         const variance = await stocktakeVarianceReport(fromAt, toAt, paging)
@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
         const rows = await wastageReport(fromAt, toAt)
         return { rows: rows.map(row => ({
           reason: says(row.reason), item: row.itemName, category: row.categoryName,
-          qtyWasted: row.qtyWasted, cost: saysMoney(row.costPence),
+          unit: says(row.unit), qtyWasted: row.qtyWasted, cost: saysMoney(row.costPence),
         })), pages: 1 }
       }
       case 'discounts': {

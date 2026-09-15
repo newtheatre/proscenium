@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { says, saysMoney } from '#shared/utils/bar'
+import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
 import type { BarReport, ReportPeriodInput, ReportPeriodKind, ReportSection } from '#shared/utils/bar-reports'
 
@@ -213,7 +213,7 @@ function exportUrl(section: ReportSection): string {
               >
                 <td class="py-2">
                   {{ row.itemName }}
-                </td><td>{{ row.qtyDepleted }}</td><td>{{ saysMoney(row.costPence) }}</td>
+                </td><td>{{ saysQuantity(row.qtyDepleted, row.unit) }}</td><td>{{ saysMoney(row.costPence) }}</td>
               </tr>
             </tbody>
           </table>
@@ -287,7 +287,7 @@ function exportUrl(section: ReportSection): string {
               <td class="py-2">
                 {{ says(row.reason) }}
               </td><td>{{ row.itemName }}</td><td>{{ row.categoryName }}</td>
-              <td>{{ row.qtyWasted }}</td><td>{{ saysMoney(row.costPence) }}</td>
+              <td>{{ saysQuantity(row.qtyWasted, row.unit) }}</td><td>{{ saysMoney(row.costPence) }}</td>
             </tr>
           </tbody>
         </table>
