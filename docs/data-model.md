@@ -1025,6 +1025,8 @@ where not null so a charge settles once (F-109 criteria 2, 3): no foreign key, t
 reasoning `product_variant_id` carries.
 Which source, tender and kind each money path posts under is the table in `architecture.md`
 under Money and the ledger. A path not in that table has not been agreed.
+Partial index on `product_variant_id` WHERE not null: `variantEverSoldColumn`
+(`server/utils/bar.ts`) checks it once per variant on every catalogue listing (0003).
 
 ### z_readings  APPEND-ONLY
 `id` PK · `night` (the show night, 04:00 to 04:00 London, the same label `till_sessions.night`
@@ -1512,6 +1514,8 @@ The kind vocabulary is complete from the first migration because widening a CHEC
 rebuild, and a rebuild of an append-only table is refused (0010). `MOVEMENT_WRITERS` says which
 path writes each: the stock screen writes `DELIVERY`, `WASTAGE`, `ADJUST` and `REVERSAL`, and
 refuses the rest by name.
+Index on (`ref_table`, `ref_id`): a void looks movements up by their source document, and the
+only prior index on `ref_id` was the partial one on stocktake lines (0003).
 
 ### stocktakes / stocktake_lines
 A delivery is a `stock_movements` row on its own (`DELIVERY`, with `unit_cost_pence`); there is no

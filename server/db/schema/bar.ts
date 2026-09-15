@@ -142,6 +142,9 @@ export const stockMovements = sqliteTable('stock_movements', {
 }, table => [
   index('stock_movements_item').on(table.itemId, table.createdAt),
   index('stock_movements_kind').on(table.kind, table.createdAt),
+  // A void looks up `ref_table = 'ledger_lines' AND ref_id IN (...)`; the only index on `ref_id`
+  // was partial on stocktake lines, so this scanned the whole table (review-data.md #7).
+  index('stock_movements_ref').on(table.refTable, table.refId),
   // A movement is corrected once, or the correction of the correction hides behind it.
   uniqueIndex('stock_movements_one_reversal').on(table.reversesId),
   // A duplicate finish rolls the whole stocktake batch back (F-115 criterion 4).
