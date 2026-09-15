@@ -58,6 +58,9 @@ erDiagram
   shows ||--o{ performances : runs
   performances ||--o{ reservations : sells
   performances ||--o{ shifts : staffs
+  venues ||--o{ bar_openings : opens_the_bar_at
+  bar_openings ||--o{ bar_opening_shifts : staffs
+  users ||--o{ bar_opening_shifts : works
   performances ||--o| night_reports : closes_with
   ledger_entries ||--o{ ledger_lines : itemises
 ```
@@ -1129,8 +1132,15 @@ header says `closed` or `open`, read from `period_locks` the same way a single d
 
 ### shift_templates
 `id` PK · `venue_id` → venues cascade, **NOT NULL, no fallback row** · `role` CHECK
-`DUTY_MANAGER|DOOR|BAR` · `count` · `updated_by` NULL → users set null · `updated_at`.
+`DUTY_MANAGER|DOOR|BAR` · `count` · `starts_before_doors_minutes` NULL · `ends_after_end_minutes`
+NULL · `updated_by` NULL → users set null · `updated_at`.
 UNIQUE (`venue_id`, `role`). CHECK: a `DUTY_MANAGER` row has `count` 1.
+The two offsets are this role's own window at this venue, in minutes (0078). NULL is the honest
+starting state and takes `SHIFT_START_BEFORE_DOORS_MINUTES` and
+`SHIFT_END_AFTER_CURTAIN_DOWN_MINUTES`: a venue nobody has asked the question of is not claiming an
+answer. They are read when a shift is stamped, and again only when its performance is restamped
+after a curtain change or filled by the backfill; editing them alone changes nothing already
+stamped.
 There is no venue-wide fallback template. A venue with no rows has no template and its
 performances stamp nothing, which is what E-101 criterion 4 asks to be visible rather than
 silent; a nullable `venue_id` would have made that state unreachable. That the duty manager
@@ -1139,8 +1149,9 @@ slot is present at all correlates rows, so it is refused at the write path (E-10
 ### shifts
 `id` PK · `performance_id` → performances cascade · `role` CHECK as above · `slot` (the
 ordinal within its role on this performance, from 1) · `user_id` NULL → users restrict ·
-`status` CHECK `OPEN|CLAIMED|CONFIRMED|DECLINED|CANCELLED` · `needs_review` bool (training
-gate could not be evaluated) · `assigned_by` NULL → users set null · `claimed_at` ·
+`status` CHECK `OPEN|CLAIMED|CONFIRMED|DECLINED|CANCELLED` · `starts_at` NULL · `ends_at` NULL ·
+`needs_review` bool (training gate could not be evaluated) · `assigned_by` NULL → users set null ·
+`claimed_at` ·
 `confirmed_at` · `notes` (describes the slot, safe) · `decline_reason` NULL (set on a decline,
 shown to the claimant, scrubbed on erasure like `notes`, never carried into the audit trail).
 CHECK `shifts_open_names_nobody`: OPEN implies `user_id` NULL, `CLAIMED|CONFIRMED|DECLINED`
@@ -1157,6 +1168,24 @@ Cancelling a performance cancels its shifts in the same batch. A refused write r
 a 409 through `shiftConstraintRefusal()`, never as a raw database error (E-106 criterion 3);
 SQLite names the columns for a unique index and the constraint name for a CHECK, so the
 mapping carries both spellings.
+
+`starts_at` and `ends_at` are when this shift is worked, stamped from the performance and the
+venue's template at stamp time: `coalesce(doors_at, starts_at)` less this role's start offset, to
+`starts_at` plus the running time and the intervals plus its end offset (0078, E-131). The
+arithmetic is one pair of absolute seconds, so the two clock-change nights need no case of their
+own, and `shiftWindow()` in `shared/utils/rota-times.ts` is the same computation in TypeScript for
+a caller that has the row rather than the query. Both are nullable because a shift stamped before
+the columns existed carries neither; the backfill fills those, and until it does an unknown window
+bounds nobody. A confirmed shift opens its tool only between them, widened at each end by
+`SHIFT_AUTHORITY_GRACE_MINUTES`, and the refusal quotes the window in London wall clock rather than
+telling somebody holding tonight's shift that they hold none (E-131 criterion 4). Moving a
+performance's curtain restamps its shifts, because the window says when the shift is worked; a
+template edit does not, because it is not.
+
+The bar's own window is also what says which house a sale belongs to on a two-performance day:
+`barWindowsTonight()` computes one per performance at the venue, and a sale takes the window
+containing it, else the nearest, ties to the earlier, later house first where two contain it
+(F-126). A comp resolves its house the same way.
 
 Moving a performance to another venue carries a claimed or confirmed shift with it and
 restamps the open ones from the new venue's template; a held shift in a role the new venue's
