@@ -35,7 +35,8 @@ export default defineEventHandler(async (event) => {
     detail: changes({ role: [null, input.role], slot: [null, input.slot], userId: [null, input.userId ?? null] }),
   })
 
-  await withShiftConstraints(() => auditedWrite(db.run(addShiftStatement(shiftId, input, resolved.account.id)), entry))
+  const offsets = await shiftOffsetDefaults(event)
+  await withShiftConstraints(() => auditedWrite(db.run(addShiftStatement(shiftId, input, resolved.account.id, offsets)), entry))
 
   if (subject) {
     const when = formatLondon(new Date(performance.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })

@@ -112,21 +112,19 @@ const open = ref(false)
 const counts = reactive<Record<ShiftRole, number>>({ DUTY_MANAGER: 1, DOOR: 0, BAR: 0 })
 
 // Blank means this venue has never been asked, and the shift takes the configured default (0078).
-const offsets = reactive<Record<ShiftRole, { start: string, end: string }>>({
-  DUTY_MANAGER: { start: '', end: '' },
-  DOOR: { start: '', end: '' },
-  BAR: { start: '', end: '' },
+// Null is an empty field, which is the venue taking the house default rather than nought (0078).
+const offsets = reactive<Record<ShiftRole, { start: number | null, end: number | null }>>({
+  DUTY_MANAGER: { start: null, end: null },
+  DOOR: { start: null, end: null },
+  BAR: { start: null, end: null },
 })
-
-const saidOffset = (minutes: number | null | undefined): string => (minutes == null ? '' : String(minutes))
-const readOffset = (typed: string): number | null => (typed.trim() === '' ? null : Number(typed))
 
 function edit(venue: VenueTemplate): void {
   editing.value = venue
   for (const role of SHIFT_ROLES) {
     const slot = venue.slots.find(one => one.role === role)
     counts[role] = slot?.count ?? (role === 'DUTY_MANAGER' ? 1 : 0)
-    offsets[role] = { start: saidOffset(slot?.startsBeforeDoorsMinutes), end: saidOffset(slot?.endsAfterEndMinutes) }
+    offsets[role] = { start: slot?.startsBeforeDoorsMinutes ?? null, end: slot?.endsAfterEndMinutes ?? null }
   }
   open.value = true
 }
@@ -136,8 +134,8 @@ const chosen = computed<TemplateSlot[]>(() =>
   SHIFT_ROLES.filter(role => counts[role] > 0).map(role => ({
     role,
     count: counts[role],
-    startsBeforeDoorsMinutes: readOffset(offsets[role].start),
-    endsAfterEndMinutes: readOffset(offsets[role].end),
+    startsBeforeDoorsMinutes: offsets[role].start,
+    endsAfterEndMinutes: offsets[role].end,
   })))
 
 const refusal = computed(() => templateRefusal(chosen.value))
@@ -189,12 +187,13 @@ async function remove(venue: VenueTemplate): Promise<void> {
 async function stamp(venue: VenueTemplate): Promise<void> {
   failure.value = null
   try {
-    const answer = await $fetch<{ stamped: number }>(`/api/admin/rota/templates/${venue.venueId}/stamp`, { method: 'POST' })
+    const answer = await $fetch<{ stamped: number, filled: number }>(`/api/admin/rota/templates/${venue.venueId}/stamp`, { method: 'POST' })
+    const said = answer.filled === 0 ? '' : ` ${plural(answer.filled, 'shift')} gained the times its template asks for.`
     toast.add({
       title: answer.stamped === 0 ? 'Nothing to add' : `${plural(answer.stamped, 'shift')} added`,
-      description: answer.stamped === 0
+      description: (answer.stamped === 0
         ? 'Every performance from tonight onwards already has its slots.'
-        : 'Performances from tonight onwards now carry every slot the template asks for.',
+        : 'Performances from tonight onwards now carry every slot the template asks for.') + said,
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -378,9 +377,8 @@ const columns: TableColumn<VenueTemplate>[] = [
                 label="Starts before doors"
                 :description="`Minutes. Blank takes the house default.`"
               >
-                <UInput
+                <UInputNumber
                   v-model="offsets[role].start"
-                  type="number"
                   :min="0"
                   :max="MAX_SHIFT_OFFSET_MINUTES"
                   placeholder="Default"
@@ -392,9 +390,8 @@ const columns: TableColumn<VenueTemplate>[] = [
                 label="Ends after the show"
                 description="Minutes. Blank takes the house default."
               >
-                <UInput
+                <UInputNumber
                   v-model="offsets[role].end"
-                  type="number"
                   :min="0"
                   :max="MAX_SHIFT_OFFSET_MINUTES"
                   placeholder="Default"

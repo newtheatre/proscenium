@@ -21,9 +21,9 @@ export default defineEventHandler(async (event) => {
 
   // The entry records the action and its scope; how many shifts it added is a screen figure, and
   // the rows themselves carry when they were stamped.
-  const [stamped] = await withShiftConstraints(() => db.batch([
+  const [stamped, filled] = await withShiftConstraints(() => db.batch([
     db.all<{ id: string }>(backfillVenueStatement(venueId, from, defaults)),
-    db.run(backfillShiftTimesStatement(defaults, venueId)),
+    db.all<{ id: string }>(backfillShiftTimesStatement(defaults, venueId)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'shift.stamped',
@@ -32,5 +32,5 @@ export default defineEventHandler(async (event) => {
     })),
   ]))
 
-  return { ok: true, stamped: stamped.length }
+  return { ok: true, stamped: stamped.length, filled: filled.length }
 })

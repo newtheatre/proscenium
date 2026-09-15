@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  addShiftStatement,
   backfillShiftTimesStatement,
   backfillVenueStatement,
   replaceTemplateStatements,
+  restampShiftTimesStatement,
   stampPerformanceStatement,
 } from '#server/utils/rota'
 import { shiftWindow } from '#shared/utils/rota-times'
@@ -189,6 +191,44 @@ describe('the backfill fills what is null and nothing else (E-131 criterion 3)',
       run(database, backfillShiftTimesStatement({ startBeforeDoorsMinutes: 240, endAfterEndMinutes: 240 }))
 
       expect(timesOn(database, tonight.performanceId)).toEqual(before)
+    })
+  })
+})
+
+describe('the performance\'s own clock moves its windows (E-131 criterion 1)', () => {
+  test('a curtain moved to the afternoon takes every stamped shift with it', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId, HOUSE)
+      run(database, stampPerformanceStatement(tonight.performanceId, DEFAULTS))
+
+      const moved = tonight.startsAt - 5 * 3600
+      database.batch([['UPDATE performances SET starts_at = ?, doors_at = ? WHERE id = ?', moved, moved - 1800, tonight.performanceId]])
+      run(database, restampShiftTimesStatement(tonight.performanceId, DEFAULTS))
+
+      const expected = shiftWindow({ startsAt: moved, doorsAt: moved - 1800, durationMinutes: 120 }, DEFAULTS)
+      expect(timesOn(database, tonight.performanceId).every(shift => shift.starts_at === expected.startsAt)).toBe(true)
+      expect(timesOn(database, tonight.performanceId).every(shift => shift.ends_at === expected.endsAt)).toBe(true)
+    })
+  })
+
+  test('a shift added by hand carries the window its performance and template imply', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId, [
+        { role: 'DUTY_MANAGER', count: 1 },
+        { role: 'BAR', count: 1, startsBeforeDoorsMinutes: 60, endsAfterEndMinutes: 60 },
+      ])
+      const userId = person(database, 'added')
+
+      run(database, addShiftStatement('shift-added', {
+        performanceId: tonight.performanceId, role: 'BAR', slot: 2, userId,
+      }, 'actor', DEFAULTS))
+
+      const [shift] = rows<TimedShift>(database,
+        'SELECT role, slot, starts_at, ends_at FROM shifts WHERE id = ?', 'shift-added')
+      expect(shift!.starts_at).toBe(tonight.startsAt - 1800 - 60 * 60)
+      expect(shift!.ends_at).toBe(tonight.startsAt + (120 + 60) * 60)
     })
   })
 })

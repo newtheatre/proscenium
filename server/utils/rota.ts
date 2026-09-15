@@ -126,6 +126,28 @@ const windowEnd = (defaults: ShiftOffsets): SQL => sql`
   + coalesce(t.ends_after_end_minutes, ${defaults.endAfterEndMinutes}) * 60
 `
 
+// A performance's own clock moving takes its shifts with it: the window says when the shift is
+// worked, so a curtain at a new time is a new window (0078). A template edit is not this.
+export function restampShiftTimesStatement(performanceId: string, defaults: ShiftOffsets): SQL {
+  return sql`
+    UPDATE shifts AS target
+    SET starts_at = (
+          SELECT ${windowStart(defaults)}
+          FROM performances p
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          WHERE p.id = target.performance_id
+        ),
+        ends_at = (
+          SELECT ${windowEnd(defaults)}
+          FROM performances p
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          WHERE p.id = target.performance_id
+        )
+    WHERE target.performance_id = ${performanceId}
+    RETURNING id
+  `
+}
+
 // Stamping. The slot ordinals come out of a recursive count rather than out of the request, so
 // the statement binds only what `scope` binds however many slots a template holds (0006).
 function stampStatement(scope: SQL, defaults: ShiftOffsets): SQL {
@@ -442,15 +464,20 @@ export function assignShiftStatement(shiftId: string, userId: string, actorId: s
 
 // An officer's ad hoc shift: a repeat entry collides on the same uniqueness a stamped one would
 // (E-107 criterion 5). The id is the caller's own, since this write is audited by `changes()`.
-export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId: string): SQL {
+export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId: string, defaults: ShiftOffsets): SQL {
   const confirmed = input.userId !== undefined
+  // The window comes from the performance and the template the same way a stamp's does: a shift
+  // added by hand with no window would hold authority for the whole night (0078).
   return sql`
-    INSERT INTO shifts (id, performance_id, role, slot, user_id, status, assigned_by, claimed_at, confirmed_at)
-    VALUES (
-      ${shiftId}, ${input.performanceId}, ${input.role}, ${input.slot},
+    INSERT INTO shifts (id, performance_id, role, slot, user_id, status, assigned_by, claimed_at, confirmed_at, starts_at, ends_at)
+    SELECT
+      ${shiftId}, p.id, ${input.role}, ${input.slot},
       ${input.userId ?? null}, ${confirmed ? 'CONFIRMED' : 'OPEN'}, ${confirmed ? actorId : null},
-      ${confirmed ? sql`unixepoch()` : sql`NULL`}, ${confirmed ? sql`unixepoch()` : sql`NULL`}
-    )
+      ${confirmed ? sql`unixepoch()` : sql`NULL`}, ${confirmed ? sql`unixepoch()` : sql`NULL`},
+      ${windowStart(defaults)}, ${windowEnd(defaults)}
+    FROM performances p
+    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = ${input.role}
+    WHERE p.id = ${input.performanceId}
   `
 }
 
