@@ -1,3 +1,5 @@
+import { listFailureFrom } from './useListFailure'
+import type { ListFailure } from './useListFailure'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
 import type { TillSession, TillVenueOption } from '#shared/utils/till'
 
@@ -10,7 +12,8 @@ export function useTillSession() {
   // unaided on the (typical) night only one does. Multi-venue bars are their own story (F-202).
   const requestedVenueId = computed(() => (typeof route.query.venueId === 'string' ? route.query.venueId : undefined))
   const syncedAt = ref<Date | null>(null)
-  const failure = ref<string | null>(null)
+  // Carries the enrol path a console list already reads the same way (0040, issue 897).
+  const failure = ref<ListFailure | null>(null)
   const busy = ref(false)
   const session = ref<TillSession | null>(null)
   const venueId = ref<string | null>(null)
@@ -29,7 +32,7 @@ export function useTillSession() {
       syncedAt.value = new Date()
     }
     catch (refused) {
-      failure.value = refusalText(refused)
+      failure.value = listFailureFrom(refused)
       // A recognised refusal is still a completed sync, so NightStale is not left saying "not yet
       // synced" forever (matching /tonight/index.vue's own shape).
       if (refusalStatus(refused) === 401 || refusalStatus(refused) === 403) syncedAt.value = new Date()
@@ -59,7 +62,7 @@ export function useTillSession() {
       const answered = await request<{ venues: TillVenueOption[] }>('/api/till/venues')
       venues.value = answered.venues
       // Nobody has a bar for this caller to open, which is what the guard's own refusal says.
-      if (venues.value.length === 0) venuesFailure.value = failure.value
+      if (venues.value.length === 0) venuesFailure.value = failure.value?.message ?? null
     }
     catch (refused) {
       venuesFailure.value = refusalText(refused)
@@ -86,7 +89,7 @@ export function useTillSession() {
       syncedAt.value = new Date()
     }
     catch (refused) {
-      failure.value = refusalText(refused)
+      failure.value = listFailureFrom(refused)
     }
     finally {
       busy.value = false

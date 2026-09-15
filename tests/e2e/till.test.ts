@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -481,4 +482,37 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     expect(response.status).toBe(403)
     expect(await message(response)).toContain('bar manager')
   })
+})
+
+// 0040, issue 897: a permission held without its second factor names the way out, same as every
+// console list.
+describe.skipIf(skip !== null)('a till refusal held to a missing second factor', () => {
+  test('the till shows an enrolment link rather than a bare refusal', async () => {
+    // Narrowed for one request rather than widened: the bar manager account carries no
+    // authenticator, matching a real committee member who has never needed one before.
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['BAR_MANAGER'])
+    try {
+      const enrolling = programme('till-enrol')
+      const password = generatePassword()
+      const noFactor = await registerMember(app, 'till-enrol-bar', password)
+      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'BAR_MANAGER' }, admin.cookie)
+
+      const view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', noFactor.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      await visit(view, `${app.baseURL}/tonight/till?venueId=${enrolling.venueId}`, 'body')
+      await waitFor(view, `document.querySelector('[data-test="till-failure"]')`)
+      const shown = await textOf(view, '[data-test="till-failure"]')
+      expect(shown).toMatch(/authenticator/i)
+      expect(shown).toContain('Set up an authenticator app')
+      view.close()
+    }
+    finally {
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
+    }
+  }, 120_000)
 })
