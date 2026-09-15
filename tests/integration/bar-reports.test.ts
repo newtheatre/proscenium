@@ -175,8 +175,8 @@ describe('revenue and cost run on one clock (F-119 criterion 1, 0014)', () => {
   })
 })
 
-describe("the comps section is the bar's own (F-119 criterion 1)", () => {
-  test("the box office's comps stay out of the bar manager's report", async () => {
+describe('the comps section belongs to the bar (F-119 criterion 1)', () => {
+  test('a comp given at the box office stays out of the bar report', async () => {
     await withDatabase((database) => {
       const till = entry(database, 'e-1', INSIDE, { tender: 'COMP', compReason: 'A round on the house' })
       line(database, 'l-1', till, 0, 500)

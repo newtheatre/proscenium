@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { committeeYearEnd, fromLondonWallClock, startOfLondonDayAfter } from '#shared/utils/london'
 import { showNightBounds } from '#shared/utils/show-night'
+import type { SQL } from 'drizzle-orm'
 import type { BarReport, CompRow, DiscountRow, GpReport, GpRow, ReportPeriodInput, SalesRow, VarianceRow } from '#shared/utils/bar-reports'
 
 // Every figure is a query over the ledger and the movement history, run fresh for the period
@@ -38,8 +39,17 @@ export function resolveReportPeriod(period: ReportPeriodInput): { fromAt: number
   return { fromAt, toAt }
 }
 
-export async function salesReport(fromAt: number, toAt: number): Promise<SalesRow[]> {
-  return db.all<SalesRow>(sql`
+// The delivered cost of one unit of a stocked item `i`: the weighted average across every
+// delivery it still has, so a period with no delivery of its own still has a cost to weigh against.
+const unitCostPence = sql`coalesce((
+  SELECT sum(d.qty * d.unit_cost_pence) * 1.0 / sum(d.qty)
+  FROM stock_movements d
+  WHERE d.item_id = i.id AND d.kind = 'DELIVERY' AND d.unit_cost_pence IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = d.id)
+), 0)`
+
+export function salesQuery(fromAt: number, toAt: number): SQL {
+  return sql`
     SELECT c.name AS categoryName, p.name AS productName, v.label AS variantLabel,
            sum(l.qty) AS qty, sum(l.amount_pence) AS revenuePence
     FROM ledger_lines l
@@ -50,64 +60,81 @@ export async function salesReport(fromAt: number, toAt: number): Promise<SalesRo
     WHERE l.kind = 'BAR_ITEM' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
     GROUP BY c.id, p.id, v.id
     ORDER BY c.sort, c.name COLLATE NOCASE, p.name COLLATE NOCASE, v.label COLLATE NOCASE
-  `)
+  `
 }
 
-// Cost basis is the weighted average `unit_cost_pence` across every delivery the item has ever
-// had, not just this period's: a period with no delivery still has a cost to weigh its sales against.
-export async function grossProfitReport(fromAt: number, toAt: number): Promise<GpReport> {
-  const [revenue] = await db.all<{ revenuePence: number }>(sql`
+export async function salesReport(fromAt: number, toAt: number): Promise<SalesRow[]> {
+  return db.all<SalesRow>(salesQuery(fromAt, toAt))
+}
+
+export function gpRevenueQuery(fromAt: number, toAt: number): SQL {
+  return sql`
     SELECT coalesce(sum(l.amount_pence), 0) AS revenuePence
     FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
     WHERE l.kind = 'BAR_ITEM' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
-  `)
+  `
+}
 
-  const byItem = await db.all<GpRow>(sql`
+// Both halves window on the entry's own clock, so a sale recorded late keeps its revenue and its
+// cost together; a comp pours stock exactly as a paid sale does (F-110 criterion 4).
+export function gpDepletionQuery(fromAt: number, toAt: number): SQL {
+  return sql`
     SELECT i.name AS itemName, -sum(m.qty) AS qtyDepleted,
-           round(-sum(m.qty) * coalesce((
-             SELECT sum(d.qty * d.unit_cost_pence) * 1.0 / sum(d.qty)
-             FROM stock_movements d WHERE d.item_id = i.id AND d.kind = 'DELIVERY' AND d.unit_cost_pence IS NOT NULL
-           ), 0)) AS costPence
-    FROM stock_movements m JOIN bar_items i ON i.id = m.item_id
-    WHERE m.kind = 'SALE' AND m.created_at >= ${fromAt} AND m.created_at < ${toAt}
+           round(-sum(m.qty) * ${unitCostPence}) AS costPence
+    FROM stock_movements m
+    JOIN bar_items i ON i.id = m.item_id
+    JOIN ledger_lines l ON l.id = m.ref_id AND m.ref_table = 'ledger_lines'
+    JOIN ledger_entries e ON e.id = l.entry_id
+    WHERE m.kind IN ('SALE', 'COMP') AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
     GROUP BY i.id
     ORDER BY i.name COLLATE NOCASE
-  `)
+  `
+}
 
+export async function grossProfitReport(fromAt: number, toAt: number): Promise<GpReport> {
+  const [revenue] = await db.all<{ revenuePence: number }>(gpRevenueQuery(fromAt, toAt))
+  const byItem = await db.all<GpRow>(gpDepletionQuery(fromAt, toAt))
   const revenuePence = revenue?.revenuePence ?? 0
   const costPence = byItem.reduce((sum, row) => sum + row.costPence, 0)
   return { revenuePence, costPence, grossProfitPence: revenuePence - costPence, byItem }
 }
 
-export async function stocktakeVarianceReport(fromAt: number, toAt: number): Promise<VarianceRow[]> {
-  return db.all<VarianceRow>(sql`
+export function varianceQuery(fromAt: number, toAt: number): SQL {
+  return sql`
     SELECT st.id AS stocktakeId, i.name AS itemName, st.applied_at AS appliedAt,
-           m.qty AS qtyVariance, round(m.qty * coalesce((
-             SELECT sum(d.qty * d.unit_cost_pence) * 1.0 / sum(d.qty)
-             FROM stock_movements d WHERE d.item_id = i.id AND d.kind = 'DELIVERY' AND d.unit_cost_pence IS NOT NULL
-           ), 0)) AS valuePence
+           m.qty AS qtyVariance, round(m.qty * ${unitCostPence}) AS valuePence
     FROM stock_movements m
     JOIN stocktake_lines sl ON sl.id = m.ref_id AND m.ref_table = 'stocktake_lines'
     JOIN stocktakes st ON st.id = sl.stocktake_id
     JOIN bar_items i ON i.id = m.item_id
     WHERE st.applied_at >= ${fromAt} AND st.applied_at < ${toAt}
     ORDER BY st.applied_at, i.name COLLATE NOCASE
-  `)
+  `
 }
 
-export async function compsReport(fromAt: number, toAt: number): Promise<CompRow[]> {
-  return db.all<CompRow>(sql`
+export async function stocktakeVarianceReport(fromAt: number, toAt: number): Promise<VarianceRow[]> {
+  return db.all<VarianceRow>(varianceQuery(fromAt, toAt))
+}
+
+// `source = 'TILL'`: module D's ticket comps post comp entries too, and this is the bar manager's
+// section, not the box office's.
+export function compsQuery(fromAt: number, toAt: number): SQL {
+  return sql`
     SELECT e.id AS entryId, e.happened_at AS happenedAt, e.comp_reason AS reason, u.name AS approvedByName,
            coalesce((SELECT sum(l.unit_price_pence * l.qty) FROM ledger_lines l WHERE l.entry_id = e.id), 0) AS foregonePence
     FROM ledger_entries e
     LEFT JOIN users u ON u.id = e.comp_approved_by
-    WHERE e.tender = 'COMP' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+    WHERE e.tender = 'COMP' AND e.source = 'TILL' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
     ORDER BY e.happened_at
-  `)
+  `
 }
 
-export async function discountsReport(fromAt: number, toAt: number): Promise<DiscountRow[]> {
-  return db.all<DiscountRow>(sql`
+export async function compsReport(fromAt: number, toAt: number): Promise<CompRow[]> {
+  return db.all<CompRow>(compsQuery(fromAt, toAt))
+}
+
+export function discountsQuery(fromAt: number, toAt: number): SQL {
+  return sql`
     SELECT l.discount_id AS discountId, max(l.discount_percent) AS percent,
            coalesce(d.name, '(deleted discount)') AS discountName,
            count(*) AS timesApplied, sum(l.discount_pence) AS discountedPence
@@ -117,7 +144,11 @@ export async function discountsReport(fromAt: number, toAt: number): Promise<Dis
     WHERE l.discount_id IS NOT NULL AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
     GROUP BY l.discount_id, d.name
     ORDER BY discountedPence DESC
-  `)
+  `
+}
+
+export async function discountsReport(fromAt: number, toAt: number): Promise<DiscountRow[]> {
+  return db.all<DiscountRow>(discountsQuery(fromAt, toAt))
 }
 
 export async function barReport(period: ReportPeriodInput): Promise<BarReport> {
