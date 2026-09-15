@@ -2,15 +2,18 @@
 import { h, resolveComponent } from 'vue'
 import {
   SERVING_KINDS,
+  choiceGroupForm,
   componentsForm,
   priceForm,
   says,
   saysMoney,
   saysQuantity,
+  variantChoiceForm,
   variantEditForm,
 } from '#shared/utils/bar'
 import type {
   BarProduct,
+  ChoiceGroup,
   ProductVariant,
   ServingKind,
   StockItem,
@@ -46,6 +49,14 @@ const { data: stock } = await useAsyncData(
   () => request<Listing>('/api/admin/bar/items', { query: { pageSize: 100, retired: 'false' } }),
   { default: (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 }) },
 )
+
+// Every choice group, for attaching to a size; refreshed after one is created here (F-113).
+const { data: choiceGroupsData, refresh: refreshChoiceGroups } = await useAsyncData(
+  'bar-choice-groups',
+  () => request<{ groups: ChoiceGroup[] }>('/api/admin/bar/choice-groups'),
+  { default: (): { groups: ChoiceGroup[] } => ({ groups: [] }) },
+)
+const choiceGroupOptions = computed(() => choiceGroupsData.value.groups.map(group => ({ label: group.name, value: group.id })))
 
 const search = ref('')
 const includeRetired = ref(true)
@@ -166,9 +177,119 @@ function editRecipe(variant: ProductVariant): void {
     .map(component => ({ itemId: component.itemId!, qty: component.qty }))
 }
 
-// Read-only here: a choice group is F-113's own screen to attach or clear. The server already
+// Read-only here: attaching or clearing is the Choice button's, below. The server already
 // leaves it alone on a recipe save; showing it stops a save looking like it might remove it.
 const pouringChoiceGroup = computed(() => pouring.value?.components.find(component => component.itemId === null) ?? null)
+
+function choiceGroupOf(variant: ProductVariant): ProductVariant['components'][number] | null {
+  return variant.components.find(component => component.itemId === null) ?? null
+}
+
+const choosing = ref<ProductVariant | null>(null)
+// undefined, not null, while nothing is picked: USelect's own model type. Converted to the
+// nullable the route expects only where it is actually sent (0032).
+const choiceState = reactive<{ choiceGroupId: string | undefined, qty: number, includedInPrice: boolean }>({
+  choiceGroupId: undefined,
+  qty: 1,
+  includedInPrice: false,
+})
+
+function editChoice(variant: ProductVariant): void {
+  choosing.value = variant
+  failure.value = null
+  const current = choiceGroupOf(variant)
+  Object.assign(choiceState, {
+    choiceGroupId: current?.choiceGroupId ?? choiceGroupOptions.value[0]?.value ?? undefined,
+    qty: current?.qty ?? 1,
+    includedInPrice: current?.includedInPrice ?? false,
+  })
+}
+
+async function saveChoice(): Promise<void> {
+  const variant = choosing.value
+  if (!variant) return
+
+  saving.value = true
+  failure.value = null
+  try {
+    await $fetch(`/api/admin/bar/variants/${variant.id}/choice`, {
+      method: 'PUT',
+      body: { choiceGroupId: choiceState.choiceGroupId ?? null, qty: choiceState.qty, includedInPrice: choiceState.includedInPrice },
+    })
+    toast.add({
+      title: 'Choice attached',
+      description: 'The till prompts for it on this size from now on.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    choosing.value = null
+    await refresh()
+  }
+  catch (refused) {
+    failure.value = refusalText(refused)
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function clearChoice(variant: ProductVariant): Promise<void> {
+  failure.value = null
+  try {
+    await $fetch(`/api/admin/bar/variants/${variant.id}/choice`, { method: 'PUT', body: { choiceGroupId: null } })
+    toast.add({ title: `${variant.label} no longer offers a choice`, icon: 'i-lucide-check', color: 'success' })
+    await refresh()
+  }
+  catch (refused) {
+    failure.value = refusalText(refused)
+  }
+}
+
+interface ChoiceOptionLine { itemId: string, qty: number }
+
+const creatingGroup = ref(false)
+const newGroup = reactive<{ name: string, options: ChoiceOptionLine[] }>({ name: '', options: [] })
+
+function openNewGroup(): void {
+  failure.value = null
+  Object.assign(newGroup, { name: '', options: [] })
+  creatingGroup.value = true
+}
+
+const addNewGroupLine = (): void => {
+  newGroup.options.push({ itemId: itemOptions.value[0]?.value ?? '', qty: 1 })
+}
+
+const dropNewGroupLine = (index: number): void => {
+  newGroup.options.splice(index, 1)
+}
+
+async function saveNewGroup(): Promise<void> {
+  saving.value = true
+  failure.value = null
+  try {
+    const created = await $fetch<{ id: string }>('/api/admin/bar/choice-groups', {
+      method: 'POST',
+      body: { name: newGroup.name.trim(), options: newGroup.options },
+    })
+    await refreshChoiceGroups()
+    // Land back on the attach form with the group it was opened from already chosen.
+    choiceState.choiceGroupId = created.id
+    creatingGroup.value = false
+    toast.add({
+      title: 'Choice group added',
+      description: 'Attach it below to put it on the till.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+  }
+  catch (refused) {
+    failure.value = refusalText(refused)
+  }
+  finally {
+    saving.value = false
+  }
+}
 
 const addLine = (): void => {
   recipe.components.push({ itemId: itemOptions.value[0]?.value ?? '', qty: 1 })
@@ -318,6 +439,22 @@ const columns: TableColumn<ProductVariant>[] = [
         'size': 'sm',
         'color': 'neutral',
         'variant': 'ghost',
+        'data-test': `choice-${row.original.id}`,
+        'onClick': () => editChoice(row.original),
+      }, () => (choiceGroupOf(row.original) ? 'Change choice' : 'Add a choice')),
+      choiceGroupOf(row.original)
+        ? h(UButton, {
+            'size': 'sm',
+            'color': 'neutral',
+            'variant': 'ghost',
+            'data-test': `clear-choice-${row.original.id}`,
+            'onClick': () => clearChoice(row.original),
+          }, () => 'Clear choice')
+        : null,
+      h(UButton, {
+        'size': 'sm',
+        'color': 'neutral',
+        'variant': 'ghost',
         'data-test': `prices-${row.original.id}`,
         'onClick': () => editPrices(row.original),
       }, () => 'Prices'),
@@ -378,7 +515,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
     />
 
     <UAlert
-      v-if="failure && !open && pouring === null && pricing === null && removing === null"
+      v-if="failure && !open && pouring === null && pricing === null && removing === null && choosing === null && !creatingGroup"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -573,7 +710,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               Choice group
             </UBadge>
             <span>{{ pouringChoiceGroup.choiceGroupName }}, {{ pouringChoiceGroup.qty }}</span>
-            <span class="text-xs text-muted">Set from the serving size's own choice, not here. Saving below leaves it as it is.</span>
+            <span class="text-xs text-muted">Set from the Choice button on this size's row, not here. Saving below leaves it as it is.</span>
           </div>
 
           <p
@@ -733,6 +870,211 @@ const priceColumns: TableColumn<VariantPrice>[] = [
             </template>
           </UTable>
         </div>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="choosing !== null"
+      :title="choosing ? `Choice for ${choosing.label}` : ''"
+      description="A serving size offers at most one choice group; attaching a new one replaces the last."
+      @update:open="choosing = null; failure = null"
+    >
+      <template #body>
+        <UForm
+          :schema="variantChoiceForm"
+          :state="choiceState"
+          class="space-y-4"
+          data-test="choice-form"
+          @submit="saveChoice"
+        >
+          <UAlert
+            v-if="failure"
+            data-test="choice-failure"
+            color="error"
+            variant="subtle"
+            :description="failure"
+          />
+
+          <UFormField
+            label="Choice group"
+            name="choiceGroupId"
+            required
+            description="What the till offers a choice of when this size is added to the basket."
+          >
+            <USelect
+              v-model="choiceState.choiceGroupId"
+              :items="choiceGroupOptions"
+              :disabled="choiceGroupOptions.length === 0"
+              placeholder="No choice groups yet"
+              class="w-full"
+              data-test="choice-group-select"
+            />
+          </UFormField>
+
+          <UButton
+            color="neutral"
+            variant="link"
+            size="sm"
+            class="px-0"
+            data-test="new-choice-group"
+            @click="openNewGroup"
+          >
+            + Add a new choice group
+          </UButton>
+
+          <UFormField
+            label="Quantity"
+            name="qty"
+            description="How much of whichever option is chosen a sale depletes, in that item's own unit."
+          >
+            <UInputNumber
+              v-model="choiceState.qty"
+              :min="1"
+              class="w-full"
+              data-test="choice-qty"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Included in the price"
+            name="includedInPrice"
+            description="Ticked for a free mixer: choosing it adds nothing to what this size already charges."
+          >
+            <USwitch
+              v-model="choiceState.includedInPrice"
+              data-test="choice-included"
+            />
+          </UFormField>
+
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              type="submit"
+              :loading="saving"
+              :disabled="choiceGroupOptions.length === 0"
+              data-test="choice-submit"
+            >
+              Attach it
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              @click="choosing = null"
+            >
+              Back
+            </UButton>
+          </div>
+        </UForm>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="creatingGroup"
+      title="Add a choice group"
+      description="A named set of stocked items a size can offer a choice of, such as a spirit's mixer."
+      @update:open="creatingGroup = false; failure = null"
+    >
+      <template #body>
+        <UForm
+          :schema="choiceGroupForm"
+          :state="newGroup"
+          class="space-y-4"
+          data-test="new-group-form"
+          @submit="saveNewGroup"
+        >
+          <UAlert
+            v-if="failure"
+            data-test="new-group-failure"
+            color="error"
+            variant="subtle"
+            :description="failure"
+          />
+
+          <UFormField
+            label="Name"
+            name="name"
+            required
+            description="What the till calls it, such as Mixers."
+          >
+            <UInput
+              v-model="newGroup.name"
+              class="w-full"
+              data-test="new-group-name"
+            />
+          </UFormField>
+
+          <p
+            v-if="newGroup.options.length === 0"
+            class="text-sm text-muted"
+          >
+            No options yet. Add at least one stocked item.
+          </p>
+
+          <div
+            v-for="(line, index) in newGroup.options"
+            :key="index"
+            class="flex flex-wrap items-end gap-2"
+          >
+            <UFormField
+              label="Stocked item"
+              :name="`options.${index}.itemId`"
+              class="flex-1"
+            >
+              <USelect
+                v-model="line.itemId"
+                :items="itemOptions"
+                class="w-full"
+                :data-test="`new-group-item-${index}`"
+              />
+            </UFormField>
+            <UFormField
+              :label="`Quantity in ${says(unitOf(line.itemId)).toLowerCase()}`"
+              :name="`options.${index}.qty`"
+              class="w-40"
+            >
+              <UInputNumber
+                v-model="line.qty"
+                :min="1"
+                class="w-full"
+                :data-test="`new-group-qty-${index}`"
+              />
+            </UFormField>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-x"
+              aria-label="Take this option out"
+              :data-test="`new-group-drop-${index}`"
+              @click="dropNewGroupLine(index)"
+            />
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-plus"
+              :disabled="itemOptions.length === 0"
+              data-test="new-group-add"
+              @click="addNewGroupLine"
+            >
+              Add an option
+            </UButton>
+            <UButton
+              type="submit"
+              :loading="saving"
+              data-test="new-group-submit"
+            >
+              Add it
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              @click="creatingGroup = false"
+            >
+              Back
+            </UButton>
+          </div>
+        </UForm>
       </template>
     </UModal>
 

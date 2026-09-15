@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -691,6 +691,52 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, `[data-test="recipe-${variantId}"]`)
     await waitFor(view, `document.querySelector('[data-test="recipe-form"]')`)
     expect(await textOf(view, '[data-test="recipe-choice-group"]')).toContain('Screen mixers')
+
+    view.close()
+  }, 120_000)
+
+  test('a choice group is created and attached to a size through the screen, then cleared (issue #1051)', async () => {
+    const productId = await aProduct()
+    const variantId = await addVariant(productId, { label: 'Gin and tonic screen' })
+    const mixerName = named('Screen mixer item')
+    await anItem({ name: mixerName })
+    const groupName = named('Screen new mixers')
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/products/${productId}`, `[data-test="choice-${variantId}"]`)
+    await click(view, `[data-test="choice-${variantId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="choice-form"]')`)
+
+    // Building a new choice group from inside the attach form, not a separate trip to a
+    // different screen: create it, then attach it, in the one flow.
+    await click(view, '[data-test="new-choice-group"]')
+    await waitFor(view, `document.querySelector('[data-test="new-group-form"]')`)
+    await fill(view, '[data-test="new-group-name"]', groupName)
+    await click(view, '[data-test="new-group-add"]')
+    await waitFor(view, `document.querySelector('[data-test="new-group-item-0"]')`)
+    await pickOption(view, '[data-test="new-group-item-0"]', mixerName)
+    await click(view, '[data-test="new-group-submit"]')
+    await waitFor(view, `!document.querySelector('[data-test="new-group-form"]') && document.querySelector('[data-test="choice-form"]')`)
+
+    await click(view, '[data-test="choice-submit"]')
+    await waitFor(view, `!document.querySelector('[data-test="choice-form"]')`)
+
+    const attached = (await variants(productId)).find(variant => variant.id === variantId)!
+    const choice = attached.components.find(component => component.choiceGroupId !== null)
+    expect(choice?.choiceGroupName).toBe(groupName)
+    expect(await textOf(view, `[data-test="choice-${variantId}"]`)).toBe('Change choice')
+
+    // Clearing acts straight from the row, no confirmation modal, matching Retire's directness.
+    await click(view, `[data-test="clear-choice-${variantId}"]`)
+    await waitFor(view, `!document.querySelector('[data-test="clear-choice-${variantId}"]')`)
+    const cleared = (await variants(productId)).find(variant => variant.id === variantId)!
+    expect(cleared.components.find(component => component.choiceGroupId !== null)).toBeUndefined()
 
     view.close()
   }, 120_000)
