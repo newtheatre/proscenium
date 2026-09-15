@@ -48,13 +48,14 @@ export function postEntry(input: EntryInput, at = new Date(), guard?: SQL): Post
         tabDebtorId: entry.tabDebtorId ?? null,
         voidOfEntryId: entry.voidOfEntryId ?? null,
         voidReason: entry.voidReason ?? null,
+        tillSessionId: entry.tillSessionId ?? null,
       })
     : db.run(sql`
         INSERT INTO ledger_entries
-          (id, happened_at, london_day, source, tender, actor_id, total_pence, reverses_entry_id, comp_reason, comp_approved_by, tab_debtor_id, void_of_entry_id, void_reason)
+          (id, happened_at, london_day, source, tender, actor_id, total_pence, reverses_entry_id, comp_reason, comp_approved_by, tab_debtor_id, void_of_entry_id, void_reason, till_session_id)
         SELECT ${id}, ${happenedAt}, ${londonDay}, ${entry.source}, ${entry.tender}, ${entry.actorId ?? null},
                ${totalPence}, ${entry.reversesEntryId ?? null}, ${entry.compReason ?? null}, ${entry.compApprovedBy ?? null}, ${entry.tabDebtorId ?? null},
-               ${entry.voidOfEntryId ?? null}, ${entry.voidReason ?? null}
+               ${entry.voidOfEntryId ?? null}, ${entry.voidReason ?? null}, ${entry.tillSessionId ?? null}
         WHERE ${guard}
       `)
 

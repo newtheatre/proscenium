@@ -1002,7 +1002,9 @@ UPDATE outright, and a charge cannot know at insert time whether it will later b
 `ledger_lines.settles_entry_id` on the settlement's own lines is what actually answers it
 (F-109). `void_of_entry_id` NULL (tab charges only; a reversing entry, 0031's rule carried),
 unique where not null so a charge voids once · `void_reason` NULL, free text, on the record
-and off the audit trail (0011) · `created_at`.
+and off the audit trail (0011) · `till_session_id` NULL, bare (no foreign key: one would rebuild
+this table), the session an entry was rung up against, so a close figure can be its own session's
+rather than the whole night's (F-105.1, F-118, F-202.3) · `created_at`.
 A void credit carries the same `tab_debtor_id` as the charge it credits, and every balance
 (the account screen, the F-108 cap, the year-end list, the retention exemption) reads
 `OUTSTANDING_CHARGE` in `server/utils/tab-settlement.ts`, which drops both the voided charge and
@@ -1509,7 +1511,9 @@ counting unit · `kind` CHECK `DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJ
 `reason`, from `MOVEMENT_REASONS` in `shared/utils/bar.ts` rather than a CHECK, so a
 bar-manager-managed list (F-204) needs no rebuild · `unit_cost_pence`, delivery only (F-119's cost
 basis) · `ref_table` / `ref_id`, set together or not at all · `reverses_id` → stock_movements
-restrict · `actor_id` → users restrict, NULL being the system · `created_at`.
+restrict · `actor_id` → users restrict, NULL being the system · `location_venue_id` NULL, bare
+(no foreign key: one would rebuild this table), the venue the movement happened at, written at
+the write path as the single venue (F-202) · `created_at`.
 
 On-hand is always `SUM(qty)`, computed where it is asked for; no column anywhere holds a balance,
 and a test over the live schema refuses one. Triggers refuse every UPDATE and DELETE, and refuse a

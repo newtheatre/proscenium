@@ -38,6 +38,9 @@ export const ledgerEntries = sqliteTable('ledger_entries', {
   voidOfEntryId: text('void_of_entry_id'),
   // Free text, so it stays off the audit trail and on the record itself (0011, F-109 criterion 4).
   voidReason: text('void_reason'),
+  // Bare: a foreign key onto till_sessions would rebuild this append-only table (0010). Nullable
+  // because most entries do not come off a till at all (F-105.1, F-202).
+  tillSessionId: text('till_session_id'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   // Every report groups by day; without this each one is a scan of the whole ledger.
