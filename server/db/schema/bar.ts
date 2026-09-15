@@ -138,6 +138,9 @@ export const stockMovements = sqliteTable('stock_movements', {
   // Null is the system acting. A user is anonymised in place and never deleted, so restrict here
   // still resolves after an erasure (0011).
   actorId: text('actor_id').references(() => users.id, { onDelete: 'restrict' }),
+  // Bare: a foreign key onto venues would rebuild this append-only table (0010). Nullable so
+  // every historical row reads NULL rather than needing a guess (F-202).
+  locationVenueId: text('location_venue_id'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   index('stock_movements_item').on(table.itemId, table.createdAt),

@@ -109,6 +109,9 @@ export const entryForm = z.object({
   // trail (0011, F-109 criterion 4).
   voidOfEntryId: z.string().max(64).nullish(),
   voidReason: z.string().max(200).nullish(),
+  // The till session this entry was rung up against, so a close figure can be its own session's
+  // rather than the whole night's (F-118, F-202.3).
+  tillSessionId: z.string().max(64).nullish(),
   lines: z.array(lineForm).min(1, 'An entry itemises to at least one line'),
 }).refine(
   entry => entry.id === undefined || entry.id !== entry.reversesEntryId,
