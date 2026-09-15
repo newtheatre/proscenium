@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import { currentShowNight } from '#shared/utils/show-night'
 import { officerBypassTarget } from '#shared/utils/night-authority'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -306,6 +306,36 @@ describe.skipIf(skip !== null)('closing a session (F-102 criterion 4)', () => {
   test('closing a session that does not exist is a 404', async () => {
     expect((await closeTill('no-such-session', bar.cookie)).status).toBe(404)
   })
+})
+
+describe.skipIf(skip !== null)('the screen', () => {
+  // Close till is not a per-sale action, so the thumb zone is Charge and the SumUp hand-off
+  // only (K-102 criterion 2).
+  test('Close till is reached from the overflow menu, not the pinned actions, and still closes the session', async () => {
+    const screenPassword = generatePassword()
+    const screenBar = await registerMember(app, 'till-screen-close', screenPassword)
+    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    const closing = programme('till-screen-close')
+    await openTill(closing.venueId, screenBar.cookie)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', screenBar.email)
+    await fill(view, 'form input[type="password"]', screenPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="open-close-till"]')`)).toBe(false)
+
+    await click(view, '[data-test="till-overflow-menu"]')
+    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
+    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await waitFor(view, `document.querySelector('[data-test="confirm-close-till"]')`)
+    await click(view, '[data-test="confirm-close-till"]')
+    await waitFor(view, `document.querySelector('[data-test="till-closed"]')`)
+    view.close()
+  }, 120_000)
 })
 
 describe.skipIf(skip !== null)('a stale session waits for the bar manager, not tonight\'s shift (F-102 criterion 5)', () => {

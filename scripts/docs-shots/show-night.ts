@@ -74,7 +74,7 @@ export const showNight: Shot[] = [
       { selector: '[data-test="pane-tickets"]', label: 'Tickets' },
       { selector: '[data-test^="variant-"]', label: 'A size' },
       { selector: '[data-test^="allergen-"]', label: 'Allergens' },
-      { selector: '[data-test="open-close-till"]', label: 'Close till' },
+      { selector: '[data-test="till-overflow-menu"]', label: 'Close till (not a per-sale action)' },
     ],
   },
   {

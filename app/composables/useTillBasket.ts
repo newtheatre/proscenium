@@ -91,6 +91,12 @@ export function useTillBasket(deps: TillBasketDeps) {
   const hasTicketMoney = computed(() => ticketLines.value.length > 0 || walkUpLines.value.length > 0)
   const basketEmpty = computed(() => basket.value.length === 0 && !hasTicketMoney.value)
 
+  // Credit cannot pay for a ticket (F-122 criterion 5): the holder itself has to let go, not
+  // just its picker, or the pinned action keeps naming a tab the server would then refuse.
+  watch(hasTicketMoney, (has) => {
+    if (has) selectedTabHolderId.value = null
+  })
+
   const priced = ref<PricedBasket | null>(null)
   const pricing = ref(false)
   const priceFailure = ref<string | null>(null)

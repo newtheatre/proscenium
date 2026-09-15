@@ -41,6 +41,10 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
     class="space-y-4"
     data-test="tickets-pane"
   >
+    <p class="text-xs text-muted">
+      Ticket money is taken on the reader: credit cannot pay for a ticket, so choosing one here clears any tab holder already picked.
+    </p>
+
     <NightBlock title="Find a booking">
       <div class="flex flex-wrap gap-2">
         <UInput

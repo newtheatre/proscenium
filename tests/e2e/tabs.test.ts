@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
-import { generatePassword } from '#tests/helpers/seed'
+import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -109,6 +109,29 @@ async function aSellableProduct(pricePence = 500): Promise<{ variantId: string }
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, tabHolderId: string | null, as = barStaff.cookie): Promise<Response> =>
   send('POST', '/api/till/sale', { venueId, lines, expectedTotalPence, tabHolderId }, as)
+
+const aTicketType = async (price = 900): Promise<string> => {
+  const answered = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price })
+  return (await answered.json() as { id: string }).id
+}
+
+async function pendingBooking(performanceId: string, ticketTypeId: string): Promise<{ id: string, reference: string }> {
+  const answered = await send('POST', '/api/reservations', {
+    performanceId,
+    lines: [{ ticketTypeId, quantity: 1 }],
+    guest: { name: 'Tab Clear Tester', email: registrableAddress('tab-clear-guest') },
+  }, '')
+  expect(answered.status).toBe(200)
+  const { reference } = await answered.json() as { reference: string }
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    const row = database.query('SELECT id FROM reservations WHERE reference = ?').get(reference) as { id: string }
+    return { id: row.id, reference }
+  }
+  finally {
+    database.close()
+  }
+}
 
 interface LedgerEntryRow { tender: string, tab_debtor_id: string | null, tab_settled_at: number | null, total_pence: number, actor_id: string }
 
@@ -292,6 +315,49 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, `[aria-label^="Put"]`)
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
     expect(await textOf(view, '[data-test="tab-balance-note"]')).toContain('£5.00')
+    view.close()
+  }, 120_000)
+
+  // The picker hides once ticket money joins the basket; the holder it had chosen has to let go
+  // too, or the pinned action keeps naming the tab (F-122 criterion 5).
+  test('adding a booking after a tab holder is chosen clears it, so the charge goes to the reader', async () => {
+    const { venueId, performanceId } = programme(`tabs-clear-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await setCap(2000)
+    const ticketTypeId = await aTicketType()
+    const booking = await pendingBooking(performanceId, ticketTypeId)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barStaff.email)
+    await fill(view, 'form input[type="password"]', barStaffPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
+    await click(view, `[data-test="variant-${variantId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="tab-holder-${member.id}"]')`)
+    await click(view, `[data-test="tab-holder-${member.id}"]`)
+    await waitFor(view, `document.querySelector('[aria-label^="Put"]')`)
+
+    await click(view, '[data-test="pane-tickets"]')
+    await fill(view, '[data-test="ticket-lookup"]', booking.reference)
+    await click(view, '[data-test="ticket-lookup-submit"]')
+    await waitFor(view, `document.querySelector('[data-test="found-add-${booking.id}"]')`)
+    await click(view, `[data-test="found-add-${booking.id}"]`)
+
+    // The picker is already hidden by this basket; what this proves is that the holder itself
+    // let go, not merely that its control went away.
+    await waitFor(view, `!document.querySelector('[aria-label^="Put"]')`)
+    expect(await textOf(view, '[data-test="basket-split"]')).toContain('£9.00')
+
+    await click(view, `[data-test="charge-reader"]`)
+    await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
+    expect(await textOf(view, '[data-test="charge-confirmation"]')).toContain('Key this into the reader')
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="tab-balance-note"]')`)).toBe(false)
     view.close()
   }, 120_000)
 })
