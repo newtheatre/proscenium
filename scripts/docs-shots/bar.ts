@@ -148,4 +148,14 @@ export const bar: Shot[] = [
       { selector: '[data-test="gp-summary"]', label: 'Gross profit summary' },
     ],
   },
+  {
+    name: 'bar/tabs',
+    persona,
+    url: '/bar/tabs',
+    marker: '[data-test="bar-tabs-table"]',
+    width: CONSOLE_WIDTH,
+    annotations: [
+      { selector: '[data-test="bar-tabs-table"]', label: 'Every holder still carrying a balance' },
+    ],
+  },
 ]

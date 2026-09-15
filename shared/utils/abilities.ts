@@ -91,6 +91,10 @@ export const viewBarStock = defineAbility((viewer: Viewer) => holds(viewer, 'bar
 // no bar.read, so reports admit finance.read too, without opening the catalogue or stock (#906).
 export const viewBarReports = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read') || holds(viewer, 'finance.read'))
 
+// Voiding a tab charge is the manager's own call (F-109 criterion 4), so the register that does
+// it gates the same as the write, not the narrower catalogue or stock read.
+export const manageBarTabs = defineAbility((viewer: Viewer) => holds(viewer, 'bar.write'))
+
 // The treasurer's own read over the ledger, starting with foregone comp and discount value
 // (I-103); everything else module I builds on it gates the same way.
 export const viewFinanceReports = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read'))
@@ -182,6 +186,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewBarCatalogue: 'bar.read',
   viewBarStock: 'bar.read',
   viewBarReports: 'bar.read',
+  manageBarTabs: 'bar.write',
   viewFinanceReports: 'finance.read',
   recordZReadings: 'finance.write',
   viewSeasonSummary: 'finance.summary',

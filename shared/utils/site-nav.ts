@@ -2,6 +2,7 @@ import {
   anybody,
   decideRoomRequests,
   exportAgeChecks,
+  manageBarTabs,
   reachConsole,
   runTrainingSessions,
   sendAnnouncements,
@@ -130,6 +131,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Stocktakes', icon: 'i-lucide-clipboard-list', to: '/bar/stock/stocktakes', ability: viewBarStock },
       { label: 'Order list', icon: 'i-lucide-truck', to: '/bar/stock/order-list', ability: viewBarStock },
       { label: 'Reports', icon: 'i-lucide-bar-chart-3', to: '/bar/reports', ability: viewBarReports },
+      { label: 'Tabs', icon: 'i-lucide-receipt', to: '/bar/tabs', ability: manageBarTabs },
     ],
   },
 
