@@ -164,7 +164,7 @@ const priceColumns: TableColumn<CategoryPrice>[] = [
   { id: 'price', header: 'Price', cell: ({ row }) => saysMoney(row.original.pricePence) },
 ]
 
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The categories could not be read.') : null))
+const listingFailure = useListFailure(error, 'The categories could not be read.')
 
 const columns: TableColumn<BarCategory>[] = [
   {
@@ -222,7 +222,8 @@ const columns: TableColumn<BarCategory>[] = [
       data-test="listing-failure"
       color="error"
       variant="subtle"
-      :description="listingFailure"
+      :description="listingFailure.message"
+      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
     <UAlert

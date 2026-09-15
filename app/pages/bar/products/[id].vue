@@ -260,7 +260,7 @@ async function savePrice(): Promise<void> {
   }
 }
 
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The serving sizes could not be read.') : null))
+const listingFailure = useListFailure(error, 'The serving sizes could not be read.')
 
 const depletion = (variant: ProductVariant): string =>
   variant.components.length === 0
@@ -373,7 +373,8 @@ const priceColumns: TableColumn<VariantPrice>[] = [
       data-test="listing-failure"
       color="error"
       variant="subtle"
-      :description="listingFailure"
+      :description="listingFailure.message"
+      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
     <UAlert

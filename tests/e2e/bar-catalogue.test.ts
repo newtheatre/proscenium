@@ -716,6 +716,53 @@ describe.skipIf(skip !== null)('who may administer the bar (F-111 criterion 5)',
   })
 })
 
+describe.skipIf(skip !== null)('a bar refusal held to a missing second factor names the way out (0040, review-ui finding 9)', () => {
+  function override(key: string, value: unknown): void {
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('INSERT OR REPLACE INTO config (key, value, updated_by, updated_at) VALUES (?, ?, NULL, ?)')
+        .run(key, JSON.stringify(value), Math.floor(Date.now() / 1000))
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  function clearOverride(key: string): void {
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('DELETE FROM config WHERE key = ?').run(key)
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  test('the categories screen shows an enrolment link rather than a bare refusal', async () => {
+    // Narrowed for one request rather than widened: the bar manager account carries no
+    // authenticator, matching a real committee member who has never needed one before.
+    override('PRIVILEGED_ROLES', ['BAR_MANAGER'])
+    try {
+      const view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', barManager.email)
+      await fill(view, 'form input[type="password"]', barPassword)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      await visit(view, `${app.baseURL}/bar/categories`, 'body')
+      await waitFor(view, `document.querySelector('[data-test="listing-failure"]')`)
+      const shown = await textOf(view, '[data-test="listing-failure"]')
+      expect(shown).toMatch(/authenticator/i)
+      expect(shown).toContain('Set up an authenticator app')
+      view.close()
+    }
+    finally {
+      clearOverride('PRIVILEGED_ROLES')
+    }
+  }, 120_000)
+})
+
 describe.skipIf(skip !== null)('the screens', () => {
   test('the bar manager sees the products and the stock they are made of', async () => {
     const categoryId = await addCategory({ name: named('On screen') })

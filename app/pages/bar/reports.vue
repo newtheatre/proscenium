@@ -40,7 +40,7 @@ const { data, status, error, refresh } = await useAsyncData(
   { watch: [query] },
 )
 
-const reportFailure = computed(() => (error.value ? refusalText(error.value, 'The report could not be read.') : null))
+const reportFailure = useListFailure(error, 'The report could not be read.')
 
 function exportUrl(section: ReportSection): string {
   const params = new URLSearchParams({ ...query.value, section })
@@ -101,7 +101,8 @@ function exportUrl(section: ReportSection): string {
       data-test="report-failure"
       color="error"
       variant="subtle"
-      :description="reportFailure"
+      :description="reportFailure.message"
+      :actions="reportFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: reportFailure.enrolPath, color: 'error' }] : []"
     />
 
     <template v-else-if="status !== 'pending' && data">
