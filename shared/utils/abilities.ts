@@ -186,6 +186,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewBarCatalogue: 'bar.read',
   viewBarStock: 'bar.read',
   viewBarReports: 'bar.read',
+  manageBarTabs: 'bar.write',
   viewFinanceReports: 'finance.read',
   recordZReadings: 'finance.write',
   viewSeasonSummary: 'finance.summary',

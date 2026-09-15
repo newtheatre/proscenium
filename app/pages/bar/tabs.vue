@@ -12,7 +12,6 @@ const UButton = resolveComponent('UButton')
 
 const request = useRequestFetch()
 const toast = useToast()
-const failure = ref<string | null>(null)
 const saving = ref(false)
 
 interface HolderRow { holderId: string, holderName: string, outstandingPence: number }
@@ -28,29 +27,47 @@ const listingFailure = useListFailure(error, 'The tab register could not be read
 const viewing = ref<HolderRow | null>(null)
 const tab = ref<ItemisedTab | null>(null)
 const tabLoading = ref(false)
+const tabFailure = ref<string | null>(null)
 const voiding = ref<TabCharge | null>(null)
 const voidReason = ref('')
+const voidFailure = ref<string | null>(null)
 
+// A void reopens this itself, so a stale reply from a holder switched away from must never land
+// on the one now showing: only the fetch this holder's own click started may write the result.
 async function view(holder: HolderRow): Promise<void> {
   viewing.value = holder
   tab.value = null
-  failure.value = null
+  tabFailure.value = null
   tabLoading.value = true
   try {
-    tab.value = (await $fetch<{ ok: true, tab: ItemisedTab }>(`/api/admin/bar/tabs/${holder.holderId}`)).tab
+    const answered = await $fetch<{ ok: true, tab: ItemisedTab }>(`/api/admin/bar/tabs/${holder.holderId}`)
+    if (viewing.value?.holderId !== holder.holderId) return
+    tab.value = answered.tab
   }
   catch (refused) {
-    failure.value = refusalText(refused)
+    if (viewing.value?.holderId !== holder.holderId) return
+    tabFailure.value = refusalText(refused)
   }
   finally {
-    tabLoading.value = false
+    if (viewing.value?.holderId === holder.holderId) tabLoading.value = false
   }
+}
+
+function closeView(): void {
+  viewing.value = null
+  tab.value = null
+  tabFailure.value = null
 }
 
 function openVoid(charge: TabCharge): void {
   voiding.value = charge
   voidReason.value = ''
-  failure.value = null
+  voidFailure.value = null
+}
+
+function closeVoid(): void {
+  voiding.value = null
+  voidFailure.value = null
 }
 
 async function confirmVoid(): Promise<void> {
@@ -59,21 +76,20 @@ async function confirmVoid(): Promise<void> {
 
   const parsed = voidTabChargeForm.safeParse({ reason: voidReason.value })
   if (!parsed.success) {
-    failure.value = parsed.error.issues[0]?.message ?? 'Say why'
+    voidFailure.value = parsed.error.issues[0]?.message ?? 'Say why'
     return
   }
 
   saving.value = true
-  failure.value = null
+  voidFailure.value = null
   try {
     await $fetch(`/api/admin/bar/tab-charges/${charge.entryId}/void`, { method: 'POST', body: parsed.data })
     toast.add({ title: 'Charge voided', icon: 'i-lucide-check', color: 'success' })
     voiding.value = null
-    if (viewing.value) await view(viewing.value)
-    await refresh()
+    await Promise.all([viewing.value ? view(viewing.value) : Promise.resolve(), refresh()])
   }
   catch (refused) {
-    failure.value = refusalText(refused)
+    voidFailure.value = refusalText(refused)
   }
   finally {
     saving.value = false
@@ -121,14 +137,6 @@ const columns: TableColumn<HolderRow>[] = [
     />
 
     <UAlert
-      v-if="failure && !viewing"
-      data-test="failure"
-      color="error"
-      variant="subtle"
-      :description="failure"
-    />
-
-    <UAlert
       color="neutral"
       variant="subtle"
       icon="i-lucide-receipt"
@@ -159,15 +167,15 @@ const columns: TableColumn<HolderRow>[] = [
       :open="viewing !== null"
       :title="viewing ? `${viewing.holderName}'s tab` : ''"
       :description="viewing ? `Outstanding ${saysMoney(tab?.outstandingPence ?? viewing.outstandingPence)}` : ''"
-      @update:open="viewing = null; tab = null; failure = null"
+      @update:open="closeView"
     >
       <template #body>
         <UAlert
-          v-if="failure"
+          v-if="tabFailure"
           data-test="tab-failure"
           color="error"
           variant="subtle"
-          :description="failure"
+          :description="tabFailure"
         />
 
         <p
@@ -238,7 +246,7 @@ const columns: TableColumn<HolderRow>[] = [
         <UButton
           color="neutral"
           variant="ghost"
-          @click="viewing = null"
+          @click="closeView"
         >
           Close
         </UButton>
@@ -249,15 +257,15 @@ const columns: TableColumn<HolderRow>[] = [
       :open="voiding !== null"
       title="Void this charge?"
       description="Written once and never edited: a void is a reversing credit, on the record with why."
-      @update:open="voiding = null; failure = null"
+      @update:open="closeVoid"
     >
       <template #body>
         <UAlert
-          v-if="failure"
+          v-if="voidFailure"
           data-test="void-failure"
           color="error"
           variant="subtle"
-          :description="failure"
+          :description="voidFailure"
         />
         <p
           v-if="voiding"
@@ -291,7 +299,7 @@ const columns: TableColumn<HolderRow>[] = [
         <UButton
           color="neutral"
           variant="ghost"
-          @click="voiding = null"
+          @click="closeVoid"
         >
           Back
         </UButton>
