@@ -771,6 +771,13 @@
       "when": 1789502414709,
       "tag": "0109_comp_request_house",
       "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "6",
+      "when": 1789505881382,
+      "tag": "0110_a_closed_session_is_append_only_and_a_night_is_a_date",
+      "breakpoints": true
     }
   ]
 }
