@@ -1503,6 +1503,13 @@ moves until a row reaches `SUCCEEDED`; every transition is a conditional `UPDATE
 could not record, for a person to resolve, and does not. Indexes on (`night`, `status`) and
 `till_session_id`.
 
+Two rules keep one answer from posting two sales. The stuck-completion clock runs from
+`callback_at`, the answer that began the recording, falling back to `created_at`, so a basket
+handed over at seven and answered at nine is measured from nine; and once a commit has posted, the
+entry is recorded on the row whatever the sweep did meanwhile, taking it to `SUCCEEDED`, while a
+claim into `COMPLETING` requires `entry_id IS NULL`. A row that already names an entry can
+therefore never be replayed into a second one.
+
 ### stock_movements  APPEND-ONLY
 `id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own
 counting unit · `kind` CHECK `DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJUST|REVERSAL` ·

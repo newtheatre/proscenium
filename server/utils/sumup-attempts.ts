@@ -8,6 +8,7 @@ import { auditedWrite } from './audit'
 import { commitSale } from './sale'
 import { openSessionFor, requireOpenSession } from './till'
 import { qrTokenFor, verifyQrToken } from './qr-tokens'
+import { ATTEMPT_COLUMNS, recordPostedSaleStatement, stuckAttemptsQuery } from './sumup-queries'
 import { auditEntry } from '#shared/utils/audit'
 import { londonDayOf } from '#shared/utils/ledger'
 import { ATTEMPT_KEY_DOMAIN, OPEN_ATTEMPT_STATUSES, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, UNRESOLVED_ATTEMPT_STATUSES, attemptMayMove, isTerminalAttempt, sumupLaunchUrl } from '#shared/utils/sumup'
@@ -66,18 +67,10 @@ interface AttemptRow {
   resolvedBy: string | null
   resolvedAt: number | null
   resolutionNote: string | null
+  callbackAt: number | null
   entryId: string | null
   error: string | null
 }
-
-const ATTEMPT_COLUMNS = sql`
-  a.id AS id, a.till_session_id AS tillSessionId, a.venue_id AS venueId, a.night AS night,
-  a.created_by AS createdBy, u.name AS createdByName, a.created_at AS createdAt, a.basket AS basket,
-  a.expected_total_pence AS expectedTotalPence, a.status AS status, a.smp_status AS smpStatus,
-  a.smp_tx_code AS smpTxCode, a.smp_message AS smpMessage, a.smp_failure_cause AS smpFailureCause,
-  a.resolution AS resolution, a.resolved_by AS resolvedBy, a.resolved_at AS resolvedAt,
-  a.resolution_note AS resolutionNote, a.entry_id AS entryId, a.error AS error
-`
 
 export function attemptByIdQuery(id: string): SQL {
   return sql`SELECT ${ATTEMPT_COLUMNS} FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by WHERE a.id = ${id}`
@@ -191,6 +184,9 @@ interface Move {
 // callback and a staff answer racing each other advance the row once, and the loser reads back.
 async function move(id: string, from: SumupAttemptStatus, to: SumupAttemptStatus, change: Move, actorId: string | null): Promise<boolean> {
   if (!attemptMayMove(from, to)) return false
+  // A row whose sale is already posted is never claimed for recording again: the replay of a
+  // mismatch would otherwise commit the basket a second time (criterion 5).
+  const unposted = to === 'COMPLETING' ? sql`entry_id IS NULL` : sql`1 = 1`
   const now = Math.floor(Date.now() / 1000)
   const resolvedAt = isTerminalAttempt(to) || to === 'MISMATCH' ? now : null
   const entry = auditEntry({
@@ -214,9 +210,21 @@ async function move(id: string, from: SumupAttemptStatus, to: SumupAttemptStatus
       resolution_note = coalesce(${change.note ?? null}, resolution_note),
       entry_id = coalesce(${change.entryId ?? null}, entry_id),
       error = ${change.error ?? null}
-    WHERE id = ${id} AND status = ${from}
+    WHERE id = ${id} AND status = ${from} AND ${unposted}
     RETURNING id
   `), entry)
+}
+
+// Not a transition the state machine offers a caller: this is the commit's own bookkeeping, and
+// it lands on SUCCEEDED from wherever the row drifted to while the sale was being written.
+async function recordPostedSale(id: string, entryId: string | null, actorId: string | null): Promise<void> {
+  const now = Math.floor(Date.now() / 1000)
+  await auditedWrite(db.all(recordPostedSaleStatement(id, entryId, now)), auditEntry({
+    actorId,
+    action: 'bar.sumup.completed',
+    target: `sumup-attempt:${id}`,
+    detail: { to: 'SUCCEEDED', entryId },
+  }))
 }
 
 export interface CompletionOutcome {
@@ -269,7 +277,7 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
       },
       { tickets: basket.sale.tickets, walkUps: basket.sale.walkUps, walkUpGuest: basket.sale.walkUpGuest },
     )
-    await move(row.id, 'COMPLETING', 'SUCCEEDED', { entryId: receipt.entryId, resolvedBy: by.actorId }, by.actorId)
+    await recordPostedSale(row.id, receipt.entryId, by.actorId)
     return { status: 'SUCCEEDED', receipt, error: null }
   }
   catch (error) {
@@ -308,9 +316,9 @@ export async function resolveAttempt(row: AttemptRow, outcome: 'succeeded' | 'ab
   return { status: 'ABANDONED', receipt: null, error: null }
 }
 
-// Minutes since the last recorded touch, for a completion that never finished.
+// Minutes since the answer that began the recording, for a completion that never finished.
 function stuckFor(row: AttemptRow): number {
-  const since = row.resolvedAt ?? row.createdAt
+  const since = row.callbackAt ?? row.createdAt
   return (Date.now() / 1000 - since) / 60
 }
 
@@ -318,11 +326,7 @@ function stuckFor(row: AttemptRow): number {
 // completion stuck past its own is a mismatch for a person to look at.
 export async function sweepAttempts(timeoutMinutes: number, now = new Date()): Promise<{ abandoned: number, mismatched: number }> {
   const at = Math.floor(now.getTime() / 1000)
-  const stale = await db.all<AttemptRow>(sql`
-    SELECT ${ATTEMPT_COLUMNS} FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by
-    WHERE (a.status = 'STARTED' AND a.created_at < ${at - timeoutMinutes * 60})
-       OR (a.status = 'COMPLETING' AND coalesce(a.resolved_at, a.created_at) < ${at - SUMUP_STUCK_COMPLETING_MINUTES * 60})
-  `)
+  const stale = await db.all<AttemptRow>(stuckAttemptsQuery(at, timeoutMinutes))
   let abandoned = 0
   let mismatched = 0
   for (const row of stale) {
