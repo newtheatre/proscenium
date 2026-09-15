@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, menuOptions, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, menuOptions, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -249,8 +249,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     view.close()
   }, 120_000)
 
-  // review-ui.md finding 11: the kind picker read in shouting capitals, and no period field
-  // carried a label a screen reader could announce.
+  // K-101: the kind picker read in shouting capitals, and no period field carried a label a
+  // screen reader could announce.
   test('the period kind reads as words, and every period field carries its own label', async () => {
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -276,6 +276,51 @@ describe.skipIf(skip !== null)('the screen', () => {
     await pickOption(view, '[data-test="period-kind"]', 'Season')
     await waitFor(view, `document.querySelector('[data-test="period-season"]')`)
     expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'Season']))
+
+    view.close()
+  }, 120_000)
+
+  // 0032, K-101: a bare table with no #empty equivalent and no scope="col".
+  test('an empty section says so, with scoped headers and right-aligned numbers', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barManagerPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
+    // Nothing this suite writes ever lands here.
+    await fillDate(view, '[data-test="period-from"]', '2030-01-01')
+    await fillDate(view, '[data-test="period-to"]', '2030-01-02')
+    await click(view, '[data-test="refresh-report"]')
+    await waitFor(view, `document.querySelector('[data-test="section-sales"]')`)
+
+    expect(await textOf(view, '[data-test="section-sales"]')).toContain('Nothing sold in this period.')
+    expect(await view.evaluate<number>(
+      `document.querySelectorAll('[data-test="section-sales"] th[scope="col"]').length`,
+    )).toBe(5)
+    expect(await textOf(view, '[data-test="section-sales"] th:last-child')).toBe('Revenue')
+
+    view.close()
+  }, 120_000)
+
+  // 0032: the whole report blanked on every period change rather than dimming.
+  test('the report stays on screen across a period change, never blanking', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barManagerPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
+    await waitFor(view, `document.querySelector('[data-test="section-sales"]')`)
+
+    await pickOption(view, '[data-test="period-kind"]', 'Night')
+    // Present immediately: a refetch dims the table rather than removing the whole report while
+    // its new period is pending.
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="section-sales"]')`)).toBe(true)
 
     view.close()
   }, 120_000)

@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
-import type { BarReport, ReportPeriodInput, ReportPeriodKind, ReportSection } from '#shared/utils/bar-reports'
+import type {
+  BarReport,
+  CompRow,
+  DiscountRow,
+  GpRow,
+  ReportPeriodInput,
+  ReportPeriodKind,
+  ReportSection,
+  SalesRow,
+  VarianceRow,
+  WastageRow,
+} from '#shared/utils/bar-reports'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Bar reports', middleware: 'console', docs: '/docs/bar/reports' })
 
 // Words, not the enum's own shouting-capitals spelling: the same treatment every other bar
-// screen gives a stored value (review-ui.md finding 11).
+// screen gives a stored value (K-101).
 function saysReportPeriod(value: ReportPeriodKind): string {
   return value === 'NIGHT' ? 'Night' : value === 'WEEK' ? 'Week' : value === 'SEASON' ? 'Season' : 'Custom range'
 }
@@ -49,6 +61,7 @@ const { data, status, error, refresh } = await useAsyncData(
 )
 
 const reportFailure = useListFailure(error, 'The report could not be read.')
+const loading = computed(() => status.value === 'pending')
 
 // Comps and variance are the two sections that page; the rest answer whole and say nothing.
 function saysMoreOf(section: ReportSection): string {
@@ -60,6 +73,47 @@ function exportUrl(section: ReportSection): string {
   const params = new URLSearchParams({ ...query.value, section })
   return `/api/admin/bar/reports/export?${params.toString()}`
 }
+
+const salesColumns: TableColumn<SalesRow>[] = [
+  { id: 'category', header: 'Category', cell: ({ row }) => row.original.categoryName },
+  { id: 'product', header: 'Product', cell: ({ row }) => row.original.productName },
+  { id: 'variant', header: 'Variant', cell: ({ row }) => row.original.variantLabel },
+  { id: 'qty', header: 'Qty', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.qty) },
+  { id: 'revenue', header: 'Revenue', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.revenuePence) },
+]
+
+const gpColumns: TableColumn<GpRow>[] = [
+  { id: 'item', header: 'Item', cell: ({ row }) => row.original.itemName },
+  { id: 'qty', header: 'Qty depleted', meta: RIGHT_ALIGNED, cell: ({ row }) => saysQuantity(row.original.qtyDepleted, row.original.unit) },
+  { id: 'cost', header: 'Cost', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.costPence) },
+]
+
+const varianceColumns: TableColumn<VarianceRow>[] = [
+  { id: 'item', header: 'Item', cell: ({ row }) => row.original.itemName },
+  { id: 'qty', header: 'Qty variance', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.qtyVariance) },
+  { id: 'value', header: 'Value', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.valuePence) },
+]
+
+const compsColumns: TableColumn<CompRow>[] = [
+  { id: 'reason', header: 'Reason', cell: ({ row }) => row.original.reason },
+  { id: 'approvedBy', header: 'Approved by', cell: ({ row }) => row.original.approvedByName },
+  { id: 'foregone', header: 'Foregone', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.foregonePence) },
+]
+
+const wastageColumns: TableColumn<WastageRow>[] = [
+  { id: 'reason', header: 'Reason', cell: ({ row }) => says(row.original.reason) },
+  { id: 'item', header: 'Item', cell: ({ row }) => row.original.itemName },
+  { id: 'category', header: 'Category', cell: ({ row }) => row.original.categoryName },
+  { id: 'qty', header: 'Qty', meta: RIGHT_ALIGNED, cell: ({ row }) => saysQuantity(row.original.qtyWasted, row.original.unit) },
+  { id: 'cost', header: 'At cost', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.costPence) },
+]
+
+const discountsColumns: TableColumn<DiscountRow>[] = [
+  { id: 'discount', header: 'Discount', cell: ({ row }) => row.original.discountName },
+  { id: 'percent', header: 'Percent', meta: RIGHT_ALIGNED, cell: ({ row }) => `${row.original.percent}%` },
+  { id: 'timesApplied', header: 'Times applied', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.timesApplied) },
+  { id: 'givenAway', header: 'Given away', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.discountedPence) },
+]
 </script>
 
 <template>
@@ -136,7 +190,8 @@ function exportUrl(section: ReportSection): string {
       :actions="reportFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: reportFailure.enrolPath, color: 'error' }] : []"
     />
 
-    <template v-else-if="status !== 'pending' && data">
+    <!-- Data stays on screen while a new period refetches, rather than blanking (0032). -->
+    <template v-else-if="data">
       <section
         v-for="section in ([
           ['sales', 'Sales'], ['gp', 'Gross profit'], ['variance', 'Stocktake variance'],
@@ -164,30 +219,18 @@ function exportUrl(section: ReportSection): string {
           </UButton>
         </div>
 
-        <table
+        <UTable
           v-if="section[0] === 'sales'"
-          class="w-full text-sm"
+          :data="data.sales"
+          :columns="salesColumns"
+          :loading="loading"
         >
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Category
-              </th><th>Product</th><th>Variant</th><th>Qty</th><th>Revenue</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.sales"
-              :key="`${row.categoryName}-${row.productName}-${row.variantLabel}`"
-              class="border-b last:border-0"
-            >
-              <td class="py-2">
-                {{ row.categoryName }}
-              </td><td>{{ row.productName }}</td><td>{{ row.variantLabel }}</td>
-              <td>{{ row.qty }}</td><td>{{ saysMoney(row.revenuePence) }}</td>
-            </tr>
-          </tbody>
-        </table>
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              Nothing sold in this period.
+            </p>
+          </template>
+        </UTable>
 
         <div v-else-if="section[0] === 'gp'">
           <p
@@ -197,125 +240,70 @@ function exportUrl(section: ReportSection): string {
             Revenue {{ saysMoney(data.gp.revenuePence) }}, cost {{ saysMoney(data.gp.costPence) }},
             gross profit {{ saysMoney(data.gp.grossProfitPence) }}
           </p>
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b text-left text-muted">
-                <th class="py-2">
-                  Item
-                </th><th>Qty depleted</th><th>Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="row in data.gp.byItem"
-                :key="row.itemName"
-                class="border-b last:border-0"
-              >
-                <td class="py-2">
-                  {{ row.itemName }}
-                </td><td>{{ saysQuantity(row.qtyDepleted, row.unit) }}</td><td>{{ saysMoney(row.costPence) }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <UTable
+            :data="data.gp.byItem"
+            :columns="gpColumns"
+            :loading="loading"
+          >
+            <template #empty>
+              <p class="py-6 text-center text-sm text-muted">
+                Nothing depleted in this period.
+              </p>
+            </template>
+          </UTable>
         </div>
 
-        <table
+        <UTable
           v-else-if="section[0] === 'variance'"
-          class="w-full text-sm"
+          :data="data.variance.items"
+          :columns="varianceColumns"
+          :loading="loading"
         >
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Item
-              </th><th>Qty variance</th><th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.variance.items"
-              :key="`${row.stocktakeId}-${row.itemName}`"
-              class="border-b last:border-0"
-            >
-              <td class="py-2">
-                {{ row.itemName }}
-              </td><td>{{ row.qtyVariance }}</td><td>{{ saysMoney(row.valuePence) }}</td>
-            </tr>
-          </tbody>
-        </table>
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              No stocktake applied in this period.
+            </p>
+          </template>
+        </UTable>
 
-        <table
+        <UTable
           v-else-if="section[0] === 'comps'"
-          class="w-full text-sm"
+          :data="data.comps.items"
+          :columns="compsColumns"
+          :loading="loading"
         >
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Reason
-              </th><th>Approved by</th><th>Foregone</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.comps.items"
-              :key="row.entryId"
-              class="border-b last:border-0"
-            >
-              <td class="py-2">
-                {{ row.reason }}
-              </td><td>{{ row.approvedByName }}</td><td>{{ saysMoney(row.foregonePence) }}</td>
-            </tr>
-          </tbody>
-        </table>
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              No comps given in this period.
+            </p>
+          </template>
+        </UTable>
 
-        <table
+        <UTable
           v-else-if="section[0] === 'wastage'"
-          class="w-full text-sm"
+          :data="data.wastage"
+          :columns="wastageColumns"
+          :loading="loading"
         >
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Reason
-              </th><th>Item</th><th>Category</th><th>Qty</th><th>At cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.wastage"
-              :key="`${row.reason}-${row.itemName}`"
-              class="border-b last:border-0"
-            >
-              <td class="py-2">
-                {{ says(row.reason) }}
-              </td><td>{{ row.itemName }}</td><td>{{ row.categoryName }}</td>
-              <td>{{ saysQuantity(row.qtyWasted, row.unit) }}</td><td>{{ saysMoney(row.costPence) }}</td>
-            </tr>
-          </tbody>
-        </table>
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              Nothing wasted in this period.
+            </p>
+          </template>
+        </UTable>
 
-        <table
+        <UTable
           v-else
-          class="w-full text-sm"
+          :data="data.discounts"
+          :columns="discountsColumns"
+          :loading="loading"
         >
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Discount
-              </th><th>Percent</th><th>Times applied</th><th>Given away</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.discounts"
-              :key="row.discountId"
-              class="border-b last:border-0"
-            >
-              <td class="py-2">
-                {{ row.discountName }}
-              </td><td>{{ row.percent }}%</td><td>{{ row.timesApplied }}</td>
-              <td>{{ saysMoney(row.discountedPence) }}</td>
-            </tr>
-          </tbody>
-        </table>
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              No discount applied in this period.
+            </p>
+          </template>
+        </UTable>
 
         <p
           v-if="saysMoreOf(section[0])"

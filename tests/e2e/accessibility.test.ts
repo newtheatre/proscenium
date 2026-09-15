@@ -174,7 +174,7 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
       await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
 
       expect(await violationsOn(view, '/rooms/manage', '[data-test="rooms-table"]')).toEqual([])
-      // 0032's says() treatment and labelled fields apply to a period picker too.
+      // K-101: raw enum values and unlabelled period fields.
       expect(await violationsOn(view, '/bar/reports', '[data-test="period-kind"]')).toEqual([])
     }
     finally {

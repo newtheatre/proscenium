@@ -320,7 +320,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   }, 120_000)
 })
 
-describe.skipIf(skip !== null)('the console screen (review-ui.md finding 5)', () => {
+describe.skipIf(skip !== null)('the console screen (#1051)', () => {
   async function signedInView(): Promise<Bun.WebView> {
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
