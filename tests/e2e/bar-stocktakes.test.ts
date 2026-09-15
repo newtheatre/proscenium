@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fillNumber, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
@@ -19,6 +19,7 @@ let app: AppUnderTest
 let officer: TestMember
 let barManager: TestMember
 let member: TestMember
+const barPassword = generatePassword()
 
 beforeAll(async () => {
   if (skip) return
@@ -26,7 +27,7 @@ beforeAll(async () => {
   officer = await adminSession(app)
   member = await registerMember(app, 'ordinary', generatePassword())
 
-  barManager = await registerMember(app, 'barmanager', generatePassword())
+  barManager = await registerMember(app, 'barmanager', barPassword)
   await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
@@ -231,6 +232,40 @@ describe.skipIf(skip !== null)('who may run a stocktake', () => {
     expect((await apply(opened.stocktake.id, member.cookie)).status).toBe(403)
     await apply(opened.stocktake.id)
   })
+})
+
+describe.skipIf(skip !== null)('the screen', () => {
+  test('Apply saves what was typed and never posted, and names it first (F-115 criteria 3, 4)', async () => {
+    const item = await anItem()
+    await deliver(item.id, 10, 480)
+    const opened = await open()
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+    await fillNumber(view, `[data-test="counted-${item.id}"]`, '7')
+
+    // Apply without ever pressing Save counts: the typed figure must still reach the register.
+    await click(view, '[data-test="open-apply"]')
+    await waitFor(view, `document.querySelector('[data-test="apply-summary"]')`)
+    expect(await textOf(view, '[data-test="apply-counted"]')).toContain('1')
+    expect(await textOf(view, '[data-test="apply-uncounted"]')).toContain('0')
+    // 7 counted against 10 expected, at 480 pence each: -3 * 480.
+    expect(await textOf(view, '[data-test="apply-net-variance"]')).toContain('14.40')
+
+    await click(view, '[data-test="confirm-apply"]')
+    await waitFor(view, `!document.querySelector('[data-test="open-apply"]')`)
+    view.close()
+
+    const posted = movementsFor(item.id).filter(m => m.kind === 'STOCKTAKE')
+    expect(posted).toHaveLength(1)
+    expect(posted[0]!.qty).toBe(-3)
+  }, 120_000)
 })
 
 describe.skipIf(skip !== null)('the suggested order list compares live on-hand to par (F-120)', () => {
