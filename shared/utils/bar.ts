@@ -151,7 +151,13 @@ export const MEASURE_PRESETS: readonly MeasurePreset[] = [
     name: 'Bottles and cans',
     unit: 'ITEM',
     containerMl: null,
-    sizes: [{ servingKind: 'item', qty: 1 }],
+    // Three kinds rather than one: a category default priced per can prices nothing if the wizard
+    // creates the can as an "Each", so the person picks the kind the bar already prices on.
+    sizes: [
+      { servingKind: 'can', qty: 1 },
+      { servingKind: 'bottle', qty: 1 },
+      { servingKind: 'item', qty: 1 },
+    ],
     words: ['can', 'bottle', 'packaged', 'soft', 'mixer', 'juice', 'water'],
   },
 ]
@@ -369,6 +375,18 @@ export const productSetupForm = z.discriminatedUnion('shape', [
       ctx.addIssue({ code: 'custom', message: 'Each serving size is set up once, at the quantity it pours', path: ['sizes'] })
     }
   }
+  if (value.shape !== 'RECIPE' && value.item.mode === 'NEW') {
+    const { unit, containerMl } = value.item.item
+    const servings = value.shape === 'SIMPLE' ? [value.serving] : value.sizes
+    // The default serving is "Each, one of them", which against a measured item would pour one
+    // millilitre a sale: a bottle that never empties. Say the measure instead.
+    if (unit === 'ML' && servings.some(serving => serving.servingKind === 'item')) {
+      ctx.addIssue({ code: 'custom', message: 'A measured item sells by a measure: say the size and how much it pours', path: ['serving'] })
+    }
+    if (containerMl && servings.some(serving => serving.qty > containerMl)) {
+      ctx.addIssue({ code: 'custom', message: 'A serving cannot pour more than the container holds', path: ['serving'] })
+    }
+  }
   if (value.shape === 'RECIPE') {
     const items = value.components.map(component => component.itemId)
     if (new Set(items).size !== items.length) {
@@ -582,9 +600,11 @@ export function measurePreset(id: MeasurePresetId): MeasurePreset | null {
 // A suggestion, not a rule: the wizard preselects a preset from the category's name and the person
 // can pick another. Nothing matched means nothing preselected, never a guessed set of sizes.
 export function presetForCategory(name: string): MeasurePresetId | null {
-  const words = name.toLowerCase().split(/[^a-z]+/).filter(Boolean)
+  // Whole words only, plural tolerated: "Ginger beer" starts with "gin" and is not a spirit.
+  const words = name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z]+/).filter(Boolean)
+  const matches = (word: string, match: string) => word === match || word === `${match}s` || word === `${match}es`
   const found = MEASURE_PRESETS.find(preset =>
-    words.some(word => preset.words.some(match => word.startsWith(match))))
+    words.some(word => preset.words.some(match => matches(word, match))))
   return found?.id ?? null
 }
 

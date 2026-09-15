@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   MEASURE_PRESETS,
   SERVING_KINDS,
+  categoryPriceForm,
   measurePreset,
   presetForCategory,
   productSetupForm,
@@ -99,6 +100,13 @@ describe('a product shape is read from its variants, never stored (F-127 criteri
     expect(productShape(jug)).toBe('RECIPE')
   })
 
+  // Sizes with no recipe yet are what the existing screens leave behind mid-set-up. The shape is
+  // the question the sizes answer, so it reads from them and the missing recipe refuses elsewhere.
+  test('sizes that pour nothing yet still say what shape the product is', () => {
+    expect(productShape([aVariant()])).toBe('SIMPLE')
+    expect(productShape([aVariant(), aVariant()])).toBe('MEASURED')
+  })
+
   test('retired sizes do not decide the shape of what is still sold', () => {
     const wine = [
       aVariant({ components: [pours('item-red', 750)] }),
@@ -121,7 +129,13 @@ describe('measure presets sit over the serving kinds that already exist (F-127 c
     expect(measurePreset('WINE')?.sizes.map(size => size.qty)).toEqual([750, 250, 175, 125])
     expect(measurePreset('SPIRITS')?.sizes.map(size => size.qty)).toEqual([25, 50])
     expect(measurePreset('DRAUGHT')?.sizes.map(size => size.qty)).toEqual([568, 284])
-    expect(measurePreset('PACKAGED')?.sizes.map(size => size.qty)).toEqual([1])
+    expect(measurePreset('PACKAGED')?.sizes.map(size => size.qty)).toEqual([1, 1, 1])
+  })
+
+  // The bar prices its cans per can, so a preset offering only "Each" would create a variant no
+  // category default resolves for, and the product would sit HIDDEN for no visible reason.
+  test('a packaged thing can be set up as the kind the bar already prices it on', () => {
+    expect(measurePreset('PACKAGED')?.sizes.map(size => size.servingKind)).toEqual(['can', 'bottle', 'item'])
   })
 
   test('a preset says what it is measured in, and only a measured one suggests a container', () => {
@@ -133,8 +147,16 @@ describe('measure presets sit over the serving kinds that already exist (F-127 c
     expect(measurePreset('DRAUGHT')?.containerMl).toBe(null)
   })
 
-  test('every preset size resolves a serving kind a category default can be set for', () => {
+  test('every preset size is a serving kind a category default price can be set for', () => {
     for (const preset of MEASURE_PRESETS) {
+      for (const size of preset.sizes) {
+        const priced = categoryPriceForm.safeParse({
+          servingKind: size.servingKind,
+          pricePence: 250,
+          effectiveFrom: '2026-09-15',
+        })
+        expect(`${preset.id} ${size.servingKind}: ${priced.success}`).toBe(`${preset.id} ${size.servingKind}: true`)
+      }
       const kinds = preset.sizes.map(size => size.servingKind)
       expect(`${preset.id}: ${new Set(kinds).size === kinds.length}`).toBe(`${preset.id}: true`)
     }
@@ -146,6 +168,16 @@ describe('measure presets sit over the serving kinds that already exist (F-127 c
     expect(presetForCategory('Spirits')).toBe('SPIRITS')
     expect(presetForCategory('Draught beer')).toBe('DRAUGHT')
     expect(presetForCategory('Cans and bottles')).toBe('PACKAGED')
+  })
+
+  test('an accent is a spelling, not a different category', () => {
+    expect(presetForCategory('Rosé')).toBe('WINE')
+  })
+
+  // A word that merely starts with a preset's word is a different word: ginger beer is not a gin.
+  test('a near miss preselects nothing rather than four wrong sizes', () => {
+    expect(presetForCategory('Ginger beer')).toBe(null)
+    expect(presetForCategory('Redbull and mixers')).toBe('PACKAGED')
   })
 
   test('a category nothing matches preselects nothing rather than guessing', () => {
@@ -226,6 +258,33 @@ describe('one payload per shape, validated before anything is written (F-127 cri
 
   test('a choice group with no options is refused', () => {
     expect(aRecipe({ choice: { group: { name: 'Mixer', options: [] } } }).success).toBe(false)
+  })
+
+  // The serving nobody filled in is "Each, one of them", which against a bottle would pour one
+  // millilitre a sale and never empty it.
+  test('a measured item is not set up as a whole thing by leaving the serving alone', () => {
+    const parsed = productSetupForm.safeParse({
+      shape: 'SIMPLE',
+      product: aProduct,
+      item: { mode: 'NEW', item: { name: 'House red 750ml', unit: 'ML', containerMl: 750 } },
+    })
+    expect(parsed.success).toBe(false)
+  })
+
+  test('a serving cannot pour more than the container holds', () => {
+    expect(aMeasured({
+      sizes: [{ servingKind: 'bottle', label: 'Magnum', qty: 1500, pricePence: 2800 }],
+    }).success).toBe(false)
+  })
+
+  test('a whole thing still sets up with no serving stated at all', () => {
+    const parsed = productSetupForm.safeParse({
+      shape: 'SIMPLE',
+      product: { name: 'Crisps', categoryId: 'cat-snacks' },
+      item: { mode: 'NEW', item: { name: 'Crisps', unit: 'ITEM' } },
+    })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.shape === 'SIMPLE' && parsed.data.serving.qty).toBe(1)
   })
 
   test('an opening delivery is optional, positive and costed in pence', () => {
