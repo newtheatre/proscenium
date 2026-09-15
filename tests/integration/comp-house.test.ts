@@ -58,9 +58,9 @@ describe('a comp request keys to a house, never to the venue\'s whole night (F-1
     })
   })
 
-  // The house the duty manager is reading is what narrows the queue; a houseless ask is
-  // everybody's, because nothing else would ever put it in front of somebody.
-  test('the queue narrows to one house, and still shows an ask that named none', async () => {
+  // The queue is the venue's whole night on purpose: an ask lapses in minutes, and one narrowed
+  // to the house the reader has selected would let the other house's asks go undecided.
+  test('both houses are in one queue, each ask carrying the house it names', async () => {
     await withDatabase(async (database) => {
       const matinee = tonightsPerformance(database, { suffix: 'matinee', curtainHoursAfterNightStart: 10.5 })
       const evening = tonightsPerformance(database, {
@@ -72,15 +72,17 @@ describe('a comp request keys to a house, never to the venue\'s whole night (F-1
       ask(database, 'comp-b', matinee.venueId, evening.performanceId)
       ask(database, 'comp-c', matinee.venueId, null)
 
-      const forHouse = (performanceId: string): string[] => rows<{ id: string }>(database, `
-        SELECT id FROM comp_requests
+      const queued = rows<CompRow>(database, `
+        SELECT id, performance_id FROM comp_requests
         WHERE venue_id = ? AND night = ? AND status = 'PENDING'
-          AND (performance_id IS NULL OR performance_id = ?)
         ORDER BY id
-      `, matinee.venueId, NIGHT, performanceId).map(row => row.id)
+      `, matinee.venueId, NIGHT)
 
-      expect(forHouse(matinee.performanceId)).toEqual(['comp-a', 'comp-c'])
-      expect(forHouse(evening.performanceId)).toEqual(['comp-b', 'comp-c'])
+      expect(queued).toEqual([
+        { id: 'comp-a', performance_id: matinee.performanceId },
+        { id: 'comp-b', performance_id: evening.performanceId },
+        { id: 'comp-c', performance_id: null },
+      ])
     })
   })
 

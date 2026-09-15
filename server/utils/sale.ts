@@ -849,9 +849,12 @@ export async function commitCompSale(
   const lines = await compRequestLines(requestId)
   if (!lines) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
 
-  // The house the ask named, because that is where it was asked for; only an older request that
-  // never recorded one falls back to resolving it now (F-126 criterion 4).
-  const performanceId = request.performanceId ?? await performanceForSale(context, Math.floor(Date.now() / 1000))
+  // The house the ask named, where this session's authority covers it; anything else resolves
+  // against the bar's windows now, so nothing is ever keyed outside what the caller holds (F-126).
+  const asked = request.performanceId
+  const performanceId = asked !== null && (context.performanceIds ?? []).includes(asked)
+    ? asked
+    : await performanceForSale(context, Math.floor(Date.now() / 1000))
 
   // A comp is never discounted on top: it is already free (F-110's own criterion 4).
   const { resolved, priced } = await resolveSale(lines, on, null)

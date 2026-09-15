@@ -232,10 +232,15 @@ describe.skipIf(skip !== null)('the approver\'s queue, which is what the duty ma
 
     const queued = await send('GET', `/api/till/comp-requests?performanceId=${performanceId}`, undefined, dutyManager.cookie)
     expect(queued.status).toBe(200)
-    const { requests } = await queued.json() as { requests: { request: { id: string, reason: string }, priced: { totalPence: number } }[] }
+    const { requests } = await queued.json() as {
+      requests: { request: { id: string, reason: string, performanceId: string | null }, priced: { totalPence: number } }[]
+    }
     const mine = requests.find(one => one.request.id === id)
     expect(mine?.request.reason).toBe('A round on the house')
     expect(mine?.priced.totalPence).toBe(500)
+    // The ask records the house it was made at, so the queue can say which one it belongs to on a
+    // two-house day (F-126 criterion 4).
+    expect(mine?.request.performanceId).toBe(performanceId)
 
     expect((await approve(id, dutyManager.cookie)).status).toBe(200)
 

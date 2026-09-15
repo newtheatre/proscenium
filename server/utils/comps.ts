@@ -66,23 +66,14 @@ export async function compRequestById(id: string, expiryMinutes: number, now = n
 // The approver's queue: only ever a handful open at once, so a plain per-request read (the
 // caller prices each one) beats folding pricing into this query (0003's reasoning applied small).
 
-// Narrowed to the house the caller names (F-126); an ask that resolved none is everybody's,
-// because nothing else would ever put it in front of somebody.
-export async function pendingCompRequests(
-  venueId: string,
-  night: string,
-  expiryMinutes: number,
-  now = new Date(),
-  performanceId?: string,
-): Promise<CompRequest[]> {
-  const house = performanceId
-    ? sql` AND (r.performance_id IS NULL OR r.performance_id = ${performanceId})`
-    : sql``
+// The venue's whole night, deliberately: an ask is decided in minutes and a queue narrowed to the
+// house the reader happens to have selected would let the other house's asks lapse unseen (F-126).
+export async function pendingCompRequests(venueId: string, night: string, expiryMinutes: number, now = new Date()): Promise<CompRequest[]> {
   const rows = await db.all<RawRow>(sql`
     SELECT ${ROW_COLUMNS} FROM comp_requests r
     JOIN users u ON u.id = r.requested_by
     LEFT JOIN users d ON d.id = r.decided_by
-    WHERE r.venue_id = ${venueId} AND r.night = ${night} AND r.status = 'PENDING'${house}
+    WHERE r.venue_id = ${venueId} AND r.night = ${night} AND r.status = 'PENDING'
     ORDER BY r.created_at
   `)
   return rows.map(row => hydrate(row, expiryMinutes, now))

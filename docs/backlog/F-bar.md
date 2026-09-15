@@ -610,8 +610,12 @@ Open questions:
      night with no bar windows resolves no performance and the sale records none.
   3. A 14:30 sale and a 20:30 sale on a two-house day land on different performances inside one
      till session, and the session's reconciliation figure is unchanged by the split.
-  4. A comp request records the house the same way, so an approved comp reports against the
-     performance it was served to.
+  4. A comp request records the house it was asked at, resolved the same way a sale's is, so an
+     approved comp reports against that house rather than against the venue's whole night. The
+     approver's queue stays the whole night, because an ask lapses in minutes and one narrowed to
+     the house the reader has selected would let the other house's asks go undecided; each row
+     names its own house instead. Giving the comp keys it to the house the ask named where the
+     till's authority covers it, and resolves it afresh where it does not.
   5. The resolution is one shared function called from the sale write path, so no route decides
      which house a second way.
 - Source: E-127 criterion 5 (one session, two houses); the 15 September 2026 bar review; decision
