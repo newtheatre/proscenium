@@ -11,7 +11,17 @@ export default defineEventHandler(async (event) => {
   // check a priced basket always gets (F-103 criterion 3).
   const priced = await priceBasket(input.lines, londonDayOf(new Date()), null)
 
-  const id = await createCompRequest(resolved.account.id, resolved.venueId, resolved.night, input.reason, input.lines)
+  // The house the ask was made at, resolved from the bar's own windows exactly as a sale is, so
+  // an approved comp reports against the performance it was served to (F-126 criterion 4).
+  const performanceId = await performanceForSale({
+    venueId: resolved.venueId,
+    night: resolved.night,
+    performanceId: null,
+    performanceIds: resolved.performanceIds,
+    event,
+  }, Math.floor(Date.now() / 1000))
+
+  const id = await createCompRequest(resolved.account.id, resolved.venueId, resolved.night, input.reason, input.lines, performanceId)
 
   return { ok: true, id, priced }
 })

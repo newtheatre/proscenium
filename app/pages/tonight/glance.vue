@@ -57,6 +57,8 @@ let timer: ReturnType<typeof setInterval> | undefined
 // drinks at the till. Each is hidden when its own route refuses this viewer, never pre-judged.
 interface PendingComp {
   id: string
+  // A bar ask carries the house it was made at; null is a night with no house there (F-126).
+  performanceId?: string | null
   requestedBy: string
   requestedByName: string
   reason: string
@@ -107,6 +109,13 @@ const deciding = ref<string | null>(null)
 const declining = ref<{ queue: 'TICKET' | 'BAR', id: string } | null>(null)
 const declineReason = ref('')
 const declineFailure = ref<string | null>(null)
+
+// Which house an ask was made at, in words. The queue is the venue's whole night, so on a
+// two-house day this is what says which one a row belongs to (F-126).
+function houseOf(performanceId: string | null | undefined): string | null {
+  const house = performances.value.find(one => one.performanceId === performanceId)
+  return house ? `${house.showTitle}, ${timeOf(house.startsAt)}` : null
+}
 
 const compRoute = (queue: 'TICKET' | 'BAR', id: string): string =>
   (queue === 'TICKET' ? `/api/box-office/desk/comp-requests/${id}` : `/api/till/comp-requests/${id}`)
@@ -344,6 +353,13 @@ onUnmounted(() => {
               </p>
               <p class="font-mono text-xs text-muted">
                 asked by {{ pending.request.requestedByName }}
+              </p>
+              <p
+                v-if="houseOf(pending.request.performanceId)"
+                class="text-xs text-muted"
+                :data-test="`comp-house-${pending.request.id}`"
+              >
+                Asked at {{ houseOf(pending.request.performanceId) }}
               </p>
               <p
                 v-if="viewer && viewer.id === pending.request.requestedBy"

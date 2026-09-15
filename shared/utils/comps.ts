@@ -43,6 +43,8 @@ export interface CompRequest {
   id: string
   venueId: string
   night: string
+  // Null where the night ran no house at that venue, which is what a bar opening looks like.
+  performanceId: string | null
   requestedBy: string
   requestedByName: string
   reason: string

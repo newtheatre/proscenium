@@ -1,0 +1,1 @@
+ALTER TABLE `comp_requests` ADD `performance_id` text;
