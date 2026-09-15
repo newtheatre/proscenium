@@ -521,6 +521,14 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rota/shifts/add.post.ts', actions: ['shift.added'] },
   { route: 'server/api/admin/rota/shifts/board.get.ts', exempt: 'reads the per-performance rota, scoped to rota.write' },
   { route: 'server/api/admin/rota/candidates.get.ts', exempt: 'reads who might take a role not yet on the rota, scoped to rota.write' },
+  { route: 'server/api/rota/openings/index.get.ts', exempt: 'reads the planned bar openings and the slots on them' },
+  { route: 'server/api/rota/openings/index.post.ts', actions: ['bar-opening.created'] },
+  { route: 'server/api/rota/openings/[id]/cancel.post.ts', actions: ['bar-opening.cancelled'] },
+  { route: 'server/api/rota/openings/shifts/[id]/claim.post.ts', actions: ['bar-opening-shift.claimed'] },
+  { route: 'server/api/rota/openings/shifts/[id]/approve.post.ts', actions: ['bar-opening-shift.confirmed'] },
+  { route: 'server/api/rota/openings/shifts/[id]/decline.post.ts', actions: ['bar-opening-shift.declined'] },
+  { route: 'server/api/rota/openings/shifts/[id]/assign.post.ts', actions: ['bar-opening-shift.reassigned'] },
+  { route: 'server/api/rota/openings/shifts/[id]/unconfirm.post.ts', actions: ['bar-opening-shift.unconfirmed'] },
 
   // Module F: bar
 

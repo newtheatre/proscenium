@@ -320,6 +320,23 @@ There is nothing for you to do. Other shifts you hold are unaffected.
 The Nottingham New Theatre`,
   }),
 
+  // A bar opening has no show to name, so the label is what the evening was called (0077).
+  'shift-opening-cancelled': (context: TemplateContext): Rendered => ({
+    subject: 'A bar opening you were working has been cancelled',
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${context.show} at ${context.venue} on ${context.when} has been cancelled, so your bar shift
+on it has gone with it.</p>
+<p>There is nothing for you to do. Other shifts you hold are unaffected.</p>`),
+    text: `Hello ${context.name},
+
+${context.show} at ${context.venue} on ${context.when} has been cancelled, so your bar shift
+on it has gone with it.
+
+There is nothing for you to do. Other shifts you hold are unaffected.
+
+The Nottingham New Theatre`,
+  }),
+
   // The performance still runs; only the house changed, and the shift moved with it. The way
   // out is in the same breath, because a venue that does not suit is exactly why it exists.
   'shift-venue-changed': (context: TemplateContext): Rendered => ({

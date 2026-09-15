@@ -76,6 +76,55 @@ export const shifts = sqliteTable('shifts', {
     .where(sql`role = 'DUTY_MANAGER' AND status = 'CONFIRMED'`),
 ])
 
+// A bar opening (E-130, 0077): a planned evening at a venue with nothing running. It names no
+// performance and no show, because on a hire or a social there is none.
+export const barOpenings = sqliteTable('bar_openings', {
+  id: id(),
+  venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
+  // The London show-night date the opening belongs to, the key the rest of the night uses (0014).
+  night: text('night').notNull(),
+  label: text('label').notNull(),
+  startsAt: integer('starts_at').notNull(),
+  endsAt: integer('ends_at').notNull(),
+  status: text('status').notNull().default('PLANNED'),
+  createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  index('bar_openings_venue_night').on(table.venueId, table.night),
+  check('bar_openings_status_values', sql`${table.status} IN ('PLANNED', 'CANCELLED')`),
+  check('bar_openings_ends_after_start', sql`${table.endsAt} > ${table.startsAt}`),
+])
+
+// An opening's staffing: the claim columns of `shifts` with no role, because every slot on a bar
+// opening is a bar slot (0077). The claim path is the rota's own, parameterised by table.
+export const barOpeningShifts = sqliteTable('bar_opening_shifts', {
+  id: id(),
+  openingId: text('opening_id').notNull().references(() => barOpenings.id, { onDelete: 'cascade' }),
+  slot: integer('slot').notNull(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'restrict' }),
+  status: text('status').notNull().default('OPEN'),
+  assignedBy: text('assigned_by').references(() => users.id, { onDelete: 'set null' }),
+  claimedAt: integer('claimed_at'),
+  confirmedAt: integer('confirmed_at'),
+  // Describes the slot, never the person in it.
+  notes: text('notes'),
+  declineReason: text('decline_reason'),
+  createdAt: integer('created_at').notNull().default(now),
+}, table => [
+  unique('bar_opening_shifts_opening_slot').on(table.openingId, table.slot),
+  index('bar_opening_shifts_opening').on(table.openingId),
+  index('bar_opening_shifts_user').on(table.userId),
+  check('bar_opening_shifts_status_values', sql`${table.status} IN ('OPEN', 'CLAIMED', 'CONFIRMED', 'DECLINED', 'CANCELLED')`),
+  check('bar_opening_shifts_slot_positive', sql`${table.slot} >= 1`),
+  // The same rule `shifts` holds: an open slot names nobody, an assigned one names somebody, and
+  // a cancelled one says nothing either way (E-106, E-130 criterion 5).
+  check('bar_opening_shifts_open_names_nobody', sql`
+    (${table.status} = 'OPEN' AND ${table.userId} IS NULL)
+    OR (${table.status} IN ('CLAIMED', 'CONFIRMED', 'DECLINED') AND ${table.userId} IS NOT NULL)
+    OR ${table.status} = 'CANCELLED'
+  `),
+])
+
 // Consent, not a fact about the person: whether their phone shows on tonight's team list. A new
 // table rather than a `users` column, which build-order.md fixes against new NOT NULL additions.
 export const shiftContactPreferences = sqliteTable('shift_contact_preferences', {

@@ -387,6 +387,27 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Which performances somebody worked. The staffing record survives; a note on the slot does not.',
   },
   {
+    name: 'bar_openings',
+    column: 'created_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // That the bar opened on a hire night is a fact about the building. The officer who planned
+    // it is a reference the tombstone still answers, as `shift_templates.updated_by` is.
+    why: 'When the bar opened with nothing running. It describes the evening, not the officer who planned it.',
+  },
+  {
+    name: 'bar_opening_shifts',
+    column: 'user_id',
+    section: 'bar-opening-shifts',
+    columns: ['opening_id', 'slot', 'status', 'claimed_at', 'confirmed_at'],
+    erasure: 'scrub',
+    scrub: ['notes', 'decline_reason'],
+    // Who worked which opening is the staffing record E-123 reads, exactly as `shifts` is; a
+    // note written on the slot is not.
+    why: 'Which bar openings somebody worked. The staffing record survives; a note on the slot does not.',
+  },
+  {
     name: 'shift_contact_preferences',
     column: 'user_id',
     section: null,

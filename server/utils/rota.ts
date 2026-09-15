@@ -381,18 +381,26 @@ export async function shiftDetail(id: string): Promise<ShiftDetail | null> {
   return row ?? null
 }
 
-// Availability and one-shift-per-performance both ride the UPDATE, so two simultaneous claims
-// resolve to exactly one winner (E-104). A duty manager's own uniqueness is the schema's (E-106).
-export function claimShiftStatement(shiftId: string, userId: string, status: ShiftStatus): SQL {
+// Which table holds the slots, and which column names the event they belong to: a bar opening
+// claims through this same write, under a second table rather than a rebuilt `shifts` (0077).
+export interface ClaimScope { table: string, event: string }
+
+export const SHIFT_CLAIM_SCOPE: ClaimScope = { table: 'shifts', event: 'performance_id' }
+
+// Availability and one-slot-per-event both ride the UPDATE, so two simultaneous claims resolve to
+// exactly one winner (E-104). A duty manager's own uniqueness is the schema's (E-106).
+export function claimSlotStatement(scope: ClaimScope, slotId: string, userId: string, status: ShiftStatus): SQL {
+  const table = sql.raw(scope.table)
+  const event = sql.raw(scope.event)
   return sql`
-    UPDATE shifts AS target
+    UPDATE ${table} AS target
     SET user_id = ${userId}, status = ${status}, claimed_at = unixepoch(),
         confirmed_at = ${status === 'CONFIRMED' ? sql`unixepoch()` : sql`NULL`}
-    WHERE target.id = ${shiftId}
+    WHERE target.id = ${slotId}
       AND target.status = 'OPEN'
       AND NOT EXISTS (
-        SELECT 1 FROM shifts AS other
-        WHERE other.performance_id = target.performance_id
+        SELECT 1 FROM ${table} AS other
+        WHERE other.${event} = target.${event}
           AND other.user_id = ${userId}
           AND other.status IN ('CLAIMED', 'CONFIRMED')
       )
@@ -400,24 +408,37 @@ export function claimShiftStatement(shiftId: string, userId: string, status: Shi
   `
 }
 
-// Answering a queued claim (E-105 criteria 2 and 3). Both read only `status = 'CLAIMED'` on the
-// write, so two officers deciding at once settle it once between them (0003).
-export function approveShiftStatement(shiftId: string): SQL {
+export function claimShiftStatement(shiftId: string, userId: string, status: ShiftStatus): SQL {
+  return claimSlotStatement(SHIFT_CLAIM_SCOPE, shiftId, userId, status)
+}
+
+// Answering a queued claim, under whichever table holds it: the predicate is the status alone, so
+// two officers deciding at once settle it once between them (E-105 criterion 2, 0003).
+export function approveSlotStatement(scope: ClaimScope, slotId: string): SQL {
   return sql`
-    UPDATE shifts SET status = 'CONFIRMED', confirmed_at = unixepoch()
-    WHERE id = ${shiftId} AND status = 'CLAIMED'
+    UPDATE ${sql.raw(scope.table)} SET status = 'CONFIRMED', confirmed_at = unixepoch()
+    WHERE id = ${slotId} AND status = 'CLAIMED'
     RETURNING id
   `
 }
 
 // The reason lands on the row, never in the audit trail, which keeps only that the status
 // changed (0011).
-export function declineShiftStatement(shiftId: string, reason: string): SQL {
+export function declineSlotStatement(scope: ClaimScope, slotId: string, reason: string): SQL {
   return sql`
-    UPDATE shifts SET status = 'DECLINED', decline_reason = ${reason}
-    WHERE id = ${shiftId} AND status = 'CLAIMED'
+    UPDATE ${sql.raw(scope.table)} SET status = 'DECLINED', decline_reason = ${reason}
+    WHERE id = ${slotId} AND status = 'CLAIMED'
     RETURNING id
   `
+}
+
+// Answering a queued claim (E-105 criteria 2 and 3).
+export function approveShiftStatement(shiftId: string): SQL {
+  return approveSlotStatement(SHIFT_CLAIM_SCOPE, shiftId)
+}
+
+export function declineShiftStatement(shiftId: string, reason: string): SQL {
+  return declineSlotStatement(SHIFT_CLAIM_SCOPE, shiftId, reason)
 }
 
 // Release and reassignment (E-107). Both ride their own UPDATE, exactly as claiming does.

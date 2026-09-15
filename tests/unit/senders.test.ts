@@ -54,6 +54,7 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'waiting-list.joined': 'BOX_OFFICE',
   'waiting-list.offered': 'BOX_OFFICE',
   'shift.performance-cancelled': 'ANNOUNCEMENTS',
+  'shift.opening-cancelled': 'ANNOUNCEMENTS',
   'shift.venue-changed': 'ANNOUNCEMENTS',
   'shift.role-not-needed': 'ANNOUNCEMENTS',
   'shift.rota-unstaffed': 'ANNOUNCEMENTS',
