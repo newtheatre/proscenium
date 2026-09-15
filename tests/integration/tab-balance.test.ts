@@ -70,6 +70,7 @@ const balanceOf = (database: TestDatabase): number =>
 
 const yearEnd = (database: TestDatabase): { holderId: string, outstandingPence: number }[] =>
   read<{ holderId: string, outstandingPence: number }>(database, unsettledTabsQuery())
+    .map(row => ({ holderId: row.holderId, outstandingPence: row.outstandingPence }))
 
 describe('a voided tab charge leaves the holder\'s balance (F-109 criteria 1, 6)', () => {
   test('an outstanding charge counts, and its holder is on the year-end list', async () => {
