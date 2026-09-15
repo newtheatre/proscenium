@@ -75,19 +75,29 @@ export function gpRevenueQuery(fromAt: number, toAt: number): SQL {
   `
 }
 
-// Both halves window on the entry's own clock, so a late sale keeps revenue and cost together; a
-// comp pours like a paid sale (F-110 criterion 4) and a pour a REVERSAL names leaves the cost.
+// A pour runs on its entry's clock, so a late sale keeps revenue and cost together, and a comp
+// pours like a paid sale (F-110 criterion 4).
+
+// A REVERSAL nets in on its own clock rather than removing the pour: the credit it belongs to is
+// a new entry in a later period, so taking the cost out of the first one would flatter it.
 export function gpDepletionQuery(fromAt: number, toAt: number): SQL {
   return sql`
     SELECT i.name AS itemName, -sum(m.qty) AS qtyDepleted,
            round(-sum(m.qty) * ${unitCostPence}) AS costPence
     FROM stock_movements m
     JOIN bar_items i ON i.id = m.item_id
-    JOIN ledger_lines l ON l.id = m.ref_id AND m.ref_table = 'ledger_lines'
-    JOIN ledger_entries e ON e.id = l.entry_id
-    WHERE m.kind IN ('SALE', 'COMP') AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
-      AND NOT EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = m.id)
+    WHERE (
+      m.kind IN ('SALE', 'COMP') AND EXISTS (
+        SELECT 1 FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
+        WHERE l.id = m.ref_id AND m.ref_table = 'ledger_lines'
+          AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      )
+    ) OR (
+      m.kind = 'REVERSAL' AND m.created_at >= ${fromAt} AND m.created_at < ${toAt}
+      AND EXISTS (SELECT 1 FROM stock_movements t WHERE t.id = m.reverses_id AND t.kind IN ('SALE', 'COMP'))
+    )
     GROUP BY i.id
+    HAVING sum(m.qty) <> 0
     ORDER BY i.name COLLATE NOCASE
   `
 }

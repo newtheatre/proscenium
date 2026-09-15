@@ -7,6 +7,8 @@ import type { SQL } from 'drizzle-orm'
 // F-119 against the real migrations: what gross profit counts on the cost side, which clock the
 // period runs on, and whose comps the bar manager's section carries (F-110 criterion 4).
 
+// A bottle delivered at a penny the millilitre, so every cost below is the quantity itself.
+const PENCE_PER_ML = 1
 const FROM_AT = 1_000_000
 const TO_AT = 2_000_000
 const INSIDE = 1_500_000
@@ -71,6 +73,12 @@ function line(database: TestDatabase, id: string, entryId: string, amountPence: 
   return id
 }
 
+// The credit a void or a hand-entered correction posts: no ledger line of its own, so it nets in
+// on its own clock (0053's trigger wants the same item and the opposite quantity).
+function reversePour(database: TestDatabase, id: string, itemId: string, qty: number, reversesId: string, createdAt: number): void {
+  insert(database, 'stock_movements', { id, item_id: itemId, qty, kind: 'REVERSAL', reverses_id: reversesId, created_at: createdAt })
+}
+
 // Depletion cites the sale line that caused it, which is the only route back to the entry's own
 // clock; `created_at` is the moment the row was written, which is a different question.
 function depletion(database: TestDatabase, id: string, itemId: string, qty: number, kind: string, lineId: string, createdAt: number): void {
@@ -85,34 +93,48 @@ describe('gross profit counts what a comp poured (F-110 criterion 4, F-119 crite
   test('a comp depletes the cost side exactly as a paid sale does', async () => {
     await withDatabase((database) => {
       const itemId = bottle(database)
-      delivery(database, 'd-1', itemId, 700, 700)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
       const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
       const comp = line(database, 'l-2', entry(database, 'e-2', INSIDE, { tender: 'COMP', compReason: 'On the house' }), 0, 500)
       depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
       depletion(database, 'm-2', itemId, 50, 'COMP', comp, INSIDE)
 
-      // 100ml at 1p per ml delivered, half of it given away and counted all the same.
+      // Half of it given away and counted all the same.
       expect(depleted(database)).toEqual([{ itemName: 'Gin 1', qtyDepleted: 100, costPence: 100 }])
     })
   })
 
-  test('a pour a reversal names leaves the cost side, the way a void nets its revenue away', async () => {
+  test('a pour reversed in the same period nets to nothing, and leaves no empty row behind', async () => {
     await withDatabase((database) => {
       const itemId = bottle(database)
-      delivery(database, 'd-1', itemId, 700, 700)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
       const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
       depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
-      // The credit carries no ledger line of its own, so the original is what has to drop out.
-      insert(database, 'stock_movements', { id: 'r-1', item_id: itemId, qty: 50, kind: 'REVERSAL', reverses_id: 'm-1', created_at: INSIDE })
+      reversePour(database, 'r-1', itemId, 50, 'm-1', INSIDE)
 
       expect(depleted(database)).toEqual([])
+    })
+  })
+
+  test('a pour reversed later credits the period it was reversed in, not the one it was poured in', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
+      const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
+      depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
+      // Voided a week later: the credit is its own entry, in its own period.
+      reversePour(database, 'r-1', itemId, 50, 'm-1', TO_AT + 86_400)
+
+      expect(depleted(database)).toEqual([{ itemName: 'Gin 1', qtyDepleted: 50, costPence: 50 }])
+      const [later] = read<GpRow>(database, gpDepletionQuery(TO_AT, TO_AT + 604_800))
+      expect(later).toEqual({ itemName: 'Gin 1', qtyDepleted: -50, costPence: -50 })
     })
   })
 
   test('a stocktake adjustment is not a depletion and stays out of the cost side', async () => {
     await withDatabase((database) => {
       const itemId = bottle(database)
-      delivery(database, 'd-1', itemId, 700, 700)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
       insert(database, 'stock_movements', { id: 'm-1', item_id: itemId, qty: -20, kind: 'WASTAGE', reason: 'BREAKAGE', created_at: INSIDE })
 
       expect(depleted(database)).toEqual([])
@@ -163,7 +185,7 @@ describe('revenue and cost run on one clock (F-119 criterion 1, 0014)', () => {
   test('a sale recorded late keeps its revenue and its cost in the same period', async () => {
     await withDatabase((database) => {
       const itemId = bottle(database)
-      delivery(database, 'd-1', itemId, 700, 700)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
       const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
       // Posted a day after it happened: the movement's own clock is outside the period.
       depletion(database, 'm-1', itemId, 50, 'SALE', sale, TO_AT + 86_400)
@@ -177,7 +199,7 @@ describe('revenue and cost run on one clock (F-119 criterion 1, 0014)', () => {
   test('a sale that happened before the period is in neither half of it', async () => {
     await withDatabase((database) => {
       const itemId = bottle(database)
-      delivery(database, 'd-1', itemId, 700, 700)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
       const sale = line(database, 'l-1', entry(database, 'e-1', BEFORE), 500)
       depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
 
