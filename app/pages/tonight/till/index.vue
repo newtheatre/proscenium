@@ -328,7 +328,8 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         data-test="till-failure"
         color="error"
         variant="subtle"
-        :description="failure"
+        :description="failure.message"
+        :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
       />
 
       <div
