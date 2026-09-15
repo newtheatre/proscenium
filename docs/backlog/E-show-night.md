@@ -7,8 +7,8 @@ auto-closing night reports), while the fail-open eligibility seam to the trainin
 into internal queries that fail closed. Show night is hostile territory: every screen here is
 phone-first, one-handed, and degrades to cached read-only rather than a spinner.
 
-Counts: 29 MVP stories (E-101 to E-129), 4 V2 stories (E-201 to E-204), 1 Later epic stub (E-301).
-34 total.
+Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later epic stub (E-301).
+36 total.
 
 ## Open questions
 
@@ -172,7 +172,7 @@ Counts: 29 MVP stories (E-101 to E-129), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As tonight's confirmed shift holder, I want my shift to be my authority so that operational power derives from the rota and expires by itself.
 - Depends on: E-104, E-110
 - Acceptance criteria:
-  1. Show-night tools open only to a confirmed shift on tonight's performance at that venue: DUTY_MANAGER opens approvals (comps, waiting-list overrides), the board reset and the close-night action; DOOR opens the door screen; BAR opens the till. A DOOR shift does not open the till.
+  1. Show-night tools open only to a confirmed shift on tonight's performance at that venue: DUTY_MANAGER opens approvals (comps, waiting-list overrides), the board reset and the close-night action; DOOR opens the door screen; BAR opens the till. A DOOR shift does not open the till. Amended 15 September 2026 by decision 0078: a confirmed shift opens its tool only between its own start less the configured grace and its own end plus that grace (E-131), and the refusal names the window. Amended by decision 0077: BAR also resolves on a confirmed shift on tonight's bar opening at the venue, which carries no performance (E-130, F-125).
   2. Authority is evaluated server-side on every request against the E-110 boundary; at 04:00 it is gone with nothing to revoke, and a request a second later is refused.
   3. A released or reassigned shift loses its authority on the next request, not at next login.
   4. Designated officer roles may open the screens without a shift; every bypass use is recorded and flagged on the night report's staffing section.
@@ -435,6 +435,37 @@ Counts: 29 MVP stories (E-101 to E-129), 4 V2 stories (E-201 to E-204), 1 Later 
   7. The verdict is what door mode shows and nothing more (design document section 2.1): the reference in the mono face, PAID or UNPAID or a named refusal, the party it admits, and the two ways on. No price, no email address, no booking history.
   8. The whole flow is testable without a camera: the decode-to-reference parsing and the repeat suppression are unit tested, and an end-to-end test feeds a decoded value through the screen.
 - Source: Show-night screen design sections 2.1 and 3; issues 928 and the camera row in `docs/known-issues.md`; committee direction (camera scanning is a core feature, not a later refinement).
+
+## E-130: Bar openings planned like a rota
+
+- Role: Front of house
+- Phase: MVP
+- Story: As the front of house officer, I want to plan a bar opening on a night with no performance so that an external hire or a society social is staffed and claimed the same way a show night is.
+- Depends on: E-101, E-104, E-106; decision 0077
+- Acceptance criteria:
+  1. An opening records a venue, the London show-night date, a label, a start and an end, its creator and a status of `PLANNED` or `CANCELLED`; the database refuses an end at or before the start, and `/rota/manage/openings` is where an officer creates, lists and cancels one.
+  2. Creating an opening stamps bar slots from the venue's template count; a venue with no bar row in its template stamps nothing and says so rather than guessing one slot.
+  3. Slots are claimed and confirmed through the same race-safe conditional write the rota's own claims use, honouring the auto-confirm setting, so two simultaneous claims on one slot resolve to exactly one winner and the loser is told the slot has gone.
+  4. An opening's shifts appear on the claimant's own rota alongside their performance shifts, labelled by the opening's label and venue rather than by a show title, and the open-slot list offers them the same way.
+  5. Cancelling an opening cancels its shifts; whoever held one keeps their name on it and is told, and an unclaimed slot names nobody, exactly as a cancelled performance's shifts behave.
+  6. An opening names no performance and no show anywhere: no listing, no attendance figure and no night report derives from one.
+- Source: Matt's direction of 15 September 2026 (the ad-hoc shift is a bar opening record); decision 0077; module F open question 5.
+
+## E-131: Shifts carry their own start and end
+
+- Role: Shift authority
+- Phase: MVP
+- Story: As tonight's shift holder, I want my shift to have its own start and end so that my authority covers the hours I agreed to work rather than the whole show night.
+- Depends on: E-101, E-102, E-110, E-111; decision 0078
+- Acceptance criteria:
+  1. A shift carries `starts_at` and `ends_at`, computed when it is stamped: the start is the configured minutes before the performance's doors time, falling back to its curtain; the end is the configured minutes after curtain plus running time plus intervals, falling back to its curtain.
+  2. A venue's template overrides both offsets per role; null means the configured default, and every existing template row starts null rather than claiming an answer.
+  3. Editing a template changes nothing already stamped, and the template screen says so; a shift stamped before this story exists is filled by an idempotent backfill that writes only where the columns are null.
+  4. A confirmed shift opens its tool only between its start less the configured grace and its end plus that grace, for every role; the refusal names the window in London time. A shift with no computed window refuses nobody, and the 04:00 boundary still bounds the lookup whatever the window says.
+  5. The officer bypass has no window and is unaffected; it remains recorded once per night, venue and role.
+  6. One pure function computes a window and every caller uses it: the stamping statement, the authority check, the rota screens and the sale resolver derive it no other way.
+  7. The arithmetic is absolute seconds: the 2026 clock-change nights of 29 March and 25 October are named automated test cases, and a window spanning either is the offset it was configured with, not an hour more or less.
+- Source: Matt's direction of 15 September 2026 (shifts gain timings, per role, bounding authority); decision 0078; amends E-111 criterion 1.
 
 ## E-201: Door offline queue refinements
 
