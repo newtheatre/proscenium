@@ -237,6 +237,19 @@ describe.skipIf(skip !== null)('a product is retired, never destroyed (F-111 cri
     expect((await send('DELETE', `/api/admin/bar/products/${id}`)).status).toBe(404)
   })
 
+  // Cascading deletes would otherwise reach the append-only variant_prices trigger and raise a
+  // raw 500 (review-stock 1, 0010, 0047).
+  test('a product with a priced variant is refused, readably, rather than reaching the trigger', async () => {
+    const id = await addProduct(await addCategory())
+    const variantId = await addVariant(id)
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+    await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 350, effectiveFrom: today })
+
+    const answered = await send('DELETE', `/api/admin/bar/products/${id}`)
+    expect(answered.status).toBe(409)
+    expect((await answered.json() as { message?: string }).message).toContain('retired')
+  })
+
   test('a product in no category is refused, and a category with products stays', async () => {
     const categoryId = await addCategory()
     await addProduct(categoryId)

@@ -655,20 +655,27 @@ Open questions:
   recipes in my head.
 - Depends on: F-111, F-112, F-113, F-114
 - Acceptance criteria:
-  1. The stocked-item list carries a "Poured by" cell naming the active products that deplete the
+  1. An ACTIVE serving size has at least one component, a stocked item or a choice group, so a
+     sale always has something to deplete; a choice group counts on its own, since a chosen
+     option is what actually pours. Activation refuses naming the sizes with neither, and an
+     already-ACTIVE product refuses an edit that would empty a size's last component.
+  2. Every sellable thing depletes something: this is the answer to F-111 criterion 2's open
+     "resolvable recipe" question, closing known-issues' row on it.
+  3. The stocked-item list carries a "Poured by" cell naming the active products that deplete the
      item, each linking to that product.
-  2. A product's component rows say how many more servings the current on-hand supports at each
+  4. A product's component rows say how many more servings the current on-hand supports at each
      size, and badge a component whose stocked item is retired or out of stock.
-  3. Retiring a stocked item that active products deplete is refused, and the refusal names those
+  5. Retiring a stocked item that active products deplete is refused, and the refusal names those
      products rather than counting them.
-  4. The refusal offers to retire the item and hide its dependent products in one batch; the
+  6. The refusal offers to retire the item and hide its dependent products in one batch; the
      retirement carries the on-hand sum as a subquery in its own UPDATE's predicate, and the hides
      scope to the dependent products by subquery over the components, never by an id list read
      first (0006), so a delivery or a recipe change landing in the window cannot slip past.
-  5. Both views derive from the existing components: no link is stored in either direction, and
+  7. Both views derive from the existing components: no link is stored in either direction, and
      the till's catalogue contract is untouched.
 - Source: bar review, 15 September 2026 (known issues: the retirement guard reads on-hand before
-  the write); Matt's direction, 15 September 2026.
+  the write, and the empty-recipe gap); Matt's direction, 15 September 2026 (every sellable thing
+  depletes something).
 
 ## F-201: Reader-initiated checkout
 

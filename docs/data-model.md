@@ -1387,7 +1387,13 @@ queries over the tables referencing it, declared in `BAR_PRODUCT_REFERENCES`
 `tests/integration/bar-catalogue.test.ts` (F-111 criteria 2 and 3). Activation also refuses while
 any `ACTIVE` variant's recipe, directly or through an attached choice group, still calls for a
 stocked item that has since been retired; the refusal names it (`retiredIngredientsOf`,
-`server/utils/bar.ts`, F-113 criterion 5).
+`server/utils/bar.ts`, F-113 criterion 5). Every `ACTIVE` variant also needs at least one
+component of its own, an item directly or a choice group standing in for one, or activation names
+the sizes that lack one (`variantsWithoutRecipeQuery`, F-128 criteria 1 and 2); a retired variant
+is exempt, and emptying an `ACTIVE` variant's stocked-item components refuses unless a choice
+group still covers it. Deleting a product outright refuses when any of its variants has ever
+priced or ever sold, the same predicate `variants/[id]/index.delete.ts` uses one at a time,
+because a cascade would otherwise reach the append-only `variant_prices` trigger.
 
 ### product_variants
 `id` PK · `product_id` → bar_products cascade · `serving_kind`, the price-resolution key

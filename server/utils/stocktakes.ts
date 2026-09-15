@@ -61,14 +61,14 @@ export async function countStocktakes(clause: ListClause): Promise<number> {
   return count(sql`SELECT count(*) AS total FROM stocktakes t${predicate(clause)}`)
 }
 
-// The delivered cost a variance is valued at, or null if the item has never been delivered
-// through this system (F-119's cost basis, reused for a figure before anything applies, F-115).
-function latestUnitCostColumn(alias: string): SQL {
+// The delivered cost a variance is previewed at: the same weighted average over unreversed
+// deliveries the applied variance report uses, so the two never disagree (review-stock 5).
+function unitCostColumn(alias: string): SQL {
   return sql`(
-    SELECT m.unit_cost_pence FROM stock_movements m
-    WHERE m.item_id = ${sql.raw(alias)}.id AND m.kind = 'DELIVERY'
-    ORDER BY m.created_at DESC, m.rowid DESC
-    LIMIT 1
+    SELECT sum(d.qty * d.unit_cost_pence) * 1.0 / sum(d.qty)
+    FROM stock_movements d
+    WHERE d.item_id = ${sql.raw(alias)}.id AND d.kind = 'DELIVERY' AND d.unit_cost_pence IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = d.id)
   )`
 }
 
@@ -90,7 +90,7 @@ export function stocktakeLinesQuery(stocktakeId: string): SQL {
     SELECT l.id AS id, l.item_id AS itemId, i.name AS itemName, i.unit AS unit,
            l.expected_qty AS expectedQty, l.counted_qty AS countedQty,
            CASE WHEN l.counted_qty IS NULL THEN NULL ELSE l.counted_qty - l.expected_qty END AS variance,
-           ${latestUnitCostColumn('i')} AS unitCostPence
+           ${unitCostColumn('i')} AS unitCostPence
     FROM stocktake_lines l JOIN bar_items i ON i.id = l.item_id
     WHERE l.stocktake_id = ${stocktakeId}
     ORDER BY i.name COLLATE NOCASE
