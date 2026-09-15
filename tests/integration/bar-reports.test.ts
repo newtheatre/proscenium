@@ -290,3 +290,59 @@ describe('an unbounded section pages rather than truncating silently (F-119 crit
     })
   })
 })
+
+// Wastage is typed in on the stock screen and has no ledger entry, so its own clock is all there is.
+function wastage(database: TestDatabase, id: string, itemId: string, qty: number, reason: string, createdAt = INSIDE): void {
+  insert(database, 'stock_movements', { id, item_id: itemId, qty: -qty, kind: 'WASTAGE', reason, created_at: createdAt })
+}
+
+interface WastageRow { reason: string, itemName: string, categoryName: string, qtyWasted: number, costPence: number }
+
+describe('wastage groups by reason, item and category (0079, F-204 criterion 2)', () => {
+  test('two spillages of one item are one row, and a second reason is its own', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
+      wastage(database, 'w-1', itemId, 25, 'SPILLAGE')
+      wastage(database, 'w-2', itemId, 25, 'SPILLAGE')
+      wastage(database, 'w-3', itemId, 10, 'BREAKAGE')
+
+      const rows = read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))
+      expect(rows.map(row => [row.reason, row.qtyWasted, row.costPence])).toEqual([['SPILLAGE', 50, 50], ['BREAKAGE', 10, 10]])
+    })
+  })
+
+  test('the item carries its category, so a season groups by what the bar buys', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      database.batch([['UPDATE bar_items SET category = ? WHERE id = ?', 'Spirits', itemId]])
+      wastage(database, 'w-1', itemId, 10, 'OUT_OF_DATE')
+
+      expect(read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))[0]?.categoryName).toBe('Spirits')
+    })
+  })
+
+  test('a wastage outside the period, and one a reversal names, are both absent', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      wastage(database, 'w-1', itemId, 10, 'BREAKAGE', BEFORE)
+      wastage(database, 'w-2', itemId, 10, 'BREAKAGE')
+      // Typed in against the wrong item and corrected: it never happened, and there is no
+      // money on the other side of it to keep in step.
+      insert(database, 'stock_movements', { id: 'r-1', item_id: itemId, qty: 10, kind: 'REVERSAL', reverses_id: 'w-2', created_at: INSIDE })
+
+      expect(read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))).toEqual([])
+    })
+  })
+
+  test('a sale is not wastage, whatever it did to the shelf', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
+      const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
+      depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
+
+      expect(read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))).toEqual([])
+    })
+  })
+})
