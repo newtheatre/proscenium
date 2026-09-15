@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -316,6 +316,73 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
     expect(await textOf(view, '[data-test="charge-confirmation"]')).toContain('£4.00')
     expect(await textOf(view, '[data-test="discount-applied-note"]')).toContain(name)
+    view.close()
+  }, 120_000)
+})
+
+describe.skipIf(skip !== null)('the console screen (review-ui.md finding 5)', () => {
+  async function signedInView(): Promise<Bun.WebView> {
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    return view
+  }
+
+  test('a discount is added, edited, retired and put back through the screen', async () => {
+    const view = await signedInView()
+    await visit(view, `${app.baseURL}/bar/discounts`, '[data-test="add-discount"]')
+
+    const name = named('Screen night')
+    await click(view, '[data-test="add-discount"]')
+    await waitFor(view, `document.querySelector('[data-test="discount-form"]')`)
+    await fill(view, '[data-test="discount-name"]', name)
+    await fillNumber(view, '[data-test="discount-percent"]', '15')
+    await click(view, '[data-test="discount-submit"]')
+    await waitFor(view, `!document.querySelector('[data-test="discount-form"]')`)
+    expect(await textOf(view, '[data-test="bar-discounts-table"]')).toContain(name)
+
+    const listed = await (await send('GET', '/api/admin/bar/discounts')).json() as { items: { id: string, name: string }[] }
+    const id = listed.items.find(item => item.name === name)!.id
+
+    // Edit: the percentage changes, but the name it was created under is not lost by accident.
+    await click(view, `[data-test="edit-${id}"]`)
+    await waitFor(view, `document.querySelector('[data-test="discount-form"]')`)
+    await fillNumber(view, '[data-test="discount-percent"]', '18')
+    await click(view, '[data-test="discount-submit"]')
+    await waitFor(view, `!document.querySelector('[data-test="discount-form"]')`)
+    expect(await textOf(view, `[data-test="edit-${id}"]`)).toBeTruthy()
+
+    // Retire, then put back: never deleted, and the table names the state either way.
+    await click(view, `[data-test="status-${id}"]`)
+    await waitFor(view, `document.querySelector('[data-test="status-${id}"]') && document.querySelector('[data-test="status-${id}"]').textContent.trim() === 'Put back'`)
+    expect(await textOf(view, '[data-test="bar-discounts-table"]')).toContain('Retired')
+
+    await click(view, `[data-test="status-${id}"]`)
+    await waitFor(view, `document.querySelector('[data-test="status-${id}"]') && document.querySelector('[data-test="status-${id}"]').textContent.trim() === 'Retire'`)
+
+    view.close()
+  }, 120_000)
+
+  // The cap and both figures are the route's own words, unsoftened by the screen (finding 5).
+  test('the cap refusal reaches the screen verbatim', async () => {
+    await setCap(20)
+    const view = await signedInView()
+    await visit(view, `${app.baseURL}/bar/discounts`, '[data-test="add-discount"]')
+
+    const name = named('Over cap on screen')
+    await click(view, '[data-test="add-discount"]')
+    await waitFor(view, `document.querySelector('[data-test="discount-form"]')`)
+    await fill(view, '[data-test="discount-name"]', name)
+    await fillNumber(view, '[data-test="discount-percent"]', '55')
+    await click(view, '[data-test="discount-submit"]')
+    await waitFor(view, `document.querySelector('[data-test="discount-failure"]')`)
+
+    const shown = await textOf(view, '[data-test="discount-failure"]')
+    expect(shown).toContain('A discount cannot exceed 20%')
+    expect(shown).toContain(`${name} asked for 55%`)
     view.close()
   }, 120_000)
 })

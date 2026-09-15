@@ -28,6 +28,9 @@ from a shift: a bar shift opens the till, not these screens.
   ::card{icon="i-lucide-layout-grid" title="Categories" to="/docs/bar/categories"}
   The groups the till shows, in the order it shows them, with default prices by serving kind.
   ::
+  ::card{icon="i-lucide-percent" title="Discounts" to="/docs/bar/discounts"}
+  Percentage discounts the till can offer, capped by configuration and snapshotted onto each sale.
+  ::
   ::card{icon="i-lucide-package" title="Stock" to="/docs/bar/stock"}
   The register of stocked items, what is on hand, and recording a delivery or wastage.
   ::

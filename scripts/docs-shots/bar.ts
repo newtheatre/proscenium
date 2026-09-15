@@ -49,6 +49,17 @@ export const bar: Shot[] = [
     ],
   },
   {
+    name: 'bar/discounts',
+    persona,
+    url: '/bar/discounts',
+    marker: '[data-test="bar-discounts-table"]',
+    width: CONSOLE_WIDTH,
+    annotations: [
+      { selector: '[data-test="add-discount"]', label: 'Add a discount' },
+      { selector: '[data-test^="status-"]', label: 'Retire or put back' },
+    ],
+  },
+  {
     name: 'bar/stock',
     persona,
     url: '/bar/stock',
