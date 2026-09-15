@@ -1218,7 +1218,9 @@ A system-verified item's done state is never stored: `noShowHoldsReleased()` and
 on the evening's data (E-128). Reviewing an incident (`POST
 /api/tonight/incidents/[id]/review`) writes an `incident.reviewed` audit entry rather than a
 column on `incidents`, which cannot be touched post-insert; acknowledgement, not E-116's later
-severity-routed resolution, which is a separate workflow this does not build.
+severity-routed resolution, which is a separate workflow this does not build. `/tonight/incidents`
+offers it per entry to a caller who resolved duty manager authority, reading the same
+acknowledgement back as a `reviewed` flag on each row of `GET /api/tonight/incidents`.
 
 `POST /api/tonight/checklist/close` recomputes every required item across both phases; anything
 neither ticked nor exempted refuses with a 409 naming it by label (criterion 4), and a second

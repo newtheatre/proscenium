@@ -20,6 +20,7 @@ interface Entry {
   happenedAt: number
   supersedesId: string | null
   supersededBy: string | null
+  reviewed: boolean
 }
 
 interface Listing { items: Entry[], total: number }
@@ -38,6 +39,9 @@ const performanceIds = ref<string[]>([])
 // resolve a performance the route did not label.
 const performances = ref<{ id: string, showTitle: string, startsAt: number }[]>([])
 const authorityFailure = ref<string | null>(null)
+// The role this screen actually resolved, which is what decides whether the review action is
+// offered: the route behind it takes a duty manager and nobody else (E-114 criterion 3).
+const resolvedRole = ref<NightRole | null>(null)
 
 async function resolveAuthority(): Promise<void> {
   for (const role of NIGHT_ROLES) {
@@ -45,6 +49,7 @@ async function resolveAuthority(): Promise<void> {
       const resolved = await request<{ performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }>('/api/tonight/authority', { query: { role } })
       performanceIds.value = resolved.performanceIds
       performances.value = resolved.performances ?? []
+      resolvedRole.value = role
       authorityFailure.value = null
       return
     }
@@ -167,6 +172,23 @@ async function submitNearMiss(): Promise<void> {
   }
   finally {
     saving.value = false
+  }
+}
+
+const reviewing = ref<string | null>(null)
+
+async function markReviewed(entry: Entry): Promise<void> {
+  reviewing.value = entry.id
+  try {
+    await $fetch(`/api/tonight/incidents/${entry.id}/review`, { method: 'POST' })
+    toast.add({ title: 'Marked reviewed', icon: 'i-lucide-check', color: 'success' })
+    await load()
+  }
+  catch (refused) {
+    toast.add({ title: 'Not marked reviewed', description: refusalText(refused), icon: 'i-lucide-triangle-alert', color: 'error' })
+  }
+  finally {
+    reviewing.value = null
   }
 }
 
@@ -316,23 +338,40 @@ async function submitCorrect(): Promise<void> {
                 · {{ saysCategory(entry.category) }}, {{ saysSeverity(entry.severity) }}
                 <span v-if="entry.supersedesId"> · corrects an earlier entry</span>
                 <span v-if="entry.supersededBy"> · superseded</span>
+                <span v-if="entry.reviewed"> · reviewed</span>
               </p>
-              <UButton
-                v-if="!entry.supersededBy"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                :data-test="`correct-${entry.id}`"
-                @click="openCorrect(entry)"
-              >
-                Correct this entry
-              </UButton>
+              <div class="flex flex-wrap items-center gap-2">
+                <!-- Offered to the duty manager alone, because the route takes that authority and
+                     nothing here re-derives it from a standing grant (0009). -->
+                <UButton
+                  v-if="resolvedRole === 'DUTY_MANAGER' && !entry.reviewed"
+                  color="secondary"
+                  variant="outline"
+                  class="min-h-12"
+                  :loading="reviewing === entry.id"
+                  :data-test="`review-${entry.id}`"
+                  @click="markReviewed(entry)"
+                >
+                  Mark reviewed
+                </UButton>
+                <UButton
+                  v-if="!entry.supersededBy"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  :data-test="`correct-${entry.id}`"
+                  @click="openCorrect(entry)"
+                >
+                  Correct this entry
+                </UButton>
+              </div>
             </div>
           </div>
 
           <p class="mt-3 text-center text-sm text-muted">
             Timestamped and named: entries land in the end-of-night report in full, and a mistake is
-            corrected with a new entry, never an edit.
+            corrected with a new entry, never an edit. The duty manager marks each one reviewed
+            before the night closes.
           </p>
         </section>
       </div>

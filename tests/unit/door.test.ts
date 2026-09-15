@@ -104,6 +104,7 @@ describe('door mode answers admit or redirect, and never with a figure (criterio
     expect(verdict.state).toBe('UNPAID')
     expect(verdict.line).toBe('Send to the bar to pay')
     expect(`${verdict.headline}${verdict.line}${verdict.note}`).not.toContain('£')
+    expect(verdict.note).not.toMatch(/cash/i)
   })
 
   test('any other refusal names its own reason', () => {
