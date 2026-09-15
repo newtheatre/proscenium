@@ -123,7 +123,13 @@ const columns: TableColumn<OrderListRow>[] = [
           v-for="row in data.unconfigured"
           :key="row.id"
         >
-          {{ row.name }}
+          <NuxtLink
+            :to="`/bar/stock?search=${encodeURIComponent(row.name)}`"
+            class="underline"
+            :data-test="`unconfigured-${row.id}`"
+          >
+            {{ row.name }}
+          </NuxtLink>
         </li>
       </ul>
     </div>
