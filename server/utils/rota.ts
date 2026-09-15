@@ -7,6 +7,7 @@ import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
@@ -558,6 +559,29 @@ export async function confirmedShiftsTonight(
   scope: ConfirmedShiftScope,
 ): Promise<ConfirmedShiftTonight[]> {
   return await db.all<ConfirmedShiftTonight>(confirmedShiftsTonightQuery(userId, role, from, to, scope))
+}
+
+// The viewer fact the chrome gates Tonight on (0040). CONFIRMED only, since a claim awaiting
+// approval is not yet authority (0009, 0044); the night's own bounds, not the day (0014).
+export function onShiftTonightQuery(userId: string, from: number, to: number): SQL {
+  return sql`
+    SELECT count(*) AS n
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    WHERE s.user_id = ${userId}
+      AND s.status = 'CONFIRMED'
+      AND p.status <> 'CANCELLED'
+      AND p.starts_at >= ${from}
+      AND p.starts_at < ${to}
+  `
+}
+
+export async function onShiftTonight(userId: string): Promise<boolean> {
+  const { from, to } = showNightBounds(currentShowNight())
+  const [row] = await db.all<{ n: number }>(
+    onShiftTonightQuery(userId, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)),
+  )
+  return (row?.n ?? 0) > 0
 }
 
 export interface UnfilledShiftRow {

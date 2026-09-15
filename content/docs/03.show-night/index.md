@@ -11,8 +11,9 @@ navigation:
 
 The show-night screens live at `/tonight` and are built for a phone held in one hand in a
 foyer: a dark screen, big buttons, the actions under your thumb, no sidebar. The hub is the
-navigation; every other screen has a back arrow to it. On a night you are on shift, the
-**Next shift** tile on My NNT points here, and the address works typed into any phone.
+navigation; every other screen has a back arrow to it. On a night you hold a confirmed shift,
+**Tonight** appears in the account menu and the **Next shift** tile on My NNT points here; the
+address also works typed into any phone.
 
 ::callout{icon="i-lucide-info" color="info"}
 **A shift tonight is what opens these screens, not a standing role.** A confirmed door, bar or

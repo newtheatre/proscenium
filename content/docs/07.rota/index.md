@@ -27,7 +27,7 @@ reaches these screens: a confirmed shift opens the night's tools, and a role ope
   ::card{icon="i-lucide-check-check" title="Approvals" to="/docs/rota/approvals"}
   Confirming or declining a member's claim when claims queue rather than confirm themselves.
   ::
-  ::card{icon="i-lucide-user-round-x" title="Unfilled shifts" to="/docs/rota/unfilled-shifts"}
+  ::card{icon="i-lucide-user-round-x" title="Rota board" to="/docs/rota/rota-board"}
   The rota itself: assigning, confirming and standing down shifts, and the reminders that chase a gap.
   ::
   ::card{icon="i-lucide-list-checks" title="Checklists" to="/docs/rota/checklists"}

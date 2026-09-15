@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { can, member, memberOrGrace, viewBarReports } from '#shared/utils/abilities'
+import { can, member, memberOrGrace, viewBarReports, workTonight } from '#shared/utils/abilities'
 import type { Viewer } from '#shared/utils/abilities'
 import type { MembershipState } from '#shared/utils/membership'
 
@@ -65,5 +65,26 @@ describe('viewBarReports admits the treasurer alongside the bar manager', () => 
 
   test('a viewer with neither permission is refused', () => {
     expect(can(withPermissions([]), viewBarReports)).toBe(false)
+  })
+})
+
+// #1039, 0040: Tonight in the account menu is gated on this one fact, which stayed hard-coded
+// false while E-102 and E-104 were outstanding. Only a confirmed shift tonight sets it.
+describe('workTonight rests on the shift fact alone', () => {
+  const onShift = (onShiftTonight: boolean): Viewer => ({
+    id: 'someone', permissions: [], onShiftTonight, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' },
+  })
+
+  test('a viewer on shift tonight holds it, with no permission at all', () => {
+    expect(can(onShift(true), workTonight)).toBe(true)
+  })
+
+  test('a viewer who is not refuses, whatever else they hold', () => {
+    expect(can(onShift(false), workTonight)).toBe(false)
+    expect(can({ ...onShift(false), permissions: ['rota.write'], leadsDepartment: true }, workTonight)).toBe(false)
+  })
+
+  test('a guest with no account is refused, not thrown at', () => {
+    expect(can(null, workTonight)).toBe(false)
   })
 })

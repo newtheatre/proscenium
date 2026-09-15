@@ -233,7 +233,11 @@ becomes interactive.
   `Viewer` also carries `membershipState` (`current`, `grace`, `lapsed` or `none`, never two
   booleans), and `member` and `memberOrGrace` read it; navigation is not filtered by either, so a
   lapsed member sees every member screen and is refused only at the write path it tries
-  (`docs/access-matrix.md`, A-129).
+  (`docs/access-matrix.md`, A-129). It also carries `onShiftTonight`, which both resolvers derive
+  from `onShiftTonight` (`server/utils/rota.ts`): a `CONFIRMED` shift on a performance that is not
+  cancelled, inside `showNightBounds(currentShowNight())` (0014). `CLAIMED` does not count, unlike
+  My NNT's accent tile, because authority follows the confirmation rather than the claim (0009,
+  0044); it is what `workTonight` gates the account menu's Tonight entry on (0040).
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).
 - A passkey is a complete sign-in and no challenge follows it: the authenticator verified the
   person before it would sign, so the credential step and the second step happened at once
@@ -886,10 +890,12 @@ Approving and declining both ride the same
 `changes() = 1` shape; a decline's reason lands on `shifts.decline_reason`, which the claimant is
 emailed, never in the audit trail, which keeps only that the status changed (0011). A declined
 shift still stays off the open list rather than reopening itself, but it is no longer invisible:
-`GET /api/admin/rota/shifts` (`/rota/manage/shifts`) lists every `OPEN` or `DECLINED` shift on a
-performance still to come, which is what an officer now reassigns from (E-107 criterion 3). It
-filters by role, status and night through `shared/utils/unfilled-shifts-list.ts`, the same
-`dateAs: 'night'` extension the approvals list uses (K-129, 0014).
+`GET /api/admin/rota/shifts` lists every `OPEN` or `DECLINED` shift on a performance still to
+come, filtered by role, status and night through `shared/utils/unfilled-shifts-list.ts`, the same
+`dateAs: 'night'` extension the approvals list uses (K-129, 0014). No screen reads that paged
+list any more. `/rota/manage/shifts` is the Rota board (E-107 criterion 6, issue 933): it reads
+`GET /api/admin/rota/shifts/board`, which returns the next `BOARD_WINDOW` performances whole,
+every shift on them, filled ones included, and is what an officer reassigns from.
 
 ### Release and reassignment (E-107)
 

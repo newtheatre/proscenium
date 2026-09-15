@@ -46,7 +46,7 @@ the permission and what the screens are for.
   The rooms, room requests, closures, other rooms and utilisation.
   ::
   ::card{icon="i-lucide-clipboard-list" title="Rota" to="/docs/rota"}
-  Shift templates, approvals, unfilled shifts, checklists, emergency cards, safety, the age-check register and the backstage board.
+  Shift templates, approvals, the rota board, checklists, emergency cards, safety, the age-check register and the backstage board.
   ::
   ::card{icon="i-lucide-graduation-cap" title="Training" to="/docs/training"}
   The catalogue, departments, records, requests and sessions.

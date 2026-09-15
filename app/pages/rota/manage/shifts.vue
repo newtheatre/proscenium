@@ -3,7 +3,7 @@ import { formatLondon } from '#shared/utils/london'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
-definePageMeta({ layout: 'console', title: 'Rota', middleware: 'console', docs: '/docs/rota/unfilled-shifts' })
+definePageMeta({ layout: 'console', title: 'Rota board', middleware: 'console', docs: '/docs/rota/rota-board' })
 
 interface RosterShift {
   shiftId: string
@@ -179,7 +179,7 @@ const roleOptions = SHIFT_ROLES.map(role => ({ label: saysShiftRole(role), value
     />
 
     <UPageHeader
-      title="Rota"
+      title="Rota board"
       description="A confirmed shift is what lights up the show-night screen."
     />
 
