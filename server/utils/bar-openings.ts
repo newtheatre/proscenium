@@ -132,6 +132,27 @@ export function assignOpeningShiftStatement(slotId: string, userId: string, acto
   `
 }
 
+// The holder's own release: the slot returns to OPEN naming nobody, the same shape a fresh stamp
+// leaves, exactly as a shift's own release does (E-107 criterion 1).
+export function releaseOpeningShiftStatement(slotId: string, userId: string): SQL {
+  return sql`
+    UPDATE bar_opening_shifts
+    SET status = 'OPEN', user_id = NULL, claimed_at = NULL, confirmed_at = NULL
+    WHERE id = ${slotId} AND user_id = ${userId} AND status IN ('CLAIMED', 'CONFIRMED')
+    RETURNING id
+  `
+}
+
+// A member clearing a declined claim off their own rota, as E-114 lets them for a shift.
+export function dismissOpeningShiftStatement(slotId: string, userId: string): SQL {
+  return sql`
+    UPDATE bar_opening_shifts
+    SET status = 'OPEN', user_id = NULL, claimed_at = NULL, confirmed_at = NULL, decline_reason = NULL
+    WHERE id = ${slotId} AND user_id = ${userId} AND status = 'DECLINED'
+    RETURNING id
+  `
+}
+
 // A declined slot is included, because nothing else reopens one: an opening has no approvals
 // queue of its own, so a decline would otherwise strand the slot with a name on it (E-107).
 export function unconfirmOpeningShiftStatement(slotId: string): SQL {
@@ -216,6 +237,63 @@ export function openingShiftsQuery(clause: ListClause, limit: number, offset: nu
       LIMIT ${limit} OFFSET ${offset}
     )
     ORDER BY s.opening_id, s.slot
+  `
+}
+
+export interface MyOpeningShiftRow {
+  slotId: string
+  openingId: string
+  slot: number
+  status: ShiftStatus
+  label: string
+  venueName: string
+  startsAt: number
+  endsAt: number
+}
+
+// A member's own opening slots, upcoming and not cancelled, labelled by the opening rather than
+// by a show title (E-130 criterion 4). Bounded by LIMIT, as `myShiftsQuery` is.
+export function myOpeningShiftsQuery(userId: string, now: number): SQL {
+  return sql`
+    SELECT s.id AS slotId, o.id AS openingId, s.slot AS slot, s.status AS status,
+           o.label AS label, v.name AS venueName, o.starts_at AS startsAt, o.ends_at AS endsAt
+    FROM bar_opening_shifts s
+    JOIN bar_openings o ON o.id = s.opening_id
+    JOIN venues v ON v.id = o.venue_id
+    WHERE s.user_id = ${userId} AND s.status <> 'CANCELLED' AND o.status <> 'CANCELLED'
+      AND o.ends_at >= ${now}
+    ORDER BY o.starts_at, s.slot
+    LIMIT 100
+  `
+}
+
+export interface OpenOpeningShiftRow {
+  slotId: string
+  openingId: string
+  slot: number
+  label: string
+  venueId: string
+  venueName: string
+  startsAt: number
+  endsAt: number
+}
+
+// The open slots an opening still has, offered beside the rota's own open shifts (criterion 4).
+// Bounded by count rather than paged: a night holds a handful of openings, not a page of them.
+export function openOpeningShiftsQuery(window: { from?: number, to?: number }, now: number, limit: number): SQL {
+  // The same window the open-shift list narrows by, so a reader filtering to a fortnight is not
+  // handed every opening the season holds.
+  const notBefore = Math.max(now, window.from ?? now)
+  const notAfter = window.to === undefined ? sql`` : sql` AND o.starts_at <= ${window.to}`
+  return sql`
+    SELECT s.id AS slotId, o.id AS openingId, s.slot AS slot, o.label AS label,
+           v.id AS venueId, v.name AS venueName, o.starts_at AS startsAt, o.ends_at AS endsAt
+    FROM bar_opening_shifts s
+    JOIN bar_openings o ON o.id = s.opening_id
+    JOIN venues v ON v.id = o.venue_id
+    WHERE s.status = 'OPEN' AND o.status <> 'CANCELLED' AND o.starts_at >= ${notBefore}${notAfter}
+    ORDER BY o.starts_at, s.slot
+    LIMIT ${limit}
   `
 }
 

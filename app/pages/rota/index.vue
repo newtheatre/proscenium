@@ -16,6 +16,32 @@ interface MyShift {
   startsAt: number
 }
 
+// A slot on a bar opening: labelled by the opening and its venue, because there is no show to
+// name (E-130 criterion 4, 0077).
+interface MyOpeningShift {
+  slotId: string
+  openingId: string
+  slot: number
+  status: ShiftStatus
+  label: string
+  venueName: string
+  startsAt: number
+  endsAt: number
+}
+
+interface OpenOpeningShift {
+  slotId: string
+  openingId: string
+  slot: number
+  label: string
+  venueId: string
+  venueName: string
+  startsAt: number
+  endsAt: number
+  eligible: boolean
+  unlockedBy: { moduleId: string, moduleName: string } | null
+}
+
 interface OpenShift {
   shiftId: string
   role: ShiftRole
@@ -30,17 +56,19 @@ interface OpenShift {
 
 const toast = useToast()
 
-const { data: mine, refresh: refreshMine } = await useFetch<{ items: MyShift[] }>('/api/rota/mine', {
-  default: (): { items: MyShift[] } => ({ items: [] }),
+const { data: mine, refresh: refreshMine } = await useFetch<{ items: MyShift[], openings: MyOpeningShift[] }>('/api/rota/mine', {
+  default: (): { items: MyShift[], openings: MyOpeningShift[] } => ({ items: [], openings: [] }),
 })
 
 const role = ref<ShiftRole | undefined>(undefined)
 const page = ref(1)
 
-const { data, status, refresh } = await useFetch<Page<OpenShift>>('/api/rota/shifts', {
+type OpenShifts = Page<OpenShift> & { openings: OpenOpeningShift[] }
+
+const { data, status, refresh } = await useFetch<OpenShifts>('/api/rota/shifts', {
   query: computed(() => ({ role: role.value, page: page.value })),
   watch: [role, page],
-  default: (): Page<OpenShift> => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 }),
+  default: (): OpenShifts => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1, openings: [] }),
 })
 
 const claiming = ref<string | null>(null)
@@ -83,6 +111,65 @@ async function dismiss(shift: MyShift): Promise<void> {
   }
   finally {
     dismissing.value = null
+  }
+}
+
+// A slot on an opening is given back and cleared exactly as a shift is (E-107, E-114).
+async function releaseOpening(slot: MyOpeningShift): Promise<void> {
+  releasing.value = slot.slotId
+  try {
+    await $fetch(`/api/rota/openings/shifts/${slot.slotId}/release`, { method: 'POST' })
+    toast.add({
+      title: 'Released',
+      description: `${slot.label} at ${slot.venueName} is back on the open list.`,
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await Promise.all([refresh(), refreshMine()])
+  }
+  catch (error) {
+    toast.add({ title: 'Could not release that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
+  }
+  finally {
+    releasing.value = null
+  }
+}
+
+async function dismissOpening(slot: MyOpeningShift): Promise<void> {
+  dismissing.value = slot.slotId
+  try {
+    await $fetch(`/api/rota/openings/shifts/${slot.slotId}/dismiss`, { method: 'POST' })
+    await Promise.all([refresh(), refreshMine()])
+  }
+  catch (error) {
+    toast.add({ title: 'Could not dismiss that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
+  }
+  finally {
+    dismissing.value = null
+  }
+}
+
+// The same race-safe claim the rota's own slots ride, under its own route because the slot lives
+// in its own table (E-130 criterion 3, 0077).
+async function claimOpening(slot: OpenOpeningShift): Promise<void> {
+  claiming.value = slot.slotId
+  try {
+    const answer = await $fetch<{ status: 'CLAIMED' | 'CONFIRMED' }>(`/api/rota/openings/shifts/${slot.slotId}/claim`, { method: 'POST' })
+    toast.add({
+      title: answer.status === 'CONFIRMED' ? 'Slot confirmed' : 'Claim sent for approval',
+      description: answer.status === 'CONFIRMED'
+        ? `${slot.label} at ${slot.venueName} is yours.`
+        : 'The FOH officer will confirm or decline it; you will be told either way.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await Promise.all([refresh(), refreshMine()])
+  }
+  catch (error) {
+    toast.add({ title: 'Could not claim that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
+  }
+  finally {
+    claiming.value = null
   }
 }
 
@@ -131,7 +218,7 @@ useSeoMeta({ title: 'My rota' })
     />
 
     <section
-      v-if="mine.items.length"
+      v-if="mine.items.length || mine.openings.length"
       class="mt-8"
       data-test="my-shifts"
     >
@@ -186,6 +273,53 @@ useSeoMeta({ title: 'My rota' })
             Dismiss
           </UButton>
         </li>
+        <li
+          v-for="slot in mine.openings"
+          :key="slot.slotId"
+          class="flex flex-wrap items-start gap-3 py-4"
+          :data-test="`my-opening-${slot.slotId}`"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="flex flex-wrap items-center gap-2 font-medium">
+              Bar, {{ slot.venueName }}
+              <UBadge
+                :color="slot.status === 'CONFIRMED' ? 'success' : slot.status === 'DECLINED' ? 'error' : 'warning'"
+                variant="subtle"
+                size="sm"
+              >
+                {{ saysShiftStatus(slot.status) }}
+              </UBadge>
+            </p>
+            <p class="text-sm text-muted">
+              {{ spanOf(slot.startsAt) }}
+            </p>
+            <p class="text-sm">
+              {{ slot.label }}
+            </p>
+          </div>
+          <UButton
+            v-if="slot.status === 'CLAIMED' || slot.status === 'CONFIRMED'"
+            size="sm"
+            color="neutral"
+            variant="subtle"
+            :loading="releasing === slot.slotId"
+            :data-test="`release-opening-${slot.slotId}`"
+            @click="releaseOpening(slot)"
+          >
+            Release
+          </UButton>
+          <UButton
+            v-else-if="slot.status === 'DECLINED'"
+            size="sm"
+            color="neutral"
+            variant="subtle"
+            :loading="dismissing === slot.slotId"
+            :data-test="`dismiss-opening-${slot.slotId}`"
+            @click="dismissOpening(slot)"
+          >
+            Dismiss
+          </UButton>
+        </li>
       </ul>
     </section>
 
@@ -227,7 +361,7 @@ useSeoMeta({ title: 'My rota' })
       </div>
 
       <p
-        v-else-if="data.items.length === 0"
+        v-else-if="data.items.length === 0 && data.openings.length === 0"
         class="mt-8 text-sm text-muted"
         data-test="open-shifts-empty"
       >
@@ -292,6 +426,73 @@ useSeoMeta({ title: 'My rota' })
           </UButton>
         </li>
       </ul>
+
+      <section
+        v-if="data.openings.length && page === 1 && status !== 'pending'"
+        class="mt-8"
+        data-test="open-opening-slots"
+      >
+        <h3 class="nnt-headline text-base">
+          Bar openings
+        </h3>
+        <p class="mt-1 text-sm text-muted">
+          Evenings with no performance: a hire, a social or a get-in. The bar runs exactly as it
+          does on a show night.
+        </p>
+        <ul class="mt-4 divide-y divide-default">
+          <li
+            v-for="slot in data.openings"
+            :key="slot.slotId"
+            class="flex flex-wrap items-start gap-3 py-4"
+            :data-test="`open-opening-${slot.slotId}`"
+          >
+            <div class="min-w-0 flex-1">
+              <p class="flex flex-wrap items-center gap-2 font-medium">
+                Bar, {{ slot.venueName }}
+                <UBadge
+                  :color="slot.eligible ? 'success' : 'neutral'"
+                  variant="subtle"
+                  size="sm"
+                >
+                  {{ slot.eligible ? 'You qualify' : 'Locked' }}
+                </UBadge>
+              </p>
+              <p class="text-sm text-muted">
+                {{ spanOf(slot.startsAt) }}
+              </p>
+              <p class="text-sm">
+                {{ slot.label }}
+              </p>
+              <p
+                v-if="!slot.eligible && slot.unlockedBy"
+                class="mt-1 text-sm"
+                :data-test="`unlock-opening-${slot.slotId}`"
+              >
+                Unlocked by
+                <ULink :to="`/training/modules/${slot.unlockedBy.moduleId}`">
+                  {{ slot.unlockedBy.moduleName }}
+                </ULink>
+              </p>
+              <p
+                v-else-if="!slot.eligible"
+                class="mt-1 text-sm text-muted"
+                :data-test="`unlock-opening-${slot.slotId}`"
+              >
+                Not open for claiming yet: the committee has not named what unlocks the bar.
+              </p>
+            </div>
+            <UButton
+              v-if="slot.eligible"
+              size="sm"
+              :loading="claiming === slot.slotId"
+              :data-test="`claim-opening-${slot.slotId}`"
+              @click="claimOpening(slot)"
+            >
+              Claim
+            </UButton>
+          </li>
+        </ul>
+      </section>
 
       <div
         v-if="data.items.length"

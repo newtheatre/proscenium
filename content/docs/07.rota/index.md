@@ -30,6 +30,9 @@ reaches these screens: a confirmed shift opens the night's tools, and a role ope
   ::card{icon="i-lucide-user-round-x" title="Rota board" to="/docs/rota/rota-board"}
   The rota itself: assigning, confirming and standing down shifts, and the reminders that chase a gap.
   ::
+  ::card{icon="i-lucide-beer" title="Bar openings" to="/docs/rota/bar-openings"}
+  Planning and staffing an evening with no performance: a hire, a society social, a get-in.
+  ::
   ::card{icon="i-lucide-list-checks" title="Checklists" to="/docs/rota/checklists"}
   Writing the pre-show and post-show checklist each venue's duty manager works through.
   ::
@@ -55,6 +58,9 @@ reaches these screens: a confirmed shift opens the night's tools, and a role ope
    [Approvals](/docs/rota/approvals), depending on a setting.
 4. A **confirmed shift** is what opens the show-night screens that evening, and what the day-before
    reminder and the seven-day digest are counted against.
-5. What the duty manager ticks, reads and reports that night comes from
+5. An evening with **no performance** is planned on [Bar openings](/docs/rota/bar-openings)
+   instead: it stamps bar slots, they are claimed the same way, and a confirmed one opens the
+   till without a house being open.
+6. What the duty manager ticks, reads and reports that night comes from
    [Checklists](/docs/rota/checklists), [Emergency cards](/docs/rota/emergency-cards) and
    [Safety](/docs/rota/safety).
