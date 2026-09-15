@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -17,6 +17,7 @@ const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 let admin: TestMember
 let boxOffice: TestMember
+let boxOfficePassword: string
 let front: TestMember
 let performanceId: string
 
@@ -24,7 +25,8 @@ beforeAll(async () => {
   if (skip) return
   app = await startApp()
   admin = await adminSession(app)
-  boxOffice = await registerMember(app, 'export-box-office', generatePassword())
+  boxOfficePassword = generatePassword()
+  boxOffice = await registerMember(app, 'export-box-office', boxOfficePassword)
   front = await registerMember(app, 'export-front', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: front.id, role: 'FRONT_OF_HOUSE' }, admin.cookie)
@@ -128,4 +130,29 @@ describe.skipIf(skip !== null)('a bad filter combination is refused before any q
     const answered = await send('GET', '/api/admin/tickets/export?from=2026-08-01', undefined, boxOffice.cookie)
     expect(answered.status).toBe(400)
   })
+})
+
+// #1059: the route was reachable only by a typed URL, so the screen is what this proves.
+describe.skipIf(skip !== null)('the box office shows screen links to the export (#1059)', () => {
+  test('the card offers a day range and a link carrying it', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', boxOffice.email)
+      await fill(view, 'form input[type="password"]', boxOfficePassword)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+
+      await visit(view, `${app.baseURL}/box-office/shows`, '[data-test="shows-table"]')
+      await waitFor(view, `document.querySelector('[data-test="ticket-export-csv"]')`, 30_000)
+
+      const href = await view.evaluate<string>(`document.querySelector('[data-test="ticket-export-csv"]').getAttribute('href')`)
+      expect(href).toContain('/api/admin/tickets/export?')
+      expect(href).toContain('from=')
+      expect(href).toContain('to=')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DESK_STATUS_FILTERS, DESK_TENDERS } from '#shared/utils/desk'
+import { DESK_STATUS_FILTERS, DESK_TENDERS, REINSTATE_REASON_LIMIT, reinstateRefusal, uncollectableReason } from '#shared/utils/desk'
 import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskStatusFilter, DeskTender } from '#shared/utils/desk'
@@ -59,6 +59,9 @@ interface ReservationDetail {
   id: string
   reference: string
   status: string
+  // Null except on a cancelled booking: a staff cancellation only ever follows a refund, and
+  // that is what decides whether this screen may offer to bring the hold back (D-118).
+  cancelledBy: string | null
   showTitle: string
   startsAt: number
   bookerName: string
@@ -196,6 +199,38 @@ const compRequestFailure = ref<string | null>(null)
 const collecting = ref(false)
 const collectFailure = ref<string | null>(null)
 
+const reinstateReason = ref('')
+const reinstating = ref(false)
+const reinstateFailure = ref<string | null>(null)
+
+const uncollectableSays = computed(() => (selected.value ? uncollectableReason(selected.value.status) : null))
+// The route refuses again on its own and re-checks capacity at the write: this only decides
+// whether the desk offers the form at all (D-118 criteria 1, 5).
+const reinstateSays = computed(() => (selected.value ? reinstateRefusal(selected.value.status, selected.value.cancelledBy) : null))
+
+async function reinstate(): Promise<void> {
+  if (!selected.value || !reinstateReason.value.trim()) return
+  reinstating.value = true
+  reinstateFailure.value = null
+  try {
+    await $fetch(`/api/box-office/desk/reservations/${selected.value.id}/reinstate`, {
+      method: 'POST',
+      body: { reason: reinstateReason.value.trim() },
+    })
+    toast.add({ title: 'Booking reinstated', description: 'It holds again until the release time.', icon: 'i-lucide-check', color: 'success' })
+    reinstateReason.value = ''
+    selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${selected.value.id}`)
+    await search()
+    void loadSummary()
+  }
+  catch (error) {
+    reinstateFailure.value = refusalText(error)
+  }
+  finally {
+    reinstating.value = false
+  }
+}
+
 const ticketTotalPence = computed(() => selected.value?.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0) ?? 0)
 const dueNow = computed(() => (tender.value === 'COMP' ? 0 : ticketTotalPence.value))
 // D-117: only an approved, unexpired, unspent request lets a comp be collected.
@@ -206,6 +241,8 @@ async function open2(id: string): Promise<void> {
   tender.value = 'CARD'
   compRequestReason.value = ''
   compRequestFailure.value = null
+  reinstateReason.value = ''
+  reinstateFailure.value = null
   selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${id}`)
   open.value = true
 }
@@ -224,6 +261,8 @@ async function resolveScan(raw: string): Promise<void> {
     compRequestReason.value = ''
     compRequestFailure.value = null
     collectFailure.value = null
+    reinstateReason.value = ''
+    reinstateFailure.value = null
     open.value = true
     scanned.value = ''
   }
@@ -847,13 +886,46 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
               Cancel booking
             </UButton>
           </template>
-          <p
-            v-else
-            class="text-sm text-muted"
-            data-test="desk-uncollectable"
-          >
-            {{ selected.status }}: this booking cannot be collected from here.
-          </p>
+          <template v-else>
+            <p
+              class="text-sm text-muted"
+              data-test="desk-uncollectable"
+            >
+              {{ uncollectableSays }}
+            </p>
+
+            <template v-if="reinstateSays === null">
+              <UAlert
+                v-if="reinstateFailure"
+                color="error"
+                variant="subtle"
+                :description="reinstateFailure"
+                data-test="desk-reinstate-failure"
+              />
+
+              <UFormField
+                label="Reason for reinstating"
+                description="Recorded against the booking. The seats are re-checked as this is written, so a resold house refuses it."
+                required
+              >
+                <UInput
+                  v-model="reinstateReason"
+                  class="w-full"
+                  :maxlength="REINSTATE_REASON_LIMIT"
+                  data-test="desk-reinstate-reason"
+                />
+              </UFormField>
+
+              <UButton
+                :loading="reinstating"
+                :disabled="!reinstateReason.trim()"
+                data-test="desk-reinstate"
+                @click="reinstate"
+              >
+                Reinstate booking
+              </UButton>
+            </template>
+          </template>
         </div>
       </template>
     </UModal>
