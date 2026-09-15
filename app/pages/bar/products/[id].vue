@@ -34,13 +34,14 @@ const productId = computed(() => String(route.params.id))
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
-interface Sizes { product: BarProduct | null, variants: ProductVariant[] }
+interface ServingsAvailable { variantId: string, label: string, servings: number | null }
+interface Sizes { product: BarProduct | null, variants: ProductVariant[], servings: ServingsAvailable[] }
 interface Listing { items: StockItem[], total: number, pageSize: number, pages: number }
 
 const { data, status, error, refresh } = await useAsyncData(
   () => `bar-variants-${productId.value}`,
   () => request<Sizes>(`/api/admin/bar/products/${productId.value}/variants`),
-  { watch: [productId], default: (): Sizes => ({ product: null, variants: [] }) },
+  { watch: [productId], default: (): Sizes => ({ product: null, variants: [], servings: [] }) },
 )
 
 // The recipe editor needs the stocked items to choose from, up to the page cap.
@@ -383,6 +384,15 @@ async function savePrice(): Promise<void> {
 
 const listingFailure = useListFailure(error, 'The serving sizes could not be read.')
 
+// What the stock still supports, read from the movements rather than stored (F-128 criterion 4).
+const servingsOf = (variantId: string): number | null =>
+  data.value.servings.find(row => row.variantId === variantId)?.servings ?? null
+
+// Never below nought: a sale past an empty shelf leaves the sum negative, and "sells minus two
+// more" says nothing a person can act on.
+const saysServings = (servings: number | null): string =>
+  servings === null ? '' : `sells ${Math.max(servings, 0)} more at current stock`
+
 const depletion = (variant: ProductVariant): string =>
   variant.components.length === 0
     ? 'Nothing yet'
@@ -405,6 +415,17 @@ const columns: TableColumn<ProductVariant>[] = [
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, depletion(row.original)),
+      h('div', { 'class': 'mt-1 flex flex-wrap items-center gap-1', 'data-test': `stock-${row.original.id}` }, [
+        row.original.status === 'ACTIVE' && servingsOf(row.original.id) !== null
+          ? h('span', { class: 'text-xs text-muted' }, saysServings(servingsOf(row.original.id)))
+          : null,
+        ...row.original.components
+          .filter(component => component.itemId !== null && component.itemStatus === 'RETIRED')
+          .map(component => h(UBadge, { color: 'error', variant: 'subtle', size: 'sm' }, () => `${component.itemName} is retired`)),
+        ...row.original.components
+          .filter(component => component.itemId !== null && component.itemStatus !== 'RETIRED' && (component.onHand ?? 0) <= 0)
+          .map(component => h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => `${component.itemName} is out of stock`)),
+      ]),
     ]),
   },
   {

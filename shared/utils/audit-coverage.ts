@@ -568,7 +568,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/bar/items/index.get.ts', exempt: 'reads the stocked items and what is on hand' },
   { route: 'server/api/admin/bar/items/index.post.ts', actions: ['bar.item.created'] },
   { route: 'server/api/admin/bar/items/[id]/index.put.ts', actions: ['bar.item.updated'] },
-  { route: 'server/api/admin/bar/items/[id]/status.post.ts', actions: ['bar.item.status.changed'] },
+  {
+    route: 'server/api/admin/bar/items/[id]/status.post.ts',
+    actions: ['bar.item.status.changed', 'bar.product.status.changed'],
+    via: ['server/utils/bar-linkage.ts'],
+  },
   { route: 'server/api/admin/bar/items/[id]/index.delete.ts', actions: ['bar.item.deleted'] },
   { route: 'server/api/admin/bar/stocktakes/index.get.ts', exempt: 'reads stocktake history' },
   { route: 'server/api/admin/bar/stocktakes/index.post.ts', actions: ['bar.stocktake.opened'] },
