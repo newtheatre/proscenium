@@ -16,7 +16,9 @@ export default defineEventHandler(async (event) => {
     sessionId: session.id,
     venueId: resolved.venueId,
     night: resolved.night,
-    performanceId: resolved.performanceIds.length === 1 ? resolved.performanceIds[0]! : null,
+    // The bar's windows say which house a comp belongs to, exactly as they do for a sale (F-126).
+    performanceId: null,
+    performanceIds: resolved.performanceIds,
   })
 
   return { ok: true, ...committed }

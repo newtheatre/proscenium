@@ -13,7 +13,7 @@ import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { AddShiftInput, ShiftRole, ShiftStatus, TemplateSlot } from '#shared/utils/rota'
-import type { ShiftOffsets } from '#shared/utils/rota-times'
+import type { ShiftOffsets, WindowedPerformance } from '#shared/utils/rota-times'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
@@ -125,6 +125,26 @@ const windowEnd = (defaults: ShiftOffsets): SQL => sql`
   + (coalesce(p.duration_minutes, 0) + coalesce(p.interval_count, 0) * coalesce(p.interval_minutes, 0)) * 60
   + coalesce(t.ends_after_end_minutes, ${defaults.endAfterEndMinutes}) * 60
 `
+
+// When the bar is worked at each of tonight's houses, which says who a sale belongs to on a
+// two-performance day (F-126). Computed, not read off `shifts`: an unstaffed house has a window.
+export function barWindowsTonightQuery(venueId: string, from: number, to: number, defaults: ShiftOffsets): SQL {
+  return sql`
+    SELECT p.id AS performanceId, ${windowStart(defaults)} AS startsAt, ${windowEnd(defaults)} AS endsAt
+    FROM performances p
+    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = 'BAR'
+    WHERE p.venue_id = ${venueId} AND p.status <> 'CANCELLED'
+      AND p.starts_at >= ${from} AND p.starts_at < ${to}
+    ORDER BY p.starts_at
+  `
+}
+
+export async function barWindowsTonight(venueId: string, night: string, defaults: ShiftOffsets): Promise<WindowedPerformance[]> {
+  const { from, to } = showNightBounds(night)
+  return await db.all<WindowedPerformance>(barWindowsTonightQuery(
+    venueId, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000), defaults,
+  ))
+}
 
 // A performance's own clock moving takes its shifts with it: the window says when the shift is
 // worked, so a curtain at a new time is a new window (0078). A template edit is not this.

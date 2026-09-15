@@ -19,9 +19,9 @@ export default defineEventHandler(async (event) => {
       sessionId: session.id,
       venueId: resolved.venueId,
       night: resolved.night,
-      // A basket sells for the whole night, not one performance; naming one is only honest when the
-      // till's own authority resolved to exactly one (E-118 criterion 4's nullable performance_id).
-      performanceId: resolved.performanceIds.length === 1 ? resolved.performanceIds[0]! : null,
+      // Which house a basket belongs to is the bar's own windows' answer, worked out inside the
+      // sale rather than guessed from the count here (F-126, 0078).
+      performanceId: null,
       performanceIds: resolved.performanceIds,
       baseURL: useRuntimeConfig(event).public.baseURL,
       event,
