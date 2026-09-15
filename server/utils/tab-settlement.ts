@@ -201,6 +201,7 @@ export async function settleTab(
     source: 'TILL',
     tender: 'CARD',
     actorId: context.actorId,
+    tillSessionId: context.sessionId,
     lines: rows.map(row => ({ kind: 'TAB_SETTLEMENT' as LineKind, amountPence: row.totalPence, qty: 1, settlesEntryId: row.id })),
   })
   const statements = [...posted.statements]

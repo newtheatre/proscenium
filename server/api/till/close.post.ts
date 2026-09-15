@@ -24,9 +24,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Recomputed here, never trusted from an earlier preview read: the ledger may have gained a
-  // sale between the officer opening the close screen and pressing confirm.
-  const bar = await barReconciliation(session.night)
+  // Recomputed here, never trusted from an earlier preview read, and scoped to this session, so
+  // a second bar open the same night stamps its own figure (F-202 criterion 3).
+  const bar = await barReconciliation(session.night, { sessionId: session.id })
   const variancePence = actualZPence - bar.expectedPence
   if (variancePence !== 0 && !varianceNote) {
     throw createError({

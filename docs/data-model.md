@@ -1004,8 +1004,9 @@ UPDATE outright, and a charge cannot know at insert time whether it will later b
 unique where not null so a charge voids once · `void_reason` NULL, free text, on the record
 and off the audit trail (0011) · `till_session_id` NULL, bare (no foreign key: one would rebuild
 this table), the session an entry was rung up against, so a close figure can be its own session's
-rather than the whole night's (F-105.1, F-118, F-202.3); `postEntry` accepts it but no caller
-passes it yet, so every existing row reads NULL · `created_at`.
+rather than the whole night's (F-105.1, F-118, F-202.3); every till write path sets it (a sale, a
+comp given, a tab settlement), and rows from before the column, the desk's own money and any
+import read NULL · `created_at`.
 Indexed on `london_day` (every report groups by day), `happened_at` (the GP period filter reads
 this column directly, #1094), `reverses_entry_id` and `tab_debtor_id`.
 The F-108 cap is a condition on the charge's own insert (`tabCapGuard`), re-summing the holder's
@@ -1510,9 +1511,9 @@ Partial UNIQUE (`venue_id`, `night`) WHERE `closed_at IS NULL`: at most one *ope
 venue per night, so a session once closed stays closed and a fresh one opening later that night is
 a row of its own rather than a reuse. Keys to the night rather than a performance, so one session
 covers a matinee and an evening at the same venue (E-127), the same choice 0044 makes for an
-officer bypass. The expected figure itself is night-wide, not this session's venue alone: ledger
-money carries no venue reference (`server/utils/reconciliation.ts`), so two venues running the
-same night would each be shown the combined total, an open gap tracked in `docs/known-issues.md`.
+officer bypass. The expected figure is this session's own: `barReconciliation` takes an optional session or venue
+scope and the close passes its own session (`server/utils/reconciliation.ts`), so two venues
+running the same night each stamp their own total rather than the estate's combined one (F-202.3).
 A session left open past its night is F-102's own query (`staleUnclosedSessionsQuery`). E-114's
 checklist criterion 3 names only two system-verified checks; a stale till session is not a third
 one it added, so this query still has no screen reading it (`docs/known-issues.md`).
@@ -1561,10 +1562,10 @@ basket handed over at seven and answered at nine is measured from nine rather th
 for the sweep the moment it is claimed. And once a commit has posted, its entry is recorded on the
 row whatever the sweep did meanwhile, taking it to `SUCCEEDED`, while a claim into `COMPLETING`
 requires `entry_id IS NULL`: a row that already names an entry can never be replayed into a second
-one. What remains is the gap between the sale's own batch and that recording. A worker that dies
-inside it leaves a posted sale on a row that does not name it, and the next answer commits the
-basket again. Closing that needs the attempt's `entry_id` to ride the sale's own batch, alongside
-`ledger_entries.till_session_id` (F-105 criterion 1, F-202), which is where it will land.
+one. The recording itself rides the sale's own batch, conditional on the entry having been written
+by it and on the row still being `COMPLETING` with no entry, so no gap remains in which a posted
+sale sits on a row that does not name it (F-105 criterion 1, F-124 criterion 5). A basket that
+posts no entry has none to name and is taken to `SUCCEEDED` afterwards, where there is no gap.
 
 ### stock_movements  APPEND-ONLY
 `id` PK · `item_id` → bar_items restrict · `qty` signed integer, whole units of the item's own
@@ -1573,9 +1574,10 @@ counting unit · `kind` CHECK `DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJ
 bar-manager-managed list (F-204) needs no rebuild · `unit_cost_pence`, delivery only (F-119's cost
 basis) · `ref_table` / `ref_id`, set together or not at all · `reverses_id` → stock_movements
 restrict · `actor_id` → users restrict, NULL being the system · `location_venue_id` NULL, bare
-(no foreign key: one would rebuild this table), the venue the movement happened at; the column
-exists from this migration, every historical row reads NULL, and no write path sets it yet
-(F-202) · `created_at`.
+(no foreign key: one would rebuild this table), the venue the movement happened at, set by the
+till's own write paths from the open session's venue; a delivery, a stocktake and a wastage
+movement are keyed from the console and read NULL, as does every historical row (F-202) ·
+`created_at`.
 
 On-hand is always `SUM(qty)`, computed where it is asked for; no column anywhere holds a balance,
 and a test over the live schema refuses one. Triggers refuse every UPDATE and DELETE, and refuse a

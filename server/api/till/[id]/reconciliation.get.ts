@@ -14,5 +14,6 @@ export default defineEventHandler(async (event) => {
 
   await closerFor(event, session)
 
-  return nightReconciliation(session.night)
+  // The same scope the close stamps, so the preview is a figure the closer can act on.
+  return nightReconciliation(session.night, { sessionId: session.id })
 })

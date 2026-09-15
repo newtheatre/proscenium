@@ -12,81 +12,96 @@ function windowOf(night: string): { fromAt: number, toAt: number } {
   return { fromAt: Math.floor(from.getTime() / 1000), toAt: Math.floor(to.getTime() / 1000) }
 }
 
+// Which bar's money a figure is (F-202 criterion 3). Absent, every figure below is the whole
+// night's, which is what the estate's one-bar nights and the night report both want.
+export interface ReconciliationScope {
+  sessionId?: string
+  venueId?: string
+}
+
+// Scoped by the session an entry was rung up against, a venue by subquery rather than an id list
+// read back first (0003). A session-less entry is outside any scope, so a filter excludes it.
+function scoped(scope: ReconciliationScope | undefined): SQL {
+  if (scope?.sessionId) return sql` AND e.till_session_id = ${scope.sessionId}`
+  if (scope?.venueId) return sql` AND e.till_session_id IN (SELECT id FROM till_sessions WHERE venue_id = ${scope.venueId})`
+  return sql.empty()
+}
+
 // Card sales already net any future reversal in the same sum rather than excluding it (0031), so
 // `refundsQuery` below is itemised for display and never subtracted a second time from this.
-export function cardSalesQuery(night: string): SQL {
+export function cardSalesQuery(night: string, scope?: ReconciliationScope): SQL {
   const { fromAt, toAt } = windowOf(night)
   return sql`
     SELECT coalesce(sum(l.amount_pence), 0) AS cardSalesPence
     FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
     WHERE e.source = 'TILL' AND e.tender = 'CARD' AND l.kind = 'BAR_ITEM'
-      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}${scoped(scope)}
   `
 }
 
 // Ticket money the bar took on its own reader (F-122 criterion 6, F-123): a booking collected
 // there and a walk-up sold there, both inside the figure the reader is expected to show.
-export function ticketsAtTheBarQuery(night: string): SQL {
+export function ticketsAtTheBarQuery(night: string, scope?: ReconciliationScope): SQL {
   const { fromAt, toAt } = windowOf(night)
   return sql`
     SELECT coalesce(sum(l.amount_pence), 0) AS ticketsPence
     FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
     WHERE e.source = 'TILL' AND e.tender = 'CARD' AND l.kind IN ('TICKET_COLLECTION', 'WALK_UP')
-      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}${scoped(scope)}
   `
 }
 
-export function tabSettlementsQuery(night: string): SQL {
+export function tabSettlementsQuery(night: string, scope?: ReconciliationScope): SQL {
   const { fromAt, toAt } = windowOf(night)
   return sql`
     SELECT coalesce(sum(l.amount_pence), 0) AS tabSettlementsPence
     FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
     WHERE e.source = 'TILL' AND e.tender = 'CARD' AND l.kind = 'TAB_SETTLEMENT'
-      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}${scoped(scope)}
   `
 }
 
-export function compsQuery(night: string): SQL {
+export function compsQuery(night: string, scope?: ReconciliationScope): SQL {
   const { fromAt, toAt } = windowOf(night)
   return sql`
     SELECT count(DISTINCT e.id) AS compsCount, coalesce(sum(l.unit_price_pence * l.qty), 0) AS compsForegonePence
     FROM ledger_entries e JOIN ledger_lines l ON l.entry_id = e.id
     WHERE e.source = 'TILL' AND e.tender = 'COMP'
-      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}${scoped(scope)}
   `
 }
 
-export function discountsQuery(night: string): SQL {
+export function discountsQuery(night: string, scope?: ReconciliationScope): SQL {
   const { fromAt, toAt } = windowOf(night)
   return sql`
     SELECT coalesce(sum(l.discount_pence), 0) AS discountsPence
     FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
     WHERE e.source = 'TILL' AND l.discount_id IS NOT NULL
-      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}${scoped(scope)}
   `
 }
 
 // Magnitude only, itemising what is already netted into card sales above; never a MVP path yet
 // (no bar-sale reversal route exists), so this reads zero until one is built.
-export function refundsQuery(night: string): SQL {
+export function refundsQuery(night: string, scope?: ReconciliationScope): SQL {
   const { fromAt, toAt } = windowOf(night)
   return sql`
     SELECT coalesce(-sum(e.total_pence), 0) AS refundsPence
     FROM ledger_entries e
     WHERE e.source = 'TILL' AND e.tender = 'CARD' AND e.reverses_entry_id IS NOT NULL
-      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}${scoped(scope)}
   `
 }
 
 // Credit extended, not money taken (criterion 2): a void posts as a negative TAB entry, so it
 // nets against the charge it corrects in the same sum (0031), the same convention as above.
-export function tabChargesQuery(night: string): SQL {
+export function tabChargesQuery(night: string, scope?: ReconciliationScope): SQL {
   const { fromAt, toAt } = windowOf(night)
   return sql`
     SELECT coalesce(sum(e.total_pence), 0) AS tabChargesPence
     FROM ledger_entries e
     WHERE e.source = 'TILL' AND e.tender = 'TAB'
-      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}${scoped(scope)}
   `
 }
 
@@ -102,15 +117,15 @@ export function deskTakingsQuery(night: string): SQL {
   `
 }
 
-export async function barReconciliation(night: string): Promise<BarReconciliation> {
+export async function barReconciliation(night: string, scope?: ReconciliationScope): Promise<BarReconciliation> {
   const [[cardSales], [tickets], [tabSettlements], [comps], [discounts], [refunds], [tabCharges]] = await Promise.all([
-    db.all<{ cardSalesPence: number }>(cardSalesQuery(night)),
-    db.all<{ ticketsPence: number }>(ticketsAtTheBarQuery(night)),
-    db.all<{ tabSettlementsPence: number }>(tabSettlementsQuery(night)),
-    db.all<{ compsCount: number, compsForegonePence: number }>(compsQuery(night)),
-    db.all<{ discountsPence: number }>(discountsQuery(night)),
-    db.all<{ refundsPence: number }>(refundsQuery(night)),
-    db.all<{ tabChargesPence: number }>(tabChargesQuery(night)),
+    db.all<{ cardSalesPence: number }>(cardSalesQuery(night, scope)),
+    db.all<{ ticketsPence: number }>(ticketsAtTheBarQuery(night, scope)),
+    db.all<{ tabSettlementsPence: number }>(tabSettlementsQuery(night, scope)),
+    db.all<{ compsCount: number, compsForegonePence: number }>(compsQuery(night, scope)),
+    db.all<{ discountsPence: number }>(discountsQuery(night, scope)),
+    db.all<{ refundsPence: number }>(refundsQuery(night, scope)),
+    db.all<{ tabChargesPence: number }>(tabChargesQuery(night, scope)),
   ])
 
   const cardSalesPence = cardSales?.cardSalesPence ?? 0
@@ -137,7 +152,9 @@ export async function deskTakingsPence(night: string): Promise<number> {
   return row?.deskTakingsPence ?? 0
 }
 
-export async function nightReconciliation(night: string): Promise<NightReconciliation> {
-  const [bar, deskPence] = await Promise.all([barReconciliation(night), deskTakingsPence(night)])
+// The desk's own takings are never scoped: they belong to no bar session, and the whole-day
+// figure a close screen shows beside its own is still the night's (F-118 criterion 1, F-202.3).
+export async function nightReconciliation(night: string, scope?: ReconciliationScope): Promise<NightReconciliation> {
+  const [bar, deskPence] = await Promise.all([barReconciliation(night, scope), deskTakingsPence(night)])
   return { bar, deskTakingsPence: deskPence, wholeNightExpectedPence: bar.expectedPence + deskPence }
 }

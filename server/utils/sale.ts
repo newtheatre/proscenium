@@ -20,6 +20,7 @@ import { effectiveCapacity } from '#server/utils/performances'
 import { qrTokenFor } from '#server/utils/qr-tokens'
 import { qrSvgBase64 } from '#server/utils/qr'
 import { sendWalkUpPaid } from '#server/utils/reservation-confirmation'
+import { recordPostedSaleStatement } from '#server/utils/sumup-queries'
 import { barWindowsTonight, shiftOffsetDefaults } from '#server/utils/rota'
 import { houseForSale } from '#shared/utils/rota-times'
 import { saleRefusal } from '#shared/utils/programme'
@@ -302,6 +303,9 @@ export interface SaleContext {
   // Tonight's houses at this venue: what a walk-up may be sold for, and what "tonight" means
   // when a found booking is flagged as another night's (F-122, F-123).
   performanceIds?: string[]
+  // The SumUp hand-off this sale answers (F-124 criterion 5): its recording rides the sale's own
+  // batch, so no window exists in which a posted sale sits on a row that does not name it.
+  attemptId?: string
   // Where the door pass and the walk-up's email point (D-108); absent means no pass is minted.
   baseURL?: string
   // Present on a live request, so a walk-up's confirmation goes out through the real transport.
@@ -651,6 +655,7 @@ export async function commitSale(
       tender: tab ? 'TAB' : 'CARD',
       actorId: context.actorId,
       tabDebtorId: tab?.holderId ?? null,
+      tillSessionId: context.sessionId,
       lines: [...soldResolved.map((line, index) => ({
         kind: 'BAR_ITEM' as const,
         // Net of the discount: what actually moved, the ledger's own meaning for the column
@@ -677,8 +682,8 @@ export async function commitSale(
         // Conditional on the entry, which a tab charge at its cap may not have written: stock
         // never moves for a sale that did not post (0001, F-105 criterion 1).
         statements.push(db.run(sql`
-          INSERT INTO stock_movements (id, item_id, qty, kind, ref_table, ref_id, actor_id)
-          SELECT ${newId()}, ${ingredient.itemId}, ${-(ingredient.qty * line.qty)}, 'SALE', 'ledger_lines', ${lineId}, ${context.actorId}
+          INSERT INTO stock_movements (id, item_id, qty, kind, ref_table, ref_id, actor_id, location_venue_id)
+          SELECT ${newId()}, ${ingredient.itemId}, ${-(ingredient.qty * line.qty)}, 'SALE', 'ledger_lines', ${lineId}, ${context.actorId}, ${context.venueId}
           WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})
         `))
       }
@@ -714,6 +719,18 @@ export async function commitSale(
         target: `till-session:${context.sessionId}`,
         detail: { tabHolderId: tab.holderId, chargePence: soldTotalPence },
       }))
+    }
+    if (context.attemptId) {
+      const claimable = sql`status = 'COMPLETING' AND EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})`
+      // Before the recording itself: the audit row reads the status the recording is about to
+      // change, so the trail says completed only where this batch is what completed it (0027).
+      statements.push(db.run(sql`
+        INSERT INTO audit_log (id, actor_id, action, target, detail)
+        SELECT ${newId()}, ${context.actorId}, 'bar.sumup.completed', ${`sumup-attempt:${context.attemptId}`},
+               ${JSON.stringify({ claimedFrom: 'COMPLETING', to: 'SUCCEEDED', entryId: posted.id })}
+        WHERE EXISTS (SELECT 1 FROM sumup_attempts WHERE id = ${context.attemptId} AND entry_id IS NULL AND ${claimable})
+      `))
+      statements.push(db.run(recordPostedSaleStatement(context.attemptId, posted.id, Math.floor(Date.now() / 1000), claimable)))
     }
     entryId = posted.id
   }
@@ -897,6 +914,7 @@ export async function commitCompSale(
     source: 'TILL',
     tender: 'COMP',
     actorId: context.actorId,
+    tillSessionId: context.sessionId,
     compReason: request.reason,
     compApprovedBy: request.decidedBy,
     // Zero moves, but the retail price is snapshotted onto each line, so the foregone value is
@@ -924,6 +942,7 @@ export async function commitCompSale(
         refTable: 'ledger_lines',
         refId: lineId,
         actorId: context.actorId,
+        locationVenueId: context.venueId,
       }))
     }
   })
