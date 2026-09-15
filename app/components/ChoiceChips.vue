@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The discount and tab-holder pickers on the till are the same twenty lines twice
-// (review-ui.md, "Splitting the till"): a chip per choice, plus a "none" chip.
+// The discount (F-117) and tab-holder (F-108) pickers on the till are the same twenty lines
+// twice: a chip per choice, plus a "none" chip.
 
 const props = defineProps<{
   containerTestId: string

@@ -121,6 +121,12 @@ const {
   requestPrice: body => $fetch<PricedBasket>('/api/till/price', { method: 'POST', body }),
 })
 
+// A collapsed reminder above the pinned actions, so checking the basket does not mean scrolling
+// past the whole grid first (K-102 criterion 3).
+const basketItemCount = computed(() => basket.value.reduce((sum, line) => sum + line.qty, 0)
+  + ticketLines.value.length
+  + walkUpLines.value.reduce((sum, line) => sum + line.quantity, 0))
+
 const charging = ref(false)
 const chargeFailure = ref<string | null>(null)
 const charged = ref<ChargedReceipt | null>(null)
@@ -443,6 +449,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             :ticket-lines="ticketLines"
             :walk-up-lines="walkUpLines"
             :basket="basket"
+            :products="products"
             :line-amount="lineAmount"
             :remove-booking="removeBooking"
             :remove-walk-up="removeWalkUp"
@@ -459,6 +466,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             :pricing="pricing"
             :tickets-pence="ticketsPence"
             :walk-ups-pence="walkUpsPence"
+            @open-allergens="allergenOpen = $event"
           />
         </template>
 
@@ -558,6 +566,14 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
       </p>
 
       <template #actions>
+        <div
+          v-if="session && !charged && !basketEmpty"
+          class="flex items-center justify-between rounded-lg bg-elevated px-3 py-2 text-sm"
+          data-test="basket-summary-bar"
+        >
+          <span>{{ basketItemCount }} {{ basketItemCount === 1 ? 'item' : 'items' }}</span>
+          <span data-test="basket-summary-total">{{ grandTotalPence !== null && !pricing ? saysMoney(grandTotalPence) : 'Pricing…' }}</span>
+        </div>
         <NightAction
           v-if="session && !charged && !basketEmpty && grandTotalPence !== null && sumupAvailable && !sumup.pending.value"
           :label="`Charge ${saysMoney(grandTotalPence)} on SumUp`"

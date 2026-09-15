@@ -63,8 +63,8 @@ describe('refusalText still prefers the route-written message alongside enrolPat
   })
 })
 
-// review-ui.md finding 16: a write is unprotected by design (K-103 protects reads only), so a
-// network drop mid-write needs its own words, not the generic "did not work" fallback.
+// K-103 protects reads, not writes: a network drop mid-write needs its own words, not the
+// generic "did not work" fallback.
 describe('writeFailureText tells a transport failure apart from an ordinary refusal', () => {
   test('an ordinary refusal, with a statusCode, reads as normal', () => {
     const error = { statusCode: 409, data: { statusMessage: 'The total has changed: £5.00 now, was £4.50' } }

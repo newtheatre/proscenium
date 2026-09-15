@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
 import type { Discount } from '#shared/utils/discounts'
-import type { PricedBasket, TillBooking } from '#shared/utils/sale'
+import type { PricedBasket, SaleProduct, TillBooking } from '#shared/utils/sale'
 import type { TabHolder } from '~/composables/useTillCatalogue'
 import type { BasketLine, WalkUpLine } from '~/composables/useTillBasket'
 
 // The basket (F-122 criterion 3): drinks, ticket money and walk-ups in one list, one total.
 
-defineProps<{
+const props = defineProps<{
   ticketLines: TillBooking[]
   walkUpLines: WalkUpLine[]
   basket: BasketLine[]
+  products: SaleProduct[]
   lineAmount: (line: BasketLine) => string | null
   removeBooking: (id: string) => void
   removeWalkUp: (line: WalkUpLine) => void
@@ -29,8 +30,19 @@ defineProps<{
   walkUpsPence: number
 }>()
 
+const emit = defineEmits<{
+  openAllergens: [{ name: string, state: SaleProduct['allergenState'], note: string | null }]
+}>()
+
 const selectedDiscountId = defineModel<string | null>('selectedDiscountId', { required: true })
 const selectedTabHolderId = defineModel<string | null>('selectedTabHolderId', { required: true })
+
+// The question usually comes after the round is rung up, not while looking at the grid above
+// (F-107 criterion 1). Indexed once per catalogue change, not scanned per line per render.
+const productByVariantId = computed(() => new Map(props.products.flatMap(product => product.variants.map(variant => [variant.id, product] as const))))
+function productFor(line: BasketLine): SaleProduct | undefined {
+  return productByVariantId.value.get(line.variantId)
+}
 </script>
 
 <template>
@@ -110,6 +122,17 @@ const selectedTabHolderId = defineModel<string | null>('selectedTabHolderId', { 
         </p>
       </div>
       <div class="flex items-center gap-1">
+        <UButton
+          v-if="productFor(line)"
+          size="sm"
+          color="neutral"
+          variant="ghost"
+          icon="i-lucide-info"
+          class="size-12"
+          :aria-label="`Allergens for ${line.productName}`"
+          :data-test="`line-allergen-${line.id}`"
+          @click="emit('openAllergens', { name: productFor(line)!.name, state: productFor(line)!.allergenState, note: productFor(line)!.allergenNote })"
+        />
         <UButton
           size="sm"
           color="neutral"
