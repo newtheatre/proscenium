@@ -57,12 +57,12 @@ export const members: Shot[] = [
     persona,
     url: '/rooms',
     marker: '[data-test="calendar-span"]',
-    width: CONSOLE_WIDTH,
+    width: PHONE_WIDTH,
     annotations: [
       { selector: '[data-test="calendar-today"]', label: 'Today' },
       { selector: '[data-test="calendar-room"]', label: 'Every room, or one' },
       { selector: '[data-test="book-unlisted"]', label: 'A room not listed here' },
-      { selector: '[data-test^="summary-"]', label: 'A room on a day' },
+      { selector: '[data-test^="slot-"]', label: 'A quarter hour to book' },
     ],
   },
   {
