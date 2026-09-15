@@ -14,6 +14,19 @@ export default defineEventHandler(async (event) => {
 
   const { components } = await readValidatedBodyOrThrow(event, componentsForm)
 
+  // An ACTIVE size needs something a sale can deplete (F-128). A choice group already attached
+  // stands in for a stocked item, so an empty submission only refuses when nothing else covers it.
+  if (components.length === 0) {
+    const product = await productById(held.productId)
+    const hasChoiceGroup = held.components.some(component => component.choiceGroupId !== null)
+    if (product?.status === 'ACTIVE' && !hasChoiceGroup) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${held.label} is on the till, so it needs something for a sale to deplete: give it a stocked item or a choice group`,
+      })
+    }
+  }
+
   // One statement for every ingredient named. The list comes from the request and the schema caps
   // it, so the parameter count is bounded by what was sent rather than by what is stored (0003).
   const named = components.map(component => component.itemId)

@@ -174,6 +174,32 @@ describe.skipIf(skip !== null)('variance is shown in units and at cost before an
 
     await apply(opened.stocktake.id)
   })
+
+  // The preview values a variance the same way the applied report does: a weighted average over
+  // unreversed deliveries, not the most recent delivery's cost (review-stock 5).
+  test('the preview is weighted across deliveries, and a reversed one drops out of the basis', async () => {
+    const item = await anItem()
+    await deliver(item.id, 10, 100)
+    const second = await created(await send('POST', '/api/admin/bar/movements', {
+      itemId: item.id, kind: 'DELIVERY', qty: 10, unitCostPence: 900,
+    }))
+    // Weighted: (10*100 + 10*900) / 20 = 500, not 900, which the most recent delivery alone would give.
+    const opened = await open()
+    await count(opened.stocktake.id, [{ itemId: item.id, counted: 19 }])
+    const beforeReversal = await view(opened.stocktake.id)
+    expect(beforeReversal.lines.find(candidate => candidate.itemId === item.id)!.varianceCostPence).toBe(-1 * 500)
+    await apply(opened.stocktake.id)
+
+    // Reversing the second delivery leaves only the first in the weighted basis.
+    await send('POST', '/api/admin/bar/movements', {
+      itemId: item.id, kind: 'REVERSAL', qty: -10, reason: 'COUNT_CORRECTION', reversesId: second,
+    })
+    const reopened = await open()
+    await count(reopened.stocktake.id, [{ itemId: item.id, counted: 8 }])
+    const afterReversal = await view(reopened.stocktake.id)
+    expect(afterReversal.lines.find(candidate => candidate.itemId === item.id)!.varianceCostPence).toBe(-1 * 100)
+    await apply(reopened.stocktake.id)
+  })
 })
 
 describe.skipIf(skip !== null)('applying posts adjustments atomically and freezes the stocktake (F-115 criteria 4, 5)', () => {

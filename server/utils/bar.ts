@@ -32,8 +32,7 @@ export interface BarProductReference {
   why: string
 }
 
-// A product with a serving size may go active with no recipe line at all; F-113 only refuses one
-// that already calls for a retired ingredient (known-issues.md).
+// The recipe requirement itself is universal, below, rather than a row here (F-128).
 export const BAR_PRODUCT_REFERENCES: BarProductReference[] = [
   {
     table: 'product_variants',
@@ -70,10 +69,24 @@ export function productEverSoldQuery(productId: string, references = productSale
   return sql`SELECT CASE WHEN ${sql.join(terms, sql` OR `)} THEN 1 ELSE 0 END AS sold`
 }
 
+// Every ACTIVE size needs something a sale can deplete, an item directly or a choice group
+// standing in for one (F-128). `LIMIT -1` keeps SQLite's flattener from dropping the subquery's order.
+export function variantsWithoutRecipeQuery(productId: string): SQL {
+  return sql`
+    SELECT 'a recipe for ' || v.label AS needs
+    FROM (
+      SELECT id, label FROM product_variants
+      WHERE product_id = ${productId} AND status = 'ACTIVE'
+      ORDER BY sort, label COLLATE NOCASE
+      LIMIT -1
+    ) v
+    WHERE NOT EXISTS (SELECT 1 FROM variant_components c WHERE c.variant_id = v.id)
+  `
+}
+
 // One row per thing the product still lacks, so a refusal can name them. An empty result means it
-// may go on the till.
+// may go on the till. The recipe requirement above is universal, not one a reference opts into.
 export function missingBeforeActiveQuery(productId: string, references = productActivationReferences()): SQL {
-  if (references.length === 0) return sql`SELECT NULL AS needs WHERE 0`
   const terms = references.map(reference => sql`
     SELECT ${reference.requiredToActivate} AS needs
     WHERE NOT EXISTS (
@@ -81,11 +94,10 @@ export function missingBeforeActiveQuery(productId: string, references = product
       ${reference.countingOnly ? sql`AND ${sql.raw(reference.countingOnly)}` : sql``}
     )
   `)
-  return sql.join(terms, sql` UNION ALL `)
+  return sql.join([...terms, variantsWithoutRecipeQuery(productId)], sql` UNION ALL `)
 }
 
 export async function missingBeforeActive(productId: string): Promise<string[]> {
-  if (productActivationReferences().length === 0) return []
   return (await db.all<{ needs: string }>(missingBeforeActiveQuery(productId))).map(row => row.needs)
 }
 

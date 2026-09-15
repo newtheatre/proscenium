@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm'
+import { londonDayOf } from '#shared/utils/ledger'
 
-// Delete a product nothing has ever been sold under. One that has can only be retired, and the
-// refusal says so (F-111 criterion 3).
+// Delete a product nothing has ever been sold under, and nothing has priced. One that has can
+// only be retired, because a variant's price history is append-only (F-111 criterion 3, 0010).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const resolved = await requirePermission(event, 'bar.write')
@@ -13,6 +14,17 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 409,
       statusMessage: `${held.name} has been sold, so it can only be retired: every line sold under it still has to resolve`,
+    })
+  }
+
+  // Cascading deletes reach `variant_prices`, which is append-only and trigger-enforced; refusing
+  // here gives a readable message instead of the trigger's raw error (0010, 0047).
+  const variants = await variantsOf(id, londonDayOf(new Date()))
+  const blocked = variants.find(variant => variant.everPriced || variant.everSold)
+  if (blocked) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `${held.name} has a serving size with ${blocked.everSold ? 'sales' : 'a price history'} against it, so it can only be retired: every line still has to resolve`,
     })
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { BAR_PRODUCT_REFERENCES, productActivationReferences, productEverSoldQuery, missingBeforeActiveQuery, productSaleReferences } from '#server/utils/bar'
+import { BAR_PRODUCT_REFERENCES, productActivationReferences, productEverSoldQuery, missingBeforeActiveQuery, productSaleReferences, variantsWithoutRecipeQuery } from '#server/utils/bar'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BarProductReference } from '#server/utils/bar'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
@@ -34,6 +34,22 @@ function category(database: TestDatabase, over: Record<string, unknown> = {}): s
 function product(database: TestDatabase, over: Record<string, unknown> = {}): string {
   const values = { id: 'prod-1', category_id: 'cat-1', name: 'House red', ...over }
   insert(database, 'bar_products', values)
+  return String(values.id)
+}
+
+function item(database: TestDatabase, over: Record<string, unknown> = {}): string {
+  const values = { id: 'item-1', name: 'Bar item', unit: 'ML', ...over }
+  insert(database, 'bar_items', values)
+  return String(values.id)
+}
+
+function componentOf(database: TestDatabase, over: Record<string, unknown> = {}): void {
+  insert(database, 'variant_components', { id: 'comp-1', qty: 1, ...over })
+}
+
+function choiceGroup(database: TestDatabase, over: Record<string, unknown> = {}): string {
+  const values = { id: 'group-1', name: 'Mixer', ...over }
+  insert(database, 'choice_groups', values)
   return String(values.id)
 }
 
@@ -126,12 +142,15 @@ describe('a product cannot go active until it has what a sale needs (criterion 2
       expect(missing(database, id)).toEqual(['a serving size'])
 
       insert(database, 'product_variants', { id: 'var-1', product_id: id, serving_kind: 'bottle', label: 'Bottle' })
+      const itemId = item(database)
+      componentOf(database, { variant_id: 'var-1', item_id: itemId })
       expect(missing(database, id)).toEqual([])
     })
   })
 
-  // A retired size is not one the till can draw, so it does not keep a product active on its own.
-  test('a size that has been retired does not count towards the requirement', async () => {
+  // A retired size is not one the till can draw, so it does not keep a product active on its own,
+  // and does not need a recipe either: nothing will ever sell it.
+  test('a size that has been retired does not count towards either requirement', async () => {
     await withDatabase((database) => {
       category(database)
       const id = product(database)
@@ -140,9 +159,51 @@ describe('a product cannot go active until it has what a sale needs (criterion 2
     })
   })
 
-  // The recipe requirement is F-113's to add; until it does, a size is the whole of it.
-  test('nothing else is required yet, because the table that supplies it is not built', async () => {
-    expect(productActivationReferences().map(reference => reference.requiredToActivate)).toEqual(['a serving size'])
+  // F-128: every ACTIVE size needs something a sale can deplete, whether an item directly or a
+  // choice group standing in for one.
+  describe('every ACTIVE size needs a recipe (F-128 criteria 1 and 2)', () => {
+    test('a size with no component at all blocks activation, naming the size', async () => {
+      await withDatabase((database) => {
+        category(database)
+        const id = product(database)
+        insert(database, 'product_variants', { id: 'var-1', product_id: id, serving_kind: 'bottle', label: 'Bottle' })
+        expect(missing(database, id)).toEqual(['a recipe for Bottle'])
+
+        const itemId = item(database)
+        componentOf(database, { variant_id: 'var-1', item_id: itemId })
+        expect(missing(database, id)).toEqual([])
+      })
+    })
+
+    test('two sizes with no recipe are both named', async () => {
+      await withDatabase((database) => {
+        category(database)
+        const id = product(database)
+        insert(database, 'product_variants', { id: 'var-1', product_id: id, serving_kind: 'bottle', label: 'Bottle', sort: 0 })
+        insert(database, 'product_variants', { id: 'var-2', product_id: id, serving_kind: 'single', label: 'Single', sort: 1 })
+        expect(missing(database, id)).toEqual(['a recipe for Bottle', 'a recipe for Single'])
+      })
+    })
+
+    test('a choice-group-only recipe counts, since a chosen option is what actually depletes', async () => {
+      await withDatabase((database) => {
+        category(database)
+        const id = product(database)
+        insert(database, 'product_variants', { id: 'var-1', product_id: id, serving_kind: 'double', label: 'Double' })
+        const groupId = choiceGroup(database)
+        componentOf(database, { variant_id: 'var-1', choice_group_id: groupId, item_id: null })
+        expect(missing(database, id)).toEqual([])
+      })
+    })
+
+    test('a retired size with no recipe is not named: nothing will ever sell it', async () => {
+      await withDatabase((database) => {
+        category(database)
+        const id = product(database)
+        insert(database, 'product_variants', { id: 'var-1', product_id: id, serving_kind: 'bottle', label: 'Bottle', status: 'RETIRED' })
+        expect(ask<{ needs: string }>(database, variantsWithoutRecipeQuery(id))).toEqual([])
+      })
+    })
   })
 
   test('a requirement with no row refuses activation and names what is missing', async () => {

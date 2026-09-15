@@ -222,13 +222,87 @@ describe.skipIf(skip !== null)('one stocked thing sells at many sizes (F-112 cri
     expect((await refused.json() as { message?: string }).message).toContain('retired')
   })
 
-  test('a product with no serving size cannot go on the till, and one with a size can', async () => {
+  // F-128: an ACTIVE size needs something to pour, so emptying its recipe is refused while the
+  // product is on the till, naming the size.
+  test('emptying an ACTIVE size\'s recipe is refused, naming it', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+    const itemId = await anItem()
+    await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [{ itemId, qty: 175 }] })
+    await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+
+    const refused = await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [] })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain('deplete')
+  })
+
+  test('emptying a HIDDEN size\'s recipe is fine: nothing is selling it', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+    const itemId = await anItem()
+    await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [{ itemId, qty: 175 }] })
+
+    expect((await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [] })).status).toBe(200)
+  })
+
+  test('emptying an ACTIVE size\'s stocked items is fine when a choice group still covers it', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+    const itemId = await anItem()
+    await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [{ itemId, qty: 175 }] })
+
+    const groupItem = await anItem({ name: named('Tonic') })
+    const groupId = await addChoiceGroup([{ itemId: groupItem, qty: 200 }])
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId })
+    await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+
+    expect((await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [] })).status).toBe(200)
+  })
+
+  test('a product with no serving size cannot go on the till, and one with a size and a recipe can', async () => {
     const productId = await aProduct()
     const refused = await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
     expect(refused.status).toBe(409)
     expect((await refused.json() as { message?: string }).message).toContain('a serving size')
 
-    await addVariant(productId)
+    const id = await addVariant(productId)
+    const itemId = await anItem()
+    await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [{ itemId, qty: 175 }] })
+    expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
+  })
+
+  // F-128: every sellable thing depletes something, so a size with a button and nothing behind it
+  // cannot reach the till.
+  test('a size with no recipe blocks activation, and the refusal names it', async () => {
+    const productId = await aProduct()
+    await addVariant(productId, { servingKind: 'bottle', label: 'Bottle' })
+
+    const refused = await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain('Bottle')
+  })
+
+  test('a choice-group-only recipe is enough to activate: a chosen option is what actually depletes', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId, { servingKind: 'double', label: 'Double' })
+    const itemId = await anItem({ name: named('Tonic') })
+    const groupId = await addChoiceGroup([{ itemId, qty: 200 }])
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId })
+
+    expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
+  })
+
+  // A retired size still keeps whatever recipe it had, but never needing one is what lets an old,
+  // never-finished draft be retired rather than blocking the whole product's other sizes.
+  test('a retired size with no recipe does not block its product going active', async () => {
+    const productId = await aProduct()
+    const retired = await addVariant(productId, { servingKind: 'bottle', label: 'Bottle' })
+    await send('POST', `/api/admin/bar/variants/${retired}/status`, { status: 'RETIRED' })
+
+    const active = await addVariant(productId, { servingKind: 'single', label: 'Single' })
+    const itemId = await anItem()
+    await send('PUT', `/api/admin/bar/variants/${active}/components`, { components: [{ itemId, qty: 175 }] })
+
     expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
   })
 })
