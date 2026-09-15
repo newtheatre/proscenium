@@ -82,6 +82,9 @@ export const ledgerLines = sqliteTable('ledger_lines', {
   index('ledger_lines_entry').on(table.entryId),
   index('ledger_lines_kind').on(table.kind),
   index('ledger_lines_performance').on(table.performanceId),
+  // `variantEverSoldColumn` (server/utils/bar.ts) scans this per variant on every catalogue
+  // listing without it (review 15 Sep 2026, review-data.md #7).
+  index('ledger_lines_variant').on(table.productVariantId).where(sql`${table.productVariantId} IS NOT NULL`),
   // A ticket is collected once, ever, whichever of the two money paths that collection was
   // (D-114 criterion 2, D-115): the guard is the index, not application code.
   uniqueIndex('ledger_lines_ticket_collection_once').on(table.ticketId).where(sql`kind IN ('TICKET_COLLECTION', 'WALK_UP')`),

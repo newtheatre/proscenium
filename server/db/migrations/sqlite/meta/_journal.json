@@ -729,6 +729,13 @@
       "when": 1789351165370,
       "tag": "0103_an_imported_pass_has_no_issuer",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "6",
+      "when": 1789479042578,
+      "tag": "0104_smiling_snowbird",
+      "breakpoints": true
     }
   ]
 }
