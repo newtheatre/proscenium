@@ -531,6 +531,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/bar/categories/[id]/prices.post.ts', actions: ['bar.category.price.set'] },
   { route: 'server/api/admin/bar/products/index.get.ts', exempt: 'reads the products, retired ones included' },
   { route: 'server/api/admin/bar/products/index.post.ts', actions: ['bar.product.created'] },
+  {
+    route: 'server/api/admin/bar/products/setup.post.ts',
+    actions: ['bar.item.created', 'bar.product.created', 'bar.variant.created', 'bar.choice-group.created'],
+    via: ['server/utils/bar-setup.ts'],
+  },
   { route: 'server/api/admin/bar/products/[id]/index.put.ts', actions: ['bar.product.updated'] },
   { route: 'server/api/admin/bar/products/[id]/status.post.ts', actions: ['bar.product.status.changed'] },
   { route: 'server/api/admin/bar/products/[id]/index.delete.ts', actions: ['bar.product.deleted'] },
