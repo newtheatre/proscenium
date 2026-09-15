@@ -1518,7 +1518,9 @@ checklist criterion 3 names only two system-verified checks; a stale till sessio
 one it added, so this query still has no screen reading it (`docs/known-issues.md`).
 
 ### comp_requests
-`id` PK · `venue_id` → venues restrict · `night` · `requested_by` → users restrict · `reason` ·
+`id` PK · `venue_id` → venues restrict · `night` · `performance_id` NULL (the house the ask was
+made at, resolved from the bar's windows exactly as a sale's is, F-126; no foreign key, because
+adding one to a live table is a rebuild) · `requested_by` → users restrict · `reason` ·
 `lines` JSON basket, read exactly at approval and at the sale, never resubmitted · `status` CHECK
 `PENDING|APPROVED|DECLINED` · `decided_by` NULL → users restrict, `decided_at` NULL, set together
 or not at all · `decline_reason` NULL, set exactly when declined · `entry_id`, set once the request

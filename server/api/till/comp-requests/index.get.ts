@@ -8,7 +8,8 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireAnyNightAuthority(event, ['DUTY_MANAGER', 'BAR'], scope)
 
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
-  const requests = await pendingCompRequests(resolved.venueId, resolved.night, expiryMinutes)
+  // Narrowed to the house the caller is reading, where they named one (F-126).
+  const requests = await pendingCompRequests(resolved.venueId, resolved.night, expiryMinutes, new Date(), scope.performanceId)
   const on = londonDayOf(new Date())
   // Resolved once for the whole queue, not once per request: a read that scales with an unrelated
   // table's rows is the same shape an IN list is (0003).

@@ -47,6 +47,9 @@ export const compRequests = sqliteTable('comp_requests', {
   id: id(),
   venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' }),
   night: text('night').notNull(),
+  // Which house the ask was made at, resolved from the bar's windows the way a sale is (F-126).
+  // No foreign key: adding one to a live table is a rebuild, which `check migrations` refuses.
+  performanceId: text('performance_id'),
   requestedBy: text('requested_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
   reason: text('reason').notNull(),
   lines: text('lines', { mode: 'json' }).notNull(),

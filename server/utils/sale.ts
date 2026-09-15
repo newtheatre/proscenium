@@ -492,9 +492,18 @@ interface PreparedSale {
   soldTotalPence: number
 }
 
+// What resolving a house needs: a comp request is asked for before there is a session to name.
+export interface HouseScope {
+  venueId: string
+  night: string
+  performanceId: string | null
+  performanceIds?: string[]
+  event?: H3Event
+}
+
 // Which house a bar sale belongs to on a night running more than one: the window containing the
 // sale, else the nearest, with a tie to the earlier; no window resolves nothing (F-126).
-export async function performanceForSale(context: SaleContext, at: number): Promise<string | null> {
+export async function performanceForSale(context: HouseScope, at: number): Promise<string | null> {
   // A caller naming a performance was already narrowed to it by the guard.
   if (context.performanceId) return context.performanceId
   const covered = context.performanceIds ?? []
@@ -840,8 +849,9 @@ export async function commitCompSale(
   const lines = await compRequestLines(requestId)
   if (!lines) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
 
-  // A comp is given at a house exactly as a sale is sold at one (F-126).
-  const performanceId = await performanceForSale(context, Math.floor(Date.now() / 1000))
+  // The house the ask named, because that is where it was asked for; only an older request that
+  // never recorded one falls back to resolving it now (F-126 criterion 4).
+  const performanceId = request.performanceId ?? await performanceForSale(context, Math.floor(Date.now() / 1000))
 
   // A comp is never discounted on top: it is already free (F-110's own criterion 4).
   const { resolved, priced } = await resolveSale(lines, on, null)

@@ -57,6 +57,8 @@ let timer: ReturnType<typeof setInterval> | undefined
 // drinks at the till. Each is hidden when its own route refuses this viewer, never pre-judged.
 interface PendingComp {
   id: string
+  // A bar ask carries the house it was made at; null is a night with no house there (F-126).
+  performanceId?: string | null
   requestedBy: string
   requestedByName: string
   reason: string
@@ -344,6 +346,13 @@ onUnmounted(() => {
               </p>
               <p class="font-mono text-xs text-muted">
                 asked by {{ pending.request.requestedByName }}
+              </p>
+              <p
+                v-if="pending.queue === 'BAR' && !pending.request.performanceId"
+                class="text-xs text-muted"
+                :data-test="`comp-no-house-${pending.request.id}`"
+              >
+                No house: the bar was open with nothing running.
               </p>
               <p
                 v-if="viewer && viewer.id === pending.request.requestedBy"

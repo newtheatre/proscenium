@@ -17,6 +17,7 @@ interface RawRow {
   id: string
   venueId: string
   night: string
+  performanceId: string | null
   requestedBy: string
   requestedByName: string
   reason: string
@@ -31,7 +32,8 @@ interface RawRow {
 }
 
 const ROW_COLUMNS = sql`
-  r.id AS id, r.venue_id AS venueId, r.night AS night, r.requested_by AS requestedBy, u.name AS requestedByName,
+  r.id AS id, r.venue_id AS venueId, r.night AS night, r.performance_id AS performanceId,
+  r.requested_by AS requestedBy, u.name AS requestedByName,
   r.reason AS reason, r.lines AS lines, r.status AS status, r.decided_by AS decidedBy, d.name AS decidedByName,
   r.decided_at AS decidedAt, r.decline_reason AS declineReason, r.entry_id AS entryId, r.created_at AS createdAt
 `
@@ -63,12 +65,24 @@ export async function compRequestById(id: string, expiryMinutes: number, now = n
 
 // The approver's queue: only ever a handful open at once, so a plain per-request read (the
 // caller prices each one) beats folding pricing into this query (0003's reasoning applied small).
-export async function pendingCompRequests(venueId: string, night: string, expiryMinutes: number, now = new Date()): Promise<CompRequest[]> {
+
+// Narrowed to the house the caller names (F-126); an ask that resolved none is everybody's,
+// because nothing else would ever put it in front of somebody.
+export async function pendingCompRequests(
+  venueId: string,
+  night: string,
+  expiryMinutes: number,
+  now = new Date(),
+  performanceId?: string,
+): Promise<CompRequest[]> {
+  const house = performanceId
+    ? sql` AND (r.performance_id IS NULL OR r.performance_id = ${performanceId})`
+    : sql``
   const rows = await db.all<RawRow>(sql`
     SELECT ${ROW_COLUMNS} FROM comp_requests r
     JOIN users u ON u.id = r.requested_by
     LEFT JOIN users d ON d.id = r.decided_by
-    WHERE r.venue_id = ${venueId} AND r.night = ${night} AND r.status = 'PENDING'
+    WHERE r.venue_id = ${venueId} AND r.night = ${night} AND r.status = 'PENDING'${house}
     ORDER BY r.created_at
   `)
   return rows.map(row => hydrate(row, expiryMinutes, now))
@@ -80,12 +94,13 @@ export async function createCompRequest(
   night: string,
   reason: string,
   lines: BasketLineInput[],
+  performanceId: string | null = null,
 ): Promise<string> {
   const id = newId()
   await db.batch([
     db.run(sql`
-      INSERT INTO comp_requests (id, venue_id, night, requested_by, reason, lines)
-      VALUES (${id}, ${venueId}, ${night}, ${requestedBy}, ${reason}, ${JSON.stringify(lines)})
+      INSERT INTO comp_requests (id, venue_id, night, performance_id, requested_by, reason, lines)
+      VALUES (${id}, ${venueId}, ${night}, ${performanceId}, ${requestedBy}, ${reason}, ${JSON.stringify(lines)})
     `),
     // No `reason` in detail: that is free text and belongs on the record itself, which the
     // target id already points at (0011).
@@ -93,7 +108,7 @@ export async function createCompRequest(
       actorId: requestedBy,
       action: 'bar.comp-request.created',
       target: `comp-request:${id}`,
-      detail: { venueId, night },
+      detail: { venueId, night, performanceId },
     })),
   ])
   return id

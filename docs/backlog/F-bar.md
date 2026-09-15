@@ -603,9 +603,11 @@ Open questions:
 - Acceptance criteria:
   1. A sale resolves its performance from the instant it happened against tonight's bar shift
      windows at the venue, not from how many performances the caller's authority happens to cover.
-  2. A sale inside a bar window takes that window's performance; a sale inside none takes the
-     nearest bound, ties going to the earlier performance; a night with no bar windows resolves no
-     performance and the sale records none.
+  2. A sale inside a bar window takes that window's performance. Amended 15 September 2026: where
+     a venue's own bar offsets make two windows contain the instant, it takes the later house,
+     because the drink is for the show about to go in rather than the one whose audience has left.
+     A sale inside no window takes the nearest bound, ties going to the earlier performance; a
+     night with no bar windows resolves no performance and the sale records none.
   3. A 14:30 sale and a 20:30 sale on a two-house day land on different performances inside one
      till session, and the session's reconciliation figure is unchanged by the split.
   4. A comp request records the house the same way, so an approved comp reports against the
