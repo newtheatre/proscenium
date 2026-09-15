@@ -334,9 +334,8 @@ const columns: TableColumn<Opening>[] = [
             label="Evening"
             required
           >
-            <UInput
+            <DateField
               v-model="plan.evening"
-              type="date"
               data-test="opening-evening"
               class="w-full"
             />
