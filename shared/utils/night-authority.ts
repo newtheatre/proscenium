@@ -21,6 +21,14 @@ export const NIGHT_ROLE_PERMISSION: Record<NightRole, Permission> = {
   BAR: 'night.till',
 }
 
+// How a refusal says the shift out loud. `BAR` is a value in a column, not something to put in
+// front of a volunteer, and British English is the rule for every piece of UI copy.
+export const NIGHT_ROLE_WORDS: Record<NightRole, string> = {
+  DUTY_MANAGER: 'a confirmed duty manager shift',
+  DOOR: 'a confirmed door shift',
+  BAR: 'a confirmed bar shift',
+}
+
 // The officer a refusal points at. A unit test fails when the role named here stops holding the
 // permission above, so the advice cannot drift from the permission map (0044).
 export const NIGHT_ROLE_OFFICER: Record<NightRole, { role: Role, words: string }> = {
@@ -46,7 +54,7 @@ export function isNightRole(value: string): value is NightRole {
 export function nightAuthorityRefusal(role: NightRole): { statusCode: 403, statusMessage: string } {
   return {
     statusCode: 403,
-    statusMessage: `This needs a confirmed ${role} shift on one of tonight's performances, or ${NIGHT_ROLE_OFFICER[role].words}`,
+    statusMessage: `This needs ${NIGHT_ROLE_WORDS[role]} on one of tonight's performances, or ${NIGHT_ROLE_OFFICER[role].words}`,
   }
 }
 

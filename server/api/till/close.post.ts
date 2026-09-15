@@ -1,26 +1,5 @@
-import { sql } from 'drizzle-orm'
 import { closeTillSessionForm } from '#shared/utils/reconciliation'
 import { saysMoney } from '#shared/utils/bar'
-import type { H3Event } from 'h3'
-import type { AccountRow } from '#server/utils/accounts'
-
-// Tonight's session closes under the same authority that opened it; a night that has ended has
-// no shift left to fall back on, so only the standing officer role reaches back for it (F-102 criterion 5).
-async function closerFor(event: H3Event, session: { venueId: string, night: string }): Promise<AccountRow> {
-  if (session.night === currentShowNight()) {
-    return (await requireNightAuthority(event, 'BAR', { venueId: session.venueId })).account
-  }
-
-  const resolved = await authority(event)
-  if (!resolved.permissions.has('night.till')) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'A session from an earlier night needs the bar manager\'s role to close',
-    })
-  }
-  await requireSecondFactorIfPrivileged(event, resolved)
-  return resolved.account
-}
 
 // Close a till session, stamping who and when, and record the expected-versus-actual reader
 // figure alongside it: closing is the one write, so both are as append-only as it is (F-118 criterion 3).
@@ -64,26 +43,31 @@ export default defineEventHandler(async (event) => {
     detail: { venueId: session.venueId, night: session.night, expectedPence: bar.expectedPence, actualZPence, variancePence },
   })
 
-  // The predicate rides the write, so a second close attempt racing this one changes nothing and
-  // writes no second audit row for one closure (0001, 0003).
-  await db.batch([
-    db.run(sql`
-      UPDATE till_sessions SET closed_by = ${account.id}, closed_at = unixepoch(),
-        expected_total_pence = ${bar.expectedPence}, actual_z_pence = ${actualZPence},
-        variance_pence = ${variancePence}, variance_note = ${varianceNote ?? null}
-      WHERE id = ${id} AND closed_at IS NULL
-    `),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-      WHERE changes() = 1
-    `),
-  ])
+  // Both predicates ride the write, so a second close attempt and a hand-off started since the
+  // count above change nothing and write no second audit row for one closure (0001, 0003).
+  const closed = await auditedWrite(db.all(closeSessionStatement({
+    id,
+    venueId: session.venueId,
+    night: session.night,
+    closedBy: account.id,
+    expectedPence: bar.expectedPence,
+    actualZPence,
+    variancePence,
+    varianceNote: varianceNote ?? null,
+  })), entry)
 
   const after = await sessionById(id)
-  if (!after || isOpen(after)) {
-    throw createError({ statusCode: 409, statusMessage: 'That session is already closed' })
+  // This caller's own answer, not what the row happens to say: a loser here had their Z figure
+  // and their note thrown away, and must not be told the close went through (F-118 criterion 3).
+  if (!closed) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: after && !isOpen(after)
+        ? 'Somebody else closed this session first, so this reading was not recorded. Read the till before recording anything.'
+        : 'A SumUp payment landed while this close was in flight, so nothing was recorded. Answer it on the till and close again.',
+    })
   }
+  if (!after) throw createError({ statusCode: 409, statusMessage: 'That session is no longer there' })
 
   return { ok: true, session: after }
 })

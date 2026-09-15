@@ -279,6 +279,23 @@ describe.skipIf(skip !== null)('closing a session (F-102 criterion 4)', () => {
     expect(second.status).toBe(409)
   })
 
+  // The loser's Z reading and note are thrown away, so the loser has to be told plainly: a close
+  // that answers "done" over somebody else's figure is the one lie this write must not tell.
+  test('two closes at once leave one winner, and the loser is told whose reading stands', async () => {
+    const closing = programme('till-race-close')
+    const opened = await (await openTill(closing.venueId, bar.cookie)).json() as { session: TillSessionBody }
+
+    const answers = await Promise.all([
+      closeTill(opened.session.id, bar.cookie),
+      closeTill(opened.session.id, bar.cookie),
+    ])
+
+    expect(answers.filter(answer => answer.status === 200)).toHaveLength(1)
+    const loser = answers.find(answer => answer.status !== 200)!
+    expect(loser.status).toBe(409)
+    expect(await message(loser)).toContain('closed this session first')
+  })
+
   test('an ordinary member cannot close tonight\'s session', async () => {
     const closing = programme('till-close-refusal')
     const opened = await (await openTill(closing.venueId, bar.cookie)).json() as { session: TillSessionBody }

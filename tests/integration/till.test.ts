@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { openSessionForQuery, sessionByIdQuery, staleUnclosedSessionsQuery } from '#server/utils/till'
+import { closeSessionStatement, openSessionForQuery, sessionByIdQuery, staleUnclosedSessionsQuery } from '#server/utils/till'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 import type { TillSession } from '#shared/utils/till'
@@ -174,6 +174,100 @@ describe('closing is a one-way predicate (F-102 criterion 4)', () => {
 
       const [session] = rows<{ closed_by: string, closed_at: number }>(database, 'SELECT closed_by, closed_at FROM till_sessions WHERE id = ?', 't-1')
       expect(session).toMatchObject({ closed_by: first, closed_at: 2000 })
+    })
+  })
+})
+
+// The Z cannot be reconciled around money that may still be arriving on the reader, and a
+// hand-off started while the close is in flight is exactly the case a pre-read cannot see.
+describe('a close is refused while a hand-off is open, on the write (F-124 criterion 6)', () => {
+  function sessionWithAttempt(database: TestDatabase, status: string | null): { venueId: string, night: string } {
+    const opener = person(database)
+    const venueId = venue(database)
+    const night = '2026-09-04'
+    insert(database, 'till_sessions', { id: 't-1', venue_id: venueId, night, opened_by: opener, opened_at: 1000 })
+    if (status !== null) {
+      insert(database, 'sumup_attempts', {
+        id: 'att-1', till_session_id: 't-1', venue_id: venueId, night, created_by: opener,
+        basket: '{}', expected_total_pence: 250, status,
+      })
+    }
+    return { venueId, night }
+  }
+
+  const close = (database: TestDatabase, venueId: string, night: string, closedBy: string): number =>
+    rows<{ id: string }>(database, ...boundStatement(database, closeSessionStatement({
+      id: 't-1',
+      venueId,
+      night,
+      closedBy,
+      expectedPence: 0,
+      actualZPence: 0,
+      variancePence: 0,
+      varianceNote: null,
+    }))).length
+
+  const closedAt = (database: TestDatabase): number | null =>
+    rows<{ closedAt: number | null }>(database, 'SELECT closed_at AS closedAt FROM till_sessions WHERE id = ?', 't-1')[0]?.closedAt ?? null
+
+  test('a session with nothing waiting closes', async () => {
+    await withDatabase((database) => {
+      const { venueId, night } = sessionWithAttempt(database, null)
+
+      expect(close(database, venueId, night, 'u-1')).toBe(1)
+      expect(closedAt(database)).not.toBeNull()
+    })
+  })
+
+  for (const status of ['STARTED', 'COMPLETING']) {
+    test(`a hand-off sitting at ${status} refuses the close, and nothing is written`, async () => {
+      await withDatabase((database) => {
+        const { venueId, night } = sessionWithAttempt(database, status)
+
+        expect(close(database, venueId, night, 'u-1')).toBe(0)
+        expect(closedAt(database)).toBeNull()
+      })
+    })
+  }
+
+  // A mismatch is a reconciliation fact rather than a wait: it never blocks the close.
+  for (const status of ['MISMATCH', 'SUCCEEDED', 'FAILED', 'ABANDONED']) {
+    test(`a hand-off already ${status} does not hold the close up`, async () => {
+      await withDatabase((database) => {
+        const { venueId, night } = sessionWithAttempt(database, status)
+
+        expect(close(database, venueId, night, 'u-1')).toBe(1)
+      })
+    })
+  }
+
+  // The route's readable count is a pre-read: here it sees nothing, and the hand-off lands
+  // afterwards, so only a predicate carried on the write can still refuse the close.
+  test('a hand-off started after the close read its count still refuses the close', async () => {
+    await withDatabase((database) => {
+      const { venueId, night } = sessionWithAttempt(database, null)
+
+      insert(database, 'sumup_attempts', {
+        id: 'att-late', till_session_id: 't-1', venue_id: venueId, night, created_by: 'u-1',
+        basket: '{}', expected_total_pence: 250, status: 'STARTED',
+      })
+
+      expect(close(database, venueId, night, 'u-1')).toBe(0)
+      expect(closedAt(database)).toBeNull()
+    })
+  })
+
+  test('a hand-off at another venue on the same night is not this session\'s business', async () => {
+    await withDatabase((database) => {
+      const { venueId, night } = sessionWithAttempt(database, null)
+      const other = venue(database, '2')
+      insert(database, 'till_sessions', { id: 't-2', venue_id: other, night, opened_by: 'u-1', opened_at: 1000 })
+      insert(database, 'sumup_attempts', {
+        id: 'att-other', till_session_id: 't-2', venue_id: other, night, created_by: 'u-1',
+        basket: '{}', expected_total_pence: 250, status: 'STARTED',
+      })
+
+      expect(close(database, venueId, night, 'u-1')).toBe(1)
     })
   })
 })
