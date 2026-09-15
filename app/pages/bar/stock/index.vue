@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import {
   HAND_ENTERED_KINDS,
-  MOVEMENT_REASONS,
+  REASONS_BY_KIND,
   STOCK_UNITS,
   movementEntryForm,
   says,
@@ -76,7 +76,13 @@ const unitOptions = STOCK_UNITS.map(value => ({ label: says(value), value }))
 // A reversal is raised from the movement history, against the movement it cancels.
 const kindOptions = (HAND_ENTERED_KINDS.filter(kind => kind !== 'REVERSAL') as HandEnteredKind[])
   .map(value => ({ label: says(value), value }))
-const reasonOptions = MOVEMENT_REASONS.map(value => ({ label: says(value), value }))
+// Only the reasons the kind actually takes: the server refuses the rest, so the picker never
+// offers one it would (F-204, 3.5).
+const reasonOptions = computed(() => (REASONS_BY_KIND[movement.kind] ?? []).map(value => ({ label: says(value), value })))
+
+watch(() => movement.kind, () => {
+  movement.reason = undefined
+})
 const directionOptions = [{ label: 'Add to stock', value: true }, { label: 'Take off stock', value: false }]
 
 // The field takes pounds and the request carries pence, converted here and nowhere else (0004).
