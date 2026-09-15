@@ -152,9 +152,21 @@ export async function deskTakingsPence(night: string): Promise<number> {
   return row?.deskTakingsPence ?? 0
 }
 
-// The desk's own takings are never scoped: they belong to no bar session, and the whole-day
-// figure a close screen shows beside its own is still the night's (F-118 criterion 1, F-202.3).
+// The three sums the expected figure is made of, unscoped, for a caller whose bar half is
+// narrowed to one session and still owes the night its own whole-day total (F-202 criterion 3).
+async function nightExpectedBarPence(night: string): Promise<number> {
+  const [[cardSales], [tickets], [tabSettlements]] = await Promise.all([
+    db.all<{ cardSalesPence: number }>(cardSalesQuery(night)),
+    db.all<{ ticketsPence: number }>(ticketsAtTheBarQuery(night)),
+    db.all<{ tabSettlementsPence: number }>(tabSettlementsQuery(night)),
+  ])
+  return (cardSales?.cardSalesPence ?? 0) + (tickets?.ticketsPence ?? 0) + (tabSettlements?.tabSettlementsPence ?? 0)
+}
+
+// The desk's own takings are never scoped: they belong to no bar session. The whole-day figure
+// stays the night's whichever bar the breakdown beside it is about (F-118 criterion 1, F-202.3).
 export async function nightReconciliation(night: string, scope?: ReconciliationScope): Promise<NightReconciliation> {
   const [bar, deskPence] = await Promise.all([barReconciliation(night, scope), deskTakingsPence(night)])
-  return { bar, deskTakingsPence: deskPence, wholeNightExpectedPence: bar.expectedPence + deskPence }
+  const barPence = scope ? await nightExpectedBarPence(night) : bar.expectedPence
+  return { bar, deskTakingsPence: deskPence, wholeNightExpectedPence: barPence + deskPence }
 }

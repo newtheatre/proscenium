@@ -721,16 +721,18 @@ export async function commitSale(
       }))
     }
     if (context.attemptId) {
-      const claimable = sql`status = 'COMPLETING' AND EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})`
-      // Before the recording itself: the audit row reads the status the recording is about to
-      // change, so the trail says completed only where this batch is what completed it (0027).
+      // Never on the status, which a sweep may have moved meanwhile: the row names this entry
+      // whatever it drifted to, and `entry_id IS NULL` is what stops a second posting (F-124.5).
+      const posts = sql`EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})`
+      // Ordered ahead of the recording it records, so its predicate reads the row as the
+      // recording will find it and the trail says completed only where this batch did (0027).
       statements.push(db.run(sql`
         INSERT INTO audit_log (id, actor_id, action, target, detail)
         SELECT ${newId()}, ${context.actorId}, 'bar.sumup.completed', ${`sumup-attempt:${context.attemptId}`},
                ${JSON.stringify({ claimedFrom: 'COMPLETING', to: 'SUCCEEDED', entryId: posted.id })}
-        WHERE EXISTS (SELECT 1 FROM sumup_attempts WHERE id = ${context.attemptId} AND entry_id IS NULL AND ${claimable})
+        WHERE ${posts} AND EXISTS (SELECT 1 FROM sumup_attempts WHERE id = ${context.attemptId} AND entry_id IS NULL)
       `))
-      statements.push(db.run(recordPostedSaleStatement(context.attemptId, posted.id, Math.floor(Date.now() / 1000), claimable)))
+      statements.push(db.run(recordPostedSaleStatement(context.attemptId, posted.id, Math.floor(Date.now() / 1000), posts)))
     }
     entryId = posted.id
   }

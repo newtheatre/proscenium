@@ -295,8 +295,8 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
     throw error
   }
 
-  // The recording rode the sale's own batch (criterion 5), so this reads what landed rather than
-  // writing again. A basket that posted no entry has none to name, and records the old way.
+  // The recording rode the sale's own batch (criterion 5), so this reads back what landed, the
+  // way the tab cap's own refusal does. A basket that posted no entry records the old way.
   const recorded = receipt.entryId === null
     ? await recordPostedSale(row.id, null, by.actorId)
     : (await attemptById(row.id))?.entryId === receipt.entryId

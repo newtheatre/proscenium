@@ -250,7 +250,7 @@ describe('the recording rides the sale\'s own batch (F-124 criterion 5, F-105 cr
   // Exactly the predicate and the order `commitSale` batches: the entry, then the recording
   // conditional on that entry having been written by this same batch.
   function saleBatch(database: TestDatabase, entryId: string, options: { postsEntry?: boolean, fails?: boolean } = {}): void {
-    const claimable = sql`status = 'COMPLETING' AND EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${entryId})`
+    const posts = sql`EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${entryId})`
     const statements: BoundStatement[] = []
     if (options.postsEntry !== false) {
       statements.push([
@@ -258,7 +258,7 @@ describe('the recording rides the sale\'s own batch (F-124 criterion 5, F-105 cr
         entryId,
       ])
     }
-    statements.push(boundStatement(database, recordPostedSaleStatement('att-1', entryId, 2000, claimable)))
+    statements.push(boundStatement(database, recordPostedSaleStatement('att-1', entryId, 2000, posts)))
     if (options.fails) {
       statements.push(['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty) VALUES (?, ?, ?, ?, ?)',
         'l-orphan', 'no-such-entry', 'BAR_ITEM', 250, 1])
@@ -294,11 +294,14 @@ describe('the recording rides the sale\'s own batch (F-124 criterion 5, F-105 cr
     })
   })
 
-  test('a row nobody claimed into COMPLETING is never recorded by a batch', async () => {
+  // The guard is never on the status: a sweep that mismatched the row while the commit was in
+  // flight must not cost the recording, or the next answer replays the basket (criterion 5).
+  test('a row a sweep mismatched mid-commit is still recorded by the batch', async () => {
     await withDatabase((database) => {
-      completing(database, 'STARTED')
+      completing(database)
+      expect(move(database, 'att-1', 'COMPLETING', 'MISMATCH')).toBe(1)
       saleBatch(database, 'entry-1')
-      expect(state(database)).toEqual({ status: 'STARTED', entryId: null })
+      expect(state(database)).toEqual({ status: 'SUCCEEDED', entryId: 'entry-1' })
     })
   })
 })

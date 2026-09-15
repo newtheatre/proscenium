@@ -1005,7 +1005,8 @@ unique where not null so a charge voids once · `void_reason` NULL, free text, o
 and off the audit trail (0011) · `till_session_id` NULL, bare (no foreign key: one would rebuild
 this table), the session an entry was rung up against, so a close figure can be its own session's
 rather than the whole night's (F-105.1, F-118, F-202.3); every till write path sets it (a sale, a
-comp given, a tab settlement), and rows from before the column, the desk's own money and any
+comp given, a tab settlement, and a tab-charge void, which carries the session of the charge it
+corrects so the pair still nets), and rows from before the column, the desk's own money and any
 import read NULL · `created_at`.
 Indexed on `london_day` (every report groups by day), `happened_at` (the GP period filter reads
 this column directly, #1094), `reverses_entry_id` and `tab_debtor_id`.
@@ -1575,9 +1576,9 @@ bar-manager-managed list (F-204) needs no rebuild · `unit_cost_pence`, delivery
 basis) · `ref_table` / `ref_id`, set together or not at all · `reverses_id` → stock_movements
 restrict · `actor_id` → users restrict, NULL being the system · `location_venue_id` NULL, bare
 (no foreign key: one would rebuild this table), the venue the movement happened at, set by the
-till's own write paths from the open session's venue; a delivery, a stocktake and a wastage
-movement are keyed from the console and read NULL, as does every historical row (F-202) ·
-`created_at`.
+till's own write paths from the open session's venue, and by a void's credit from the movement it
+reverses; a delivery, a stocktake and a wastage movement are keyed from the console and read NULL,
+as does every historical row (F-202) · `created_at`.
 
 On-hand is always `SUM(qty)`, computed where it is asked for; no column anywhere holds a balance,
 and a test over the live schema refuses one. Triggers refuse every UPDATE and DELETE, and refuse a
