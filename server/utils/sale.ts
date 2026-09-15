@@ -93,7 +93,7 @@ interface ResolvedVariant extends SaleVariant {
   recipe: Depletion[]
 }
 
-interface Resolvable {
+export interface Resolvable {
   variants: Map<string, ResolvedVariant>
   // Keyed by the option row's id, not the item: two options in different groups could share a
   // stocked item, and it is the option chosen that says how much of it a line depletes.
@@ -101,8 +101,8 @@ interface Resolvable {
 }
 
 // The catalogue read every screen and every price check shares, so none of them can disagree
-// about what is sellable (F-103 criterion 3).
-async function activeVariantsWithChoices(on: string): Promise<Resolvable> {
+// about what is sellable (F-103 criterion 3); exported so several baskets can share one resolve.
+export async function activeVariantsWithChoices(on: string): Promise<Resolvable> {
   const { pricePence, priceSource, priceRowId } = resolvedPriceColumns(sql`p.category_id`, 'v', on)
   const variantRows = await db.all<VariantRow>(sql`
     SELECT v.id AS id, v.product_id AS productId, v.serving_kind AS servingKind, v.label AS label,
@@ -241,9 +241,9 @@ async function resolveSale(
   lines: BasketLineInput[],
   on: string,
   discountId: string | null,
+  catalogue?: Resolvable,
 ): Promise<{ resolved: ResolvedLine[], priced: PricedLine[], totalPence: number, discount: Discount | null }> {
-  const catalogue = await activeVariantsWithChoices(on)
-  const resolved = resolveLines(lines, catalogue)
+  const resolved = resolveLines(lines, catalogue ?? await activeVariantsWithChoices(on))
   const discount = await resolveDiscount(discountId)
 
   // Scoped to the basket's own lines, bounded by MAX_BASKET_LINES, never to the whole catalogue
@@ -279,6 +279,13 @@ function publicDiscount(discount: Discount | null): PublicDiscount | null {
 // (0004). A line naming a variant this cannot sell right now is refused by name (F-103 criterion 3).
 export async function priceBasket(lines: BasketLineInput[], on: string, discountId: string | null): Promise<PricedBasket> {
   const { priced, totalPence, discount } = await resolveSale(lines, on, discountId)
+  return { lines: priced, totalPence, discount: publicDiscount(discount) }
+}
+
+// Prices a basket against a catalogue resolved elsewhere: one resolve for several baskets, not
+// one per basket (review-till 8, the comp queue). `on` goes unused once a catalogue is given.
+export async function priceBasketAgainst(lines: BasketLineInput[], catalogue: Resolvable, discountId: string | null): Promise<PricedBasket> {
+  const { priced, totalPence, discount } = await resolveSale(lines, '', discountId, catalogue)
   return { lines: priced, totalPence, discount: publicDiscount(discount) }
 }
 
@@ -796,8 +803,15 @@ export async function commitCompSale(
   if (request.status !== 'APPROVED') {
     throw createError({ statusCode: 409, statusMessage: request.status === 'PENDING' ? 'That request has not been approved yet' : 'That request was declined' })
   }
-  if (request.expired) throw createError({ statusCode: 409, statusMessage: 'That request has lapsed; ask again' })
+  // A comp is spent where it was approved, never at another venue's session on a two-house night
+  // (review-till 13).
+  if (request.venueId !== context.venueId) {
+    throw createError({ statusCode: 409, statusMessage: 'That request was approved for a different venue' })
+  }
+  // Already given wins over lapsed: a retry of a spent request that has since aged past the
+  // window must say it was given, not that it lapsed (`expired` is now computed for APPROVED too).
   if (request.entryId) throw createError({ statusCode: 409, statusMessage: 'That comp has already been given' })
+  if (request.expired) throw createError({ statusCode: 409, statusMessage: 'That request has lapsed; ask again' })
 
   const lines = await compRequestLines(requestId)
   if (!lines) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })

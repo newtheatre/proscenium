@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { stocktakesList } from '#shared/utils/stocktakes-list'
+import { unitCostPence } from './bar-reports'
 import { aliasColumns, count, predicate, whereFrom } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
@@ -61,17 +62,6 @@ export async function countStocktakes(clause: ListClause): Promise<number> {
   return count(sql`SELECT count(*) AS total FROM stocktakes t${predicate(clause)}`)
 }
 
-// The delivered cost a variance is previewed at: the same weighted average over unreversed
-// deliveries the applied variance report uses, so the two never disagree (review-stock 5).
-function unitCostColumn(alias: string): SQL {
-  return sql`(
-    SELECT sum(d.qty * d.unit_cost_pence) * 1.0 / sum(d.qty)
-    FROM stock_movements d
-    WHERE d.item_id = ${sql.raw(alias)}.id AND d.kind = 'DELIVERY' AND d.unit_cost_pence IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = d.id)
-  )`
-}
-
 interface StocktakeLineRow extends Omit<StocktakeLine, 'variance' | 'varianceCostPence'> {
   variance: number | null
   unitCostPence: number | null
@@ -85,12 +75,14 @@ function readLine(row: StocktakeLineRow): StocktakeLine {
   }
 }
 
+// Priced the same way the applied variance report values a line (server/utils/bar-reports.ts's
+// unitCostPence, F-119's basis), so a stocktake in progress never disagrees with what it applies as.
 export function stocktakeLinesQuery(stocktakeId: string): SQL {
   return sql`
     SELECT l.id AS id, l.item_id AS itemId, i.name AS itemName, i.unit AS unit,
            l.expected_qty AS expectedQty, l.counted_qty AS countedQty,
            CASE WHEN l.counted_qty IS NULL THEN NULL ELSE l.counted_qty - l.expected_qty END AS variance,
-           ${unitCostColumn('i')} AS unitCostPence
+           ${unitCostPence} AS unitCostPence
     FROM stocktake_lines l JOIN bar_items i ON i.id = l.item_id
     WHERE l.stocktake_id = ${stocktakeId}
     ORDER BY i.name COLLATE NOCASE

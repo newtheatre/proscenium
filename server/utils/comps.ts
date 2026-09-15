@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
 import { auditedWrite } from '#server/utils/audit'
+import { isDutyOrBarManager } from '#server/utils/bar-authority'
 import { compRequestExpired } from '#shared/utils/comps'
 import { auditEntry } from '#shared/utils/audit'
 import type { BasketLineInput } from '#shared/utils/sale'
@@ -35,9 +36,12 @@ const ROW_COLUMNS = sql`
   r.decided_at AS decidedAt, r.decline_reason AS declineReason, r.entry_id AS entryId, r.created_at AS createdAt
 `
 
+// Computed for a decided-but-unspent row too, not only PENDING: commitCompSale's own expiry
+// check would otherwise never see a true value, since it only ever reads an APPROVED row.
 function hydrate(row: RawRow, expiryMinutes: number, now: Date): CompRequest {
   const { lines: _lines, ...rest } = row
-  return { ...rest, expired: row.status === 'PENDING' && compRequestExpired(row.createdAt, expiryMinutes, now) }
+  const undecidedOrApproved = row.status === 'PENDING' || row.status === 'APPROVED'
+  return { ...rest, expired: undecidedOrApproved && compRequestExpired(row.createdAt, expiryMinutes, now) }
 }
 
 // The basket a request names, for whoever has to re-resolve it: the approver's queue prices it
@@ -93,6 +97,23 @@ export async function createCompRequest(
     })),
   ])
   return id
+}
+
+// The id and 404, ahead of the night-authority call every decide route makes itself, literally
+// in its own source (E-111 criterion 5's own registry test reads for it).
+export async function requestedCompRequest(id: string | undefined, expiryMinutes: number): Promise<CompRequest> {
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Which request' })
+  const request = await compRequestById(id, expiryMinutes)
+  if (!request) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+  return request
+}
+
+// Deciding either way is the same conflict of interest for the requester (F-110 criterion 1);
+// the caller has already established they hold tonight's authority at all.
+export async function requireCompDecider(deciderId: string, request: CompRequest): Promise<void> {
+  if (!await isDutyOrBarManager(deciderId, request.night)) {
+    throw createError({ statusCode: 403, statusMessage: 'A duty manager or bar manager decides a comp request' })
+  }
 }
 
 export type CompDecisionRefusal = 'not-found' | 'not-pending' | 'expired' | 'self'

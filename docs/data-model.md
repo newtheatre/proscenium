@@ -1502,6 +1502,11 @@ claim has already won, so an immediate foreign key would refuse the very stateme
 claim atomic. Do not add one back; the fix for a stale reference is a read-time check, not a
 constraint SQLite cannot enforce at the moment it is written.
 
+`shared/utils/comps.ts` is the one module for the whole request-approve-or-decline-then-spend
+lifecycle: the ask, decline and commit forms, the `CompRequest` read shape (with `expired`
+derived at read time, never stored) and `compRequestExpired`, so the approver's queue, the till
+and `server/utils/sale.ts` all share one idea of what a comp request is and when it has lapsed.
+
 ### sumup_attempts
 `id` PK, also the `foreign-tx-id` the SumUp app is given · `till_session_id` → till_sessions
 restrict · `venue_id` → venues restrict · `night` · `created_by` → users restrict · `created_at` ·
