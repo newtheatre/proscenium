@@ -522,6 +522,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rota/shifts/board.get.ts', exempt: 'reads the per-performance rota, scoped to rota.write' },
   { route: 'server/api/admin/rota/candidates.get.ts', exempt: 'reads who might take a role not yet on the rota, scoped to rota.write' },
   { route: 'server/api/rota/openings/index.get.ts', exempt: 'reads the planned bar openings and the slots on them' },
+  { route: 'server/api/till/venues.get.ts', exempt: 'reads which venues the caller may open a till at tonight' },
   { route: 'server/api/rota/openings/index.post.ts', actions: ['bar-opening.created'] },
   { route: 'server/api/rota/openings/[id]/cancel.post.ts', actions: ['bar-opening.cancelled'] },
   { route: 'server/api/rota/openings/shifts/[id]/claim.post.ts', actions: ['bar-opening-shift.claimed'] },

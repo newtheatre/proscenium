@@ -27,5 +27,13 @@ export const tillScopeForm = z.object({
 
 export type TillScopeInput = z.output<typeof tillScopeForm>
 
+// One row of the picker the till shows when the scope names no venue: what the evening is there,
+// so a volunteer chooses by show or by the opening's label rather than by a database id (F-125).
+export interface TillVenueOption {
+  venueId: string
+  venueName: string
+  what: string
+}
+
 // Closing a session takes the reader's own reading and needs a live expected figure to compare
 // it against, so its form lives with that computation in `shared/utils/reconciliation.ts` (F-118).
