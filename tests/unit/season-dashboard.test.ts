@@ -22,7 +22,11 @@ describe('a season dashboard period', () => {
     expect(periodForm.safeParse({ kind: 'SEASON', year: 2026 }).success).toBe(true)
   })
 
-  test('term is not a selectable kind yet: it waits on the periods table (I-107)', () => {
+  test('a term takes the range the defined term itself carries', () => {
+    expect(periodForm.safeParse({ kind: 'TERM', fromDay: '2026-09-21', toDay: '2026-12-11' }).success).toBe(true)
+  })
+
+  test('a term named by id rather than by its range is refused: the screen resolves the range', () => {
     expect(periodForm.safeParse({ kind: 'TERM', id: 'autumn-2026' }).success).toBe(false)
   })
 })

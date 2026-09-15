@@ -3,7 +3,8 @@ import { saysMoney } from '#shared/utils/bar'
 import { PERIOD_KINDS } from '#shared/utils/season-dashboard'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
 import { currentSeasonYear } from '#shared/utils/season'
-import type { PeriodInput, SeasonSummary } from '#shared/utils/season-dashboard'
+import type { PeriodInput, PeriodKind, SeasonSummary } from '#shared/utils/season-dashboard'
+import type { Period } from '#shared/utils/period-locks'
 
 definePageMeta({ layout: 'console', title: 'Season dashboard', middleware: 'console', docs: '/docs/money' })
 
@@ -11,18 +12,29 @@ const request = useRequestFetch()
 
 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 const currentYear = currentSeasonYear()
-// TERM has a range, not a formula, so it needs its own picker over I-107's defined terms;
-// this screen offers only the kinds a year and a day already answer, until that picker exists.
-const SELECTABLE_PERIOD_KINDS = PERIOD_KINDS.filter(one => one !== 'TERM')
-const kind = ref<(typeof SELECTABLE_PERIOD_KINDS)[number]>('SEASON')
+const { data: terms } = await useAsyncData(
+  'finance-terms',
+  () => request<{ periods: Period[] }>('/api/admin/finance/terms').then(response => response.periods),
+  { default: (): Period[] => [] },
+)
+
+// TERM has a range rather than a formula, so it is offered only once I-107 has a term to pick;
+// the range submitted is the defined term's own, never a rule this screen computes.
+const selectableKinds = computed(() => PERIOD_KINDS.filter(one => one !== 'TERM' || terms.value.length > 0))
+const termItems = computed(() => terms.value.map(one => ({ label: one.label, value: one.id })))
+const kind = ref<PeriodKind>('SEASON')
+const termId = ref(terms.value[0]?.id ?? '')
 const day = ref(today)
 const year = ref(currentYear)
 const month = ref(new Date().getMonth() + 1)
+
+const term = computed(() => terms.value.find(one => one.id === termId.value) ?? terms.value[0])
 
 const period = computed<PeriodInput>(() => {
   if (kind.value === 'DAY') return { kind: 'DAY', day: day.value }
   if (kind.value === 'WEEK') return { kind: 'WEEK', day: day.value }
   if (kind.value === 'MONTH') return { kind: 'MONTH', year: year.value, month: month.value }
+  if (kind.value === 'TERM' && term.value) return { kind: 'TERM', fromDay: term.value.fromDay, toDay: term.value.toDay }
   return { kind: 'SEASON', year: year.value }
 })
 
@@ -74,7 +86,15 @@ function entriesUrl(source?: string): string {
           v-model="kind"
           aria-label="Period kind"
           data-test="period-kind"
-          :items="[...SELECTABLE_PERIOD_KINDS]"
+          :items="selectableKinds"
+        />
+        <USelect
+          v-if="kind === 'TERM'"
+          v-model="termId"
+          aria-label="Term"
+          data-test="period-term"
+          :items="termItems"
+          value-key="value"
         />
         <DateField
           v-if="kind === 'DAY' || kind === 'WEEK'"
@@ -128,7 +148,7 @@ function entriesUrl(source?: string): string {
             <tr class="border-b text-left text-muted">
               <th class="py-2">
                 Source
-              </th><th>Pence</th><th v-if="mayDrillDown" />
+              </th><th>Amount</th><th v-if="mayDrillDown" />
             </tr>
           </thead>
           <tbody>

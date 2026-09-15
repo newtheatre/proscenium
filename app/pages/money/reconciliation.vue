@@ -120,7 +120,7 @@ async function record(): Promise<void> {
             <tr class="border-b text-left text-muted">
               <th class="py-2">
                 Desk, by kind
-              </th><th>Pence</th>
+              </th><th>Amount</th>
             </tr>
           </thead>
           <tbody>
