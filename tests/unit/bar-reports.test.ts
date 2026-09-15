@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { reportPeriodForm } from '#shared/utils/bar-reports'
+import { reportPeriodForm, saysPageOf } from '#shared/utils/bar-reports'
 import { fromLondonWallClock } from '#shared/utils/london'
 import { resolveReportPeriod } from '#server/utils/bar-reports'
 
@@ -105,5 +105,18 @@ describe('resolveReportPeriod bounds every kind on the London calendar (F-119 cr
     const period = resolveReportPeriod({ kind: 'CUSTOM', from: '2026-03-29', to: '2026-03-29' })
     expect(period.toAt).toBe(at(2026, 3, 30))
     expect(hours(period)).toBe(23)
+  })
+})
+
+describe('a section that does not fit says so rather than reading as the whole (F-119 criterion 2)', () => {
+  const page = (items: number, pageNumber: number, total: number) =>
+    ({ items: Array.from({ length: items }, (_, index) => index), page: pageNumber, pageSize: 25, total, pages: Math.ceil(total / 25) })
+
+  test('the first page names where it starts, where it ends and the whole', () => {
+    expect(saysPageOf(page(25, 1, 212))).toBe('Showing 1 to 25 of 212. Narrow the period to see the rest.')
+  })
+
+  test('a later page counts from its own offset', () => {
+    expect(saysPageOf(page(12, 9, 212))).toBe('Showing 201 to 212 of 212. Narrow the period to see the rest.')
   })
 })

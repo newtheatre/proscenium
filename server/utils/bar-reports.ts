@@ -5,13 +5,17 @@ import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { committeeYearEnd, fromLondonWallClock, startOfLondonDayAfter } from '#shared/utils/london'
 import { showNightBounds } from '#shared/utils/show-night'
+import { envelope, offsetFor } from '#shared/utils/pagination'
 import type { SQL } from 'drizzle-orm'
+import type { Page } from '#shared/utils/pagination'
 import type { BarReport, CompRow, DiscountRow, GpReport, GpRow, ReportPeriodInput, SalesRow, VarianceRow } from '#shared/utils/bar-reports'
 
 // Every figure is a query over the ledger and the movement history, run fresh for the period
 // asked for; nothing here is a stored aggregate (F-119 criterion 4).
 
 const WEEK_DAYS = 7
+
+export interface ReportPaging { page: number, pageSize: number }
 
 const londonDayStart = (day: string, plusDays = 0): number =>
   Math.floor(startOfLondonDayAfter(day, plusDays).getTime() / 1000)
@@ -110,38 +114,60 @@ export async function grossProfitReport(fromAt: number, toAt: number): Promise<G
   return { revenuePence, costPence, grossProfitPence: revenuePence - costPence, byItem }
 }
 
-export function varianceQuery(fromAt: number, toAt: number): SQL {
+const varianceScope = (fromAt: number, toAt: number): SQL => sql`
+  FROM stock_movements m
+  JOIN stocktake_lines sl ON sl.id = m.ref_id AND m.ref_table = 'stocktake_lines'
+  JOIN stocktakes st ON st.id = sl.stocktake_id
+  JOIN bar_items i ON i.id = m.item_id
+  WHERE st.applied_at >= ${fromAt} AND st.applied_at < ${toAt}
+`
+
+export function varianceQuery(fromAt: number, toAt: number, limit: number, offset: number): SQL {
   return sql`
     SELECT st.id AS stocktakeId, i.name AS itemName, st.applied_at AS appliedAt,
            m.qty AS qtyVariance, round(m.qty * ${unitCostPence}) AS valuePence
-    FROM stock_movements m
-    JOIN stocktake_lines sl ON sl.id = m.ref_id AND m.ref_table = 'stocktake_lines'
-    JOIN stocktakes st ON st.id = sl.stocktake_id
-    JOIN bar_items i ON i.id = m.item_id
-    WHERE st.applied_at >= ${fromAt} AND st.applied_at < ${toAt}
+    ${varianceScope(fromAt, toAt)}
     ORDER BY st.applied_at, i.name COLLATE NOCASE
+    LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function stocktakeVarianceReport(fromAt: number, toAt: number): Promise<VarianceRow[]> {
-  return db.all<VarianceRow>(varianceQuery(fromAt, toAt))
+export function varianceCountQuery(fromAt: number, toAt: number): SQL {
+  return sql`SELECT count(*) AS total ${varianceScope(fromAt, toAt)}`
+}
+
+export async function stocktakeVarianceReport(fromAt: number, toAt: number, paging: ReportPaging): Promise<Page<VarianceRow>> {
+  const [counted] = await db.all<{ total: number }>(varianceCountQuery(fromAt, toAt))
+  const items = await db.all<VarianceRow>(varianceQuery(fromAt, toAt, paging.pageSize, offsetFor(paging.page, paging.pageSize)))
+  return envelope(items, counted?.total ?? 0, paging.page, paging.pageSize)
 }
 
 // `source = 'TILL'`: module D's ticket comps post comp entries too, and this is the bar manager's
 // section, not the box office's.
-export function compsQuery(fromAt: number, toAt: number): SQL {
+const compsScope = (fromAt: number, toAt: number): SQL => sql`
+  FROM ledger_entries e
+  LEFT JOIN users u ON u.id = e.comp_approved_by
+  WHERE e.tender = 'COMP' AND e.source = 'TILL' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+`
+
+export function compsQuery(fromAt: number, toAt: number, limit: number, offset: number): SQL {
   return sql`
     SELECT e.id AS entryId, e.happened_at AS happenedAt, e.comp_reason AS reason, u.name AS approvedByName,
            coalesce((SELECT sum(l.unit_price_pence * l.qty) FROM ledger_lines l WHERE l.entry_id = e.id), 0) AS foregonePence
-    FROM ledger_entries e
-    LEFT JOIN users u ON u.id = e.comp_approved_by
-    WHERE e.tender = 'COMP' AND e.source = 'TILL' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+    ${compsScope(fromAt, toAt)}
     ORDER BY e.happened_at
+    LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export async function compsReport(fromAt: number, toAt: number): Promise<CompRow[]> {
-  return db.all<CompRow>(compsQuery(fromAt, toAt))
+export function compsCountQuery(fromAt: number, toAt: number): SQL {
+  return sql`SELECT count(*) AS total ${compsScope(fromAt, toAt)}`
+}
+
+export async function compsReport(fromAt: number, toAt: number, paging: ReportPaging): Promise<Page<CompRow>> {
+  const [counted] = await db.all<{ total: number }>(compsCountQuery(fromAt, toAt))
+  const items = await db.all<CompRow>(compsQuery(fromAt, toAt, paging.pageSize, offsetFor(paging.page, paging.pageSize)))
+  return envelope(items, counted?.total ?? 0, paging.page, paging.pageSize)
 }
 
 export function discountsQuery(fromAt: number, toAt: number): SQL {
@@ -162,13 +188,13 @@ export async function discountsReport(fromAt: number, toAt: number): Promise<Dis
   return db.all<DiscountRow>(discountsQuery(fromAt, toAt))
 }
 
-export async function barReport(period: ReportPeriodInput): Promise<BarReport> {
+export async function barReport(period: ReportPeriodInput, paging: ReportPaging): Promise<BarReport> {
   const { fromAt, toAt } = resolveReportPeriod(period)
   const [sales, gp, variance, comps, discounts] = await Promise.all([
     salesReport(fromAt, toAt),
     grossProfitReport(fromAt, toAt),
-    stocktakeVarianceReport(fromAt, toAt),
-    compsReport(fromAt, toAt),
+    stocktakeVarianceReport(fromAt, toAt, paging),
+    compsReport(fromAt, toAt, paging),
     discountsReport(fromAt, toAt),
   ])
   return { fromAt, toAt, sales, gp, variance, comps, discounts }

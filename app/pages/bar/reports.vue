@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
-import { REPORT_PERIOD_KINDS } from '#shared/utils/bar-reports'
+import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
 import type { BarReport, ReportPeriodInput, ReportSection } from '#shared/utils/bar-reports'
 
 definePageMeta({ layout: 'console', title: 'Bar reports', middleware: 'console', docs: '/docs/bar/reports' })
@@ -200,7 +200,7 @@ function exportUrl(section: ReportSection): string {
           </thead>
           <tbody>
             <tr
-              v-for="row in data.variance"
+              v-for="row in data.variance.items"
               :key="`${row.stocktakeId}-${row.itemName}`"
               class="border-b last:border-0"
             >
@@ -210,6 +210,14 @@ function exportUrl(section: ReportSection): string {
             </tr>
           </tbody>
         </table>
+
+        <p
+          v-if="section[0] === 'variance' && data.variance.pages > 1"
+          class="text-sm text-muted"
+          data-test="variance-more"
+        >
+          {{ saysPageOf(data.variance) }}
+        </p>
 
         <table
           v-else-if="section[0] === 'comps'"
@@ -224,7 +232,7 @@ function exportUrl(section: ReportSection): string {
           </thead>
           <tbody>
             <tr
-              v-for="row in data.comps"
+              v-for="row in data.comps.items"
               :key="row.entryId"
               class="border-b last:border-0"
             >
@@ -234,6 +242,14 @@ function exportUrl(section: ReportSection): string {
             </tr>
           </tbody>
         </table>
+
+        <p
+          v-if="section[0] === 'comps' && data.comps.pages > 1"
+          class="text-sm text-muted"
+          data-test="comps-more"
+        >
+          {{ saysPageOf(data.comps) }}
+        </p>
 
         <table
           v-else

@@ -97,7 +97,7 @@ interface ReportBody {
     toAt: number
     sales: { productName: string, variantLabel: string, qty: number, revenuePence: number }[]
     gp: { revenuePence: number, costPence: number, grossProfitPence: number, byItem: { itemName: string, qtyDepleted: number, costPence: number }[] }
-    comps: { reason: string, foregonePence: number }[]
+    comps: { items: { reason: string, foregonePence: number }[], total: number, pages: number }
     discounts: { discountName: string, discountedPence: number }[]
   }
 }
@@ -152,9 +152,11 @@ describe.skipIf(skip !== null)('sales, GP, comps and discounts are read live fro
     await send('POST', `/api/till/comp-requests/${id}/sale`, { venueId, expectedForegonePence: 500 }, barStaff.cookie)
 
     const { report } = await (await runReport()).json() as ReportBody
-    const comp = report.comps.find(row => row.reason === 'A round on the house')
+    const comp = report.comps.items.find(row => row.reason === 'A round on the house')
     expect(comp).toBeTruthy()
     expect(comp?.foregonePence).toBe(500)
+    // The section is an envelope, so the count is of the period rather than of what fitted.
+    expect(report.comps.total).toBeGreaterThanOrEqual(report.comps.items.length)
   })
 
   test('a discount reports the name and the pence given away', async () => {

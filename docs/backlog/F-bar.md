@@ -326,8 +326,9 @@ Open questions:
      adjustment and are listed as uncounted in the result.
   3. Variance per counted item is counted minus expected, shown in units and at cost before
      anything is applied.
-  4. Applying posts one adjustment movement per counted item in a single transaction, all or none,
-     and freezes the stocktake.
+  4. Applying posts one adjustment movement per counted item whose count differs from expected, in
+     a single transaction, all or none, and freezes the stocktake. A count that agrees with
+     expected posts nothing: a movement of zero moves nothing and the database refuses it.
   5. A frozen stocktake is immutable; a mistake is corrected by a new stocktake or a reversing
      movement, never an edit.
   6. Named regression case: a blank count never writes a zero adjustment, the exact damage the old

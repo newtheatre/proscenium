@@ -1,10 +1,14 @@
 import { reportPeriodForm } from '#shared/utils/bar-reports'
+import { pageQuery } from '#shared/utils/pagination'
 
 // Sales, GP, variance, comps and discounts for a period, read live (F-119 criteria 1, 4). The
 // bar manager, the treasurer and administrators (criterion 5), never the wider catalogue reader.
+
+// One page applies to both unbounded sections: comps and variance are each one row per event, so
+// a season is unbounded in both and neither may answer whole (criterion 2).
 export default defineEventHandler(async (event) => {
   await requireAnyPermission(event, ['bar.read', 'finance.read'])
-  const period = await getValidatedQueryOrThrow(event, reportPeriodForm)
+  const { page, pageSize, ...period } = await getValidatedQueryOrThrow(event, reportPeriodForm.and(pageQuery))
 
-  return { ok: true, report: await barReport(period) }
+  return { ok: true, report: await barReport(period, { page, pageSize }) }
 })
