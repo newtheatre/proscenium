@@ -41,6 +41,17 @@ export const OUTSTANDING_CHARGE = sql`
   AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
 `
 
+// The cap as a condition on the charge's own insert, re-summing at the moment it is written: a
+// read and a check cannot hold a cap two tills are charging against at once (F-108 criterion 3).
+export function tabCapGuard(holderId: string, chargePence: number, capPence: number): SQL {
+  return sql`
+    (${chargePence} + (
+      SELECT coalesce(sum(e.total_pence), 0) FROM ledger_entries e
+      WHERE e.tab_debtor_id = ${holderId} AND ${OUTSTANDING_CHARGE}
+    )) <= ${capPence}
+  `
+}
+
 // Exported as a query rather than a number so a test can run it against the real migrations.
 export function tabBalanceQuery(holderId: string): SQL {
   return sql`

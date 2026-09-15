@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { createTestDatabase, rows } from '#tests/helpers/database'
+import { tabCapGuard } from '#server/utils/tab-settlement'
+import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { expectOneWinner, race } from '#tests/helpers/race'
+import type { TestDatabase } from '#tests/helpers/database'
 
 // F-109 criteria 2, 3. A `Promise.all` of HTTP requests does not reliably prove a SQL-level race
 // in this harness, so this runs directly against the database (`tab-settlement.test.ts` is supplementary).
@@ -95,6 +97,102 @@ describe('a tab charge settles once, however many settlements race it (F-109)', 
           AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
       `)[0]?.total
       expect(outstanding).toBe(500)
+    }
+    finally {
+      database.close()
+    }
+  })
+})
+
+// F-108 criterion 3. The cap is a promise about what may be written, so the predicate that keeps
+// it has to be on the write: two tills reading the same balance both pass a read-then-check.
+describe('a hard cap holds however many charges race it (F-108)', () => {
+  const CAP = 2000
+
+  function holder(database: TestDatabase): void {
+    database.batch([
+      ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-member', 'member@example.invalid', 'Member'],
+      ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-staff', 'staff@example.invalid', 'Staff'],
+    ])
+  }
+
+  // Exactly the shape `postEntry`'s guarded branch writes: the whole entry rides one conditional
+  // statement, so a loser writes nothing rather than writing and being corrected.
+  function charge(database: TestDatabase, id: string, at: number, chargePence: number): number {
+    const [guard, ...guardParameters] = boundStatement(database, tabCapGuard('u-member', chargePence, CAP))
+    return rows<{ id: string }>(database, `
+      INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence, tab_debtor_id)
+      SELECT ?, ?, '2026-09-09', 'TILL', 'TAB', 'u-staff', ?, 'u-member'
+      WHERE ${guard}
+      RETURNING id
+    `, id, at, chargePence, ...guardParameters).length
+  }
+
+  const outstanding = (database: TestDatabase): number => rows<{ total: number }>(database, `
+    SELECT coalesce(sum(e.total_pence), 0) AS total FROM ledger_entries e
+    WHERE e.tab_debtor_id = 'u-member' AND e.reverses_entry_id IS NULL AND e.void_of_entry_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM ledger_entries v WHERE v.void_of_entry_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
+  `)[0]!.total
+
+  test('two charges that each fit alone, but not together, leave exactly one', async () => {
+    const database = await createTestDatabase()
+    try {
+      holder(database)
+
+      const answers = await race(2, async index => ({
+        status: charge(database, `charge-${index}`, 1_788_950_000 + index, 1500) === 1 ? 200 : 409,
+      }))
+
+      expectOneWinner(answers)
+      expect(outstanding(database)).toBe(1500)
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('a charge that takes the balance exactly to the cap is allowed', async () => {
+    const database = await createTestDatabase()
+    try {
+      holder(database)
+
+      expect(charge(database, 'charge-1', 1_788_950_000, 1500)).toBe(1)
+      expect(charge(database, 'charge-2', 1_788_950_001, 500)).toBe(1)
+      expect(outstanding(database)).toBe(CAP)
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('one penny more than the cap writes nothing at all', async () => {
+    const database = await createTestDatabase()
+    try {
+      holder(database)
+
+      expect(charge(database, 'charge-1', 1_788_950_000, CAP + 1)).toBe(0)
+      expect(outstanding(database)).toBe(0)
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  // A void frees the room it was taking, and the guard reads the same sum every other balance
+  // does, so the holder may charge up to the cap again (F-109).
+  test('a voided charge leaves room under the cap for the write, not just for the read', async () => {
+    const database = await createTestDatabase()
+    try {
+      holder(database)
+      expect(charge(database, 'charge-1', 1_788_950_000, CAP)).toBe(1)
+      database.batch([[`
+        INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence, tab_debtor_id, void_of_entry_id, void_reason)
+        VALUES ('void-1', ?, '2026-09-09', 'TILL', 'TAB', 'u-staff', ?, 'u-member', 'charge-1', 'Charged in error')`,
+      1_788_950_010, -CAP]])
+
+      expect(charge(database, 'charge-2', 1_788_950_020, CAP)).toBe(1)
+      expect(outstanding(database)).toBe(CAP)
     }
     finally {
       database.close()

@@ -9,6 +9,7 @@ import { discountedPence } from '#shared/utils/discounts'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
 import { isDutyOrBarManager } from '#server/utils/bar-authority'
 import { authorisedTabHolder, outstandingTabBalance } from '#server/utils/tab-holders'
+import { tabCapGuard } from '#server/utils/tab-settlement'
 import { claimCompRequestForSale, compRequestById, compRequestLines, releaseCompRequestClaim } from '#server/utils/comps'
 import { priceRef, saysMoney } from '#shared/utils/bar'
 import { deskTicketsQuery } from '#server/utils/desk'
@@ -26,7 +27,9 @@ import type { Discount } from '#shared/utils/discounts'
 import type { DeskTicketLine } from '#server/utils/desk'
 import type { ReservationLineToWrite } from '#server/utils/reservations'
 import type { BasketLineInput, CollectedTicketLine, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleInput, SaleProduct, SaleReceipt, SaleVariant, TicketLineInput, WalkUpGuestInput, WalkUpLineInput, WalkUpReceipt } from '#shared/utils/sale'
+import type { AuditRow } from '#shared/utils/audit'
 import type { EntryInput } from '#shared/utils/ledger'
+import type { SQL } from 'drizzle-orm'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { H3Event } from 'h3'
 
@@ -419,6 +422,13 @@ function saleableAfterAgeCheck(
   return { restricted, sold }
 }
 
+// Whether a guarded entry actually landed. Read back rather than inferred, the same way a
+// contended claim always answers for itself (0001, 0003).
+async function entryExists(id: string): Promise<boolean> {
+  const [row] = await db.all<{ n: number }>(sql`SELECT count(*) AS n FROM ledger_entries WHERE id = ${id}`)
+  return Number(row?.n ?? 0) === 1
+}
+
 // The tab side of the cross-check (F-108 criteria 1, 3, 4): resolved once, so the balance read
 // and the write it gates can never see two different figures.
 async function resolveTab(
@@ -426,7 +436,7 @@ async function resolveTab(
   actorId: string,
   night: string,
   chargePence: number,
-): Promise<{ holderId: string, holderName: string, outstandingPence: number, capOverridden: boolean } | null> {
+): Promise<{ holderId: string, holderName: string, outstandingPence: number, capOverridden: boolean, guard: SQL | null } | null> {
   if (!tabHolderId) return null
 
   const holder = await authorisedTabHolder(undefined, tabHolderId)
@@ -442,13 +452,16 @@ async function resolveTab(
       throw createError({
         statusCode: 409,
         statusMessage: `${holder.name}'s tab is at ${saysMoney(outstandingPence)}; this charge of ${saysMoney(chargePence)} `
-          + `would take it past the ${saysMoney(cap)} cap. A duty manager or bar manager can override.`,
+          + `would take it past the ${saysMoney(cap)} cap. Nothing has been charged: a duty manager or bar manager can override.`,
       })
     }
     capOverridden = true
   }
 
-  return { holderId: holder.id, holderName: holder.name, outstandingPence, capOverridden }
+  // The refusal above is for the reader; this is what actually holds the cap. An overridden
+  // charge carries no guard: a manager waved this one past deliberately (criterion 4).
+  const guard = capOverridden ? null : tabCapGuard(holder.id, chargePence, cap)
+  return { holderId: holder.id, holderName: holder.name, outstandingPence, capOverridden, guard }
 }
 
 // The cross-check (F-104) and the one atomic write (F-105 criterion 1): the ledger entry, its
@@ -614,25 +627,32 @@ export async function commitSale(
         // Without this a matinee sale is invisible to its own report (E-127 criterion 6).
         performanceId: context.performanceId,
       })), ...ticketLines],
-    })
+    }, new Date(), tab?.guard ?? undefined)
     statements.push(...posted.statements)
     // Every movement cites the sale line that caused it (F-105 criterion 3), which is only known
     // once `postEntry` has assigned that line's id; a movement of zero never reaches the batch (0010).
     soldResolved.forEach((line, index) => {
       const lineId = posted.lineIds[index]!
       for (const ingredient of line.depletion) {
-        statements.push(db.insert(schema.stockMovements).values({
-          id: newId(),
-          itemId: ingredient.itemId,
-          qty: -(ingredient.qty * line.qty),
-          kind: 'SALE',
-          refTable: 'ledger_lines',
-          refId: lineId,
-          actorId: context.actorId,
-        }))
+        // Conditional on the entry, which a tab charge at its cap may not have written: stock
+        // never moves for a sale that did not post (0001, F-105 criterion 1).
+        statements.push(db.run(sql`
+          INSERT INTO stock_movements (id, item_id, qty, kind, ref_table, ref_id, actor_id)
+          SELECT ${newId()}, ${ingredient.itemId}, ${-(ingredient.qty * line.qty)}, 'SALE', 'ledger_lines', ${lineId}, ${context.actorId}
+          WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})
+        `))
       }
     })
-    statements.push(db.insert(schema.auditLog).values(auditEntry({
+    // Audit rides the same condition as the sale it records (0027): a charge the cap refused is
+    // not a sale, and the trail must not say one happened.
+    const audited = (row: AuditRow): void => {
+      statements.push(db.run(sql`
+        INSERT INTO audit_log (id, actor_id, action, target, detail)
+        SELECT ${row.id}, ${row.actorId}, ${row.action}, ${row.target}, ${row.detail !== null ? JSON.stringify(row.detail) : null}
+        WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})
+      `))
+    }
+    audited(auditEntry({
       actorId: context.actorId,
       action: 'bar.till.sale',
       target: `till-session:${context.sessionId}`,
@@ -644,16 +664,16 @@ export async function commitSale(
         discountId: discount?.id ?? null,
         tender: tab ? 'TAB' : 'CARD',
       },
-    })))
+    }))
     // A separate row from the sale itself: real because `actorId` above is only set by whoever
     // was actually signed in to submit it (F-108 criterion 4).
     if (tab?.capOverridden) {
-      statements.push(db.insert(schema.auditLog).values(auditEntry({
+      audited(auditEntry({
         actorId: context.actorId,
         action: 'bar.tab.cap-overridden',
         target: `till-session:${context.sessionId}`,
         detail: { tabHolderId: tab.holderId, chargePence: soldTotalPence },
-      })))
+      }))
     }
     entryId = posted.id
   }
@@ -700,6 +720,16 @@ export async function commitSale(
       throw createError({ statusCode: 409, statusMessage: 'One of those bookings was collected elsewhere just now. Nothing has been charged: look it up again.' })
     }
     throw error
+  }
+
+  // The cap's own refusal, read back: the guard on the entry wrote nothing, and everything that
+  // depended on it carried the same condition, so there is nothing to undo (F-108 criterion 3).
+  if (tab?.guard && entryId && !await entryExists(entryId)) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `${tab.holderName}'s tab reached the cap while this was being charged. `
+        + 'Nothing has been charged: read the tab and try again, or ask a duty manager or bar manager to override.',
+    })
   }
 
   // The door pass (F-123 criterion 4), and the email for a booker who gave an address (criterion 2).

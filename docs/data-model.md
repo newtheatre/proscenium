@@ -1008,6 +1008,13 @@ rather than the whole night's (F-105.1, F-118, F-202.3); `postEntry` accepts it 
 passes it yet, so every existing row reads NULL · `created_at`.
 Indexed on `london_day` (every report groups by day), `happened_at` (the GP period filter reads
 this column directly, #1094), `reverses_entry_id` and `tab_debtor_id`.
+The F-108 cap is a condition on the charge's own insert (`tabCapGuard`), re-summing the holder's
+outstanding entries at the moment it is written, so two tills charging one holder at once cannot
+both pass. Everything in that batch which depends on the entry, the stock movements and the audit
+rows, carries `EXISTS (SELECT 1 FROM ledger_entries WHERE id = …)`, so a refused charge leaves
+nothing behind and the route reads the entry back to refuse in words. A charge a manager waved
+past the cap carries no guard: the override is the decision.
+
 A void credit carries the same `tab_debtor_id` as the charge it credits, and every balance
 (the account screen, the F-108 cap, the year-end list, the retention exemption) reads
 `OUTSTANDING_CHARGE` in `server/utils/tab-settlement.ts`, which drops both the voided charge and

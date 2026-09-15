@@ -30,6 +30,16 @@ describe('configuration surface (0012, 0019)', () => {
     expect(CONFIG_KEYS.BAR_TAB_CAP_PENCE.default).toBe(2000)
   })
 
+  // The allow-list is read into one bounded IN query on every charge, so its own length is what
+  // keeps that query inside D1's parameter limit (0003). Committee-sized by nature is not a rule.
+  test('the tab allow-list is bounded at the parameter limit', () => {
+    const ids = (count: number): string[] => Array.from({ length: count }, (_, index) => `user-${index}`)
+    const schema = CONFIG_KEYS.BAR_AUTHORISED_TAB_HOLDERS.schema
+
+    expect(schema.safeParse(ids(90)).success).toBe(true)
+    expect(schema.safeParse(ids(91)).success).toBe(false)
+  })
+
   test('retention ships disarmed', () => {
     expect(CONFIG_KEYS.RETENTION_ARMED.default).toBe(false)
   })
