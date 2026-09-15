@@ -46,6 +46,9 @@ from a shift: a bar shift opens the till, not these screens.
   ::card{icon="i-lucide-bar-chart-3" title="Reports" to="/docs/bar/reports"}
   Sales, gross profit, stocktake variance, comps and discounts over a period, with CSV export.
   ::
+  ::card{icon="i-lucide-receipt" title="Tabs" to="/docs/bar/tabs"}
+  Every holder still carrying a balance, itemised, and voiding a charge behind a reason.
+  ::
 ::
 
 ## How the pieces fit
