@@ -352,6 +352,66 @@ describe.skipIf(skip !== null)('every change is audited with a from and a to (F-
   })
 })
 
+// The name predicate and the audit insert share one batch (auditedWrite, 0049), so a losing
+// racer's write touches nothing and the audit trail never logs a change that did not happen.
+describe.skipIf(skip !== null)('a race for a name is refused, and the loser logs nothing (0049)', () => {
+  test('two managers creating a category with the same name at once write one audit entry', async () => {
+    const name = named('Contested category')
+    const raced = await Promise.all([
+      send('POST', '/api/admin/bar/categories', { name, sort: 10 }),
+      send('POST', '/api/admin/bar/categories', { name, sort: 20 }, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
+    const { id } = await raced.find(answered => answered.status === 200)!.json() as { id: string }
+    expect(auditCount('bar.category.created', `bar-category:${id}`)).toBe(1)
+  })
+
+  test('two managers renaming the same category at once write one audit entry, and the loser is refused', async () => {
+    const categoryId = await addCategory()
+    const target = named('Renamed category')
+
+    const raced = await Promise.all([
+      send('PUT', `/api/admin/bar/categories/${categoryId}`, { name: target, sort: 10 }),
+      send('PUT', `/api/admin/bar/categories/${categoryId}`, { name: target, sort: 20 }, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
+    expect(auditCount('bar.category.updated', `bar-category:${categoryId}`)).toBe(1)
+  })
+
+  test('two managers renaming the same product at once write one audit entry, and the loser is refused', async () => {
+    const categoryId = await addCategory()
+    const productId = await addProduct(categoryId)
+    const target = named('Renamed product')
+
+    const raced = await Promise.all([
+      send('PUT', `/api/admin/bar/products/${productId}`, { name: target, categoryId }),
+      send('PUT', `/api/admin/bar/products/${productId}`, { name: target, categoryId }, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
+    expect(auditCount('bar.product.updated', `bar-product:${productId}`)).toBe(1)
+  })
+
+  test('two managers renaming the same stocked item at once write one audit entry, and the loser is refused', async () => {
+    const itemId = await addItem()
+    const target = named('Renamed item')
+
+    const raced = await Promise.all([
+      send('PUT', `/api/admin/bar/items/${itemId}`, { name: target, unit: 'ML', containerMl: 750 }),
+      send('PUT', `/api/admin/bar/items/${itemId}`, { name: target, unit: 'ML', containerMl: 750 }, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
+    expect(auditCount('bar.item.updated', `bar-item:${itemId}`)).toBe(1)
+  })
+})
+
 describe.skipIf(skip !== null)('a stocked item is counted in its own unit (F-114 criterion 1)', () => {
   test('an item carries a name and a real counting unit', async () => {
     const name = named('House red')

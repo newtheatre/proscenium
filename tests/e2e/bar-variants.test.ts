@@ -180,6 +180,22 @@ describe.skipIf(skip !== null)('one stocked thing sells at many sizes (F-112 cri
     expect((await again.json() as { message?: string }).message).toContain('bottle')
   })
 
+  // The serving-kind predicate and the audit insert share one batch (auditedWrite, 0049), so a
+  // losing racer's write touches nothing and the audit trail never logs a change that did not happen.
+  test('two managers adding the same serving kind at once write one audit entry, and the loser is refused', async () => {
+    const productId = await aProduct()
+
+    const raced = await Promise.all([
+      send('POST', '/api/admin/bar/variants', { productId, servingKind: 'bottle', label: 'Bottle' }),
+      send('POST', '/api/admin/bar/variants', { productId, servingKind: 'bottle', label: 'Bottle again' }, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
+    const { id } = await raced.find(answered => answered.status === 200)!.json() as { id: string }
+    expect(auditCount('bar.variant.created', `bar-variant:${id}`)).toBe(1)
+  })
+
   test('a serving kind nobody defined is refused', async () => {
     const productId = await aProduct()
     expect((await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'schooner', label: 'Schooner' })).status).toBe(400)
@@ -276,6 +292,24 @@ describe.skipIf(skip !== null)('a size is retired, never destroyed (F-112 criter
     expect((await variants(elsewhere)).map(variant => variant.id)).not.toContain(id)
     expect((await variants(productId)).find(variant => variant.id === id)?.label).toBe('Moved')
   })
+
+  // Same batch, same guarantee as the create race above: the loser's UPDATE touches nothing. Two
+  // distinct sizes race to claim the one kind neither of them holds yet.
+  test('two sizes racing to claim the same serving kind write one audit entry, and the loser is refused', async () => {
+    const productId = await aProduct()
+    const bottle = await addVariant(productId, { servingKind: 'bottle', label: 'Bottle' })
+    const single = await addVariant(productId, { servingKind: 'single', label: 'Single' })
+
+    const raced = await Promise.all([
+      send('PUT', `/api/admin/bar/variants/${bottle}`, { servingKind: 'double', label: 'Bottle' }),
+      send('PUT', `/api/admin/bar/variants/${single}`, { servingKind: 'double', label: 'Single' }, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
+    const winnerId = raced[0]!.status === 200 ? bottle : single
+    expect(auditCount('bar.variant.updated', `bar-variant:${winnerId}`)).toBe(1)
+  })
 })
 
 describe.skipIf(skip !== null)('a price is a dated append-only row (F-116)', () => {
@@ -293,6 +327,19 @@ describe.skipIf(skip !== null)('a price is a dated append-only row (F-116)', () 
     const history = await prices(id)
     expect(history.map(row => row.pricePence)).toEqual([1900, 1800])
     expect(history.find(row => row.effective)?.pricePence).toBe(1800)
+  })
+
+  // The price row and its audit entry share one batch (auditedWrite, 0049), so the two never
+  // land as two separate round trips: exactly one audit row per price set.
+  test('setting a price writes exactly one audit entry, in the same write as the price row', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId)
+
+    await send('POST', `/api/admin/bar/variants/${id}/prices`, { pricePence: 1250, effectiveFrom: today() })
+    expect(auditCount('bar.variant.price.set', `bar-variant:${id}`)).toBe(1)
+
+    await send('POST', `/api/admin/bar/variants/${id}/prices`, { pricePence: 1300, effectiveFrom: today() })
+    expect(auditCount('bar.variant.price.set', `bar-variant:${id}`)).toBe(2)
   })
 
   // The old estate held one row per product per day, so a same-day mistake waited for tomorrow.

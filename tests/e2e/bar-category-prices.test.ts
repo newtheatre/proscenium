@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -96,6 +97,19 @@ const setVariantPrice = (variantId: string, over: Record<string, unknown> = {}):
 
 const resolved = async (productId: string, variantId: string): Promise<ListedVariant | undefined> =>
   (await variants(productId)).find(variant => variant.id === variantId)
+
+function auditCount(action: string, target: string): number {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    const row = database
+      .query('SELECT count(*) AS total FROM audit_log WHERE action = ? AND target = ?')
+      .get(action, target) as { total: number }
+    return row.total
+  }
+  finally {
+    database.close()
+  }
+}
 
 describe.skipIf(skip !== null)('resolution is variant price first, category default second (F-121 criterion 2)', () => {
   test('a variant with no price of its own falls back to the category default', async () => {
@@ -271,4 +285,18 @@ describe.skipIf(skip !== null)('the catalogue screen', () => {
     expect(variant?.pricePence).toBe(250)
     expect(variant?.priceSource).toBe('category')
   }, 120_000)
+})
+
+// The price row and its audit entry share one batch (auditedWrite, 0049), rather than landing
+// as two round trips a crash between them could split.
+describe.skipIf(skip !== null)('setting a category default writes exactly one audit entry (0049)', () => {
+  test('one price set is one audit entry, and a second set is a second entry', async () => {
+    const categoryId = await aCategory()
+
+    await setCategoryDefault(categoryId, { pricePence: 250 })
+    expect(auditCount('bar.category.price.set', `bar-category:${categoryId}`)).toBe(1)
+
+    await setCategoryDefault(categoryId, { pricePence: 275, effectiveFrom: dayFrom(1) })
+    expect(auditCount('bar.category.price.set', `bar-category:${categoryId}`)).toBe(2)
+  })
 })

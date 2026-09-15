@@ -14,31 +14,32 @@ export default defineEventHandler(async (event) => {
   const colour = input.colour ?? null
 
   // The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
-  // moment refuses rather than reaching the unique index (0003, 0006).
-  const updated = await db.all<{ id: string }>(sql`
-    UPDATE bar_categories
-    SET name = ${input.name}, sort = ${input.sort}, colour = ${colour}
-    WHERE id = ${id}
-      AND NOT EXISTS (SELECT 1 FROM bar_categories WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
-    RETURNING id
-  `)
+  // moment refuses rather than reaching the unique index (0003, 0006, 0049).
+  const applied = await auditedWrite(
+    db.all<{ id: string }>(sql`
+      UPDATE bar_categories
+      SET name = ${input.name}, sort = ${input.sort}, colour = ${colour}
+      WHERE id = ${id}
+        AND NOT EXISTS (SELECT 1 FROM bar_categories WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
+      RETURNING id
+    `),
+    auditEntry({
+      actorId: resolved.account.id,
+      action: 'bar.category.updated',
+      target: `bar-category:${id}`,
+      detail: changes({
+        name: [held.name, input.name],
+        sort: [held.sort, input.sort],
+        colour: [held.colour, colour],
+      }),
+    }),
+  )
 
-  if (updated.length === 0) {
+  if (!applied) {
     const taken = await categoryNamed(input.name, id)
     if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such category' })
     throw createError({ statusCode: 409, statusMessage: `A category is already called ${taken.name}` })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: resolved.account.id,
-    action: 'bar.category.updated',
-    target: `bar-category:${id}`,
-    detail: changes({
-      name: [held.name, input.name],
-      sort: [held.sort, input.sort],
-      colour: [held.colour, colour],
-    }),
-  }))
 
   return { ok: true }
 })
