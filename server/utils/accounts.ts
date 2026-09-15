@@ -32,6 +32,15 @@ export async function findByEmail(email: string): Promise<AccountRow | undefined
   return row as AccountRow | undefined
 }
 
+// No password, no Google link, no passkey and not a tombstone: a guest, a console creation or an
+// imported row, which "sign in as usual" would send nowhere (A-116 criterion 2, 0011).
+export async function hasNoWayIn(account: AccountRow): Promise<boolean> {
+  if (account.password !== null || account.googleSub !== null || account.anonymisedAt !== null) return false
+  const [passkey] = await db.select({ id: schema.passkeys.id })
+    .from(schema.passkeys).where(eq(schema.passkeys.userId, account.id)).limit(1)
+  return passkey === undefined
+}
+
 export async function findById(id: string): Promise<AccountRow | undefined> {
   const [row] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1)
   return row as AccountRow | undefined

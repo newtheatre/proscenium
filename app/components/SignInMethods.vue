@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
+import { refusalToAddPassword } from '#shared/utils/sign-in-methods'
 import type { SignInMethod } from '#shared/utils/sign-in-methods'
 
 // What this account can sign in with. A removal the server would refuse is never offered: the
@@ -63,6 +64,36 @@ async function changeEmail(): Promise<void> {
   }
   finally {
     changing.value = false
+  }
+}
+
+// 0008: a Workspace address holds no password by any path, so the field is not offered on one.
+const passwordRefusal = computed(() => refusalToAddPassword({ email: account.value.user?.email ?? '' }))
+const wantedPassword = ref('')
+const settingPassword = ref(false)
+
+async function setPassword(): Promise<void> {
+  settingPassword.value = true
+  try {
+    const answer = await $fetch<{ added: boolean }>('/api/account/password', {
+      method: 'PUT',
+      body: { password: wantedPassword.value },
+    })
+    wantedPassword.value = ''
+    toast.add({ title: answer.added ? 'Password added' : 'Password changed', icon: 'i-lucide-key-round', color: 'success' })
+    await load()
+  }
+  catch (error) {
+    if (needsReauthentication(error)) {
+      pending.value = setPassword
+      reauthenticating.value = true
+    }
+    else {
+      toast.add({ title: refusalText(error), color: 'error' })
+    }
+  }
+  finally {
+    settingPassword.value = false
   }
 }
 
@@ -204,6 +235,39 @@ onMounted(load)
             </UButton>
           </div>
         </UFormField>
+
+        <UFormField
+          v-if="passwordRefusal === null"
+          label="Password"
+          name="password"
+          description="Add one, or replace the one you have."
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <UInput
+              v-model="wantedPassword"
+              type="password"
+              placeholder="New password"
+              class="w-full sm:w-80"
+              data-test="new-password"
+            />
+            <UButton
+              color="neutral"
+              variant="subtle"
+              :disabled="!wantedPassword"
+              :loading="settingPassword"
+              data-test="set-password"
+              @click="setPassword"
+            >
+              Set it
+            </UButton>
+          </div>
+        </UFormField>
+        <p
+          v-else
+          class="text-sm text-muted"
+        >
+          Theatre addresses sign in with Google and cannot hold a password.
+        </p>
 
         <UButton
           v-if="isSupported"
