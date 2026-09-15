@@ -430,6 +430,26 @@ describe.skipIf(skip !== null)('a name is held once whatever the capitals, and t
     expect((await again.json() as { message?: string }).message).toContain(name)
   })
 
+  test('a product name collides case-insensitively', async () => {
+    const categoryId = await addCategory()
+    const name = named('Lager')
+    await addProduct(categoryId, { name })
+    const again = await send('POST', '/api/admin/bar/products', { name: name.toUpperCase(), categoryId })
+    expect(again.status).toBe(409)
+    expect((await again.json() as { message?: string }).message).toContain(name)
+  })
+
+  test('renaming onto a held product name refuses case-insensitively', async () => {
+    const categoryId = await addCategory()
+    const productId = await addProduct(categoryId)
+    const name = named('Cider')
+    await addProduct(categoryId, { name })
+
+    const collided = await send('PUT', `/api/admin/bar/products/${productId}`, { name: name.toUpperCase(), categoryId })
+    expect(collided.status).toBe(409)
+    expect((await collided.json() as { message?: string }).message).toContain(name)
+  })
+
   test('renaming onto a held category name refuses, and a 404 still wins when the row itself is gone', async () => {
     const categoryId = await addCategory()
     const name = named('Wine')

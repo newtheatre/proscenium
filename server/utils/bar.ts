@@ -264,9 +264,19 @@ export async function categoryById(id: string): Promise<BarCategory | undefined>
   return row
 }
 
-// Who already holds a name, for the refusal a losing create or rename gives (0047). `table` and
-// `column` are written here, never taken from a request, so raw interpolation is safe.
-export async function claimName(table: string, column: string, name: string, exceptId?: string): Promise<{ id: string, name: string } | undefined> {
+// Every table and column claimName may look a name up against, so a caller names an entity
+// rather than an arbitrary identifier: raw SQL interpolation stays off anything a request sends.
+const NAMED_TABLES = {
+  category: { table: 'bar_categories', column: 'name' },
+  product: { table: 'bar_products', column: 'name' },
+  item: { table: 'bar_items', column: 'name' },
+} as const
+
+export type NamedEntity = keyof typeof NAMED_TABLES
+
+// Who already holds a name, for the refusal a losing create or rename gives (0047).
+export async function claimName(entity: NamedEntity, name: string, exceptId?: string): Promise<{ id: string, name: string } | undefined> {
+  const { table, column } = NAMED_TABLES[entity]
   const except = exceptId ? sql` AND id <> ${exceptId}` : sql``
   const [row] = await db.all<{ id: string, name: string }>(sql`
     SELECT id, ${sql.raw(column)} AS name FROM ${sql.raw(table)}

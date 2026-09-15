@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
   )
 
   if (!applied) {
-    const taken = await claimName('bar_categories', 'name', input.name, id)
+    const taken = await claimName('category', input.name, id)
     if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such category' })
     throw createError({ statusCode: 409, statusMessage: `A category is already called ${taken.name}` })
   }
