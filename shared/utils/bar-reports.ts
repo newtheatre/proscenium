@@ -31,6 +31,7 @@ export const REPORT_EXPORT_PAGE_ROWS = 1000
 
 // What a paged section says when it does not fit, so the first page is never read as the whole.
 export function saysPageOf(page: Page<unknown>): string {
+  if (page.items.length === 0) return `Nothing on this page. There are ${page.total} in the period.`
   const first = (page.page - 1) * page.pageSize + 1
   return `Showing ${first} to ${first + page.items.length - 1} of ${page.total}. Narrow the period to see the rest.`
 }

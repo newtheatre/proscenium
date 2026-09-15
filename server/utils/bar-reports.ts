@@ -127,7 +127,7 @@ export function varianceQuery(fromAt: number, toAt: number, limit: number, offse
     SELECT st.id AS stocktakeId, i.name AS itemName, st.applied_at AS appliedAt,
            m.qty AS qtyVariance, round(m.qty * ${unitCostPence}) AS valuePence
     ${varianceScope(fromAt, toAt)}
-    ORDER BY st.applied_at, i.name COLLATE NOCASE
+    ORDER BY st.applied_at, i.name COLLATE NOCASE, m.id
     LIMIT ${limit} OFFSET ${offset}
   `
 }
@@ -150,12 +150,14 @@ const compsScope = (fromAt: number, toAt: number): SQL => sql`
   WHERE e.tender = 'COMP' AND e.source = 'TILL' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
 `
 
+// The id breaks the tie: two comps in the same second have no other order, and a page boundary
+// between them would otherwise repeat one row and drop another (criterion 2).
 export function compsQuery(fromAt: number, toAt: number, limit: number, offset: number): SQL {
   return sql`
     SELECT e.id AS entryId, e.happened_at AS happenedAt, e.comp_reason AS reason, u.name AS approvedByName,
            coalesce((SELECT sum(l.unit_price_pence * l.qty) FROM ledger_lines l WHERE l.entry_id = e.id), 0) AS foregonePence
     ${compsScope(fromAt, toAt)}
-    ORDER BY e.happened_at
+    ORDER BY e.happened_at, e.id
     LIMIT ${limit} OFFSET ${offset}
   `
 }

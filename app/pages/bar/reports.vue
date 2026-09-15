@@ -42,6 +42,12 @@ const { data, status, error, refresh } = await useAsyncData(
 
 const reportFailure = computed(() => (error.value ? refusalText(error.value, 'The report could not be read.') : null))
 
+// Comps and variance are the two sections that page; the rest answer whole and say nothing.
+function saysMoreOf(section: ReportSection): string {
+  const paged = section === 'comps' ? data.value?.comps : section === 'variance' ? data.value?.variance : null
+  return paged && paged.pages > 1 ? saysPageOf(paged) : ''
+}
+
 function exportUrl(section: ReportSection): string {
   const params = new URLSearchParams({ ...query.value, section })
   return `/api/admin/bar/reports/export?${params.toString()}`
@@ -211,14 +217,6 @@ function exportUrl(section: ReportSection): string {
           </tbody>
         </table>
 
-        <p
-          v-if="section[0] === 'variance' && data.variance.pages > 1"
-          class="text-sm text-muted"
-          data-test="variance-more"
-        >
-          {{ saysPageOf(data.variance) }}
-        </p>
-
         <table
           v-else-if="section[0] === 'comps'"
           class="w-full text-sm"
@@ -242,14 +240,6 @@ function exportUrl(section: ReportSection): string {
             </tr>
           </tbody>
         </table>
-
-        <p
-          v-if="section[0] === 'comps' && data.comps.pages > 1"
-          class="text-sm text-muted"
-          data-test="comps-more"
-        >
-          {{ saysPageOf(data.comps) }}
-        </p>
 
         <table
           v-else
@@ -275,6 +265,14 @@ function exportUrl(section: ReportSection): string {
             </tr>
           </tbody>
         </table>
+
+        <p
+          v-if="saysMoreOf(section[0])"
+          class="text-sm text-muted"
+          :data-test="`${section[0]}-more`"
+        >
+          {{ saysMoreOf(section[0]) }}
+        </p>
       </section>
     </template>
   </div>

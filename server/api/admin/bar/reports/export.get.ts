@@ -20,13 +20,6 @@ export default defineEventHandler(async (event) => {
   const { fromAt, toAt } = resolveReportPeriod(period)
   const paging = { page, pageSize: REPORT_EXPORT_PAGE_ROWS }
 
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: resolved.account.id,
-    action: 'bar.report.exported',
-    target: null,
-    detail: { section, fromAt, toAt, page },
-  }))
-
   const exported = await (async (): Promise<{ rows: Record<string, unknown>[], pages: number }> => {
     switch (section) {
       case 'sales': {
@@ -64,6 +57,14 @@ export default defineEventHandler(async (event) => {
       }
     }
   })()
+
+  // Recorded once the rows are in hand, so the trail never claims an export the reader never got.
+  await db.insert(schema.auditLog).values(auditEntry({
+    actorId: resolved.account.id,
+    action: 'bar.report.exported',
+    target: null,
+    detail: { section, fromAt, toAt, page },
+  }))
 
   const named = exported.pages > 1 ? `bar-${section}-report-page-${page}-of-${exported.pages}` : `bar-${section}-report`
   setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')

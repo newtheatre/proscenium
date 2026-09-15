@@ -116,6 +116,10 @@ describe('a section that does not fit says so rather than reading as the whole (
     expect(saysPageOf(page(25, 1, 212))).toBe('Showing 1 to 25 of 212. Narrow the period to see the rest.')
   })
 
+  test('a page past the last says so rather than counting backwards', () => {
+    expect(saysPageOf(page(0, 99, 212))).toBe('Nothing on this page. There are 212 in the period.')
+  })
+
   test('a later page counts from its own offset', () => {
     expect(saysPageOf(page(12, 9, 212))).toBe('Showing 201 to 212 of 212. Narrow the period to see the rest.')
   })

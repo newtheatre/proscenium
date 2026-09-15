@@ -255,6 +255,18 @@ describe('an unbounded section pages rather than truncating silently (F-119 crit
     })
   })
 
+  test('two comps in the same second still page without repeating or dropping one', async () => {
+    await withDatabase((database) => {
+      for (const n of [1, 2, 3]) {
+        line(database, `l-${n}`, entry(database, `e-${n}`, INSIDE, { tender: 'COMP', compReason: `Round ${n}` }), 0, 100)
+      }
+
+      const first = ids(read(database, compsQuery(FROM_AT, TO_AT, 2, 0)))
+      const second = ids(read(database, compsQuery(FROM_AT, TO_AT, 2, 2)))
+      expect([...first, ...second].sort()).toEqual(['e-1', 'e-2', 'e-3'])
+    })
+  })
+
   test('the count is of the period, not of the page, and a desk comp is in neither', async () => {
     await withDatabase((database) => {
       line(database, 'l-1', entry(database, 'e-1', INSIDE, { tender: 'COMP', compReason: 'A round' }), 0, 500)
