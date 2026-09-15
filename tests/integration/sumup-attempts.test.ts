@@ -2,9 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import { recordPostedSaleStatement, stuckAttemptsQuery } from '#server/utils/sumup-queries'
 import { tillBookingByIdQuery, tillBookingByReferenceQuery } from '#server/utils/till-bookings'
 import { SUMUP_STUCK_COMPLETING_MINUTES } from '#shared/utils/sumup'
+import { sql } from 'drizzle-orm'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance, ticketTypeFixture } from '#tests/helpers/programme'
-import type { TestDatabase } from '#tests/helpers/database'
+import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
 // F-124 on the real migrations: transitions are conditional writes and the schema refuses an
@@ -232,6 +233,75 @@ describe('the Tickets tab reads a booking with or without an account behind it (
       expect(found?.bookerName).toBe('Person booker')
       expect(Number(found?.partySize)).toBe(1)
       expect(Number(found?.owedPence)).toBe(900)
+    })
+  })
+})
+
+// The residual window the two rules above could not close: a worker dying between the sale's
+// batch and the recording left a posted sale on a row that did not name it (F-124 criterion 5).
+describe('the recording rides the sale\'s own batch (F-124 criterion 5, F-105 criterion 1)', () => {
+  function completing(database: TestDatabase, status = 'COMPLETING'): void {
+    const opener = person(database)
+    const { venueId } = tonightsPerformance(database, { suffix: 'batched' })
+    insert(database, 'till_sessions', { id: 't-1', venue_id: venueId, night: '2026-09-14', opened_by: opener, opened_at: 1000 })
+    attempt(database, 'att-1', 't-1', venueId, opener, status)
+  }
+
+  // Exactly the predicate and the order `commitSale` batches: the entry, then the recording
+  // conditional on that entry having been written by this same batch.
+  function saleBatch(database: TestDatabase, entryId: string, options: { postsEntry?: boolean, fails?: boolean } = {}): void {
+    const posts = sql`EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${entryId})`
+    const statements: BoundStatement[] = []
+    if (options.postsEntry !== false) {
+      statements.push([
+        `INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence) VALUES (?, '2026-09-14', 'TILL', 'CARD', 2000, 250)`,
+        entryId,
+      ])
+    }
+    statements.push(boundStatement(database, recordPostedSaleStatement('att-1', entryId, 2000, posts)))
+    if (options.fails) {
+      statements.push(['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty) VALUES (?, ?, ?, ?, ?)',
+        'l-orphan', 'no-such-entry', 'BAR_ITEM', 250, 1])
+    }
+    database.batch(statements)
+  }
+
+  const state = (database: TestDatabase): { status: string, entryId: string | null } =>
+    rows<{ status: string, entryId: string | null }>(database, 'SELECT status, entry_id AS entryId FROM sumup_attempts WHERE id = ?', 'att-1')[0]!
+
+  test('the entry and the SUCCEEDED status land with the sale', async () => {
+    await withDatabase((database) => {
+      completing(database)
+      saleBatch(database, 'entry-1')
+      expect(state(database)).toEqual({ status: 'SUCCEEDED', entryId: 'entry-1' })
+    })
+  })
+
+  test('a batch that fails leaves the attempt exactly as it was', async () => {
+    await withDatabase((database) => {
+      completing(database)
+      expect(() => saleBatch(database, 'entry-1', { fails: true })).toThrow()
+      expect(state(database)).toEqual({ status: 'COMPLETING', entryId: null })
+      expect(rows(database, 'SELECT id FROM ledger_entries WHERE id = ?', 'entry-1')).toHaveLength(0)
+    })
+  })
+
+  test('a sale the tab cap refused writes no entry, so the attempt records nothing', async () => {
+    await withDatabase((database) => {
+      completing(database)
+      saleBatch(database, 'entry-1', { postsEntry: false })
+      expect(state(database)).toEqual({ status: 'COMPLETING', entryId: null })
+    })
+  })
+
+  // The guard is never on the status: a sweep that mismatched the row while the commit was in
+  // flight must not cost the recording, or the next answer replays the basket (criterion 5).
+  test('a row a sweep mismatched mid-commit is still recorded by the batch', async () => {
+    await withDatabase((database) => {
+      completing(database)
+      expect(move(database, 'att-1', 'COMPLETING', 'MISMATCH')).toBe(1)
+      saleBatch(database, 'entry-1')
+      expect(state(database)).toEqual({ status: 'SUCCEEDED', entryId: 'entry-1' })
     })
   })
 })

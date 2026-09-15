@@ -27,14 +27,14 @@ export function stuckAttemptsQuery(at: number, timeoutMinutes: number): SQL {
   `
 }
 
-// The sale posted, so the attempt succeeded and names its entry, whatever the row says now: a
-// sweep may have called it a mismatch while the commit was in flight, and its note is then wrong.
-export function recordPostedSaleStatement(id: string, entryId: string | null, at: number): SQL {
+// The sale posted, so the attempt succeeded and names its entry, whatever the row says now (a
+// sweep may have called it a mismatch mid-commit); `guard` rides the sale batch's own condition.
+export function recordPostedSaleStatement(id: string, entryId: string | null, at: number, guard?: SQL): SQL {
   return sql`
     UPDATE sumup_attempts SET status = 'SUCCEEDED', entry_id = coalesce(${entryId}, entry_id),
       resolved_at = coalesce(resolved_at, ${at}), error = NULL,
       resolution_note = CASE WHEN status = 'COMPLETING' THEN resolution_note ELSE NULL END
-    WHERE id = ${id} AND entry_id IS NULL
+    WHERE id = ${id} AND entry_id IS NULL${guard === undefined ? sql.empty() : sql` AND ${guard}`}
     RETURNING id
   `
 }

@@ -213,8 +213,8 @@ async function move(id: string, from: SumupAttemptStatus, to: SumupAttemptStatus
   `), entry)
 }
 
-// Not a transition the state machine offers a caller: this is the commit's own bookkeeping, and
-// it lands on SUCCEEDED from wherever the row drifted to while the sale was being written.
+// The one basket that posts nothing: no entry rode a batch, so there is no window to close and
+// the row is taken to SUCCEEDED on its own afterwards.
 async function recordPostedSale(id: string, entryId: string | null, actorId: string | null): Promise<boolean> {
   const now = Math.floor(Date.now() / 1000)
   return auditedWrite(db.all(recordPostedSaleStatement(id, entryId, now)), auditEntry({
@@ -271,6 +271,7 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
       {
         actorId: row.createdBy,
         sessionId: session.id,
+        attemptId: row.id,
         venueId: basket.venueId,
         night: basket.night,
         performanceId: basket.performanceId,
@@ -294,9 +295,11 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
     throw error
   }
 
-  // Outside the catch above: a recording that fails must never reset the row, or the sale it
-  // posted would be committed again by the next answer (criterion 5).
-  const recorded = await recordPostedSale(row.id, receipt.entryId, by.actorId)
+  // The recording rode the sale's own batch (criterion 5), so this reads back what landed, the
+  // way the tab cap's own refusal does. A basket that posted no entry records the old way.
+  const recorded = receipt.entryId === null
+    ? await recordPostedSale(row.id, null, by.actorId)
+    : (await attemptById(row.id))?.entryId === receipt.entryId
   return { status: 'SUCCEEDED', receipt, error: recorded ? null : DUPLICATE }
 }
 

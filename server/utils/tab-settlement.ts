@@ -100,7 +100,7 @@ export const LISTED_CHARGE = sql`e.void_of_entry_id IS NULL AND e.reverses_entry
 // charge with no lines rather than rendering `IN ()` and failing outright.
 export function chargeMovementsQuery(entryId: string): SQL {
   return sql`
-    SELECT id, item_id AS itemId, qty FROM stock_movements
+    SELECT id, item_id AS itemId, qty, location_venue_id AS locationVenueId FROM stock_movements
     WHERE ref_table = 'ledger_lines' AND ref_id IN (SELECT id FROM ledger_lines WHERE entry_id = ${entryId})
   `
 }
@@ -201,6 +201,7 @@ export async function settleTab(
     source: 'TILL',
     tender: 'CARD',
     actorId: context.actorId,
+    tillSessionId: context.sessionId,
     lines: rows.map(row => ({ kind: 'TAB_SETTLEMENT' as LineKind, amountPence: row.totalPence, qty: 1, settlesEntryId: row.id })),
   })
   const statements = [...posted.statements]
@@ -234,8 +235,8 @@ export async function voidTabCharge(
   reason: string,
   actorId: string,
 ): Promise<{ voidEntryId: string }> {
-  const [charge] = await db.all<{ id: string, tabDebtorId: string }>(sql`
-    SELECT e.id AS id, e.tab_debtor_id AS tabDebtorId FROM ledger_entries e
+  const [charge] = await db.all<{ id: string, tabDebtorId: string, tillSessionId: string | null }>(sql`
+    SELECT e.id AS id, e.tab_debtor_id AS tabDebtorId, e.till_session_id AS tillSessionId FROM ledger_entries e
     WHERE e.id = ${entryId} AND e.tab_debtor_id IS NOT NULL
       AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
   `)
@@ -252,7 +253,7 @@ export async function voidTabCharge(
     SELECT id, kind, amount_pence AS amountPence, qty, unit_price_pence AS unitPricePence, product_variant_id AS productVariantId, price_ref AS priceRef, performance_id AS performanceId
     FROM ledger_lines WHERE entry_id = ${entryId}
   `)
-  const movements = await db.all<{ id: string, itemId: string, qty: number }>(chargeMovementsQuery(entryId))
+  const movements = await db.all<{ id: string, itemId: string, qty: number, locationVenueId: string | null }>(chargeMovementsQuery(entryId))
 
   // Still unsettled at the moment of insert, not just at the read above: a settlement racing
   // this refuses here rather than crediting stock for a charge that was just taken (criterion 4).
@@ -264,6 +265,9 @@ export async function voidTabCharge(
     // The credit is the holder's fact, not the theatre's: a ledger row crediting somebody names
     // whom it credits, as the charge names whom it charged (F-109 criterion 1).
     tabDebtorId: charge.tabDebtorId,
+    // The charge's own session, so a session-scoped figure nets the void against what it
+    // corrects rather than counting only the charge (F-118, 0031).
+    tillSessionId: charge.tillSessionId,
     voidOfEntryId: entryId,
     voidReason: reason,
     lines: lines.map(line => ({
@@ -284,8 +288,8 @@ export async function voidTabCharge(
   // the named double-void regression (criterion 5). No `ref_table`/`ref_id`: `reverses_id` alone.
   for (const movement of movements) {
     statements.push(db.run(sql`
-      INSERT INTO stock_movements (id, item_id, qty, kind, reason, reverses_id, actor_id)
-      SELECT ${newId()}, ${movement.itemId}, ${-movement.qty}, 'REVERSAL', ${VOID_MOVEMENT_REASON}, ${movement.id}, ${actorId}
+      INSERT INTO stock_movements (id, item_id, qty, kind, reason, reverses_id, actor_id, location_venue_id)
+      SELECT ${newId()}, ${movement.itemId}, ${-movement.qty}, 'REVERSAL', ${VOID_MOVEMENT_REASON}, ${movement.id}, ${actorId}, ${movement.locationVenueId}
       WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})
     `))
   }

@@ -133,6 +133,7 @@ interface MovementRow {
   ref_table: string | null
   ref_id: string | null
   actor_id: string | null
+  location_venue_id: string | null
 }
 
 function movementsFor(refId: string): MovementRow[] {
@@ -145,10 +146,12 @@ function movementsFor(refId: string): MovementRow[] {
   }
 }
 
-function ledgerEntry(entryId: string): { source: string, tender: string, actor_id: string, total_pence: number } | undefined {
+interface EntryRow { source: string, tender: string, actor_id: string, total_pence: number, till_session_id: string | null }
+
+function ledgerEntry(entryId: string): EntryRow | undefined {
   const database = new Database(app.databaseFile, { readonly: true })
   try {
-    return database.query('SELECT source, tender, actor_id, total_pence FROM ledger_entries WHERE id = ?').get(entryId) as never
+    return database.query('SELECT source, tender, actor_id, total_pence, till_session_id FROM ledger_entries WHERE id = ?').get(entryId) as never
   }
   finally {
     database.close()
@@ -330,5 +333,33 @@ describe.skipIf(skip !== null)('a sold variant reads as sold, everywhere that gu
     const refused = await send('DELETE', `/api/admin/bar/variants/${variantId}`)
     expect(refused.status).toBe(409)
     expect(await message(refused)).toContain('has been sold')
+  })
+})
+
+// F-105 criterion 1 and F-202: the entry names the session it was rung up against and every
+// movement names the bar it was poured at, so a close figure can be that session's own.
+describe.skipIf(skip !== null)('a sale names its session and its bar (F-105 criterion 1, F-202)', () => {
+  test('the entry carries the session and every movement carries the venue', async () => {
+    const { venueId } = programme('commit-session-venue')
+    const categoryId = await aCategory()
+    const productId = await aProductIn(categoryId)
+    const variantId = await addVariant(productId)
+    await priceVariant(variantId, 250)
+    const itemId = await anItem({ name: named('Gin bottle') })
+    await deliver(itemId, 1000)
+    await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 25 }] })
+    await activate(productId)
+    const { session } = await (await openTill(venueId)).json() as { session: { id: string } }
+
+    const answered = await charge(venueId, [{ variantId, qty: 2 }], 500)
+    expect(answered.status).toBe(200)
+    const { entryId } = await answered.json() as { entryId: string }
+
+    expect(ledgerEntry(entryId)).toMatchObject({ till_session_id: session.id })
+
+    const [line] = ledgerLinesFor(entryId)
+    const movements = movementsFor(line!.id)
+    expect(movements).toHaveLength(1)
+    expect(movements.every(movement => movement.location_venue_id === venueId)).toBe(true)
   })
 })

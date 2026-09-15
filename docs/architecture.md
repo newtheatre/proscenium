@@ -374,6 +374,14 @@ reading across two days and read as a discrepancy every time it happens. F-118's
 I-104's own daily reconciliation both resolve the night from `showNightBounds` (E-110, 0014) and
 never from `london_day`; the ledger holds no night column and gains none.
 
+The ledger holds no venue column either, and gains none: `ledger_entries.till_session_id` names
+the till session an entry was rung up against, and the session names the venue and the night, so
+reconciliation narrows to one bar by that session, or to a venue's sessions by subquery
+(`server/utils/reconciliation.ts`, F-105 criterion 1, F-202 criterion 3). A till close stamps its
+own session's figure; the night report and I-104's whole-night figure pass no scope and so still
+read the estate's whole night. An entry naming no session, the desk's own money included, is
+outside every scope and counts only in the unscoped figure.
+
 | Money path | Posts when | Module | Source | Tender | Kind |
 | --- | --- | --- | --- | --- | --- |
 | Desk collection | The reader is paid at collection, never at reservation (D-114) | ticketing | `DESK` | `CARD` | `TICKET_COLLECTION` |
