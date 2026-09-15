@@ -584,4 +584,40 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect(await textOf(view, '[data-test="price-history"]')).toContain('In force today')
     view.close()
   }, 120_000)
+
+  test('the recipe editor shows an attached choice group and round-trips it (review-ui finding 2)', async () => {
+    const productId = await aProduct()
+    const mixerId = await anItem({ name: named('Screen tonic') })
+    const variantId = await addVariant(productId, { label: 'Gin and tonic' })
+    const groupId = await addChoiceGroup([{ itemId: mixerId, qty: 50 }], { name: named('Screen mixers') })
+    await send('PUT', `/api/admin/bar/variants/${variantId}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: false })
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/products/${productId}`, `[data-test="recipe-${variantId}"]`)
+    await click(view, `[data-test="recipe-${variantId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="recipe-form"]')`)
+
+    // Shown as a read-only row: it is F-113's own screen to change, not this one.
+    expect(await textOf(view, '[data-test="recipe-choice-group"]')).toContain('Screen mixers')
+
+    // Save with no item lines at all: the failure mode is exactly this, an otherwise-empty save.
+    await click(view, '[data-test="recipe-submit"]')
+    await waitFor(view, `!document.querySelector('[data-test="recipe-form"]')`)
+
+    const afterSave = (await variants(productId)).find(variant => variant.id === variantId)!
+    expect(afterSave.components.find(component => component.choiceGroupId === groupId)).toBeTruthy()
+
+    // Reopening proves it round-trips, not merely that one save happened to survive.
+    await click(view, `[data-test="recipe-${variantId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="recipe-form"]')`)
+    expect(await textOf(view, '[data-test="recipe-choice-group"]')).toContain('Screen mixers')
+
+    view.close()
+  }, 120_000)
 })
