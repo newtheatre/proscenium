@@ -701,6 +701,28 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'How far ahead of a performance a released shift notifies the FOH officer immediately rather than waiting for the daily digest. A released duty-manager shift always notifies immediately.',
   },
+  // The house default for when a shift is worked; a venue's template overrides either offset per
+  // role, and the times are stamped onto the shift rather than derived at read time (0078).
+  SHIFT_START_BEFORE_DOORS_MINUTES: {
+    schema: z.number().int().nonnegative(),
+    default: 30,
+    workshop: 'spaces-and-training',
+    describes: 'Minutes before a performance opens its doors that a shift starts. The curtain stands in where no doors time is recorded.',
+  },
+  SHIFT_END_AFTER_CURTAIN_DOWN_MINUTES: {
+    schema: z.number().int().nonnegative(),
+    default: 30,
+    workshop: 'spaces-and-training',
+    describes: 'Minutes after a performance ends, counting its running time and intervals, that a shift ends. The curtain stands in where no running time is recorded.',
+  },
+  // Wide enough that an early arrival or a late close-down is not refused by the clock; the
+  // 04:00 boundary still bounds everything and the officer bypass has no window (0078).
+  SHIFT_AUTHORITY_GRACE_MINUTES: {
+    schema: z.number().int().nonnegative(),
+    default: 30,
+    workshop: 'spaces-and-training',
+    describes: 'How far outside their own shift window a confirmed shift still opens its show-night tool.',
+  },
 } as const satisfies Record<string, ConfigKeyDefinition>
 
 export type ConfigKey = keyof typeof CONFIG_KEYS
