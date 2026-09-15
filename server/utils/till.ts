@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
+import { OPEN_ATTEMPT_STATUSES } from '#shared/utils/sumup'
 import type { SQL } from 'drizzle-orm'
 import type { TillSession } from '#shared/utils/till'
 
@@ -21,6 +22,34 @@ export function openSessionForQuery(venueId: string, night: string): SQL {
   return sql`
     SELECT ${SESSION_COLUMNS} FROM till_sessions
     WHERE venue_id = ${venueId} AND night = ${night} AND closed_at IS NULL
+  `
+}
+
+export interface SessionClose {
+  id: string
+  venueId: string
+  night: string
+  closedBy: string
+  expectedPence: number
+  actualZPence: number
+  variancePence: number
+  varianceNote: string | null
+}
+
+// Both predicates ride the write (0001, 0003): a second close changes nothing, and a hand-off
+// started since the count was read refuses the close rather than being closed around (F-124).
+export function closeSessionStatement(close: SessionClose): SQL {
+  return sql`
+    UPDATE till_sessions SET closed_by = ${close.closedBy}, closed_at = unixepoch(),
+      expected_total_pence = ${close.expectedPence}, actual_z_pence = ${close.actualZPence},
+      variance_pence = ${close.variancePence}, variance_note = ${close.varianceNote}
+    WHERE id = ${close.id} AND closed_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM sumup_attempts
+        WHERE night = ${close.night} AND venue_id = ${close.venueId}
+          AND status IN (${sql.join(OPEN_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})
+      )
+    RETURNING id
   `
 }
 
