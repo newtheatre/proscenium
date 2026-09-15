@@ -9,6 +9,7 @@ import {
   nextCommitteeYearEnd,
   saysSeason,
   startOfLondonDay,
+  startOfLondonDayAfter,
 } from '#shared/utils/london'
 
 // The named regression cases for time (K-121). The runtime is UTC, so every one of these is
@@ -88,6 +89,28 @@ describe('a screen field names a whole day, not a moment in it (D-123)', () => {
     const end = endOfLondonDay('2026-08-31').getTime()
     expect(end).toBeGreaterThan(start)
     expect(londonParts(new Date(end))).toMatchObject({ year: 2026, month: 8, day: 31 })
+  })
+})
+
+describe('an exclusive end counts calendar days, not fixed seconds (0014)', () => {
+  const HOURS = 60 * 60 * 1000
+  const span = (day: string): number => startOfLondonDayAfter(day, 1).getTime() - startOfLondonDay(day).getTime()
+
+  test('a day is 24 hours either side of the clock changes', () => {
+    expect(span('2026-09-15') / HOURS).toBe(24)
+  })
+
+  test('the day the clocks go back is 25 hours, so a window ending on it keeps its last hour', () => {
+    expect(span('2026-10-25') / HOURS).toBe(25)
+  })
+
+  test('the day the clocks go forward is 23 hours, so a window ending on it stops on time', () => {
+    expect(span('2026-03-29') / HOURS).toBe(23)
+  })
+
+  test('counting on lands on midnight of the day named, whatever the offset either side', () => {
+    expect(startOfLondonDayAfter('2026-10-19', 7).toISOString()).toBe('2026-10-26T00:00:00.000Z')
+    expect(startOfLondonDayAfter('2026-12-31', 1).toISOString()).toBe('2027-01-01T00:00:00.000Z')
   })
 })
 

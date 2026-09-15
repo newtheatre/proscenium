@@ -175,6 +175,13 @@ describe('a serving size is a row, priced by a dated series (F-112, F-116)', () 
     expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '2026-09-14' }).success).toBe(true)
   })
 
+  test('a date the calendar does not have is refused, not stored to sort first (0014)', () => {
+    expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '2026-13-45' }).success).toBe(false)
+    expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '2026-02-30' }).success).toBe(false)
+    expect(categoryPriceForm.safeParse({ servingKind: 'single', pricePence: 250, effectiveFrom: '2026-13-45' }).success).toBe(false)
+    expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '2028-02-29' }).success).toBe(true)
+  })
+
   test('a category default names the serving kind it prices (F-121 criterion 1)', () => {
     expect(categoryPriceForm.safeParse({ servingKind: 'single', pricePence: 250, effectiveFrom: '2026-09-14' }).success).toBe(true)
     expect(categoryPriceForm.safeParse({ servingKind: 'not-a-kind', pricePence: 250, effectiveFrom: '2026-09-14' }).success).toBe(false)

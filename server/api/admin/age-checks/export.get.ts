@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { toCsv } from '#server/utils/csv'
 import { buildTablePdf } from '#server/utils/pdf'
 import { saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { formatLondon, startOfLondonDayAfter } from '#shared/utils/london'
 
 const query = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -10,16 +10,14 @@ const query = z.object({
   format: z.enum(['csv', 'pdf']),
 })
 
-const DAY_SECONDS = 24 * 60 * 60
-
 // The register exported for a licensing inspection (E-119). CSV and a formatted PDF stating
 // venue, period and generation date; both cover the same rows, nothing omitted (criteria 1, 2).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'age-checks.export')
   const { from, to, format } = await getValidatedQueryOrThrow(event, query)
 
-  const fromAt = Math.floor(startOfLondonDay(from).getTime() / 1000)
-  const toAt = Math.floor(startOfLondonDay(to).getTime() / 1000) + DAY_SECONDS
+  const fromAt = Math.floor(startOfLondonDayAfter(from, 0).getTime() / 1000)
+  const toAt = Math.floor(startOfLondonDayAfter(to, 1).getTime() / 1000)
   const rows = await exportRows(fromAt, toAt)
 
   await db.insert(schema.auditLog).values(auditEntry({
