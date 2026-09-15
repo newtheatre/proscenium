@@ -182,6 +182,47 @@ describe.skipIf(skip !== null)('managing sign-in methods (A-113)', () => {
     }
   }, CASE_TIMEOUT_MS)
 
+  test('the screen sets a first password on an account without one, and it signs in', async () => {
+    const { email, view } = await signedIn('methods-add-password')
+    try {
+      // A passkey stands as the way in while the password goes, without an epoch bump ending the
+      // session this test is driving the screen with.
+      giveAPasskey(email, 'pk-add-password-test')
+      write('UPDATE users SET password = NULL, password_set_at = NULL WHERE email = ?', email)
+
+      await visit(view, `${app.baseURL}/account/security`, '[data-test="new-password"]')
+      const chosen = generatePassword()
+      await fill(view, '[data-test="new-password"]', chosen)
+      await click(view, '[data-test="set-password"]')
+      await waitFor(view, 'document.querySelectorAll(\'[data-test="methods"] li\').length === 2')
+
+      const signedInAgain = await fetch(`${app.baseURL}/api/auth/sign-in`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, password: chosen }),
+      })
+      expect(signedInAgain.status).toBe(200)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a theatre address is told it holds no password rather than offered the field', async () => {
+    const { email, view } = await signedIn('methods-workspace-screen')
+    try {
+      write('UPDATE users SET email = ?, password = NULL, password_set_at = NULL, google_sub = ?, google_linked_at = ? WHERE email = ?',
+        `methods-workspace-screen-${Date.now()}@newtheatre.org.uk`, `sub-screen-${Date.now()}`, Math.floor(Date.now() / 1000), email)
+
+      await visit(view, `${app.baseURL}/account/security`, '[data-test="methods"]')
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="new-password"]\')')).toBe(false)
+      expect(await textOf(view, 'main')).toContain('cannot hold a password')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('a Workspace address is refused a password, and told to use Google', async () => {
     const { email, cookie, view } = await signedIn('methods-workspace')
     try {

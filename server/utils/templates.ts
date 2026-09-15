@@ -83,6 +83,32 @@ The Nottingham New Theatre`,
     }
   },
 
+  // Says only that the address is already known, never what is on the account: somebody else may
+  // have typed it into the registration form.
+  'account-claim': (context: TemplateContext): Rendered => {
+    const url = String(context.url)
+    const until = expiry(context.expiresAt as Date)
+    return {
+      subject: 'Finish setting up your account',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>This address is already known to the theatre, from a booking or from our old records, but it
+has no way to sign in yet. Choose a password and everything already on it is yours.</p>
+<p><a href="${url}">Choose my password</a></p>
+<p>The link works until ${until}. If you were not expecting this, ignore it: nothing has
+changed.</p>`),
+      text: `Hello ${context.name},
+
+This address is already known to the theatre, from a booking or from our old records, but it has
+no way to sign in yet. Choose a password and everything already on it is yours:
+
+${url}
+
+The link works until ${until}. If you were not expecting this, ignore it: nothing has changed.
+
+The Nottingham New Theatre`,
+    }
+  },
+
   // Names what went, never what remains: a message read by the wrong person must not inventory
   // the ways into the account.
   'method-removed': (context: TemplateContext): Rendered => {

@@ -110,4 +110,23 @@ describe.skipIf(skip !== null)('the people console gates its write controls on f
   }, 120_000)
 })
 
+describe.skipIf(skip !== null)('the account page gates its security operations on accounts.disable (#1043)', () => {
+  test('a THEATRE_MANAGER (accounts.read only) is offered none of the three', async () => {
+    const theatreManager = await officerWith('theatre-mgr-security', 'THEATRE_MANAGER')
+    const subject = await registerMember(app, 'security-subject', generatePassword())
+
+    const view = await signedInView(theatreManager)
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${subject.id}`, '[data-test="account-name"]')
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="sign-out-everywhere"]\')')).toBe(false)
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="disable"]\')')).toBe(false)
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="reset-mfa"]\')')).toBe(false)
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="erase-reveal"]\')')).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

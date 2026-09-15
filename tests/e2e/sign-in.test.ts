@@ -208,5 +208,69 @@ describe.skipIf(skip !== null)('an unverified address cannot sign in (0026)', ()
   })
 })
 
+// A row the box office made for a ticket guest: a name, an address and no way to sign in.
+function guest(email: string, name: string): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query('INSERT INTO users (id, email, name) VALUES (?, ?, ?)')
+      .run(crypto.randomUUID().replaceAll('-', ''), email, name)
+  }
+  finally {
+    database.close()
+  }
+}
+
+function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query(statement).get(...parameters as never[]) as T | undefined
+  }
+  finally {
+    database.close()
+  }
+}
+
+describe.skipIf(skip !== null)('registering on an address that already booked as a guest (A-116)', () => {
+  test('it is sent a claim link rather than told to sign in as usual', async () => {
+    const email = registrableAddress('guest-claim')
+    guest(email, 'Guest Booker (test)')
+
+    const answered = await post('/api/auth/register', { email, name: 'Guest Booker (test)', password })
+    expect(answered.status).toBe(200)
+
+    // The row is claimed, never replaced: the bookings already on it are the point.
+    expect(read<{ password: string | null, n: number }>('SELECT password, count(*) n FROM users WHERE email = ?', email))
+      .toMatchObject({ password: null, n: 1 })
+
+    const token = read<{ kind: string }>(
+      'SELECT t.kind FROM auth_tokens t JOIN users u ON u.id = t.user_id WHERE u.email = ?', email)
+    expect(token?.kind).toBe('SET_PASSWORD')
+
+    const sent = read<{ type: string, status: string }>(
+      'SELECT l.type, l.status FROM notification_log l JOIN users u ON u.id = l.user_id WHERE u.email = ?', email)
+    expect(sent).toMatchObject({ type: 'account.claim', status: 'SENT' })
+
+    // A-101 criterion 2: the answer is still the one a free address gets.
+    const fresh = await post('/api/auth/register', { email: registrableAddress('guest-claim-fresh'), name: 'Fresh (test)', password })
+    expect(await answered.text()).toBe(await fresh.text())
+  })
+
+  test('an address that can already sign in is told it exists, and gets no token', async () => {
+    const email = await unproven('already-registered')
+
+    expect((await post('/api/auth/register', { email, name: 'Twice (test)', password })).status).toBe(200)
+
+    const sent = read<{ type: string }>(
+      `SELECT l.type FROM notification_log l JOIN users u ON u.id = l.user_id
+       WHERE u.email = ? AND l.type = 'account.exists'`, email)
+    expect(sent?.type).toBe('account.exists')
+
+    const claim = read<{ n: number }>(
+      `SELECT count(*) n FROM auth_tokens t JOIN users u ON u.id = t.user_id
+       WHERE u.email = ? AND t.kind = 'SET_PASSWORD'`, email)
+    expect(claim?.n).toBe(0)
+  })
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
 if (!skip && !googleConfigured) console.warn('[e2e] Google handoff skipped: NUXT_OAUTH_GOOGLE_CLIENT_ID is not set')

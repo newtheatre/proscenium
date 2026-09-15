@@ -63,6 +63,15 @@ export const MESSAGE_TYPES = {
     reachesUnverified: true,
   },
 
+  // Registering on an address that already holds a guest's bookings. The address is the only
+  // thing that proves the claim, so it must reach an unverified one (A-116 criterion 2).
+  'account.claim': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'account-claim',
+    reachesUnverified: true,
+  },
+
   // Security, so no topic can suppress it, and no reachesUnverified (A-102 criterion 2).
   'account.method-removed': {
     topic: null,

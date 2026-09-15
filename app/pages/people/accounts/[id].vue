@@ -408,6 +408,7 @@ onMounted(load)
       </UPageCard>
 
       <UPageCard
+        v-if="sees.disables"
         title="Security"
         description="These take effect on the next request, everywhere."
       >
@@ -450,7 +451,7 @@ onMounted(load)
           </UButton>
         </div>
 
-        <template v-if="sees.disables && !view.account.anonymisedAt">
+        <template v-if="!view.account.anonymisedAt">
           <UButton
             v-if="!eraseReveal"
             class="mt-4"
