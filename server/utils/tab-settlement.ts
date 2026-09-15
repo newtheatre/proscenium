@@ -1,14 +1,17 @@
-import { db } from '@nuxthub/db'
+import { db, schema } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
+import { newId } from '#server/utils/accounts'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
+import { auditEntry } from '#shared/utils/audit'
 import { saysMoney } from '#shared/utils/bar'
 import { MAX_SETTLEMENT_CHARGES } from '#shared/utils/tab-settlement'
 import type { ItemisedTab, TabCharge } from '#shared/utils/tab-settlement'
 import type { LineKind } from '#shared/utils/ledger'
 import type { BatchItem } from 'drizzle-orm/batch'
+import type { SQL } from 'drizzle-orm'
 
 // Settlement, itemisation and void of a tab charge (F-109). `ledger_entries` never accepts an
 // UPDATE (0010): a charge is settled by being referenced, never by being rewritten.
@@ -29,6 +32,35 @@ const CHARGE_COLUMNS = sql`
   (SELECT s.happened_at FROM ledger_lines l JOIN ledger_entries s ON s.id = l.entry_id WHERE l.settles_entry_id = e.id) AS settledAt,
   EXISTS (SELECT 1 FROM ledger_entries v WHERE v.void_of_entry_id = e.id) AS voided
 `
+
+// Still owed: not a reversal, not a credit entry itself, not voided, not settled. Every balance
+// shares it, so the account screen, the cap and the year-end list cannot drift apart (F-109).
+export const OUTSTANDING_CHARGE = sql`
+  e.reverses_entry_id IS NULL AND e.void_of_entry_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM ledger_entries v WHERE v.void_of_entry_id = e.id)
+  AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
+`
+
+// Exported as a query rather than a number so a test can run it against the real migrations.
+export function tabBalanceQuery(holderId: string): SQL {
+  return sql`
+    SELECT coalesce(sum(e.total_pence), 0) AS total FROM ledger_entries e
+    WHERE e.tab_debtor_id = ${holderId} AND ${OUTSTANDING_CHARGE}
+  `
+}
+
+// Every holder still carrying a balance, for the closing checklist I-203 has not built yet
+// (criterion 6): this is the query that list would read, not the list itself.
+export function unsettledTabsQuery(): SQL {
+  return sql`
+    SELECT u.id AS holderId, u.name AS holderName, sum(e.total_pence) AS outstandingPence
+    FROM ledger_entries e JOIN users u ON u.id = e.tab_debtor_id
+    WHERE e.tab_debtor_id IS NOT NULL AND ${OUTSTANDING_CHARGE}
+    GROUP BY u.id, u.name
+    HAVING sum(e.total_pence) <> 0
+    ORDER BY outstandingPence DESC
+  `
+}
 
 interface LineRow { entryId: string, productName: string, variantLabel: string, qty: number, unitPricePence: number }
 
@@ -71,11 +103,7 @@ export async function itemisedTab(holderId: string): Promise<ItemisedTab | null>
     WHERE e.tab_debtor_id = ${holderId} AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
     ORDER BY e.happened_at DESC
   `)
-  const [balance] = await db.all<{ total: number }>(sql`
-    SELECT coalesce(sum(e.total_pence), 0) AS total FROM ledger_entries e
-    WHERE e.tab_debtor_id = ${holderId} AND e.reverses_entry_id IS NULL
-      AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
-  `)
+  const [balance] = await db.all<{ total: number }>(tabBalanceQuery(holderId))
   const linesByEntry = await productLinesFor(rows.map(row => row.entryId))
   const charges = rows.map(row => hydrate(row, linesByEntry.get(row.entryId) ?? []))
 
@@ -87,27 +115,15 @@ export async function itemisedTab(holderId: string): Promise<ItemisedTab | null>
 export async function outstandingTabCharges(holderId: string): Promise<TabCharge[]> {
   const rows = await db.all<ChargeRow>(sql`
     SELECT ${CHARGE_COLUMNS} FROM ledger_entries e
-    WHERE e.tab_debtor_id = ${holderId} AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
-      AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
-      AND NOT EXISTS (SELECT 1 FROM ledger_entries v WHERE v.void_of_entry_id = e.id)
+    WHERE e.tab_debtor_id = ${holderId} AND ${OUTSTANDING_CHARGE}
     ORDER BY e.happened_at
   `)
   const linesByEntry = await productLinesFor(rows.map(row => row.entryId))
   return rows.map(row => hydrate(row, linesByEntry.get(row.entryId) ?? []))
 }
 
-// Every holder still carrying a balance, for the closing checklist I-203 has not built yet
-// (criterion 6): this is the query that list would read, not the list itself.
 export async function unsettledTabsSummary(): Promise<{ holderId: string, holderName: string, outstandingPence: number }[]> {
-  return db.all<{ holderId: string, holderName: string, outstandingPence: number }>(sql`
-    SELECT u.id AS holderId, u.name AS holderName, sum(e.total_pence) AS outstandingPence
-    FROM ledger_entries e JOIN users u ON u.id = e.tab_debtor_id
-    WHERE e.tab_debtor_id IS NOT NULL AND e.reverses_entry_id IS NULL
-      AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
-    GROUP BY u.id, u.name
-    HAVING sum(e.total_pence) <> 0
-    ORDER BY outstandingPence DESC
-  `)
+  return db.all<{ holderId: string, holderName: string, outstandingPence: number }>(unsettledTabsQuery())
 }
 
 export interface SettlementContext {
@@ -131,9 +147,7 @@ export async function settleTab(
   const rows = await db.all<{ id: string, totalPence: number }>(sql`
     SELECT e.id AS id, e.total_pence AS totalPence FROM ledger_entries e
     WHERE e.id IN (${sql.join(uniqueIds.map(id => sql`${id}`), sql`, `)})
-      AND e.tab_debtor_id = ${holderId} AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
-      AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
-      AND NOT EXISTS (SELECT 1 FROM ledger_entries v WHERE v.void_of_entry_id = e.id)
+      AND e.tab_debtor_id = ${holderId} AND ${OUTSTANDING_CHARGE}
   `)
   if (rows.length !== uniqueIds.length) {
     throw createError({
@@ -185,8 +199,8 @@ export async function voidTabCharge(
   reason: string,
   actorId: string,
 ): Promise<{ voidEntryId: string }> {
-  const [charge] = await db.all<{ id: string }>(sql`
-    SELECT e.id AS id FROM ledger_entries e
+  const [charge] = await db.all<{ id: string, tabDebtorId: string }>(sql`
+    SELECT e.id AS id, e.tab_debtor_id AS tabDebtorId FROM ledger_entries e
     WHERE e.id = ${entryId} AND e.tab_debtor_id IS NOT NULL
   `)
   if (!charge) throw createError({ statusCode: 404, statusMessage: 'No such tab charge' })
@@ -213,6 +227,9 @@ export async function voidTabCharge(
     source: 'TILL',
     tender: 'TAB',
     actorId,
+    // The credit is the holder's fact, not the theatre's: a ledger row crediting somebody names
+    // whom it credits, as the charge names whom it charged (F-109 criterion 1).
+    tabDebtorId: charge.tabDebtorId,
     voidOfEntryId: entryId,
     voidReason: reason,
     lines: lines.map(line => ({

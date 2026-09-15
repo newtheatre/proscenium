@@ -1003,6 +1003,11 @@ UPDATE outright, and a charge cannot know at insert time whether it will later b
 (F-109). `void_of_entry_id` NULL (tab charges only; a reversing entry, 0031's rule carried),
 unique where not null so a charge voids once · `void_reason` NULL, free text, on the record
 and off the audit trail (0011) · `created_at`.
+A void credit carries the same `tab_debtor_id` as the charge it credits, and every balance
+(the account screen, the F-108 cap, the year-end list, the retention exemption) reads
+`OUTSTANDING_CHARGE` in `server/utils/tab-settlement.ts`, which drops both the voided charge and
+its credit: a void therefore leaves the holder owing nothing, rather than a figure neither
+settleable nor payable.
 Exception to append-only: none. Even voids and refunds are new reversing rows, and
 `ledger_entries_no_self_reversal` refuses an entry that claims to reverse itself.
 `server/utils/ledger.ts` is the only writer; `check ledger` fails the build on any other file

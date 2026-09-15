@@ -20,11 +20,13 @@ export interface CandidateRow {
   createdAt: number
 }
 
-// A tab charge with nothing settling it yet, by reference: append-only `ledger_entries` (0016)
-// cannot mark itself settled, so `tab_settled_at`/`tab_settlement_entry_id` stay unwritten (F-109).
+// A tab charge still owed, by reference: append-only `ledger_entries` (0016) cannot mark itself
+// settled, and a voided charge never will be, so it holds erasure for ever if read as owed (F-109).
 const unsettledMoney = (): SQL => sql`exists (
   select 1 from ledger_entries e
   where e.tab_debtor_id = ${schema.users.id} and e.tender = 'TAB'
+    and e.void_of_entry_id is null
+    and not exists (select 1 from ledger_entries v where v.void_of_entry_id = e.id)
     and not exists (select 1 from ledger_lines l where l.settles_entry_id = e.id)
 )`
 
