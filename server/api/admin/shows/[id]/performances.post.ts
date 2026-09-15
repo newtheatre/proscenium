@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
       notes: input.notes ?? null,
       status: 'DRAFT',
     }),
-    db.run(stampPerformanceStatement(id)),
+    db.run(stampPerformanceStatement(id, await shiftOffsetDefaults(event))),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'performance.created',

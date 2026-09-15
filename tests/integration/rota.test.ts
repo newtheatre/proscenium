@@ -29,6 +29,10 @@ import type { SQL } from 'drizzle-orm'
 // E-101, E-102 and E-106 against the real migrations. The two staffing invariants are the
 // database's, so they are attempted here in SQL and not only through a route (E-106 criterion 4).
 
+// The house defaults a route would read from configuration (0078); a venue template may
+// override either offset, which `tests/integration/rota-timings.test.ts` is where it is pinned.
+const OFFSETS = { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }
+
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
   try {
@@ -89,7 +93,7 @@ describe('a template stamps a rota onto a performance (E-102 criteria 1 and 3)',
       const tonight = tonightsPerformance(database)
       template(database, tonight.venueId)
 
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
 
       const stamped = shiftsOn(database, tonight.performanceId)
       expect(stamped.length).toBe(4)
@@ -103,7 +107,7 @@ describe('a template stamps a rota onto a performance (E-102 criteria 1 and 3)',
   test('a venue with no template stamps nothing and does not fail (E-101 criterion 4)', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
       expect(shiftsOn(database, tonight.performanceId)).toEqual([])
     })
   })
@@ -112,7 +116,7 @@ describe('a template stamps a rota onto a performance (E-102 criteria 1 and 3)',
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database, { status: 'CANCELLED' })
       template(database, tonight.venueId)
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
       expect(shiftsOn(database, tonight.performanceId)).toEqual([])
     })
   })
@@ -124,8 +128,8 @@ describe('the backfill is idempotent (E-102 criterion 2)', () => {
       const tonight = tonightsPerformance(database)
       template(database, tonight.venueId)
 
-      const first = run(database, backfillVenueStatement(tonight.venueId, 0))
-      const second = run(database, backfillVenueStatement(tonight.venueId, 0))
+      const first = run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
+      const second = run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
 
       expect(first.length).toBe(4)
       expect(second.length).toBe(0)
@@ -140,11 +144,11 @@ describe('the backfill is idempotent (E-102 criterion 2)', () => {
       for (const statement of replaceTemplateStatements(tonight.venueId, [{ role: 'DUTY_MANAGER', count: 1 }], 'actor')) {
         run(database, statement)
       }
-      run(database, backfillVenueStatement(tonight.venueId, 0))
+      run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
       const before = shiftsOn(database, tonight.performanceId)[0]!
 
       template(database, tonight.venueId)
-      run(database, backfillVenueStatement(tonight.venueId, 0))
+      run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
 
       const after = shiftsOn(database, tonight.performanceId)
       expect(after.length).toBe(4)
@@ -157,7 +161,7 @@ describe('the backfill is idempotent (E-102 criterion 2)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       template(database, tonight.venueId)
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
 
       for (const statement of replaceTemplateStatements(tonight.venueId, [{ role: 'DUTY_MANAGER', count: 1 }], 'actor')) {
         run(database, statement)
@@ -171,7 +175,7 @@ describe('the backfill is idempotent (E-102 criterion 2)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       template(database, tonight.venueId)
-      run(database, backfillVenueStatement(tonight.venueId, tonight.startsAt + 1))
+      run(database, backfillVenueStatement(tonight.venueId, tonight.startsAt + 1, OFFSETS))
       expect(shiftsOn(database, tonight.performanceId)).toEqual([])
     })
   })
@@ -188,7 +192,7 @@ describe('a rota belongs to a performance', () => {
       })
       template(database, matinee.venueId)
 
-      run(database, backfillVenueStatement(matinee.venueId, 0))
+      run(database, backfillVenueStatement(matinee.venueId, 0, OFFSETS))
 
       expect(shiftsOn(database, matinee.performanceId).length).toBe(4)
       expect(shiftsOn(database, evening.performanceId).length).toBe(4)
@@ -333,7 +337,7 @@ describe('cancelling a performance cancels its shifts (E-102 criterion 4)', () =
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       template(database, tonight.venueId)
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
       const who = person(database, 'holder')
       database.batch([['UPDATE shifts SET user_id = ?, status = \'CONFIRMED\' WHERE performance_id = ? AND role = \'DUTY_MANAGER\'',
         who, tonight.performanceId]])
@@ -350,11 +354,11 @@ describe('cancelling a performance cancels its shifts (E-102 criterion 4)', () =
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       template(database, tonight.venueId)
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
       database.batch([['UPDATE performances SET status = \'CANCELLED\' WHERE id = ?', tonight.performanceId]])
       run(database, cancelShiftsStatement(tonight.performanceId))
 
-      run(database, backfillVenueStatement(tonight.venueId, 0))
+      run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
 
       expect(shiftsOn(database, tonight.performanceId).every(shift => shift.status === 'CANCELLED')).toBe(true)
     })
@@ -368,7 +372,7 @@ describe('a venue move cancels only a held shift the new house does not staff at
       template(database, tonight.venueId)
       testVenue(database, { suffix: 'b' })
       template(database, 'venue-b')
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
       const who = person(database, 'holder')
       database.batch([['UPDATE shifts SET user_id = ?, status = \'CONFIRMED\' WHERE performance_id = ? AND role = \'DUTY_MANAGER\'',
         who, tonight.performanceId]])
@@ -388,7 +392,7 @@ describe('a venue move cancels only a held shift the new house does not staff at
       for (const statement of replaceTemplateStatements('venue-b', [{ role: 'DUTY_MANAGER', count: 1 }], 'actor')) {
         run(database, statement)
       }
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
       const who = person(database, 'holder')
       database.batch([['UPDATE shifts SET user_id = ?, status = \'CONFIRMED\' WHERE performance_id = ? AND role = \'BAR\'',
         who, tonight.performanceId]])
@@ -410,7 +414,7 @@ describe('a venue move cancels only a held shift the new house does not staff at
       for (const statement of replaceTemplateStatements('venue-b', [{ role: 'DUTY_MANAGER', count: 1 }], 'actor')) {
         run(database, statement)
       }
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
 
       run(database, cancelOrphanedShiftsStatement(tonight.performanceId, 'venue-b'))
 
@@ -433,10 +437,10 @@ describe('no statement binds per performance or per slot', () => {
         ]])
       }
 
-      const [, ...parameters] = boundStatement(database, backfillVenueStatement(tonight.venueId, 0))
+      const [, ...parameters] = boundStatement(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
       expect(parameters.length).toBeLessThan(MAX_BOUND_PARAMETERS)
 
-      run(database, backfillVenueStatement(tonight.venueId, 0))
+      run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
       expect(rows<{ n: number }>(database, 'SELECT count(*) AS n FROM shifts')[0]!.n).toBe(31 * 4)
     })
   })
@@ -511,7 +515,7 @@ describe('a shift goes when its performance does', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       template(database, tonight.venueId)
-      run(database, stampPerformanceStatement(tonight.performanceId))
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
 
       database.batch([['DELETE FROM performances WHERE id = ?', tonight.performanceId]])
 

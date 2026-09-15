@@ -34,16 +34,29 @@ export function shiftNamesAPerson(status: ShiftStatus): boolean | null {
 // slip, and the count is what a person types.
 export const MAX_SLOT_COUNT = 20
 
+// The offsets are this role's own; null takes the configured default, which is what a venue that
+// has never been asked the question holds (0078, E-131 criterion 2).
 export interface TemplateSlot {
   role: ShiftRole
   count: number
+  startsBeforeDoorsMinutes?: number | null
+  endsAfterEndMinutes?: number | null
 }
+
+// A shift is worked within hours of its performance, so an offset beyond this is a slip.
+export const MAX_SHIFT_OFFSET_MINUTES = 480
 
 // One row per role, which is the whole template for a venue. A venue with no rows has no
 // template, and its performances stamp nothing (E-101 criterion 4).
+const offsetField = z.number().int().min(0, 'Enter a number of minutes, or leave it blank')
+  .max(MAX_SHIFT_OFFSET_MINUTES, 'A shift starts and ends within eight hours of its performance')
+  .nullish()
+
 export const templateSlotForm = z.object({
   role: z.enum(SHIFT_ROLES),
   count: z.number().int().min(1, 'Enter a count of at least one').max(MAX_SLOT_COUNT),
+  startsBeforeDoorsMinutes: offsetField,
+  endsAfterEndMinutes: offsetField,
 })
 
 export const shiftTemplateForm = z.object({

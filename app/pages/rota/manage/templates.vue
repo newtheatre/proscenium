@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { can, editSettings, manageRota, viewSettings } from '#shared/utils/abilities'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
-import { MAX_SLOT_COUNT, SHIFT_ROLES, orderedSlots, saysShiftRole, templateRefusal } from '#shared/utils/rota'
+import { MAX_SHIFT_OFFSET_MINUTES, MAX_SLOT_COUNT, SHIFT_ROLES, orderedSlots, saysShiftRole, templateRefusal } from '#shared/utils/rota'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import type { ShiftRole, TemplateSlot } from '#shared/utils/rota'
 import type { TableColumn } from '@nuxt/ui'
@@ -111,17 +111,34 @@ const editing = ref<VenueTemplate | null>(null)
 const open = ref(false)
 const counts = reactive<Record<ShiftRole, number>>({ DUTY_MANAGER: 1, DOOR: 0, BAR: 0 })
 
+// Blank means this venue has never been asked, and the shift takes the configured default (0078).
+const offsets = reactive<Record<ShiftRole, { start: string, end: string }>>({
+  DUTY_MANAGER: { start: '', end: '' },
+  DOOR: { start: '', end: '' },
+  BAR: { start: '', end: '' },
+})
+
+const saidOffset = (minutes: number | null | undefined): string => (minutes == null ? '' : String(minutes))
+const readOffset = (typed: string): number | null => (typed.trim() === '' ? null : Number(typed))
+
 function edit(venue: VenueTemplate): void {
   editing.value = venue
   for (const role of SHIFT_ROLES) {
-    counts[role] = venue.slots.find(slot => slot.role === role)?.count ?? (role === 'DUTY_MANAGER' ? 1 : 0)
+    const slot = venue.slots.find(one => one.role === role)
+    counts[role] = slot?.count ?? (role === 'DUTY_MANAGER' ? 1 : 0)
+    offsets[role] = { start: saidOffset(slot?.startsBeforeDoorsMinutes), end: saidOffset(slot?.endsAfterEndMinutes) }
   }
   open.value = true
 }
 
 // A count of nought is a role this venue does not staff, so it is left out rather than saved.
 const chosen = computed<TemplateSlot[]>(() =>
-  SHIFT_ROLES.filter(role => counts[role] > 0).map(role => ({ role, count: counts[role] })))
+  SHIFT_ROLES.filter(role => counts[role] > 0).map(role => ({
+    role,
+    count: counts[role],
+    startsBeforeDoorsMinutes: readOffset(offsets[role].start),
+    endsAfterEndMinutes: readOffset(offsets[role].end),
+  })))
 
 const refusal = computed(() => templateRefusal(chosen.value))
 
@@ -335,7 +352,7 @@ const columns: TableColumn<VenueTemplate>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Staffing for ${editing.venueName}` : ''"
-      description="How many of each role every performance at this venue needs. A nought means the venue does not staff that role at all."
+      description="How many of each role every performance at this venue needs, and when each is worked. A nought means the venue does not staff that role at all. Editing this changes nothing already stamped."
     >
       <template #body>
         <div class="space-y-4">
@@ -352,6 +369,40 @@ const columns: TableColumn<VenueTemplate>[] = [
               class="w-full"
               :data-test="`slot-${role}`"
             />
+
+            <div
+              v-if="counts[role] > 0"
+              class="mt-2 grid grid-cols-2 gap-2"
+            >
+              <UFormField
+                label="Starts before doors"
+                :description="`Minutes. Blank takes the house default.`"
+              >
+                <UInput
+                  v-model="offsets[role].start"
+                  type="number"
+                  :min="0"
+                  :max="MAX_SHIFT_OFFSET_MINUTES"
+                  placeholder="Default"
+                  class="w-full"
+                  :data-test="`starts-before-${role}`"
+                />
+              </UFormField>
+              <UFormField
+                label="Ends after the show"
+                description="Minutes. Blank takes the house default."
+              >
+                <UInput
+                  v-model="offsets[role].end"
+                  type="number"
+                  :min="0"
+                  :max="MAX_SHIFT_OFFSET_MINUTES"
+                  placeholder="Default"
+                  class="w-full"
+                  :data-test="`ends-after-${role}`"
+                />
+              </UFormField>
+            </div>
           </UFormField>
 
           <UAlert

@@ -17,6 +17,10 @@ export const shiftTemplates = sqliteTable('shift_templates', {
   venueId: text('venue_id').notNull().references(() => venues.id, { onDelete: 'cascade' }),
   role: text('role').notNull(),
   count: integer('count').notNull(),
+  // This role's own offsets, in minutes. NULL is the honest starting state and takes the
+  // configured default; a venue that has never been asked is not claiming an answer (0078).
+  startsBeforeDoorsMinutes: integer('starts_before_doors_minutes'),
+  endsAfterEndMinutes: integer('ends_after_end_minutes'),
   updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [
@@ -35,6 +39,10 @@ export const shifts = sqliteTable('shifts', {
   performanceId: text('performance_id').notNull().references(() => performances.id, { onDelete: 'cascade' }),
   role: text('role').notNull(),
   slot: integer('slot').notNull(),
+  // When this shift is worked, stamped from the performance and the template at stamp time, so a
+  // later template edit changes nothing already stamped (0078). NULL until the backfill runs.
+  startsAt: integer('starts_at'),
+  endsAt: integer('ends_at'),
   userId: text('user_id').references(() => users.id, { onDelete: 'restrict' }),
   status: text('status').notNull().default('OPEN'),
   // The training gate could not be evaluated, so somebody has to look (E-103 criterion 4).

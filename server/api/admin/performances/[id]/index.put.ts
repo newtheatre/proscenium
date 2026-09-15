@@ -109,7 +109,7 @@ export default defineEventHandler(async (event) => {
     await db.batch([
       db.run(cancelOrphanedShiftsStatement(id, input.venueId)),
       db.run(clearOpenShiftsStatement(id)),
-      db.run(stampPerformanceStatement(id)),
+      db.run(stampPerformanceStatement(id, await shiftOffsetDefaults(event))),
     ])
   }
 
