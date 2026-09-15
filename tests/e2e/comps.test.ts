@@ -132,6 +132,16 @@ function linesFor(entryId: string): LedgerLineRow[] {
   }
 }
 
+function write(sql: string, ...parameters: unknown[]): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(sql).run(...parameters as never[])
+  }
+  finally {
+    database.close()
+  }
+}
+
 async function approvedRequest(pricePence = 500): Promise<{ id: string, venueId: string, performanceId: string, variantId: string }> {
   const { venueId, performanceId } = programme(`comps-${crypto.randomUUID().slice(0, 6)}`)
   const { variantId } = await aSellableProduct(pricePence)
@@ -378,5 +388,92 @@ describe.skipIf(skip !== null)('a restricted line still needs a Challenge 25 out
     const answered = await give(id, venueId, 500)
     expect(answered.status).toBe(409)
     expect(await message(answered)).toContain('Challenge 25')
+  })
+})
+
+describe.skipIf(skip !== null)('a comp is spent where it was approved (review-till 13)', () => {
+  test('an approved comp cannot be given at another venue\'s session on a two-house night', async () => {
+    const houseA = programme(`comps-venue-a-${crypto.randomUUID().slice(0, 6)}`)
+    const houseB = programme(`comps-venue-b-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct()
+    await openTill(houseA.venueId, houseA.performanceId)
+    await openTill(houseB.venueId, houseB.performanceId)
+    confirmShift(houseA.performanceId, 'DUTY_MANAGER', barManager.id)
+
+    const asked = await ask({ venueId: houseA.venueId, lines: [{ variantId, qty: 1 }], reason: 'A round on the house' })
+    const { id } = await asked.json() as { id: string }
+    expect((await approve(id, barManager.cookie)).status).toBe(200)
+
+    const mismatched = await give(id, houseB.venueId, 500)
+    expect(mismatched.status).toBe(409)
+    expect(await message(mismatched)).toContain('different venue')
+
+    // The comp is still good at the venue it was actually approved for.
+    expect((await give(id, houseA.venueId, 500)).status).toBe(200)
+  })
+})
+
+describe.skipIf(skip !== null)('an approved request lapses too, not only a pending one (review-till 12)', () => {
+  test('the lapse wording reaches the caller, rather than the generic claim refusal', async () => {
+    const { id, venueId } = await approvedRequest(500)
+    write('UPDATE comp_requests SET created_at = ? WHERE id = ?', Math.floor(Date.now() / 1000) - 11 * 60, id)
+
+    const answered = await give(id, venueId, 500)
+    expect(answered.status).toBe(409)
+    expect(await message(answered)).toContain('lapsed')
+  })
+})
+
+describe.skipIf(skip !== null)('the approver\'s queue resolves the catalogue once for every pending request (review-till 8)', () => {
+  test('a ten-request queue prices every request correctly', async () => {
+    const { venueId, performanceId } = programme(`comps-ten-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(350)
+    await openTill(venueId, performanceId)
+    const dutyManager = await registerMember(app, `comps-ten-duty-${crypto.randomUUID().slice(0, 6)}`, generatePassword())
+    confirmShift(performanceId, 'DUTY_MANAGER', dutyManager.id)
+
+    const ids: string[] = []
+    for (let i = 0; i < 10; i += 1) {
+      const asked = await ask({ venueId, lines: [{ variantId, qty: 1 }], reason: `Round ${i}` })
+      const { id } = await asked.json() as { id: string }
+      ids.push(id)
+    }
+
+    const queued = await send('GET', `/api/till/comp-requests?performanceId=${performanceId}`, undefined, dutyManager.cookie)
+    expect(queued.status).toBe(200)
+    const { requests } = await queued.json() as { requests: { request: { id: string }, priced: { totalPence: number } }[] }
+    expect(requests).toHaveLength(10)
+    for (const id of ids) {
+      expect(requests.find(one => one.request.id === id)?.priced.totalPence).toBe(350)
+    }
+  })
+})
+
+describe.skipIf(skip !== null)('a single request is readable on its own, for the till to poll while it waits (Stream 6 A10)', () => {
+  test('the till reads its own request\'s current status', async () => {
+    const { venueId, performanceId } = programme(`comps-single-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId, performanceId)
+    confirmShift(performanceId, 'DUTY_MANAGER', barManager.id)
+
+    const asked = await ask({ venueId, lines: [{ variantId, qty: 1 }], reason: 'A round on the house' })
+    const { id } = await asked.json() as { id: string }
+
+    const before = await send('GET', `/api/till/comp-requests/${id}`, undefined, barStaff.cookie)
+    expect(before.status).toBe(200)
+    const beforeBody = await before.json() as { request: { id: string, status: string } }
+    expect(beforeBody.request.status).toBe('PENDING')
+
+    await approve(id, barManager.cookie)
+
+    const after = await send('GET', `/api/till/comp-requests/${id}`, undefined, barStaff.cookie)
+    const afterBody = await after.json() as { request: { status: string } }
+    expect(afterBody.request.status).toBe('APPROVED')
+  })
+
+  test('a request that does not exist is a 404', async () => {
+    const { venueId, performanceId } = programme(`comps-single-missing-${crypto.randomUUID().slice(0, 6)}`)
+    await openTill(venueId, performanceId)
+    expect((await send('GET', '/api/till/comp-requests/nowhere', undefined, barStaff.cookie)).status).toBe(404)
   })
 })

@@ -43,14 +43,14 @@ export function resolveReportPeriod(period: ReportPeriodInput): { fromAt: number
   return { fromAt, toAt }
 }
 
-// The delivered cost of one unit of a stocked item `i`: the weighted average across every
-// delivery it still has, so a period with no delivery of its own still has a cost to weigh against.
-const unitCostPence = sql`coalesce((
+// The delivered cost of one unit of stocked item `i`: the weighted average across every
+// unreversed delivery, or null if it has never had one; callers coalesce it their own way.
+export const unitCostPence = sql`(
   SELECT sum(d.qty * d.unit_cost_pence) * 1.0 / sum(d.qty)
   FROM stock_movements d
   WHERE d.item_id = i.id AND d.kind = 'DELIVERY' AND d.unit_cost_pence IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = d.id)
-), 0)`
+)`
 
 export function salesQuery(fromAt: number, toAt: number): SQL {
   return sql`
@@ -87,7 +87,7 @@ export function gpRevenueQuery(fromAt: number, toAt: number): SQL {
 export function gpDepletionQuery(fromAt: number, toAt: number): SQL {
   return sql`
     SELECT i.name AS itemName, -sum(m.qty) AS qtyDepleted,
-           round(-sum(m.qty) * ${unitCostPence}) AS costPence
+           round(-sum(m.qty) * coalesce(${unitCostPence}, 0)) AS costPence
     FROM stock_movements m
     JOIN bar_items i ON i.id = m.item_id
     WHERE (
@@ -125,7 +125,7 @@ const varianceScope = (fromAt: number, toAt: number): SQL => sql`
 export function varianceQuery(fromAt: number, toAt: number, limit: number, offset: number): SQL {
   return sql`
     SELECT st.id AS stocktakeId, i.name AS itemName, st.applied_at AS appliedAt,
-           m.qty AS qtyVariance, round(m.qty * ${unitCostPence}) AS valuePence
+           m.qty AS qtyVariance, round(m.qty * coalesce(${unitCostPence}, 0)) AS valuePence
     ${varianceScope(fromAt, toAt)}
     ORDER BY st.applied_at, i.name COLLATE NOCASE, m.id
     LIMIT ${limit} OFFSET ${offset}

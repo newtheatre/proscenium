@@ -4,8 +4,11 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
 import { auditedWrite } from '#server/utils/audit'
+import { isDutyOrBarManager } from '#server/utils/bar-authority'
+import { requireAnyNightAuthority } from '#server/utils/night-authority'
 import { compRequestExpired } from '#shared/utils/comps'
 import { auditEntry } from '#shared/utils/audit'
+import type { H3Event } from 'h3'
 import type { BasketLineInput } from '#shared/utils/sale'
 import type { CompRequest, CompRequestStatus } from '#shared/utils/comps'
 
@@ -35,9 +38,12 @@ const ROW_COLUMNS = sql`
   r.decided_at AS decidedAt, r.decline_reason AS declineReason, r.entry_id AS entryId, r.created_at AS createdAt
 `
 
+// Computed for a decided-but-unspent row too, not only PENDING: commitCompSale's own expiry
+// check would otherwise never see a true value, since it only ever reads an APPROVED row.
 function hydrate(row: RawRow, expiryMinutes: number, now: Date): CompRequest {
   const { lines: _lines, ...rest } = row
-  return { ...rest, expired: row.status === 'PENDING' && compRequestExpired(row.createdAt, expiryMinutes, now) }
+  const undecidedOrApproved = row.status === 'PENDING' || row.status === 'APPROVED'
+  return { ...rest, expired: undecidedOrApproved && compRequestExpired(row.createdAt, expiryMinutes, now) }
 }
 
 // The basket a request names, for whoever has to re-resolve it: the approver's queue prices it
@@ -93,6 +99,27 @@ export async function createCompRequest(
     })),
   ])
   return id
+}
+
+export interface CompDecisionContext {
+  request: CompRequest
+  deciderId: string
+}
+
+// Every decide route needs the same three things first: the request, that the caller holds
+// tonight's authority at all, and that they may decide (never their own, F-110 criterion 1).
+export async function resolveCompDecision(event: H3Event, id: string | undefined, expiryMinutes: number): Promise<CompDecisionContext> {
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Which request' })
+  const request = await compRequestById(id, expiryMinutes)
+  if (!request) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+
+  // Establishes that the caller is legitimately on tonight's till or duty roster at all
+  // (E-111 criterion 5); deciding itself needs the stricter check below.
+  const resolved = await requireAnyNightAuthority(event, ['DUTY_MANAGER', 'BAR'], { venueId: request.venueId })
+  if (!await isDutyOrBarManager(resolved.account.id, request.night)) {
+    throw createError({ statusCode: 403, statusMessage: 'A duty manager or bar manager decides a comp request' })
+  }
+  return { request, deciderId: resolved.account.id }
 }
 
 export type CompDecisionRefusal = 'not-found' | 'not-pending' | 'expired' | 'self'

@@ -10,9 +10,12 @@ export default defineEventHandler(async (event) => {
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
   const requests = await pendingCompRequests(resolved.venueId, resolved.night, expiryMinutes)
   const on = londonDayOf(new Date())
+  // Resolved once for the whole queue, not once per request (review-till 8): ten pending requests
+  // were forty catalogue reads for one screen.
+  const catalogue = await activeVariantsWithChoices(on)
   const priced = await Promise.all(requests.map(async request => ({
     request,
-    priced: await priceBasket((await compRequestLines(request.id)) ?? [], on, null),
+    priced: await priceBasketAgainst((await compRequestLines(request.id)) ?? [], catalogue, null),
   })))
 
   return { ok: true, requests: priced }
