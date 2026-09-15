@@ -1,5 +1,5 @@
 import type { NightReconciliation } from '#shared/utils/reconciliation'
-import type { TillSession } from '#shared/utils/till'
+import type { TillSession, TillVenueOption } from '#shared/utils/till'
 
 // The till's session lifecycle (F-102, F-118): opening, the periodic re-sync, and the close flow
 // with its expected-versus-actual figure. Everything else on the screen waits on this.
@@ -33,10 +33,45 @@ export function useTillSession() {
       // A recognised refusal is still a completed sync, so NightStale is not left saying "not yet
       // synced" forever (matching /tonight/index.vue's own shape).
       if (refusalStatus(refused) === 401 || refusalStatus(refused) === 403) syncedAt.value = new Date()
+      // Refused at the venue just chosen: the picker comes back rather than leaving the only way
+      // out in the address bar.
+      if (refusalStatus(refused) === 403 && venues.value.length > 0) venueAsked.value = true
+      // 400 is the guard asking which venue, so the screen answers with a picker rather than
+      // leaving a volunteer to decode a refusal (F-125, 0077).
+      if (refusalStatus(refused) === 400) await loadVenues()
     }
     finally {
       busy.value = false
     }
+  }
+
+  // The venues this caller may open a session at, read only when the guard asks for one. The
+  // picker shows on the question rather than on the answer, so a list that fails still explains.
+  const venues = ref<TillVenueOption[]>([])
+  const venuesFailure = ref<string | null>(null)
+  const venueAsked = ref(false)
+  const needsVenue = computed(() => venueAsked.value && !session.value)
+
+  async function loadVenues(): Promise<void> {
+    venueAsked.value = true
+    venuesFailure.value = null
+    try {
+      const answered = await request<{ venues: TillVenueOption[] }>('/api/till/venues')
+      venues.value = answered.venues
+      // Nobody has a bar for this caller to open, which is what the guard's own refusal says.
+      if (venues.value.length === 0) venuesFailure.value = failure.value
+    }
+    catch (refused) {
+      venuesFailure.value = refusalText(refused)
+    }
+  }
+
+  // Naming the venue is a reload rather than a second state to hold: the query string is what
+  // every other request on the screen already reads it from.
+  async function chooseVenue(chosen: string): Promise<void> {
+    await navigateTo({ path: route.path, query: { ...route.query, venueId: chosen } })
+    venueAsked.value = false
+    await load()
   }
 
   async function open(): Promise<void> {
@@ -145,6 +180,10 @@ export function useTillSession() {
     session,
     venueId,
     sumupEnabled,
+    venues,
+    venuesFailure,
+    needsVenue,
+    chooseVenue,
     load,
     open,
     closeModalOpen,

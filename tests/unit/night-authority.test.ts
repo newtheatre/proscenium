@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { ABILITY_PERMISSIONS, can, manageTonight, reachConsole, workTheDoor, workTheTill } from '#shared/utils/abilities'
 import { isAuditAction } from '#shared/utils/audit-actions'
 import { AUDIT_COVERAGE } from '#shared/utils/audit-coverage'
@@ -182,7 +182,10 @@ describe('every show-night route checks authority itself (E-111 criterion 5)', (
   // A namespace nobody has written into yet is empty, not a failure: the bar owns `/api/till`.
   const routes = (): string[] => NAMESPACES.flatMap((directory) => {
     try {
-      return [...new Bun.Glob('**/*.ts').scanSync({ cwd: directory, onlyFiles: true })].map(path => join(directory, path)).sort()
+      // Posix separators, because the registries these are compared against are written with
+      // them and `join` answers backslashes on Windows.
+      return [...new Bun.Glob('**/*.ts').scanSync({ cwd: directory, onlyFiles: true })]
+        .map(path => join(directory, path).split(sep).join('/')).sort()
     }
     catch {
       return []
@@ -197,13 +200,25 @@ describe('every show-night route checks authority itself (E-111 criterion 5)', (
   // close's, shared so a preview cannot drift from the write; all three reach the same guard.
   const GUARDS = ['requireNightAuthority(', 'requireAnyNightAuthority(', 'closerFor(']
 
+  // The one route that cannot resolve night authority, because it exists to answer the question
+  // the guard asks when it refuses: which venue. It returns venue names and nothing else (0077).
+  const WITHOUT_AUTHORITY: Record<string, string> = {
+    'server/api/till/venues.get.ts': 'names the venues a caller may open a till at, which is what a request naming none is refused for',
+  }
+
   test('no route under them resolves authority any other way', async () => {
     const skipped: string[] = []
     for (const route of routes()) {
+      if (WITHOUT_AUTHORITY[route]) continue
       const source = await Bun.file(route).text()
       if (!GUARDS.some(guard => source.includes(guard))) skipped.push(route)
     }
     expect(skipped).toEqual([])
+  })
+
+  // An exemption is a decision somebody made, so it names a route that is actually there.
+  test('every exempted route exists, so the list cannot outlive what it excuses', () => {
+    expect(Object.keys(WITHOUT_AUTHORITY).filter(route => !routes().includes(route))).toEqual([])
   })
 
   // A named guard is only a guard while it holds one: without this, moving a route's authority

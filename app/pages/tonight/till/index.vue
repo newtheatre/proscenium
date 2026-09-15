@@ -18,6 +18,10 @@ const {
   session,
   venueId,
   sumupEnabled,
+  venues,
+  venuesFailure,
+  needsVenue,
+  chooseVenue,
   open,
   closeModalOpen,
   reconciliation,
@@ -280,8 +284,41 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
       :stale="session ? catalogue.cachedAt.value : syncedAt"
       :busy="busy || catalogue.pending.value"
     >
+      <!-- The guard refuses a request naming no venue, and the answer to that is a tap rather
+           than a refusal a volunteer has to decode (F-125, 0077). -->
+      <div
+        v-if="needsVenue"
+        data-test="till-venue-picker"
+        class="space-y-3"
+      >
+        <p class="text-sm text-muted">
+          Which bar are you opening tonight?
+        </p>
+        <UAlert
+          v-if="venuesFailure"
+          data-test="till-venues-failure"
+          color="error"
+          variant="subtle"
+          :description="venuesFailure"
+        />
+        <UButton
+          v-for="venue in venues"
+          :key="venue.venueId"
+          :data-test="`till-venue-${venue.venueId}`"
+          color="neutral"
+          variant="subtle"
+          size="xl"
+          block
+          class="justify-between"
+          @click="chooseVenue(venue.venueId)"
+        >
+          <span>{{ venue.venueName }}</span>
+          <span class="text-xs text-muted">{{ venue.what }}</span>
+        </UButton>
+      </div>
+
       <UAlert
-        v-if="failure"
+        v-else-if="failure"
         data-test="till-failure"
         color="error"
         variant="subtle"
