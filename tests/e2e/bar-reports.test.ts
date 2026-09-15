@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, menuOptions, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -246,6 +246,37 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, '[data-test="refresh-report"]')
     await waitFor(view, `document.querySelector('[data-test="section-sales"]')`)
     expect(await textOf(view, '[data-test="section-sales"]')).toContain('£5.00')
+    view.close()
+  }, 120_000)
+
+  // review-ui.md finding 11: the kind picker read in shouting capitals, and no period field
+  // carried a label a screen reader could announce.
+  test('the period kind reads as words, and every period field carries its own label', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barManagerPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
+    expect(await menuOptions(view, '[data-test="period-kind"]')).toEqual(['Night', 'Week', 'Season', 'Custom range'])
+
+    const labelTexts = async (): Promise<string[]> => JSON.parse(await view.evaluate<string>(
+      `JSON.stringify([...document.querySelectorAll('label')].map(el => el.textContent.trim()))`,
+    )) as string[]
+
+    // Custom is the default: From and To are two identical date controls unless each says which.
+    expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'From', 'To']))
+
+    await pickOption(view, '[data-test="period-kind"]', 'Night')
+    await waitFor(view, `document.querySelector('[data-test="period-night"]')`)
+    expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'Night']))
+
+    await pickOption(view, '[data-test="period-kind"]', 'Season')
+    await waitFor(view, `document.querySelector('[data-test="period-season"]')`)
+    expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'Season']))
+
     view.close()
   }, 120_000)
 })

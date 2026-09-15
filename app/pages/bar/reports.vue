@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
-import type { BarReport, ReportPeriodInput, ReportSection } from '#shared/utils/bar-reports'
+import type { BarReport, ReportPeriodInput, ReportPeriodKind, ReportSection } from '#shared/utils/bar-reports'
 
 definePageMeta({ layout: 'console', title: 'Bar reports', middleware: 'console', docs: '/docs/bar/reports' })
+
+// Words, not the enum's own shouting-capitals spelling: the same treatment every other bar
+// screen gives a stored value (review-ui.md finding 11).
+function saysReportPeriod(value: ReportPeriodKind): string {
+  return value === 'NIGHT' ? 'Night' : value === 'WEEK' ? 'Week' : value === 'SEASON' ? 'Season' : 'Custom range'
+}
+
+const periodKindOptions = REPORT_PERIOD_KINDS.map(value => ({ label: saysReportPeriod(value), value }))
 
 const request = useRequestFetch()
 
@@ -61,36 +69,53 @@ function exportUrl(section: ReportSection): string {
       :searchable="false"
     >
       <template #actions>
-        <USelect
-          v-model="kind"
-          aria-label="Period kind"
-          data-test="period-kind"
-          :items="[...REPORT_PERIOD_KINDS]"
-        />
-        <DateField
+        <UFormField label="Period">
+          <USelect
+            v-model="kind"
+            data-test="period-kind"
+            :items="periodKindOptions"
+          />
+        </UFormField>
+        <UFormField
           v-if="kind === 'NIGHT'"
-          v-model="night"
-          data-test="period-night"
-        />
-        <DateField
+          label="Night"
+        >
+          <DateField
+            v-model="night"
+            data-test="period-night"
+          />
+        </UFormField>
+        <UFormField
           v-if="kind === 'WEEK'"
-          v-model="day"
-          data-test="period-week"
-        />
-        <UInputNumber
+          label="Week of"
+        >
+          <DateField
+            v-model="day"
+            data-test="period-week"
+          />
+        </UFormField>
+        <UFormField
           v-if="kind === 'SEASON'"
-          v-model="year"
-          data-test="period-season"
-        />
+          label="Season"
+        >
+          <UInputNumber
+            v-model="year"
+            data-test="period-season"
+          />
+        </UFormField>
         <template v-if="kind === 'CUSTOM'">
-          <DateField
-            v-model="from"
-            data-test="period-from"
-          />
-          <DateField
-            v-model="to"
-            data-test="period-to"
-          />
+          <UFormField label="From">
+            <DateField
+              v-model="from"
+              data-test="period-from"
+            />
+          </UFormField>
+          <UFormField label="To">
+            <DateField
+              v-model="to"
+              data-test="period-to"
+            />
+          </UFormField>
         </template>
         <UButton
           data-test="refresh-report"
