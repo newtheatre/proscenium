@@ -519,6 +519,46 @@ describe.skipIf(skip !== null)('the register is a screen a trainer can open (G-1
       view.close()
     }
   }, CASE_TIMEOUT_MS)
+
+  // A settled register offered the marking list, Add someone and Submit, all three refused with
+  // a 409 by the server. It says what it is instead.
+  test('a marked register past the edit window offers nothing to mark', async () => {
+    const session = await sessionToday([await addModule()])
+    const member = await adminSession(app, { roles: [] })
+    signUp(session, member.id, Math.floor(Date.now() / 1000))
+    await openRegister(session)
+    expect((await mark(session, { marks: [{ userId: member.id, mark: 'ATTENDED' }] })).status).toBe(200)
+    write('UPDATE training_sessions SET held_on = ? WHERE id = ?', daysFrom(-365), session)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', trainer.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+
+      await visit(view, `${app.baseURL}/training/sessions/${session}/register`)
+      await waitFor(view, `document.querySelector('[data-test="settled-register"]')`, 30_000)
+
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="register-list"]')`,
+      )).toBe(false)
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="add-someone"]')`,
+      )).toBe(false)
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="submit-register"]')`,
+      )).toBe(false)
+      expect(await view.evaluate<boolean>(
+        `!!document.querySelector('[data-test="correct-register"]')`,
+      )).toBe(false)
+      expect(await textOf(view, '[data-test="settled-register"]')).toContain('settled')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
