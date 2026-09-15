@@ -70,6 +70,10 @@ export const viewTicketTypes = defineAbility((viewer: Viewer) => holds(viewer, '
 export const viewProgramme = defineAbility((viewer: Viewer) => holds(viewer, 'ticketing.read'))
 export const viewPassTypes = defineAbility((viewer: Viewer) => holds(viewer, 'ticketing.read'))
 
+// Taking a copy of season sales, which the box office holds and general front of house does
+// not, and which is audited on every use (D-129 criterion 3).
+export const exportTickets = defineAbility((viewer: Viewer) => holds(viewer, 'ticketing.export'))
+
 // Narrowing what a pass already covers once something holds a live pass against the show being
 // dropped (D-123 criterion 4).
 export const managePassTypes = defineAbility((viewer: Viewer) => holds(viewer, 'ticketing.manage'))
@@ -174,6 +178,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewProgramme: 'ticketing.read',
   viewPassTypes: 'ticketing.read',
   managePassTypes: 'ticketing.manage',
+  exportTickets: 'ticketing.export',
   viewBarCatalogue: 'bar.read',
   viewBarStock: 'bar.read',
   viewBarReports: 'bar.read',

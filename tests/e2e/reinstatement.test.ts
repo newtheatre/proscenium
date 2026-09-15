@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { showNightOf } from '#shared/utils/show-night'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -19,6 +19,7 @@ const CASE_TIMEOUT_MS = 120_000
 let app: AppUnderTest
 let officer: TestMember
 let boxOffice: TestMember
+let boxOfficePassword: string
 let manager: TestMember
 let venueId: string
 
@@ -27,7 +28,8 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
 
-  boxOffice = await registerMember(app, 'boxoffice', generatePassword())
+  boxOfficePassword = generatePassword()
+  boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, officer.cookie)
 
   manager = await registerMember(app, 'manager', generatePassword())
@@ -283,5 +285,74 @@ describe.skipIf(skip !== null)('who may reinstate (D-118 role: Box Office office
     const refused = await send('POST', `/api/box-office/desk/reservations/${booked.id}/reinstate`, { reason: 'Not my call' }, stranger.cookie)
     expect(refused.status).toBe(403)
     expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', booked.id)?.status).toBe('EXPIRED')
+  }, CASE_TIMEOUT_MS)
+})
+
+async function signInAsBoxOffice(): ReturnType<typeof openSignedOutView> {
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', boxOffice.email)
+  await fill(view, 'form input[type="password"]', boxOfficePassword)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+  return view
+}
+
+// #1037: the words said "reinstate it below" while nothing below reinstated. The screen is what
+// this proves: the booking is opened by its reference, which needs no particular night.
+describe.skipIf(skip !== null)('reinstating from the desk screen itself (#1037)', () => {
+  test('a lapsed hold is opened, given a reason and brought back', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const booked = await expiredReservation(performanceId, ticketTypeId)
+
+    const view = await signInAsBoxOffice()
+    try {
+      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await fill(view, '[data-test="desk-scan"]', booked.reference)
+      await click(view, '[data-test="desk-scan-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-uncollectable"]')`, 15_000)
+
+      const says = await textOf(view, '[data-test="desk-uncollectable"]')
+      expect(says).toContain('Box office can reinstate it')
+      expect(says).not.toContain('below')
+
+      await fill(view, '[data-test="desk-reinstate-reason"]', 'Booker was held up on the tram')
+      await click(view, '[data-test="desk-reinstate"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-tender"]')`, 15_000)
+
+      expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', booked.id)?.status).toBe('PENDING')
+      expect(query<{ reason: string }>(
+        'SELECT reason FROM reservation_reinstatements WHERE reservation_id = ?', booked.id,
+      )?.reason).toBe('Booker was held up on the tram')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a staff cancellation opens with no reinstate control at all', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const booked = await bookedReservation(performanceId, ticketTypeId)
+    expect((await send('POST', `/api/box-office/desk/reservations/${booked.id}/collect`, {
+      expectedTotalPence: 900, tender: 'CARD',
+    })).status).toBe(200)
+    const ticketId = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', booked.id)!.id
+    expect((await send('POST', `/api/box-office/desk/reservations/${booked.id}/tickets/${ticketId}/refund`, {
+      expectedTotalPence: 900,
+    }, manager.cookie)).status).toBe(200)
+    expect((await send('POST', `/api/box-office/desk/reservations/${booked.id}/cancel`)).status).toBe(200)
+
+    const view = await signInAsBoxOffice()
+    try {
+      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await fill(view, '[data-test="desk-scan"]', booked.reference)
+      await click(view, '[data-test="desk-scan-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-uncollectable"]')`, 15_000)
+
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="desk-reinstate"]'))`)).toBe(false)
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })

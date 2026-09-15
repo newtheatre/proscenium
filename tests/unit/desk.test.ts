@@ -33,6 +33,18 @@ describe('a booking is collectable only while PENDING (criterion 2)', () => {
   test('an unrecognised status still says something rather than nothing', () => {
     expect(uncollectableReason('SOMETHING_NEW')).toContain('cannot be collected')
   })
+
+  // #1037: the till shows these words too, on a screen that never reinstates anything, so no
+  // reason may point at a control below it.
+  test('no reason sends the reader to something below it', () => {
+    const reasons = ['COLLECTED', 'DOOR', 'CANCELLED', 'EXPIRED', 'NO_SHOW', 'SOMETHING_NEW']
+      .map(status => uncollectableReason(status) ?? '')
+    expect(reasons.some(reason => reason.toLowerCase().includes('below'))).toBe(false)
+  })
+
+  test('a lapsed hold names who can bring it back', () => {
+    expect(uncollectableReason('EXPIRED')).toContain('Box office can reinstate it')
+  })
 })
 
 describe('what is due now depends on the tender (criterion 4)', () => {

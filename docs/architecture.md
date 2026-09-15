@@ -1523,7 +1523,10 @@ E-119's export already uses. A `season` filter resolves through `resolveSeasonBo
 (`shared/utils/ticket-export.ts`) against the `SEASON_START`/`SEASON_END` configuration keys,
 1 August to 31 July by default (criterion 5); an explicit `from`/`to` range is the alternative, not
 both at once. Every export writes a `tickets.exported` audit entry naming the actor, the filter
-and the row count, before the file body is built (criterion 4).
+and the row count, before the file body is built (criterion 4). `/box-office/shows` carries the
+card that reaches it, a day range and a link, gated on the `exportTickets` ability so the route is
+not something only a typed URL finds; the link is a plain `GET` the browser follows and saves,
+the shape `/money/exports` already uses rather than a fetch that would have to hold the file.
 
 ## Show-night resilience (module K)
 

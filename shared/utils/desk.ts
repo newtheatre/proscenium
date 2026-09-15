@@ -52,9 +52,9 @@ export function uncollectableReason(status: string): string | null {
     case 'DOOR':
       return 'This booking was already admitted at the door.'
     case 'CANCELLED':
-      return 'This booking was cancelled and cannot be collected. Reinstate it below if it still can be.'
+      return 'This booking was cancelled and cannot be collected. Box office can reinstate it if the seats are still free.'
     case 'EXPIRED':
-      return 'This hold has lapsed. Reinstate it below if the seats are still free.'
+      return 'This hold has lapsed. Box office can reinstate it if the seats are still free.'
     case 'NO_SHOW':
       return 'This booking was recorded as a no-show and cannot be collected.'
     default:

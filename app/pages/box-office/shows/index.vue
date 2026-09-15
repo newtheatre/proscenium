@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { can, exportTickets } from '#shared/utils/abilities'
 import { saysReferenceName, saysShowDates, saysShowSeasonLine, saysShowStanding, saysShowVenues, showForm, toSlug } from '#shared/utils/programme'
 import { saysHouse, soldShare } from '#shared/utils/show-strip'
 import { showsList } from '#shared/utils/shows-list'
@@ -86,6 +87,16 @@ async function create(): Promise<void> {
     saving.value = false
   }
 }
+
+const mayExport = computed(() => can(useViewer().value, exportTickets))
+
+const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+const exportFrom = ref(today)
+const exportTo = ref(today)
+
+// A GET link, not a fetch: the browser follows the content-disposition header and saves the file
+// itself, the same shape money/exports.vue already uses.
+const ticketExportUrl = computed(() => `/api/admin/tickets/export?${new URLSearchParams({ from: exportFrom.value, to: exportTo.value }).toString()}`)
 
 // A listing that refused says so, or the table quietly keeps showing rows the filters no longer
 // describe.
@@ -259,6 +270,41 @@ const artless = computed(() => data.value.items.filter(one => one.status === 'DR
       :title="`${plural(artless.length, 'draft')} with no poster`"
       :description="`${artless.map(one => one.title).join(', ')}. A draft can go on sale without artwork, but it will show its own gradient everywhere until one is uploaded.`"
     />
+
+    <section
+      v-if="mayExport"
+      class="space-y-4"
+      data-test="section-ticket-export"
+    >
+      <h2 class="font-semibold">
+        Ticket sales export
+      </h2>
+      <p class="text-sm text-muted">
+        Every ticket sold between these two days, as a CSV: reference, performance, type, price,
+        source, whether it was collected and whether it was refunded. No names and no access
+        details are ever in it. Taking a copy is recorded in the audit trail.
+      </p>
+      <AdminToolbar :filterable="false">
+        <template #actions>
+          <DateField
+            v-model="exportFrom"
+            data-test="ticket-export-from"
+          />
+          <DateField
+            v-model="exportTo"
+            data-test="ticket-export-to"
+          />
+          <UButton
+            data-test="ticket-export-csv"
+            icon="i-lucide-download"
+            :to="ticketExportUrl"
+            :disabled="!exportFrom || !exportTo || exportTo < exportFrom"
+          >
+            Export CSV
+          </UButton>
+        </template>
+      </AdminToolbar>
+    </section>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p
