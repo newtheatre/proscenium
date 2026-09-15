@@ -71,6 +71,9 @@ describe('formatted for what it measures (criterion 2)', () => {
   test('money is pence formatted as pounds, never as a bare number', () => {
     expect(formatPolicyValue('BAR_TAB_CAP_PENCE', 2000)).toBe('£20.00')
     expect(formatPolicyValue('BAR_TAB_CAP_PENCE', 2050)).toBe('£20.50')
+    // A page naming a `_PENCE` key in prose (a tab "capped at {{BAR_TAB_CAP_PENCE}}") gets pounds
+    // back, never the pence figure the key's own name might tempt a sentence to call it.
+    expect(formatPolicyValue('BAR_TAB_CAP_PENCE', 2000)).not.toBe('2000')
   })
 
   test('a percentage carries its sign', () => {
