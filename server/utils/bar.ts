@@ -70,7 +70,7 @@ export function productEverSoldQuery(productId: string, references = productSale
 }
 
 // Every ACTIVE size needs something a sale can deplete, an item directly or a choice group
-// standing in for one (F-128). Order lives in the derived table: a compound SELECT may only order by its final term.
+// standing in for one (F-128). `LIMIT -1` keeps SQLite's flattener from dropping the subquery's order.
 export function variantsWithoutRecipeQuery(productId: string): SQL {
   return sql`
     SELECT 'a recipe for ' || v.label AS needs
@@ -78,6 +78,7 @@ export function variantsWithoutRecipeQuery(productId: string): SQL {
       SELECT id, label FROM product_variants
       WHERE product_id = ${productId} AND status = 'ACTIVE'
       ORDER BY sort, label COLLATE NOCASE
+      LIMIT -1
     ) v
     WHERE NOT EXISTS (SELECT 1 FROM variant_components c WHERE c.variant_id = v.id)
   `
