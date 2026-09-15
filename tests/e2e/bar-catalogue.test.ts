@@ -835,6 +835,53 @@ describe.skipIf(skip !== null)('the screens', () => {
     view.close()
   }, 120_000)
 
+  // A ticket price is per container, not a per-ml sum nobody has ever priced by hand
+  // (F-114 criterion 6): asked that way, converted to the stored cost per ml.
+  test('a measured item asks a delivery cost per container, converted to a cost per ml', async () => {
+    const itemName = named('Costed bottle')
+    const itemId = await addItem({ name: itemName, containerMl: 700 })
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="move-${itemId}"]`)
+    await click(view, `[data-test="move-${itemId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
+    expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost a container')
+
+    await fillNumber(view, '[data-test="movement-qty"]', '700')
+    // £7 for a 700 ml container is exactly 1p a ml: a round number on both sides of the division.
+    await fillNumber(view, '[data-test="movement-cost"]', '7')
+    await click(view, '[data-test="movement-submit"]')
+    await waitFor(view, `!document.querySelector('[data-test="movement-form"]')`)
+
+    expect((await movements(`&itemId=${itemId}`))[0]).toMatchObject({ kind: 'DELIVERY', unitCostPence: 1 })
+    view.close()
+  }, 120_000)
+
+  test('an item counted by the each asks a delivery cost per unit, not per container', async () => {
+    const itemName = named('Costed each')
+    const itemId = await addItem({ name: itemName, unit: 'ITEM', containerMl: null })
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="move-${itemId}"]`)
+    await click(view, `[data-test="move-${itemId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
+    expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost a unit')
+
+    view.close()
+  }, 120_000)
+
   // The picker offers only what the write path accepts for the chosen kind, and forgets a
   // choice that stops making sense when the kind changes under it (F-204, 3.5).
   test('the reason picker is filtered by kind, and resets when the kind changes', async () => {

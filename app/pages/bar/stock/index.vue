@@ -94,6 +94,21 @@ const pounds = computed({
   },
 })
 
+// A ticket price is per bottle or keg, not per millilitre nobody has ever priced by hand
+// (F-114 criterion 6): asked in the unit the manager actually holds, the container.
+const byContainer = computed(() => moving.value?.unit === 'ML' && Boolean(moving.value?.containerMl))
+
+// Converted once, at the pounds-per-container to pence-per-ml boundary, the same rule as
+// `pounds` above: never redisplayed and redivided as the figure is edited.
+const containerPounds = ref<number | undefined>(undefined)
+
+// A whole penny a ml is the ledger's own limit (unit_cost_pence is an integer, 0004): the same
+// figure a manager dividing by hand would have had to settle for typing directly.
+watch(containerPounds, (value) => {
+  const size = moving.value?.containerMl
+  movement.unitCostPence = value === undefined || !size ? undefined : Math.round((value * 100) / size)
+})
+
 async function reload(): Promise<void> {
   await refresh()
   if (page.value > data.value.pages) page.value = data.value.pages
@@ -116,6 +131,7 @@ function edit(item: StockItem | null): void {
 function moveStock(item: StockItem): void {
   moving.value = item
   Object.assign(movement, { kind: 'DELIVERY', qty: 1, reason: undefined, unitCostPence: undefined, adds: true })
+  containerPounds.value = undefined
 }
 
 async function save(): Promise<void> {
@@ -608,7 +624,23 @@ const columns: TableColumn<StockItem>[] = [
           </UFormField>
 
           <UFormField
-            v-if="movement.kind === 'DELIVERY'"
+            v-if="movement.kind === 'DELIVERY' && byContainer"
+            label="Cost a container"
+            name="unitCostPence"
+            :description="`In pounds, for the whole ${moving?.containerMl} ml container. Divided to a cost per ml, what gross profit is measured against.`"
+          >
+            <UInputNumber
+              v-model="containerPounds"
+              :min="0"
+              :step="0.01"
+              :format-options="{ style: 'currency', currency: 'GBP' }"
+              class="w-full"
+              data-test="movement-cost"
+            />
+          </UFormField>
+
+          <UFormField
+            v-else-if="movement.kind === 'DELIVERY'"
             label="Cost a unit"
             name="unitCostPence"
             description="In pounds, for what was actually paid. This is what gross profit is measured against."
