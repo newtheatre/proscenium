@@ -1004,7 +1004,10 @@ UPDATE outright, and a charge cannot know at insert time whether it will later b
 unique where not null so a charge voids once · `void_reason` NULL, free text, on the record
 and off the audit trail (0011) · `till_session_id` NULL, bare (no foreign key: one would rebuild
 this table), the session an entry was rung up against, so a close figure can be its own session's
-rather than the whole night's (F-105.1, F-118, F-202.3) · `created_at`.
+rather than the whole night's (F-105.1, F-118, F-202.3); `postEntry` accepts it but no caller
+passes it yet, so every existing row reads NULL · `created_at`.
+Indexed on `london_day` (every report groups by day), `happened_at` (the GP period filter reads
+this column directly, #1094), `reverses_entry_id` and `tab_debtor_id`.
 A void credit carries the same `tab_debtor_id` as the charge it credits, and every balance
 (the account screen, the F-108 cap, the year-end list, the retention exemption) reads
 `OUTSTANDING_CHARGE` in `server/utils/tab-settlement.ts`, which drops both the voided charge and
@@ -1512,8 +1515,9 @@ counting unit · `kind` CHECK `DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJ
 bar-manager-managed list (F-204) needs no rebuild · `unit_cost_pence`, delivery only (F-119's cost
 basis) · `ref_table` / `ref_id`, set together or not at all · `reverses_id` → stock_movements
 restrict · `actor_id` → users restrict, NULL being the system · `location_venue_id` NULL, bare
-(no foreign key: one would rebuild this table), the venue the movement happened at, written at
-the write path as the single venue (F-202) · `created_at`.
+(no foreign key: one would rebuild this table), the venue the movement happened at; the column
+exists from this migration, every historical row reads NULL, and no write path sets it yet
+(F-202) · `created_at`.
 
 On-hand is always `SUM(qty)`, computed where it is asked for; no column anywhere holds a balance,
 and a test over the live schema refuses one. Triggers refuse every UPDATE and DELETE, and refuse a

@@ -45,6 +45,8 @@ export const ledgerEntries = sqliteTable('ledger_entries', {
 }, table => [
   // Every report groups by day; without this each one is a scan of the whole ledger.
   index('ledger_entries_london_day').on(table.londonDay),
+  // The GP period filter (#1094) reads this column directly rather than london_day.
+  index('ledger_entries_happened_at').on(table.happenedAt),
   index('ledger_entries_reverses').on(table.reversesEntryId),
   index('ledger_entries_tab_debtor').on(table.tabDebtorId),
   check('ledger_entries_source', sql`${table.source} IN ('DESK', 'TILL', 'SELF_SERVE', 'IMPORT', 'SYSTEM')`),
