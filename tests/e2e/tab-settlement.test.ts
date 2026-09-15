@@ -349,6 +349,27 @@ describe.skipIf(skip !== null)('a voided charge leaves the balance, the cap and 
     expect(body.tab.charges.some(charge => charge.voided)).toBe(true)
   })
 
+  test('the credit a void posts is not itself a charge, so it cannot be voided', async () => {
+    const { venueId, performanceId } = programme(`settle-void-credit-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member.id, 500)
+
+    const candidates = await settleCandidates(venueId, member.id)
+    const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
+    const voided = await voidCharge(charges[0]!.entryId, 'Charged in error', barManager.cookie)
+    const { voidEntryId } = await voided.json() as { voidEntryId: string }
+
+    const answered = await voidCharge(voidEntryId, 'Undoing the undo', barManager.cookie)
+    expect(answered.status).toBe(404)
+
+    const after = await send('GET', '/api/account/tab', undefined, member.cookie)
+    const body = await after.json() as { tab: { outstandingPence: number } }
+    expect(body.tab.outstandingPence).toBe(0)
+  })
+
   test('the holder drops off the treasurer\'s unsettled list', async () => {
     const { venueId, performanceId } = programme(`settle-void-yearend-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aSellableProduct(500)

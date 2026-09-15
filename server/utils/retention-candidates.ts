@@ -25,7 +25,7 @@ export interface CandidateRow {
 const unsettledMoney = (): SQL => sql`exists (
   select 1 from ledger_entries e
   where e.tab_debtor_id = ${schema.users.id} and e.tender = 'TAB'
-    and e.void_of_entry_id is null
+    and e.void_of_entry_id is null and e.reverses_entry_id is null
     and not exists (select 1 from ledger_entries v where v.void_of_entry_id = e.id)
     and not exists (select 1 from ledger_lines l where l.settles_entry_id = e.id)
 )`

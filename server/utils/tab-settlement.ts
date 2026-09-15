@@ -193,7 +193,8 @@ export async function settleTab(
   return { entryId: posted.id, settledPence: owedPence }
 }
 
-// A settled charge is corrected by refund policy, never a void (criterion 4).
+// A settled charge is corrected by refund policy, never a void (criterion 4). A credit names its
+// holder too, so the lookup says charge rather than "anything naming a debtor" (criterion 5).
 export async function voidTabCharge(
   entryId: string,
   reason: string,
@@ -202,6 +203,7 @@ export async function voidTabCharge(
   const [charge] = await db.all<{ id: string, tabDebtorId: string }>(sql`
     SELECT e.id AS id, e.tab_debtor_id AS tabDebtorId FROM ledger_entries e
     WHERE e.id = ${entryId} AND e.tab_debtor_id IS NOT NULL
+      AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
   `)
   if (!charge) throw createError({ statusCode: 404, statusMessage: 'No such tab charge' })
 
