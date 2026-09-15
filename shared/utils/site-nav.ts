@@ -245,6 +245,10 @@ export const MY_NAV: NavEntry[] = [
   { label: 'My training', icon: 'i-lucide-graduation-cap', to: '/training', ability: signedIn, exact: true },
   { label: 'Training sessions', icon: 'i-lucide-calendar-days', to: '/training/sessions', ability: signedIn },
 
+  // Module F: bar
+
+  { label: 'My tab', icon: 'i-lucide-receipt', to: '/account/bar-tab', ability: signedIn },
+
   // Module D: ticketing
 
   { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/account/passes', ability: signedIn },
