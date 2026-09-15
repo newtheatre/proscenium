@@ -2,12 +2,12 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// /money/periods and /money/exports (I-107, I-108): pins each screen's own flow, preview
-// before close, a typed confirmation before reopen, and editing a mapping before the CSV reads it.
+// /money, /money/periods and /money/exports (I-105, I-107, I-108): each screen's own flow, from
+// the dashboard's period picker to a typed confirmation before a reopen.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -16,15 +16,19 @@ let app: AppUnderTest
 let admin: TestMember
 let treasurer: TestMember
 let boxOffice: TestMember
+let committee: TestMember
+const treasurerPassword = generatePassword()
 
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
   admin = await adminSession(app)
-  treasurer = await registerMember(app, 'screens-treasurer', generatePassword())
+  treasurer = await registerMember(app, 'screens-treasurer', treasurerPassword)
   boxOffice = await registerMember(app, 'screens-box-office', generatePassword())
+  committee = await registerMember(app, 'screens-committee', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, admin.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -128,6 +132,47 @@ describe.skipIf(skip !== null)('/money/exports: editing a mapping before the CSV
     expect((await send('POST', '/api/admin/finance/nominal-mappings', { kind: 'WALK_UP', source: 'DESK', nominalCode: '9999' }, boxOffice.cookie)).status).toBe(403)
     expect((await send('GET', '/api/admin/finance/export?fromDay=2019-05-01&toDay=2019-05-31', undefined, boxOffice.cookie)).status).toBe(403)
   })
+})
+
+describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105 criterion 4)', () => {
+  test('the committee may list the terms the picker offers, box office may not', async () => {
+    expect((await send('GET', '/api/admin/finance/terms', undefined, committee.cookie)).status).toBe(200)
+    expect((await send('GET', '/api/admin/finance/terms', undefined, boxOffice.cookie)).status).toBe(403)
+  })
+
+  test('the summary answers a term as the range the term itself carries', async () => {
+    const defined = await send('POST', '/api/admin/finance/terms', { label: 'Autumn 2019', fromDay: '2019-09-23', toDay: '2019-12-13' }, treasurer.cookie)
+    expect(defined.status).toBe(200)
+
+    const answered = await send('GET', '/api/admin/finance/season?kind=TERM&fromDay=2019-09-23&toDay=2019-12-13', undefined, treasurer.cookie)
+    expect(answered.status).toBe(200)
+    const { summary } = await answered.json() as { summary: { fromDay: string, toDay: string } }
+    expect(summary).toMatchObject({ fromDay: '2019-09-23', toDay: '2019-12-13' })
+  })
+
+  test('the screen offers the term, and its money column is headed Amount rather than Pence', async () => {
+    await send('POST', '/api/admin/finance/terms', { label: 'Spring 2020', fromDay: '2020-01-13', toDay: '2020-03-27' }, treasurer.cookie)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', treasurer.email)
+    await fill(view, 'form input[type="password"]', treasurerPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/money`, '[data-test="period-kind"]')
+    await waitFor(view, `document.querySelector('[data-test="section-revenue"]')`)
+    expect(await textOf(view, '[data-test="section-revenue"] thead')).toContain('Amount')
+    expect(await textOf(view, '[data-test="section-revenue"] thead')).not.toContain('Pence')
+
+    await pickOption(view, '[data-test="period-kind"]', 'TERM')
+    await pickOption(view, '[data-test="period-term"]', 'Spring 2020')
+    await waitFor(view, `document.body.innerText.includes('2020-01-13 to 2020-03-27')`)
+
+    await visit(view, `${app.baseURL}/money/periods`, '[data-test="defined-terms"]')
+    expect(await textOf(view, '[data-test="defined-terms"]')).toContain('Spring 2020: 2020-01-13 to 2020-03-27')
+    view.close()
+  }, 120_000)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

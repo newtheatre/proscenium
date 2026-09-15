@@ -37,14 +37,17 @@ and typing it in.
 ## The season dashboard
 
 The dashboard at `/money` is the first item in the group. It answers "how are we doing" for one
-period: a day, a week, a month or a season. The season runs from {{ SEASON_START }} to
+period: a day, a week, a month, a term or a season. The season runs from {{ SEASON_START }} to
 {{ SEASON_END }} (month and day, London), the same year the committee's roles run to.
 
 ![The season dashboard with the period kind (1), the year (2), Refresh (3), revenue by source (4) and the other figures (5)](/images/docs/money/dashboard.png)
 
-1. **Period kind**: DAY, WEEK, MONTH or SEASON. A day or a week takes a date; a month takes a
-   month number and a year; a season takes the year it starts in.
-2. **Year**, and for a month the **month number**.
+1. **Period kind**: DAY, WEEK, MONTH, TERM or SEASON. A day or a week takes a date; a month takes
+   a month number and a year; a season takes the year it starts in.
+2. **Year**, and for a month the **month number**. For a term, a second list of the terms
+   themselves. A term has no rule behind it: its range is whatever was typed when the term was
+   defined on the [periods](/docs/money/periods) screen, so TERM appears only once at least one
+   term exists.
 3. **Refresh** reads the ledger again. Every figure is a query, so a sale made a moment ago is
    already in the next read.
 4. **Revenue by source**: what each surface took on a card, Desk, Till and so on. With

@@ -3,7 +3,7 @@ import { can, closeFinancePeriods, reopenFinancePeriods } from '#shared/utils/ab
 import { hasBlockingConditions } from '#shared/utils/period-locks'
 import { formatLondon } from '#shared/utils/london'
 import type { TableColumn } from '@nuxt/ui'
-import type { BlockingConditions, PeriodLock } from '#shared/utils/period-locks'
+import type { BlockingConditions, Period, PeriodLock } from '#shared/utils/period-locks'
 
 definePageMeta({ layout: 'console', title: 'Periods', middleware: 'console', docs: '/docs/money/periods' })
 
@@ -25,6 +25,14 @@ const { data: locks, status: loading, error, refresh } = await useAsyncData(
 )
 
 const locksFailure = computed(() => (error.value ? refusalText(error.value, 'The close history could not be read.') : null))
+
+// A term is named here and read by the season dashboard's own TERM selector (I-105 criterion 4);
+// naming one neither closes it nor is required before closing it.
+const { data: terms, refresh: refreshTerms } = await useAsyncData(
+  'finance-terms',
+  () => request<{ periods: Period[] }>('/api/admin/finance/terms').then(response => response.periods),
+  { default: (): Period[] => [] },
+)
 
 // The list is newest first; the first row seen for a range is what governs it now, however many
 // times that same range has been closed and reopened since (I-107 criterion 4).
@@ -98,6 +106,41 @@ async function confirmClose(): Promise<void> {
   }
 }
 
+const termOpen = ref(false)
+const termLabel = ref('')
+const termFrom = ref('')
+const termTo = ref('')
+const defining = ref(false)
+const termFailure = ref<string | null>(null)
+
+function openDefineTerm(): void {
+  termLabel.value = ''
+  termFrom.value = ''
+  termTo.value = ''
+  termFailure.value = null
+  termOpen.value = true
+}
+
+async function confirmDefineTerm(): Promise<void> {
+  defining.value = true
+  termFailure.value = null
+  try {
+    await $fetch('/api/admin/finance/terms', {
+      method: 'POST',
+      body: { label: termLabel.value.trim(), fromDay: termFrom.value, toDay: termTo.value },
+    })
+    toast.add({ title: 'Term defined', description: `${termLabel.value.trim()} runs ${termFrom.value} to ${termTo.value}.`, icon: 'i-lucide-calendar-range', color: 'success' })
+    termOpen.value = false
+    await refreshTerms()
+  }
+  catch (refused) {
+    termFailure.value = refusalText(refused)
+  }
+  finally {
+    defining.value = false
+  }
+}
+
 const reopenTarget = ref<PeriodLock | null>(null)
 const confirmFromDay = ref('')
 const confirmToDay = ref('')
@@ -150,6 +193,15 @@ async function confirmReopen(): Promise<void> {
       <template #actions>
         <UButton
           v-if="mayClose"
+          data-test="open-define-term"
+          icon="i-lucide-calendar-range"
+          variant="subtle"
+          @click="openDefineTerm"
+        >
+          Define a term
+        </UButton>
+        <UButton
+          v-if="mayClose"
           data-test="open-close-period"
           icon="i-lucide-lock"
           @click="openClose"
@@ -158,6 +210,23 @@ async function confirmReopen(): Promise<void> {
         </UButton>
       </template>
     </AdminToolbar>
+
+    <section
+      v-if="terms.length > 0"
+      class="space-y-1"
+      data-test="defined-terms"
+    >
+      <h2 class="font-semibold">
+        Defined terms
+      </h2>
+      <p
+        v-for="one in terms"
+        :key="one.id"
+        class="text-sm text-muted"
+      >
+        {{ one.label }}: {{ one.fromDay }} to {{ one.toDay }}, named by {{ one.createdByName }}
+      </p>
+    </section>
 
     <UTable
       :data="locks"
@@ -285,6 +354,53 @@ async function confirmReopen(): Promise<void> {
             @click="previewClose"
           >
             Preview what this warns about
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="termOpen"
+      title="Define a term"
+      description="Names a range so the season dashboard can report on it. It neither closes the range nor is needed before closing it, and a term is never redefined: correct a mistaken range by naming a fresh term."
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UAlert
+            v-if="termFailure"
+            data-test="term-failure"
+            color="error"
+            variant="subtle"
+            :description="termFailure"
+          />
+
+          <UFormField label="Label">
+            <UInput
+              v-model="termLabel"
+              class="w-full"
+              data-test="term-label"
+            />
+          </UFormField>
+          <UFormField label="From">
+            <DateField
+              v-model="termFrom"
+              data-test="term-from"
+            />
+          </UFormField>
+          <UFormField label="To">
+            <DateField
+              v-model="termTo"
+              data-test="term-to"
+            />
+          </UFormField>
+
+          <UButton
+            data-test="confirm-define-term"
+            :loading="defining"
+            :disabled="!termLabel.trim() || !termFrom || !termTo"
+            @click="confirmDefineTerm"
+          >
+            Define it
           </UButton>
         </div>
       </template>

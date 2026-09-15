@@ -660,11 +660,17 @@ on quietly, and row counts and money totals are exactly what the drill below rec
 reaches the trail rather than only a cron log nobody reads. To run it by hand,
 `POST /_nitro/tasks/backup`.
 
-**The restore drill itself is a manual exercise**, run by the IT Manager: restore a Time Travel
-bookmark into a scratch D1 database and reconcile its row counts and ledger total against the
-manifest for that week (or against production directly). Record the outcome at `/admin/backups`
-(`backups.write`): the date, the outcome, minutes to restore, and whether row counts and money
-totals reconciled. A failed drill is still recorded, not omitted; the finding is the point of it.
+**The restore drill itself is a manual exercise**, run by the IT Manager. Time Travel restores a
+database in place (`wrangler d1 time-travel restore <database> --bookmark` names the database it
+overwrites, and `d1 export` has no bookmark option), so production's history cannot be poured into
+a second database and the drill works from an export instead: `wrangler d1 export unified --remote
+--output drill.sql`, `d1 create unified-drill`, `d1 execute unified-drill --remote --file=drill.sql`,
+reconcile its row counts and `sum(total_pence)` against that week's manifest, then exercise Time
+Travel on `unified-drill` itself (take its bookmark, delete a row, restore, check the row is back).
+Record the outcome at `/admin/backups` (`backups.write`): the date, the outcome, minutes to restore,
+and whether row counts and money totals reconciled. A failed drill is still recorded, not omitted;
+the finding is the point of it. Delete `unified-drill` and `drill.sql` once it is recorded: both are
+full copies of personal data outside the erasure path (0011).
 
 The same screen (`backups.read`) shows the last drill that **passed** and flags it overdue once
 `BACKUP_DRILL_INTERVAL_DAYS` (proposed 120, `docs/workshops.md`) has elapsed since. A drill that
@@ -877,10 +883,9 @@ query with types, dates and outcomes only, never a message body; every such view
 ## Not built yet
 
 The restore drill procedure now lives in the in-app operator documentation at
-`/docs/system/backups-and-restore` (J-109, J-107 criterion 5, 0076); the scratch-database step is
-only as precise as the paragraph above, which the IT Manager should verify against wrangler before
-the first drill. The retention sweep is built and documented above; what it still waits on is a warning cadence and, in December, an
-arming (A-126, K-111).
+`/docs/system/backups-and-restore` (J-109, J-107 criterion 5, 0076), command by command, and
+matches the paragraph above. The retention sweep is built and documented above; what it still
+waits on is a warning cadence and, in December, an arming (A-126, K-111).
 
 H-106's own criterion 2, the manual re-send action, still waits: `retry_payload` is cleared by
 the time a row reaches `FAILED_FINAL`, so resending has to rebuild the message from source, per
