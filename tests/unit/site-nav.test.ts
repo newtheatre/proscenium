@@ -95,6 +95,36 @@ describe('a group is a job, and the order never varies (0040)', () => {
   })
 })
 
+// The sidebar said "Unfilled shifts" for months after the screen became the rota board (#1041).
+// A label and its page's title are one name, so renaming one side alone fails here.
+describe('a sidebar label says what the page it opens calls itself', () => {
+  // A title that names its own domain where the sidebar group already supplies it: the screen is
+  // reached from elsewhere too, and "Stock" alone would not say what of.
+  const NAMES_ITS_OWN_DOMAIN = new Set(['/bar/stock', '/bar/stock/movements'])
+
+  function titleOf(source: string): string | null {
+    const meta = /definePageMeta\(\{[\s\S]*?\}\)/.exec(source)?.[0] ?? ''
+    return /title:\s*'([^']*)'/.exec(meta)?.[1] ?? null
+  }
+
+  test('every console entry reads as its page does', async () => {
+    const sources = new Map((await pages()).map(page => [routeOf(page.path), page.source]))
+    const drifted: string[] = []
+    for (const group of CONSOLE_NAV) {
+      for (const item of group.items) {
+        if (NAMES_ITS_OWN_DOMAIN.has(item.to)) continue
+        const source = sources.get(item.to)
+        if (source === undefined) continue
+        const title = titleOf(source)
+        // A page under a group may lead with the group's own word, which the sidebar supplies.
+        const prefixed = `${group.label} ${item.label.toLowerCase()}`
+        if (title !== item.label && title !== prefixed) drifted.push(`${item.to}: "${item.label}" against "${title}"`)
+      }
+    }
+    expect(drifted).toEqual([])
+  })
+})
+
 describe('the vocabulary has not drifted from the permission map (0009)', () => {
   test('every ability stands on a real permission', () => {
     const unknown = Object.entries(ABILITY_PERMISSIONS)

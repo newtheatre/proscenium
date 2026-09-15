@@ -82,7 +82,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     items: [
       { label: 'Shift templates', icon: 'i-lucide-clipboard-list', to: '/rota/manage/templates', ability: viewRota },
       { label: 'Approvals', icon: 'i-lucide-check-check', to: '/rota/manage/approvals', ability: viewRota },
-      { label: 'Unfilled shifts', icon: 'i-lucide-user-round-x', to: '/rota/manage/shifts', ability: viewRota },
+      { label: 'Rota board', icon: 'i-lucide-user-round-x', to: '/rota/manage/shifts', ability: viewRota },
       { label: 'Checklists', icon: 'i-lucide-list-checks', to: '/rota/manage/checklists', ability: viewChecklist },
       { label: 'Emergency cards', icon: 'i-lucide-siren', to: '/rota/manage/emergency', ability: viewEmergencyCard },
       { label: 'Safety', icon: 'i-lucide-shield-alert', to: '/rota/manage/safety', ability: viewSafety },

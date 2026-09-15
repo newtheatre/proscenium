@@ -11,11 +11,13 @@ import {
   declineShiftStatement,
   dismissShiftStatement,
   myShiftsQuery,
+  onShiftTonightQuery,
   openShiftsQuery,
   releaseShiftStatement,
   replaceTemplateStatements,
   stampPerformanceStatement,
 } from '#server/utils/rota'
+import { daysAfter } from '#shared/utils/membership'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -1060,6 +1062,77 @@ describe('a confirmed shift resolves authority only for a current account', () =
 
       const resolved = run(database, confirmedShiftsTonightQuery(holder, 'DOOR', from, to, {}))
       expect(resolved).toHaveLength(0)
+    })
+  })
+})
+
+// The viewer fact the account menu's Tonight entry is gated on (#1039, 0040). Confirmed only,
+// unlike My NNT's accent tile, which counts a claim still waiting on approval (0009, 0044).
+describe('onShiftTonight is a confirmed shift inside tonight, and nothing else', () => {
+  const bounds = showNightBounds(currentShowNight())
+  const from = Math.floor(bounds.from.getTime() / 1000)
+  const to = Math.floor(bounds.to.getTime() / 1000)
+
+  function shift(database: TestDatabase, performanceId: string, userId: string, status: string): void {
+    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+      `${performanceId}-shift`, performanceId, 'DOOR', userId, status]])
+  }
+
+  function onShift(database: TestDatabase, userId: string): boolean {
+    const [row] = run(database, onShiftTonightQuery(userId, from, to)) as { n: number }[]
+    return (row?.n ?? 0) > 0
+  }
+
+  test('a confirmed shift tonight reads true', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const holder = person(database, 'holder')
+      shift(database, tonight.performanceId, holder, 'CONFIRMED')
+
+      expect(onShift(database, holder)).toBe(true)
+    })
+  })
+
+  test('a claim still waiting on approval reads false', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const holder = person(database, 'holder')
+      shift(database, tonight.performanceId, holder, 'CLAIMED')
+
+      expect(onShift(database, holder)).toBe(false)
+    })
+  })
+
+  test('a confirmed shift on a cancelled performance reads false', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database, { status: 'CANCELLED' })
+      const holder = person(database, 'holder')
+      shift(database, tonight.performanceId, holder, 'CONFIRMED')
+
+      expect(onShift(database, holder)).toBe(false)
+    })
+  })
+
+  test('a confirmed shift tomorrow night reads false', async () => {
+    await withDatabase(async (database) => {
+      const tomorrow = tonightsPerformance(database, { night: daysAfter(currentShowNight(), 1), suffix: 'b' })
+      const holder = person(database, 'holder')
+      shift(database, tomorrow.performanceId, holder, 'CONFIRMED')
+
+      expect(onShift(database, holder)).toBe(false)
+    })
+  })
+
+  // 01:00 belongs to the evening that began at 04:00 the day before, so a late finish is still
+  // tonight's work rather than tomorrow's (0014).
+  test('a confirmed shift on a performance starting at 01:00 reads true', async () => {
+    await withDatabase(async (database) => {
+      const HOURS_TO_ONE_AM = 21
+      const late = tonightsPerformance(database, { curtainHoursAfterNightStart: HOURS_TO_ONE_AM })
+      const holder = person(database, 'holder')
+      shift(database, late.performanceId, holder, 'CONFIRMED')
+
+      expect(onShift(database, holder)).toBe(true)
     })
   })
 })

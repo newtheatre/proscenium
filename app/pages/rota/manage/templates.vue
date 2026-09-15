@@ -260,7 +260,7 @@ const columns: TableColumn<VenueTemplate>[] = [
     <UPageCard
       v-if="seesEligibility"
       title="Shift eligibility"
-      description="A role with a module set here is locked to members who currently hold it; a locked shift on /rota names the module and links to the catalogue. Leave a role unset and nothing gates it beyond membership."
+      description="A role with a module set here is locked to members who currently hold it; a locked shift on /rota names the module and links to the catalogue. A role left unset is closed to everybody: nobody can claim it until a module is named."
       data-test="shift-eligibility"
     >
       <div class="grid gap-4 sm:grid-cols-3">
@@ -268,7 +268,7 @@ const columns: TableColumn<VenueTemplate>[] = [
           v-for="role in SHIFT_ROLES"
           :key="role"
           :label="saysShiftRole(role)"
-          :description="eligibility[role] ? `Currently ${moduleName(eligibility[role])}.` : 'Nothing gates this role yet.'"
+          :description="eligibility[role] ? `Currently ${moduleName(eligibility[role])}.` : 'Closed: nobody can claim this role yet.'"
         >
           <USelectMenu
             :model-value="eligibility[role] ?? undefined"
