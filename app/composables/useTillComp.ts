@@ -53,9 +53,9 @@ export function useTillComp(deps: TillCompDeps) {
   const canGive = computed(() => request.value?.status === 'APPROVED' && !request.value.expired && given.value === null)
   const declined = computed(() => request.value?.status === 'DECLINED')
   const lapsed = computed(() => request.value !== null && request.value.status !== 'DECLINED' && request.value.expired && given.value === null)
-  // Locks the basket and charging alike until the next sale starts, given included, so what a
-  // request named cannot be sold or comped twice; declined or lapsed frees it straight away.
-  const locked = computed(() => requestId.value !== null && (given.value !== null || (!declined.value && !lapsed.value)))
+  // Locks from the moment Ask is pressed, not only once it answers, or the modal's close control
+  // could charge the same basket mid-flight; stays locked, given included, until the next sale.
+  const locked = computed(() => sending.value || (requestId.value !== null && (given.value !== null || (!declined.value && !lapsed.value))))
 
   // A fresh ask if nothing is outstanding; otherwise this reopens onto the request already in
   // flight, whatever it has decided while the modal sat closed.
