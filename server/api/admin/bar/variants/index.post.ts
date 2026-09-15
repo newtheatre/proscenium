@@ -13,29 +13,30 @@ export default defineEventHandler(async (event) => {
   const id = newId()
 
   // The predicate rides the write, so two managers adding the same size at once produce one
-  // variant and a refusal rather than a constraint error (0003, 0006).
-  const created = await db.all<{ id: string }>(sql`
-    INSERT INTO product_variants (id, product_id, serving_kind, label, status, sort)
-    SELECT ${id}, ${input.productId}, ${input.servingKind}, ${input.label}, 'ACTIVE', ${input.sort}
-    WHERE NOT EXISTS (
-      SELECT 1 FROM product_variants WHERE product_id = ${input.productId} AND serving_kind = ${input.servingKind}
-    )
-    RETURNING id
-  `)
+  // variant and a refusal rather than a constraint error (0003, 0006, 0049).
+  const applied = await auditedWrite(
+    db.all<{ id: string }>(sql`
+      INSERT INTO product_variants (id, product_id, serving_kind, label, status, sort)
+      SELECT ${id}, ${input.productId}, ${input.servingKind}, ${input.label}, 'ACTIVE', ${input.sort}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM product_variants WHERE product_id = ${input.productId} AND serving_kind = ${input.servingKind}
+      )
+      RETURNING id
+    `),
+    auditEntry({
+      actorId: resolved.account.id,
+      action: 'bar.variant.created',
+      target: `bar-variant:${id}`,
+      detail: { productId: input.productId, servingKind: input.servingKind, label: input.label },
+    }),
+  )
 
-  if (created.length === 0) {
+  if (!applied) {
     throw createError({
       statusCode: 409,
       statusMessage: `${product.name} already sells as a ${says(input.servingKind).toLowerCase()}`,
     })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: resolved.account.id,
-    action: 'bar.variant.created',
-    target: `bar-variant:${id}`,
-    detail: { productId: input.productId, servingKind: input.servingKind, label: input.label },
-  }))
 
   return { ok: true, id }
 })

@@ -12,31 +12,32 @@ export default defineEventHandler(async (event) => {
   }
 
   // The predicate rides the write, so two managers naming the same thing at once produce one
-  // product and a refusal rather than a constraint error (0003, 0006).
-  const created = await db.all<{ id: string }>(sql`
-    INSERT INTO bar_products (id, category_id, name, status, staffed_only, age_restricted, allergen_state, allergen_note, sort)
-    SELECT ${id}, ${input.categoryId}, ${input.name}, 'HIDDEN', ${input.staffedOnly ? 1 : 0},
-           ${input.ageRestricted ? 1 : 0}, ${input.allergenState}, ${input.allergenNote ?? null}, ${input.sort}
-    WHERE NOT EXISTS (SELECT 1 FROM bar_products WHERE name = ${input.name} COLLATE NOCASE)
-    RETURNING id
-  `)
+  // product and a refusal rather than a constraint error (0003, 0006, 0049).
+  const applied = await auditedWrite(
+    db.all<{ id: string }>(sql`
+      INSERT INTO bar_products (id, category_id, name, status, staffed_only, age_restricted, allergen_state, allergen_note, sort)
+      SELECT ${id}, ${input.categoryId}, ${input.name}, 'HIDDEN', ${input.staffedOnly ? 1 : 0},
+             ${input.ageRestricted ? 1 : 0}, ${input.allergenState}, ${input.allergenNote ?? null}, ${input.sort}
+      WHERE NOT EXISTS (SELECT 1 FROM bar_products WHERE name = ${input.name} COLLATE NOCASE)
+      RETURNING id
+    `),
+    auditEntry({
+      actorId: resolved.account.id,
+      action: 'bar.product.created',
+      target: `bar-product:${id}`,
+      detail: {
+        name: input.name,
+        categoryId: input.categoryId,
+        ageRestricted: input.ageRestricted,
+        allergenState: input.allergenState,
+      },
+    }),
+  )
 
-  if (created.length === 0) {
+  if (!applied) {
     const taken = await productNamed(input.name)
     throw createError({ statusCode: 409, statusMessage: `A product is already called ${taken?.name ?? input.name}` })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: resolved.account.id,
-    action: 'bar.product.created',
-    target: `bar-product:${id}`,
-    detail: {
-      name: input.name,
-      categoryId: input.categoryId,
-      ageRestricted: input.ageRestricted,
-      allergenState: input.allergenState,
-    },
-  }))
 
   return { ok: true, id }
 })

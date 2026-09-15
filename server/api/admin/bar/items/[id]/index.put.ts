@@ -22,43 +22,46 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const updated = await db.all<{ id: string }>(sql`
-    UPDATE bar_items
-    SET name = ${input.name},
-        unit = ${input.unit},
-        container_ml = ${containerMl},
-        par_qty = ${input.parQty ?? null},
-        category = ${input.category ?? null},
-        age_restricted = ${input.ageRestricted ? 1 : 0},
-        allergen_notes = ${input.allergenNotes ?? null}
-    WHERE id = ${id}
-      AND NOT EXISTS (SELECT 1 FROM bar_items WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
-    RETURNING id
-  `)
+  // The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
+  // moment refuses rather than reaching the unique index (0003, 0006, 0049).
+  const applied = await auditedWrite(
+    db.all<{ id: string }>(sql`
+      UPDATE bar_items
+      SET name = ${input.name},
+          unit = ${input.unit},
+          container_ml = ${containerMl},
+          par_qty = ${input.parQty ?? null},
+          category = ${input.category ?? null},
+          age_restricted = ${input.ageRestricted ? 1 : 0},
+          allergen_notes = ${input.allergenNotes ?? null}
+      WHERE id = ${id}
+        AND NOT EXISTS (SELECT 1 FROM bar_items WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
+      RETURNING id
+    `),
+    auditEntry({
+      actorId: resolved.account.id,
+      action: 'bar.item.updated',
+      target: `bar-item:${id}`,
+      // The allergen notes are prose, so the trail records that they moved and never what they say.
+      detail: {
+        ...changes({
+          name: [held.name, input.name],
+          unit: [held.unit, input.unit],
+          containerMl: [held.containerMl, containerMl],
+          parQty: [held.parQty, input.parQty ?? null],
+          category: [held.category, input.category ?? null],
+          ageRestricted: [held.ageRestricted, input.ageRestricted],
+        }),
+        allergenNotesChanged: (input.allergenNotes ?? null) !== held.allergenNotes,
+      },
+    }),
+  )
 
-  if (updated.length === 0) {
+  if (!applied) {
     const taken = await itemNamed(input.name, id)
     if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
     throw createError({ statusCode: 409, statusMessage: `A stocked item is already called ${taken.name}` })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: resolved.account.id,
-    action: 'bar.item.updated',
-    target: `bar-item:${id}`,
-    // The allergen notes are prose, so the trail records that they moved and never what they say.
-    detail: {
-      ...changes({
-        name: [held.name, input.name],
-        unit: [held.unit, input.unit],
-        containerMl: [held.containerMl, containerMl],
-        parQty: [held.parQty, input.parQty ?? null],
-        category: [held.category, input.category ?? null],
-        ageRestricted: [held.ageRestricted, input.ageRestricted],
-      }),
-      allergenNotesChanged: (input.allergenNotes ?? null) !== held.allergenNotes,
-    },
-  }))
 
   return { ok: true }
 })

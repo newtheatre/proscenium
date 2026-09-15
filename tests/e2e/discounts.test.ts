@@ -168,6 +168,30 @@ describe.skipIf(skip !== null)('creation and edits are bar-manager-only and audi
       database.close()
     }
   })
+
+  // The name predicate and the audit insert share one batch, so a losing racer's write touches
+  // nothing and logs nothing (0049).
+  test('two managers naming the same discount at once write one audit entry, and the loser is refused', async () => {
+    const name = named('Raced')
+    const raced = await Promise.all([
+      createDiscount(name, 10),
+      createDiscount(name, 15, barManager.cookie),
+    ])
+
+    expect(raced.filter(answered => answered.status === 200).length).toBe(1)
+    expect(raced.filter(answered => answered.status === 409).length).toBe(1)
+
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const count = (database.query(
+        `SELECT count(*) AS n FROM audit_log WHERE action = 'bar.discount.created' AND detail LIKE ?`,
+      ).get(`%${name}%`) as { n: number }).n
+      expect(count).toBe(1)
+    }
+    finally {
+      database.close()
+    }
+  })
 })
 
 describe.skipIf(skip !== null)('a discount is retired, never deleted', () => {

@@ -14,21 +14,22 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, categoryPriceForm)
   const priceId = newId()
 
-  await db.insert(schema.categoryPrices).values({
-    id: priceId,
-    categoryId: id,
-    servingKind: input.servingKind,
-    pricePence: input.pricePence,
-    effectiveFrom: input.effectiveFrom,
-    createdBy: resolved.account.id,
-  })
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: resolved.account.id,
-    action: 'bar.category.price.set',
-    target: `bar-category:${id}`,
-    detail: { servingKind: input.servingKind, pricePence: input.pricePence, effectiveFrom: input.effectiveFrom },
-  }))
+  await auditedWrite(
+    db.insert(schema.categoryPrices).values({
+      id: priceId,
+      categoryId: id,
+      servingKind: input.servingKind,
+      pricePence: input.pricePence,
+      effectiveFrom: input.effectiveFrom,
+      createdBy: resolved.account.id,
+    }),
+    auditEntry({
+      actorId: resolved.account.id,
+      action: 'bar.category.price.set',
+      target: `bar-category:${id}`,
+      detail: { servingKind: input.servingKind, pricePence: input.pricePence, effectiveFrom: input.effectiveFrom },
+    }),
+  )
 
   return { ok: true, id: priceId, effectiveNow: input.effectiveFrom <= on }
 })

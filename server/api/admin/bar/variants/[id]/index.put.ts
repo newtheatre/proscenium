@@ -22,34 +22,37 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const updated = await db.all<{ id: string }>(sql`
-    UPDATE product_variants
-    SET serving_kind = ${input.servingKind}, label = ${input.label}, sort = ${input.sort}
-    WHERE id = ${id}
-      AND NOT EXISTS (
-        SELECT 1 FROM product_variants
-        WHERE product_id = ${held.productId} AND serving_kind = ${input.servingKind} AND id <> ${id}
-      )
-    RETURNING id
-  `)
+  // The serving-kind predicate rides the UPDATE, so a race for the same kind refuses rather than
+  // reaching the unique index (0003, 0006, 0049).
+  const applied = await auditedWrite(
+    db.all<{ id: string }>(sql`
+      UPDATE product_variants
+      SET serving_kind = ${input.servingKind}, label = ${input.label}, sort = ${input.sort}
+      WHERE id = ${id}
+        AND NOT EXISTS (
+          SELECT 1 FROM product_variants
+          WHERE product_id = ${held.productId} AND serving_kind = ${input.servingKind} AND id <> ${id}
+        )
+      RETURNING id
+    `),
+    auditEntry({
+      actorId: resolved.account.id,
+      action: 'bar.variant.updated',
+      target: `bar-variant:${id}`,
+      detail: changes({
+        servingKind: [held.servingKind, input.servingKind],
+        label: [held.label, input.label],
+        sort: [held.sort, input.sort],
+      }),
+    }),
+  )
 
-  if (updated.length === 0) {
+  if (!applied) {
     throw createError({
       statusCode: 409,
       statusMessage: `This product already sells as a ${says(input.servingKind).toLowerCase()}`,
     })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: resolved.account.id,
-    action: 'bar.variant.updated',
-    target: `bar-variant:${id}`,
-    detail: changes({
-      servingKind: [held.servingKind, input.servingKind],
-      label: [held.label, input.label],
-      sort: [held.sort, input.sort],
-    }),
-  }))
 
   return { ok: true }
 })

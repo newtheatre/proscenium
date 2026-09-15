@@ -14,22 +14,23 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, priceForm)
   const priceId = newId()
 
-  await db.insert(schema.variantPrices).values({
-    id: priceId,
-    variantId: id,
-    pricePence: input.pricePence,
-    effectiveFrom: input.effectiveFrom,
-    createdBy: resolved.account.id,
-  })
-
   // The row is the record of the change, so the trail carries who set which price from when and
-  // never a before value: the series already holds every one of those (0010).
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: resolved.account.id,
-    action: 'bar.variant.price.set',
-    target: `bar-variant:${id}`,
-    detail: { pricePence: input.pricePence, effectiveFrom: input.effectiveFrom },
-  }))
+  // never a before value: the series already holds every one of those (0010, 0049).
+  await auditedWrite(
+    db.insert(schema.variantPrices).values({
+      id: priceId,
+      variantId: id,
+      pricePence: input.pricePence,
+      effectiveFrom: input.effectiveFrom,
+      createdBy: resolved.account.id,
+    }),
+    auditEntry({
+      actorId: resolved.account.id,
+      action: 'bar.variant.price.set',
+      target: `bar-variant:${id}`,
+      detail: { pricePence: input.pricePence, effectiveFrom: input.effectiveFrom },
+    }),
+  )
 
   return { ok: true, id: priceId, effectiveNow: input.effectiveFrom <= on }
 })
