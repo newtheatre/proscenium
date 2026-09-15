@@ -222,12 +222,13 @@ async function setStatus(item: StockItem, status: 'ACTIVE' | 'RETIRED', hideDepe
     await reload()
   }
   catch (refused) {
-    const dependents = (refused as { data?: { data?: { dependents?: { id: string, name: string }[] } } })
-      .data?.data?.dependents
+    const dependents = refusalData<{ dependents?: { id: string, name: string }[] }>(refused)?.dependents
     if (status === 'RETIRED' && !hideDependents && dependents?.length) {
       hiding.value = { item, products: dependents }
       return
     }
+    // A refused hide leaves the modal in the way of its own explanation, so it closes first.
+    hiding.value = null
     failure.value = refusalText(refused)
   }
 }

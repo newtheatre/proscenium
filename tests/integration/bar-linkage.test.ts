@@ -68,8 +68,8 @@ function servings(database: TestDatabase, productId: string): { variantId: strin
   return rows(database, statement, ...parameters)
 }
 
-function run(database: TestDatabase, statements: readonly SQL[]): void {
-  database.batch(statements.map(statement => boundStatement(database, statement)))
+function run(database: TestDatabase, plan: { statements: readonly SQL[] }): void {
+  database.batch(plan.statements.map(statement => boundStatement(database, statement)))
 }
 
 describe('the stock list says what pours each item (F-128 criterion 3)', () => {
@@ -204,9 +204,9 @@ describe('retiring a stocked item the bar still pours (F-128 criteria 5 and 6)',
   test('a delivery landing between the decision and the write stops the retirement', async () => {
     await withDatabase((database) => {
       bar(database)
-      const statements = retireItemStatements('item-crisps', { actorId: 'user-1', hideDependents: true })
+      const plan = retireItemStatements('item-crisps', { actorId: 'user-1', hideDependents: true })
       delivery(database, 'item-crisps', 24)
-      run(database, statements)
+      run(database, plan)
 
       expect(rows(database, `SELECT status FROM bar_items WHERE id = 'item-crisps'`)).toEqual([{ status: 'ACTIVE' }])
       expect(rows(database, `SELECT status FROM bar_products WHERE id = 'prod-crisps'`)).toEqual([{ status: 'ACTIVE' }])
@@ -218,9 +218,9 @@ describe('retiring a stocked item the bar still pours (F-128 criteria 5 and 6)',
   test('a product that starts pouring the item in the window is hidden with the rest', async () => {
     await withDatabase((database) => {
       bar(database)
-      const statements = retireItemStatements('item-crisps', { actorId: 'user-1', hideDependents: true })
+      const plan = retireItemStatements('item-crisps', { actorId: 'user-1', hideDependents: true })
       insert(database, 'variant_components', { id: 'c-6', variant_id: 'var-negroni', item_id: 'item-crisps', qty: 1 })
-      run(database, statements)
+      run(database, plan)
 
       expect(rows<{ id: string, status: string }>(database, `SELECT id, status FROM bar_products ORDER BY id`))
         .toEqual([
@@ -234,7 +234,7 @@ describe('retiring a stocked item the bar still pours (F-128 criteria 5 and 6)',
   test('the batch binds no parameter per dependent product', async () => {
     await withDatabase((database) => {
       bar(database)
-      for (const statement of retireItemStatements('item-gin', { actorId: 'user-1', hideDependents: true })) {
+      for (const statement of retireItemStatements('item-gin', { actorId: 'user-1', hideDependents: true }).statements) {
         const [, ...parameters] = boundStatement(database, statement)
         expect(parameters.length).toBeLessThanOrEqual(MAX_BOUND_PARAMETERS)
       }

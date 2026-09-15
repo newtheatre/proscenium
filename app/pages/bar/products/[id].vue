@@ -388,8 +388,10 @@ const listingFailure = useListFailure(error, 'The serving sizes could not be rea
 const servingsOf = (variantId: string): number | null =>
   data.value.servings.find(row => row.variantId === variantId)?.servings ?? null
 
+// Never below nought: a sale past an empty shelf leaves the sum negative, and "sells minus two
+// more" says nothing a person can act on.
 const saysServings = (servings: number | null): string =>
-  servings === null ? '' : `sells ${servings} more at current stock`
+  servings === null ? '' : `sells ${Math.max(servings, 0)} more at current stock`
 
 const depletion = (variant: ProductVariant): string =>
   variant.components.length === 0

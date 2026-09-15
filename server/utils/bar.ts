@@ -458,11 +458,16 @@ const VARIANT_COLUMNS = sql`
 
 // Scoped by subquery rather than by an id list read out of the variants: a bound-parameter count
 // must not grow with the rows it covers (0003, 0006).
-export function componentsQuery(scope: SQL): SQL {
+export function componentsQuery(scope: SQL, withStock = false): SQL {
+  // `withStock` walks the movement history a line at a time, so the sale path, which shares this
+  // query and reads none of it, leaves it off (F-128 criterion 4).
+  const stock = withStock
+    ? sql`i.status AS itemStatus,
+           (SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = c.item_id) AS onHand,`
+    : sql`NULL AS itemStatus, NULL AS onHand,`
   return sql`
     SELECT c.id AS id, c.variant_id AS variantId, c.item_id AS itemId, i.name AS itemName, i.unit AS unit,
-           i.status AS itemStatus,
-           (SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = c.item_id) AS onHand,
+           ${stock}
            c.choice_group_id AS choiceGroupId, g.name AS choiceGroupName,
            c.qty AS qty, c.included_in_price AS includedInPrice
     FROM variant_components c
@@ -479,7 +484,7 @@ const readComponent = (row: ComponentRow): VariantComponent => ({
   itemName: row.itemName,
   unit: row.unit,
   itemStatus: row.itemStatus,
-  onHand: row.itemId === null ? null : Number(row.onHand ?? 0),
+  onHand: row.onHand === null || row.itemId === null ? null : Number(row.onHand),
   choiceGroupId: row.choiceGroupId,
   choiceGroupName: row.choiceGroupName,
   qty: row.qty,
@@ -507,7 +512,7 @@ export async function variantsOf(productId: string, on: string, includeRetired =
     WHERE v.product_id = ${productId}${retired}
     ORDER BY v.status, v.sort, v.label COLLATE NOCASE
   `)
-  const components = await db.all<ComponentRow>(componentsQuery(sql`SELECT id FROM product_variants WHERE product_id = ${productId}`))
+  const components = await db.all<ComponentRow>(componentsQuery(sql`SELECT id FROM product_variants WHERE product_id = ${productId}`, true))
   return withComponents(variants, components)
 }
 
@@ -520,7 +525,7 @@ export async function variantById(id: string, on: string): Promise<ProductVarian
     WHERE v.id = ${id}
   `)
   if (!row) return undefined
-  const components = await db.all<ComponentRow>(componentsQuery(sql`SELECT id FROM product_variants WHERE id = ${id}`))
+  const components = await db.all<ComponentRow>(componentsQuery(sql`SELECT id FROM product_variants WHERE id = ${id}`, true))
   return withComponents([row], components)[0]
 }
 

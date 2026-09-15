@@ -2,6 +2,31 @@ import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { stockItemStatusForm } from '#shared/utils/bar'
 
+// Which predicate refused, in the words the operator can act on: a figure that moved under them
+// is not the same problem as somebody else editing the item (F-114, F-128).
+async function lostTheRetirement(id: string, name: string): Promise<Error> {
+  const now = await itemById(id)
+  if (!now) return createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+  if (now.onHand !== 0) {
+    return createError({
+      statusCode: 409,
+      statusMessage: `${now.name} still has stock on hand: write it off or count it out before retiring it`,
+    })
+  }
+  const poured = await dependentProducts(id)
+  if (poured.length > 0) {
+    return createError({
+      statusCode: 409,
+      statusMessage: `${now.name} is poured by ${poured.map(product => product.name).join(', ')}: change those recipes, or retire it and hide them together`,
+      data: { dependents: poured },
+    })
+  }
+  return createError({
+    statusCode: 409,
+    statusMessage: now.status === 'RETIRED' ? `${name} is already retired` : `${name} changed while you were editing it`,
+  })
+}
+
 // Retire a stocked item, or put it back. Retiring takes it off the lists and leaves every
 // movement it carries exactly where it is (F-114 criterion 1).
 export default defineEventHandler(async (event) => {
@@ -38,16 +63,16 @@ export default defineEventHandler(async (event) => {
 
     // Every predicate rides its own statement, so a delivery or a recipe change landing between
     // the reads above and the batch cannot slip past (known issues, 0006, 0049).
-    const statements = retireItemStatements(id, { actorId: resolved.account.id, hideDependents })
-    await db.batch(statements.map(statement => db.run(statement)) as unknown as Parameters<typeof db.batch>[0])
+    const plan = retireItemStatements(id, { actorId: resolved.account.id, hideDependents })
+    const results = await db.batch(plan.statements.map((statement, index) =>
+      (index === plan.retireAt ? db.all<{ id: string }>(statement) : db.run(statement)),
+    ) as unknown as Parameters<typeof db.batch>[0])
 
-    const now = await itemById(id)
-    if (now?.status !== 'RETIRED') {
-      throw createError({
-        statusCode: 409,
-        statusMessage: `${held.name} changed while you were editing it`,
-      })
-    }
+    // This request's own statement is what says it won, never a re-read: a loser would see the
+    // winner's row and answer as though it had done the work (0049).
+    const won = (results[plan.retireAt] as { id: string }[] | undefined)?.length === 1
+    if (!won) throw await lostTheRetirement(id, held.name)
+
     return { ok: true, status, hidden: dependents.length }
   }
 

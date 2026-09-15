@@ -100,9 +100,15 @@ export interface RetireItem {
   hideDependents: boolean
 }
 
+export interface RetirePlan {
+  statements: readonly SQL[]
+  // Which statement retires the item: its own result is the proof this request won (0049).
+  retireAt: number
+}
+
 // Every predicate rides its own statement: the on-hand sum as a subquery, the dependants scoped by
 // subquery over the components, so nothing landing in the window slips past (0006, 0049).
-export function retireItemStatements(itemId: string, options: RetireItem): readonly SQL[] {
+export function retireItemStatements(itemId: string, options: RetireItem): RetirePlan {
   const stillPoured = sql`
     EXISTS (
       SELECT 1 FROM bar_products p
@@ -121,8 +127,11 @@ export function retireItemStatements(itemId: string, options: RetireItem): reado
   const statements: SQL[] = []
 
   if (options.hideDependents) {
+    // The same conditions the item's own retirement carries, so a request whose retirement does
+    // nothing cannot still take products off the till.
     const hiding = sql`
       status = 'ACTIVE'
+      AND (SELECT status FROM bar_items WHERE id = ${itemId}) = 'ACTIVE'
       AND (SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = ${itemId}) = 0
       AND EXISTS (
         SELECT 1 FROM product_variants v
@@ -150,11 +159,13 @@ export function retireItemStatements(itemId: string, options: RetireItem): reado
     statements.push(sql`UPDATE bar_products SET status = 'HIDDEN' WHERE ${hiding}`)
   }
 
+  const retireAt = statements.length
   statements.push(sql`
     UPDATE bar_items SET status = 'RETIRED'
     WHERE id = ${itemId} AND status = 'ACTIVE'
       AND (SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = ${itemId}) = 0
       AND NOT ${stillPoured}
+    RETURNING id
   `)
 
   const entry = auditEntry({
@@ -170,5 +181,5 @@ export function retireItemStatements(itemId: string, options: RetireItem): reado
     WHERE changes() = 1
   `)
 
-  return statements
+  return { statements, retireAt }
 }
