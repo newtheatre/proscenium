@@ -609,6 +609,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/reservations.ts'],
   },
   { route: 'server/api/till/comp-requests/index.get.ts', exempt: 'reads tonight\'s pending comp requests, writing nothing' },
+  { route: 'server/api/till/comp-requests/[id]/index.get.ts', exempt: 'reads one request\'s status, for the till to poll while it waits; nothing is written' },
   { route: 'server/api/till/comp-requests/index.post.ts', actions: ['bar.comp-request.created'], via: ['server/utils/comps.ts'] },
   {
     route: 'server/api/till/comp-requests/[id]/approve.post.ts',

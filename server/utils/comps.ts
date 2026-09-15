@@ -5,10 +5,8 @@ import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { auditedWrite } from '#server/utils/audit'
 import { isDutyOrBarManager } from '#server/utils/bar-authority'
-import { requireAnyNightAuthority } from '#server/utils/night-authority'
 import { compRequestExpired } from '#shared/utils/comps'
 import { auditEntry } from '#shared/utils/audit'
-import type { H3Event } from 'h3'
 import type { BasketLineInput } from '#shared/utils/sale'
 import type { CompRequest, CompRequestStatus } from '#shared/utils/comps'
 
@@ -101,25 +99,21 @@ export async function createCompRequest(
   return id
 }
 
-export interface CompDecisionContext {
-  request: CompRequest
-  deciderId: string
-}
-
-// Every decide route needs the same three things first: the request, that the caller holds
-// tonight's authority at all, and that they may decide (never their own, F-110 criterion 1).
-export async function resolveCompDecision(event: H3Event, id: string | undefined, expiryMinutes: number): Promise<CompDecisionContext> {
+// The id and 404, ahead of the night-authority call every decide route makes itself, literally
+// in its own source (E-111 criterion 5's own registry test reads for it).
+export async function requestedCompRequest(id: string | undefined, expiryMinutes: number): Promise<CompRequest> {
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Which request' })
   const request = await compRequestById(id, expiryMinutes)
   if (!request) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+  return request
+}
 
-  // Establishes that the caller is legitimately on tonight's till or duty roster at all
-  // (E-111 criterion 5); deciding itself needs the stricter check below.
-  const resolved = await requireAnyNightAuthority(event, ['DUTY_MANAGER', 'BAR'], { venueId: request.venueId })
-  if (!await isDutyOrBarManager(resolved.account.id, request.night)) {
+// Deciding either way is the same conflict of interest for the requester (F-110 criterion 1);
+// the caller has already established they hold tonight's authority at all.
+export async function requireCompDecider(deciderId: string, request: CompRequest): Promise<void> {
+  if (!await isDutyOrBarManager(deciderId, request.night)) {
     throw createError({ statusCode: 403, statusMessage: 'A duty manager or bar manager decides a comp request' })
   }
-  return { request, deciderId: resolved.account.id }
 }
 
 export type CompDecisionRefusal = 'not-found' | 'not-pending' | 'expired' | 'self'
