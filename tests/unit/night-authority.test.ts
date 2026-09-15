@@ -8,6 +8,7 @@ import {
   NIGHT_ROLES,
   NIGHT_ROLE_OFFICER,
   NIGHT_ROLE_PERMISSION,
+  NIGHT_ROLE_WORDS,
   OFFICER_BYPASS_ACTION,
   nightAuthorityRefusal,
   officerBypassEntry,
@@ -65,9 +66,23 @@ describe('a refusal names what would unlock it (E-111, F-101 criterion 5)', () =
     for (const role of NIGHT_ROLES) {
       const refusal = nightAuthorityRefusal(role)
       expect(refusal.statusCode).toBe(403)
-      expect(refusal.statusMessage).toContain(role)
+      expect(refusal.statusMessage).toContain(NIGHT_ROLE_WORDS[role])
       expect(refusal.statusMessage).toContain(NIGHT_ROLE_OFFICER[role].words)
     }
+  })
+
+  // A volunteer is refused in English, not in the vocabulary the rota keys on: "BAR" is a value
+  // in a column, and a refusal that quotes it is asking the reader to know the schema.
+  test('it never quotes the role as the rota spells it', () => {
+    for (const role of NIGHT_ROLES) {
+      expect(nightAuthorityRefusal(role).statusMessage).not.toContain(role)
+    }
+  })
+
+  test('the words for each role read as a shift somebody could go and get', () => {
+    expect(NIGHT_ROLE_WORDS.BAR).toBe('a confirmed bar shift')
+    expect(NIGHT_ROLE_WORDS.DOOR).toBe('a confirmed door shift')
+    expect(NIGHT_ROLE_WORDS.DUTY_MANAGER).toBe('a confirmed duty manager shift')
   })
 
   // Naming the administrator as the way out is not advice, it is an invitation.
