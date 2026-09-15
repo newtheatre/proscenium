@@ -341,7 +341,9 @@ describe('a show\'s performances filter by their declaration (D-132, K-129)', ()
 
   // Two venues on one night and a second night in the first, which is the shape E-127 insists on.
   function seedRun(database: TestDatabase): string {
-    const first = tonightsPerformance(database, { status: 'ON_SALE' })
+    // 19:30, pinned: the default curtain follows the clock, and late in the evening the second
+    // performance an hour later lands on the next calendar day, which the curtain filter reads.
+    const first = tonightsPerformance(database, { status: 'ON_SALE', curtainHoursAfterNightStart: 15.5 })
     database.batch([
       ['INSERT INTO venues (id, name, capacity) VALUES (?, ?, ?)', 'venue-studio', 'The Studio', 40],
       [`INSERT INTO performances (id, show_id, venue_id, starts_at, status)
