@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { londonDayOf } from '#shared/utils/ledger'
 import { productSetupForm } from '#shared/utils/bar'
 import type { BatchItem } from 'drizzle-orm/batch'
-import type { ServingKind } from '#shared/utils/bar'
+import type { ServingKind, StockUnit } from '#shared/utils/bar'
 
 // Set a whole product up in one submission (F-127). The batch is the transaction (0001, 0003), so
 // a name lost to another manager writes nothing at all rather than half a product.
@@ -21,12 +21,38 @@ export default defineEventHandler(async (event) => {
 
   const held = named.length === 0
     ? []
-    : await db.all<{ id: string, name: string, status: string }>(sql`
-      SELECT id, name, status FROM bar_items WHERE id IN (${sql.join([...new Set(named)].map(id => sql`${id}`), sql`, `)})
+    : await db.all<{ id: string, name: string, status: string, unit: StockUnit, containerMl: number | null }>(sql`
+      SELECT id, name, status, unit, container_ml AS containerMl FROM bar_items
+      WHERE id IN (${sql.join([...new Set(named)].map(id => sql`${id}`), sql`, `)})
     `)
 
   if (held.length !== new Set(named).size) {
     throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+  }
+
+  // The form checks these for an item created here; an item chosen from the list carries its unit
+  // in the database rather than in the payload, so the same two rules are re-applied against it.
+  if (input.shape !== 'RECIPE' && input.item.mode === 'EXISTING') {
+    const item = held[0]!
+    const servings = input.shape === 'SIMPLE' ? [input.serving] : input.sizes
+    if (item.unit === 'ML' && servings.some(serving => serving.servingKind === 'item')) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${item.name} is measured, so it sells by a measure: say the size and how much it pours`,
+      })
+    }
+    if (item.containerMl && servings.some(serving => serving.qty > item.containerMl!)) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `A serving cannot pour more than a ${item.name} holds`,
+      })
+    }
+    if (item.status === 'RETIRED' && input.opening) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: `${item.name} is retired, so put it back before moving stock against it`,
+      })
+    }
   }
 
   const taken = await claimName('product', input.product.name)
@@ -38,6 +64,16 @@ export default defineEventHandler(async (event) => {
     const item = await claimName('item', input.item.item.name)
     if (item) {
       throw createError({ statusCode: 409, statusMessage: `A stocked item is already called ${item.name}` })
+    }
+  }
+
+  const groupName = input.shape === 'RECIPE' ? input.choice?.group.name ?? null : null
+  if (groupName) {
+    const [group] = await db.all<{ name: string }>(sql`
+      SELECT name FROM choice_groups WHERE name = ${groupName} COLLATE NOCASE LIMIT 1
+    `)
+    if (group) {
+      throw createError({ statusCode: 409, statusMessage: `A choice group is already called ${group.name}` })
     }
   }
 
@@ -61,10 +97,20 @@ export default defineEventHandler(async (event) => {
 
   const [written] = await db.all<{ id: string }>(sql`SELECT id FROM bar_products WHERE id = ${plan.productId}`)
   if (!written) {
-    const loser = await claimName('product', input.product.name)
+    // Whichever name the racer took is the one to name back: the product's is often still free.
+    const product = await claimName('product', input.product.name)
+    if (product) {
+      throw createError({ statusCode: 409, statusMessage: `A product is already called ${product.name}` })
+    }
+    if (input.shape !== 'RECIPE' && input.item.mode === 'NEW') {
+      const item = await claimName('item', input.item.item.name)
+      if (item) {
+        throw createError({ statusCode: 409, statusMessage: `A stocked item is already called ${item.name}` })
+      }
+    }
     throw createError({
       statusCode: 409,
-      statusMessage: `A product is already called ${loser?.name ?? input.product.name}`,
+      statusMessage: `Something else took one of these names while ${input.product.name} was being set up: try again`,
     })
   }
 

@@ -247,6 +247,22 @@ describe('nothing partial survives a collision (F-127 criterion 4)', () => {
     })
   })
 
+  // A choice group's name is unique, and the group is written after the product, so a taken group
+  // name has to stop the product rather than abort the batch on a constraint.
+  test('a set-up whose choice group name is taken writes nothing at all', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      spirits(database)
+      insert(database, 'choice_groups', { id: 'group-1', name: 'Garnish' })
+
+      apply(database, planProductSetup(NEGRONI, context()))
+
+      expect(rows(database, 'SELECT count(*) AS n FROM bar_products')).toEqual([{ n: 0 }])
+      expect(rows(database, 'SELECT count(*) AS n FROM choice_groups')).toEqual([{ n: 1 }])
+      expect(rows(database, 'SELECT count(*) AS n FROM product_variants')).toEqual([{ n: 0 }])
+    })
+  })
+
   // 0003 and 0006: a statement binding more than the chunk limit is refused by D1 in production,
   // and the test sink refuses it here for the same reason.
   test('no statement in the batch binds more than the chunk limit', async () => {

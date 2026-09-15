@@ -89,6 +89,12 @@ export function planProductSetup(input: ProductSetupInput, context: SetupContext
   const itemFree = newItem
     ? sql`NOT EXISTS (SELECT 1 FROM bar_items WHERE name = ${newItem.name} COLLATE NOCASE)`
     : sql`1 = 1`
+  // A choice group's name is unique too, and it is written after the product, so the product has
+  // to guard on it or a taken group name would leave a product with no choice to offer.
+  const newGroup = input.shape === 'RECIPE' ? input.choice?.group ?? null : null
+  const groupFree = newGroup
+    ? sql`NOT EXISTS (SELECT 1 FROM choice_groups WHERE name = ${newGroup.name} COLLATE NOCASE)`
+    : sql`1 = 1`
   const itemId = input.shape === 'RECIPE'
     ? null
     : input.item.mode === 'EXISTING' ? input.item.itemId : context.newId()
@@ -98,7 +104,7 @@ export function planProductSetup(input: ProductSetupInput, context: SetupContext
       INSERT INTO bar_items (id, name, unit, container_ml, par_qty, category, age_restricted, allergen_notes, status)
       SELECT ${itemId}, ${newItem.name}, ${newItem.unit}, ${newItem.containerMl ?? null}, ${newItem.parQty ?? null},
              ${newItem.category ?? null}, ${newItem.ageRestricted ? 1 : 0}, ${newItem.allergenNotes ?? null}, 'ACTIVE'
-      WHERE ${itemFree} AND ${productFree}
+      WHERE ${itemFree} AND ${productFree} AND ${groupFree}
     `)
     statements.push(auditStatement(context.actorId, 'bar.item.created', `bar-item:${itemId}`, {
       name: newItem.name,
@@ -116,7 +122,7 @@ export function planProductSetup(input: ProductSetupInput, context: SetupContext
     INSERT INTO bar_products (id, category_id, name, status, staffed_only, age_restricted, allergen_state, allergen_note, sort)
     SELECT ${productId}, ${product.categoryId}, ${product.name}, ${status}, ${product.staffedOnly ? 1 : 0},
            ${product.ageRestricted ? 1 : 0}, ${product.allergenState}, ${product.allergenNote ?? null}, ${product.sort}
-    WHERE ${productFree} AND ${itemHeld}
+    WHERE ${productFree} AND ${groupFree} AND ${itemHeld}
   `)
 
   const landed = sql`EXISTS (SELECT 1 FROM bar_products WHERE id = ${productId})`
@@ -136,7 +142,7 @@ export function planProductSetup(input: ProductSetupInput, context: SetupContext
     statements.push(sql`
       INSERT INTO choice_groups (id, name)
       SELECT ${choiceGroupId}, ${input.choice.group.name}
-      WHERE ${landed}
+      WHERE ${landed} AND ${groupFree}
     `)
     statements.push(auditStatement(context.actorId, 'bar.choice-group.created', `bar-choice-group:${choiceGroupId}`, {
       name: input.choice.group.name,
