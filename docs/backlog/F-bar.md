@@ -7,7 +7,7 @@ computes, cross-checks and records; it never initiates an online charge and neve
 data. Every sale, tab charge, comp and settlement posts to the unified ledger in integer pence, and
 on-hand stock is always the sum of movements, never a stored figure.
 
-Counts: 29 stories (24 MVP, 3 V2, 1 Later, 1 resolved won't-build).
+Counts: 31 stories (26 MVP, 3 V2, 1 Later, 1 resolved won't-build).
 
 Open questions:
 
@@ -23,8 +23,10 @@ Open questions:
   which of the three documented data-damage repairs run as repairs versus explicit write-offs?
 - Are wastage reasons a fixed vocabulary or a bar-manager-managed list? Waste analytics (F-204)
   needs structure; free text alone cannot be reported on.
-- On a night with no performance (an external hire with the bar open), who holds comp approval and
-  till-opening authority, given both normally derive from the show-night rota?
+- Answered 15 September 2026: on a night with no performance (an external hire with the bar open),
+  a bar opening is planned like a rota and a confirmed shift on it opens the till; the bar
+  manager's officer role still opens it by naming the venue, recorded as any bypass is. Comp
+  approval widens the same way. Decision 0077; stories F-125 and E-130.
 
 ## F-101: Till access scoped to tonight's bar shift
 
@@ -559,6 +561,56 @@ Open questions:
 - Source: SumUp Payment Switch (developer.sumup.com/terminal-payments/payment-switch, and the
   sumup-android-url-scheme and sumup-ios-url-scheme references); decision 0069; Matt's
   direction, 13 September 2026.
+
+## F-125: The till opens at a venue with nothing running
+
+- Role: Bar staff
+- Phase: MVP
+- Story: As tonight's bar staff on an external hire, I want the till to open with no performance
+  running so that a bar the theatre has planned takes money the same way every other bar does.
+- Depends on: F-101, F-102, E-130; decision 0077
+- Acceptance criteria:
+  1. A person holding a confirmed shift on tonight's bar opening at a venue opens the till there,
+     reaching it as `via: 'SHIFT'`, with an empty performance list and the opening named.
+  2. A holder of the bar manager's officer role opens the till at a venue with nothing running by
+     naming the venue; the bypass is recorded once per night, venue and role as it always was, and
+     its detail carries an empty performance list and the opening where there is one.
+  3. Asking for BAR authority with nothing running and no venue named is refused 400 asking for
+     the venue, not 403; a door or duty-manager request on such a night is still refused 403,
+     because there is no house to work.
+  4. `GET /api/till/venues` lists the venues the caller may open a session at: venues with a
+     performance tonight, venues with an opening they hold a confirmed shift on, and every venue
+     for a holder of the till bypass permission. The till shows a picker on the 400 and reloads
+     naming the venue.
+  5. A sale, a comp, an age check and a stock movement on such a night record no performance and
+     are otherwise indistinguishable from a show night's; the session is still one per venue per
+     night.
+  6. A refusal names both ways in: a confirmed bar shift on tonight's performances or on tonight's
+     bar opening at this venue, or the bar manager's role.
+- Source: Module F open question 5 (till and comp authority on a night with no performance),
+  answered by Matt on 15 September 2026; decision 0077.
+
+## F-126: A bar sale on a two-house night names its own performance
+
+- Role: Bar manager
+- Phase: MVP
+- Story: As the bar manager on a matinee day, I want each sale attributed to the house it was
+  served to so that one session's takings still report per performance.
+- Depends on: F-105, E-127, E-131; decision 0078
+- Acceptance criteria:
+  1. A sale resolves its performance from the instant it happened against tonight's bar shift
+     windows at the venue, not from how many performances the caller's authority happens to cover.
+  2. A sale inside a bar window takes that window's performance; a sale inside none takes the
+     nearest bound, ties going to the earlier performance; a night with no bar windows resolves no
+     performance and the sale records none.
+  3. A 14:30 sale and a 20:30 sale on a two-house day land on different performances inside one
+     till session, and the session's reconciliation figure is unchanged by the split.
+  4. A comp request records the house the same way, so an approved comp reports against the
+     performance it was served to.
+  5. The resolution is one shared function called from the sale write path, so no route decides
+     which house a second way.
+- Source: E-127 criterion 5 (one session, two houses); the 15 September 2026 bar review; decision
+  0078.
 
 ## F-201: Reader-initiated checkout
 
