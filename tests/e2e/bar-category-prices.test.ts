@@ -285,6 +285,48 @@ describe.skipIf(skip !== null)('the catalogue screen', () => {
     expect(variant?.pricePence).toBe(250)
     expect(variant?.priceSource).toBe('category')
   }, 120_000)
+
+  // The info banner on this screen says a category with a price history cannot be removed:
+  // Delete has to agree, not just watch productCount (issue 908).
+  test('a category with a price history offers no Delete, the same reason the banner already gives', async () => {
+    const categoryId = await aCategory()
+    await setCategoryDefault(categoryId, { pricePence: 250 })
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/categories`, `[data-test="edit-${categoryId}"]`)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="delete-${categoryId}"]')`)).toBe(false)
+    view.close()
+  }, 120_000)
+
+  test('a colour picked or typed in the form shows as a swatch on the list', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    const name = named('Colourful')
+    await visit(view, `${app.baseURL}/bar/categories`, `[data-test="add-category"]`)
+    await click(view, '[data-test="add-category"]')
+    await waitFor(view, `document.querySelector('[data-test="category-form"]')`)
+    await fill(view, '[data-test="category-name"]', name)
+    await fill(view, '[data-test="colour-hex"]', '#00c16a')
+    await click(view, '[data-test="category-submit"]')
+    await waitFor(view, `document.querySelector('[data-test="bar-categories-table"]').textContent.includes(${JSON.stringify(name)})`)
+
+    const id = await view.evaluate<string>(
+      `[...document.querySelectorAll('[data-test^="category-swatch-"]')].find(el => el.closest('tr')?.textContent.includes(${JSON.stringify(name)}))?.getAttribute('data-test')?.replace('category-swatch-', '')`,
+    )
+    expect(id).toBeTruthy()
+    view.close()
+  }, 120_000)
 })
 
 // The price row and its audit entry share one batch (auditedWrite, 0049), rather than landing
