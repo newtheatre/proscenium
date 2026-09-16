@@ -32,6 +32,9 @@ const HAND_REVIEWED_REBUILDS = new Set<string>([
   // passes has two restrict dependents (pass_admissions, pass_requests), held and recreated around
   // it in the order 0063 sets out, verified against a real three-table fixture (0073).
   '0103_an_imported_pass_has_no_issuer',
+  // till_sessions has one restrict dependent (sumup_attempts), held and recreated around it in the
+  // order 0063 sets out, verified against a real fixture (F-118 criterion 3).
+  '0110_a_closed_session_is_append_only_and_a_night_is_a_date',
 ])
 
 function scan(dir: string, pattern: string): string[] {

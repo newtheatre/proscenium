@@ -1538,15 +1538,15 @@ change never restates a past sale (criterion 4).
 ### bar_discounts
 `id` PK · `name` · `percent` 1..100 · `status`. Snapshotted onto entries; bar lines only.
 
-### till_sessions
-`id` PK · `venue_id` → venues restrict · `night` civil date, the show night it belongs to ·
+### till_sessions  APPEND-ONLY once closed
+`id` PK · `venue_id` → venues restrict · `night` civil date, the show night it belongs to, CHECK
+GLOB plus `date()` so an impossible day such as 2026-13-45 is refused as well as a misshapen one ·
 `opened_by` → users restrict · `opened_at` · `closed_by` NULL → users restrict · `closed_at` NULL,
 set with `closed_by` together or not at all, never before `opened_at` (F-102). `expected_total_pence`,
 `actual_z_pence`, `variance_pence` NULL → set together with the close itself, never separately;
 `variance_note` NULL unless the two disagree, in which case it is required (F-118 criterion 3).
 `close.post.ts` is the only writer and enforces both rules; no CHECK does, since one referencing
-these columns would force a rebuild whose generated copying INSERT cannot resolve a column the old
-table never had (0052).
+these columns means rebuilding this table by hand (0063).
 Partial UNIQUE (`venue_id`, `night`) WHERE `closed_at IS NULL`: at most one *open* session per
 venue per night, so a session once closed stays closed and a fresh one opening later that night is
 a row of its own rather than a reuse. Keys to the night rather than a performance, so one session
@@ -1554,12 +1554,20 @@ covers a matinee and an evening at the same venue (E-127), the same choice 0044 
 officer bypass. The expected figure is this session's own: `barReconciliation` takes an optional session or venue
 scope and the close passes its own session (`server/utils/reconciliation.ts`), so two venues
 running the same night each stamp their own total rather than the estate's combined one (F-202.3).
+Append-only from the close onwards: `till_sessions_closed_is_append_only` fires
+`BEFORE UPDATE` whenever `closed_at` is already set and refuses the write, so the Z figure, the
+variance and the close itself are facts once recorded (F-118 criterion 3, 0010). A mis-keyed Z is
+corrected by a superseding `z_readings` row (`server/utils/night-reconciliation.ts`), never by a
+second session for the same night, which `requireNightAuthority` refuses to open once the night
+has passed. The close still runs, since its own predicate reads
+`closed_at IS NULL`, and no other write path updates the table at all.
 A session left open past its night is F-102's own query (`staleUnclosedSessionsQuery`). E-114's
 checklist criterion 3 names only two system-verified checks; a stale till session is not a third
 one it added, so this query still has no screen reading it (`docs/known-issues.md`).
 
 ### comp_requests
-`id` PK · `venue_id` → venues restrict · `night` · `performance_id` NULL (the house the ask was
+`id` PK · `venue_id` → venues restrict · `night`, the same date CHECK `till_sessions.night`
+carries · `performance_id` NULL (the house the ask was
 made at, resolved from the bar's windows exactly as a sale's is, F-126; no foreign key, because
 adding one to a live table is a rebuild) · `requested_by` → users restrict · `reason` ·
 `lines` JSON basket, read exactly at approval and at the sale, never resubmitted · `status` CHECK
@@ -1579,7 +1587,8 @@ and `server/utils/sale.ts` all share one idea of what a comp request is and when
 
 ### sumup_attempts
 `id` PK, also the `foreign-tx-id` the SumUp app is given · `till_session_id` → till_sessions
-restrict · `venue_id` → venues restrict · `night` · `created_by` → users restrict · `created_at` ·
+restrict · `venue_id` → venues restrict · `night`, the same date CHECK `till_sessions.night`
+carries · `created_by` → users restrict · `created_at` ·
 `basket` JSON, the sale exactly as submitted plus the scope it resolved under, replayed at the
 answer and never resubmitted · `expected_total_pence` · `status` CHECK
 `STARTED|COMPLETING|SUCCEEDED|FAILED|ABANDONED|MISMATCH` · `smp_status`, `smp_tx_code`,

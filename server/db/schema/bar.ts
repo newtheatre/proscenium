@@ -63,6 +63,9 @@ export const compRequests = sqliteTable('comp_requests', {
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   index('comp_requests_venue_night').on(table.venueId, table.night),
+  // Stricter than `variant_prices.effective_from`'s bare GLOB: `date()` refuses a well-shaped
+  // impossible day such as 2026-13-45, which a character class cannot (0014).
+  check('comp_requests_night_is_a_date', sql`${table.night} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND ${table.night} IS date(${table.night})`),
   check('comp_requests_status_values', sql`${table.status} IN ('PENDING', 'APPROVED', 'DECLINED')`),
   check('comp_requests_decided_shape', sql`
     (${table.status} = 'PENDING' AND ${table.decidedBy} IS NULL AND ${table.decidedAt} IS NULL)
@@ -261,10 +264,12 @@ export const tillSessions = sqliteTable('till_sessions', {
   night: text('night').notNull(),
   openedBy: text('opened_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
   openedAt: integer('opened_at').notNull().default(now),
+  // Append-only once closed: a trigger refuses every UPDATE while `closed_at` is set. A mis-keyed
+  // Z is corrected by a superseding `z_readings` row, never here (0010, F-118 criterion 3).
   closedBy: text('closed_by').references(() => users.id, { onDelete: 'restrict' }),
   closedAt: integer('closed_at'),
   // Written once with the close (F-118 criterion 3); `close.post.ts` is the only writer. No CHECK
-  // enforces that: one on a brand-new column forces a rebuild the copying INSERT cannot resolve (0052).
+  // pairs the four: adding one means rebuilding this table by hand (0063).
   expectedTotalPence: integer('expected_total_pence'),
   actualZPence: integer('actual_z_pence'),
   variancePence: integer('variance_pence'),
@@ -272,6 +277,7 @@ export const tillSessions = sqliteTable('till_sessions', {
 }, table => [
   uniqueIndex('till_sessions_one_open_per_venue_night').on(table.venueId, table.night).where(sql`closed_at IS NULL`),
   index('till_sessions_unclosed').on(table.night).where(sql`closed_at IS NULL`),
+  check('till_sessions_night_is_a_date', sql`${table.night} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND ${table.night} IS date(${table.night})`),
   check('till_sessions_close_is_whole', sql`(${table.closedAt} IS NULL) = (${table.closedBy} IS NULL)`),
   check('till_sessions_closes_after_it_opens', sql`${table.closedAt} IS NULL OR ${table.closedAt} >= ${table.openedAt}`),
 ])
@@ -303,6 +309,7 @@ export const sumupAttempts = sqliteTable('sumup_attempts', {
 }, table => [
   index('sumup_attempts_night_status').on(table.night, table.status),
   index('sumup_attempts_session').on(table.tillSessionId),
+  check('sumup_attempts_night_is_a_date', sql`${table.night} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND ${table.night} IS date(${table.night})`),
   check('sumup_attempts_status_values', sql`${table.status} IN ('STARTED', 'COMPLETING', 'SUCCEEDED', 'FAILED', 'ABANDONED', 'MISMATCH')`),
   check('sumup_attempts_resolution_values', sql`${table.resolution} IS NULL OR ${table.resolution} IN ('CALLBACK', 'KEY', 'STAFF', 'SWEEP')`),
   check('sumup_attempts_entry_needs_success', sql`${table.entryId} IS NULL OR ${table.status} = 'SUCCEEDED'`),
