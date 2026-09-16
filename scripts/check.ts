@@ -18,7 +18,7 @@ export const CHECKS: Check[] = [
   {
     name: 'migrations',
     script: 'scripts/check-migrations.ts',
-    describes: 'A generated rebuild of an append-only table, or one dropping a cascade or trigger the snapshot cannot re-emit (0010).',
+    describes: 'A generated rebuild of an append-only table, one dropping a cascade or trigger the snapshot cannot re-emit (0010), or a LIKE pattern past D1\'s fifty characters (0081).',
   },
   {
     name: 'content-tokens',

@@ -20,7 +20,9 @@ export const barCategories = sqliteTable('bar_categories', {
 }, table => [
   unique('bar_categories_name').on(table.name),
   uniqueIndex('bar_categories_name_nocase').on(sql`${table.name} COLLATE NOCASE`),
-  check('bar_categories_colour_hex', sql`${table.colour} IS NULL OR ${table.colour} GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'`),
+  // `lower()` rather than a second case in the class: the pattern has to stay inside D1's fifty
+  // characters, and both cases spell a 67-character one that fails every write it guards (0081).
+  check('bar_categories_colour_hex', sql`${table.colour} IS NULL OR lower(${table.colour}) GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'`),
 ])
 
 // A percentage a bar manager may apply to a sale, capped by configuration (0012). Editable in

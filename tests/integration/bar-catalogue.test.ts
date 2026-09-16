@@ -358,3 +358,40 @@ describe('changes() after a conditional UPDATE names that UPDATE\'s own effect',
     })
   })
 })
+
+// The pattern's length is what broke on D1 and only there (0081); this suite's driver carries
+// SQLite's stock limit and would take the old 67-character one. What it can prove is the meaning.
+describe('a category colour is six hexadecimal characters after a hash, in either case (0081)', () => {
+  const colour = (database: TestDatabase, value: string | null): void => {
+    category(database, { id: `cat-${value ?? 'none'}`, name: `Named ${value ?? 'none'}`, colour: value })
+  }
+
+  test('a lower-case colour saves, which is what every category write sent before it 500d', async () => {
+    await withDatabase((database) => {
+      colour(database, '#ff0044')
+      expect(rows<{ colour: string }>(database, 'SELECT colour FROM bar_categories')[0]!.colour).toBe('#ff0044')
+    })
+  })
+
+  test('an upper-case colour saves as itself, since `lower()` is the constraint\'s and not the column\'s', async () => {
+    await withDatabase((database) => {
+      colour(database, '#FF0044')
+      expect(rows<{ colour: string }>(database, 'SELECT colour FROM bar_categories')[0]!.colour).toBe('#FF0044')
+    })
+  })
+
+  test('no colour is a colour nobody chose, not a malformed one', async () => {
+    await withDatabase((database) => {
+      colour(database, null)
+      expect(rows<{ colour: string | null }>(database, 'SELECT colour FROM bar_categories')[0]!.colour).toBeNull()
+    })
+  })
+
+  test('a non-hex character, a short value, a long one and a missing hash are each refused', async () => {
+    await withDatabase((database) => {
+      for (const bad of ['#gg0044', '#ff004', '#ff00445', 'ff0044', '']) {
+        expect(() => colour(database, bad)).toThrow()
+      }
+    })
+  })
+})
