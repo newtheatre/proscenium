@@ -1,11 +1,18 @@
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { changes } from '#shared/utils/audit'
 import { ROLES } from '#shared/utils/roles'
+
+// Provenance on the grant, never in the audit trail's detail, which carries identifiers and never
+// prose about a person (A-118 criterion 2, 0011).
+const MAX_NOTE = 500
 
 const body = z.object({
   userId: z.string().min(1).max(64),
   role: z.enum(ROLES),
   // Omitted means the committee year end; explicit null means permanent (0009).
   expiresAt: z.union([z.number().int().positive(), z.null()]).optional(),
+  note: z.string().max(MAX_NOTE).optional(),
 })
 
 // Grant a role, expiring at the committee year unless told otherwise.
@@ -19,6 +26,26 @@ export default defineEventHandler(async (event) => {
   }
 
   const expiresAt = input.expiresAt === undefined ? defaultRoleExpiry(new Date()) : input.expiresAt
+  const note = input.note?.trim() || null
+
+  // Putting an expiry on the last administrator is the same act as revoking them, delayed
+  // (A-120 criterion 1).
+  if (expiresAt !== null && await wouldStrandTheSystem(input.role, subject.id)) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'That is the last administrator: grant another before dating this one',
+    })
+  }
+
+  // The unique key is (user, role), so a lapsed grant is still a row: without this a renewal
+  // would insert nothing, say nothing, and leave the role gone (A-131 criterion 5).
+  const [held] = await db.select({
+    expiresAt: schema.roleGrants.expiresAt,
+    note: schema.roleGrants.note,
+  })
+    .from(schema.roleGrants)
+    .where(and(eq(schema.roleGrants.userId, subject.id), eq(schema.roleGrants.role, input.role)))
+    .limit(1)
 
   await db.batch([
     db.insert(schema.roleGrants).values({
@@ -27,14 +54,22 @@ export default defineEventHandler(async (event) => {
       role: input.role,
       expiresAt,
       grantedBy: resolved.account.id,
-    }).onConflictDoNothing(),
+      note,
+    }).onConflictDoUpdate({
+      target: [schema.roleGrants.userId, schema.roleGrants.role],
+      // A changed expiry re-arms the lapse warning, which would otherwise never fire again
+      // for this grant (A-119 criterion 1).
+      set: { expiresAt, grantedBy: resolved.account.id, grantedAt: Math.floor(Date.now() / 1000), note, expiryWarnedAt: null },
+    }),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
-      action: 'role.granted',
+      action: held ? 'role.renewed' : 'role.granted',
       target: `user:${subject.id}`,
-      detail: { role: input.role, expiresAt, permanent: expiresAt === null },
+      detail: held
+        ? { role: input.role, noted: note !== null, ...changes({ expiresAt: [held.expiresAt, expiresAt] }) }
+        : { role: input.role, expiresAt, permanent: expiresAt === null, noted: note !== null },
     })),
   ])
 
-  return { ok: true, role: input.role, expiresAt }
+  return { ok: true, role: input.role, expiresAt, renewed: Boolean(held) }
 })

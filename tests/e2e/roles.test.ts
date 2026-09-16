@@ -41,11 +41,15 @@ async function signIn(email: string): Promise<string> {
   return (response.headers.get('set-cookie') ?? '').split(';')[0]!
 }
 
-function send(method: string, path: string, body: unknown, cookie?: string): Promise<Response> {
-  return fetch(`${app.baseURL}${path}`, {
+// A DELETE carries no body: reading one hangs the Workers runtime, so its parameters go in the
+// query string and the client has to send them there (0068).
+function send(method: string, path: string, body: Record<string, unknown>, cookie?: string): Promise<Response> {
+  const asQuery = method === 'DELETE'
+  const query = asQuery ? `?${new URLSearchParams(body as Record<string, string>)}` : ''
+  return fetch(`${app.baseURL}${path}${query}`, {
     method,
     headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
-    body: JSON.stringify(body),
+    ...(asQuery ? {} : { body: JSON.stringify(body) }),
   })
 }
 

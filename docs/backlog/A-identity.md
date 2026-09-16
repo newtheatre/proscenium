@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 29 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 30 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -531,6 +531,39 @@ Open questions for the committee:
   6. Every member-facing response is column allow-listed; any that is not is fixed in the same
      change or recorded in known issues.
 - Source: Pre-cutover review, 10 September 2026; 0009 (authority derives from facts), 0031, 0040.
+
+## A-131: Manage roles from a register of their own
+
+- Role: Administrator
+- Phase: MVP
+- Story: As the IT Manager, I want a page that answers "who holds this role" and lets me grant and
+  revoke it there so that handover is worked role by role rather than account by account.
+- Depends on: A-118, A-121
+- Acceptance criteria:
+  1. `/people/roles` names every role with its count of live holders, read in one grouped
+     statement rather than a query per role (0006). Choosing a role puts it in the URL, so a
+     link opens on it.
+  2. The chosen role's holders are listed server-side through a list declaration (K-129): who,
+     until when, who granted it and any note, searchable by name or address, paged and sorted.
+  3. A lapsed grant is hidden until asked for, the way a shadow account is (0071), and the total
+     line says how many were hidden. A live count never includes a lapsed grant (0009).
+  4. A holder is added from this page by choosing an account with the person picker (0032), with
+     no detour through the account directory. The account page keeps its own Roles card, and both
+     reach the same endpoint, the same guards and the same audit entries.
+  5. A grant's expiry is the committee year end (the default), a picked date, or permanent, and
+     it carries a note of up to 500 characters (A-118 criteria 1 and 2). Re-granting a role the
+     account already has a row for renews that row rather than silently doing nothing, and the
+     audit entry is a from/to diff (A-118 criterion 5). Changing an expiry re-arms A-119's
+     lapse warning.
+  6. Permanent grants are a standing report on the page, across every role, because they are the
+     exception and have to stay visible (A-118 criterion 1, A-119 criterion 3).
+  7. Reading the register needs `accounts.read`; the grant and revoke controls appear only for
+     `roles.grant` and `roles.revoke`. The last-administrator guard (A-120) and the second-factor
+     requirement (A-112) stay the server's, and the page quotes the refusal it is given.
+  8. A note is provenance on the grant and never reaches the audit trail's detail, which records
+     only that one was written (0011).
+- Source: Requested 16 September 2026. A-118's expiry choices, note and audit diff had no screen;
+  A-121 criterion 5 reaches grants from the account, which is the wrong way round at handover.
 
 ## A-201: Import an SU membership list by hand
 
