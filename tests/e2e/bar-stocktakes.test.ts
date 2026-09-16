@@ -450,4 +450,21 @@ describe.skipIf(skip !== null)('the suggested order list compares live on-hand t
     expect(await view.evaluate<string>(`(${ownGroup}).querySelector('th:last-child').textContent`)).toBe('Shortfall')
     view.close()
   }, 120_000)
+
+  test('an unconfigured item links straight to its own row on the stock screen', async () => {
+    const item = await anItem({ category: named('Unconfigured spirits') })
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock/order-list`, `[data-test="unconfigured-${item.id}"]`)
+    await click(view, `[data-test="unconfigured-${item.id}"]`)
+    await waitFor(view, `document.querySelector('[data-test="bar-items-table"]')`)
+    expect(await textOf(view, '[data-test="bar-items-table"]')).toContain(item.name)
+    view.close()
+  }, 120_000)
 })
