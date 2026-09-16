@@ -173,6 +173,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     prefix: '/people',
     items: [
       { label: 'Accounts', icon: 'i-lucide-users', to: '/people/accounts', ability: viewAccounts },
+      { label: 'Roles', icon: 'i-lucide-shield', to: '/people/roles', ability: viewAccounts },
       { label: 'Members', icon: 'i-lucide-badge-check', to: '/people/members', ability: viewMembers },
       { label: 'Fellows', icon: 'i-lucide-award', to: '/people/fellows', ability: viewFellows },
     ],

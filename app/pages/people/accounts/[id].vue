@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
 import { can, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
-import { ROLES, saysRole } from '#shared/utils/roles'
-import type { Role } from '#shared/utils/roles'
 
 definePageMeta({ layout: 'console', title: 'Account', middleware: 'console', docs: '/docs/people/accounts' })
 
@@ -40,43 +38,10 @@ const sees = computed(() => ({
   disables: can(useViewer().value, disableAccounts),
 }))
 
-// A role already held live is not offered again: the server would silently no-op the insert
-// rather than say why, and offering it invites exactly that confusion.
-const availableRoles = computed(() => {
-  const held = new Set((view.value?.grants ?? []).filter(grant => grant.live).map(grant => grant.role))
-  return ROLES.filter(role => !held.has(role)).map(role => ({ label: saysRole(role), value: role }))
-})
-
-const roleToGrant = ref<Role | undefined>(undefined)
-const permanentGrant = ref(false)
-const grantWorking = ref(false)
-const grantFailure = ref<string | null>(null)
-
-async function grantRole(): Promise<void> {
-  if (!roleToGrant.value) return
-  grantWorking.value = true
-  grantFailure.value = null
-  try {
-    await $fetch('/api/admin/roles', {
-      method: 'POST',
-      body: {
-        userId: route.params.id,
-        role: roleToGrant.value,
-        // Omitted defaults to the committee year end server-side (0009); explicit null is permanent.
-        ...(permanentGrant.value ? { expiresAt: null } : {}),
-      },
-    })
-    roleToGrant.value = undefined
-    permanentGrant.value = false
-    await load()
-  }
-  catch (error) {
-    grantFailure.value = refusalText(error)
-  }
-  finally {
-    grantWorking.value = false
-  }
-}
+// A role already held live is not offered again: re-granting it would renew the grant rather
+// than add one, which is a different act from the one this form offers (A-131 criterion 5).
+const heldRoles = computed(() =>
+  (view.value?.grants ?? []).filter(grant => grant.live).map(grant => grant.role))
 
 async function revokeRole(role: string): Promise<void> {
   working.value = `revoke-${role}`
@@ -314,50 +279,26 @@ onMounted(load)
           </li>
         </ul>
 
-        <UAlert
-          v-if="grantFailure"
-          data-test="grant-failure"
-          color="error"
-          variant="subtle"
-          :description="grantFailure"
-          class="mt-3"
-        />
-
         <div
           v-if="sees.grants"
-          class="mt-3 flex flex-wrap items-end gap-2 border-t border-default pt-3"
+          class="mt-3 border-t border-default pt-3"
         >
-          <UFormField label="Grant a role">
-            <USelect
-              v-model="roleToGrant"
-              :items="availableRoles"
-              value-key="value"
-              placeholder="Choose a role"
-              class="w-48"
-              data-test="grant-role"
-            />
-          </UFormField>
-          <UFormField label="Permanent">
-            <USwitch
-              v-model="permanentGrant"
-              data-test="grant-permanent"
-            />
-          </UFormField>
-          <UButton
-            :loading="grantWorking"
-            :disabled="!roleToGrant"
-            data-test="grant-submit"
-            @click="grantRole"
-          >
-            Grant it
-          </UButton>
+          <RoleGrantForm
+            :user-id="String(route.params.id)"
+            :held="heldRoles"
+            @granted="load"
+          />
         </div>
-        <p
-          v-if="sees.grants"
-          class="mt-1 text-xs text-muted"
-        >
-          Expires at the committee year end unless marked permanent (0009).
-        </p>
+
+        <UButton
+          class="mt-3"
+          to="/people/roles"
+          variant="link"
+          size="sm"
+          icon="i-lucide-shield"
+          label="Work the whole register, role by role"
+          data-test="open-register"
+        />
       </UPageCard>
 
       <UPageCard

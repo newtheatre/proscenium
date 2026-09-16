@@ -70,6 +70,7 @@ const CATALOGUE = {
 
   'role.granted': { label: 'Role granted', module: 'identity' },
   'role.revoked': { label: 'Role revoked', module: 'identity' },
+  'role.renewed': { label: 'Role grant renewed', module: 'identity' },
   // Written by the nightly sweep with no actor, which is what attributes it to system (A-119
   // criterion 5). Neither changes what anybody holds: expiry is enforced at read time (0009).
   'role.lapse-warned': { label: 'Role expiry warning sent', module: 'identity' },
