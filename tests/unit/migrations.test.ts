@@ -3,6 +3,8 @@ import {
   copyingInserts,
   dependentsByTable,
   journalProblems,
+  likePatternProblems,
+  MAX_LIKE_PATTERN,
   migrationEventsIn,
   normaliseMigrationTag,
   pendingMigrations,
@@ -365,5 +367,43 @@ describe('a table rebuild is refused for dropping a trigger it does not restore 
     expect(problems).toHaveLength(1)
     expect(problems[0]).toContain('0080_rebuild.sql')
     expect(problems[0]).toContain('`incident_log_no_delete`')
+  })
+})
+
+describe('a LIKE or GLOB pattern stays inside D1\'s limit (0081)', () => {
+  const hex = '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'
+  const date = '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+
+  test('the limit is the 50 characters D1 builds SQLite with, measured against a real probe', () => {
+    expect(MAX_LIKE_PATTERN).toBe(50)
+  })
+
+  test('the colour pattern that 500d every category write is refused, and says how long it is', () => {
+    const problems = likePatternProblems('schema.ts', `check('c', sql\`colour GLOB '${hex}'\`)`)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('67 characters')
+    expect(problems[0]).toContain('schema.ts')
+  })
+
+  test('the date patterns the same schema already relies on are left alone', () => {
+    expect(likePatternProblems('schema.ts', `night GLOB '${date}'`)).toEqual([])
+  })
+
+  test('a pattern of exactly the limit passes and one character more does not', () => {
+    expect(likePatternProblems('f', `x LIKE '${'a'.repeat(50)}'`)).toEqual([])
+    expect(likePatternProblems('f', `x LIKE '${'a'.repeat(51)}'`)).toHaveLength(1)
+  })
+
+  test('LIKE is read as well as GLOB, and every pattern in a file is reported, not just the first', () => {
+    const problems = likePatternProblems('f', `a GLOB '${hex}' OR b LIKE '${hex}'`)
+    expect(problems).toHaveLength(2)
+  })
+
+  test('a doubled quote inside a pattern counts as the one character it is', () => {
+    expect(likePatternProblems('f', `x GLOB '${'a'.repeat(49)}'''`)).toEqual([])
+  })
+
+  test('a file with no pattern at all has nothing to say', () => {
+    expect(likePatternProblems('f', 'SELECT 1')).toEqual([])
   })
 })

@@ -1440,7 +1440,8 @@ the same batch, scoped by subquery over the components rather than by ids read f
 
 ### bar_categories
 `id` PK · `name` unique, case-insensitively · `sort`, which drives the till's layout and is read
-per request · `colour` CHECK six hexadecimal characters after a hash.
+per request · `colour` CHECK six hexadecimal characters after a hash, in either case, spelt
+`lower(colour) GLOB` so the pattern stays inside D1's fifty characters (0081).
 
 ### discounts
 `id` PK · `name` unique, case-insensitively · `percent` CHECK 1 to 100 · `status` CHECK

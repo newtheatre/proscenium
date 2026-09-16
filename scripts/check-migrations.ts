@@ -7,6 +7,8 @@ import {
   copyingInserts,
   dependentsByTable,
   journalProblems,
+  likePatternProblems,
+  MAX_LIKE_PATTERN,
   migrationEventsIn,
   rebuildDependentProblems,
   snapshotBefore,
@@ -18,6 +20,13 @@ import type { JournalEntry, SnapshotTable } from '../shared/utils/migrations'
 
 const DIR = 'server/db/migrations/sqlite'
 const META = join(DIR, 'meta')
+const SCHEMA = 'server/db/schema'
+
+// 0053 carried the over-long colour pattern that 0081 found and 0111 replaced. The file is
+// applied history and cannot change; the live schema no longer holds the pattern.
+const GRANDFATHERED_PATTERNS = new Set<string>([
+  '0053_the_bar_stocks_things_and_moves_stock.sql',
+])
 
 // The estate carried two rebuilds applied before the rule existed. This schema starts clean,
 // so a rebuild here is always a defect.
@@ -35,6 +44,9 @@ const HAND_REVIEWED_REBUILDS = new Set<string>([
   // till_sessions has one restrict dependent (sumup_attempts), held and recreated around it in the
   // order 0063 sets out, verified against a real fixture (F-118 criterion 3).
   '0110_a_closed_session_is_append_only_and_a_night_is_a_date',
+  // bar_categories has five dependents and holds none of them: this one is safe by running
+  // before the bar catalogue carries a row, which is 0081's decision, not 0063's ordering.
+  '0111_a_colour_check_d1_can_evaluate',
 ])
 
 function scan(dir: string, pattern: string): string[] {
@@ -87,6 +99,7 @@ const dependentsOnto = dependentsByTable(latest.tables ?? {})
 // Triggers live across migrations, so replay the whole directory in order.
 const liveTriggers = new Map<string, string>()
 const problems: string[] = []
+const patternProblems: string[] = []
 
 for (const file of scan(DIR, '*.sql')) {
   const sql = await Bun.file(join(DIR, file)).text()
@@ -111,6 +124,7 @@ for (const file of scan(DIR, '*.sql')) {
   }
 
   problems.push(...triggerDropProblems(file, events, liveTriggers, grandfathered))
+  if (!GRANDFATHERED_PATTERNS.has(file)) patternProblems.push(...likePatternProblems(join(DIR, file), sql))
 }
 
 if (problems.length) {
@@ -147,8 +161,29 @@ if (disagreements.length) {
   process.exit(1)
 }
 
+// The schema is where a person writes the pattern; the migration is only where it lands.
+for (const file of scan(SCHEMA, '**/*.ts')) {
+  patternProblems.push(...likePatternProblems(join(SCHEMA, file), await Bun.file(join(SCHEMA, file)).text()))
+}
+
+if (patternProblems.length) {
+  console.error('check-migrations: a LIKE or GLOB pattern is longer than D1 will evaluate.\n')
+  for (const problem of patternProblems) console.error(`  ${problem}`)
+  console.error('\nD1 builds SQLite with SQLITE_MAX_LIKE_PATTERN_LENGTH at 50, far below the stock')
+  console.error('50000. The limit is checked when the pattern is evaluated, not when the statement')
+  console.error('is prepared, so nothing refuses the schema, the migration applies, and every write')
+  console.error('the pattern is evaluated against fails with SQLITE_ERROR instead. In a CHECK')
+  console.error('constraint that is every row carrying a value, surfacing as an unhandled 500 with')
+  console.error('the D1 driver in the stack and no mention of the constraint.')
+  console.error('Split the pattern (`lower(x) GLOB` halves a case-insensitive character class), or')
+  console.error('express the test with `length`, `substr` and `trim`, which have no such limit.')
+  console.error('See docs/decisions/0081-a-like-pattern-is-fifty-characters-on-d1.md.')
+  process.exit(1)
+}
+
 const guarded = [...dependentsOnto.keys()].length
 console.log(`check-migrations: ${guarded} tables have foreign keys guarding a rebuild and `
   + `${liveTriggers.size} triggers are live, none dropped or bypassed. `
   + `${(journal.entries ?? []).length} journal entries match their files. `
-  + `${snapshots.length} snapshots chain unbroken.`)
+  + `${snapshots.length} snapshots chain unbroken. `
+  + `Every LIKE and GLOB pattern is inside D1's ${MAX_LIKE_PATTERN} characters.`)

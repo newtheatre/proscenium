@@ -234,3 +234,23 @@ export function triggerDropProblems(
   }
   return problems
 }
+
+// D1 builds SQLite with SQLITE_MAX_LIKE_PATTERN_LENGTH at 50. A longer pattern raises
+// SQLITE_ERROR when it is evaluated, not when it is prepared, so only a real write finds it (0081).
+export const MAX_LIKE_PATTERN = 50
+
+const LIKE_PATTERN = /\b(?:GLOB|LIKE)\s+'((?:[^']|'')*)'/gi
+
+// Every LIKE or GLOB pattern literal over the limit, wherever it is written: a CHECK constraint
+// in the schema, a generated migration, or a query. One message per pattern (0081).
+export function likePatternProblems(file: string, source: string): string[] {
+  const problems: string[] = []
+  for (const match of source.matchAll(LIKE_PATTERN)) {
+    const pattern = match[1]!.replaceAll('\'\'', '\'')
+    if (pattern.length <= MAX_LIKE_PATTERN) continue
+    problems.push(`${file}: the pattern \`${pattern}\` is ${pattern.length} characters, `
+      + `over D1's limit of ${MAX_LIKE_PATTERN}. Every row it is evaluated against fails with `
+      + `"LIKE or GLOB pattern too complex".`)
+  }
+  return problems
+}
