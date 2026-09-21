@@ -97,7 +97,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
 </script>
 
 <template>
-  <UContainer class="max-w-xl py-16">
+  <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       title="Book a room not listed here"
       description="For when nothing of ours suits. Somebody else decides which room we get, so this is a request rather than a booking."

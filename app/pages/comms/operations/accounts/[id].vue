@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { formatLondon } from '#shared/utils/london'
+import { saysNotificationStatus } from '#shared/utils/notifications'
+import { saysWhen } from '#shared/utils/when'
 import type { PersonHistoryRow } from '#shared/utils/notification-log'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
@@ -49,7 +50,7 @@ function clearType(): void {
   type.value = ''
 }
 
-const when = (at: number | null): string => at ? formatLondon(new Date(at * 1000), { dateStyle: 'medium', timeStyle: 'short' }) : 'Not sent'
+const when = (at: number | null): string => at ? saysWhen(at) : 'Not sent'
 
 const columns: TableColumn<PersonHistoryRow>[] = [
   { accessorKey: 'type', header: 'Type', meta: { class: { td: 'font-mono text-sm' } } },
@@ -57,9 +58,9 @@ const columns: TableColumn<PersonHistoryRow>[] = [
   {
     id: 'status',
     header: 'Outcome',
-    cell: ({ row }) => h(UBadge, { variant: 'subtle', size: 'sm' }, () => row.original.status),
+    cell: ({ row }) => h(UBadge, { variant: 'subtle', size: 'sm' }, () => saysNotificationStatus(row.original.status)),
   },
-  { id: 'createdAt', header: 'Enqueued', cell: ({ row }) => formatLondon(new Date(row.original.createdAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }) },
+  { id: 'createdAt', header: 'Enqueued', cell: ({ row }) => saysWhen(row.original.createdAt) },
   { id: 'sentAt', header: 'Sent', cell: ({ row }) => when(row.original.sentAt) },
 ]
 

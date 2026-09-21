@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
-import { formatLondon, fromLondonWallClock, londonParts, startOfLondonDay } from '#shared/utils/london'
+import { fromLondonWallClock, londonParts } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -58,7 +59,7 @@ interface Plan {
 
 // The same short London day the member-facing list reads, so a date means one thing either side.
 const sessionDay = (heldOn: string): string =>
-  formatLondon(startOfLondonDay(heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
+  saysDay(heldOn)
 
 const request = useRequestFetch()
 const toast = useToast()

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { groupContentWarnings, saysAssessment } from '#shared/utils/content-warnings'
-import { formatLondon } from '#shared/utils/london'
+import { saysClock, saysDay, saysWhenLong } from '#shared/utils/when'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { pounds, saysPrice, saysRestriction } from '#shared/utils/ticket-types'
 import { DEFAULT_OG_IMAGE, SITE_ADDRESS } from '#shared/utils/seo'
@@ -60,11 +60,9 @@ useSchemaOrg(computed(() => (data.value?.performances ?? []).map(performance => 
   })),
 }))))
 
-const saysWhen = (at: number): string =>
-  formatLondon(new Date(at * 1000), { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+const saysNight = (at: number): string => saysWhenLong(at)
 
-const day = (at: number): string =>
-  formatLondon(new Date(at * 1000), { weekday: 'short', day: 'numeric', month: 'short' })
+const day = (at: number): string => saysDay(at)
 
 // Gold is the limelight: the night that is nearly gone is the one worth looking at twice
 // (show-page.png). Available says nothing extra, which is why it reads muted.
@@ -394,7 +392,7 @@ function saysInterval(performance: ListedPerformance): string {
             <div class="flex flex-wrap items-start gap-x-3 gap-y-2">
               <div class="min-w-0">
                 <p class="font-medium">
-                  {{ saysWhen(performance.startsAt) }}
+                  {{ saysNight(performance.startsAt) }}
                 </p>
                 <!-- Colour plus words, never colour alone (docs/design-language.md). An external
                      link reads booking closed, so it says where the tickets are instead. -->
@@ -457,7 +455,7 @@ function saysInterval(performance: ListedPerformance): string {
             <p class="flex flex-wrap gap-x-3 text-sm text-muted">
               <span v-if="venues.length > 1">{{ performance.venueName }}</span>
               <span v-if="performance.doorsAt">
-                Doors {{ formatLondon(new Date(performance.doorsAt * 1000), { hour: '2-digit', minute: '2-digit' }) }}
+                Doors {{ saysClock(performance.doorsAt) }}
               </span>
             </p>
 

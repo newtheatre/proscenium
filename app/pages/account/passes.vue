@@ -75,7 +75,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
 
 <template>
   <UContainer
-    class="max-w-3xl py-10"
+    :class="MEMBER_PAGE_READING"
     data-test="account-passes-page"
   >
     <UPageHeader
@@ -97,7 +97,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
     <div class="mt-6 space-y-6">
       <UCard data-test="account-passes-held">
         <template #header>
-          <h2 class="nnt-headline text-lg">
+          <h2 class="text-lg font-semibold">
             Your passes
           </h2>
         </template>
@@ -127,7 +127,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
 
       <UCard v-if="data.requests.length > 0">
         <template #header>
-          <h2 class="nnt-headline text-lg">
+          <h2 class="text-lg font-semibold">
             Your requests
           </h2>
         </template>
@@ -151,7 +151,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
         data-test="account-passes-sellable"
       >
         <template #header>
-          <h2 class="nnt-headline text-lg">
+          <h2 class="text-lg font-semibold">
             Request a pass
           </h2>
         </template>

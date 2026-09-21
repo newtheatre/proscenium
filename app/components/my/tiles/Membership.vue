@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import type { MySummary } from '#shared/utils/my-summary'
 
 const props = defineProps<{ summary: MySummary }>()
 
-const sayDay = (day: string): string => formatLondon(startOfLondonDay(day), { day: 'numeric', month: 'short', year: 'numeric' })
+const sayDay = (day: string): string => saysDay(day, { year: true })
 
 const word = computed(() => {
   const membership = props.summary.membership

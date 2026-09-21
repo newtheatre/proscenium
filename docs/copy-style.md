@@ -149,14 +149,17 @@ Dates and times are Europe/London and take two shapes: short in a list, "Wed 14 
 long in prose, "Wednesday 14 October at 19:30". Both come from `shared/utils/when.ts`, which fixes
 the separators the locale would otherwise choose for itself: `saysWhen()` and `saysWhenLong()` for
 an instant, `saysDay()` and `saysDayLong()` where only the day is meant, and `saysClock()` for a
-time on its own. Each takes an epoch number, an ISO string, or a `YYYY-MM-DD` London day, and each
-pins the zone by construction, so no page builds its own options object. `formatLondon()`
-(`shared/utils/london.ts`) is the mechanism underneath and is not called from a page.
+time on its own. Each takes an epoch number (seconds, or milliseconds above 1e11), a `Date`, an
+ISO string, or a `YYYY-MM-DD` London day, and each pins the zone by construction, so nothing
+builds its own options object. `formatLondon()` (`shared/utils/london.ts`) is the mechanism
+underneath, and a page, a component or a shared helper calls the shapes rather than it.
 
 A year is shown only when the date falls outside the committee year in hand (0009), or when the
 caller asks for it with `{ year: true }`. An input keeps its machine value: only what is read
 changes. `toLocaleDateString`, `toLocaleString` and `toLocaleTimeString` are banned under `app/`,
-and `tests/unit/admin-conventions.test.ts` and `tests/unit/design-language.test.ts` enforce it.
+and `tests/unit/admin-conventions.test.ts` and `tests/unit/design-language.test.ts` enforce that
+and the ban on a bespoke options object, the second against a named list that may shrink and may
+not grow.
 
 The show night runs 04:00 to 04:00 (0014): a booking or a shift made at 01:00 belongs to the
 previous calendar date on screen.
@@ -172,6 +175,12 @@ UI strings themselves are not comments and are not bound by it.
 No em dash anywhere, in any string. K-128 criterion 4 adds a unit test enforcing this under `app/`,
 `shared/` and `content/`; name it as coming when you touch a string, because it will fail a build
 that reintroduces one.
+
+A stored value never reaches a screen. An enum value, a permission or audit code, a table name
+and a configuration key are the estate's own vocabulary, not the reader's: each has a `says*`
+helper or a `*_WORDING` map beside the enum in `shared/utils/`, and that is what a page shows,
+including in a select's options. `tests/unit/admin-conventions.test.ts` fails a console screen
+that shows one, and `tests/unit/code-wording.test.ts` fails a value nobody has worded.
 
 British spellings, the ones that recur: organise, colour, recognise, apologise, licence (noun),
 practise (verb), programme (except a computer program). Already the practice throughout the
@@ -189,7 +198,8 @@ spelled with two Ls everywhere, for example `shared/utils/audit-coverage.ts`'s
    three words on `tonight`.
 3. Glossary word used correctly: performance vs show, room vs venue vs space, shift vs rota.
 4. A refusal says what happened, what to do, where to go, in that order, in the policy's own words.
-5. An error never blames the reader and never shows an id, a table name or a status code.
+5. An error never blames the reader and never shows an id, a table name or a status code, and
+   no screen shows an enum value, a permission or audit code or a configuration key.
 6. An empty state names the one action that fills it; never a bare "No X yet."
 7. A button is verb first, sentence case, no trailing punctuation; a destructive one names what it
    destroys.

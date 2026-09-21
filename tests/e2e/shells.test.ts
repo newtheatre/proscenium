@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession } from '#tests/helpers/accounts'
+import { adminSession, registerMember } from '#tests/helpers/accounts'
+import { generatePassword } from '#tests/helpers/seed'
 import { testVenue } from '#tests/helpers/programme'
-import { click, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import type { TestMember } from '#tests/helpers/accounts'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -14,6 +16,8 @@ let app: AppUnderTest
 // real one rather than on an empty listing (J-111 criterion 9).
 let showSlug = ''
 let performanceId = ''
+let member: TestMember
+let memberPassword = ''
 
 async function seedShow(cookie: string): Promise<void> {
   const database = new Database(app.databaseFile)
@@ -46,6 +50,8 @@ beforeAll(async () => {
   if (skip) return
   app = await startApp()
   await seedShow((await adminSession(app)).cookie)
+  memberPassword = generatePassword()
+  member = await registerMember(app, 'shells', memberPassword)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -143,6 +149,33 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     })()`)
     expect(href).toBe('/admin')
   })
+
+  // The member's own screens are calm, the same way the console is and for the same reason
+  // (0084): the kit signifies only while it stays on the public site and the show night.
+  test('no member screen uses the expressive kit', async () => {
+    const paths = [
+      '/my', '/account/membership', '/account/bar-tab', '/account/passes', '/account/security',
+      '/rooms/mine', '/rota', '/training',
+    ]
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', member.email)
+      await fill(view, 'form input[type="password"]', memberPassword)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      for (const path of paths) {
+        await visit(view, `${app.baseURL}${path}`)
+        // Counted inside main: the site footer and the wordmark are public chrome and keep theirs.
+        const kit = await view.evaluate<number>(`document.querySelectorAll('main [class*="nnt-"]').length`)
+        expect(`${path}: ${kit}`).toBe(`${path}: 0`)
+      }
+    }
+    finally {
+      view.close()
+    }
+  }, 150_000)
 
   test('the show-night shell is a dark subtree, not a dashboard', async () => {
     const seen = await inspect<{ bg: string, dashboard: number }>('/tonight', `(() => ({

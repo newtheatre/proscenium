@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhenLong } from '#shared/utils/when'
 import { saysShiftRole, saysShiftStatus, SHIFT_ROLES } from '#shared/utils/rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { Page } from '#shared/utils/pagination'
@@ -196,7 +196,7 @@ async function claim(shift: OpenShift): Promise<void> {
 }
 
 function spanOf(startsAt: number): string {
-  return formatLondon(new Date(startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
+  return saysWhenLong(startsAt)
 }
 
 function selectRole(one: ShiftRole | undefined): void {
@@ -209,7 +209,7 @@ useSeoMeta({ title: 'My rota' })
 
 <template>
   <UContainer
-    class="max-w-3xl py-16"
+    :class="MEMBER_PAGE_READING"
     data-test="rota-page"
   >
     <UPageHeader
@@ -222,7 +222,7 @@ useSeoMeta({ title: 'My rota' })
       class="mt-8"
       data-test="my-shifts"
     >
-      <h2 class="nnt-headline text-lg">
+      <h2 class="text-lg font-semibold">
         What you hold
       </h2>
       <ul class="mt-4 divide-y divide-default">
@@ -324,7 +324,7 @@ useSeoMeta({ title: 'My rota' })
     </section>
 
     <section class="mt-10">
-      <h2 class="nnt-headline text-lg">
+      <h2 class="text-lg font-semibold">
         Open shifts
       </h2>
 
@@ -432,7 +432,7 @@ useSeoMeta({ title: 'My rota' })
         class="mt-8"
         data-test="open-opening-slots"
       >
-        <h3 class="nnt-headline text-base">
+        <h3 class="text-base font-semibold">
           Bar openings
         </h3>
         <p class="mt-1 text-sm text-muted">

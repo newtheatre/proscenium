@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
 import { saysAccessKind } from '#shared/utils/ticket-types'
+import { FINANCE_SCOPES, saysFinanceScope } from '#shared/utils/finance-reports'
 import type { FinanceForegoneReport } from '#shared/utils/finance-reports'
 
 definePageMeta({ layout: 'console', title: 'Comps and discounts', middleware: 'console', docs: '/docs/money/comps-and-discounts' })
@@ -47,7 +48,8 @@ const reportFailure = computed(() => (error.value ? refusalText(error.value, 'Th
           v-model="scopeKind"
           aria-label="Scope"
           data-test="scope-kind"
-          :items="['SHOW', 'PERIOD']"
+          :items="FINANCE_SCOPES.map(value => ({ label: saysFinanceScope(value), value }))"
+          value-key="value"
         />
         <USelectMenu
           v-if="scopeKind === 'SHOW'"

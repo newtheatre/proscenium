@@ -13,6 +13,18 @@ export const financeScopeForm = z.discriminatedUnion('scope', [
 
 export type FinanceScopeInput = z.output<typeof financeScopeForm>
 
+export const FINANCE_SCOPES = ['SHOW', 'PERIOD'] as const
+export type FinanceScope = (typeof FINANCE_SCOPES)[number]
+
+const FINANCE_SCOPE_WORDING: Record<FinanceScope, string> = {
+  SHOW: 'One show',
+  PERIOD: 'A date range',
+}
+
+export function saysFinanceScope(scope: FinanceScope): string {
+  return FINANCE_SCOPE_WORDING[scope]
+}
+
 export interface ForegoneReport {
   compsPence: number
   compCount: number

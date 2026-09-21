@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { describeExpiry, saysDeliveryMode, saysKind } from '#shared/utils/training'
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import type { DeliveryMode, ExpiryMode, ModuleKind } from '#shared/utils/training'
 
 // One catalogue card, calm (no marquee, sticker or spotlight): the public catalogue spends its
@@ -29,7 +29,7 @@ const emit = defineEmits<{ requested: [] }>()
 
 const nextSessionLine = computed(() => {
   if (!props.nextSession) return 'No session scheduled'
-  const day = formatLondon(startOfLondonDay(props.nextSession.heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
+  const day = saysDay(props.nextSession.heldOn)
   return props.nextSession.place ? `${day}, ${props.nextSession.startsAt} · ${props.nextSession.place}` : `${day}, ${props.nextSession.startsAt}`
 })
 </script>

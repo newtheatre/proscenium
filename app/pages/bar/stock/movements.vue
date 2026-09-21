@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { REASONS_BY_KIND, says, saysMoney, saysQuantity } from '#shared/utils/bar'
+import { REASONS_BY_KIND, says, saysMoney, saysMovementSource, saysQuantity } from '#shared/utils/bar'
+import { saysWhen } from '#shared/utils/when'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { MovementReason, StockItem, StockMovement } from '#shared/utils/bar'
@@ -42,10 +43,6 @@ const { data, status, error, refresh } = await useAsyncData(
 
 // A reversal always posts REVERSAL, so only that kind's own reasons are offered (F-204, 3.5).
 const reasonOptions = (REASONS_BY_KIND.REVERSAL ?? []).map(value => ({ label: says(value), value }))
-
-// Pinned to Europe/London, because the worker runs in UTC and half the year would read wrong.
-const when = (at: number): string =>
-  formatLondon(new Date(at * 1000), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 // A movement is never edited, so the only correction is one that cancels it and says why.
 async function reverse(): Promise<void> {
@@ -89,7 +86,7 @@ const columns: TableColumn<StockMovement>[] = [
     id: 'when',
     header: 'When',
     meta: { class: { td: 'whitespace-nowrap' } },
-    cell: ({ row }) => when(row.original.createdAt),
+    cell: ({ row }) => saysWhen(row.original.createdAt),
   },
   {
     id: 'item',
@@ -97,7 +94,7 @@ const columns: TableColumn<StockMovement>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.itemName),
       row.original.refTable
-        ? h('div', { class: 'text-xs text-muted' }, `From ${row.original.refTable.replaceAll('_', ' ')}`)
+        ? h('div', { class: 'text-xs text-muted' }, `From ${saysMovementSource(row.original.refTable)}`)
         : null,
     ]),
   },
@@ -228,7 +225,7 @@ const columns: TableColumn<StockMovement>[] = [
             class="text-sm text-muted"
           >
             {{ reversing.itemName }}, {{ saysQuantity(reversing.qty, reversing.unit) }}, recorded
-            {{ when(reversing.createdAt) }}.
+            {{ saysWhen(reversing.createdAt) }}.
           </p>
 
           <UFormField

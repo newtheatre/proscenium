@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import { TOPIC_DESCRIPTIONS, TOPIC_LABELS } from '#shared/utils/notifications'
 import type { NotificationTopic } from '#shared/utils/senders'
 
@@ -93,7 +93,7 @@ useSeoMeta({ title: 'Notifications' })
           :data-test="`topic-${cell.topic}`"
         >
           <div class="flex flex-wrap items-baseline gap-x-3">
-            <h3 class="font-medium">
+            <h3 class="text-base font-semibold">
               {{ TOPIC_LABELS[cell.topic] }}
             </h3>
             <UBadge
@@ -179,7 +179,7 @@ useSeoMeta({ title: 'Notifications' })
               class="font-medium"
             >{{ item.title }}</span>
             <span class="ms-auto text-xs text-muted">
-              {{ formatLondon(new Date(item.createdAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }) }}
+              {{ saysWhen(item.createdAt) }}
             </span>
           </div>
           <p

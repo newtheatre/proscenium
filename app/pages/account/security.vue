@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { renderSVG } from 'uqr'
-import { formatLondon } from '#shared/utils/london'
+import { saysDayLong } from '#shared/utils/when'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
 
@@ -115,7 +115,7 @@ const closeAccount = (): Promise<void> => attempt(async () => {
 })
 
 const confirmedOn = computed(() =>
-  state.value?.confirmedAt ? formatLondon(new Date(state.value.confirmedAt * 1000), { dateStyle: 'long' }) : null)
+  state.value?.confirmedAt ? saysDayLong(state.value.confirmedAt, { year: true }) : null)
 
 onMounted(load)
 
@@ -171,7 +171,7 @@ useSeoMeta({ title: 'Security' })
         class="space-y-6"
       >
         <div class="space-y-2">
-          <h2 class="nnt-headline text-xl">
+          <h2 class="text-lg font-semibold">
             Scan this with your authenticator app
           </h2>
           <p class="text-sm text-muted">
@@ -216,7 +216,7 @@ useSeoMeta({ title: 'Security' })
         class="space-y-4"
       >
         <div class="space-y-2">
-          <h2 class="nnt-headline text-xl">
+          <h2 class="text-lg font-semibold">
             Save your recovery codes
           </h2>
           <p class="text-sm text-muted">

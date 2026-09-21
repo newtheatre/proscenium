@@ -6,6 +6,17 @@ import { startOfLondonDay } from './london'
 export const DRILL_OUTCOMES = ['PASS', 'FAIL'] as const
 export type DrillOutcome = (typeof DRILL_OUTCOMES)[number]
 
+// A drill is read by whoever has to trust the backups, so the outcome reads as a verdict rather
+// than as the value stored against it (K-128).
+const DRILL_OUTCOME_WORDING: Record<DrillOutcome, string> = {
+  PASS: 'Passed',
+  FAIL: 'Failed',
+}
+
+export function saysDrillOutcome(outcome: DrillOutcome): string {
+  return DRILL_OUTCOME_WORDING[outcome]
+}
+
 const civilDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Give the date as YYYY-MM-DD')
 
 // A drill records what it reconciled whether it passed or failed: a failure is the finding, not

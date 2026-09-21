@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 
 // H-924: a session is chosen, never typed (0032). Searches what it teaches and its date.
 
@@ -45,12 +45,12 @@ const { data, status } = await useAsyncData(
   { watch: [settled], default: (): Listing => ({ items: [] }), getCachedData: () => undefined },
 )
 
-function saysWhen(heldOn: string, startsAt: string): string {
-  return `${formatLondon(startOfLondonDay(heldOn), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}, ${startsAt}`
+function saysSession(heldOn: string, startsAt: string): string {
+  return `${saysDay(heldOn, { year: true })}, ${startsAt}`
 }
 
 const items = computed<Item[]>(() => (data.value?.items ?? []).map(session => ({
-  label: `${session.title}, ${saysWhen(session.heldOn, session.startsAt)}`,
+  label: `${session.title}, ${saysSession(session.heldOn, session.startsAt)}`,
   value: session.id,
   heldOn: session.heldOn,
   startsAt: session.startsAt,

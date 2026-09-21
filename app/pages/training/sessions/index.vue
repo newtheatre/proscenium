@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysGaps } from '#shared/utils/training'
 import { saysClosure, saysPlace } from '#shared/utils/training-signup'
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import type { PrerequisiteGap } from '#shared/utils/training'
 import type { ClosureReason } from '#shared/utils/training-signup'
 
@@ -108,12 +108,12 @@ async function withdraw(session: Session): Promise<void> {
 const placesLeft = (session: Session): number => Math.max(0, session.capacity - session.signedUp)
 
 const sessionDay = (session: Session): string =>
-  formatLondon(startOfLondonDay(session.heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
+  saysDay(session.heldOn)
 </script>
 
 <template>
   <UContainer
-    class="max-w-3xl py-16"
+    :class="MEMBER_PAGE_READING"
     data-test="sessions-page"
   >
     <UPageHeader
@@ -147,7 +147,7 @@ const sessionDay = (session: Session): string =>
       class="mt-8"
       data-test="my-sessions"
     >
-      <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+      <h2 class="text-lg font-semibold">
         What you are signed up to
       </h2>
 
@@ -212,7 +212,7 @@ const sessionDay = (session: Session): string =>
       class="mt-12"
       data-test="open-sessions"
     >
-      <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+      <h2 class="text-lg font-semibold">
         Coming up
       </h2>
 

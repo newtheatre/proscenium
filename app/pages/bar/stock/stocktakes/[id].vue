@@ -34,9 +34,6 @@ watch(data, (held) => {
 
 const open = computed(() => data.value?.stocktake.status === 'OPEN')
 
-const when = (at: number): string =>
-  formatLondon(new Date(at * 1000), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-
 async function saveCounts(): Promise<void> {
   if (!data.value) return
 
@@ -235,8 +232,8 @@ const columns: TableColumn<StocktakeLine>[] = [
             {{ open ? 'Open' : 'Applied' }}
           </UBadge>
           <p class="mt-1 text-sm text-muted">
-            Opened {{ when(data.stocktake.openedAt) }}<template v-if="data.stocktake.appliedAt">
-              , applied {{ when(data.stocktake.appliedAt) }}
+            Opened {{ saysWhen(data.stocktake.openedAt) }}<template v-if="data.stocktake.appliedAt">
+              , applied {{ saysWhen(data.stocktake.appliedAt) }}
             </template>.
             <span data-test="uncounted-count">{{ plural(uncounted, 'item') }} not yet counted.</span>
           </p>
