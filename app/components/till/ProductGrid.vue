@@ -50,7 +50,7 @@ function priceLine(product: SaleProduct): string {
         size="sm"
         color="neutral"
         variant="subtle"
-        class="min-h-10 shrink-0"
+        class="min-h-12 shrink-0"
         :data-test="`category-chip-${category.id}`"
         @click="jumpTo(category.id)"
       >
@@ -67,10 +67,12 @@ function priceLine(product: SaleProduct): string {
         {{ category.name }}
       </h2>
       <div class="mb-4 grid grid-cols-2 gap-2">
+        <!-- The allergen affordance sits under the name rather than beside it: at 360 pixels a
+             48 pixel button in the header took a third of the tile's width (F-107 criterion 1). -->
         <div
           v-for="product in productsIn(category.id)"
           :key="product.id"
-          class="flex items-start justify-between gap-1 rounded-lg border border-default p-2"
+          class="flex flex-col rounded-lg border border-default p-2"
         >
           <UButton
             color="neutral"
@@ -96,15 +98,18 @@ function priceLine(product: SaleProduct): string {
             </span>
           </UButton>
           <UButton
-            size="sm"
+            size="xs"
             color="neutral"
             variant="ghost"
             icon="i-lucide-info"
-            class="min-h-12 min-w-12 shrink-0"
+            block
+            class="min-h-12 justify-start p-1 text-xs"
             :aria-label="`Allergens for ${product.name}`"
             :data-test="`allergen-${product.id}`"
             @click="emit('openAllergens', { name: product.name, state: product.allergenState, note: product.allergenNote })"
-          />
+          >
+            Allergens
+          </UButton>
         </div>
       </div>
     </div>

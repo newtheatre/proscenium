@@ -127,7 +127,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
       <div class="mt-2 flex flex-wrap gap-2">
         <UButton
           size="sm"
-          class="min-h-10"
+          class="min-h-12"
           :loading="resolving"
           :data-test="`sumup-open-succeeded-${attempt.id}`"
           @click="emit('resolve', attempt.id, 'succeeded', null)"
@@ -138,7 +138,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
           size="sm"
           color="neutral"
           variant="subtle"
-          class="min-h-10"
+          class="min-h-12"
           :loading="resolving"
           :data-test="`sumup-open-abandoned-${attempt.id}`"
           @click="emit('resolve', attempt.id, 'abandoned', attempt.status === 'MISMATCH' ? (abandonNote.trim() || null) : null)"

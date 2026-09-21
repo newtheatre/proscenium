@@ -159,7 +159,9 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    the expressive kit, and all four are show-night only.
 4. **The show-night screens are phone-first and work offline.** They cache their night on open
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
-   looks right on a desk monitor is wrong for the surface it is on.
+   looks right on a desk monitor is wrong for the surface it is on. Every control on one clears
+   48 by 48 pixels, not only the primary actions K-102 criterion 2 names: a cold hand in a dark
+   foyer does not aim, and a secondary control missed twice costs more than the room it saved.
 5. **Navigation is declared once and filtered by ability.** Every destination in the console
    sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu, the
    public header (`HEADER_NAV`, a derived slice of `PUBLIC_NAV`) and the footer comes from
@@ -240,6 +242,17 @@ that is not there (K-126). The default Open Graph image, `public/og-default.png`
 banner scrimmed with the white logo over it, so a shared link looks like the house even for a page
 with no picture of its own.
 
+## Printing
+
+Almost nothing here is printed, and what is printed is printed from a dark screen: a show-night
+screen defaults to stage black, and a browser asked to print one sends the lot to the paper.
+`theme.css` carries a single `@media print` rule that hides the page and shows only what is
+marked `.print-pass`, light on white, inside a `.print-sheet` lifted to the top of the page. A
+walk-up's door pass at the till is what it exists for (F-123).
+
+A screen with something worth printing marks that region and nothing more; there is no
+per-screen print stylesheet, because two of them would disagree about what "print" means.
+
 ## What belongs here
 
 A colour, a font or a token change belongs in `theme.css`, and a component variant belongs in
@@ -256,7 +269,7 @@ The one exception is show artwork, which is sovereign and never house-styled.
 The rule that a colour must be a token is a test, not a review habit:
 `tests/unit/design-language.test.ts` fails on a raw hex anywhere under `app/` except
 `theme.css` itself, which is where the tokens are defined. It also asserts that the three brand
-scales exist and that no Google Fonts request has crept in.
+scales exist, that no Google Fonts request has crept in, and that the print rule is still there.
 
 `tests/e2e/shells.test.ts` holds the rest to the same standard, in a real browser: a public view
 spends its expressive budget at most once each, the admin shell uses none of the kit at all, and

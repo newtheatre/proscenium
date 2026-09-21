@@ -171,6 +171,19 @@ describe('a time is always the shared TimeField (#915)', () => {
   })
 })
 
+// K-102, issue 1150 item 8: a door pass is printed from the counter laptop, and a show-night
+// screen is dark. Printing one without a rule puts the whole dark screen on the paper.
+describe('printing takes the pass alone, light on white (K-102)', () => {
+  test('the token source carries a print rule that hides everything but the pass', async () => {
+    const theme = await Bun.file(TOKEN_SOURCE).text()
+    const print = theme.slice(theme.indexOf('@media print'))
+    expect(theme).toContain('@media print')
+    expect(print).toContain('.print-pass')
+    expect(print).toContain('visibility: visible')
+    expect(print).toContain('color-scheme: light')
+  })
+})
+
 // The member and public shells, the console's half of the same rule being in
 // admin-conventions.test.ts. A locale format takes the runtime's zone, which is UTC (0014).
 const LOCALE_FORMAT = /\.toLocale(?:Date|Time)?String\(/
