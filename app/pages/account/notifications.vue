@@ -66,7 +66,7 @@ useSeoMeta({ title: 'Notifications' })
   <AccountSettings
     data-test="account-notifications-page"
     title="Notifications"
-    description="Choose what we tell you about, by topic rather than by which part of the theatre sends it. Each switch saves as you set it and takes effect on the next message. Tickets, receipts, security emails and safety notices always arrive: those answer something you just did, and no preference here silences one."
+    description="Choose what we tell you about, by topic. Each switch saves as you set it. Tickets, receipts, security emails and safety notices always arrive."
   >
     <UPageCard>
       <div
