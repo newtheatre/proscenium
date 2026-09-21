@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { z } from 'zod'
 import { HOUSE_ERROR, registerHouseErrors } from '#shared/utils/house-errors'
 
-// K-128 criterion 2: zod's stock English ("Too small: expected string to have >=1 characters")
-// reaches a screen through `refusalText`, so the map below is what a field with no message says.
+// K-128 criterion 2: a field message reaches a screen through `refusalText`, so a check with no
+// wording of its own must speak in the house voice rather than the library's.
 registerHouseErrors()
 
 function firstMessage(schema: z.ZodType, input: unknown): string {
@@ -64,7 +64,7 @@ describe('nothing zod writes reaches a person', () => {
   ])('no developer wording, bound or type name in the message', (schema) => {
     const message = firstMessage(schema as z.ZodType, {})
     expect(message).not.toMatch(/expected|received|Invalid input|Too small|Too big|>=|<=|characters|element/i)
-    expect(Object.values(HOUSE_ERROR)).toContain(message)
+    expect(Object.values(HOUSE_ERROR) as string[]).toContain(message)
   })
 })
 

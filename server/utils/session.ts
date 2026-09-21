@@ -19,7 +19,7 @@ export async function currentAccount(event: H3Event): Promise<AccountRow | null>
 
 export async function requireAccount(event: H3Event): Promise<AccountRow> {
   const account = await currentAccount(event)
-  if (!account) throw createError({ statusCode: 401, statusMessage: 'Not signed in' })
+  if (!account) throw createError({ statusCode: 401, statusMessage: 'Your sign-in has ended. Sign in again.' })
   return account
 }
 

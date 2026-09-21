@@ -5,7 +5,7 @@ import { londonDayOf } from '#shared/utils/ledger'
 // never be stretched to cover more than was asked for (F-110 criteria 2, 4).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Which request' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean.' })
   const input = await readValidatedBodyOrThrow(event, commitCompSaleForm)
 
   const resolved = await requireNightAuthority(event, 'BAR', { venueId: input.venueId, performanceId: input.performanceId })

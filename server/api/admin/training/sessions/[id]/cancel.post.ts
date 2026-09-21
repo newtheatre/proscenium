@@ -5,7 +5,7 @@ import { sessionCancelForm } from '#shared/utils/training'
 // register can never be opened, so this is only ever the path before one is (G-113).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'No session named' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean.' })
 
   const resolved = await requireTrainer(event)
   const input = await readValidatedBodyOrThrow(event, sessionCancelForm)

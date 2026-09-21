@@ -6,7 +6,7 @@ import { refreshBadgeStatement, sessionCapacityForm } from '#shared/utils/traini
 export default defineEventHandler(async (event) => {
   const resolved = await requireTrainer(event)
   const sessionId = getRouterParam(event, 'id')
-  if (!sessionId) throw createError({ statusCode: 400, statusMessage: 'No session named' })
+  if (!sessionId) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean.' })
 
   const input = await readValidatedBodyOrThrow(event, sessionCapacityForm)
 

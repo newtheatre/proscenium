@@ -5,7 +5,7 @@ import { coverageProblem, markForm } from '#shared/utils/training'
 // other path from attending to holding, and there never will be (G-116).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'No session named' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean.' })
 
   const resolved = await requireTrainer(event)
   const input = await readValidatedBodyOrThrow(event, markForm)

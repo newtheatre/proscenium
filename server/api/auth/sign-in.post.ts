@@ -4,8 +4,8 @@ import { z } from 'zod'
 // Never the policy bounds: a password set before the policy tightened must still be able to
 // sign in, and telling an attacker the current rules from the sign-in form helps only them.
 const body = z.object({
-  email: z.string().email().max(320),
-  password: z.string().min(1).max(ABSOLUTE_PASSWORD_LIMIT),
+  email: z.string().email('Type the email address on your account.').max(320, 'Type the email address on your account.'),
+  password: z.string().min(1, 'Type your password.').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long.'),
 })
 
 // Sign in with an address and a password.

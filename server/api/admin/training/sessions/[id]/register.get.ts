@@ -4,7 +4,7 @@ import { daysBetween } from '#shared/utils/training'
 // The register a trainer marks: who is on it, what it teaches, and whether it is open yet.
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'No session named' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean.' })
 
   const resolved = await requireTrainer(event)
 

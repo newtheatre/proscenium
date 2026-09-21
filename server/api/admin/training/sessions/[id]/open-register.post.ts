@@ -5,7 +5,7 @@ import { registerOpenable } from '#shared/utils/training'
 // sign-up closes (G-115).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'No session named' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean.' })
 
   const resolved = await requireTrainer(event)
 

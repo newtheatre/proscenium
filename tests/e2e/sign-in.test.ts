@@ -93,8 +93,7 @@ describe.skipIf(skip !== null)('registering and signing in (A-101, A-103, 0007)'
     expect((await response.json()).statusMessage ?? '').toMatch(/at least \d+ characters/)
   })
 
-  // K-128 criterion 2: an empty box used to read "Too small: expected string to have >=1
-  // characters", which is zod's wording, not ours.
+  // K-128 criterion 2: no validation-library wording reaches a person.
   test('an empty password is refused in the house voice', async () => {
     const response = await post('/api/auth/sign-in', { email: person.email, password: '' })
     expect(response.status).toBe(400)
