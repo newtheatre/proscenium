@@ -11,6 +11,7 @@ import {
   variantChoiceForm,
   variantEditForm,
 } from '#shared/utils/bar'
+import { saysDay } from '#shared/utils/when'
 import type {
   BarProduct,
   ChoiceGroup,
@@ -556,7 +557,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
     id: 'from',
     header: 'From',
     cell: ({ row }) => h('div', { class: 'flex items-center gap-2' }, [
-      h('span', {}, row.original.effectiveFrom),
+      h('span', {}, saysDay(row.original.effectiveFrom)),
       row.original.effective
         ? h(UBadge, { color: 'success', variant: 'subtle', size: 'sm' }, () => 'In force today')
         : null,

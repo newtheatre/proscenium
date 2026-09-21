@@ -2,6 +2,7 @@
 import { h } from 'vue'
 import { SERVING_KINDS, categoryForm, categoryPriceForm, says, saysMoney } from '#shared/utils/bar'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
+import { saysDay } from '#shared/utils/when'
 import type { BarCategory, CategoryPrice, ServingKind } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -155,7 +156,7 @@ const priceColumns: TableColumn<CategoryPrice>[] = [
     id: 'from',
     header: 'From',
     cell: ({ row }) => h('div', { class: 'flex items-center gap-2' }, [
-      h('span', {}, row.original.effectiveFrom),
+      h('span', {}, saysDay(row.original.effectiveFrom)),
       row.original.effective
         ? h(resolveComponent('UBadge'), { color: 'success', variant: 'subtle', size: 'sm' }, () => 'In force today')
         : null,

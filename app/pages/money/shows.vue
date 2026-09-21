@@ -53,7 +53,7 @@ const reportFailure = computed(() => (error.value ? refusalText(error.value, 'Th
 
     <template v-else-if="status !== 'pending' && data">
       <p class="text-sm text-muted">
-        {{ data.fromDay }} to {{ data.toDay }}
+        {{ saysDay(data.fromDay) }} to {{ saysDay(data.toDay) }}
       </p>
 
       <table class="w-full text-sm">

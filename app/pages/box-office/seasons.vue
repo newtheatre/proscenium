@@ -2,6 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { seasonForm } from '#shared/utils/seasons'
 import { seasonsList } from '#shared/utils/seasons-list'
+import { saysDay } from '#shared/utils/when'
 import type { TableColumn } from '@nuxt/ui'
 import type { AdminSeason } from '#shared/utils/seasons'
 
@@ -140,7 +141,7 @@ const columns: TableColumn<AdminSeason>[] = [
   {
     id: 'window',
     header: 'Runs',
-    cell: ({ row }) => `${row.original.startsOn} to ${row.original.endsOn}`,
+    cell: ({ row }) => `${saysDay(row.original.startsOn)} to ${saysDay(row.original.endsOn)}`,
   },
   {
     id: 'inUse',

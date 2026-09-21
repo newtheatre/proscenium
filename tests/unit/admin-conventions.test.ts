@@ -314,3 +314,27 @@ describe('every console modal wears one frame (K-123 criterion 8, 0032)', () => 
     expect(inTheBody).toEqual([])
   })
 })
+
+// A date a person reads comes from the shared shapes in shared/utils/when.ts (K-128, 0014).
+// A locale format takes the runtime's zone, which is UTC, so it is wrong for half the year.
+const LOCALE_FORMAT = /\.toLocale(?:Date|Time)?String\(/
+
+// Machine values a reader never sees: an input's value, a query string. The list may shrink
+// and may not grow.
+const CONSOLE_RAW_DATES: string[] = []
+
+const templateOf = (source: string): string => {
+  const start = source.search(/^<template>$/m)
+  return start === -1 ? '' : source.slice(start)
+}
+
+describe('a console date is read in London (K-128, issue 1151 item 8)', () => {
+  test('no console screen formats a date by locale', async () => {
+    expect((await offenders(source => LOCALE_FORMAT.test(source)))
+      .filter(path => !CONSOLE_RAW_DATES.includes(path))).toEqual([])
+  })
+
+  test('no console screen puts an ISO instant on the page', async () => {
+    expect(await offenders(source => templateOf(source).includes('toISOString('))).toEqual([])
+  })
+})

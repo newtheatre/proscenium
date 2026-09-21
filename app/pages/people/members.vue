@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { can, manageMembers } from '#shared/utils/abilities'
 import { recordMembership } from '#shared/utils/admin-forms'
-import { formatLondon } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { MEMBERSHIP_TERMS, isInGrace, londonDay } from '#shared/utils/membership'
 import { claimDeclineForm } from '#shared/utils/membership-claims'
 import { membershipsList } from '#shared/utils/memberships-list'
@@ -231,12 +231,17 @@ const columns: TableColumn<Member>[] = [
       h('div', { class: 'font-mono text-xs text-muted' }, row.original.studentId ?? row.original.email),
     ]),
   },
-  { accessorKey: 'startsOn', header: 'From', meta: { class: { td: 'font-mono text-sm whitespace-nowrap' } } },
+  {
+    id: 'startsOn',
+    header: 'From',
+    cell: ({ row }) => saysDay(row.original.startsOn),
+    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+  },
   {
     id: 'expiresOn',
     header: 'Until',
     cell: ({ row }) => h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
-      h('span', { class: 'font-mono text-sm' }, row.original.expiresOn),
+      h('span', { class: 'text-sm' }, saysDay(row.original.expiresOn)),
       isInGrace(row.original, londonDay(new Date()), listing.value?.graceDays ?? 0)
         ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'In grace')
         : null,
@@ -271,8 +276,6 @@ const columns: TableColumn<Member>[] = [
   },
 ]
 
-const sayWhen = (at: number): string => formatLondon(new Date(at * 1000), { day: 'numeric', month: 'short' })
-
 const claimColumns: TableColumn<Claim>[] = [
   {
     id: 'name',
@@ -292,7 +295,12 @@ const claimColumns: TableColumn<Claim>[] = [
         : null,
     ]),
   },
-  { accessorKey: 'startsOn', header: 'Bought', meta: { class: { td: 'font-mono text-sm whitespace-nowrap' } } },
+  {
+    id: 'startsOn',
+    header: 'Bought',
+    cell: ({ row }) => saysDay(row.original.startsOn),
+    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+  },
   {
     id: 'term',
     header: 'Term',
@@ -302,12 +310,15 @@ const claimColumns: TableColumn<Claim>[] = [
   {
     id: 'since',
     header: 'Waiting since',
-    cell: ({ row }) => h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
-      h('span', {}, sayWhen(row.original.createdAt)),
-      row.original.heldUntil && row.original.heldUntil >= londonDay(new Date())
-        ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held' }, () => `Holds one until ${row.original.heldUntil}`)
-        : null,
-    ]),
+    cell: ({ row }) => {
+      const held = row.original.heldUntil
+      return h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
+        h('span', {}, saysDay(row.original.createdAt)),
+        held && held >= londonDay(new Date())
+          ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held' }, () => `Holds one until ${saysDay(held)}`)
+          : null,
+      ])
+    },
     meta: { class: { td: 'text-sm text-muted' } },
   },
   {
@@ -479,7 +490,7 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
             v-if="declining"
             class="text-sm text-muted"
           >
-            {{ declining.name }}, student number {{ declining.studentId }}, bought on {{ declining.startsOn }}.
+            {{ declining.name }}, student number {{ declining.studentId }}, bought on {{ saysDay(declining.startsOn) }}.
           </p>
           <UFormField
             name="reason"

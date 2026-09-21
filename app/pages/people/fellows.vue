@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { can, manageFellows } from '#shared/utils/abilities'
 import { awardFellowship, revokeFellowship } from '#shared/utils/admin-forms'
 import { fellowshipsList } from '#shared/utils/fellowships-list'
+import { saysDay } from '#shared/utils/when'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { AwardFellowship } from '#shared/utils/admin-forms'
 
@@ -111,7 +112,12 @@ async function revoke(event: FormSubmitEvent<{ reason: string }>): Promise<void>
 watch(query, load)
 
 const columns: TableColumn<Fellow>[] = [
-  { accessorKey: 'awardedOn', header: 'Awarded', meta: { class: { td: 'font-mono text-sm whitespace-nowrap' } } },
+  {
+    id: 'awardedOn',
+    header: 'Awarded',
+    cell: ({ row }) => saysDay(row.original.awardedOn),
+    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+  },
   {
     id: 'name',
     header: 'Fellow',

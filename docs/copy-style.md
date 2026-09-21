@@ -145,13 +145,18 @@ to it, and its comment above `<template #links>` names the budget explicitly.
 Money is pence until formatted, and formatted the one way: `saysPrice()` in `shared/utils/
 ticket-types.ts` returns `£12.50`, never a bare number.
 
-Dates and times are Europe/London, read via `formatLondon()` (`shared/utils/london.ts`), and take
-two shapes: short components in a list, "Wed 14 Oct, 19:30", and long components in prose,
-"Wednesday 14 October at 19:30". The split already exists: `whats-on.vue` uses short weekday, day
-and month for its list; `shows/[slug].vue` uses long forms for its prose. Neither yet fixes the
-literal separator this rule asks for, since `formatLondon` renders whatever `Intl.DateTimeFormat`
-chooses; the sweep should add the two shared helpers that fix it once, rather than each page
-building its own options object as it does today.
+Dates and times are Europe/London and take two shapes: short in a list, "Wed 14 Oct, 19:30", and
+long in prose, "Wednesday 14 October at 19:30". Both come from `shared/utils/when.ts`, which fixes
+the separators the locale would otherwise choose for itself: `saysWhen()` and `saysWhenLong()` for
+an instant, `saysDay()` and `saysDayLong()` where only the day is meant, and `saysClock()` for a
+time on its own. Each takes an epoch number, an ISO string, or a `YYYY-MM-DD` London day, and each
+pins the zone by construction, so no page builds its own options object. `formatLondon()`
+(`shared/utils/london.ts`) is the mechanism underneath and is not called from a page.
+
+A year is shown only when the date falls outside the committee year in hand (0009), or when the
+caller asks for it with `{ year: true }`. An input keeps its machine value: only what is read
+changes. `toLocaleDateString`, `toLocaleString` and `toLocaleTimeString` are banned under `app/`,
+and `tests/unit/admin-conventions.test.ts` and `tests/unit/design-language.test.ts` enforce it.
 
 The show night runs 04:00 to 04:00 (0014): a booking or a shift made at 01:00 belongs to the
 previous calendar date on screen.
@@ -188,7 +193,7 @@ spelled with two Ls everywhere, for example `shared/utils/audit-coverage.ts`'s
 6. An empty state names the one action that fills it; never a bare "No X yet."
 7. A button is verb first, sentence case, no trailing punctuation; a destructive one names what it
    destroys.
-8. Money is pence until `saysPrice`; dates use `formatLondon` in the shell's shape, not a bespoke
-   format.
+8. Money is pence until `saysPrice`; dates use `saysWhen`, `saysWhenLong`, `saysDay`,
+   `saysDayLong` or `saysClock`, not a bespoke format.
 9. No em dash; British spelling; none of the banned American or verbed forms.
 10. Nothing here touches `content/` or the policy pages.

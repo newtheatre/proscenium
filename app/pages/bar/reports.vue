@@ -27,7 +27,7 @@ const periodKindOptions = REPORT_PERIOD_KINDS.map(value => ({ label: saysReportP
 
 const request = useRequestFetch()
 
-const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+const today = londonDay(new Date())
 const kind = ref<(typeof REPORT_PERIOD_KINDS)[number]>('CUSTOM')
 const night = ref(today)
 const day = ref(today)

@@ -2,7 +2,7 @@
 import { h } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { saysEntrySource, saysTender } from '#shared/utils/ledger'
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { EntrySource, Tender } from '#shared/utils/ledger'
@@ -17,7 +17,7 @@ const request = useRequestFetch()
 
 // Opened cold (no query string at all), the list defaults to today's London day rather than
 // asking the endpoint for every entry the ledger has ever held (I-105 criterion 3).
-const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+const today = londonDay(new Date())
 if (typeof route.query.happenedAt !== 'string') {
   await navigateTo({ path: route.path, query: { ...route.query, happenedAt: today } }, { replace: true })
 }
@@ -39,7 +39,7 @@ const columns: TableColumn<LedgerEntry>[] = [
     id: 'happenedAt',
     header: 'When',
     meta: { class: { td: 'whitespace-nowrap' } },
-    cell: ({ row }) => h('span', {}, formatLondon(new Date(row.original.happenedAt * 1000), { dateStyle: 'short', timeStyle: 'short' })),
+    cell: ({ row }) => h('span', {}, saysWhen(row.original.happenedAt)),
   },
   {
     id: 'source',
