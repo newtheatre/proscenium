@@ -121,14 +121,26 @@ async function saveNote(): Promise<void> {
   }
 }
 
-async function forget(space: Space, purpose: string): Promise<void> {
+const forgetting = ref<{ space: Space, purpose: string } | null>(null)
+const forgetFailure = ref<string | null>(null)
+const forgetWorking = ref(false)
+
+async function forget(): Promise<void> {
+  const asked = forgetting.value
+  if (!asked) return
+  forgetWorking.value = true
+  forgetFailure.value = null
   try {
-    await $fetch(`/api/admin/rooms/external-spaces/${space.id}/notes/${purpose}`, { method: 'DELETE' })
-    toast.add({ title: 'Note removed', icon: 'i-lucide-check', color: 'success' })
+    await $fetch(`/api/admin/rooms/external-spaces/${asked.space.id}/notes/${asked.purpose}`, { method: 'DELETE' })
+    toast.add({ title: 'Note forgotten', icon: 'i-lucide-check', color: 'success' })
+    forgetting.value = null
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    forgetFailure.value = refusalText(error)
+  }
+  finally {
+    forgetWorking.value = false
   }
 }
 
@@ -176,7 +188,10 @@ const columns: TableColumn<Space>[] = [
                   'variant': 'ghost',
                   'aria-label': `Forget what we know about ${row.original.name} for ${describePurpose(one.purpose)}`,
                   'data-test': `forget-${row.original.id}-${one.purpose}`,
-                  'onClick': () => forget(row.original, one.purpose),
+                  'onClick': () => {
+                    forgetFailure.value = null
+                    forgetting.value = { space: row.original, purpose: one.purpose }
+                  },
                 }),
           ])))),
   },
@@ -467,5 +482,17 @@ const columns: TableColumn<Space>[] = [
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="forgetting !== null"
+      name="forget-note"
+      title="Forget this note"
+      verb="Forget the note"
+      :consequence="forgetting ? `What we know about ${forgetting.space.name} for ${describePurpose(forgetting.purpose).toLowerCase()} goes. Anyone asking about the space is told nothing until somebody writes a new note.` : ''"
+      :loading="forgetWorking"
+      :failure="forgetFailure"
+      @update:open="value => { if (!value) forgetting = null }"
+      @confirm="forget"
+    />
   </div>
 </template>

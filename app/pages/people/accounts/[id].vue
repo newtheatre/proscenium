@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
 import { can, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
+import { saysRole } from '#shared/utils/roles'
 
 definePageMeta({ layout: 'console', title: 'Account', middleware: 'console', docs: '/docs/people/accounts' })
 
@@ -43,16 +44,45 @@ const sees = computed(() => ({
 const heldRoles = computed(() =>
   (view.value?.grants ?? []).filter(grant => grant.live).map(grant => grant.role))
 
-async function revokeRole(role: string): Promise<void> {
+const revoking = ref<string | null>(null)
+const revokeFailure = ref<string | null>(null)
+
+async function revokeRole(): Promise<void> {
+  const role = revoking.value
+  if (!role) return
   working.value = `revoke-${role}`
-  failure.value = null
+  revokeFailure.value = null
   try {
     // Query, not body: a DELETE carrying a body hangs the Workers runtime when read (0068).
     await $fetch('/api/admin/roles', { method: 'DELETE', query: { userId: route.params.id, role } })
+    revoking.value = null
     await load()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    revokeFailure.value = refusalText(error)
+  }
+  finally {
+    working.value = ''
+  }
+}
+
+// Disabling and resetting an authenticator both lock somebody out, so both confirm; signing out
+// everywhere and enabling do not (K-123 criterion 7).
+const securing = ref<'disable' | 'reset-mfa' | null>(null)
+const secureFailure = ref<string | null>(null)
+
+async function secure(): Promise<void> {
+  const operation = securing.value
+  if (!operation) return
+  working.value = operation
+  secureFailure.value = null
+  try {
+    await $fetch(`/api/admin/accounts/${route.params.id}/security`, { method: 'POST', body: { operation } })
+    securing.value = null
+    await load()
+  }
+  catch (error) {
+    secureFailure.value = refusalText(error)
   }
   finally {
     working.value = ''
@@ -272,7 +302,7 @@ onMounted(load)
               variant="ghost"
               :loading="working === `revoke-${grant.role}`"
               :data-test="`revoke-${grant.role}`"
-              @click="revokeRole(grant.role)"
+              @click="revokeFailure = null; revoking = grant.role"
             >
               Revoke
             </UButton>
@@ -368,7 +398,7 @@ onMounted(load)
             color="error"
             variant="subtle"
             :loading="working === 'disable'"
-            @click="operate('disable')"
+            @click="secureFailure = null; securing = 'disable'"
           >
             Disable the account
           </UButton>
@@ -386,7 +416,7 @@ onMounted(load)
             color="error"
             variant="subtle"
             :loading="working === 'reset-mfa'"
-            @click="operate('reset-mfa')"
+            @click="secureFailure = null; securing = 'reset-mfa'"
           >
             Reset the authenticator
           </UButton>
@@ -552,5 +582,31 @@ onMounted(load)
         </ul>
       </UPageCard>
     </div>
+
+    <ConfirmModal
+      :open="revoking !== null"
+      name="revoke-role"
+      :title="revoking ? `Revoke ${saysRole(revoking)}` : ''"
+      :verb="revoking ? `Revoke ${saysRole(revoking)}` : ''"
+      consequence="Their permission stops now. Nothing they did under it is touched."
+      :loading="working.startsWith('revoke-')"
+      :failure="revokeFailure"
+      @update:open="value => { if (!value) revoking = null }"
+      @confirm="revokeRole"
+    />
+
+    <ConfirmModal
+      :open="securing !== null"
+      name="secure-account"
+      :title="securing === 'disable' ? `Disable ${view?.account.name}'s account` : `Reset ${view?.account.name}'s authenticator`"
+      :verb="securing === 'disable' ? 'Disable the account' : 'Reset the authenticator'"
+      :consequence="securing === 'disable'
+        ? 'They are signed out everywhere and cannot sign in again until somebody enables the account.'
+        : 'Their authenticator and recovery codes go, and they are signed out everywhere. An officer holding a privileged role cannot sign in again until they enrol a new one.'"
+      :loading="working === securing"
+      :failure="secureFailure"
+      @update:open="value => { if (!value) securing = null }"
+      @confirm="secure"
+    />
   </div>
 </template>

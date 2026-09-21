@@ -110,9 +110,8 @@ describe('a console list filters by its declaration (K-129)', () => {
 // segment names what it undoes. A status flip is both directions; only the off one confirms.
 const DESTRUCTIVE_ROUTE = /method:\s*'DELETE'|\/(?:cancel|revoke|void|decline|retire|unconfirm|stand-down|status|security)['`]/
 
-// A destructive action that already confirms in a dialogue of its own, with a verb that names
-// what it destroys and, where the route asks for one, a reason. Moving each onto ConfirmModal is
-// mechanical and is a slice of its own; the list may shrink and may not grow.
+// A destructive action that already confirms in a dialogue of its own, with a verb naming what it
+// destroys. Moving each onto ConfirmModal is mechanical; the list may shrink and may not grow.
 const CONFIRMS_IN_ITS_OWN_DIALOGUE = [
   'app/pages/bar/categories.vue',
   'app/pages/bar/tabs.vue',

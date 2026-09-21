@@ -124,15 +124,26 @@ async function confirm(shift: RosterShift): Promise<void> {
   }
 }
 
-async function unconfirm(shift: RosterShift): Promise<void> {
-  failure.value = null
+const unconfirming = ref<RosterShift | null>(null)
+const unconfirmFailure = ref<string | null>(null)
+const unconfirmWorking = ref(false)
+
+async function unconfirm(): Promise<void> {
+  const shift = unconfirming.value
+  if (!shift) return
+  unconfirmWorking.value = true
+  unconfirmFailure.value = null
   try {
     await $fetch(`/api/admin/rota/shifts/${shift.shiftId}/unconfirm`, { method: 'POST' })
     toast.add({ title: 'Unconfirmed', description: 'The shift is open again.', icon: 'i-lucide-undo-2', color: 'neutral' })
+    unconfirming.value = null
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    unconfirmFailure.value = refusalText(error)
+  }
+  finally {
+    unconfirmWorking.value = false
   }
 }
 
@@ -277,7 +288,7 @@ const roleOptions = SHIFT_ROLES.map(role => ({ label: saysShiftRole(role), value
                 variant="ghost"
                 icon="i-lucide-undo-2"
                 :data-test="`unconfirm-${shift.shiftId}`"
-                @click="unconfirm(shift)"
+                @click="unconfirmFailure = null; unconfirming = shift"
               >
                 Unconfirm
               </UButton>
@@ -452,5 +463,17 @@ const roleOptions = SHIFT_ROLES.map(role => ({ label: saysShiftRole(role), value
         </div>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="unconfirming !== null"
+      name="unconfirm-shift"
+      :title="unconfirming ? `Unconfirm ${unconfirming.holderName ?? 'this shift'}` : ''"
+      :verb="unconfirming ? `Unconfirm ${unconfirming.holderName ?? 'the shift'}` : ''"
+      consequence="The shift is open again and whoever held it is told they are off it."
+      :loading="unconfirmWorking"
+      :failure="unconfirmFailure"
+      @update:open="value => { if (!value) unconfirming = null }"
+      @confirm="unconfirm"
+    />
   </div>
 </template>

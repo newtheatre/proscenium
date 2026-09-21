@@ -142,14 +142,31 @@ async function save(event: FormSubmitEvent<z.output<typeof roomForm>>): Promise<
   }
 }
 
-async function retire(room: Room): Promise<void> {
+const retiring = ref<Room | null>(null)
+const retireFailure = ref<string | null>(null)
+const retireWorking = ref(false)
+
+function askRetire(room: Room): void {
+  retireFailure.value = null
+  retiring.value = room
+}
+
+async function retire(): Promise<void> {
+  const room = retiring.value
+  if (!room) return
+  retireWorking.value = true
+  retireFailure.value = null
   try {
     await $fetch(`/api/admin/rooms/${room.id}`, { method: 'DELETE' })
     toast.add({ title: `${room.name} retired`, icon: 'i-lucide-archive', color: 'success' })
+    retiring.value = null
     await refresh()
   }
   catch (error) {
-    toast.add({ title: refusalText(error), color: 'error' })
+    retireFailure.value = refusalText(error)
+  }
+  finally {
+    retireWorking.value = false
   }
 }
 
@@ -308,7 +325,8 @@ const columns: TableColumn<Room>[] = [
             size="sm"
             color="neutral"
             variant="ghost"
-            @click="retire(row.original)"
+            :data-test="`retire-room-${row.original.id}`"
+            @click="askRetire(row.original)"
           >
             Retire
           </UButton>
@@ -548,5 +566,17 @@ const columns: TableColumn<Room>[] = [
         </UForm>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="retiring !== null"
+      name="retire-room"
+      :title="retiring ? `Retire ${retiring.name}` : ''"
+      :verb="retiring ? `Retire ${retiring.name}` : ''"
+      consequence="It comes off the calendar from now. Bookings already made and everything it has held stay."
+      :loading="retireWorking"
+      :failure="retireFailure"
+      @update:open="value => { if (!value) retiring = null }"
+      @confirm="retire"
+    />
   </div>
 </template>
