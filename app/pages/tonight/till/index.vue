@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { formatLondon, londonClock } from '#shared/utils/london'
 import { saysMoney } from '#shared/utils/bar'
+import { saysChargeOnReader, saysChargeOnSumUp } from '#shared/utils/till'
+import { saysClock } from '#shared/utils/when'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { CompRequest } from '#shared/utils/comps'
 import type { PricedBasket, SaleProduct, SaleReceipt } from '#shared/utils/sale'
@@ -339,7 +340,7 @@ async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = passedAgeChe
 }
 
 function timeOf(at: number): string {
-  return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
+  return saysClock(at)
 }
 
 // Whichever the modal answers with, the same submission the reader, SumUp or comp path already
@@ -367,12 +368,8 @@ function nextSale(): void {
 
 // What the charge buttons read while the total is unknown, so they can stay on screen and say
 // why rather than disappearing (issue 1150 item 7).
-const readerLabel = computed(() => {
-  if (selectedTabHolderId.value) return grandTotalPence.value === null ? 'Put the basket on the tab' : `Put ${saysMoney(grandTotalPence.value)} on the tab`
-  if (grandTotalPence.value === null) return 'Charge the basket'
-  return sumupAvailable.value ? `Key ${saysMoney(grandTotalPence.value)} into the reader` : `Charge ${saysMoney(grandTotalPence.value)}`
-})
-const sumupLabel = computed(() => grandTotalPence.value === null ? 'Charge the basket on SumUp' : `Charge ${saysMoney(grandTotalPence.value)} on SumUp`)
+const readerLabel = computed(() => saysChargeOnReader(grandTotalPence.value, Boolean(selectedTabHolderId.value)))
+const sumupLabel = computed(() => saysChargeOnSumUp(grandTotalPence.value))
 
 // A walk-up's door pass, printed from the counter laptop (F-123 criterion 4).
 function printPass(): void {
@@ -396,7 +393,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
       title="Till"
       :hint="session
         ? (basketEmpty ? 'Tap a size to add it. Quantities and lines are editable before payment.' : undefined)
-        : 'Opening the till is one session for the whole night. Everyone at this venue sells against it.'"
+        : 'One till for the whole night. Everyone at this bar sells against it.'"
       :stale="session ? catalogue.cachedAt.value : syncedAt"
       :busy="busy || catalogue.pending.value"
     >
@@ -451,7 +448,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             data-test="till-open"
             class="text-xs text-muted"
           >
-            Open since {{ londonClock(new Date(session.openedAt * 1000)) }}.
+            Open since {{ saysClock(session.openedAt) }}.
           </p>
           <!-- Not a per-sale action, so it lives here rather than under the thumb (K-102
                criterion 2). -->
@@ -651,10 +648,10 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           </div>
           <UAlert
             v-if="charged && charged.tickets.length"
-            data-test="tickets-collected-note"
+            data-test="tickets-paid-note"
             color="info"
             variant="subtle"
-            :description="`Collected: ${charged.tickets.map(ticket => ticket.reference).join(', ')}. The door now reads PAID.`"
+            :description="`Paid: ${charged.tickets.map(ticket => ticket.reference).join(', ')}`"
           />
           <!-- The door pass (F-123 criterion 4): photographed off the screen, or printed. The
                print rule in the token source puts these on the paper and nothing else. -->
@@ -696,7 +693,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             data-test="door-pass-print"
             @click="printPass"
           >
-            Print the door pass
+            Print the pass
           </UButton>
           <UAlert
             v-if="charged && charged.refusedLines.length"
@@ -726,7 +723,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             data-test="next-sale"
             @click="nextSale"
           >
-            Start the next sale
+            Next sale
           </UButton>
         </div>
       </div>
@@ -751,7 +748,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             data-test="till-offline"
           >No connection. Charging waits for it.</span>
           <template v-else>
-            <span v-if="!basketEmpty">{{ basketItemCount }} {{ basketItemCount === 1 ? 'item' : 'items' }}</span>
+            <span v-if="!basketEmpty">{{ plural(basketItemCount, 'item') }}</span>
             <UButton
               v-if="compRequestId === null && compEligible"
               size="sm"
@@ -774,7 +771,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               data-test="till-comp-pending-chip"
               @click="openCompModal"
             >
-              {{ compDeclined ? 'Comp declined' : compLapsed ? 'Comp lapsed' : compCanGive ? 'Comp approved, give it' : compGiven ? 'Comp given' : 'Comp pending…' }}
+              {{ compDeclined ? 'Comp declined' : compLapsed ? 'Comp lapsed' : compCanGive ? 'Give the comp' : compGiven ? 'Comp given' : 'Comp pending…' }}
             </UButton>
             <span
               v-if="!basketEmpty"

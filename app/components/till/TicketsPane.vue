@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysClock, saysWhen } from '#shared/utils/when'
 import { saysMoney } from '#shared/utils/bar'
 import type { TillBooking, WalkUpOption } from '#shared/utils/sale'
 import type { ScannerFailure } from '~/composables/useQrScanner'
@@ -123,7 +123,7 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
           class="text-sm"
           :class="booking.isTonight ? 'text-muted' : 'text-warning'"
         >
-          {{ formatLondon(new Date(booking.startsAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }) }}
+          {{ saysWhen(booking.startsAt) }}
           <template v-if="!booking.isTonight">
             · not tonight
           </template>
@@ -142,7 +142,7 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
           :data-test="`found-add-${booking.id}`"
           @click="addBooking(booking)"
         >
-          Add {{ saysMoney(booking.owedPence) }} to the basket
+          Add {{ saysMoney(booking.owedPence) }}
         </UButton>
       </div>
     </NightBlock>
@@ -151,7 +151,7 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
       <USelect
         v-if="tonightsPerformances.length > 1"
         v-model="walkUpPerformanceId"
-        :items="tonightsPerformances.map(one => ({ label: `${one.showTitle} · ${formatLondon(new Date(one.startsAt * 1000), { timeStyle: 'short' })}`, value: one.id }))"
+        :items="tonightsPerformances.map(one => ({ label: `${one.showTitle} · ${saysClock(one.startsAt)}`, value: one.id }))"
         placeholder="Which performance"
         class="w-full"
         data-test="walk-up-performance"
@@ -212,7 +212,7 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
         data-test="walk-up-add"
         @click="addWalkUps"
       >
-        Add to the basket
+        Add the walk-ups
       </UButton>
       <p class="mt-4 text-xs text-muted">
         Their name and email are optional. With them, the booking's QR is emailed; without, the pass on screen is theirs to photograph.

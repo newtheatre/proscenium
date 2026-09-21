@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PASS_ADMISSION_PARTY_SIZE, doorFailureVerdict } from '#shared/utils/door'
+import { doorFailureVerdict } from '#shared/utils/door'
 import type { DoorVerdict } from '#shared/utils/door'
 
 // Admitting a pass holder (D-126). The search and the card; the verdict afterwards is the door
@@ -174,8 +174,8 @@ async function admit(pass: PassCard): Promise<void> {
         :data-test="`pass-refusal-${pass.reference}`"
       />
 
-      <!-- The limelight, filled: the one admit button on the screen it belongs to, through the
-           theme's own secondary rather than a scale name (docs/design-language.md). -->
+      <!-- The limelight, filled, through the theme's own secondary and never a scale name. A pass
+           admits its holder and nobody else, so the label names no count (D-126 criterion 4). -->
       <UButton
         v-else
         size="xl"
@@ -187,7 +187,7 @@ async function admit(pass: PassCard): Promise<void> {
         :data-test="`pass-admit-${pass.reference}`"
         @click="admit(pass)"
       >
-        Admit, party of {{ PASS_ADMISSION_PARTY_SIZE }}
+        Admit one
       </UButton>
     </div>
   </div>

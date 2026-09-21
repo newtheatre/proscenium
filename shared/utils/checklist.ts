@@ -30,7 +30,7 @@ export function saysBlockedClose(labels: readonly string[]): string {
   const many = labels.length > 1
   const named = many ? `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}` : labels.join('')
   return `The checklist cannot close while ${named} ${many ? 'are' : 'is'} still open: `
-    + `tick ${many ? 'each' : 'it'} or record an exception`
+    + 'tick or make an exception'
 }
 
 const LABEL_LIMIT = 200
@@ -57,7 +57,7 @@ export type ChecklistScopeInput = z.output<typeof checklistScopeForm>
 const REASON_LIMIT = 500
 
 export const exemptForm = checklistScopeForm.extend({
-  reason: z.string().trim().min(1, 'Say why, because an exception needs a reason on the record').max(REASON_LIMIT),
+  reason: z.string().trim().min(1, 'Say why this item is an exception').max(REASON_LIMIT),
 })
 
 export type ExemptInput = z.output<typeof exemptForm>

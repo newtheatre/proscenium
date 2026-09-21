@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhenLong } from '#shared/utils/when'
 import { nightCacheKey } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
@@ -42,7 +42,7 @@ const card = computed(() => cache.data.value ?? served.value)
 const asOfAt = computed(() => cache.data.value ? cache.cachedAt.value : Date.now())
 
 function asOf(at: number): string {
-  return formatLondon(new Date(at * 1000), { dateStyle: 'long', timeStyle: 'short' })
+  return saysWhenLong(at)
 }
 
 const evacuation = computed(() => {
@@ -240,7 +240,7 @@ const isolation = computed(() => {
         v-else-if="!cache.pending.value"
         class="text-muted"
       >
-        No emergency card is cached on this device yet, and none could be read just now.
+        No emergency card is saved on this phone yet, and none could be read just now.
       </p>
     </div>
 

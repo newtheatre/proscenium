@@ -1,3 +1,4 @@
+import { saysMoney } from './bar'
 import { z } from 'zod'
 
 // The till's own session (F-102): the one accountable window that every sale, tab charge and comp
@@ -37,3 +38,14 @@ export interface TillVenueOption {
 
 // Closing a session takes the reader's own reading and needs a live expected figure to compare
 // it against, so its form lives with that computation in `shared/utils/reconciliation.ts` (F-118).
+
+// What a charge button reads. Show-night register: four words at most, verb first, so a total
+// read at arm's length mid-service is the whole label (K-128, copy-style §3).
+export function saysChargeOnReader(totalPence: number | null, onTab: boolean): string {
+  if (onTab) return 'Charge the tab'
+  return totalPence === null ? 'Charge the basket' : `Charge ${saysMoney(totalPence)}`
+}
+
+export function saysChargeOnSumUp(totalPence: number | null): string {
+  return totalPence === null ? 'Charge on SumUp' : `Charge ${saysMoney(totalPence)} on SumUp`
+}

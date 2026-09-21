@@ -161,7 +161,7 @@ async function closeNight(): Promise<void> {
   <div>
     <NightScreen
       title="Checklist"
-      hint="A system-verified item ticks itself. Everything else is yours to tick, or to close over with a reason."
+      hint="An item that ticks itself needs nothing from you. Tick the rest, or make an exception with a reason."
       :stale="syncedAt"
       :busy="busy"
     >
@@ -213,7 +213,7 @@ async function closeNight(): Promise<void> {
             v-if="phaseItems.length === 0"
             class="text-sm text-muted"
           >
-            Nothing configured.
+            Nothing on this list yet. Ask the Safety Officer to add the items.
           </p>
           <ul class="space-y-2">
             <li
@@ -234,7 +234,7 @@ async function closeNight(): Promise<void> {
                   v-if="entry.systemCheck"
                   class="text-xs text-muted"
                 >
-                  System-verified: {{ entry.done ? 'clear' : 'not yet clear' }}
+                  Ticks itself: {{ entry.done ? 'clear' : 'not yet clear' }}
                 </p>
                 <p
                   v-else-if="entry.tickedByName"
@@ -246,7 +246,7 @@ async function closeNight(): Promise<void> {
                   v-else-if="entry.exempted"
                   class="text-xs text-muted"
                 >
-                  Closed over: {{ entry.exemptReason }}
+                  Exception: {{ entry.exemptReason }}
                 </p>
               </div>
               <div class="flex shrink-0 items-center gap-2">
@@ -272,7 +272,7 @@ async function closeNight(): Promise<void> {
                     :data-test="`exempt-${entry.id}`"
                     @click="openExempt(entry)"
                   >
-                    Close over
+                    Make an exception
                   </UButton>
                 </template>
               </div>
@@ -291,7 +291,7 @@ async function closeNight(): Promise<void> {
           v-else-if="outstandingRequired.length > 0"
           class="text-sm text-muted"
         >
-          {{ plural(outstandingRequired.length, 'required item') }} still open: tick {{ outstandingRequired.length === 1 ? 'it' : 'each' }} or record an exception.
+          {{ plural(outstandingRequired.length, 'required item') }} still open. Tick or make an exception.
         </p>
       </div>
 
@@ -312,8 +312,8 @@ async function closeNight(): Promise<void> {
 
     <UModal
       :open="exempting !== null"
-      :title="exempting ? `Close over: ${exempting.label}` : ''"
-      description="This records who and why. It stays on the record."
+      :title="exempting ? `Exception: ${exempting.label}` : ''"
+      description="This names who and why, and it stays on the list."
       @update:open="exempting = null"
     >
       <template #body>
@@ -345,14 +345,14 @@ async function closeNight(): Promise<void> {
               :loading="saving"
               data-test="exempt-submit"
             >
-              Record it
+              Make the exception
             </UButton>
             <UButton
               color="neutral"
               variant="ghost"
               @click="exempting = null"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </form>

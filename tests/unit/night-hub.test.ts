@@ -155,7 +155,7 @@ describe('pass pressure answers the door, not a statistician (E-112 criterion 1)
 
 describe('the running time line (E-112 criterion 1, issue 905)', () => {
   test('hours, minutes and the interval in one line', () => {
-    expect(runningTimeLine(130, 1, 20)).toBe('2h 10 · one interval of 20 minutes')
+    expect(runningTimeLine(130, 1, 20)).toBe('2h 10 · 1 interval of 20 minutes')
   })
 
   test('no interval says straight through rather than nothing', () => {

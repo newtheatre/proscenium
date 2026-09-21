@@ -2,7 +2,7 @@
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import type { NightRole } from '#shared/utils/night-authority'
 import { CATEGORIES, SEVERITIES, saysCategory, saysSeverity } from '#shared/utils/incidents'
-import { londonClock } from '#shared/utils/london'
+import { saysClock } from '#shared/utils/when'
 import { saysShiftRole } from '#shared/utils/rota'
 import { contactRoster, saysPerformanceChoice, telHref } from '#shared/utils/tonight'
 import type { Category, Severity } from '#shared/utils/incidents'
@@ -241,7 +241,7 @@ async function submitCorrect(): Promise<void> {
               v-if="team.length === 0"
               class="text-sm text-muted"
             >
-              Nobody is rostered on tonight yet.
+              Nobody is on the rota tonight yet.
             </p>
             <div
               v-for="slot in team"
@@ -322,10 +322,10 @@ async function submitCorrect(): Promise<void> {
             >
               <p>{{ entry.body }}</p>
               <p class="font-mono text-xs text-muted">
-                {{ londonClock(new Date(entry.happenedAt * 1000)) }} · logged by {{ entry.reportedByName }}
+                {{ saysClock(entry.happenedAt) }} · logged by {{ entry.reportedByName }}
                 · {{ saysCategory(entry.category) }}, {{ saysSeverity(entry.severity) }}
                 <span v-if="entry.supersedesId"> · corrects an earlier entry</span>
-                <span v-if="entry.supersededBy"> · superseded</span>
+                <span v-if="entry.supersededBy"> · corrected later</span>
                 <span v-if="entry.reviewed"> · reviewed</span>
               </p>
               <div class="flex flex-wrap items-center gap-2">
@@ -357,9 +357,9 @@ async function submitCorrect(): Promise<void> {
           </div>
 
           <p class="mt-3 text-center text-sm text-muted">
-            Timestamped and named: entries land in the end-of-night report in full, and a mistake is
-            corrected with a new entry, never an edit. The duty manager marks each one reviewed
-            before the night closes.
+            Every entry is timed and named, and lands in the end-of-night report in full. A mistake
+            is corrected with a new entry, never an edit, and the duty manager marks each one
+            reviewed before the night closes.
           </p>
         </section>
       </div>
@@ -390,7 +390,7 @@ async function submitCorrect(): Promise<void> {
     <UModal
       v-model:open="logging"
       title="Log an incident"
-      description="Timestamp, category, severity and a free-text account. The reporter is attributed automatically."
+      description="The time, a category, a severity and what happened. Your name goes on it."
     >
       <template #body>
         <form
@@ -462,7 +462,7 @@ async function submitCorrect(): Promise<void> {
               variant="ghost"
               @click="logging = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </form>
@@ -531,7 +531,7 @@ async function submitCorrect(): Promise<void> {
               variant="ghost"
               @click="reportingNearMiss = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </form>
@@ -541,7 +541,7 @@ async function submitCorrect(): Promise<void> {
     <UModal
       :open="correcting !== null"
       :title="correcting ? 'Correct this entry' : ''"
-      description="This files a new entry naming what it supersedes. The original stays visible."
+      description="This files a new entry. The original stays visible."
       @update:open="correcting = null"
     >
       <template #body>
@@ -598,7 +598,7 @@ async function submitCorrect(): Promise<void> {
               variant="ghost"
               @click="correcting = null"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </form>
