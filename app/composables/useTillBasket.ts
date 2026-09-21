@@ -1,9 +1,9 @@
 import { computed, ref, watch } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
-import { refusalText } from '../utils/refusal'
+import { refusalText, writeFailureText } from '../utils/refusal'
 import type { ComputedRef, Ref } from 'vue'
-import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
+import type { InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
 import type { PricedBasket, PricedLine, SaleChoice, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
 
 // A refusal drops the restricted lines from what is payable; shared by a reader charge
@@ -43,10 +43,13 @@ export interface TillBasketDeps {
   // Injected rather than a bare $fetch, so the pure basket logic type-checks and runs under
   // bun:test with no Nuxt runtime beneath it (tests/tsconfig.json).
   requestPrice: (body: { venueId: string, lines: { variantId: string, qty: number, choiceItemId: string | null }[], discountId: string | null }) => Promise<PricedBasket>
+  // A refusal at the tap may never reach a sale, so it goes on the register on its own
+  // (F-106 criterion 6).
+  recordAgeCheck: (body: { outcome: 'REFUSED', idType: null, reason: RefusalReason | null, description: string, notes: string | null, product: string | null, performanceId: null }) => Promise<unknown>
 }
 
 export function useTillBasket(deps: TillBasketDeps) {
-  const { venueId, products, selectedDiscountId, selectedTabHolderId, ticketLines, walkUpLines, walkUpGuest, ticketsPence, walkUpsPence, requestPrice } = deps
+  const { venueId, products, selectedDiscountId, selectedTabHolderId, ticketLines, walkUpLines, walkUpGuest, ticketsPence, walkUpsPence, requestPrice, recordAgeCheck } = deps
 
   const basket = ref<BasketLine[]>([])
 
@@ -64,6 +67,15 @@ export function useTillBasket(deps: TillBasketDeps) {
         qty: 1,
       })
     }
+    askIfRestricted(productName, variant.id)
+  }
+
+  // Before the drink is poured, not at the charge (F-106 criterion 6). A sale that already
+  // passed does not ask again; a refusal is not a pass, so a later restricted tap asks afresh.
+  function askIfRestricted(productName: string, variantId: string): void {
+    if (!isVariantRestricted(variantId) || passedAgeCheck.value) return
+    refusalRecordFailure.value = null
+    askingAgeCheckFor.value = productName
   }
 
   const choosing = ref<{ productName: string, variant: SaleVariant, choice: SaleChoice } | null>(null)
@@ -187,6 +199,43 @@ export function useTillBasket(deps: TillBasketDeps) {
   }
   const needsAgeCheck = computed(() => basket.value.some(isRestricted))
 
+  // What this sale has already settled, what it is asking about now, and what a refusal left
+  // behind for the screen to say (F-106 criterion 6).
+  const passedAgeCheck = ref<InlineAgeCheckInput | null>(null)
+  const askingAgeCheckFor = ref<string | null>(null)
+  const refusedLinesNote = ref<string | null>(null)
+  const refusalRecordFailure = ref<string | null>(null)
+
+  function acceptAgeCheck(outcome: InlineAgeCheckInput): void {
+    passedAgeCheck.value = outcome
+    askingAgeCheckFor.value = null
+  }
+
+  // The lines go at once, and the register entry is written here rather than riding on a sale
+  // that may never be made: a basket left with nothing in it still owes the licence a record.
+  async function refuseAgeCheck(outcome: InlineAgeCheckInput): Promise<void> {
+    const removed = basket.value.filter(isRestricted)
+    const names = [...new Set(removed.map(line => line.productName))].join(', ')
+    basket.value = basket.value.filter(line => !isRestricted(line))
+    askingAgeCheckFor.value = null
+    refusedLinesNote.value = names ? `Not sold, on the ID refusal: ${names}` : null
+    refusalRecordFailure.value = null
+    try {
+      await recordAgeCheck({
+        outcome: 'REFUSED',
+        idType: null,
+        reason: outcome.reason,
+        description: outcome.description,
+        notes: outcome.notes,
+        product: names || null,
+        performanceId: null,
+      })
+    }
+    catch (failed) {
+      refusalRecordFailure.value = writeFailureText(failed, 'Write this refusal up on the age checks screen.')
+    }
+  }
+
   function lineAmount(line: BasketLine): string | null {
     const index = basket.value.findIndex(entry => entry.id === line.id)
     const amount = priced.value?.lines[index]?.amountPence
@@ -219,6 +268,10 @@ export function useTillBasket(deps: TillBasketDeps) {
   function resetBasket(): void {
     basket.value = []
     priced.value = null
+    passedAgeCheck.value = null
+    askingAgeCheckFor.value = null
+    refusedLinesNote.value = null
+    refusalRecordFailure.value = null
   }
 
   return {
@@ -241,6 +294,12 @@ export function useTillBasket(deps: TillBasketDeps) {
     isRestricted,
     isVariantRestricted,
     needsAgeCheck,
+    passedAgeCheck,
+    askingAgeCheckFor,
+    refusedLinesNote,
+    refusalRecordFailure,
+    acceptAgeCheck,
+    refuseAgeCheck,
     lineAmount,
     saleBody,
     expectedAfter,

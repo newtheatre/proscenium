@@ -7,7 +7,10 @@ export type AgeCheckStep = 'closed' | 'choose' | 'refuse'
 // Two taps for the routine pass case (F-106 criterion 2): the ID type button both records the
 // outcome and submits. A refusal needs a reason and a description before it can go through.
 
-defineProps<{ charging: boolean }>()
+const props = defineProps<{ charging: boolean, product: string | null }>()
+
+// The line that raised the ask, so nobody has to work out which drink is being checked for.
+const says = computed(() => props.product ? `${props.product} is age-restricted.` : 'This basket has an age-restricted line.')
 const emit = defineEmits<{ accept: [InlineAgeCheckInput], refuse: [InlineAgeCheckInput] }>()
 
 const step = defineModel<AgeCheckStep>('step', { required: true })
@@ -47,7 +50,7 @@ function refuse(): void {
   <UModal
     :open="step !== 'closed'"
     title="Challenge 25"
-    description="This basket has an age-restricted line."
+    :description="says"
     @update:open="step = 'closed'"
   >
     <template #body>
@@ -55,8 +58,11 @@ function refuse(): void {
         v-if="step === 'choose'"
         class="space-y-3"
       >
-        <p class="text-sm text-muted">
-          What ID was shown?
+        <p
+          class="text-sm text-muted"
+          data-test="age-check-product"
+        >
+          {{ says }} What ID was shown?
         </p>
         <div class="grid grid-cols-2 gap-2">
           <UButton

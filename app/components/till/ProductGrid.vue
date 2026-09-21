@@ -82,6 +82,17 @@ function priceLine(product: SaleProduct): string {
             <span class="flex flex-col items-start gap-0.5">
               <span class="text-sm font-medium">{{ product.name }}</span>
               <span class="text-xs text-muted">{{ priceLine(product) }}</span>
+              <!-- Carried by the word, never by the colour alone (K-101 criterion 3, F-106
+                   criterion 6). -->
+              <UBadge
+                v-if="product.ageRestricted"
+                color="warning"
+                variant="subtle"
+                size="sm"
+                icon="i-lucide-id-card"
+                label="Check ID"
+                :data-test="`restricted-mark-${product.id}`"
+              />
             </span>
           </UButton>
           <UButton
