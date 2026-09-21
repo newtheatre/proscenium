@@ -294,19 +294,14 @@ describe('the member shell is calm (0084, K-127, issue 1153 item 1)', () => {
 // shared/utils/when.ts, and a bespoke options object is how the two shapes drifted (copy-style §9).
 const BUILDS_ITS_OWN = /formatLondon\(/
 
-// What other sweeps own: the show-night screens, the member room pages, the one console file
-// whose shapes feed a form, and the shared helpers. The list may shrink and may not grow.
+// What other sweeps own: the member room pages, the one console file whose shapes feed a form,
+// and the shared helpers. The list may shrink and may not grow.
 const BUILDS_ITS_OWN_ALLOWED = [
   'app/components/box-office/show/Performances.vue',
-  'app/components/till/TicketsPane.vue',
   'app/pages/rooms/index.vue',
   'app/pages/rooms/mine.vue',
-  'app/pages/tonight/emergency.vue',
-  'app/pages/tonight/glance.vue',
-  'app/pages/tonight/till/index.vue',
   'shared/utils/blackouts.ts',
   'shared/utils/list-filters.ts',
-  'shared/utils/night-hub.ts',
   'shared/utils/programme.ts',
 ]
 

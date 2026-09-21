@@ -121,7 +121,7 @@ describe.skipIf(skip !== null)('the verdict the door shows (criterion 7)', () =>
       partySize: number
     }
     expect(scanned.verdict.state).toBe('PAID')
-    expect(scanned.verdict.line).toBe('All collected, admit')
+    expect(scanned.verdict.line).toBe('Paid, admit')
     expect(scanned.reference).toBe(reference)
     expect(scanned.partySize).toBe(3)
     expect(JSON.stringify(scanned.verdict)).not.toContain('£')
@@ -164,7 +164,7 @@ describe.skipIf(skip !== null)('the screen, with no camera to open (criteria 5, 
 
       const card = await textOf(view, '[data-test="door-verdict"]')
       expect(card).toContain('PAID')
-      expect(card).toContain('All collected, admit')
+      expect(card).toContain('Paid, admit')
       expect(card).toContain('party of 2')
       expect(card).toContain(reference)
       expect(card).not.toContain('£')

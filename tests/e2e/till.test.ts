@@ -559,7 +559,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     const requestId = requests[0]!.request.id
     await request(app, 'POST', `/api/till/comp-requests/${requestId}/approve`, {}, bar2.cookie)
 
-    await waitFor(view, `document.querySelector('[data-test="till-comp-pending-chip"]').textContent.includes('give it')`)
+    await waitFor(view, `document.querySelector('[data-test="till-comp-pending-chip"]').textContent.includes('Give the comp')`)
     await click(view, '[data-test="till-comp-pending-chip"]')
     await waitFor(view, `document.querySelector('[data-test="comp-give"]')`)
     await click(view, '[data-test="comp-give"]')
@@ -632,7 +632,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     const requestId = requests[0]!.request.id
     await request(app, 'POST', `/api/till/comp-requests/${requestId}/approve`, {}, bar2.cookie)
 
-    await waitFor(view, `document.querySelector('[data-test="till-comp-pending-chip"]').textContent.includes('give it')`)
+    await waitFor(view, `document.querySelector('[data-test="till-comp-pending-chip"]').textContent.includes('Give the comp')`)
     await click(view, '[data-test="till-comp-pending-chip"]')
     await waitFor(view, `document.querySelector('[data-test="comp-give"]')`)
     await click(view, '[data-test="comp-give"]')
