@@ -163,6 +163,11 @@ the reader, never show a stack trace or a status code. `app/utils/refusal.ts`'s 
 model: "That did not work. Try again." Neither it nor the `membership-recording-failed` template
 in section 2 guesses at whose fault it was.
 
+A console list whose read did not finish says what could not be read in the alert's title, from
+`useListFailure`, and adds one house sentence under it, `READ_AGAIN`: "Try again. If it keeps
+happening, tell the IT Manager." Eight screens each carried their own paragraph before the K-128
+sweep; a screen that writes its own again fails `tests/unit/admin-conventions.test.ts`.
+
 ## 7. The shape of an empty state
 
 Say what would appear here, and the one action that makes it appear. Never "No data".
@@ -249,6 +254,8 @@ spelled with two Ls everywhere, for example `shared/utils/audit-coverage.ts`'s
 5. An error never blames the reader and never shows an id, a table name or a status code, and
    no screen shows an enum value, a permission or audit code or a configuration key.
 6. An empty state names the one action that fills it; never a bare "No X yet."
+6a. A column is headed by a noun ("Request", "Detail", "Subject"), never by a question put to
+    the reader ("Who and what", "Why it is here", "To whom").
 7. A button is verb first, sentence case, no trailing punctuation; a destructive one names what it
    destroys.
 8. Money is pence until `saysPrice`; dates use `saysWhen`, `saysWhenLong`, `saysDay`,

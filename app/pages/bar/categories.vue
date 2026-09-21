@@ -500,7 +500,7 @@ const columns: TableColumn<BarCategory>[] = [
           v-else
           class="text-sm text-muted"
         >
-          The product category goes. No product sits in it, so nothing moves with it.
+          The product category goes. No product sits in it, and nothing moves with it.
         </p>
       </template>
 

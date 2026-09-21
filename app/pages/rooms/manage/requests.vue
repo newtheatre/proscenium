@@ -347,7 +347,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
     : []),
   {
     id: 'who',
-    header: 'Who and what',
+    header: 'Request',
     cell: ({ row }) => h('div', {}, [
       h('div', { class: 'flex items-center gap-2' }, [
         h('span', {}, row.original.requester),
@@ -369,7 +369,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
   },
   {
     id: 'why',
-    header: 'Why it is here',
+    header: 'Status',
     cell: ({ row }) => (row.original.kind === 'unlisted'
       ? h('div', { class: 'space-y-1' }, [
           h('div', { class: 'flex flex-wrap gap-1' }, [
@@ -614,7 +614,7 @@ onMounted(loadRooms)
           data-test="confirm-move"
           @click="confirmMove"
         >
-          Approve into it
+          Approve into the room
         </UButton>
         <UButton
           color="neutral"
@@ -658,7 +658,7 @@ onMounted(loadRooms)
           data-test="submit-confirm"
           @click="submitUnlisted"
         >
-          It is with them
+          Record the submission
         </UButton>
         <UButton
           color="neutral"
@@ -721,7 +721,7 @@ onMounted(loadRooms)
               <UCheckbox
                 v-model="despite"
                 class="mt-3"
-                label="Record it anyway"
+                label="Record the room anyway"
                 data-test="assign-despite"
               />
             </template>
@@ -735,7 +735,7 @@ onMounted(loadRooms)
           data-test="assign-confirm"
           @click="assignUnlisted"
         >
-          That is the room
+          Record the room
         </UButton>
         <UButton
           color="neutral"
@@ -824,7 +824,7 @@ onMounted(loadRooms)
           data-test="refuse-confirm"
           @click="refuseUnlisted"
         >
-          Ask them again
+          Ask for another room
         </UButton>
         <UButton
           color="neutral"
@@ -872,7 +872,7 @@ onMounted(loadRooms)
           data-test="su-reject-confirm"
           @click="rejectUnlisted"
         >
-          Turn it down
+          Turn down the request
         </UButton>
         <UButton
           color="neutral"

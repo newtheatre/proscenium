@@ -374,7 +374,7 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
         />
         <p class="text-sm">
           The room becomes bookable again. Bookings this closure cancelled stay cancelled and are
-          not restored, because their slots may be somebody else's by now.
+          not restored. Their slots may be somebody else's by now.
         </p>
       </template>
       <template #footer>

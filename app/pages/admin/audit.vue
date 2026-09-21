@@ -193,7 +193,7 @@ const columns: TableColumn<Entry>[] = [
           type.label,
           type.manual ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Recorded by hand') : null,
         ]),
-        // Below sm the when and the to whom are hidden: shown here instead, so a phone keeps what
+        // Below sm the when and the subject are hidden: shown here instead, so a phone keeps what
         // changed in view without losing what they said (issue 922).
         h('div', { class: 'sm:hidden text-xs text-muted' }, [
           saysWhen(row.original.createdAt),
@@ -204,7 +204,7 @@ const columns: TableColumn<Entry>[] = [
   },
   {
     id: 'target',
-    header: 'To whom',
+    header: 'Subject',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     // A name where there is one, and the raw target where the entry is not about a person.
     cell: ({ row }) => row.original.targetName
@@ -212,7 +212,7 @@ const columns: TableColumn<Entry>[] = [
   },
   {
     id: 'detail',
-    header: 'What changed',
+    header: 'Detail',
     cell: ({ row }) => {
       const parts = describeDetail(row.original.detail)
       const shown = parts.slice(0, SUMMARY_BADGE_LIMIT)
@@ -388,7 +388,7 @@ onMounted(load)
 
     <UModal
       v-model:open="recording"
-      title="Record something that happened outside the system"
+      title="Record something that happened elsewhere"
       description="It is signed against you, and everybody named has to be an account here."
     >
       <template #body>

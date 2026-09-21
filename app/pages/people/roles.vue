@@ -234,7 +234,7 @@ const columns: TableColumn<Holder>[] = [
       v-if="chosen && sees.grants"
       data-test="grant-card"
       :title="`Give somebody ${saysRole(chosen)}`"
-      description="Expires at the committee year end unless it is dated or marked permanent. Somebody who already has this role has their grant renewed (0009)."
+      description="Expires at the committee year end unless it is dated or marked permanent. Somebody who already has this role has their grant renewed."
     >
       <RoleGrantForm
         :role="chosen"
@@ -360,7 +360,7 @@ const columns: TableColumn<Holder>[] = [
     <UPageCard
       data-test="permanent-report"
       title="Permanent grants"
-      description="The exception to the committee year, kept in sight so it stays deliberate (A-118)."
+      description="The exception to the committee year, kept in sight."
     >
       <p
         v-if="!register.permanent.length"

@@ -105,7 +105,7 @@ const columns: TableColumn<StockMovement>[] = [
   },
   {
     id: 'kind',
-    header: 'What happened',
+    header: 'Movement',
     cell: ({ row }) => h('div', { class: 'flex flex-wrap items-center gap-2' }, [
       h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => says(row.original.kind)),
       row.original.reason ? h('span', { class: 'text-xs text-muted' }, says(row.original.reason)) : null,

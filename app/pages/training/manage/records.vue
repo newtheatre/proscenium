@@ -263,7 +263,7 @@ watch(modalOpen, (nowOpen) => {
       variant="subtle"
       icon="i-lucide-unplug"
       :title="listFailure.message"
-      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :description="READ_AGAIN"
       :actions="listFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listFailure.enrolPath, color: 'error' }] : []"
     />
 
@@ -392,7 +392,7 @@ watch(modalOpen, (nowOpen) => {
     <UModal
       v-model:open="recording"
       title="Record an external certificate"
-      description="Competence earned elsewhere. We record it rather than assess it, so the paper and its dates are the evidence."
+      description="Competence earned elsewhere. We record it, we do not assess it: the paper and its dates are the evidence."
     >
       <template #body>
         <UAlert
@@ -470,7 +470,7 @@ watch(modalOpen, (nowOpen) => {
           data-test="external-submit"
           @click="recordCertificate"
         >
-          Record it
+          Record the certificate
         </UButton>
         <UButton
           color="neutral"
