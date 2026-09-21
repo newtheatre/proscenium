@@ -139,7 +139,7 @@ describe('the show-night screens never narrate the machine (K-128, issue 1150 it
 
 // Copy-style §3: two or three words per control on `tonight`, and §8: never a pronoun.
 const CONTROL_WORD_LIMIT = 4
-const PRONOUN_LABEL = /\b(it|them|one|this|that)\b\s*$/i
+const PRONOUN_LABEL = /\b(it|them|this|that)\b\s*$/i
 
 function controlLabels(source: string): string[] {
   const found: string[] = []

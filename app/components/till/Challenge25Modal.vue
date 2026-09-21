@@ -34,7 +34,7 @@ function accept(idType: IdType): void {
 
 function refuse(): void {
   if (!reason.value) {
-    error.value = 'Say why, because a refusal needs a reason on the record'
+    error.value = 'Say why you refused'
     return
   }
   if (!description.value.trim()) {

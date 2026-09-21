@@ -64,7 +64,7 @@ export const ageCheckForm = z.object({
   ...outcomeFields,
   product: z.string().trim().max(200).nullish().transform(value => (value ?? '').trim() || null),
 }).refine(acceptedNeedsIdType, { path: ['idType'], message: 'Say what ID was shown' })
-  .refine(refusedNeedsReason, { path: ['reason'], message: 'Say why, because a refusal needs a reason on the record' })
+  .refine(refusedNeedsReason, { path: ['reason'], message: 'Say why you refused' })
   .refine(acceptedHasNoReason, { path: ['reason'], message: 'An accepted check has no refusal reason' })
   .refine(refusedHasNoIdType, { path: ['idType'], message: 'A refusal names no ID: nothing was accepted' })
 
@@ -74,7 +74,7 @@ export type AgeCheckInput = z.output<typeof ageCheckForm>
 // is the basket's restricted lines, not a second thing for staff to type.
 export const inlineAgeCheckForm = z.object(outcomeFields)
   .refine(acceptedNeedsIdType, { path: ['idType'], message: 'Say what ID was shown' })
-  .refine(refusedNeedsReason, { path: ['reason'], message: 'Say why, because a refusal needs a reason on the record' })
+  .refine(refusedNeedsReason, { path: ['reason'], message: 'Say why you refused' })
   .refine(acceptedHasNoReason, { path: ['reason'], message: 'An accepted check has no refusal reason' })
   .refine(refusedHasNoIdType, { path: ['idType'], message: 'A refusal names no ID: nothing was accepted' })
 
@@ -92,7 +92,7 @@ export const supersedeForm = z.object({
   { path: ['idType'], message: 'Say what ID was shown' },
 ).refine(
   input => input.outcome !== 'REFUSED' || input.reason !== null,
-  { path: ['reason'], message: 'Say why, because a refusal needs a reason on the record' },
+  { path: ['reason'], message: 'Say why you refused' },
 )
 
 // What a refused write reads as. SQLite names the columns for a unique index and the constraint
@@ -100,7 +100,7 @@ export const supersedeForm = z.object({
 export const AGE_CHECK_CONSTRAINT_REFUSALS: { violated: string, says: string }[] = [
   {
     violated: 'age_checks.supersedes_id',
-    says: 'That entry already has a correction: file a new one superseding the correction instead',
+    says: 'That entry already has a correction: correct the correction instead',
   },
   {
     violated: 'age_checks_outcome_shape',

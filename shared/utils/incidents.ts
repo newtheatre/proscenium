@@ -61,7 +61,7 @@ export type NearMissInput = z.output<typeof nearMissForm>
 export const INCIDENT_CONSTRAINT_REFUSALS: { violated: string, says: string }[] = [
   {
     violated: 'incidents.supersedes_id',
-    says: 'That entry already has a correction: file a new one superseding the correction instead',
+    says: 'That entry already has a correction: correct the correction instead',
   },
   {
     violated: 'incidents_no_self_supersede',

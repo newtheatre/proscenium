@@ -46,7 +46,7 @@ const reason = defineModel<string>('reason', { required: true })
             <UTextarea
               v-model="reason"
               :maxlength="COMP_REASON_LIMIT"
-              placeholder="Say why, because a comp needs a reason on the record"
+              placeholder="Say why this one is free"
               data-test="comp-reason"
             />
           </UFormField>
@@ -84,7 +84,7 @@ const reason = defineModel<string>('reason', { required: true })
             data-test="comp-next-sale"
             @click="emit('done')"
           >
-            Start the next sale
+            Next sale
           </UButton>
         </template>
 

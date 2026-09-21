@@ -2,8 +2,8 @@
 import { saysMoney } from '#shared/utils/bar'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
 
-// What the ledger expects, and what the reader actually shows (F-102 criterion 4, F-118
-// criterion 3): closing mid-service is not a per-sale action, so this stays behind a modal.
+// What the till took, and what the reader shows (F-102 criterion 4, F-118 criterion 3):
+// closing mid-service is not a per-sale action, so this stays behind a modal.
 
 const props = defineProps<{
   reconciliationLoading: boolean
@@ -31,7 +31,7 @@ const needsVarianceNote = computed(() => hasReading.value && props.variancePrevi
   <UModal
     v-model:open="open"
     title="Close till"
-    description="What the ledger expects, and what the reader actually shows."
+    description="What the till took, and what the reader shows."
   >
     <template #body>
       <div
@@ -108,16 +108,16 @@ const needsVarianceNote = computed(() => hasReading.value && props.variancePrevi
           data-test="variance-preview"
           color="warning"
           variant="subtle"
-          :description="`${saysMoney(Math.abs(variancePreviewPence))} ${variancePreviewPence > 0 ? 'over' : 'under'} what the ledger expects. A note is needed before this can be recorded.`"
+          :description="`${saysMoney(Math.abs(variancePreviewPence))} ${variancePreviewPence > 0 ? 'over' : 'under'} what the till took. Say why before closing.`"
         />
 
         <UFormField
           v-if="needsVarianceNote"
-          label="Why the reader and the ledger disagree"
+          label="Why the figures differ"
         >
           <UTextarea
             v-model="varianceNote"
-            placeholder="Why does the reader disagree with the ledger?"
+            placeholder="Why the reader and the till differ"
             data-test="variance-note"
           />
         </UFormField>

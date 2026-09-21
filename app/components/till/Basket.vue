@@ -227,7 +227,7 @@ function productFor(line: BasketLine): SaleProduct | undefined {
         class="text-xs text-muted"
         data-test="basket-split"
       >
-        Bar {{ priced && !pricing ? saysMoney(priced.totalPence) : '…' }} · tickets {{ saysMoney(ticketsPence + walkUpsPence) }}, in one reader transaction
+        Bar {{ priced && !pricing ? saysMoney(priced.totalPence) : '…' }} · tickets {{ saysMoney(ticketsPence + walkUpsPence) }}, on one reader
       </p>
     </template>
   </div>

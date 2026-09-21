@@ -166,7 +166,7 @@ async function reset(): Promise<void> {
         data-test="board-offline"
         class="text-sm text-warning"
       >
-        {{ writeQueue.connection.value.queued }} message{{ writeQueue.connection.value.queued === 1 ? '' : 's' }} waiting to send.
+        {{ plural(writeQueue.connection.value.queued, 'message') }} waiting to send.
       </p>
 
       <UAlert
@@ -220,7 +220,7 @@ async function reset(): Promise<void> {
             v-else
             class="text-sm text-muted"
           >
-            No presets are configured yet.
+            No standing calls yet. Type one below and send it.
           </p>
 
           <!-- A send the board refused comes back here, in the words it was typed in: a call
@@ -269,7 +269,7 @@ async function reset(): Promise<void> {
       <!-- Shown only on request, never polled or cached: a code sitting on screen is a code
            somebody else can read off it (E-120 criteria 2, 5). -->
       <NightBlock
-        title="Tonight's code"
+        title="Backstage code"
         data-test="board-code"
       >
         <template v-if="boardCode">
@@ -289,7 +289,7 @@ async function reset(): Promise<void> {
             data-test="board-code-hide"
             @click="boardCode = null"
           >
-            Hide it
+            Hide the code
           </UButton>
         </template>
         <UButton
@@ -300,7 +300,7 @@ async function reset(): Promise<void> {
           data-test="board-code-reveal"
           @click="loadCode"
         >
-          Show tonight's code
+          Show the code
         </UButton>
       </NightBlock>
       <div class="flex justify-center pt-2">
@@ -328,7 +328,7 @@ async function reset(): Promise<void> {
       >
         <UInput
           v-model="freeText"
-          placeholder="Free text..."
+          placeholder="Type a call"
           size="xl"
           class="w-full"
           data-test="board-free-text-input"
@@ -374,7 +374,7 @@ async function reset(): Promise<void> {
           variant="ghost"
           @click="confirmingReset = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

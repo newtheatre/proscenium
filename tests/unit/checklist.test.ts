@@ -69,12 +69,12 @@ describe('the display wording names every value (0009: no member reads a bare co
 describe('a blocked close says what is holding it and what to do (criterion 4)', () => {
   test('one open item is named inside a sentence', () => {
     expect(saysBlockedClose(['Till reconciled']))
-      .toBe('The checklist cannot close while Till reconciled is still open: tick it or record an exception')
+      .toBe('The checklist cannot close while Till reconciled is still open: tick or make an exception')
   })
 
-  test('several open items are joined with a final "and", and the verb and pronoun follow the count', () => {
+  test('several open items are joined with a final "and", and the verb follows the count', () => {
     expect(saysBlockedClose(['Till reconciled', 'Fire exits checked']))
-      .toBe('The checklist cannot close while Till reconciled and Fire exits checked are still open: tick each or record an exception')
+      .toBe('The checklist cannot close while Till reconciled and Fire exits checked are still open: tick or make an exception')
     expect(saysBlockedClose(['Till reconciled', 'Fire exits checked', 'Bar float counted']))
       .toContain('while Till reconciled, Fire exits checked and Bar float counted are still open')
   })
