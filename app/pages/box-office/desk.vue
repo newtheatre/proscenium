@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { h, resolveComponent } from 'vue'
 import { DESK_STATUS_FILTERS, DESK_TENDERS, REINSTATE_REASON_LIMIT, reinstateRefusal, uncollectableReason } from '#shared/utils/desk'
 import { saysClock } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskStatusFilter, DeskTender } from '#shared/utils/desk'
 import type { ScannerFailure } from '~/composables/useQrScanner'
+import type { TableColumn } from '@nuxt/ui'
 
 // Comp authority is the request and its approval now, not a permission the desk screen checks
 // itself (D-117): every tender is always offered, and the route is what actually decides.
@@ -416,6 +418,33 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
   EXPIRED: 'error',
   NO_SHOW: 'neutral',
 }
+
+const UBadge = resolveComponent('UBadge')
+const UButton = resolveComponent('UButton')
+
+const resultColumns: TableColumn<SearchRow>[] = [
+  { id: 'reference', header: 'Booking', meta: { class: { td: 'font-mono' } }, cell: ({ row }) => row.original.reference },
+  { id: 'booker', header: 'Booked by', cell: ({ row }) => row.original.bookerName },
+  {
+    id: 'status',
+    header: 'State',
+    cell: ({ row }) => h(UBadge, {
+      color: statusColor[row.original.status] ?? 'neutral',
+      variant: 'subtle',
+    }, () => saysReservationStatus(row.original.status)),
+  },
+  { id: 'total', header: 'Total', meta: RIGHT_ALIGNED, cell: ({ row }) => saysPrice(row.original.totalPence) },
+  {
+    id: 'act',
+    header: ACTIONS_HEADER,
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => h(UButton, {
+      'size': 'sm',
+      'data-test': `desk-open-${row.original.id}`,
+      'onClick': () => open2(row.original.id),
+    }, () => 'Open'),
+  },
+]
 </script>
 
 <template>
@@ -606,51 +635,17 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
           class="mb-4"
         />
 
-        <table
-          class="w-full text-sm"
+        <UTable
+          :data="results"
+          :columns="resultColumns"
           data-test="desk-results"
         >
-          <tbody>
-            <tr
-              v-for="row in results"
-              :key="row.id"
-              class="border-b border-default"
-            >
-              <td class="py-2 font-mono">
-                {{ row.reference }}
-              </td>
-              <td class="py-2">
-                {{ row.bookerName }}
-              </td>
-              <td class="py-2">
-                <UBadge
-                  :color="statusColor[row.status] ?? 'neutral'"
-                  variant="subtle"
-                >
-                  {{ saysReservationStatus(row.status) }}
-                </UBadge>
-              </td>
-              <td class="py-2 text-right">
-                {{ saysPrice(row.totalPence) }}
-              </td>
-              <td class="py-2 text-right">
-                <UButton
-                  size="sm"
-                  :data-test="`desk-open-${row.id}`"
-                  @click="open2(row.id)"
-                >
-                  Open
-                </UButton>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <p
-          v-if="results.length === 0"
-          class="py-6 text-center text-sm text-muted"
-        >
-          No results yet. Search, or scan a booking's code.
-        </p>
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              No results yet. Search, or scan a booking's code.
+            </p>
+          </template>
+        </UTable>
       </UCard>
 
       <UCard

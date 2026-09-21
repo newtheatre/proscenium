@@ -66,7 +66,7 @@ const columns: TableColumn<NominalMapping>[] = [
   { id: 'kind', header: 'Ledger line' },
   { id: 'source', header: 'Source' },
   { id: 'code', header: 'SU nominal code' },
-  { id: 'act', header: '' },
+  { id: 'act', header: ACTIONS_HEADER },
 ]
 
 const today = londonDay(new Date())

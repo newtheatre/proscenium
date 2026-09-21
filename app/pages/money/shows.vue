@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { h } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { currentSeasonYear } from '#shared/utils/season'
-import type { RevenueByShowReport } from '#shared/utils/revenue-by-show'
+import type { PassUtilisationRow, RevenueByShowReport, ShowRevenueRow } from '#shared/utils/revenue-by-show'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Revenue by show', middleware: 'console', docs: '/docs/money/revenue-by-show' })
 
@@ -19,6 +21,60 @@ const { data, status, error, refresh } = await useAsyncData(
 )
 
 const reportFailure = computed(() => (error.value ? refusalText(error.value, 'The report could not be read.') : null))
+
+// Money with no performance link is still money, so it reads as a row of the same table rather
+// than as a note beside it. Its walk-up split is not knowable, so those cells stay empty.
+type ShowRow = ShowRevenueRow & { unattributed?: boolean }
+
+const showRows = computed<ShowRow[]>(() => {
+  if (!data.value) return []
+  const rows: ShowRow[] = [...data.value.byShow]
+  const spare = data.value.unattributed
+  if (spare.grossPence !== 0 || spare.refundedPence !== 0) {
+    rows.push({
+      showId: 'unattributed',
+      showTitle: 'Unattributed (no performance link)',
+      grossPence: spare.grossPence,
+      refundedPence: spare.refundedPence,
+      netPence: spare.netPence,
+      walkUpPence: 0,
+      preBookedPence: 0,
+      passAdmissions: 0,
+      unattributed: true,
+    })
+  }
+  return rows
+})
+
+const showColumns: TableColumn<ShowRow>[] = [
+  {
+    id: 'show',
+    header: 'Show',
+    cell: ({ row }) => h('span', {
+      'class': row.original.unattributed ? 'italic' : undefined,
+      'data-test': row.original.unattributed ? 'unattributed-row' : 'show-row',
+    }, row.original.showTitle),
+  },
+  { id: 'gross', header: 'Gross', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.grossPence) },
+  { id: 'refunded', header: 'Refunded', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.refundedPence) },
+  { id: 'net', header: 'Net', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.netPence) },
+  { id: 'walkUp', header: 'Walk-up', meta: RIGHT_ALIGNED, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.walkUpPence)) },
+  { id: 'preBooked', header: 'Pre-booked', meta: RIGHT_ALIGNED, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.preBookedPence)) },
+  {
+    id: 'passAdmissions',
+    header: 'Pass admissions',
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => (row.original.unattributed ? '' : String(row.original.passAdmissions)),
+  },
+]
+
+const passColumns: TableColumn<PassUtilisationRow>[] = [
+  { id: 'reference', header: 'Pass', cell: ({ row }) => row.original.reference },
+  { id: 'passTypeName', header: 'Type', cell: ({ row }) => row.original.passTypeName },
+  { id: 'pricePaid', header: 'Paid', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.pricePaid) },
+  { id: 'admittedShows', header: 'Shows admitted', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.admittedShows) },
+  { id: 'coveredShows', header: 'Shows covered', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.coveredShows) },
+]
 </script>
 
 <template>
@@ -56,46 +112,17 @@ const reportFailure = computed(() => (error.value ? refusalText(error.value, 'Th
         {{ saysDay(data.fromDay) }} to {{ saysDay(data.toDay) }}
       </p>
 
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b text-left text-muted">
-            <th class="py-2">
-              Show
-            </th><th>Gross</th><th>Refunded</th><th>Net</th><th>Walk-up</th><th>Pre-booked</th><th>Pass admissions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="row in data.byShow"
-            :key="row.showId"
-            data-test="show-row"
-          >
-            <td class="py-2">
-              {{ row.showTitle }}
-            </td>
-            <td>{{ saysMoney(row.grossPence) }}</td>
-            <td>{{ saysMoney(row.refundedPence) }}</td>
-            <td>{{ saysMoney(row.netPence) }}</td>
-            <td>{{ saysMoney(row.walkUpPence) }}</td>
-            <td>{{ saysMoney(row.preBookedPence) }}</td>
-            <td>{{ row.passAdmissions }}</td>
-          </tr>
-          <tr
-            v-if="data.unattributed.grossPence !== 0 || data.unattributed.refundedPence !== 0"
-            data-test="unattributed-row"
-          >
-            <td class="py-2 italic">
-              Unattributed (no performance link)
-            </td>
-            <td>{{ saysMoney(data.unattributed.grossPence) }}</td>
-            <td>{{ saysMoney(data.unattributed.refundedPence) }}</td>
-            <td>{{ saysMoney(data.unattributed.netPence) }}</td>
-            <td />
-            <td />
-            <td />
-          </tr>
-        </tbody>
-      </table>
+      <UTable
+        :data="showRows"
+        :columns="showColumns"
+        data-test="revenue-by-show-table"
+      >
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            Nothing was taken for a show in this season.
+          </p>
+        </template>
+      </UTable>
 
       <section
         v-if="data.passes.length > 0"
@@ -105,30 +132,17 @@ const reportFailure = computed(() => (error.value ? refusalText(error.value, 'Th
         <h2 class="font-semibold">
           Pass utilisation
         </h2>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Pass
-              </th><th>Type</th><th>Paid</th><th>Shows admitted</th><th>Shows covered</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.passes"
-              :key="row.passId"
-              data-test="pass-row"
-            >
-              <td class="py-2">
-                {{ row.reference }}
-              </td>
-              <td>{{ row.passTypeName }}</td>
-              <td>{{ saysMoney(row.pricePaid) }}</td>
-              <td>{{ row.admittedShows }}</td>
-              <td>{{ row.coveredShows }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <UTable
+          :data="data.passes"
+          :columns="passColumns"
+          data-test="pass-utilisation-table"
+        >
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              No pass has been used in this season.
+            </p>
+          </template>
+        </UTable>
       </section>
     </template>
   </div>

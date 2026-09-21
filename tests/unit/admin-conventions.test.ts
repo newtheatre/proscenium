@@ -50,6 +50,9 @@ const REPORTS_WITHOUT_A_TOOLBAR = [
   // filter by name across other rows, so the shared toolbar would sit empty (0032).
   'app/pages/bar/stock/order-list.vue',
   'app/pages/bar/stock/stocktakes/[id].vue',
+  // The desk searches by reference and scans a code: its results are what one lookup returned,
+  // and the status pills beside the search are the only narrowing there is (D-114).
+  'app/pages/box-office/desk.vue',
 ]
 
 describe('an input is the component for its value (0032)', () => {
@@ -410,5 +413,121 @@ describe('no code reaches a reader on the console (K-128, issue 1151 item 8)', (
 
   test('no console screen carries an en dash', async () => {
     expect(await offenders(source => source.includes('–'))).toEqual([])
+  })
+})
+
+// A console component tree: a screen's table that moved out of its page keeps the table rules
+// with it. The show-night kit keeps its own register (design language rule 3).
+const CONSOLE_COMPONENTS = ['app/components/box-office/', 'app/components/training/']
+
+async function consoleFiles(): Promise<{ path: string, source: string }[]> {
+  const files = [...await screens()]
+  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: COMPONENTS, onlyFiles: true })) {
+    // One spelling whatever the platform separates directories with, so an allow-list matches.
+    const path = join(COMPONENTS, entry).replaceAll('\\', '/')
+    if (CONSOLE_COMPONENTS.some(tree => path.startsWith(tree))) files.push({ path, source: await Bun.file(path).text() })
+  }
+  return files.sort((a, b) => a.path.localeCompare(b.path))
+}
+
+// The column definitions of one file, each column on its own, so a rule about one column does not
+// read its neighbour's buttons.
+function columnEntries(source: string): string[][] {
+  const blocks: string[][] = []
+  const opening = /columns[^=\n]*=\s*\[/g
+  let match: RegExpExecArray | null
+  while ((match = opening.exec(source)) !== null) {
+    const entries: string[] = []
+    let depth = 1
+    let start = match.index + match[0].length
+    for (let index = start; index < source.length && depth > 0; index++) {
+      const character = source[index]
+      if (character === '[' || character === '{') depth++
+      else if (character === ']' || character === '}') {
+        depth--
+        if (depth === 1) {
+          entries.push(source.slice(start, index + 1))
+          start = index + 1
+        }
+      }
+    }
+    if (entries.length > 0) blocks.push(entries)
+  }
+  return blocks
+}
+
+// A table whose narrow view is still to be swept (issue 1151 item 6). Each takes HIDE_BELOW_SM on
+// the columns a phone cannot hold; the list may shrink and may not grow.
+const TABLES_AWAITING_A_NARROW_VIEW = [
+  'app/components/box-office/show/Performances.vue',
+  'app/components/training/CatalogueTable.vue',
+  'app/pages/admin/audit.vue',
+  'app/pages/admin/backups.vue',
+  'app/pages/bar/categories.vue',
+  'app/pages/bar/stock/movements.vue',
+  'app/pages/bar/stock/order-list.vue',
+  'app/pages/bar/stock/stocktakes/[id].vue',
+  'app/pages/bar/stock/stocktakes/index.vue',
+  'app/pages/box-office/access-profiles.vue',
+  'app/pages/box-office/content-warnings.vue',
+  'app/pages/box-office/pass-types.vue',
+  'app/pages/box-office/seasons.vue',
+  'app/pages/box-office/ticket-types.vue',
+  'app/pages/box-office/desk.vue',
+  'app/pages/box-office/venues.vue',
+  'app/pages/comms/operations/accounts/[id].vue',
+  'app/pages/comms/operations/index.vue',
+  'app/pages/money/entries.vue',
+  'app/pages/money/exports.vue',
+  'app/pages/money/index.vue',
+  'app/pages/money/periods.vue',
+  'app/pages/money/reconciliation.vue',
+  'app/pages/money/reports.vue',
+  'app/pages/money/shows.vue',
+  'app/pages/people/accounts/index.vue',
+  'app/pages/people/fellows.vue',
+  'app/pages/people/members.vue',
+  'app/pages/people/roles.vue',
+  'app/pages/rooms/manage/closures.vue',
+  'app/pages/rooms/manage/index.vue',
+  'app/pages/rooms/manage/other.vue',
+  'app/pages/rota/manage/emergency.vue',
+  'app/pages/rota/manage/openings.vue',
+  'app/pages/training/manage/records.vue',
+  'app/pages/training/manage/sessions/index.vue',
+]
+
+// A row of actions still to be swept. Each keeps its primary action in line and puts the rest in
+// a UDropdownMenu; the list may shrink and may not grow.
+const ROWS_AWAITING_AN_OVERFLOW = [
+  'app/components/box-office/show/Performances.vue',
+  'app/pages/bar/products/[id].vue',
+  'app/pages/bar/products/index.vue',
+  'app/pages/bar/stock/index.vue',
+  'app/pages/box-office/venues.vue',
+]
+
+describe('every console list is a UTable the shell knows about (K-123 criteria 9 and 10)', () => {
+  test('no console screen or console component writes table markup by hand', async () => {
+    const all = await consoleFiles()
+    expect(all.length).toBeGreaterThan(0)
+    expect(all.filter(file => file.source.includes('<table')).map(file => file.path)).toEqual([])
+  })
+
+  test('no action column leaves its header empty', async () => {
+    const all = await consoleFiles()
+    expect(all.filter(file => /header:\s*''/.test(file.source)).map(file => file.path)).toEqual([])
+  })
+
+  test('a table of more than three columns says which of them a phone drops', async () => {
+    const wide = (await tables()).filter(file => columnEntries(file.source)
+      .some(entries => entries.length > 3 && !entries.some(entry => entry.includes('HIDE_BELOW_SM'))))
+    expect(wide.map(file => file.path).filter(path => !TABLES_AWAITING_A_NARROW_VIEW.includes(path))).toEqual([])
+  })
+
+  test('a row of more than three actions puts the rest behind an overflow', async () => {
+    const walls = (await tables()).filter(file => columnEntries(file.source)
+      .some(entries => entries.some(entry => (entry.match(/h\(UButton/g) ?? []).length > 3 && !entry.includes('UDropdownMenu'))))
+    expect(walls.map(file => file.path).filter(path => !ROWS_AWAITING_AN_OVERFLOW.includes(path))).toEqual([])
   })
 })

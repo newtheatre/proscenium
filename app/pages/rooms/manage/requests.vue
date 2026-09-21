@@ -393,7 +393,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
   ...(when.value === 'open'
     ? [{
       id: 'decide',
-      header: '',
+      header: ACTIONS_HEADER,
       meta: { class: { td: 'text-right whitespace-nowrap' } },
       // No action appears on a row it would refuse: the verbs differ by kind and by status,
       // and an officer clicking one that cannot apply learns nothing (C-122 criterion 5).

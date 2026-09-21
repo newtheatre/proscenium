@@ -114,7 +114,7 @@ const columns: TableColumn<Account>[] = [
   { id: 'lastLoginAt', header: 'Last seen', cell: ({ row }) => seen(row.original.lastLoginAt) },
   {
     id: 'open',
-    header: '',
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right' } },
     cell: ({ row }) => h(UButton, {
       'to': `/people/accounts/${row.original.id}`,

@@ -533,13 +533,25 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
      refusal from the route renders inside the modal, above the footer, never in a page alert
      behind the overlay; and a form that saves has a way out beside Save, so the corner cross
      is never the only way back.
+  9. Every list on the console is a `UTable` with column definitions, never table markup written
+     by hand: a hand-written table takes none of the shell's behaviour, so it has no empty state,
+     no loading state and no column rules. A column a phone cannot hold carries `HIDE_BELOW_SM`,
+     a money column is right-aligned and mono through `RIGHT_ALIGNED` and `saysMoney`, and a
+     column of row actions has a header, the word "Actions" visually hidden where a visible one
+     would read as noise. An empty header is not a header.
+  10. A row offers at most three actions in line. Where it has more, the primary one stays
+     visible and the rest move into a `UDropdownMenu`, because seven ghost buttons in a row read
+     as a wall and are the first thing a narrow window loses.
 - Source: Review of the admin surface against the Nuxt UI component matrix, 30 August 2026;
   decision 0021 (the design language is enforced by test, not by review). Criterion 7 comes
   from the console review of 18 September 2026 (issue 1151 item 5), which counted the one-click
   refunds, revocations and retirements the surface still had. Criterion 8 comes from the same
   review (issue 1151 items 3 and 4), which counted five cancel words across the console, modals
   whose buttons sat in the body, three titles that asked a question, and refusals that landed
-  on the page behind an open overlay.
+  on the page behind an open overlay. Criteria 9 and 10 come from the same review (issue 1151
+  item 6), which counted ten hand-written tables across six screens, three div lists where a
+  table belonged, `HIDE_BELOW_SM` on four tables of forty-six, nine action columns with an
+  empty header, and rows of up to seven ghost buttons with no overflow.
 
 ## K-124: Developer tools that do not ship
 

@@ -197,7 +197,7 @@ const columns: TableColumn<Space>[] = [
   },
   {
     id: 'act',
-    header: '',
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => (writes.value === false
       ? null

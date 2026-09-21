@@ -155,7 +155,7 @@ const columns: TableColumn<Closure>[] = [
   { accessorKey: 'by', header: 'Closed by', meta: { class: { td: 'text-sm text-muted' } } },
   {
     id: 'remove',
-    header: '',
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right' } },
     cell: ({ row }) => (writes.value === false
       ? null

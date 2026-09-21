@@ -2,7 +2,9 @@
 import { saysMoney } from '#shared/utils/bar'
 import { saysAccessKind } from '#shared/utils/ticket-types'
 import { FINANCE_SCOPES, saysFinanceScope } from '#shared/utils/finance-reports'
-import type { FinanceForegoneReport } from '#shared/utils/finance-reports'
+import { h } from 'vue'
+import type { AccessAdmissionRow, FinanceForegoneReport } from '#shared/utils/finance-reports'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Comps and discounts', middleware: 'console', docs: '/docs/money/comps-and-discounts' })
 
@@ -35,6 +37,37 @@ const { data, status, error, refresh } = await useAsyncData(
 )
 
 const reportFailure = computed(() => (error.value ? refusalText(error.value, 'The report could not be read.') : null))
+
+interface ForegoneRow { label: string, test: string, count: number, pence: number }
+
+const foregoneRows = computed<ForegoneRow[]>(() => (data.value
+  ? [
+      { label: 'Comps', test: 'comps', count: data.value.foregone.compCount, pence: data.value.foregone.compsPence },
+      { label: 'Discounts', test: 'discounts', count: data.value.foregone.discountCount, pence: data.value.foregone.discountsPence },
+    ]
+  : []))
+
+const foregoneColumns: TableColumn<ForegoneRow>[] = [
+  { id: 'label', header: 'Given away', cell: ({ row }) => h('span', { 'data-test': `foregone-${row.original.test}-label` }, row.original.label) },
+  {
+    id: 'count',
+    header: 'Count',
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => h('span', { 'data-test': `foregone-${row.original.test}-count` }, String(row.original.count)),
+  },
+  {
+    id: 'value',
+    header: 'Value',
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => h('span', { 'data-test': `foregone-${row.original.test}-pence` }, saysMoney(row.original.pence)),
+  },
+]
+
+const accessColumns: TableColumn<AccessAdmissionRow>[] = [
+  { id: 'kind', header: 'Kind', cell: ({ row }) => saysAccessKind(row.original.accessKind) },
+  { id: 'count', header: 'Count', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.count) },
+  { id: 'value', header: 'Value', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.valuePence) },
+]
 </script>
 
 <template>
@@ -95,42 +128,17 @@ const reportFailure = computed(() => (error.value ? refusalText(error.value, 'Th
         <h2 class="font-semibold">
           Foregone value
         </h2>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Given away
-              </th><th>Count</th><th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="border-b">
-              <td
-                class="py-2"
-                data-test="foregone-comps-label"
-              >
-                Comps
-              </td>
-              <td data-test="foregone-comps-count">
-                {{ data.foregone.compCount }}
-              </td>
-              <td data-test="foregone-comps-pence">
-                {{ saysMoney(data.foregone.compsPence) }}
-              </td>
-            </tr>
-            <tr>
-              <td class="py-2">
-                Discounts
-              </td>
-              <td data-test="foregone-discounts-count">
-                {{ data.foregone.discountCount }}
-              </td>
-              <td data-test="foregone-discounts-pence">
-                {{ saysMoney(data.foregone.discountsPence) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <UTable
+          :data="foregoneRows"
+          :columns="foregoneColumns"
+          data-test="foregone-table"
+        >
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              Nothing was given away in this scope.
+            </p>
+          </template>
+        </UTable>
       </section>
 
       <section
@@ -140,37 +148,17 @@ const reportFailure = computed(() => (error.value ? refusalText(error.value, 'Th
         <h2 class="font-semibold">
           Access and companion admissions
         </h2>
-        <p
-          v-if="data.accessAdmissions.length === 0"
-          class="text-muted"
+        <UTable
+          :data="data.accessAdmissions"
+          :columns="accessColumns"
+          data-test="access-admissions-table"
         >
-          None in this scope.
-        </p>
-        <table
-          v-else
-          class="w-full text-sm"
-        >
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Kind
-              </th><th>Count</th><th>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.accessAdmissions"
-              :key="row.accessKind"
-              data-test="access-row"
-            >
-              <td class="py-2">
-                {{ saysAccessKind(row.accessKind) }}
-              </td>
-              <td>{{ row.count }}</td>
-              <td>{{ saysMoney(row.valuePence) }}</td>
-            </tr>
-          </tbody>
-        </table>
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              None in this scope.
+            </p>
+          </template>
+        </UTable>
       </section>
     </template>
 
