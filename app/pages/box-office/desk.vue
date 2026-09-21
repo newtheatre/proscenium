@@ -579,7 +579,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
               data-test="desk-scan-camera-close"
               @click="cameraOpen = false"
             >
-              Close the camera
+              Stop the camera
             </UButton>
             <UButton
               v-else

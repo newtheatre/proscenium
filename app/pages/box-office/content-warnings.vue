@@ -164,7 +164,7 @@ const columns: TableColumn<ContentWarning>[] = [
           size: 'sm',
         }, () => saysWarningKind(row.original.kind)),
         row.original.archived
-          ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Archived')
+          ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Retired')
           : null,
       ]),
       row.original.description ? h('div', { class: 'text-xs text-muted' }, row.original.description) : null,
@@ -327,7 +327,7 @@ const columns: TableColumn<ContentWarning>[] = [
           </UFormField>
 
           <UFormField
-            label="Address"
+            label="Web address"
             name="slug"
             required
             description="Lowercase words joined by hyphens. Written from the title until you change it."
@@ -435,7 +435,7 @@ const columns: TableColumn<ContentWarning>[] = [
             >
               <USwitch
                 v-model="state.archived"
-                label="Archived"
+                label="Retired"
                 data-test="warning-archived"
               />
             </UFormField>
@@ -464,7 +464,7 @@ const columns: TableColumn<ContentWarning>[] = [
     <UModal
       :open="removing !== null"
       title="Delete this warning"
-      description="No show carries it, so nothing on the public site changes. A warning a show carries can only be archived."
+      description="No show carries it, so nothing on the public site changes. A warning a show carries can only be retired."
       @update:open="value => { if (!value) removing = null }"
     >
       <template #body>

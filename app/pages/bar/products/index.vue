@@ -407,7 +407,7 @@ const columns: TableColumn<BarProduct>[] = [
           </UFormField>
 
           <UFormField
-            label="Category"
+            label="Product category"
             name="categoryId"
             required
           >
@@ -420,7 +420,7 @@ const columns: TableColumn<BarProduct>[] = [
           </UFormField>
 
           <UFormField
-            label="Order in the category"
+            label="Order in the product category"
             name="sort"
             description="Lower comes first on the till."
           >
@@ -480,7 +480,7 @@ const columns: TableColumn<BarProduct>[] = [
               :loading="saving"
               data-test="product-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the product' : 'Add a product' }}
             </UButton>
             <UButton
               color="neutral"
@@ -523,7 +523,7 @@ const columns: TableColumn<BarProduct>[] = [
           data-test="confirm-delete"
           @click="remove"
         >
-          Delete it
+          Delete the product
         </UButton>
         <UButton
           color="neutral"

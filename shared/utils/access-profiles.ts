@@ -26,7 +26,7 @@ export const ACCESS_FLAG_LABELS: Record<AccessFlag, string> = {
   essentialCompanion: 'Access is significantly difficult without support from another person',
   visualInformation: 'Visual information is a barrier; alternative formats are needed',
   audibleInformation: 'Audible information is difficult to access or process',
-  other: 'Anything the categories above do not cover, such as photosensitive epilepsy',
+  other: 'Anything the needs above do not cover, such as photosensitive epilepsy',
 }
 
 export const ACCESS_PROFILE_STATUSES = ['PENDING', 'VERIFIED', 'EXPIRED', 'DECLINED', 'WITHDRAWN'] as const

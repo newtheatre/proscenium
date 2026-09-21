@@ -54,7 +54,7 @@ const byId = computed(() => new Map(props.vocabulary.map(one => [one.id, one])))
 // The group's item type wants `string | undefined` where the row holds null.
 const stagingOptions = computed(() => props.vocabulary
   .filter(one => one.kind === 'TECHNICAL')
-  .map(one => ({ id: one.id, title: one.archived ? `${one.title} (archived)` : one.title, description: one.description ?? undefined })))
+  .map(one => ({ id: one.id, title: one.archived ? `${one.title} (retired)` : one.title, description: one.description ?? undefined })))
 
 interface PickerItem { id: string, title: string, description: string | undefined, category: string | undefined }
 // One shape for a heading and an item: the picker reads its keys off the entry type, and a union
@@ -66,7 +66,7 @@ const contentOptions = computed<PickerEntry[]>(() => vocabularyByCategory(props.
   { type: 'label' as const, label: group.category },
   ...group.warnings.map(one => ({
     id: one.id,
-    title: one.archived ? `${one.title} (archived)` : one.title,
+    title: one.archived ? `${one.title} (retired)` : one.title,
     description: one.description ?? undefined,
     category: one.category ?? undefined,
   })),
@@ -192,9 +192,9 @@ async function save(): Promise<void> {
       />
 
       <p class="text-sm text-muted">
-        A show warns from the vocabulary rather than in its own words, so two shows warning about
-        the same thing say it the same way. Confirming there is nothing to warn about is an answer
-        somebody gave; leaving it blank means nobody has looked yet, and the show page says so.
+        A show warns in the house words, not its own. Confirming there is nothing to warn about is
+        an answer somebody gave; leaving it blank means nobody has looked yet, and the show page
+        says so.
       </p>
 
       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -316,7 +316,7 @@ async function save(): Promise<void> {
                     variant="outline"
                     size="sm"
                   >
-                    Archived
+                    Retired
                   </UBadge>
                 </p>
                 <p

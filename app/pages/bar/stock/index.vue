@@ -352,7 +352,7 @@ const columns: TableColumn<StockItem>[] = [
   },
   {
     id: 'category',
-    header: 'Category',
+    header: 'Stock group',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => row.original.category ?? '',
   },
@@ -387,7 +387,7 @@ const columns: TableColumn<StockItem>[] = [
           retireFailure.value = null
           retiring.value = row.original
         },
-      }, () => (row.original.status === 'RETIRED' ? 'Put back' : 'Retire')),
+      }, () => (row.original.status === 'RETIRED' ? 'Bring back' : 'Retire')),
       rowOverflow(row.original.id, row.original.hasMovements
         ? []
         : [{
@@ -562,10 +562,10 @@ const columns: TableColumn<StockItem>[] = [
           </UFormField>
 
           <UFormField
-            label="Category"
+            label="Stock group"
             name="category"
             hint="Optional"
-            description="Free text, for grouping the order list; not the till's own categories."
+            description="Free text, for grouping the order list, and not a product category."
           >
             <UInput
               v-model="state.category"
@@ -601,7 +601,7 @@ const columns: TableColumn<StockItem>[] = [
               :loading="saving"
               data-test="item-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the item' : 'Add an item' }}
             </UButton>
             <UButton
               color="neutral"
@@ -715,7 +715,7 @@ const columns: TableColumn<StockItem>[] = [
             label="Reason"
             name="reason"
             required
-            description="From the list, so waste can be reported on rather than read."
+            description="From the list, so the waste report can group it."
           >
             <USelect
               v-model="movement.reason"
@@ -731,7 +731,7 @@ const columns: TableColumn<StockItem>[] = [
               :loading="saving"
               data-test="movement-submit"
             >
-              Record it
+              Record the movement
             </UButton>
             <UButton
               color="neutral"
@@ -756,7 +756,7 @@ const columns: TableColumn<StockItem>[] = [
         <p class="text-sm">
           {{ hiding?.item.name }} is poured by
           {{ hiding?.products.map(product => product.name).join(', ') }}.
-          Retiring it hides those products in the same write, so nothing is left on the till
+          Retiring it hides those products at the same time, so nothing is left on the till
           pouring something the bar no longer stocks. Their recipes, prices and history are
           untouched, and putting the item back is a separate decision.
         </p>
@@ -768,7 +768,7 @@ const columns: TableColumn<StockItem>[] = [
           data-test="confirm-hide-dependents"
           @click="hiding && setStatus(hiding.item, 'RETIRED', true)"
         >
-          Retire it and hide them
+          Retire the item and hide the products
         </UButton>
         <UButton
           color="neutral"
@@ -809,7 +809,7 @@ const columns: TableColumn<StockItem>[] = [
           data-test="confirm-delete"
           @click="remove"
         >
-          Delete it
+          Delete the item
         </UButton>
         <UButton
           color="neutral"

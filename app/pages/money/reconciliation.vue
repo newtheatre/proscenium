@@ -248,7 +248,7 @@ async function record(): Promise<void> {
           v-if="data.current"
           v-model="writeOff"
           data-test="write-off"
-          label="Write off rather than correct"
+          label="Write off instead of correcting"
         />
         <UButton
           data-test="record-reading"
