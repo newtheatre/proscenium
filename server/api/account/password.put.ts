@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { passwordProblem } from '#shared/utils/auth'
 
 const body = z.object({
-  password: z.string().min(1, 'Choose a password.').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long.'),
+  password: z.string().min(1, 'Choose a password').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long'),
 })
 
 // Set or replace this account's password.

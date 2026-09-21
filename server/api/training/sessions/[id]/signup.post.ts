@@ -14,7 +14,7 @@ import {
 export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
   const sessionId = getRouterParam(event, 'id')
-  if (!sessionId) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean.' })
+  if (!sessionId) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean' })
 
   const session = await sessionForSignUp(sessionId)
   if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session' })

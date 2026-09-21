@@ -4,7 +4,7 @@ import { declineTicketCompRequestForm } from '#shared/utils/ticket-comps'
 // reason on the record so the requester sees why, never a bare refusal.
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean.' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean' })
   const input = await readValidatedBodyOrThrow(event, declineTicketCompRequestForm)
 
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')

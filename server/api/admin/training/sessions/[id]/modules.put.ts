@@ -12,7 +12,7 @@ const form = z.object({
 // records for exactly these modules and the room agreed to them (G-115 criterion 2).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean.' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean' })
 
   const resolved = await requireTrainer(event)
   const input = await readValidatedBodyOrThrow(event, form)

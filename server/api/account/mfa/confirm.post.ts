@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { RECOVERY_CODE_COUNT } from '#shared/utils/recovery-codes'
 import { verifyCode } from '#shared/utils/totp'
 
-const body = z.object({ code: z.string().min(6, 'Enter the six-digit code.').max(20, 'Enter the six-digit code.') })
+const body = z.object({ code: z.string().min(6, 'Enter the six-digit code').max(20, 'Enter the six-digit code') })
 
 // Confirm the authenticator app, which activates the factor and mints recovery codes.
 export default defineEventHandler(async (event) => {
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   const [enrolment] = await db.select().from(schema.totpSecrets)
     .where(eq(schema.totpSecrets.userId, account.id)).limit(1)
 
-  if (!enrolment) throw createError({ statusCode: 409, statusMessage: 'Scan the code on the security page first, then enter what the app shows.' })
+  if (!enrolment) throw createError({ statusCode: 409, statusMessage: 'Scan the code on the security page first, then enter what the app shows' })
   if (enrolment.confirmedAt) throw createError({ statusCode: 409, statusMessage: 'This account already has an authenticator app' })
 
   const outcome = await verifyCode(enrolment.secret, input.code, new Date(), enrolment.lastUsedStep)

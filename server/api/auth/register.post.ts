@@ -5,8 +5,8 @@ import { z } from 'zod'
 const body = z.object({
   // 320 is the longest address RFC 5321 permits: 64 local, an @, 255 domain.
   email: z.string().email('That does not look like an email address. Check it and try again.').max(320, 'That does not look like an email address. Check it and try again.'),
-  name: z.string().trim().min(1, 'Type your name.').max(200, 'That is too long.'),
-  password: z.string().min(1, 'Choose a password.').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long.'),
+  name: z.string().trim().min(1, 'Type your name').max(200, 'That is too long'),
+  password: z.string().min(1, 'Choose a password').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long'),
 })
 
 // One answer for every outcome, so the caller cannot tell which branch ran.

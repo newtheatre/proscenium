@@ -98,14 +98,14 @@ describe.skipIf(skip !== null)('registering and signing in (A-101, A-103, 0007)'
     const response = await post('/api/auth/sign-in', { email: person.email, password: '' })
     expect(response.status).toBe(400)
     const body = await response.json()
-    expect(body.statusMessage).toBe('Something on this form needs another look.')
-    expect(body.data.fields.password).toBe('Type your password.')
+    expect(body.statusMessage).toBe('Something on this form needs another look')
+    expect(body.data.fields.password).toBe('Type your password')
   })
 
   test('an address that is not one is refused in the house voice', async () => {
     const response = await post('/api/auth/sign-in', { email: 'not-an-address', password })
     expect(response.status).toBe(400)
-    expect((await response.json()).data.fields.email).toBe('Type the email address on your account.')
+    expect((await response.json()).data.fields.email).toBe('Type the email address on your account')
   })
 
   // The fallback no longer names parameters, so nothing on the wire tells a reader what a field

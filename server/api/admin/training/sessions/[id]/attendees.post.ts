@@ -14,7 +14,7 @@ const body = z.object({
 // marked, and subject to the exact-cover rule when it is (G-117).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean.' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean' })
 
   const resolved = await requireTrainer(event)
   const input = await readValidatedBodyOrThrow(event, body)

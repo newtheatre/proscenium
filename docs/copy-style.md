@@ -95,9 +95,15 @@ paired, in `rooms/book.vue` and its equivalents, with a link to `/account/member
 pattern). The same file's other refusals hold the shape without needing a link, because nothing
 fixes them elsewhere: "That slot has already happened.", "The room is closed that day."
 
+A message of one sentence carries no full stop; two or more sentences carry all of them.
+"Somebody booked that slot first" against "That link has expired or has already been used. Ask
+for a new one." The rule holds for a field message as much as for the sentence a refusal sends.
+A handful of older one-sentence refusals still carry a stop, the two quoted above among them;
+they move with the sweep that reaches their module.
+
 This used to break down where a refusal named a parameter rather than saying what to do:
 `server/api/admin/roles/index.get.ts` threw `'Invalid request: userId'`. It now says "Say which
-account you mean.", and `server/utils/validation.ts` no longer lists field keys either. Where a
+account you mean", and `server/utils/validation.ts` no longer lists field keys either. Where a
 failed check has no wording of its own, the sentence comes from the house error map in
 `shared/utils/house-errors.ts`, registered once on each side, so a reader never sees the
 validation library's own English.

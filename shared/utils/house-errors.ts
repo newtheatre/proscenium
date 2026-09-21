@@ -4,13 +4,13 @@ import type { $ZodErrorMap, $ZodRawIssue } from 'zod/v4/core'
 // What a check with no wording of its own says (K-128 criterion 2). Every sentence here is a
 // last resort: a schema that writes its own message keeps it, because zod tries that first.
 export const HOUSE_ERROR = {
-  generic: 'Something on this form needs another look.',
+  generic: 'Something on this form needs another look',
   email: 'That does not look like an email address. Check it and try again.',
-  tooLong: 'That is too long.',
-  tooShort: 'That is too short.',
-  tooLow: 'That is too low.',
-  tooHigh: 'That is too high.',
-  choice: 'Choose one of the options offered.',
+  tooLong: 'That is too long',
+  tooShort: 'That is too short',
+  tooLow: 'That is too low',
+  tooHigh: 'That is too high',
+  choice: 'Choose one of the options offered',
 } as const
 
 const COUNTED = new Set(['number', 'int', 'bigint', 'date'])

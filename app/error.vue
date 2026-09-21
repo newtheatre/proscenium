@@ -7,7 +7,7 @@ const props = defineProps<{ error: NuxtError }>()
 const SAYS: Record<number, { title: string, says: string }> = {
   401: {
     title: 'Your sign-in has ended',
-    says: 'Sign in again to carry on.',
+    says: 'Sign in again to carry on',
   },
   403: {
     title: 'That is not yours to open',

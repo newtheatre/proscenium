@@ -2,8 +2,8 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 const body = z.object({
-  password: z.string().min(1, 'Type your password.').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long.'),
-  code: z.string().min(6, 'Enter the six-digit code.').max(20, 'Enter the six-digit code.').optional(),
+  password: z.string().min(1, 'Type your password').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long'),
+  code: z.string().min(6, 'Enter the six-digit code').max(20, 'Enter the six-digit code').optional(),
 })
 
 // Reassert identity with a password and, where the account currently holds one, its second

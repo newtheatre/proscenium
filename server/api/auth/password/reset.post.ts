@@ -3,11 +3,11 @@ import { z } from 'zod'
 import { passwordProblem } from '#shared/utils/auth'
 
 const body = z.object({
-  token: z.string().min(20, 'Open the link from the email again.').max(200, 'Open the link from the email again.'),
-  password: z.string().min(1, 'Choose a password.').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long.'),
+  token: z.string().min(20, 'Open the link from the email again').max(200, 'Open the link from the email again'),
+  password: z.string().min(1, 'Choose a password').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long'),
   // A console-created account sets its first password with the same page and the same rules,
   // so the kind travels rather than the route gaining a twin (A-121 criterion 3).
-  kind: z.enum(['PASSWORD_RESET', 'SET_PASSWORD'], 'Open the link from the email again.').default('PASSWORD_RESET'),
+  kind: z.enum(['PASSWORD_RESET', 'SET_PASSWORD'], 'Open the link from the email again').default('PASSWORD_RESET'),
 })
 
 // Set a new password with a reset token.

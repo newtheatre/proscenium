@@ -2,7 +2,7 @@
 // (D-117 criterion 1), claimed atomically so a race between two approvers settles to one.
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean.' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean' })
 
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
   const request = await ticketCompRequestById(id, expiryMinutes)

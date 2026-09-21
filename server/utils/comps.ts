@@ -108,7 +108,7 @@ export async function createCompRequest(
 // The id and 404, ahead of the night-authority call every decide route makes itself, literally
 // in its own source (E-111 criterion 5's own registry test reads for it).
 export async function requestedCompRequest(id: string | undefined, expiryMinutes: number): Promise<CompRequest> {
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean.' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean' })
   const request = await compRequestById(id, expiryMinutes)
   if (!request) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
   return request

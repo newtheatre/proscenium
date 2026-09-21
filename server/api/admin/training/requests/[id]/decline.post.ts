@@ -5,7 +5,7 @@ import { requestDeclineForm } from '#shared/utils/training'
 // verdict, and a reason is mandatory (G-104 criterion 3).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean.' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean' })
 
   const resolved = await requireCatalogueAuthority(event)
   const input = await readValidatedBodyOrThrow(event, requestDeclineForm)

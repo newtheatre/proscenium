@@ -5,7 +5,7 @@ import { voidTabChargeForm } from '#shared/utils/tab-settlement'
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which charge you mean.' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which charge you mean' })
   const input = await readValidatedBodyOrThrow(event, voidTabChargeForm)
 
   const voided = await voidTabCharge(id, input.reason, resolved.account.id)

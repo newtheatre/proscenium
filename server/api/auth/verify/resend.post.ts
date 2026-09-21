@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { normaliseEmail } from '#shared/utils/auth'
 
-const body = z.object({ email: z.string().email('Type the email address on your account.').max(320, 'Type the email address on your account.') })
+const body = z.object({ email: z.string().email('Type the email address on your account').max(320, 'Type the email address on your account') })
 
 // Ask for a fresh verification message.
 export default defineEventHandler(async (event) => {

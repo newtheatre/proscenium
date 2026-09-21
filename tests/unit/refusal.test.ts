@@ -8,7 +8,7 @@ function refusal(statusMessage: string, data?: Record<string, unknown>): unknown
 }
 
 // What `server/utils/validation.ts` now sends instead of a list of field keys (K-128 criterion 2).
-const HOUSE_REFUSAL = 'Something on this form needs another look.'
+const HOUSE_REFUSAL = 'Something on this form needs another look'
 
 describe('refusalText prefers a field message (issue 913)', () => {
   test('a single field failure is shown by its own message, not the generic sentence', () => {
