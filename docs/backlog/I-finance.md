@@ -93,7 +93,14 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
   3. Any figure drills down to its ledger entries; entry lists page in SQL and return a pagination envelope, never a bare array.
   4. Periods are selectable (day, week, month, term, season) with grouping pinned to Europe/London.
   5. Visibility is role-scoped: the treasurer and administrators see everything; other committee roles see season aggregates without personal detail.
-- Source: Prompt Book I-1, I-3 (role-scoped visibility), P4; audit PR-7 (season 1 August to 31 July)
+  6. The period controls are what ask the question: changing one reads the figures again, so no
+     money screen carries a Refresh beside them. A month and a season are each chosen from a
+     list of the months and the seasons, never typed into a number spinner (K-123 criterion 2).
+     This holds on every money screen whose toolbar picks a period, not only this one.
+- Source: Prompt Book I-1, I-3 (role-scoped visibility), P4; audit PR-7 (season 1 August to 31
+  July). Criterion 6 comes from the console review of 19 September 2026 (issue 1151 item 10),
+  which counted four Refresh buttons beside inputs that already refetch, and three number
+  spinners standing in for a month and a year.
 
 ## I-106: Revenue by show counts collected, unrefunded money
 
