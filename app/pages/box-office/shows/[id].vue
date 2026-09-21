@@ -249,14 +249,24 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
             description="Cancelled performances are left alone."
             data-test="cascade"
           />
-          <UButton
-            :loading="saving"
-            data-test="confirm-publish"
-            @click="setPublished(true)"
-          >
-            Publish it
-          </UButton>
         </div>
+      </template>
+
+      <template #footer>
+        <UButton
+          :loading="saving"
+          data-test="confirm-publish"
+          @click="setPublished(true)"
+        >
+          Publish the show
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="publishing = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
@@ -267,7 +277,8 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
     >
       <template #body>
         <p class="text-sm text-muted">
-          This cannot be undone, and there is nothing behind it to lose.
+          The show, its performances and its prices go. Nothing else is touched, and there is no
+          booking to lose.
         </p>
       </template>
 
@@ -278,14 +289,14 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
           data-test="confirm-delete-show"
           @click="deleteShow"
         >
-          Delete it
+          Delete the show
         </UButton>
         <UButton
           color="neutral"
           variant="ghost"
           @click="removingShow = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

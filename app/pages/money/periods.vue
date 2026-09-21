@@ -340,7 +340,7 @@ async function confirmReopen(): Promise<void> {
                 variant="ghost"
                 @click="preview = null"
               >
-                Back
+                {{ CONFIRM_BACK_LABEL }}
               </UButton>
             </div>
           </template>
@@ -455,7 +455,7 @@ async function confirmReopen(): Promise<void> {
               variant="ghost"
               @click="reopenTarget = null"
             >
-              Cancel
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </div>

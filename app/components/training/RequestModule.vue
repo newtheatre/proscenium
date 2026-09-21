@@ -99,7 +99,7 @@ async function submit(): Promise<void> {
           variant="ghost"
           @click.stop.prevent="open = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </div>
     </template>

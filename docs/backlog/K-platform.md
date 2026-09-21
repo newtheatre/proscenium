@@ -527,10 +527,19 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
      thing it acts on, a line says what follows, and a refusal from the route appears inside
      the dialogue rather than on the page behind it. No console action of that kind is one
      click.
+  8. Every console modal wears the same frame. Its actions sit in the footer, the verb first
+     and the way out beside it; the way out is one word everywhere, read from
+     `CONFIRM_BACK_LABEL`; its title states what the modal does and never asks a question; a
+     refusal from the route renders inside the modal, above the footer, never in a page alert
+     behind the overlay; and a form that saves has a way out beside Save, so the corner cross
+     is never the only way back.
 - Source: Review of the admin surface against the Nuxt UI component matrix, 30 August 2026;
   decision 0021 (the design language is enforced by test, not by review). Criterion 7 comes
   from the console review of 18 September 2026 (issue 1151 item 5), which counted the one-click
-  refunds, revocations and retirements the surface still had.
+  refunds, revocations and retirements the surface still had. Criterion 8 comes from the same
+  review (issue 1151 items 3 and 4), which counted five cancel words across the console, modals
+  whose buttons sat in the body, three titles that asked a question, and refusals that landed
+  on the page behind an open overlay.
 
 ## K-124: Developer tools that do not ship
 

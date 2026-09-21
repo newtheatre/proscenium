@@ -131,7 +131,7 @@ consequences list. The sidebar carries fifty-four, which is why each group split
 and Set-up first (0082): search finds a screen whose name you already know, and the sections are
 what make an unfamiliar one findable at all.
 
-Eight rules follow:
+Nine rules follow:
 
 1. **A permanently dark region is marked `dark`.** The public header and footer are stage black
    in both colour modes. That is one class on the subtree, after which every semantic token
@@ -188,6 +188,16 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    sits behind the overlay where nobody reads it. The cancel word comes from
    `CONFIRM_BACK_LABEL` in `shared/utils/admin-conventions.ts`, so unifying it later is one
    string. `tests/unit/admin-conventions.test.ts` is what holds the rule.
+9. **Every console modal wears that same frame, whether it confirms or collects.** Its actions
+   sit in the `#footer` slot, the primary verb first and the way out beside it, so no modal
+   puts a Save halfway down a scrolling body. The way out is one word everywhere, read from
+   `CONFIRM_BACK_LABEL`, and a modal that collects something has one as surely as a modal that
+   confirms: the cross in the corner is a control a phone barely offers and nobody reads as a
+   cancel. A title states what the modal does ("Void this charge"), because the two buttons
+   below it are already the question. A refusal from the route renders inside the modal above
+   its footer, `ConfirmModal`'s `failure` prop where it is one and a `UAlert` at the top of the
+   body where it is a form, and the page's own alert is hidden while a modal is open. The
+   show-night kit is not bound by this: it keeps its own register (rule 3).
 
 ## Photography and show artwork
 

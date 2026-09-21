@@ -239,6 +239,14 @@ const columns: TableColumn<Record>[] = [
         }, () => 'Revoke')),
   },
 ]
+
+// A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
+// is shown wherever the action was taken.
+const modalOpen = computed(() => signing.value || recording.value || revoking.value !== null)
+
+watch(modalOpen, (nowOpen) => {
+  if (!nowOpen) failure.value = null
+})
 </script>
 
 <template>
@@ -255,7 +263,7 @@ const columns: TableColumn<Record>[] = [
     />
 
     <UAlert
-      v-if="failure"
+      v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -337,6 +345,14 @@ const columns: TableColumn<Record>[] = [
       description="Dated today. Every direct prerequisite has to be held already, and the refusal names any that are not."
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <div class="flex flex-wrap gap-1">
           <UButton
             v-for="module in signable"
@@ -367,7 +383,7 @@ const columns: TableColumn<Record>[] = [
           variant="ghost"
           @click="signing = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -378,6 +394,14 @@ const columns: TableColumn<Record>[] = [
       description="Competence earned elsewhere. We record it rather than assess it, so the paper and its dates are the evidence."
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <div class="space-y-4">
           <UFormField
             label="Which module"
@@ -452,7 +476,7 @@ const columns: TableColumn<Record>[] = [
           variant="ghost"
           @click="recording = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -464,6 +488,14 @@ const columns: TableColumn<Record>[] = [
       @update:open="revoking = null"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <UFormField
           label="Why"
           required
@@ -494,7 +526,7 @@ const columns: TableColumn<Record>[] = [
           variant="ghost"
           @click="revoking = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

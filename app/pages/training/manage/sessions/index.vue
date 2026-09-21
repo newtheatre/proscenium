@@ -663,7 +663,7 @@ const columns: TableColumn<Session>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -918,7 +918,7 @@ const columns: TableColumn<Session>[] = [
                 variant="ghost"
                 @click="plan = null"
               >
-                Back
+                {{ CONFIRM_BACK_LABEL }}
               </UButton>
             </div>
           </div>

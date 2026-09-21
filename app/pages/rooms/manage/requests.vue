@@ -584,7 +584,7 @@ onMounted(loadRooms)
           variant="ghost"
           @click="rejecting = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -623,7 +623,7 @@ onMounted(loadRooms)
           variant="ghost"
           @click="moving = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -667,14 +667,14 @@ onMounted(loadRooms)
           variant="ghost"
           @click="unlistedSubmitting = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
 
     <UModal
       :open="unlistedAssigning !== null"
-      title="What did they give us?"
+      title="Record the room they were given"
       description="Recording the room confirms the request and tells the member which room they have."
       @update:open="unlistedAssigning = null"
     >
@@ -744,7 +744,7 @@ onMounted(loadRooms)
           variant="ghost"
           @click="unlistedAssigning = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -833,7 +833,7 @@ onMounted(loadRooms)
           variant="ghost"
           @click="unlistedRefusing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -881,7 +881,7 @@ onMounted(loadRooms)
           variant="ghost"
           @click="unlistedRejecting = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -927,7 +927,7 @@ onMounted(loadRooms)
           variant="ghost"
           @click="unlisting = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -982,7 +982,7 @@ onMounted(loadRooms)
           variant="ghost"
           @click="relisting = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
