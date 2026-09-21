@@ -222,3 +222,12 @@ export function saysPlace(place: Pick<Place, 'placed' | 'waitlistPosition'>): st
   if (place.placed) return 'You have a place'
   return `You are ${place.waitlistPosition} on the waiting list`
 }
+
+// What follows the standing, never contradicting it: somebody waiting has not been let in, whatever
+// else the message goes on to say (G-102 criterion 7). `follows` is already-worded prerequisites.
+export function saysPlaceNote(place: Pick<Place, 'placed' | 'waitlistPosition'>, follows: string): string {
+  const standing = place.placed
+    ? 'Withdraw here if you cannot make it after all.'
+    : 'A place opens for you if somebody withdraws, and you are told when it does.'
+  return follows ? `${standing} Worth knowing: this one usually follows ${follows}.` : standing
+}

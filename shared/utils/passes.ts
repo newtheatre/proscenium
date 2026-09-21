@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { plural } from './text'
+import { saysPrice } from './ticket-types'
 
 // Issuing a pass at the desk, and requesting one online ahead of payment (D-124). D-123's own
 // product shape lives in shared/utils/pass-types.ts; this is what building on top of it adds.
@@ -113,3 +114,10 @@ export const doorPassScanForm = z.strictObject({
 })
 
 export type DoorPassScanInput = z.output<typeof doorPassScanForm>
+
+// What a pass on offer costs, beside its name (D-123 criterion 7). Pence through the shared money
+// wording, never assembled here.
+export function saysPassPrices(prices: readonly { label: string, price: number }[]): string {
+  if (prices.length === 0) return 'Price set when it is issued'
+  return prices.map(one => `${saysPrice(one.price)} ${one.label.toLowerCase()}`).join(', ')
+}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysGaps } from '#shared/utils/training'
-import { saysClosure, saysPlace } from '#shared/utils/training-signup'
+import { saysClosure, saysPlace, saysPlaceNote } from '#shared/utils/training-signup'
 import { saysDay } from '#shared/utils/when'
 import type { PrerequisiteGap } from '#shared/utils/training'
 import type { ClosureReason } from '#shared/utils/training-signup'
@@ -68,9 +68,7 @@ async function signUp(session: Session): Promise<void> {
     const answer = await $fetch<SignUpAnswer>(`/api/training/sessions/${session.id}/signup`, { method: 'POST' })
     toast.add({
       title: saysPlace(answer),
-      description: answer.warnings.length > 0
-        ? `You are in. Worth knowing: this one usually follows ${saysGaps(answer.warnings)}.`
-        : 'You are on the list. Withdraw here if you cannot make it after all.',
+      description: saysPlaceNote(answer, answer.warnings.length > 0 ? saysGaps(answer.warnings) : ''),
       icon: 'i-lucide-check',
       color: answer.placed ? 'success' : 'warning',
     })

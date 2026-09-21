@@ -3,8 +3,7 @@ import { saysPassPrices } from '#shared/utils/passes'
 import { saysPlaceNote } from '#shared/utils/training-signup'
 
 // The member's training, passes and account screens: names rather than codes, an action beside
-// every suggestion, a waitlisted place that says so, and a way out (G-101, G-102, D-123, A-112,
-// H-104, issue 1153 item 6).
+// every suggestion, a waiting place that says so, and a way out (issue 1153 item 6).
 
 describe('what a pass costs, beside its name (D-123 criterion 7)', () => {
   test('one price reads as the price and what it is', () => {
@@ -75,7 +74,7 @@ describe('a way out and one message per change (A-112, H-104, issue 1153 item 6)
 
   test('a toggle saved does not raise a message of its own', async () => {
     const source = await read(NOTIFICATIONS)
-    expect(source).not.toContain("title: 'Saved'")
+    expect(source).not.toContain('Saved')
   })
 
   test('the sessions screen no longer tells a waiting member they are in', async () => {
