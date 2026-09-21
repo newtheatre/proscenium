@@ -4,7 +4,8 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { NIGHT_TAP_TARGET_PX } from '#shared/utils/night-shell'
+import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -13,6 +14,7 @@ import type { TestMember } from '#tests/helpers/accounts'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
+const CASE_TIMEOUT_MS = 120_000
 
 let app: AppUnderTest
 let admin: TestMember
@@ -312,3 +314,88 @@ describe.skipIf(skip !== null)('two performances, one venue, one day (E-128)', (
     expect(closedEvening.status).toBe(200)
   })
 })
+
+describe.skipIf(skip !== null)('the checklist screen on a matinee day (E-127, issue 1150 item 4)', () => {
+  let dmPassword: string
+  let dm: TestMember
+  let houses: { venueId: string, matineeId: string, eveningId: string }
+
+  beforeAll(async () => {
+    if (skip) return
+    dmPassword = generatePassword()
+    dm = await registerMember(app, 'checklist-picker-dm', dmPassword)
+    const database = new Database(app.databaseFile)
+    try {
+      const target = sqliteTarget(database)
+      const venue = testVenue(target, { suffix: 'checklist-picker-house' })
+      const matinee = tonightsPerformance(target, { suffix: 'checklist-picker-matinee', venueId: venue.id, curtainHoursAfterNightStart: 10 })
+      const evening = tonightsPerformance(target, { suffix: 'checklist-picker-evening', venueId: venue.id, curtainHoursAfterNightStart: 15.5 })
+      houses = { venueId: venue.id, matineeId: matinee.performanceId, eveningId: evening.performanceId }
+    }
+    finally {
+      database.close()
+    }
+    shift(houses.matineeId, 'DUTY_MANAGER', dm.id)
+    shift(houses.eveningId, 'DUTY_MANAGER', dm.id)
+    await send('POST', '/api/admin/checklist/items', { venueId: houses.venueId, phase: 'PRE', label: 'Picker: fire exits checked', sort: 1, required: true })
+  }, BOOT_TIMEOUT_MS)
+
+  async function signedInView(): Promise<Bun.WebView> {
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', dm.email)
+    await fill(view, 'form input[type="password"]', dmPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    return view
+  }
+
+  // The server's ambiguity refusal is correct and useless on its own: it leaves a duty manager
+  // mid-interval with a sentence and nothing to tap (issue 1150 item 4).
+  test('two performances offer a switcher rather than a refusal with nothing to tap', async () => {
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/tonight/checklist`, '[data-test="checklist-performance-switcher"]')
+      await waitFor(view, `document.querySelector('[data-test="choose-${houses.matineeId}"]')`)
+      expect(await view.evaluate<number>(`document.querySelectorAll('[data-test="checklist-failure"]').length`)).toBe(0)
+
+      await click(view, `[data-test="choose-${houses.matineeId}"]`)
+      await waitFor(view, `document.querySelector('[data-test="checklist-list"]')`)
+      expect(await view.evaluate<string>('document.body.innerText')).toContain('Picker: fire exits checked')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // The close still refuses on the server; this is the first line of defence, so the press never
+  // has to round-trip to learn what the screen already knows (E-114 criterion 4).
+  test('Close the night is disabled while a required item is outstanding, and says how many', async () => {
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/tonight/checklist?performanceId=${houses.eveningId}`, '[data-test="checklist-list"]')
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="close-night"]').disabled`)).toBe(true)
+      expect(await view.evaluate<string>('document.body.innerText')).toContain('1 required item still open')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // Every Tick spun when one was pressed, because one flag drove them all (issue 1150 item 4).
+  test('a Tick is a thumb-sized target and no row spins until its own is pressed', async () => {
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/tonight/checklist?performanceId=${houses.eveningId}`, '[data-test="checklist-list"]')
+      const height = await view.evaluate<number>(
+        `document.querySelector('[data-test^="tick-"]').getBoundingClientRect().height`,
+      )
+      expect(height).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+if (skip) console.warn(`[e2e] skipped: ${skip}`)

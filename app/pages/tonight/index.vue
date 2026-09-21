@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
-import { hubKpis, nightHeaderLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, checklistHint, hubKpis, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
 import { activePerformanceId } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 
@@ -25,7 +24,10 @@ const request = useRequestFetch()
 const data = ref<DutyManagerTonight | null>(null)
 const checklist = ref<ChecklistEntry[]>([])
 const syncedAt = ref<Date | null>(null)
-const staleness = ref<string | null>(null)
+// Two pieces, because a refusal that said nothing of its own is still staleness: the reason is
+// what follows the colon, and an empty one leaves the sentence alone.
+const stale = ref(false)
+const staleReason = ref('')
 const asked = ref(false)
 
 const authority = useNightAuthority()
@@ -44,19 +46,20 @@ async function load(): Promise<void> {
   if (dutyManager.status === 'fulfilled') {
     data.value = dutyManager.value
     syncedAt.value = new Date()
-    staleness.value = null
+    stale.value = false
   }
   else {
     // Not tonight's duty manager: the tiles below stand on their own, since each screen guards
     // itself (E-111 criterion 5). Still a definite answer, so it still counts as synced.
     if (refusalStatus(dutyManager.reason) === 403 || refusalStatus(dutyManager.reason) === 401) {
       syncedAt.value = new Date()
-      staleness.value = null
+      stale.value = false
     }
     // Anything else, including a dropped connection: the last-fetched values stay on screen,
     // and NightStale is what says they are no longer current. Never a spinner (criterion 3).
     else {
-      staleness.value = refusalText(dutyManager.reason)
+      stale.value = true
+      staleReason.value = refusalText(dutyManager.reason, '')
     }
   }
 
@@ -94,10 +97,6 @@ const scoped = (to: string): string => selectedId.value ? `${to}?performanceId=$
 
 const showsTill = computed(() => authority.value.roles.includes('BAR'))
 
-function timeOf(at: number): string {
-  return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
-}
-
 onMounted(() => {
   load()
   timer = setInterval(load, POLL_MS)
@@ -117,11 +116,11 @@ onUnmounted(() => {
     </div>
 
     <UAlert
-      v-if="staleness"
+      v-if="stale"
       data-test="tonight-stale-warning"
       color="warning"
       variant="subtle"
-      :description="`Showing what was last loaded: ${staleness}`"
+      :description="staleBannerLine(staleReason)"
     />
 
     <UAlert
@@ -133,26 +132,13 @@ onUnmounted(() => {
       :description="incompletePre.map(item => item.label).join(', ')"
     />
 
-    <!-- One tap to the house you are working, on a matinee day (E-127 criterion 2); a single
-         performance has nothing to switch between, so this stays out of the way entirely. -->
-    <div
+    <!-- A single performance has nothing to switch between, so this stays out of the way. -->
+    <NightPerformanceSwitcher
       v-if="performances.length > 1"
-      class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
-      data-test="performance-switcher"
-    >
-      <UButton
-        v-for="performance in performances"
-        :key="performance.performanceId"
-        size="sm"
-        class="min-h-12 shrink-0"
-        :color="performance.performanceId === selectedId ? 'primary' : 'neutral'"
-        :variant="performance.performanceId === selectedId ? 'solid' : 'subtle'"
-        :data-test="`choose-${performance.performanceId}`"
-        @click="chosenId = performance.performanceId"
-      >
-        {{ performance.showTitle }}, {{ timeOf(performance.startsAt) }}
-      </UButton>
-    </div>
+      :performances="performances"
+      :selected-id="selectedId"
+      @choose="chosenId = $event"
+    />
 
     <div
       v-if="kpis"
@@ -160,18 +146,18 @@ onUnmounted(() => {
       data-test="tonight-kpis"
     >
       <NightKpi
-        :value="String(kpis.reserved)"
+        :value="String(kpis.sold)"
         :of="kpis.capacity === null ? null : String(kpis.capacity)"
-        label="reserved"
+        :label="HUB_KPI_LABELS.sold"
       />
       <NightKpi
-        :value="String(kpis.collected)"
-        label="collected"
+        :value="String(kpis.admitted)"
+        :label="HUB_KPI_LABELS.admitted"
         tone="gold"
       />
       <NightKpi
-        :value="kpis.headroom === null ? 'Uncapped' : String(kpis.headroom)"
-        label="walk-up headroom"
+        :value="saysSeatsLeft(kpis.seatsLeft)"
+        :label="HUB_KPI_LABELS.seatsLeft"
         tone="good"
       />
     </div>
@@ -180,6 +166,8 @@ onUnmounted(() => {
       class="grid grid-cols-2 gap-3"
       data-test="tonight-hub"
     >
+      <!-- Ordered by how often a tile is tapped on a night, with Emergency last and red so a
+           thumb reaching for it in the dark never lands on it by accident (E-112 criterion 1). -->
       <NightTile
         label="Scan ticket"
         hint="QR · ref · name"
@@ -189,40 +177,11 @@ onUnmounted(() => {
         data-test="tile-scan"
       />
       <NightTile
-        label="Tonight at a glance"
-        hint="Numbers · show info"
-        icon="i-lucide-gauge"
-        :to="scoped('/tonight/glance')"
-        data-test="tile-glance"
-      />
-      <NightTile
         label="Admit pass holder"
         hint="Season and comp passes"
         icon="i-lucide-contact"
         to="/tonight/door?mode=pass"
         data-test="tile-passes"
-      />
-      <NightTile
-        label="Backstage"
-        hint="House open · clearance"
-        icon="i-lucide-messages-square"
-        to="/tonight/board"
-        data-test="tile-backstage"
-      />
-      <NightTile
-        label="Emergency"
-        hint="Evac · first aid · 999"
-        icon="i-lucide-siren"
-        tone="danger"
-        to="/tonight/emergency"
-        data-test="tile-emergency"
-      />
-      <NightTile
-        label="Contacts and incidents"
-        hint="Who's on · log"
-        icon="i-lucide-phone"
-        :to="scoped('/tonight/incidents')"
-        data-test="tile-contacts"
       />
       <!-- A bar shift works the till from here rather than from a menu it cannot see (F-101). -->
       <NightTile
@@ -232,6 +191,49 @@ onUnmounted(() => {
         icon="i-lucide-store"
         to="/tonight/till"
         data-test="tile-till"
+      />
+      <NightTile
+        label="Tonight at a glance"
+        hint="Numbers · show info"
+        icon="i-lucide-gauge"
+        :to="scoped('/tonight/glance')"
+        data-test="tile-glance"
+      />
+      <NightTile
+        label="Checklist"
+        :hint="checklistHint(checklist, houseOpen)"
+        icon="i-lucide-list-checks"
+        :to="scoped('/tonight/checklist')"
+        data-test="tile-checklist"
+      />
+      <NightTile
+        label="Challenge 25"
+        hint="Log a check · register"
+        icon="i-lucide-id-card"
+        to="/tonight/age-checks"
+        data-test="tile-age-checks"
+      />
+      <NightTile
+        label="Backstage"
+        hint="House open · clearance"
+        icon="i-lucide-messages-square"
+        to="/tonight/board"
+        data-test="tile-backstage"
+      />
+      <NightTile
+        label="Contacts and incidents"
+        hint="Who's on · log"
+        icon="i-lucide-phone"
+        :to="scoped('/tonight/incidents')"
+        data-test="tile-contacts"
+      />
+      <NightTile
+        label="Emergency"
+        hint="Evac · first aid · 999"
+        icon="i-lucide-siren"
+        tone="danger"
+        to="/tonight/emergency"
+        data-test="tile-emergency"
       />
     </div>
 

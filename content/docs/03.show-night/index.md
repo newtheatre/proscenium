@@ -2,7 +2,7 @@
 title: Tonight
 description: The phone screens a show night runs on, who they open for, and the hub they all start from.
 module: Show night
-updatedOn: 2026-09-15
+updatedOn: 2026-09-21
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -42,24 +42,37 @@ quietly moved on to the next night.
 
 ![The hub with the on-shift badge (1), the performance switcher (2), the house numbers (3), the Scan ticket tile (4), the Admit pass holder tile (5) and the Emergency tile (6)](/images/docs/show-night/hub.png)
 
+::callout{icon="i-lucide-camera" color="warning"}
+The picture above was taken before the Checklist and Challenge 25 tiles were added and before the
+house numbers were relabelled, so it shows six tiles and the old words. It needs retaking.
+::
+
 1. **The badge** says how you got in: **On shift** with your first name, or **Officer** when a
    role opened the screen with no shift behind it.
 2. **The performance switcher** appears only when the venue runs more than one performance
    tonight, a matinee and an evening. The clock picks the house whose doors are open now; a tap
    holds your choice until you tap another.
-3. **The house numbers** show reserved seats against capacity, seats collected (through the
-   door), and walk-up headroom. They refresh on their own every 20 seconds; a dropped connection
-   leaves the last numbers on screen with a warning rather than a spinner, and the **Last
-   synced** line at the top of every screen says how old what you are looking at is. The numbers
-   need duty manager authority; a door or bar shift sees the tiles without them.
+3. **The house numbers** are the three words every show-night screen uses for the house:
+   **sold** (tickets sold, paid or not) against capacity, **in** (people admitted through the
+   door) and **seats left** (capacity less sold, or **No cap** where the house is uncapped).
+   They refresh on their own every 20 seconds; a dropped connection leaves the last numbers on
+   screen with a warning rather than a spinner, and the **Last synced** line at the top of every
+   screen says how old what you are looking at is. The numbers need duty manager authority; a
+   door or bar shift sees the tiles without them.
 4. **Scan ticket** opens [the door](/docs/show-night/the-door).
 5. **Admit pass holder** opens the door in pass mode.
 6. **Emergency** opens [the emergency card](/docs/show-night/emergency-card), which is cached on
    the phone the moment any show-night screen opens.
 
-The other tiles are **Tonight at a glance**, **Backstage**, **Contacts and incidents** and, for
-a bar shift or the Bar manager only, **Till**. The line at the foot of the hub is the rule the
-whole night runs on: the door never sells tickets; unpaid and walk-up customers go to the bar.
+Every destination of the night is a tile, in the order they are tapped on a night: **Scan
+ticket**, **Admit pass holder**, **Till** (for a bar shift or the Bar manager only), **Tonight at
+a glance**, **Checklist**, **Challenge 25**, **Backstage**, **Contacts and incidents**, and
+**Emergency** last. The **Checklist** tile says what is left on it: **3 pre-show items left**
+before the house opens, **2 post-show items left** after, **All ticked** when nothing is
+outstanding. On a matinee day the **Tonight at a glance**, **Checklist** and **Contacts and
+incidents** tiles carry the house you chose on the switcher, so each opens on it. The line at the
+foot of the hub is the rule the whole night runs on: the door never sells tickets; unpaid and
+walk-up customers go to the bar.
 
 From house open (doors, or curtain where no doors time is set) the hub shows a warning naming any
 required pre-show checklist item that is still not done.
@@ -108,7 +121,7 @@ required pre-show checklist item that is still not done.
   past 04:00. Go back to the hub and open it again.
 - **"More than one venue is running tonight: name the venue or the performance"**: two venues
   are running and nothing narrowed the request. The hub passes the chosen performance to the
-  screens that take one; a screen that does not yet carry a picker cannot be opened on such a
+  screens that take one; the till does not yet carry a picker and cannot be opened on such a
   night from the phone.
 - **"Showing what was last loaded: …"**: the connection dropped. The figures on screen are the
   last ones fetched, and the Last synced line says when.
