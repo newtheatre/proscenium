@@ -3,6 +3,8 @@ import {
   HAND_ENTERED_KINDS,
   KINDS_NEEDING_A_REASON,
   MOVEMENT_WRITERS,
+  PRODUCT_AGE_RESTRICTED_DEFAULT,
+  STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   STOCK_MOVEMENT_KINDS,
   categoryForm,
   categoryPriceForm,
@@ -289,5 +291,62 @@ describe('what a screen shows', () => {
     expect(says('NONE')).toBe('Confirmed no allergens')
     // A value nothing has words for reads as itself rather than as a blank.
     expect(says('SOMETHING_NEW')).toBe('SOMETHING_NEW')
+  })
+})
+
+// F-111 criterion 6, issue 1151 item 10: three screens each spelled their own starting value for
+// the same switch, and the two that create a product disagreed on it.
+describe('one stated default for a new product and one for a new stocked item', () => {
+  const CREATORS = ['app/pages/bar/products/index.vue', 'app/pages/bar/products/new.vue', 'app/pages/bar/stock/index.vue']
+
+  test('a new product is unrestricted until somebody says otherwise', () => {
+    expect(PRODUCT_AGE_RESTRICTED_DEFAULT).toBe(false)
+  })
+
+  test('a new stocked item is restricted, since the shelf it comes off mostly is', () => {
+    expect(STOCK_ITEM_AGE_RESTRICTED_DEFAULT).toBe(true)
+  })
+
+  test('each form falls back to its own default rather than to a value typed into the schema', () => {
+    const product = productForm.parse({ name: 'Pint of bitter', categoryId: 'cat-1' })
+    expect(product.ageRestricted).toBe(PRODUCT_AGE_RESTRICTED_DEFAULT)
+    const item = stockItemForm.parse({ name: 'Bitter cask', unit: 'ML' })
+    expect(item.ageRestricted).toBe(STOCK_ITEM_AGE_RESTRICTED_DEFAULT)
+  })
+
+  test('no screen that creates either spells a starting value of its own', async () => {
+    const offenders: string[] = []
+    for (const file of CREATORS) {
+      const source = await Bun.file(file).text()
+      if (/ageRestricted:\s*(true|false)/.test(source)) offenders.push(file)
+      if (!source.includes('AGE_RESTRICTED_DEFAULT')) offenders.push(`${file} (reads no shared default)`)
+    }
+    expect(offenders).toEqual([])
+  })
+})
+
+// F-111 criterion 6: the picker listed the first page of the register and pointed at another
+// screen for the rest, which is not a way to reach the rest from here (K-123).
+describe('the stocked-item picker reaches the whole register', () => {
+  const SCREEN = 'app/pages/bar/products/new.vue'
+
+  test('it searches the register rather than naming what it left out', async () => {
+    const source = await Bun.file(SCREEN).text()
+    expect(source).toContain('update:search-term')
+    expect(source).not.toContain('reached from the stock screen')
+  })
+
+  test('the search goes to the register\'s own route, so the match is made in SQL', async () => {
+    expect(await Bun.file(SCREEN).text()).toContain('/api/admin/bar/items')
+  })
+})
+
+// F-111 criterion 6: two buttons side by side both created a product, one of them leaving it
+// without the stocked item and sizes the other sets up.
+describe('there is one way to create a product', () => {
+  test('the products screen offers the set-up flow and no second creator beside it', async () => {
+    const source = await Bun.file('app/pages/bar/products/index.vue').text()
+    expect(source).toContain('data-test="set-up-product"')
+    expect(source).not.toContain('data-test="add-product"')
   })
 })

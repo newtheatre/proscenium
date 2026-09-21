@@ -260,7 +260,12 @@ Open questions:
   4. Category and ordering changes appear on the till immediately, without a deploy.
   5. The surface is restricted to the bar manager and administrators, and every change is audited
      with a from/to diff.
-- Source: Prompt Book F-2; audit PR-12, PR-7 (archive-not-delete judgment).
+  6. One way to create a product, not two side by side. A new product's age-restricted flag and a
+     new stocked item's each start from one stated default, read by every screen that offers
+     either rather than spelled again per screen. A picker over the stock register reaches the
+     whole register, by searching it where it is longer than one page (K-123).
+- Source: Prompt Book F-2; audit PR-12, PR-7 (archive-not-delete judgment); criterion 6 from
+  issue 1151 item 10, 21 September 2026.
 
 ## F-112: Serving-size variant administration
 

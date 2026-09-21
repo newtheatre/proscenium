@@ -36,3 +36,20 @@ describe('retiring is its own action', () => {
     expect(archiveVenueForm.safeParse({}).success).toBe(false)
   })
 })
+
+// D-131 criterion 8, issue 1151 item 10: every row carried an Emergency card link and every one
+// of them went to the same list, so the column read as a link to each venue's own card.
+describe('the emergency card is linked once, not once a row', () => {
+  const SCREEN = 'app/pages/box-office/venues.vue'
+
+  test('no row action links to the emergency screen', async () => {
+    const source = await Bun.file(SCREEN).text()
+    expect(source).not.toContain('`emergency-${row.original.id}`')
+  })
+
+  test('the screen links to it once, above the table', async () => {
+    const source = await Bun.file(SCREEN).text()
+    expect(source).toContain('emergency-cards')
+    expect(source.match(/\/rota\/manage\/emergency/g) ?? []).toHaveLength(1)
+  })
+})
