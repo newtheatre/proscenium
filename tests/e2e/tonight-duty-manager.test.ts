@@ -192,3 +192,46 @@ describe.skipIf(skip !== null)('the contacts block every role reaches (E-112 cri
     expect((await send('GET', '/api/tonight/team', undefined, member.cookie)).status).toBe(403)
   })
 })
+
+// The worst moment of the night is not the moment to go looking for a number, so the card the
+// door already has open carries the one it rings after 999 (E-113, issue 1150 item 14).
+describe.skipIf(skip !== null)('the emergency card names who to ring after 999 (E-113)', () => {
+  function card(venueId: string, id: string): void {
+    write('INSERT INTO venue_emergency_info (id, venue_id, address, updated_by) VALUES (?, ?, ?, ?)',
+      id, venueId, 'The Nottingham New Theatre, Nottingham NG7 2RD', admin.id)
+  }
+
+  function venueOf(performanceId: string): string {
+    return read<{ venue_id: string }>('SELECT venue_id FROM performances WHERE id = ?', performanceId)!.venue_id
+  }
+
+  test('a consenting duty manager on tonight\'s rota is on the card the door opens', async () => {
+    const door = await registerMember(app, 'door-emergency', generatePassword())
+    const dutyManager = await registerMember(app, 'dm-emergency', generatePassword())
+    const house = performance('emergency-card')
+    shift(house.performanceId, 'DOOR', door.id)
+    shift(house.performanceId, 'DUTY_MANAGER', dutyManager.id)
+    card(venueOf(house.performanceId), 'vei-emergency-card')
+
+    const { profile } = await (await send('GET', '/api/account/profile', undefined, dutyManager.cookie)).json() as { profile: Record<string, unknown> }
+    await send('PUT', '/api/account/profile', { ...profile, phone: '07700 900333', shiftContactVisible: true }, dutyManager.cookie)
+
+    const answered = await send('GET', '/api/tonight/emergency', undefined, door.cookie)
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { dutyManagers: { name: string, phone: string }[] }
+    expect(body.dutyManagers).toEqual([{ name: dutyManager.name, phone: '07700 900333' }])
+  })
+
+  test('a duty manager who has not shared a number leaves the card with none (A-114)', async () => {
+    const door = await registerMember(app, 'door-emergency-quiet', generatePassword())
+    const dutyManager = await registerMember(app, 'dm-emergency-quiet', generatePassword())
+    const house = performance('emergency-quiet')
+    shift(house.performanceId, 'DOOR', door.id)
+    shift(house.performanceId, 'DUTY_MANAGER', dutyManager.id)
+    card(venueOf(house.performanceId), 'vei-emergency-quiet')
+
+    const body = await (await send('GET', '/api/tonight/emergency', undefined, door.cookie)).json() as
+      { dutyManagers: { name: string, phone: string }[] }
+    expect(body.dutyManagers).toEqual([])
+  })
+})
