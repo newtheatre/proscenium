@@ -2,7 +2,7 @@
 import { can, manageSafety } from '#shared/utils/abilities'
 import { closeFollowUpForm } from '#shared/utils/incident-safety'
 import { saysCategory, saysSeverity, SEVERITIES } from '#shared/utils/incidents'
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import type { Category, Severity } from '#shared/utils/incidents'
 
 definePageMeta({ layout: 'console', title: 'Safety', middleware: 'console', docs: '/docs/rota/safety' })
@@ -48,7 +48,7 @@ async function toggle(row: SeverityRow, requiresFollowUp: boolean): Promise<void
 }
 
 function when(happenedAt: number): string {
-  return formatLondon(new Date(happenedAt * 1000), { dateStyle: 'medium', timeStyle: 'short' })
+  return saysWhen(happenedAt)
 }
 
 const closing = ref<OpenItem | null>(null)

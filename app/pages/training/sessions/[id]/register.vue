@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { londonDay } from '#shared/utils/membership'
 
 // A trainer on a door, holding a phone in one hand. Big targets, no hover, nothing that needs a
@@ -299,7 +299,7 @@ async function submit(): Promise<void> {
         >
           {{ sessionDayHasArrived || !data
             ? 'Open the register'
-            : `Opens on ${formatLondon(startOfLondonDay(data.heldOn), { weekday: 'short', day: 'numeric', month: 'short' })}` }}
+            : `Opens on ${saysDay(data.heldOn)}` }}
         </UButton>
       </template>
 

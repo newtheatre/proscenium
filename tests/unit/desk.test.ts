@@ -15,6 +15,7 @@ import {
   strandedMoneyReason,
   uncollectableReason,
 } from '#shared/utils/desk'
+import { RESERVATION_STATUSES } from '#shared/utils/capacity'
 
 // D-114 as pure rules. The database enforcement (the ticket-collection-once guard) is in
 // tests/integration/desk.test.ts; the full desk flow is tests/e2e/desk.test.ts.
@@ -202,5 +203,24 @@ describe('a scanned code resolves to a token or a reference, whichever way it ar
   test('surrounding whitespace, which a scanner often appends, is ignored', () => {
     expect(readDeskScan(`  ${BASE}/qr/${TOKEN}
 `)).toEqual({ kind: 'BOOKING_TOKEN', value: TOKEN })
+  })
+})
+
+// K-128, issue 1151 item 8: a status the switch does not name still reads as words rather than as
+// the value lowercased, which is how NO_SHOW reached the desk as "no_show".
+describe('a booking status never reaches the desk as its stored value', () => {
+  test('no reason carries the stored value', () => {
+    for (const status of RESERVATION_STATUSES) {
+      for (const said of [uncollectableReason(status), reinstateRefusal(status, null)]) {
+        if (said === null) continue
+        expect(said).not.toContain('_')
+        expect(said).not.toContain(status)
+      }
+    }
+  })
+
+  test('a status nobody named reads as its wording', () => {
+    expect(uncollectableReason('NO_SHOW')).toContain('no-show')
+    expect(reinstateRefusal('NO_SHOW', null)).toContain('No-show')
   })
 })

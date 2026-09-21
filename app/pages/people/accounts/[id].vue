@@ -2,6 +2,7 @@
 import { saysDay, saysWhen } from '#shared/utils/when'
 import { can, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
 import { saysRole } from '#shared/utils/roles'
+import { describeAction } from '#shared/utils/audit-actions'
 
 definePageMeta({ layout: 'console', title: 'Account', middleware: 'console', docs: '/docs/people/accounts' })
 
@@ -287,7 +288,7 @@ onMounted(load)
             class="flex items-center justify-between gap-2"
           >
             <span>
-              <span class="font-mono">{{ grant.role }}</span>
+              <span>{{ saysRole(grant.role) }}</span>
               <span class="text-muted">
                 {{ grant.live ? 'until' : 'lapsed' }}
                 {{ grant.expiresAt ? saysWhen(grant.expiresAt) : 'further notice' }}
@@ -564,14 +565,14 @@ onMounted(load)
         <ul
           v-else
           data-test="history"
-          class="space-y-1 font-mono text-sm"
+          class="space-y-1 text-sm"
         >
           <li
             v-for="entry in view.history"
             :key="`${entry.action}-${entry.createdAt}`"
           >
             <span class="text-muted">{{ saysWhen(entry.createdAt) }}</span>
-            {{ entry.action }}
+            {{ describeAction(entry.action).label }}
             <span
               v-if="!entry.byThem"
               class="text-muted"

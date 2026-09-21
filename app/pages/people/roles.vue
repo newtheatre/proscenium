@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { can, grantRoles, revokeRoles } from '#shared/utils/abilities'
-import { formatLondon } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { ROLES, saysRole } from '#shared/utils/roles'
 import { rolesList } from '#shared/utils/roles-list'
 import type { Role } from '#shared/utils/roles'
@@ -112,7 +112,7 @@ async function granted(): Promise<void> {
 }
 
 const when = (at: number | null): string =>
-  at === null ? 'further notice' : formatLondon(new Date(at * 1000), { dateStyle: 'medium' })
+  at === null ? 'further notice' : saysDay(at)
 
 // Hidden lapsed grants are counted on the total line, so hidden never means lost (0071).
 const totalLine = computed(() => register.value.lapsedHidden

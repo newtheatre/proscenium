@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { formatLondon } from '#shared/utils/london'
+import { saysWhenLong } from '#shared/utils/when'
 import { saysShiftRole, shiftDeclineForm } from '#shared/utils/rota'
 import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
 import type { ShiftRole } from '#shared/utils/rota'
@@ -48,7 +48,7 @@ const { data: listing, status, refresh } = await useAsyncData(
 )
 
 function spanOf(startsAt: number): string {
-  return formatLondon(new Date(startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
+  return saysWhenLong(startsAt)
 }
 
 async function approve(row: PendingApproval): Promise<void> {

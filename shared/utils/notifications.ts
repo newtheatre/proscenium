@@ -652,6 +652,33 @@ export function logRetentionCutoff(nowEpoch: number, months: number): number {
   return nowEpoch - Math.round(months * (365.25 / 12) * 86_400)
 }
 
+// What the send log shows an officer. A suppressed send is not a failure and reads as neither
+// (H-106, K-128), so the words separate the four terminal outcomes rather than colouring them.
+const NOTIFICATION_STATUS_WORDING: Record<NotificationStatus, string> = {
+  PENDING: 'Waiting to go',
+  SENT: 'Sent',
+  FAILED: 'Failed, will try again',
+  RETRYING: 'Trying again',
+  FAILED_FINAL: 'Failed, no attempts left',
+  SUPPRESSED_PREFERENCE: 'Held back by a preference',
+  SKIPPED_UNDELIVERABLE: 'Skipped, no address to send to',
+}
+
+// A log row types its outcome as free text, so one nobody registered reads as itself (0027).
+export function saysNotificationStatus(status: string): string {
+  return NOTIFICATION_STATUS_WORDING[status as NotificationStatus] ?? status
+}
+
+const CHANNEL_WORDING: Record<Channel, string> = {
+  EMAIL: 'Email',
+  INBOX: 'Inbox',
+  PUSH: 'Push',
+}
+
+export function saysChannel(channel: Channel): string {
+  return CHANNEL_WORDING[channel]
+}
+
 export const TOPIC_LABELS: Record<NotificationTopic, string> = {
   BOOKINGS: 'Bookings',
   SHIFTS: 'Shifts',

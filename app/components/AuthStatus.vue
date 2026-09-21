@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { can } from '#shared/utils/abilities'
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { ACCOUNT_NAV, SHELL_NAV } from '#shared/utils/site-nav'
 import type { NavEntry } from '#shared/utils/site-nav'
 import type { DropdownMenuItem } from '@nuxt/ui'
@@ -23,7 +23,7 @@ async function signOut(): Promise<void> {
 
 const entry = (item: NavEntry): DropdownMenuItem => ({ label: item.label, icon: item.icon, to: item.to })
 
-const sayDay = (day: string): string => formatLondon(startOfLondonDay(day), { day: 'numeric', month: 'short', year: 'numeric' })
+const sayDay = (day: string): string => saysDay(day, { year: true })
 
 // The one place membership state is worth a line in the chrome (A-129 criterion 4): a lapsed or
 // unrecorded membership links to where it is put right, current and grace are read-only.

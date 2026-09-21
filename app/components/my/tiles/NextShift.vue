@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import type { MySummary } from '#shared/utils/my-summary'
 
 const props = defineProps<{ summary: MySummary }>()
@@ -32,7 +32,7 @@ const badgeLabel = computed(() => (props.summary.shift?.status === 'CONFIRMED' ?
       {{ summary.shift?.role }} · {{ summary.shift?.venueName }}
     </p>
     <div class="mt-2 flex items-center gap-2">
-      <span class="text-sm">{{ summary.shift && formatLondon(new Date(summary.shift.startsAt * 1000), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }}</span>
+      <span class="text-sm">{{ summary.shift && saysWhen(summary.shift.startsAt) }}</span>
       <UBadge
         :color="badgeColor"
         variant="subtle"

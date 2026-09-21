@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysDay, saysClock } from '#shared/utils/when'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
@@ -34,8 +34,7 @@ const { data, status, refresh } = await useAsyncData(
 )
 
 function spanOf(startsAt: number): string {
-  return formatLondon(new Date(startsAt * 1000), { weekday: 'short', day: 'numeric', month: 'short' })
-    + ' · ' + formatLondon(new Date(startsAt * 1000), { timeStyle: 'short' })
+  return `${saysDay(startsAt)} · ${saysClock(startsAt)}`
 }
 
 function confirmedCount(performance: RosterPerformance): number {

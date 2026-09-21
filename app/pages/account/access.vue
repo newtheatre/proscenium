@@ -83,7 +83,7 @@ useSeoMeta({ title: 'Access requirements' })
 </script>
 
 <template>
-  <UContainer class="max-w-xl py-16">
+  <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       title="Access requirements"
       description="Tell us what you need once, and control exactly what the door sees. This is verified in person by an accessibility officer before it reaches any other screen."

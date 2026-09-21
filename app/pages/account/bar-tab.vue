@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
+import { saysClock, saysWhen } from '#shared/utils/when'
 import type { ItemisedTab } from '#shared/utils/tab-settlement'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/tab' })
@@ -50,7 +51,7 @@ function describe(charge: ItemisedTab['charges'][number]): string {
 
 <template>
   <UContainer
-    class="max-w-3xl py-10"
+    :class="MEMBER_PAGE_READING"
     data-test="account-tab-page"
   >
     <UPageHeader
@@ -76,7 +77,7 @@ function describe(charge: ItemisedTab['charges'][number]): string {
       <UCard data-test="account-tab-balance">
         <template #header>
           <div class="flex items-center justify-between">
-            <h2 class="nnt-headline text-lg">
+            <h2 class="text-lg font-semibold">
               Outstanding
             </h2>
             <UButton
@@ -101,13 +102,13 @@ function describe(charge: ItemisedTab['charges'][number]): string {
           class="mt-1 text-xs text-muted"
           data-test="account-tab-checked"
         >
-          Checked {{ formatLondon(lastChecked, { hour: '2-digit', minute: '2-digit' }) }}
+          Checked {{ saysClock(lastChecked) }}
         </p>
       </UCard>
 
       <UCard data-test="account-tab-charges">
         <template #header>
-          <h2 class="nnt-headline text-lg">
+          <h2 class="text-lg font-semibold">
             Charges
           </h2>
         </template>
@@ -125,7 +126,7 @@ function describe(charge: ItemisedTab['charges'][number]): string {
             <div>
               <p>{{ describe(charge) }}</p>
               <p class="text-xs text-muted">
-                {{ formatLondon(new Date(charge.happenedAt * 1000), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }}
+                {{ saysWhen(charge.happenedAt) }}
                 · {{ saysMoney(charge.totalPence) }}
               </p>
             </div>

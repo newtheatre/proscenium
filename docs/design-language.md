@@ -89,6 +89,15 @@ page load, including the door scanner on a bad foyer connection.
 
 ## The expressive kit
 
+The kit is the public site and the show-night screens, and nowhere else. The console and the
+member's own screens use none of it, whoever is signed in: a member reading a tab balance is
+doing the calm half of the split, and a face spent on every screen signifies on none of them
+(0084). Two tests hold that rather than review: `design-language.test.ts` refuses an `nnt-`
+class on any page under the `member` layout, and `shells.test.ts` counts the kit on eight
+member screens in a real browser, as it already does for the console. `/passes` and
+`/training/modules` keep the display face and are not exceptions to it: both are public pages
+in the `default` layout, opened by somebody who may hold no session at all.
+
 | Utility or variant | What it is for |
 | --- | --- |
 | `nnt-spotlight` | A limelight beam on stage black. Hero bands, the show-night screens, the footer. Both beams fall off inside the box they are on, so an inset band reads as lit rather than as a clipped trapezoid. |
@@ -116,7 +125,7 @@ from Nuxt UI's structural components:
 | Editorial and policy pages | `default`, through `app/pages/[...slug].vue` | A `PhotoHero` where the page has a banner and a spotlight band where it has none, then `UPage` with a prose-width `UPageBody` and `UContentToc` in the right slot from three sections up |
 | Get involved | `default`, through `app/pages/get-involved.vue` | The one landing page: a left-aligned `PhotoHero` with the flash and the marquee, ticket-stub department tiles, a numbered step strip, a spotlight quote band, then the prose column. Its headline, flash, tiles, steps and quote are front matter, so the committee edits words and never the page |
 | Operator documentation | `docs`, through `app/pages/docs/[...slug].vue` | The member shell's header with a search button, then `UPage` with a `UPageAside` of the collection's navigation tree on the left, `UPageHeader`, a prose `UPageBody` with previous and next links, and `UContentToc` in the right slot from three sections up (0076). Calm throughout |
-| A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav of `MY_NAV`, the shared footer. No sidebar. Account settings pages (`/account/profile`, `/account/security`, `/account/notifications`) additionally wrap in `AccountSettings.vue`, a `UPage` with a `UPageAside` of `ACCOUNT_NAV` |
+| A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav of `MY_NAV`, the shared footer. No sidebar. Account settings pages (`/account/profile`, `/account/security`, `/account/notifications`) additionally wrap in `AccountSettings.vue`, a `UPage` with a `UPageAside` of `ACCOUNT_NAV`. Calm throughout, and nothing from the expressive kit: the page title is the one the layout or `AccountSettings` draws, a section heading is `text-lg font-semibold` and a heading inside one is `text-base font-semibold`, and a page takes `MEMBER_PAGE_READING`, `MEMBER_PAGE_WORKING` or `MEMBER_PAGE_WIDE` from `app/utils/member-shell.ts` rather than spelling a width of its own (0084) |
 | Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar` (its header a link to `/admin`, its `UNavigationMenu` vertical and `type="multiple"`, each group two `type: 'label'` sections), `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
 | Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard. The SumUp return screen (`/pay/return/[token]`) wears it too: it is a till operator's screen, and the signed key in its path is what it answers on, so the shell must not depend on a session (F-124 criterion 3) |
 | The backstage board | `backstage` | The same dark subtree with nothing in it at all: no header, no footer, no link off the board (E-120 criterion 6) |
@@ -278,9 +287,9 @@ The rule that a colour must be a token is a test, not a review habit:
 scales exist, that no Google Fonts request has crept in, and that the print rule is still there.
 
 `tests/e2e/shells.test.ts` holds the rest to the same standard, in a real browser: a public view
-spends its expressive budget at most once each, the admin shell uses none of the kit at all, and
-the public chrome resolves stage black from the subtree it is marked on rather than from
-overridden slot classes.
+spends its expressive budget at most once each, the admin shell and the member's own screens use
+none of the kit at all, and the public chrome resolves stage black from the subtree it is marked
+on rather than from overridden slot classes.
 
 What is still review's job is judgement: whether a surface is calm or expressive in the first
 place, whether a photograph is scrimmed, and whether show artwork has been left alone. A count

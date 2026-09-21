@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
+import { penceFromPounds } from '#shared/utils/admin-forms'
+import { describeKind } from '#shared/utils/ledger'
 import { can, recordZReadings } from '#shared/utils/abilities'
 import { currentShowNight } from '#shared/utils/show-night'
 import type { NightExpected, OutstandingNight, ZReading } from '#shared/utils/night-reconciliation'
@@ -10,7 +12,10 @@ const request = useRequestFetch()
 const toast = useToast()
 
 const night = ref(currentShowNight())
-const readerPence = ref<number | undefined>()
+// The field takes pounds and pence as they are read off the reader; the route still takes pence,
+// and the expected-total rule is untouched (0004, K-123 criterion 2).
+const readerFigure = ref('')
+const readerPence = computed(() => penceFromPounds(readerFigure.value))
 const note = ref('')
 const writeOff = ref(false)
 const saving = ref(false)
@@ -34,7 +39,7 @@ const reconciliationFailure = computed(() => (error.value ? refusalText(error.va
 const mayRecord = computed(() => can(useViewer().value, recordZReadings))
 
 async function record(): Promise<void> {
-  if (readerPence.value === undefined) return
+  if (readerPence.value === null) return
   saving.value = true
   try {
     await request('/api/admin/finance/reconciliation', {
@@ -47,7 +52,7 @@ async function record(): Promise<void> {
         writtenOff: writeOff.value,
       },
     })
-    readerPence.value = undefined
+    readerFigure.value = ''
     note.value = ''
     writeOff.value = false
     await Promise.all([refresh(), refreshOutstanding()])
@@ -129,7 +134,7 @@ async function record(): Promise<void> {
               :key="row.kind"
             >
               <td class="py-2">
-                {{ row.kind }}
+                {{ describeKind(row.kind) }}
               </td>
               <td>{{ saysMoney(row.totalPence) }}</td>
             </tr>
@@ -199,11 +204,24 @@ async function record(): Promise<void> {
         <h2 class="font-semibold">
           {{ data.current ? 'Resolve the variance' : 'Record this night\'s reading' }}
         </h2>
-        <UInputNumber
-          v-model="readerPence"
-          data-test="reader-pence"
-          placeholder="Reader figure, in pence"
-        />
+        <UFormField
+          label="Reader figure"
+          description="As the reader shows it, in pounds and pence."
+        >
+          <UInput
+            v-model="readerFigure"
+            data-test="reader-pence"
+            placeholder="123.45"
+          />
+        </UFormField>
+        <p
+          v-if="readerFigure.trim() !== ''"
+          class="text-sm"
+          :class="readerPence === null ? 'text-error' : 'text-muted'"
+          data-test="reader-parsed"
+        >
+          {{ readerPence === null ? 'Give the figure as pounds and pence, such as 123.45.' : `Recording ${saysMoney(readerPence)}.` }}
+        </p>
         <UTextarea
           v-model="note"
           data-test="reading-note"
@@ -218,7 +236,7 @@ async function record(): Promise<void> {
         <UButton
           data-test="record-reading"
           :loading="saving"
-          :disabled="readerPence === undefined"
+          :disabled="readerPence === null"
           @click="record"
         >
           Record

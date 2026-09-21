@@ -216,7 +216,7 @@ onMounted(load)
             variant="subtle"
             size="sm"
           >
-            {{ drillRow.outcome }}
+            {{ saysDrillOutcome(drillRow.outcome) }}
           </UBadge>
         </div>
         <p class="mt-1 text-muted">
@@ -281,7 +281,8 @@ onMounted(load)
             <USelect
               v-model="drill.outcome"
               data-test="drill-outcome"
-              :items="['PASS', 'FAIL']"
+              :items="DRILL_OUTCOMES.map(value => ({ label: saysDrillOutcome(value), value }))"
+              value-key="value"
               class="w-full"
             />
           </UFormField>

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { saysAvailability } from '#shared/utils/programme'
 import type { MySummary } from '#shared/utils/my-summary'
 
 defineProps<{ summary: MySummary }>()
 
-const sayDay = (at: number): string => formatLondon(new Date(at * 1000), { day: 'numeric', month: 'short' })
+const sayDay = (at: number): string => saysDay(at)
 </script>
 
 <template>
