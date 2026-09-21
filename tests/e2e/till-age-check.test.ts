@@ -77,8 +77,17 @@ const addVariant = async (productId: string, over: Record<string, unknown> = {})
 const priceVariant = (variantId: string, pricePence: number): Promise<Response> =>
   send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() })
 
+interface MixedBasket {
+  venueId: string
+  restrictedVariantId: string
+  ordinaryVariantId: string
+  restrictedProductId: string
+  ordinaryProductId: string
+  restrictedProductName: string
+}
+
 // A restricted size and an ordinary one, both priced and active, ready for one basket (F-106).
-async function aMixedBasketSetup(): Promise<{ venueId: string, restrictedVariantId: string, ordinaryVariantId: string, restrictedProductName: string }> {
+async function aMixedBasketSetup(): Promise<MixedBasket> {
   const { venueId } = programme(`age-check-${crypto.randomUUID().slice(0, 6)}`)
   const categoryId = await aCategory()
   const restrictedProductName = named('Gin')
@@ -93,7 +102,7 @@ async function aMixedBasketSetup(): Promise<{ venueId: string, restrictedVariant
   await activate(ordinaryProductId)
 
   await openTill(venueId)
-  return { venueId, restrictedVariantId, ordinaryVariantId, restrictedProductName }
+  return { venueId, restrictedVariantId, ordinaryVariantId, restrictedProductId, ordinaryProductId, restrictedProductName }
 }
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, ageCheck: unknown, as = barManager.cookie): Promise<Response> =>
@@ -275,46 +284,67 @@ describe.skipIf(skip !== null)('every restricted product is named when more than
   })
 })
 
-describe.skipIf(skip !== null)('the screen', () => {
-  test('accepting is the ID type tap: the modal opens, one tap sells the whole basket', async () => {
-    const { venueId, restrictedVariantId } = await aMixedBasketSetup()
-
+// One tap in, not one charge in (F-106 criterion 6, issue 1150 item 5). These wait for the
+// nightly browser run; they are not a CI gate.
+describe.skipIf(skip !== null)('the screen asks before the drink is poured', () => {
+  async function atTheTill(venueId: string, waitFor_: string) {
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, waitFor_)
+    return view
+  }
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${restrictedVariantId}"]`)
-    await click(view, `[data-test="variant-${restrictedVariantId}"]`)
-    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£2.50')`)
+  test('a restricted tile carries a mark in text, not colour alone', async () => {
+    const { venueId, restrictedProductId, ordinaryProductId } = await aMixedBasketSetup()
+    const view = await atTheTill(venueId, `[data-test="product-${restrictedProductId}"]`)
 
-    await click(view, `[aria-label="Charge £2.50"]`)
-    await waitFor(view, `document.querySelector('[data-test="age-check-id-PASSPORT"]')`)
-    await click(view, '[data-test="age-check-id-PASSPORT"]')
-
-    await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
-    expect(await textOf(view, '[data-test="charge-confirmation"]')).toContain('£2.50')
+    expect(await textOf(view, `[data-test="restricted-mark-${restrictedProductId}"]`)).toContain('ID')
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="restricted-mark-${ordinaryProductId}"]') === null`)).toBe(true)
     view.close()
   }, 120_000)
 
-  test('refusing needs a reason and a description, then sells only the rest of the basket', async () => {
-    const { venueId, restrictedVariantId, ordinaryVariantId } = await aMixedBasketSetup()
+  test('the first restricted tap opens Challenge 25 naming the product, and one ID tap gets on with the sale', async () => {
+    const { venueId, restrictedProductId, restrictedProductName } = await aMixedBasketSetup()
+    const view = await atTheTill(venueId, `[data-test="product-${restrictedProductId}"]`)
 
-    const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/sign-in`)
-    await fill(view, 'form input[type="email"]', barManager.email)
-    await fill(view, 'form input[type="password"]', barPassword)
-    await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await click(view, `[data-test="product-${restrictedProductId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="age-check-id-PASSPORT"]')`)
+    expect(await textOf(view, '[data-test="age-check-product"]')).toContain(restrictedProductName)
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${restrictedVariantId}"]`)
-    await click(view, `[data-test="variant-${restrictedVariantId}"]`)
-    await click(view, `[data-test="variant-${ordinaryVariantId}"]`)
-    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£5.50')`)
+    await click(view, '[data-test="age-check-id-PASSPORT"]')
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£2.50')`)
 
-    await click(view, `[aria-label="Charge £5.50"]`)
+    // The basket already passed, so charging does not ask a second time.
+    await click(view, `[aria-label="Charge £2.50"]`)
+    await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
+    view.close()
+  }, 120_000)
+
+  test('a basket that already passed does not ask again on the next restricted tap', async () => {
+    const { venueId, restrictedProductId } = await aMixedBasketSetup()
+    const view = await atTheTill(venueId, `[data-test="product-${restrictedProductId}"]`)
+
+    await click(view, `[data-test="product-${restrictedProductId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="age-check-id-PASSPORT"]')`)
+    await click(view, '[data-test="age-check-id-PASSPORT"]')
+    await waitFor(view, `document.querySelector('[data-test="age-check-id-PASSPORT"]') === null`)
+
+    await click(view, `[data-test="product-${restrictedProductId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£5.00')`)
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="age-check-id-PASSPORT"]') === null`)).toBe(true)
+    view.close()
+  }, 120_000)
+
+  test('refusing at the tap takes the line back out, says so, and leaves the rest sellable', async () => {
+    const { venueId, restrictedProductId, ordinaryProductId, restrictedProductName } = await aMixedBasketSetup()
+    const view = await atTheTill(venueId, `[data-test="product-${ordinaryProductId}"]`)
+
+    await click(view, `[data-test="product-${ordinaryProductId}"]`)
+    await click(view, `[data-test="product-${restrictedProductId}"]`)
     await waitFor(view, `document.querySelector('[data-test="age-check-refuse"]')`)
     await click(view, '[data-test="age-check-refuse"]')
 
@@ -326,9 +356,53 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, '[data-test="age-check-description"]', 'Declined to show ID')
     await click(view, '[data-test="age-check-confirm-refuse"]')
 
+    await waitFor(view, `document.querySelector('[data-test="age-check-not-sold"]')`)
+    expect(await textOf(view, '[data-test="age-check-not-sold"]')).toContain(restrictedProductName)
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£3.00')`)
+
+    await click(view, `[aria-label="Charge £3.00"]`)
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
-    expect(await textOf(view, '[data-test="charge-confirmation"]')).toContain('£3.00')
-    expect(await textOf(view, '[data-test="age-check-refused-note"]')).toContain('Not sold')
+    view.close()
+  }, 120_000)
+
+  test('the refusal is on the register before the rest of the basket is charged (F-106 criterion 6)', async () => {
+    const { venueId, restrictedProductId, restrictedProductName } = await aMixedBasketSetup()
+    const view = await atTheTill(venueId, `[data-test="product-${restrictedProductId}"]`)
+
+    const before = counts()
+    await click(view, `[data-test="product-${restrictedProductId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="age-check-refuse"]')`)
+    await click(view, '[data-test="age-check-refuse"]')
+    await click(view, '[data-test="age-check-reason-NO_ID_SHOWN"]')
+    await fill(view, '[data-test="age-check-description"]', 'Declined to show ID')
+    await click(view, '[data-test="age-check-confirm-refuse"]')
+    await waitFor(view, `document.querySelector('[data-test="age-check-not-sold"]')`)
+
+    expect(counts().ageChecks).toBe(before.ageChecks + 1)
+    const row = latestAgeCheck()
+    expect(row).toMatchObject({ outcome: 'REFUSED', reason: 'NO_ID_SHOWN', id_type: null })
+    expect(row?.product).toContain(restrictedProductName)
+    view.close()
+  }, 120_000)
+
+  // F-104 criterion 6, issue 1150 item 6: the one number the confirmation is read for.
+  test('the amount to key into the reader is the display figure, in the mono face', async () => {
+    const { venueId, ordinaryProductId } = await aMixedBasketSetup()
+    const view = await atTheTill(venueId, `[data-test="product-${ordinaryProductId}"]`)
+
+    await click(view, `[data-test="product-${ordinaryProductId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£3.00')`)
+    await click(view, `[aria-label="Charge £3.00"]`)
+    await waitFor(view, `document.querySelector('[data-test="charge-amount-figure"]')`)
+
+    expect(await textOf(view, '[data-test="charge-amount-figure"]')).toContain('£3.00')
+    const figure = `(() => {
+      const style = getComputedStyle(document.querySelector('[data-test="charge-amount-figure"]'))
+      return { size: parseFloat(style.fontSize), mono: style.fontFamily.toLowerCase().includes('mono') }
+    })()`
+    const shown = await view.evaluate<{ size: number, mono: boolean }>(figure)
+    expect(shown.mono).toBe(true)
+    expect(shown.size).toBeGreaterThanOrEqual(36)
     view.close()
   }, 120_000)
 })
