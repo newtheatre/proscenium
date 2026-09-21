@@ -12,6 +12,10 @@ if (!page.value) {
 const departments = computed(() => page.value?.departments ?? [])
 const steps = computed(() => page.value?.steps ?? [])
 
+// The tiles and the steps describe the theatre whoever writes the page; a quotation is somebody's
+// own sentence, so it waits for the copy rather than standing in for it (D-103 criterion 6).
+const quote = computed(() => (page.value?.placeholder ? null : page.value?.quote ?? null))
+
 // Joining is a membership, so a member goes to their own record and everybody else starts with
 // an account. The home page's invitation lands here and this is the step after it.
 const joinTo = computed(() => (account.value.signedIn ? '/account/membership' : '/register'))
@@ -137,15 +141,16 @@ useSchemaOrg([
       </section>
     </UContainer>
 
-    <!-- The view's one spotlight. A member's own words, once the committee has chosen whose. -->
+    <!-- The view's one spotlight. Nobody is quoted until the committee has chosen whose words
+         these are, so the band is absent rather than filled with a stand-in (D-103 criterion 6). -->
     <div
-      v-if="page!.quote"
+      v-if="quote"
       class="dark nnt-spotlight"
       data-test="join-quote"
     >
       <UContainer class="py-16">
         <blockquote class="nnt-headline max-w-3xl text-2xl text-highlighted sm:text-3xl">
-          {{ page!.quote }}
+          {{ quote }}
         </blockquote>
         <UButton
           class="mt-8"

@@ -610,6 +610,16 @@ export function performanceAvailability(
   return remaining <= Math.ceil((house.capacity ?? 0) * limitedAtOrBelowPercent / 100) ? 'LIMITED' : 'AVAILABLE'
 }
 
+// The booking picker's second line. Availability every time, in the show page's own terms, and the
+// venue only where the run uses more than one of them (D-104 criterion 8).
+export function saysNightLine(
+  night: { availability: Availability, remaining: number | null, venueName: string },
+  withVenue: boolean,
+): string {
+  const state = saysAvailability(night.availability, night.remaining)
+  return withVenue ? `${night.venueName} · ${state}` : state
+}
+
 export function saysAvailability(state: Availability, remaining: number | null): string {
   if (state === 'SOLD_OUT') return 'Sold out'
   if (state === 'BOOKING_CLOSED') return 'Booking closed'
