@@ -227,8 +227,10 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
       No figure appears on it, the membership fee included, until that fee is a configuration key.
   18. Everything on that landing page is content: the headline, the flash, the tiles, the steps
       and the quote are front-matter fields of `content/get-involved.md`, so a committee member
-      changing a department or a step never opens a Vue file. It keeps the placeholder treatment
-      until the committee's words land (D-103 criterion 5).
+      changing a department or a step never opens a Vue file. Its prose sections keep the
+      placeholder treatment until the committee's words land (D-103 criterion 5); the furniture
+      above them is written and is not held back, and a field nobody has written is absent rather
+      than filled with a stand-in (D-103 criterion 6).
   19. A listing emptied by one of its own filters says that the filter emptied it and offers to
       clear it, which is a different answer from the season having nothing in it. The show page's
       four practical facts stand in one column below `sm`, where two columns break the longest of

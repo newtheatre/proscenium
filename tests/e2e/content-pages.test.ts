@@ -25,6 +25,10 @@ const PAGES = [
   { path: '/technical-specification', title: 'Technical specification' },
 ]
 
+// Get involved is written: its hero, its tiles and its steps are the page, and the home page and
+// the error page both offer it. The other three are still the committee's to write.
+const UNWRITTEN = PAGES.filter(page => page.path !== '/get-involved')
+
 describe.skipIf(skip !== null)('editorial pages render from content markdown (D-103)', () => {
   for (const { path, title } of PAGES) {
     test(`${path} renders and states it awaits committee copy`, async () => {
@@ -41,14 +45,21 @@ describe.skipIf(skip !== null)('editorial pages render from content markdown (D-
     expect(response.status).toBe(404)
   })
 
-  // D-103 criterion 6: all four are still placeholders, so the footer carries none of them. The
-  // pages stay reachable by address, which is how an editor previews one.
-  test('the footer links no page that still awaits committee copy', async () => {
+  // D-103 criterion 6: neither end of the shell links a page awaiting copy. The pages stay
+  // reachable by address, which is how an editor previews one.
+  test('neither the header nor the footer links a page that still awaits committee copy', async () => {
     const html = await (await fetch(`${app.baseURL}/`)).text()
     const footer = html.slice(html.indexOf('data-test="footer-links"'))
-    for (const { path } of PAGES) {
-      expect(`${path}: ${footer.includes(`href="${path}"`)}`).toBe(`${path}: false`)
+    const header = html.slice(0, html.indexOf('data-test="footer-links"'))
+
+    for (const { path } of UNWRITTEN) {
+      expect(`footer ${path}: ${footer.includes(`href="${path}"`)}`).toBe(`footer ${path}: false`)
+      expect(`header ${path}: ${header.includes(`href="${path}"`)}`).toBe(`header ${path}: false`)
     }
+
+    // The written pages are still reached from both ends.
+    expect(header).toContain('href="/get-involved"')
+    expect(footer).toContain('href="/get-involved"')
     expect(footer).toContain('href="/policies/booking"')
     expect(footer).toContain('href="/whats-on"')
   })
@@ -120,11 +131,13 @@ describe.skipIf(skip !== null)('an editorial page reads as a column, not as a wa
 
       expect(counts.departments).toBeGreaterThan(3)
       expect(counts.steps).toBe(3)
-      // Nobody has said this yet, so nobody is quoted saying it (D-103 criterion 6).
+      // No quote in the front matter and so no band: nobody is quoted until somebody has said it
+      // (D-103 criterion 6).
       expect(counts.quote).toBe(0)
       expect(counts.join).toBeGreaterThan(0)
-      // The placeholder treatment stays until the committee's words land (D-103 criterion 5).
-      expect(counts.placeholder).toBe(1)
+      // The page's own furniture is written, so the page-level placeholder treatment is gone; its
+      // prose sections still say what belongs under them (J-111 criterion 18).
+      expect(counts.placeholder).toBe(0)
       for (const element of ['marquee', 'sticker', 'spotlight']) {
         expect(`${element}: ${counts[element]! <= 1}`).toBe(`${element}: true`)
       }

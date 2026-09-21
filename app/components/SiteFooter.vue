@@ -14,12 +14,7 @@ function href(entry: NavEntry): string {
   return account.value.signedIn ? entry.to : `/sign-in?next=${encodeURIComponent(entry.to)}`
 }
 
-// Not awaited: the footer is a child of every layout, and an async setup here would suspend the
-// whole shell. Nuxt still resolves it during the server render.
-const { data: unwritten } = useAsyncData('content:placeholders', async () => {
-  const pages = await queryCollection('content').where('placeholder', '=', true).select('path').all()
-  return pages.map(page => page.path)
-}, { default: (): string[] => [] })
+const unwritten = usePlaceholderPaths()
 
 // The public half groups by the heading each entry declares (0040), and a page the committee has
 // not written yet is left out of every column until it has copy (D-103 criterion 6).

@@ -1,7 +1,6 @@
 ---
 title: Get involved
 description: How to join the Nottingham New Theatre and what there is to do.
-placeholder: true
 banner: /images/banners/get-involved.webp
 headline: Turn up. Muck in. Take a bow.
 flash: No experience needed
@@ -37,7 +36,6 @@ steps:
     blurb: Socials, auditions and crew calls, posted every week. Bring nothing but yourself.
   - title: Make theatre
     blurb: You will be on a show within weeks. On stage, backstage or box office, your call.
-quote: 'Awaiting committee copy: a member''s own sentence about what the theatre turned into for them.'
 ---
 
 This page is a placeholder. The headings below mark out what belongs on it; none of the prose

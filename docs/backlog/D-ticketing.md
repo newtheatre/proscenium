@@ -97,8 +97,9 @@ Open questions:
   5. The four pages the old estate carried migrate with their copy; the empty stagecraft
      collection and the commented-out technical specification are rewritten, not imported blank.
   6. A page still flagged `placeholder` is reachable by its own address and linked from nowhere:
-     the site's link lists drop it, and any front-matter furniture whose words the committee has
-     not supplied (the landing page's pull quote) does not render at all.
+     the header's links and the footer's columns both drop it. A stand-in sentence is never
+     written into front matter; an unwritten field is left absent, and the furniture it would have
+     filled does not render.
 - Source: Prompt Book D-1; committee direction 26 August (Nuxt Content with Studio-style
   editing); audit PR-1; Get-In part 2 (content pages: rebuild)
 
