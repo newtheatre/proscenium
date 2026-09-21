@@ -83,6 +83,9 @@ Stories: 14 total (9 MVP, 4 V2, 1 Later).
   4. The in-app inbox always shows the individual entries; only the email is coalesced.
   5. Each coalesced email is one row in the send log referencing its constituent entries, so "was I told about X" remains answerable per change.
   6. An automated test enqueues five changes inside the window and asserts one provider call; a sixth after the window closes produces a second email.
+  7. The preference screen offers a channel only where something delivers on it, and a change to
+     a preference is confirmed by the control's own state rather than by a message of its own:
+     five toggles are five saved preferences, not five things to dismiss.
 - Source: Prompt Book H-1 (digest coalescing); audit RM-4 (status-change emails group per user: five moved bookings, one email), SD-13, TR-9 (grouped warnings and digests).
 
 ## H-105: The send log, with retries
