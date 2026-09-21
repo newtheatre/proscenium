@@ -264,7 +264,7 @@ const columns: TableColumn<Member>[] = [
   },
   {
     id: 'open',
-    header: '',
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right' } },
     cell: ({ row }) => h(UButton, {
       'to': `/people/accounts/${row.original.userId}`,
@@ -323,7 +323,7 @@ const claimColumns: TableColumn<Claim>[] = [
   },
   {
     id: 'decide',
-    header: '',
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => (writes.value === false
       ? null

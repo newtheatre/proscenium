@@ -167,13 +167,42 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
 
 // The pinned slot is the one thing a thumb finds in the dark, so it holds something this viewer
 // can actually do (K-102 criterion 2, issue 1150 items 10 and 14).
-describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 items 10, 14)', () => {
+describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 items 10, 12, 13, 14)', () => {
   test('the glance pins its own refresh where the viewer cannot close the night', async () => {
     const view = await openView(PHONE)
     try {
       await visit(view, `${app.baseURL}/tonight/glance`)
       expect(await textOf(view, '[data-test="night-actions"]')).toContain('Refresh the numbers')
       expect(await textOf(view, '[data-test="night-actions"]')).not.toContain('Close the night')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the board pins its own composer and keeps Reset out of the thumb\'s way', async () => {
+    const view = await openView(PHONE)
+    try {
+      await visit(view, `${app.baseURL}/tonight/board`)
+      const pinned = await textOf(view, '[data-test="night-actions"]')
+      expect(pinned).not.toContain('Reset the board')
+      await waitFor(view, 'document.querySelector(\'[data-test="night-actions"] [data-test="board-free-text-submit"]\')')
+      const reset = await boxOf(view, '[data-test="board-reset-open"]')
+      expect(reset.height).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the incident log pins the incident, with the near miss one tap on from it', async () => {
+    const view = await openView(PHONE)
+    try {
+      await visit(view, `${app.baseURL}/tonight/incidents`)
+      const pinned = await textOf(view, '[data-test="night-actions"]')
+      expect(pinned).toContain('Log an incident')
+      expect(pinned).toContain('Report a near miss')
+      expect(pinned.indexOf('Log an incident')).toBeLessThan(pinned.indexOf('Report a near miss'))
     }
     finally {
       view.close()
@@ -192,6 +221,42 @@ describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 ite
       view.close()
     }
   }, CASE_TIMEOUT_MS)
+})
+
+// Rule 4 of docs/design-language.md, measured rather than asserted from the source: every control
+// on a show-night screen clears 48 by 48, not only the primary actions (issue 1150 item 15).
+describe.skipIf(skip !== null)('the target floor holds for every control (K-102, issue 1150 item 15)', () => {
+  // The till is audited by its own suites; these are the screens outside it.
+  const SCREENS = ['/tonight', '/tonight/glance', '/tonight/board', '/tonight/incidents', '/tonight/age-checks', '/tonight/emergency']
+
+  // Zero-sized elements are the ones a `v-if` has taken out, which are not controls anybody can
+  // miss; everything with a box on the page is measured.
+  const CONTROLS = `(() => {
+    const seen = []
+    for (const node of document.querySelectorAll('button, input, select, textarea, [role="combobox"], a[href]')) {
+      const rect = node.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) continue
+      if (getComputedStyle(node).display === 'inline') continue
+      seen.push({ what: node.getAttribute('data-test') ?? node.tagName.toLowerCase(), width: rect.width, height: rect.height })
+    }
+    return JSON.stringify(seen)
+  })()`
+
+  for (const path of SCREENS) {
+    test(`every control on ${path} is a thumb-sized target`, async () => {
+      const view = await openView(PHONE)
+      try {
+        await visit(view, `${app.baseURL}${path}`)
+        const controls = JSON.parse(await view.evaluate<string>(CONTROLS)) as { what: string, width: number, height: number }[]
+        expect(controls.length).toBeGreaterThan(0)
+        const short = controls.filter(one => one.height < NIGHT_TAP_TARGET_PX || one.width < NIGHT_TAP_TARGET_PX)
+        expect(short.map(one => `${one.what} ${Math.round(one.width)}x${Math.round(one.height)}`)).toEqual([])
+      }
+      finally {
+        view.close()
+      }
+    }, CASE_TIMEOUT_MS)
+  }
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

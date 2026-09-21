@@ -171,6 +171,12 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    looks right on a desk monitor is wrong for the surface it is on. Every control on one clears
    48 by 48 pixels, not only the primary actions K-102 criterion 2 names: a cold hand in a dark
    foyer does not aim, and a secondary control missed twice costs more than the room it saved.
+   That floor is one rule, `.nnt-night` in `app/assets/css/theme.css`, and the two show-night
+   layouts put the class on the body so a teleported modal is inside it too; a screen never asks
+   for it field by field. The shells stand on `min-h-dvh` rather than `min-h-screen`, and the
+   pinned area pads by `env(safe-area-inset-bottom)`, so a phone's own browser chrome and home
+   indicator never sit on top of the action under the thumb. `tests/unit/night-shell.test.ts`
+   holds all three.
 5. **Navigation is declared once and filtered by ability.** Every destination in the console
    sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu, the
    public header (`HEADER_NAV`, a derived slice of `PUBLIC_NAV`) and the footer comes from
@@ -181,7 +187,14 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    at all; an icon belongs to one entry across the whole sidebar; and a nav label is character for
    character the `title` its page sets in `definePageMeta`, with the shorter noun winning, because
    the sidebar truncates at its default width and the navbar does not (issue 921).
-6. **A `UTable` stays usable below `sm`.** A secondary column carries `app/utils/responsive-table.ts`'s
+6. **Every console list is a `UTable` with column definitions, and it stays usable below `sm`.**
+   Table markup written by hand takes none of the shell's behaviour, so it arrives with no empty
+   state, no loading state and no column rules; a list of rows on the console is a `UTable` or it
+   is a defect (K-123 criterion 9). A money column is right-aligned and mono through
+   `RIGHT_ALIGNED` and `saysMoney`. A column of row actions has a header, `ACTIONS_HEADER`
+   hiding the word where a visible one would read as noise, and an empty header is not a header.
+   A row offers at most three actions in line, the primary one visible and the rest in a
+   `UDropdownMenu` (K-123 criterion 10). A secondary column carries `app/utils/responsive-table.ts`'s
    `HIDE_BELOW_SM` class on both its header and cell, and its content moves into the primary
    column's own cell as an `sm:hidden` line, so nothing a phone reads is lost, only where it sits;
    the row's actions never move. A read-only history table with no primary column instead renders

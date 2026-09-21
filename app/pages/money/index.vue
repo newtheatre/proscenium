@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { PERIOD_KINDS } from '#shared/utils/season-dashboard'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
 import { currentSeasonYear } from '#shared/utils/season'
-import type { PeriodInput, PeriodKind, SeasonSummary } from '#shared/utils/season-dashboard'
+import type { PeriodInput, PeriodKind, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { Period } from '#shared/utils/period-locks'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Season dashboard', middleware: 'console', docs: '/docs/money' })
 
@@ -73,6 +75,36 @@ function entriesUrl(source?: string): string {
   if (source) params.set('source', source)
   return `/money/entries?${params.toString()}`
 }
+
+const UButton = resolveComponent('UButton')
+
+const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
+  { id: 'source', header: 'Source', cell: ({ row }) => row.original.source },
+  { id: 'amount', header: 'Amount', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.totalPence) },
+  ...(mayDrillDown.value
+    ? [{
+        id: 'act',
+        header: ACTIONS_HEADER,
+        meta: RIGHT_ALIGNED,
+        cell: ({ row }: { row: { original: RevenueBySource } }) => h(UButton, {
+          size: 'sm',
+          variant: 'subtle',
+          to: entriesUrl(row.original.source),
+        }, () => 'Entries'),
+      }]
+    : []),
+])
+
+// The four figures below the revenue table are one thing each, not rows of a list, so they read
+// as a description list (design language rule 6).
+const figures = computed(() => (data.value
+  ? [
+      { label: 'Refunds', test: 'refunds-pence', pence: data.value.refundsPence },
+      { label: 'Foregone comps', test: 'comps-pence', pence: data.value.compsPence },
+      { label: 'Foregone discounts', test: 'discounts-pence', pence: data.value.discountsPence },
+      { label: 'Open variance', test: 'open-variance-pence', pence: data.value.openVariancePence },
+    ]
+  : []))
 </script>
 
 <template>
@@ -143,78 +175,40 @@ function entriesUrl(source?: string): string {
         <h2 class="font-semibold">
           Revenue by source
         </h2>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Source
-              </th><th>Amount</th><th v-if="mayDrillDown" />
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.revenueBySource"
-              :key="row.source"
-              data-test="revenue-row"
-            >
-              <td class="py-2">
-                {{ row.source }}
-              </td>
-              <td>{{ saysMoney(row.totalPence) }}</td>
-              <td v-if="mayDrillDown">
-                <UButton
-                  size="sm"
-                  variant="subtle"
-                  :to="entriesUrl(row.source)"
-                >
-                  Entries
-                </UButton>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <UTable
+          :data="data.revenueBySource"
+          :columns="revenueColumns"
+          data-test="revenue-by-source-table"
+        >
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              Nothing was taken in this period.
+            </p>
+          </template>
+        </UTable>
       </section>
 
       <section
         class="space-y-2"
         data-test="section-figures"
       >
-        <table class="w-full text-sm">
-          <tbody>
-            <tr>
-              <td class="py-2">
-                Refunds
-              </td>
-              <td data-test="refunds-pence">
-                {{ saysMoney(data.refundsPence) }}
-              </td>
-            </tr>
-            <tr>
-              <td class="py-2">
-                Foregone comps
-              </td>
-              <td data-test="comps-pence">
-                {{ saysMoney(data.compsPence) }}
-              </td>
-            </tr>
-            <tr>
-              <td class="py-2">
-                Foregone discounts
-              </td>
-              <td data-test="discounts-pence">
-                {{ saysMoney(data.discountsPence) }}
-              </td>
-            </tr>
-            <tr>
-              <td class="py-2">
-                Open variance
-              </td>
-              <td data-test="open-variance-pence">
-                {{ saysMoney(data.openVariancePence) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <dl class="divide-y divide-default text-sm">
+          <div
+            v-for="figure in figures"
+            :key="figure.test"
+            class="flex items-baseline justify-between gap-2 py-2"
+          >
+            <dt class="text-muted">
+              {{ figure.label }}
+            </dt>
+            <dd
+              :data-test="figure.test"
+              class="text-right font-mono whitespace-nowrap"
+            >
+              {{ saysMoney(figure.pence) }}
+            </dd>
+          </div>
+        </dl>
       </section>
     </template>
   </div>

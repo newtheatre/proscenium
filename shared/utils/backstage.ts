@@ -121,6 +121,17 @@ export function boardStateFrom<T>(side: BoardSide, state: { foh: T | null, backs
   return side === 'FOH' ? { own: state.foh, other: state.backstage } : { own: state.backstage, other: state.foh }
 }
 
+// A send the queue refused, in the words it was typed in (E-121 criterion 6). The preset it
+// names may have been retired between the tap and the drain, which is why the fallback exists.
+export function saysQueuedSend(
+  presets: readonly { id: string, label: string }[],
+  payload: { presetId: string | null, body: string | null },
+): string {
+  const preset = payload.presetId ? presets.find(one => one.id === payload.presetId) : undefined
+  const said = preset?.label ?? (payload.body ?? '').trim()
+  return said || 'A call to backstage'
+}
+
 export interface BoardFeedRow<T> { message: T, seenAt: number | null }
 
 // The history either end shows: live rows only, each carrying the other side's first tick.

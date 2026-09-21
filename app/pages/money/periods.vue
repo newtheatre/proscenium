@@ -12,7 +12,7 @@ const columns: TableColumn<PeriodLock>[] = [
   { id: 'label', header: 'Label' },
   { id: 'action', header: 'Action' },
   { id: 'actor', header: 'By' },
-  { id: 'act', header: '' },
+  { id: 'act', header: ACTIONS_HEADER },
 ]
 
 const request = useRequestFetch()

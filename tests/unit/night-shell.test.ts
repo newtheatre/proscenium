@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { effectScope, nextTick, ref } from 'vue'
-import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, lastSyncedLabel } from '#shared/utils/night-shell'
+import { NIGHT_STALE_AFTER_MS, NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, lastSyncedLabel, nightFreshness, staleAnnouncement } from '#shared/utils/night-shell'
 import { bindNightEyebrow, bindNightFallbackSubject, bindNightSubject } from '#composables/useNightHeader'
 import type { NightHeaderState } from '#composables/useNightHeader'
 
@@ -180,5 +180,80 @@ describe('the show-night header setters settle (E-112 criterion 1)', () => {
     inner.stop()
     expect(header.value).toEqual({ eyebrow: 'Show night', subject: null, fallback: { title: 'Machinal', meta: null } })
     outer.stop()
+  })
+})
+
+// A label that ticks every 20 seconds under aria-live reads the clock out over and over. What a
+// screen reader is owed is the change from fresh to stale and back (K-101 criterion 3).
+describe('the staleness a screen reader hears (K-101 criterion 3, issue 1150 item 15)', () => {
+  const at = Date.UTC(2026, 6, 15, 18, 42)
+
+  test('the threshold is longer than any show-night screen\'s own refresh', () => {
+    expect(NIGHT_STALE_AFTER_MS).toBeGreaterThan(20_000)
+  })
+
+  test('just synced is fresh, and stays fresh across a poll or two', () => {
+    expect(nightFreshness(at, at)).toBe('FRESH')
+    expect(nightFreshness(at, at + NIGHT_STALE_AFTER_MS - 1)).toBe('FRESH')
+  })
+
+  test('past the threshold it is stale', () => {
+    expect(nightFreshness(at, at + NIGHT_STALE_AFTER_MS)).toBe('STALE')
+    expect(nightFreshness(at, at + 10 * NIGHT_STALE_AFTER_MS)).toBe('STALE')
+  })
+
+  test('nothing synced yet is neither fresh nor stale', () => {
+    expect(nightFreshness(null, at)).toBe('NEVER')
+    expect(nightFreshness(undefined, at)).toBe('NEVER')
+  })
+
+  test('a clock that has gone backwards still reads as fresh rather than stale', () => {
+    expect(nightFreshness(at, at - 5_000)).toBe('FRESH')
+  })
+
+  test('what is announced is a state, never a time', () => {
+    expect(staleAnnouncement('STALE')).toBe('These figures are no longer current.')
+    expect(staleAnnouncement('FRESH')).toBe('These figures are current.')
+    expect(staleAnnouncement('NEVER')).toBe('Nothing has synced yet.')
+  })
+
+  test('NightStale keeps aria-live off the label that ticks', async () => {
+    const source = await component('NightStale')
+    const ticking = source.slice(source.indexOf('<template>'))
+    expect(ticking).toContain('sr-only')
+    expect(ticking).toMatch(/data-test="night-stale"[^>]*>/)
+    // The live region is the announcement, not the label: one aria-live in the component.
+    expect(ticking.match(/aria-live/g)).toHaveLength(1)
+    expect(ticking).toContain('{{ announcement }}')
+  })
+})
+
+// Rule 4 of docs/design-language.md: the show-night shell stands on the viewport a phone actually
+// shows, and every control on it clears 48 by 48, set once rather than per field.
+describe('the show-night shell stands on the visible viewport (K-102, design-language rule 4)', () => {
+  const LAYOUTS = ['app/layouts/tonight.vue', 'app/layouts/backstage.vue']
+  const TOKEN_SOURCE = 'app/assets/css/theme.css'
+  const SHELL_CLASS = 'nnt-night'
+
+  test('both show-night layouts take the dynamic viewport height, never the fixed one', async () => {
+    for (const layout of LAYOUTS) {
+      const source = await read(layout)
+      expect(`${layout}: ${source.includes('min-h-screen')}`).toBe(`${layout}: false`)
+      expect(`${layout}: ${source.includes('min-h-dvh')}`).toBe(`${layout}: true`)
+    }
+  })
+
+  test('the pinned area clears the phone\'s home indicator', async () => {
+    expect(await component('NightScreen')).toContain('env(safe-area-inset-bottom)')
+    expect(await read('app/layouts/backstage.vue')).toContain('env(safe-area-inset-bottom)')
+  })
+
+  test('the target floor is one rule for the shell, not a class per field', async () => {
+    const theme = await read(TOKEN_SOURCE)
+    expect(theme).toContain(`.${SHELL_CLASS} `)
+    expect(theme).toContain(`min-height: ${NIGHT_TAP_TARGET_PX / 16}rem`)
+    for (const layout of LAYOUTS) {
+      expect(`${layout}: ${(await read(layout)).includes(SHELL_CLASS)}`).toBe(`${layout}: true`)
+    }
   })
 })

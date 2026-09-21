@@ -69,7 +69,7 @@ export function hubKpis(house: HubHouse): HubKpis {
 // The bar under the numbers is sold over capacity, so it is the sold share it names: "collected"
 // is the next number along, and reading one for the other overstates the room (issue 1150 item 10).
 export function housePercentLine(soldPercent: number | null): string {
-  if (soldPercent === null) return 'This house is uncapped, so there is no percentage to read.'
+  if (soldPercent === null) return 'No cap on this house'
   return `${soldPercent}% of the house sold`
 }
 

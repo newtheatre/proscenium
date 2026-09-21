@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
-import { ID_TYPES, REFUSAL_REASONS, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
+import { ID_TYPES, REFUSAL_REASONS, ageCheckReady, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { londonClock } from '#shared/utils/london'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
@@ -109,6 +109,21 @@ const logForm = reactive<FormState>(blankForm())
 const logFailure = ref<string | null>(null)
 const saving = ref(false)
 
+// Picking a side clears the other one, so a value the form has stopped asking about is never
+// still sitting in it when the write goes (E-118 criterion 1).
+function chooseOutcome(form: { outcome: AgeCheckOutcome, idType: IdType | undefined, reason: RefusalReason | undefined }, outcome: AgeCheckOutcome): void {
+  form.outcome = outcome
+  if (outcome === 'ACCEPTED') form.reason = undefined
+  else form.idType = undefined
+}
+
+const logReady = computed(() => ageCheckReady({
+  outcome: logForm.outcome,
+  idType: logForm.idType ?? null,
+  reason: logForm.reason ?? null,
+  description: logForm.description,
+}))
+
 function openLog(): void {
   Object.assign(logForm, blankForm())
   logFailure.value = null
@@ -151,6 +166,13 @@ const correctForm = reactive<Omit<FormState, 'performanceId'>>({
   outcome: 'ACCEPTED', idType: undefined, reason: undefined, description: '', product: '', notes: '',
 })
 const correctFailure = ref<string | null>(null)
+
+const correctReady = computed(() => ageCheckReady({
+  outcome: correctForm.outcome,
+  idType: correctForm.idType ?? null,
+  reason: correctForm.reason ?? null,
+  description: correctForm.description,
+}))
 
 function openCorrect(entry: Entry): void {
   correcting.value = entry
@@ -244,9 +266,9 @@ async function submitCorrect(): Promise<void> {
           </p>
           <UButton
             v-if="!entry.supersededBy"
-            size="xs"
             color="neutral"
             variant="ghost"
+            class="min-h-12"
             :data-test="`correct-${entry.id}`"
             @click="openCorrect(entry)"
           >
@@ -286,49 +308,63 @@ async function submitCorrect(): Promise<void> {
             :description="logFailure"
           />
 
-          <UFormField
-            v-if="performances.length > 0"
-            label="Performance"
-          >
-            <USelect
-              v-model="logForm.performanceId"
-              :items="performanceOptions"
-              class="w-full"
-              data-test="log-performance"
-            />
-          </UFormField>
-
+          <!-- The routine check is two taps and a sentence: the outcome, the ID, who you saw.
+               Everything the register does not need every time folds away (E-118 criterion 1). -->
           <UFormField label="Outcome">
-            <USelect
-              v-model="logForm.outcome"
-              :items="outcomeOptions"
-              class="w-full"
+            <div
+              class="grid grid-cols-2 gap-2"
               data-test="log-outcome"
-            />
+            >
+              <UButton
+                v-for="option in outcomeOptions"
+                :key="option.value"
+                :color="logForm.outcome === option.value ? 'primary' : 'neutral'"
+                :variant="logForm.outcome === option.value ? 'solid' : 'subtle'"
+                size="lg"
+                class="min-h-12 justify-center font-semibold"
+                :data-test="`log-outcome-${option.value}`"
+                @click="chooseOutcome(logForm, option.value)"
+              >
+                {{ option.label }}
+              </UButton>
+            </div>
           </UFormField>
 
-          <UFormField
-            v-if="logForm.outcome === 'ACCEPTED'"
-            label="ID shown"
-          >
-            <USelect
-              v-model="logForm.idType"
-              :items="idTypeOptions"
-              class="w-full"
+          <UFormField :label="logForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'">
+            <div
+              v-if="logForm.outcome === 'ACCEPTED'"
+              class="grid grid-cols-2 gap-2"
               data-test="log-id-type"
-            />
-          </UFormField>
-
-          <UFormField
-            v-else
-            label="Why refused"
-          >
-            <USelect
-              v-model="logForm.reason"
-              :items="reasonOptions"
-              class="w-full"
+            >
+              <UButton
+                v-for="option in idTypeOptions"
+                :key="option.value"
+                :color="logForm.idType === option.value ? 'primary' : 'neutral'"
+                :variant="logForm.idType === option.value ? 'solid' : 'subtle'"
+                class="min-h-12 justify-center"
+                :data-test="`log-id-type-${option.value}`"
+                @click="logForm.idType = option.value"
+              >
+                {{ option.label }}
+              </UButton>
+            </div>
+            <div
+              v-else
+              class="grid gap-2"
               data-test="log-reason"
-            />
+            >
+              <UButton
+                v-for="option in reasonOptions"
+                :key="option.value"
+                :color="logForm.reason === option.value ? 'primary' : 'neutral'"
+                :variant="logForm.reason === option.value ? 'solid' : 'subtle'"
+                class="min-h-12 justify-center"
+                :data-test="`log-reason-${option.value}`"
+                @click="logForm.reason = option.value"
+              >
+                {{ option.label }}
+              </UButton>
+            </div>
           </UFormField>
 
           <UFormField
@@ -337,45 +373,75 @@ async function submitCorrect(): Promise<void> {
           >
             <UInput
               v-model="logForm.description"
+              size="xl"
               class="w-full"
               data-test="log-description"
             />
           </UFormField>
 
-          <UFormField
-            label="Product"
-            hint="Optional"
-          >
-            <UInput
-              v-model="logForm.product"
-              class="w-full"
-              data-test="log-product"
-            />
-          </UFormField>
+          <UCollapsible data-test="log-more">
+            <UButton
+              color="neutral"
+              variant="subtle"
+              trailing-icon="i-lucide-chevron-down"
+              block
+              class="min-h-12 justify-between"
+              data-test="log-more-open"
+            >
+              The house, the product, a note
+            </UButton>
 
-          <UFormField
-            label="Notes"
-            hint="Optional"
-          >
-            <UTextarea
-              v-model="logForm.notes"
-              :rows="2"
-              class="w-full"
-              data-test="log-notes"
-            />
-          </UFormField>
+            <template #content>
+              <div class="space-y-4 pt-4">
+                <UFormField
+                  v-if="performances.length > 0"
+                  label="Performance"
+                >
+                  <USelect
+                    v-model="logForm.performanceId"
+                    :items="performanceOptions"
+                    size="xl"
+                    class="w-full"
+                    data-test="log-performance"
+                  />
+                </UFormField>
+
+                <UFormField label="Product">
+                  <UInput
+                    v-model="logForm.product"
+                    size="xl"
+                    class="w-full"
+                    data-test="log-product"
+                  />
+                </UFormField>
+
+                <UFormField label="Notes">
+                  <UTextarea
+                    v-model="logForm.notes"
+                    :rows="2"
+                    class="w-full"
+                    data-test="log-notes"
+                  />
+                </UFormField>
+              </div>
+            </template>
+          </UCollapsible>
 
           <div class="flex flex-wrap gap-2">
             <UButton
               type="submit"
+              size="lg"
+              class="min-h-12"
               :loading="saving"
+              :disabled="!logReady"
               data-test="log-submit"
             >
-              Log it
+              Log the check
             </UButton>
             <UButton
               color="neutral"
               variant="ghost"
+              class="min-h-12"
               @click="logging = false"
             >
               Back
@@ -406,36 +472,60 @@ async function submitCorrect(): Promise<void> {
           />
 
           <UFormField label="Outcome">
-            <USelect
-              v-model="correctForm.outcome"
-              :items="outcomeOptions"
-              class="w-full"
+            <div
+              class="grid grid-cols-2 gap-2"
               data-test="correct-outcome"
-            />
+            >
+              <UButton
+                v-for="option in outcomeOptions"
+                :key="option.value"
+                :color="correctForm.outcome === option.value ? 'primary' : 'neutral'"
+                :variant="correctForm.outcome === option.value ? 'solid' : 'subtle'"
+                size="lg"
+                class="min-h-12 justify-center font-semibold"
+                :data-test="`correct-outcome-${option.value}`"
+                @click="chooseOutcome(correctForm, option.value)"
+              >
+                {{ option.label }}
+              </UButton>
+            </div>
           </UFormField>
 
-          <UFormField
-            v-if="correctForm.outcome === 'ACCEPTED'"
-            label="ID shown"
-          >
-            <USelect
-              v-model="correctForm.idType"
-              :items="idTypeOptions"
-              class="w-full"
+          <UFormField :label="correctForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'">
+            <div
+              v-if="correctForm.outcome === 'ACCEPTED'"
+              class="grid grid-cols-2 gap-2"
               data-test="correct-id-type"
-            />
-          </UFormField>
-
-          <UFormField
-            v-else
-            label="Why refused"
-          >
-            <USelect
-              v-model="correctForm.reason"
-              :items="reasonOptions"
-              class="w-full"
+            >
+              <UButton
+                v-for="option in idTypeOptions"
+                :key="option.value"
+                :color="correctForm.idType === option.value ? 'primary' : 'neutral'"
+                :variant="correctForm.idType === option.value ? 'solid' : 'subtle'"
+                class="min-h-12 justify-center"
+                :data-test="`correct-id-type-${option.value}`"
+                @click="correctForm.idType = option.value"
+              >
+                {{ option.label }}
+              </UButton>
+            </div>
+            <div
+              v-else
+              class="grid gap-2"
               data-test="correct-reason"
-            />
+            >
+              <UButton
+                v-for="option in reasonOptions"
+                :key="option.value"
+                :color="correctForm.reason === option.value ? 'primary' : 'neutral'"
+                :variant="correctForm.reason === option.value ? 'solid' : 'subtle'"
+                class="min-h-12 justify-center"
+                :data-test="`correct-reason-${option.value}`"
+                @click="correctForm.reason = option.value"
+              >
+                {{ option.label }}
+              </UButton>
+            </div>
           </UFormField>
 
           <UFormField
@@ -475,7 +565,9 @@ async function submitCorrect(): Promise<void> {
           <div class="flex flex-wrap gap-2">
             <UButton
               type="submit"
+              class="min-h-12"
               :loading="saving"
+              :disabled="!correctReady"
               data-test="correct-submit"
             >
               File the correction
@@ -483,6 +575,7 @@ async function submitCorrect(): Promise<void> {
             <UButton
               color="neutral"
               variant="ghost"
+              class="min-h-12"
               @click="correcting = null"
             >
               Back

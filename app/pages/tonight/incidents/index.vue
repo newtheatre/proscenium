@@ -282,21 +282,9 @@ async function submitCorrect(): Promise<void> {
         </section>
 
         <section>
-          <div class="mb-3 flex items-center justify-between gap-3">
-            <h2 class="font-mono text-xs tracking-[0.2em] text-muted uppercase">
-              Incident log
-            </h2>
-            <UButton
-              color="secondary"
-              icon="i-lucide-plus"
-              class="min-h-12"
-              :disabled="performanceIds.length === 0"
-              data-test="open-log-incident-inline"
-              @click="openLog"
-            >
-              Log incident
-            </UButton>
-          </div>
+          <h2 class="mb-3 font-mono text-xs tracking-[0.2em] text-muted uppercase">
+            Incident log
+          </h2>
 
           <UAlert
             v-if="failure"
@@ -356,9 +344,9 @@ async function submitCorrect(): Promise<void> {
                 </UButton>
                 <UButton
                   v-if="!entry.supersededBy"
-                  size="xs"
                   color="neutral"
                   variant="ghost"
+                  class="min-h-12"
                   :data-test="`correct-${entry.id}`"
                   @click="openCorrect(entry)"
                 >
@@ -377,10 +365,21 @@ async function submitCorrect(): Promise<void> {
       </div>
 
       <template #actions>
+        <!-- The incident is what this screen is for, so it is the one under the thumb; the near
+             miss stays one tap on from it, which is what E-112 criterion 4 asks for. -->
+        <NightAction
+          label="Log an incident"
+          icon="i-lucide-clipboard-pen"
+          color="primary"
+          :disabled="performanceIds.length === 0"
+          data-test="open-log-incident"
+          @press="openLog"
+        />
         <NightAction
           label="Report a near miss"
           icon="i-lucide-triangle-alert"
           color="neutral"
+          variant="outline"
           :disabled="performanceIds.length === 0"
           data-test="open-near-miss"
           @press="openNearMiss"
@@ -452,10 +451,11 @@ async function submitCorrect(): Promise<void> {
           <div class="flex flex-wrap gap-2">
             <UButton
               type="submit"
+              class="min-h-12"
               :loading="saving"
               data-test="log-submit"
             >
-              Log it
+              Log the incident
             </UButton>
             <UButton
               color="neutral"
@@ -520,10 +520,11 @@ async function submitCorrect(): Promise<void> {
           <div class="flex flex-wrap gap-2">
             <UButton
               type="submit"
+              class="min-h-12"
               :loading="saving"
               data-test="near-miss-submit"
             >
-              Report it
+              Report the near miss
             </UButton>
             <UButton
               color="neutral"
