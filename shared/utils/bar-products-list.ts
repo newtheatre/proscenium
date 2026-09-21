@@ -9,7 +9,7 @@ export const barProductsList = {
   fields: [
     {
       key: 'categoryId',
-      label: 'Category',
+      label: 'Product category',
       kind: 'search-list',
       column: 'category_id',
       // The column is never null, so "is empty" would always answer nothing.
@@ -20,9 +20,9 @@ export const barProductsList = {
   ],
   sort: {
     fields: [
-      { key: 'category', label: 'Category', column: 'category_sort' },
-      { key: 'categoryName', label: 'Category name', column: 'category_name', collate: 'nocase' },
-      { key: 'sort', label: 'Order in the category', column: 'sort' },
+      { key: 'category', label: 'Product category', column: 'category_sort' },
+      { key: 'categoryName', label: 'Product category name', column: 'category_name', collate: 'nocase' },
+      { key: 'sort', label: 'Order in the product category', column: 'sort' },
       { key: 'name', label: 'Product', column: 'name', collate: 'nocase' },
     ],
     default: 'category',

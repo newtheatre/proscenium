@@ -139,7 +139,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Tabs', icon: 'i-lucide-receipt', to: '/bar/tabs', ability: manageBarTabs, section: 'Every day' },
       { label: 'Reports', icon: 'i-lucide-bar-chart-3', to: '/bar/reports', ability: viewBarReports, section: 'Every day' },
       { label: 'Products', icon: 'i-lucide-cup-soda', to: '/bar/products', ability: viewBarCatalogue, section: 'Set-up' },
-      { label: 'Categories', icon: 'i-lucide-layout-grid', to: '/bar/categories', ability: viewBarCatalogue, section: 'Set-up' },
+      { label: 'Product categories', icon: 'i-lucide-layout-grid', to: '/bar/categories', ability: viewBarCatalogue, section: 'Set-up' },
       { label: 'Discounts', icon: 'i-lucide-percent', to: '/bar/discounts', ability: viewBarCatalogue, section: 'Set-up' },
     ],
   },

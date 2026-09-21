@@ -76,18 +76,18 @@ function exportUrl(section: ReportSection): string {
 }
 
 const salesColumns: TableColumn<SalesRow>[] = [
-  { id: 'category', header: 'Category', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.categoryName },
+  { id: 'category', header: 'Product category', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.categoryName },
   {
     id: 'product',
     header: 'Product',
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.productName),
-      // Below sm the category and the variant are hidden: shown here instead, so a phone keeps
+      // Below sm the product category and the size are hidden: shown here instead, so a phone keeps
       // the figures in view without losing what they said (issue 922).
       h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.variantLabel}, ${row.original.categoryName}`),
     ]),
   },
-  { id: 'variant', header: 'Variant', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.variantLabel },
+  { id: 'variant', header: 'Serving size', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.variantLabel },
   { id: 'qty', header: 'Qty', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.qty) },
   { id: 'revenue', header: 'Revenue', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.revenuePence) },
 ]
@@ -116,13 +116,13 @@ const wastageColumns: TableColumn<WastageRow>[] = [
     header: 'Reason',
     cell: ({ row }) => h('div', {}, [
       h('div', {}, says(row.original.reason)),
-      // Below sm the item and its category are hidden: shown here instead, so a phone keeps the
+      // Below sm the item and its product category are hidden: shown here instead, so a phone keeps the
       // figures in view without losing what they said (issue 922).
       h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.itemName}, ${row.original.categoryName}`),
     ]),
   },
   { id: 'item', header: 'Item', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.itemName },
-  { id: 'category', header: 'Category', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.categoryName },
+  { id: 'category', header: 'Product category', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.categoryName },
   { id: 'qty', header: 'Qty', meta: RIGHT_ALIGNED, cell: ({ row }) => saysQuantity(row.original.qtyWasted, row.original.unit) },
   { id: 'cost', header: 'At cost', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.costPence) },
 ]

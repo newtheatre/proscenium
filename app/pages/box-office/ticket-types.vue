@@ -150,8 +150,8 @@ async function setArchived(type: TicketType, archived: boolean): Promise<void> {
   try {
     await $fetch(`/api/admin/ticket-types/${type.id}/archive`, { method: 'POST', body: { archived } })
     toast.add({
-      title: archived ? 'Ticket type archived' : 'Ticket type back in use',
-      description: archived ? 'It stops appearing for new sales and still resolves for every ticket already sold.' : undefined,
+      title: archived ? 'Ticket type retired' : 'Ticket type back in use',
+      description: archived ? 'It stops appearing for new sales and still prices every ticket already sold.' : undefined,
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -200,7 +200,7 @@ const columns: TableColumn<TicketType>[] = [
           ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => saysRestriction(row.original.restrictedTo))
           : null,
         row.original.archived
-          ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Archived')
+          ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Retired')
           : null,
         row.original.activeByDefault
           ? null
@@ -242,7 +242,7 @@ const columns: TableColumn<TicketType>[] = [
         'variant': 'ghost',
         'data-test': `archive-${row.original.id}`,
         'onClick': () => setArchived(row.original, !row.original.archived),
-      }, () => (row.original.archived ? 'Put back' : 'Archive')),
+      }, () => (row.original.archived ? 'Bring back' : 'Retire')),
       row.original.everSold
         ? null
         : h(UButton, {
@@ -452,7 +452,7 @@ const columns: TableColumn<TicketType>[] = [
               :loading="saving"
               data-test="ticket-type-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the ticket type' : 'Add a ticket type' }}
             </UButton>
             <UButton
               color="neutral"
@@ -495,7 +495,7 @@ const columns: TableColumn<TicketType>[] = [
           data-test="confirm-delete"
           @click="remove"
         >
-          Delete it
+          Delete the ticket type
         </UButton>
         <UButton
           color="neutral"

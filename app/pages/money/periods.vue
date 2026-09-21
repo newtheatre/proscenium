@@ -322,7 +322,7 @@ async function confirmReopen(): Promise<void> {
               color="warning"
               variant="subtle"
               title="This range has open items"
-              :description="`${plural(preview.unreconciledNights.length, 'night')} with no recorded Z reading and ${plural(preview.openVarianceNights.length, 'night')} with an open variance. Closing does not resolve them; it only stops new entries landing inside the range.`"
+              :description="`${plural(preview.unreconciledNights.length, 'night')} with no recorded Z reading and ${plural(preview.openVarianceNights.length, 'night')} with an open variance. Closing does not settle them; it only stops new entries landing inside the range.`"
             />
             <UAlert
               v-else
@@ -407,7 +407,7 @@ async function confirmReopen(): Promise<void> {
             :disabled="!termLabel.trim() || !termFrom || !termTo"
             @click="confirmDefineTerm"
           >
-            Define it
+            Define the term
           </UButton>
         </div>
       </template>
@@ -416,7 +416,7 @@ async function confirmReopen(): Promise<void> {
     <UModal
       :open="Boolean(reopenTarget)"
       title="Reopen this period"
-      description="Requires an administrator. Type the range back to confirm you are reopening what the row above shows, not a stale read."
+      description="Requires an administrator. Type the range back to confirm you are reopening the period above."
       @update:open="(open: boolean) => { if (!open) reopenTarget = null }"
     >
       <template #body>

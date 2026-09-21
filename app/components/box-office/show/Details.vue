@@ -142,7 +142,7 @@ const saysWarnings = computed(() => {
           </UFormField>
 
           <UFormField
-            label="Address"
+            label="Web address"
             name="slug"
             required
             description="The public page is /shows/ and this."
@@ -195,7 +195,7 @@ const saysWarnings = computed(() => {
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField
-            label="Category"
+            label="Show category"
             name="categoryId"
           >
             <USelect
