@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await showById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such show' })
+  if (!held) throw noSuch('show')
 
   if (held.soldTickets > 0) {
     throw createError({

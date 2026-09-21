@@ -9,14 +9,14 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, spaceForm)
 
   const before = await findSpace(id)
-  if (!before) throw createError({ statusCode: 404, statusMessage: 'No such room' })
+  if (!before) throw noSuch('room')
 
   const changed = await db.update(schema.externalSpaces)
     .set({ ...input, updatedAt: Math.floor(Date.now() / 1000) })
     .where(eq(schema.externalSpaces.id, id))
     .returning({ id: schema.externalSpaces.id })
 
-  if (changed.length === 0) throw createError({ statusCode: 404, statusMessage: 'No such room' })
+  if (changed.length === 0) throw noSuch('room')
 
   await db.insert(schema.auditLog).values(auditEntry({
     actorId: account.id,

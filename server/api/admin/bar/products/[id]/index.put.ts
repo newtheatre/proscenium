@@ -8,11 +8,11 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await productById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such product' })
+  if (!held) throw noSuch('product')
 
   const input = await readValidatedBodyOrThrow(event, productForm)
   if (!await categoryById(input.categoryId)) {
-    throw createError({ statusCode: 404, statusMessage: 'No such category' })
+    throw noSuch('category')
   }
 
   const note = input.allergenNote ?? null
@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
 
   if (!applied) {
     const taken = await claimName('product', input.name, id)
-    if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such product' })
+    if (!taken) throw noSuch('product')
     throw createError({ statusCode: 409, statusMessage: `A product is already called ${taken.name}` })
   }
 

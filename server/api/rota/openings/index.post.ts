@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, barOpeningForm)
 
   const venue = await venueById(input.venueId)
-  if (!venue) throw createError({ statusCode: 404, statusMessage: 'No such venue' })
+  if (!venue) throw noSuch('venue')
   // Planning an opening is new work, and a retired venue is offered none (D-131 criterion 5).
   if (venue.archived) throw createError({ statusCode: 409, statusMessage: 'That venue has been retired' })
 

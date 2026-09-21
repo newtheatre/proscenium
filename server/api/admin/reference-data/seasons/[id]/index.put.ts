@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await seasonById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such season' })
+  if (!held) throw noSuch('season')
 
   const input = await readValidatedBodyOrThrow(event, seasonForm)
 
@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
 
   if (updated.length === 0) {
     const taken = await seasonNamed(input.name, id)
-    if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such season' })
+    if (!taken) throw noSuch('season')
     throw createError({ statusCode: 409, statusMessage: `A season is already called ${taken.name}` })
   }
 

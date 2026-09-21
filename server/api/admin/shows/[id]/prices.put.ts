@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const show = await showById(id)
-  if (!show) throw createError({ statusCode: 404, statusMessage: 'No such show' })
+  if (!show) throw noSuch('show')
 
   const input = await readValidatedBodyOrThrow(event, priceOverridesForm)
   const held = await showPrices(id)

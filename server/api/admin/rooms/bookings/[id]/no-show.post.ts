@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, noShowForm)
 
   const booking = await bookingFor(id)
-  if (!booking) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!booking) throw noSuch('booking')
 
   const now = Math.floor(Date.now() / 1000)
   const refusal = refusalToRecord(booking, now)

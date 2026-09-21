@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const { reason } = await readValidatedBodyOrThrow(event, shiftDeclineForm)
 
   const held = await shiftDetail(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such shift' })
+  if (!held) throw noSuch('shift')
 
   const entry = auditEntry({
     actorId: resolved.account.id,

@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await seasonById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such season' })
+  if (!held) throw noSuch('season')
 
   const { archived } = await readValidatedBodyOrThrow(event, archiveSeasonForm)
   if (archived === held.archived) {

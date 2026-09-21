@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
 
   const performance = await performanceById(id)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   const cap = await configValue(event, 'WAITING_LIST_OFFER_BATCH_CAP')
   const run = await offerWaitingList(event, id, new Date(), cap)

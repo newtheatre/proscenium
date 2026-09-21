@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
 
   const room = await findRoom(id)
-  if (!room) throw createError({ statusCode: 404, statusMessage: 'No such room' })
+  if (!room) throw noSuch('room')
   if (!room.isActive) return { ok: true, alreadyRetired: true }
 
   await db.batch([

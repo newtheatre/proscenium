@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireNightAuthority(event, 'DUTY_MANAGER')
 
   const found = await incidentById(id)
-  if (!found) throw createError({ statusCode: 404, statusMessage: 'No such entry' })
+  if (!found) throw noSuch('entry')
 
   // Idempotent by intent, not by constraint: the checklist only asks whether a review exists,
   // never how many, so a second review costs a harmless extra row rather than a conflict.

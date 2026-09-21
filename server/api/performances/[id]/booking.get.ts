@@ -8,7 +8,7 @@ import { resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const performance = await performanceById(id)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   const saleState = saleRefusal(performance, new Date(), 'CUSTOMER')
 

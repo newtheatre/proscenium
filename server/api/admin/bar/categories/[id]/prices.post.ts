@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const on = londonDayOf(new Date())
 
   const category = await categoryById(id)
-  if (!category) throw createError({ statusCode: 404, statusMessage: 'No such category' })
+  if (!category) throw noSuch('category')
 
   const input = await readValidatedBodyOrThrow(event, categoryPriceForm)
   const priceId = newId()

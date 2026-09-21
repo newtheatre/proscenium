@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const on = londonDayOf(new Date())
 
   const variant = await variantById(id, on)
-  if (!variant) throw createError({ statusCode: 404, statusMessage: 'No such serving size' })
+  if (!variant) throw noSuch('serving size')
 
   return { variant, on, prices: await priceHistory(id, on) }
 })

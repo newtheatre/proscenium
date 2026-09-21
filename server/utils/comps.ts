@@ -110,7 +110,7 @@ export async function createCompRequest(
 export async function requestedCompRequest(id: string | undefined, expiryMinutes: number): Promise<CompRequest> {
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean' })
   const request = await compRequestById(id, expiryMinutes)
-  if (!request) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+  if (!request) throw noSuch('comp request')
   return request
 }
 
@@ -180,7 +180,7 @@ export async function releaseCompRequestClaim(id: string, entryId: string): Prom
 // comp-sale route can quote why without duplicating the reasoning.
 export function compDecisionRefusalError(refusal: CompDecisionRefusal) {
   const messages: Record<CompDecisionRefusal, string> = {
-    'not-found': 'No such comp request',
+    'not-found': saysNoSuch('comp request'),
     'not-pending': 'That request has already been decided',
     'expired': 'That request has lapsed; ask again',
     'self': 'You cannot decide your own request',

@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const key = getRouterParam(event, 'key') ?? ''
 
   if (!isConfigKey(key)) {
-    throw createError({ statusCode: 404, statusMessage: 'No such setting' })
+    throw noSuch('setting')
   }
 
   const input = await readValidatedBodyOrThrow(event, body)

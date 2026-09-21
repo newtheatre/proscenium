@@ -12,11 +12,11 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await performanceById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!held) throw noSuch('performance')
 
   const input = await readValidatedBodyOrThrow(event, performanceForm)
   const venue = (await listVenues()).find(one => one.id === input.venueId)
-  if (!venue) throw createError({ statusCode: 400, statusMessage: 'No such venue' })
+  if (!venue) throw createError({ statusCode: 400, statusMessage: saysNoSuch('venue') })
   // Moving a performance to a different venue is new work; keeping its own already-retired venue
   // is not (D-131 criterion 5).
   if (venue.archived && venue.id !== held.venueId) {
@@ -96,7 +96,7 @@ export default defineEventHandler(async (event) => {
 
   if (!applied) {
     const now = await performanceById(id)
-    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+    if (!now) throw noSuch('performance')
     throw createError({
       statusCode: 409,
       statusMessage: loweringRefusal(capacity, now.soldTickets) ?? 'That performance changed while you were editing it',

@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   await requirePermission(event, 'ticketing.read')
 
   const performance = await performanceById(id)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   return { items: await performancePrices(id) }
 })

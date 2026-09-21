@@ -80,7 +80,7 @@ describe('the register defaults to current, the same hidden default an unset fil
     const parsedQuery = filterQuerySchema(membershipsList).safeParse({ filter: 'awaiting-record' })
     expect(parsedQuery.success).toBe(true)
     if (parsedQuery.success) expect(conditionsOf(membershipsList, parsedQuery.data)).toEqual([{ key: 'filter', operator: 'is', values: ['awaiting-record'] }])
-    expect(() => membershipsClause(parsedQuery.success ? parsedQuery.data : parsed({}), GRACE)).toThrow(/register filter/)
+    expect(() => membershipsClause(parsedQuery.success ? parsedQuery.data : parsed({}), GRACE)).toThrow(/the membership register offers/)
   })
 
   test('search reaches the name and the address', async () => {

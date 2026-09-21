@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
 
   const account = await findById(id)
-  if (!account) throw createError({ statusCode: 404, statusMessage: 'No such account' })
+  if (!account) throw noSuch('account')
 
   const { page, pageSize, type } = await getValidatedQueryOrThrow(event, personHistoryFilters)
 

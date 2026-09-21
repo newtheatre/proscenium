@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, ticketCompRequestForm)
 
   const reservation = await deskReservation(input.reservationId)
-  if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!reservation) throw noSuch('booking', 'Check the reference and try again')
   const refusal = uncollectableReason(reservation.status)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 

@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
 
   const performance = await performanceById(performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
   const night = performanceNight(performance.startsAt)
 
   if (!await isDutyManagerOrTicketingManager(account.id, night)) {

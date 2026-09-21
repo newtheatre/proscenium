@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, resolveAttemptForm)
 
   const row = await attemptById(id)
-  if (!row) throw createError({ statusCode: 404, statusMessage: 'No such SumUp attempt' })
+  if (!row) throw noSuch('SumUp attempt')
   const resolved = await requireNightAuthority(event, 'BAR', { venueId: row.venueId })
 
   const outcome = await resolveAttempt(row, input.outcome, input.smpTxCode, input.note, {

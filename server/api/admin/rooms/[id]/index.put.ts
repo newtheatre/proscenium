@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, body)
 
   const before = await findRoom(id)
-  if (!before) throw createError({ statusCode: 404, statusMessage: 'No such room' })
+  if (!before) throw noSuch('room')
 
   const changes = roomChanges(before, input)
   const now = Math.floor(Date.now() / 1000)

@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
 
   const known = new Set((await listShowOptions()).map(show => show.id))
   if (showIds.some(showId => !known.has(showId))) {
-    throw createError({ statusCode: 400, statusMessage: 'No such show' })
+    throw createError({ statusCode: 400, statusMessage: saysNoSuch('show') })
   }
 
   // The slug predicate rides the INSERT, so two officers naming the same address at once produce

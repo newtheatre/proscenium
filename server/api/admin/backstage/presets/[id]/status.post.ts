@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const { active } = await readValidatedBodyOrThrow(event, body)
 
   const before = (await presets(true)).find(preset => preset.id === id)
-  if (!before) throw createError({ statusCode: 404, statusMessage: 'No such preset' })
+  if (!before) throw noSuch('preset')
 
   await db.batch([
     db.run(retirePresetStatement(id, active, resolved.account.id)),

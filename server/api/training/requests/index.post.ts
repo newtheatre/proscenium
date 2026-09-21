@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, moduleRequestForm)
 
   const module = await modulePolicy(input.moduleId)
-  if (!module) throw createError({ statusCode: 404, statusMessage: 'No such module' })
+  if (!module) throw noSuch('module')
 
   // Criterion 6. A draft is not offered yet and a retired one takes nothing new, so neither is
   // a thing to ask for.

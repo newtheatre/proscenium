@@ -9,10 +9,10 @@ export default defineEventHandler(async (event) => {
 
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
   const request = await ticketCompRequestById(id, expiryMinutes)
-  if (!request) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+  if (!request) throw noSuch('comp request')
 
   const performance = await performanceById(request.performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
   const night = performanceNight(performance.startsAt)
 
   const account = await requireAccount(event)

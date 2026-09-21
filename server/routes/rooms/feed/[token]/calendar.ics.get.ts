@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const token = getRouterParam(event, 'token') ?? ''
   const holder = await feedHolder(token)
   // The same answer for a revoked token and one that never existed.
-  if (!holder) throw createError({ statusCode: 404, statusMessage: 'No such calendar' })
+  if (!holder) throw noSuch('calendar')
 
   const now = Math.floor(Date.now() / 1000)
   const horizon = await configValue(event, 'ROOM_FEED_WEEKS')

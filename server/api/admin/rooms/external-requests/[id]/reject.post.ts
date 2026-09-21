@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, rejectExternalForm)
 
   const request = await externalRequest(id)
-  if (!request) throw createError({ statusCode: 404, statusMessage: 'No such request' })
+  if (!request) throw noSuch('request')
 
   const refusal = refusalToAct(request, 'reject')
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })

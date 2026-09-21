@@ -5,6 +5,7 @@ import {
   checklistItemForm,
   checklistScopeForm,
   exemptForm,
+  saysBlockedClose,
   saysPhase,
   saysSystemCheck,
 } from '#shared/utils/checklist'
@@ -60,5 +61,27 @@ describe('the display wording names every value (0009: no member reads a bare co
   test('every phase and system check says something', () => {
     for (const phase of PHASES) expect(saysPhase(phase).length).toBeGreaterThan(2)
     for (const check of SYSTEM_CHECKS) expect(saysSystemCheck(check).length).toBeGreaterThan(2)
+  })
+})
+
+// A sentence, not a colon heading: a duty manager mid-interval needs the open items and the two
+// ways out in one read (E-114 criterion 4, K-128 criterion 2).
+describe('a blocked close says what is holding it and what to do (criterion 4)', () => {
+  test('one open item is named inside a sentence', () => {
+    expect(saysBlockedClose(['Till reconciled']))
+      .toBe('The checklist cannot close while Till reconciled is still open: tick it or record an exception')
+  })
+
+  test('several open items are joined with a final "and", and the verb and pronoun follow the count', () => {
+    expect(saysBlockedClose(['Till reconciled', 'Fire exits checked']))
+      .toBe('The checklist cannot close while Till reconciled and Fire exits checked are still open: tick each or record an exception')
+    expect(saysBlockedClose(['Till reconciled', 'Fire exits checked', 'Bar float counted']))
+      .toContain('while Till reconciled, Fire exits checked and Bar float counted are still open')
+  })
+
+  test('one sentence, so it carries no full stop, and no colon heading is left', () => {
+    const said = saysBlockedClose(['Till reconciled'])
+    expect(said).not.toEndWith('.')
+    expect(said).not.toStartWith('Cannot close')
   })
 })

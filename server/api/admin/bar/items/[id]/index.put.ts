@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await itemById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+  if (!held) throw noSuch('stocked item')
 
   const input = await readValidatedBodyOrThrow(event, stockItemForm)
   const containerMl = input.containerMl ?? null
@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
 
   if (!applied) {
     const taken = await claimName('item', input.name, id)
-    if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+    if (!taken) throw noSuch('stocked item')
     throw createError({ statusCode: 409, statusMessage: `A stocked item is already called ${taken.name}` })
   }
 

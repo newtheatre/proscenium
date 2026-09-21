@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await itemById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+  if (!held) throw noSuch('stocked item')
 
   if (held.hasMovements) {
     throw createError({

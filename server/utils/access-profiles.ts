@@ -7,6 +7,7 @@ import { decryptAccessProfilePayload, encryptAccessProfilePayload } from './acce
 import { auditedWrite } from './audit'
 import { configValue } from './configuration'
 import { tableColumns, whereFrom } from './list-filters'
+import { noSuch } from './no-such'
 import { auditEntry } from '#shared/utils/audit'
 import {
   ACCESS_FLAGS,
@@ -206,7 +207,7 @@ async function clearCardNumber(row: AccessProfileRow, userId: string): Promise<A
 const decidablePredicate = (now: number) => sql`(status = 'PENDING' OR (status = 'VERIFIED' AND expires_at IS NOT NULL AND expires_at <= ${now}))`
 
 function requireDecidable(row: AccessProfileRow | undefined, now: number): AccessProfileRow {
-  if (!row) throw createError({ statusCode: 404, statusMessage: 'No such access profile' })
+  if (!row) throw noSuch('access profile')
   const status = effectiveStatus({ status: asAccessProfileStatus(row.status), expiresAt: row.expiresAt }, now)
   if (status !== 'PENDING' && status !== 'EXPIRED') {
     throw createError({ statusCode: 409, statusMessage: `This declaration is already ${status.toLowerCase()}` })

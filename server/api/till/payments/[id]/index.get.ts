@@ -3,7 +3,7 @@
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const row = await attemptById(id)
-  if (!row) throw createError({ statusCode: 404, statusMessage: 'No such SumUp attempt' })
+  if (!row) throw noSuch('SumUp attempt')
 
   await requireNightAuthority(event, 'BAR', { venueId: row.venueId })
 

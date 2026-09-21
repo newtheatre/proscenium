@@ -9,6 +9,6 @@ export default defineEventHandler(async (event) => {
   const { performanceId } = await getValidatedQueryOrThrow(event, query)
 
   const summary = await deskSummary(event, performanceId)
-  if (!summary) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!summary) throw noSuch('performance')
   return summary
 })

@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
 
   const held = await openingShiftDetail(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such bar opening slot' })
+  if (!held) throw noSuch('bar opening slot')
   if (held.openingStatus === 'CANCELLED') {
     throw createError({ statusCode: 409, statusMessage: 'This opening has been cancelled' })
   }
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
 
   if (!applied) {
     const now = await openingShiftDetail(id)
-    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such bar opening slot' })
+    if (!now) throw noSuch('bar opening slot')
     throw createError({ statusCode: 409, statusMessage: openingClaimRefusal(now.status) })
   }
 

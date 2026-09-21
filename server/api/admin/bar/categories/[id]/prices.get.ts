@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const on = londonDayOf(new Date())
 
   const category = await categoryById(id)
-  if (!category) throw createError({ statusCode: 404, statusMessage: 'No such category' })
+  if (!category) throw noSuch('category')
 
   return { category, on, prices: await categoryPriceHistory(id, on) }
 })

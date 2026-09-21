@@ -5,7 +5,7 @@ import { POSTER_PREFIX, isPosterKey } from '#shared/utils/seo'
 // public address, so nothing outside posters/ is reachable here (K-125).
 export default defineEventHandler(async (event) => {
   const key = `${POSTER_PREFIX}${decodeURIComponent(getRouterParam(event, 'key') ?? '')}`
-  if (!isPosterKey(key)) throw createError({ statusCode: 404, statusMessage: 'No such poster' })
+  if (!isPosterKey(key)) throw noSuch('poster')
   setResponseHeader(event, 'cache-control', 'public, max-age=86400')
   return blob.serve(event, key)
 })

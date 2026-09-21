@@ -6,7 +6,7 @@ import { stockItemStatusForm } from '#shared/utils/bar'
 // is not the same problem as somebody else editing the item (F-114, F-128).
 async function lostTheRetirement(id: string, name: string): Promise<Error> {
   const now = await itemById(id)
-  if (!now) return createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+  if (!now) return noSuch('stocked item')
   if (now.onHand !== 0) {
     return createError({
       statusCode: 409,
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await itemById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+  if (!held) throw noSuch('stocked item')
 
   const { status, hideDependents } = await readValidatedBodyOrThrow(event, stockItemStatusForm)
   if (status === held.status) {
@@ -94,7 +94,7 @@ export default defineEventHandler(async (event) => {
   // must too (0049).
   if (!applied) {
     const now = await itemById(id)
-    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+    if (!now) throw noSuch('stocked item')
     throw createError({
       statusCode: 409,
       statusMessage: now.status === status

@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { newId } from '#server/utils/accounts'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
+import { noSuch } from '#server/utils/no-such'
 import { auditEntry } from '#shared/utils/audit'
 import { saysMoney } from '#shared/utils/bar'
 import { MAX_SETTLEMENT_CHARGES } from '#shared/utils/tab-settlement'
@@ -240,7 +241,7 @@ export async function voidTabCharge(
     WHERE e.id = ${entryId} AND e.tab_debtor_id IS NOT NULL
       AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
   `)
-  if (!charge) throw createError({ statusCode: 404, statusMessage: 'No such tab charge' })
+  if (!charge) throw noSuch('tab charge')
 
   const [settled] = await db.all<{ settled: number }>(sql`
     SELECT EXISTS (SELECT 1 FROM ledger_lines WHERE settles_entry_id = ${entryId}) AS settled

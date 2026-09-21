@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, completeAttemptForm)
 
   const row = await attemptById(id)
-  if (!row) throw createError({ statusCode: 404, statusMessage: 'No such SumUp attempt' })
+  if (!row) throw noSuch('SumUp attempt')
   if (input.foreignTxId && input.foreignTxId !== id) {
     throw createError({ statusCode: 400, statusMessage: 'That answer is for a different attempt' })
   }

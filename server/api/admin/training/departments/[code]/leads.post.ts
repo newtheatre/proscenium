@@ -10,11 +10,11 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, leadForm)
 
   if (!await departmentByCode(code)) {
-    throw createError({ statusCode: 404, statusMessage: 'No such department' })
+    throw noSuch('department')
   }
 
   const account = await findById(input.userId)
-  if (!account) throw createError({ statusCode: 404, statusMessage: 'No such account' })
+  if (!account) throw noSuch('account')
   if (account.anonymisedAt !== null) {
     throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
   }

@@ -605,3 +605,24 @@ describe('an unmarked register is nagged weekly (G-119 criteria 1 and 2)', () =>
     expect(nagClaimFor('s1', 0)).not.toBe(nagClaimFor('s2', 0))
   })
 })
+
+// The path is named in words, not drawn: "that would make a cycle" is not actionable when the
+// loop runs through modules nobody is looking at (G-108 criterion 2, K-128 criterion 2).
+describe('a prerequisite loop is refused in a sentence that names the path', () => {
+  test('the module is named as a prerequisite of itself', async () => {
+    const { saysCycle } = await import('#shared/utils/training')
+    expect(saysCycle('A', 'B -> A')).toBe('That would make A a prerequisite of itself, through B, then A')
+  })
+
+  test('a longer path keeps every module in it and drops every arrow', async () => {
+    const { saysCycle } = await import('#shared/utils/training')
+    const said = saysCycle('A', 'B -> C -> D -> A')
+    for (const module of ['A', 'B', 'C', 'D']) expect(said).toContain(module)
+    expect(said).not.toContain('->')
+  })
+
+  test('one sentence, so it carries no full stop', async () => {
+    const { saysCycle } = await import('#shared/utils/training')
+    expect(saysCycle('A', 'B -> A')).not.toEndWith('.')
+  })
+})

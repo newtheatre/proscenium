@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
   ])
 
   const session = await openSessionFor(resolved.venueId, resolved.night)
-  if (!session) throw createError({ statusCode: 500, statusMessage: 'The session did not open' })
+  if (!session) throw createError({ statusCode: 500, statusMessage: 'That did not save. Try again, and tell the IT Manager if it keeps happening.' })
 
   return { ok: true, opened: session.id === id, session }
 })

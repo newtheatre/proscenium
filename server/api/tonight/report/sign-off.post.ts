@@ -39,8 +39,10 @@ export default defineEventHandler(async (event) => {
   )
   if (!signed) throw createError({ statusCode: 409, statusMessage: 'This performance has already been signed off' })
 
+  // The sign-off is written by this point, so an error here would tell a duty manager the write
+  // failed when it did not; the letter is what is missed, and a reload finds the report (K-128).
   const row = await reportForPerformance(target)
-  if (!row) throw createError({ statusCode: 500, statusMessage: 'Signed off but could not be read back' })
+  if (!row) return { ok: true, report: null, notice: 'The sign-off was recorded. Reload the page to see it.' }
 
   const venue = (await venueName(resolved.venueId)) ?? 'the venue'
   const message = render('night-report-signed', {

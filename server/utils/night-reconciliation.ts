@@ -6,6 +6,7 @@ import { createError } from 'h3'
 import { newId } from './accounts'
 import { performanceNight } from './performances'
 import { nightReconciliation } from './reconciliation'
+import { saysMoney } from '#shared/utils/bar'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import type { ExpectedByKind, NightExpected, OutstandingNight, RecordZReadingInput, ZReading } from '#shared/utils/night-reconciliation'
 import type { SQL } from 'drizzle-orm'
@@ -162,7 +163,7 @@ export function zReadingStatement(input: RecordZReadingInput, actorId: string, e
   if (variancePence !== 0 && !input.note) {
     throw createError({
       statusCode: 400,
-      statusMessage: `The reader read ${input.readerPence} pence; the ledger expects ${expectedPence} pence. `
+      statusMessage: `The reader read ${saysMoney(input.readerPence)}; we expect ${saysMoney(expectedPence)}. `
         + 'That difference needs a note before it can be recorded.',
     })
   }

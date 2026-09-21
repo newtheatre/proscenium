@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await discountById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such discount' })
+  if (!held) throw noSuch('discount')
 
   const input = await readValidatedBodyOrThrow(event, discountForm)
 
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
 
   if (updated.length === 0) {
     const taken = await discountNamed(input.name, id)
-    if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such discount' })
+    if (!taken) throw noSuch('discount')
     throw createError({ statusCode: 409, statusMessage: `A discount is already called ${taken.name}` })
   }
 

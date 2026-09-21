@@ -41,7 +41,7 @@ export function membershipsClause(query: ListQuery, grace: number): ListClause {
       filter: (condition) => {
         const value = condition.values[0]!
         if (!(MEMBER_FILTERS as readonly string[]).includes(value)) {
-          throw createError({ statusCode: 400, statusMessage: `${value} is not a register filter; the claims queue answers awaiting-record` })
+          throw createError({ statusCode: 400, statusMessage: 'That filter is not one the membership register offers' })
         }
         return registerFilterPredicate(value as typeof MEMBER_FILTERS[number], grace)
       },

@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   if (!passId) throw createError({ statusCode: 401, statusMessage: 'That link has expired. Open it again from your email' })
 
   const pass = await passCurrentState(passId)
-  if (!pass) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+  if (!pass) throw noSuch('pass')
 
   const url = `${useRuntimeConfig(event).public.baseURL}/passes/${token}`
 

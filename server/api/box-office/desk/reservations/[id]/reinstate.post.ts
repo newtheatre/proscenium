@@ -8,13 +8,13 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, reinstateReservationForm)
 
   const reservation = await deskReservation(id)
-  if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!reservation) throw noSuch('booking', 'Check the reference and try again')
 
   const refusal = reinstateRefusal(reservation.status, reservation.cancelledBy)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const performance = await performanceById(reservation.performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   const releaseMinutes = resolveHoldReleaseMinutes(
     performance.holdReleaseMinutesBefore,

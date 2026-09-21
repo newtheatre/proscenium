@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const today = londonDayOf(new Date())
 
   const category = await categoryById(input.product.categoryId)
-  if (!category) throw createError({ statusCode: 404, statusMessage: 'No such category' })
+  if (!category) throw noSuch('category')
 
   const named = input.shape === 'RECIPE'
     ? [...input.components.map(component => component.itemId),
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
     `)
 
   if (held.length !== new Set(named).size) {
-    throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+    throw noSuch('stocked item')
   }
 
   // The form checks these for an item created here; an item chosen from the list carries its unit

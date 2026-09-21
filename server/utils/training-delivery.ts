@@ -109,7 +109,7 @@ export function assertLoggable(plan: DeliveryPlan, acknowledged: readonly string
   if (blocking.length > 0) {
     throw createError({
       statusCode: 422,
-      statusMessage: `Safety-critical training needs its prerequisites first. Not held yet: ${saysGaps(distinct(blocking))}`,
+      statusMessage: `Safety-critical training needs its prerequisites first. You do not yet hold ${saysGaps(distinct(blocking))}.`,
     })
   }
 
@@ -118,7 +118,7 @@ export function assertLoggable(plan: DeliveryPlan, acknowledged: readonly string
   if (waiting.length > 0) {
     throw createError({
       statusCode: 422,
-      statusMessage: `Please confirm each gap before logging. Not held yet: ${saysGaps(distinct(waiting))}`,
+      statusMessage: `Please confirm each gap before logging. You do not yet hold ${saysGaps(distinct(waiting))}.`,
     })
   }
 }

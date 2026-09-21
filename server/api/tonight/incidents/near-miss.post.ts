@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   })
 
   const created = await withIncidentConstraints(() => auditedWrite(db.all<{ id: string }>(write.statement), entry))
-  if (!created) throw createError({ statusCode: 500, statusMessage: 'Could not log that near miss' })
+  if (!created) throw createError({ statusCode: 500, statusMessage: 'That did not save. Try again, and tell the IT Manager if it keeps happening.' })
 
   await notifySafetyOfficersIfNeeded(event, write.id, input.category, 'NEAR_MISS')
 

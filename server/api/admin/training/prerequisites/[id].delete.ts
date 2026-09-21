@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.modulePrerequisites.id, id))
     .limit(1)
 
-  if (!edge) throw createError({ statusCode: 404, statusMessage: 'No such prerequisite' })
+  if (!edge) throw noSuch('prerequisite')
   assertStewards(resolved, edge.department)
 
   await db.batch([

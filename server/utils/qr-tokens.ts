@@ -16,7 +16,10 @@ let key: Promise<CryptoKey> | undefined
 function signingKey(): Promise<CryptoKey> {
   const raw = useRuntimeConfig().qrTokenSecret
   if (!raw) {
-    throw createError({ statusCode: 500, statusMessage: 'QR token signing is not configured' })
+    // Which secret is missing is the operator's to know, never the member's: this reaches a
+    // booking page (K-128 criterion 2).
+    console.error('runtime config: qrTokenSecret is not set')
+    throw createError({ statusCode: 500, statusMessage: 'This part of the site is not set up yet. Tell the IT Manager.' })
   }
   key ??= crypto.subtle.importKey(
     'raw',

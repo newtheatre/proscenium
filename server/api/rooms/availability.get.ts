@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
 
   const rooms = (await listRooms(false)).filter(room => !input.roomId || room.id === input.roomId)
   if (input.roomId && rooms.length === 0) {
-    throw createError({ statusCode: 404, statusMessage: 'No such room' })
+    throw noSuch('room')
   }
 
   const fromAt = Math.floor(window.fromAt.getTime() / 1000)

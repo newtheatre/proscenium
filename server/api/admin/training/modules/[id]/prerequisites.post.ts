@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireCatalogueAuthority(event)
 
   const held = await moduleById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such module' })
+  if (!held) throw noSuch('module')
   assertStewards(resolved, held.department)
 
   const input = await readValidatedBodyOrThrow(event, body)
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const required = await moduleById(input.requiresId)
-  if (!required) throw createError({ statusCode: 404, statusMessage: 'No such module' })
+  if (!required) throw noSuch('module')
 
   // Criterion 3. A brief gates nothing, so it can never be what another module waits on.
   if (required.kind === 'BRIEF') {
@@ -45,10 +45,7 @@ export default defineEventHandler(async (event) => {
   // when the path runs through modules the officer is not looking at.
   const loop = await cyclePath(id, input.requiresId)
   if (loop !== null) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: `Adding this would close a loop: ${id} -> ${loop}`,
-    })
+    throw createError({ statusCode: 409, statusMessage: saysCycle(id, loop) })
   }
 
   const edge = newId()

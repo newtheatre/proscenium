@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
 
   const product = await productById(id)
-  if (!product) throw createError({ statusCode: 404, statusMessage: 'No such product' })
+  if (!product) throw noSuch('product')
 
   // Servings are a reading of the movements, so they are answered beside the sizes rather than
   // stored on one (F-128 criterion 7).

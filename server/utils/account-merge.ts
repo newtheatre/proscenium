@@ -19,7 +19,7 @@ async function loadAccount(id: string): Promise<AccountRow> {
     email: schema.users.email,
     anonymisedAt: schema.users.anonymisedAt,
   }).from(schema.users).where(eq(schema.users.id, id)).limit(1)
-  if (!row) throw createError({ statusCode: 404, statusMessage: 'No such account' })
+  if (!row) throw noSuch('account')
   return row
 }
 

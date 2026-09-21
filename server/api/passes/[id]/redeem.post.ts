@@ -7,12 +7,12 @@ export default defineEventHandler(async (event) => {
   const passId = getRouterParam(event, 'id') ?? ''
 
   const performance = await performanceById(input.performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   const state = await passRedemptionState(passId, performance.showId)
   // Enumeration-safe: a pass that is not the caller's own answers exactly as one that does not
   // exist, the same shape a pass type's own 404 already takes.
-  if (!state || state.userId !== account.id) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+  if (!state || state.userId !== account.id) throw noSuch('pass')
 
   const now = Math.floor(Date.now() / 1000)
   const refusal = refusalFor(state, now)

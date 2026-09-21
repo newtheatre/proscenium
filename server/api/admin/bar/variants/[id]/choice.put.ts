@@ -10,12 +10,12 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await variantById(id, londonDayOf(new Date()))
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such serving size' })
+  if (!held) throw noSuch('serving size')
 
   const { choiceGroupId, qty, includedInPrice } = await readValidatedBodyOrThrow(event, variantChoiceForm)
 
   const group = choiceGroupId ? await choiceGroupById(choiceGroupId) : undefined
-  if (choiceGroupId && !group) throw createError({ statusCode: 404, statusMessage: 'No such choice group' })
+  if (choiceGroupId && !group) throw noSuch('choice group')
 
   if (group) {
     const retired = await retiredOptionsOf(group.id)

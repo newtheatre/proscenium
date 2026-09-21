@@ -527,7 +527,7 @@ export async function academicYear(event: H3Event): Promise<AcademicYear> {
   if (!isMonthDay(boundary)) {
     throw createError({
       statusCode: 503,
-      statusMessage: `ACADEMIC_YEAR_BOUNDARY is set to ${boundary}, which is not a day of every year`,
+      statusMessage: 'The academic year boundary setting is not a day that exists every year. Fix it under Settings.',
     })
   }
 
@@ -589,18 +589,18 @@ export async function assertAwardable(
   refusals: { retired: string, brief: string },
 ): Promise<AwardablePolicy> {
   const module = await moduleById(input.moduleId)
-  if (!module) throw createError({ statusCode: 404, statusMessage: 'No such module' })
+  if (!module) throw noSuch('module')
 
   assertStewards(resolved, module.department)
 
   const account = await findById(input.userId)
-  if (!account) throw createError({ statusCode: 404, statusMessage: 'No such account' })
+  if (!account) throw noSuch('account')
   if (account.anonymisedAt !== null) {
     throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
   }
 
   const policy = await modulePolicy(input.moduleId)
-  if (!policy) throw createError({ statusCode: 404, statusMessage: 'No such module' })
+  if (!policy) throw noSuch('module')
   if (policy.status === 'RETIRED') throw createError({ statusCode: 409, statusMessage: refusals.retired })
   if (policy.kind === 'BRIEF') throw createError({ statusCode: 409, statusMessage: refusals.brief })
 
@@ -616,7 +616,7 @@ export async function assertAwardable(
   const held = await modulesHeldBy(input.userId, today)
   const gaps = missingPrerequisites(needed, held)
   if (gaps.length > 0) {
-    throw createError({ statusCode: 422, statusMessage: `Not held yet: ${saysGaps(gaps)}` })
+    throw createError({ statusCode: 422, statusMessage: `You do not yet hold ${saysGaps(gaps)}, which this module needs first` })
   }
 
   return policy
@@ -653,14 +653,14 @@ export async function assertTeachable(
 
   const missing = moduleIds.filter(id => !taught.some(module => module.id === id))
   if (missing.length > 0) {
-    throw createError({ statusCode: 404, statusMessage: `No such module: ${missing.join(', ')}` })
+    throw createError({ statusCode: 404, statusMessage: `There is no module called ${missing.join(', ')}` })
   }
 
   const refused = taught.filter(module => module.status !== 'ACTIVE' || module.signoffRequired)
   if (refused.length > 0) {
     throw createError({
       statusCode: 422,
-      statusMessage: `Cannot be taught by session: ${refused.map(module => `${module.id} ${module.name}`).join(', ')}`,
+      statusMessage: `${refused.map(module => `${module.id} ${module.name}`).join(', ')} cannot be taught at a session`,
     })
   }
 
@@ -671,7 +671,7 @@ export async function assertTeachable(
     if (unheld.length > 0) {
       throw createError({
         statusCode: 422,
-        statusMessage: `You do not hold: ${unheld.map(module => `${module.id} ${module.name}`).join(', ')}`,
+        statusMessage: `You do not yet hold ${unheld.map(module => `${module.id} ${module.name}`).join(', ')}, which this session needs first`,
       })
     }
   }

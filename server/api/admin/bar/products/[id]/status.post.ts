@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await productById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such product' })
+  if (!held) throw noSuch('product')
 
   const { status } = await readValidatedBodyOrThrow(event, productStatusForm)
   if (status === held.status) {
@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
   // must too (0049).
   if (!applied) {
     const now = await productById(id)
-    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such product' })
+    if (!now) throw noSuch('product')
     throw createError({
       statusCode: 409,
       statusMessage: now.status === status

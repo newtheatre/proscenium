@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, relistForm)
 
   const request = await externalRequest(id)
-  if (!request) throw createError({ statusCode: 404, statusMessage: 'No such request' })
+  if (!request) throw noSuch('request')
 
   const refusal = refusalToRelist(request)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })

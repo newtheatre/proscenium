@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const { venueId, active } = await readValidatedBodyOrThrow(event, body)
 
   const before = (await itemsForVenue(venueId, true)).find(item => item.id === id)
-  if (!before) throw createError({ statusCode: 404, statusMessage: 'No such checklist item' })
+  if (!before) throw noSuch('checklist item')
 
   await db.batch([
     db.run(retireItemStatement(id, active, resolved.account.id)),

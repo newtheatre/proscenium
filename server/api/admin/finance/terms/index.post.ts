@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const { id, applied } = await defineTerm(input, resolved.account.id)
-    if (!applied) throw createError({ statusCode: 500, statusMessage: 'The term was not recorded' })
+    if (!applied) throw createError({ statusCode: 500, statusMessage: 'That did not save. Try again, and tell the IT Manager if it keeps happening.' })
     return { ok: true, id }
   }
   catch (error) {

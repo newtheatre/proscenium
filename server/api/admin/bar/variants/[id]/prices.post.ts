@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const on = londonDayOf(new Date())
 
   const variant = await variantById(id, on)
-  if (!variant) throw createError({ statusCode: 404, statusMessage: 'No such serving size' })
+  if (!variant) throw noSuch('serving size')
 
   const input = await readValidatedBodyOrThrow(event, priceForm)
   const priceId = newId()

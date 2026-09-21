@@ -3,10 +3,10 @@
 export default defineEventHandler(async (event) => {
   const token = getRouterParam(event, 'token') ?? ''
   const entryId = await verifyWaitingListToken(token)
-  if (!entryId) throw createError({ statusCode: 404, statusMessage: 'No such waiting-list entry' })
+  if (!entryId) throw noSuch('waiting-list entry', 'Ask us for a new link if you still want the seats')
 
   const entry = await waitingListEntryById(entryId)
-  if (!entry) throw createError({ statusCode: 404, statusMessage: 'No such waiting-list entry' })
+  if (!entry) throw noSuch('waiting-list entry', 'Ask us for a new link if you still want the seats')
 
   const now = Math.floor(Date.now() / 1000)
   const offerOpen = entry.status === 'OFFERED' && entry.offerExpiresAt !== null && entry.offerExpiresAt > now

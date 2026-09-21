@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
     .where(and(eq(schema.externalSpaceNotes.spaceId, id), eq(schema.externalSpaceNotes.purpose, purpose)))
     .returning({ id: schema.externalSpaceNotes.id })
 
-  if (removed.length === 0) throw createError({ statusCode: 404, statusMessage: 'No such note' })
+  if (removed.length === 0) throw noSuch('note')
 
   await db.insert(schema.auditLog).values(auditEntry({
     actorId: account.id,

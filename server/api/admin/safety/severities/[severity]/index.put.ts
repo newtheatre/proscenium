@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const { requiresFollowUp } = await readValidatedBodyOrThrow(event, severityConfigForm)
 
   if (!(SEVERITIES as readonly string[]).includes(severity)) {
-    throw createError({ statusCode: 404, statusMessage: 'No such severity' })
+    throw noSuch('severity')
   }
 
   await db.batch([

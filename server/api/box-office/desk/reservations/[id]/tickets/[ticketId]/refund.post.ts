@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, refundTicketForm)
 
   const reservation = await deskReservation(id)
-  if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!reservation) throw noSuch('booking', 'Check the reference and try again')
 
   if (reservation.status !== 'COLLECTED') {
     throw createError({ statusCode: 409, statusMessage: 'This booking has nothing paid to refund from here' })

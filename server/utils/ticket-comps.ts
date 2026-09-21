@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { newId } from './accounts'
 import { auditedWrite } from './audit'
+import { saysNoSuch } from './no-such'
 import { auditEntry } from '#shared/utils/audit'
 import { ticketCompRequestExpired } from '#shared/utils/ticket-comps'
 import type { TicketCompRequest, TicketCompRequestStatus } from '#shared/utils/ticket-comps'
@@ -151,7 +152,7 @@ export async function releaseTicketCompRequestClaim(id: string, entryId: string)
 // collection route can both quote why without duplicating the reasoning.
 export function ticketCompDecisionRefusalError(refusal: TicketCompDecisionRefusal) {
   const messages: Record<TicketCompDecisionRefusal, string> = {
-    'not-found': 'No such comp request',
+    'not-found': saysNoSuch('comp request'),
     'not-pending': 'That request has already been decided',
     'expired': 'That request has lapsed; ask again',
     'self': 'You cannot decide your own request',

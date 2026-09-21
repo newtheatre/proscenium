@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, requestPassForm)
 
   const passType = await passTypeForSale(input.passTypeId)
-  if (!passType) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+  if (!passType) throw noSuch('pass')
 
   const refusal = passSaleRefusal(passType, Math.floor(Date.now() / 1000))
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })

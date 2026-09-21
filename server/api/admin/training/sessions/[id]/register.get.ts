@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.trainingSessions.id, id))
     .limit(1)
 
-  if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session' })
+  if (!session) throw noSuch('session', 'Open the sessions list and choose it again')
 
   // A register is a list of names, so it is the trainer running it and the officers, nobody else.
   if (session.trainerId !== resolved.account.id && !resolved.permissions.has('training.read')) {

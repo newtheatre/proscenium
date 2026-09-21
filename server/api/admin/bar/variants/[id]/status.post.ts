@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await variantById(id, londonDayOf(new Date()))
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such serving size' })
+  if (!held) throw noSuch('serving size')
 
   const { status } = await readValidatedBodyOrThrow(event, variantStatusForm)
   if (status === held.status) {
@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
   // must too (0049).
   if (!applied) {
     const now = await variantById(id, londonDayOf(new Date()))
-    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such serving size' })
+    if (!now) throw noSuch('serving size')
     throw createError({
       statusCode: 409,
       statusMessage: now.status === status

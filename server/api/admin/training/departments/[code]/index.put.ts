@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, departmentForm)
 
   if (!await departmentByCode(code)) {
-    throw createError({ statusCode: 404, statusMessage: 'No such department' })
+    throw noSuch('department')
   }
 
   await db.batch([

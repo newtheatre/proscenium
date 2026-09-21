@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.roomBlackouts.id, id))
     .returning({ id: schema.roomBlackouts.id, reason: schema.roomBlackouts.reason })
 
-  if (removed.length === 0) throw createError({ statusCode: 404, statusMessage: 'No such blackout' })
+  if (removed.length === 0) throw noSuch('blackout')
 
   await db.insert(schema.auditLog).values(auditEntry({
     actorId: account.id,

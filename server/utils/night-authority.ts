@@ -59,7 +59,7 @@ async function coverage(night: string, role: NightRole, scope: NightScope): Prom
     // Every other path takes its venue from the programme, which is what proves the venue exists;
     // this one is handed one, so it reads it rather than recording a bypass against a typo.
     const venue = await venueById(scope.venueId)
-    if (!venue) throw createError({ statusCode: 404, statusMessage: 'No such venue' })
+    if (!venue) throw noSuch('venue')
 
     const openingId = await plannedOpeningTonight(scope.venueId, night)
     return { venueId: scope.venueId, performanceIds: [], venuePerformanceIds: [], openingId: openingId ?? undefined }

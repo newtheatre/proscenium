@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'rota.write')
 
   const held = await openingDetail(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such bar opening' })
+  if (!held) throw noSuch('bar opening')
   if (held.status === 'CANCELLED') throw createError({ statusCode: 409, statusMessage: openingCancelRefusal(held.status) })
 
   // Read before the write, because the cancellation is what takes the status away.

@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
 
   const [held] = await db.select({ id: schema.memberships.id, userId: schema.memberships.userId, confirmedAt: schema.memberships.confirmedAt })
     .from(schema.memberships).where(eq(schema.memberships.id, id)).limit(1)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such membership' })
+  if (!held) throw noSuch('membership')
   if (held.confirmedAt !== null) throw createError({ statusCode: 409, statusMessage: 'That membership is already confirmed' })
 
   await db.batch([

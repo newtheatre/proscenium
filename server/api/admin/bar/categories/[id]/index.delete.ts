@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await categoryById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such category' })
+  if (!held) throw noSuch('category')
 
   if (held.productCount > 0) {
     throw createError({

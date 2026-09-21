@@ -8,13 +8,13 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireAnyPermission(event, ['ticketing.write', 'ticketing.manage'])
 
   const held = await passTypeById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+  if (!held) throw noSuch('pass')
 
   const { showIds } = await readValidatedBodyOrThrow(event, passTypeShowsForm)
 
   const known = new Set((await listShowOptions()).map(show => show.id))
   if (showIds.some(showId => !known.has(showId))) {
-    throw createError({ statusCode: 400, statusMessage: 'No such show' })
+    throw createError({ statusCode: 400, statusMessage: saysNoSuch('show') })
   }
 
   const removed = held.showIds.filter(showId => !showIds.includes(showId))

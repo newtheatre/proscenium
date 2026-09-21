@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await showCategoryById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such category' })
+  if (!held) throw noSuch('category')
 
   if (held.inUse) {
     throw createError({ statusCode: 409, statusMessage: `${held.name} can only be retired: a show belongs to it` })

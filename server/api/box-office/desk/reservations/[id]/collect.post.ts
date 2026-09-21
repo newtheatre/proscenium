@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, collectForm)
 
   const reservation = await deskReservation(id)
-  if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!reservation) throw noSuch('booking', 'Check the reference and try again')
 
   const refusal = uncollectableReason(reservation.status)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     // Desk access is not comp authority (D-117 criterion 1): only an approved request, decided
     // by tonight's duty manager or a ticketing manager, ever moves a comp to collection.
     const request = await ticketCompRequestById(input.compRequestId!, expiryMinutes)
-    if (!request || request.reservationId !== id) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+    if (!request || request.reservationId !== id) throw noSuch('comp request')
     if (request.status !== 'APPROVED') {
       throw createError({ statusCode: 409, statusMessage: request.status === 'PENDING' ? 'That request has not been approved yet' : 'That request was declined' })
     }

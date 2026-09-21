@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await categoryById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such category' })
+  if (!held) throw noSuch('category')
 
   const input = await readValidatedBodyOrThrow(event, categoryForm)
   const colour = input.colour ?? null
@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
 
   if (!applied) {
     const taken = await claimName('category', input.name, id)
-    if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such category' })
+    if (!taken) throw noSuch('category')
     throw createError({ statusCode: 409, statusMessage: `A category is already called ${taken.name}` })
   }
 

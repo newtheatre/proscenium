@@ -9,13 +9,13 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, addShiftForm)
 
   const performance = await performanceById(input.performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
   if (performance.status === 'CANCELLED') throw createError({ statusCode: 409, statusMessage: 'This performance has been cancelled' })
 
   let subject = null
   if (input.userId) {
     subject = await findById(input.userId)
-    if (!subject || subject.anonymisedAt !== null) throw createError({ statusCode: 404, statusMessage: 'No such member' })
+    if (!subject || subject.anonymisedAt !== null) throw noSuch('member')
     if (subject.disabled) throw createError({ statusCode: 403, statusMessage: 'That account is disabled and cannot be assigned a shift' })
 
     const eligibilities = await shiftEligibilities(event, input.userId, londonToday())

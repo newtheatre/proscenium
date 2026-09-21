@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.moduleRequests.id, id))
     .limit(1)
 
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such request' })
+  if (!held) throw noSuch('request')
   await assertStewards(resolved, held.department)
 
   if (held.status !== 'OPEN') {

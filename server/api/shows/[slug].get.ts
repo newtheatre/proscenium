@@ -8,11 +8,11 @@ export default defineEventHandler(async (event) => {
   const slug = address.safeParse(getRouterParam(event, 'slug') ?? '')
   // A draft show and an address nobody holds answer the same way, so the listing cannot be read
   // backwards for what the committee has not published yet (D-101 criterion 1).
-  if (!slug.success) throw createError({ statusCode: 404, statusMessage: 'No such show' })
+  if (!slug.success) throw noSuch('show')
 
   const limited = await configValue(event, 'LISTING_LIMITED_THRESHOLD_PERCENT')
   const show = await publicShowBySlug(limited, slug.data)
-  if (!show) throw createError({ statusCode: 404, statusMessage: 'No such show' })
+  if (!show) throw noSuch('show')
 
   const cacheSeconds = listingCacheSeconds(show.performances.map(one => one.bookingClosesAt))
   setResponseHeader(event, 'cache-control', `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}`)

@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
 
   const [held] = await db.select({ id: schema.fellowships.id, revokedAt: schema.fellowships.revokedAt })
     .from(schema.fellowships).where(eq(schema.fellowships.id, id)).limit(1)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such fellowship' })
+  if (!held) throw noSuch('fellowship')
   if (held.revokedAt !== null) throw createError({ statusCode: 409, statusMessage: 'That fellowship is already revoked' })
 
   const [fellow] = await db.select({ userId: schema.fellowships.userId })

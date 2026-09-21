@@ -18,10 +18,7 @@ export default defineEventHandler(async (event) => {
   const items = await checklistFor(target)
   const missing = items.filter(item => item.required && !item.done)
   if (missing.length > 0) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: `Cannot close: ${missing.map(item => item.label).join(', ')} still needs completing or an exception recorded`,
-    })
+    throw createError({ statusCode: 409, statusMessage: saysBlockedClose(missing.map(item => item.label)) })
   }
 
   const id = newId()

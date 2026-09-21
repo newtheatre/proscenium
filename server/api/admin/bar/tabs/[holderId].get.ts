@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const holderId = getRouterParam(event, 'holderId') ?? ''
 
   const tab = await itemisedTab(holderId)
-  if (!tab) throw createError({ statusCode: 404, statusMessage: 'No such tab holder' })
+  if (!tab) throw noSuch('tab holder')
 
   return { ok: true, tab }
 })

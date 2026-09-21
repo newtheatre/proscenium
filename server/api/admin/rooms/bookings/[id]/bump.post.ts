@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, bumpForm)
 
   const displaced = await displacedBooking(id)
-  if (!displaced) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!displaced) throw noSuch('booking')
 
   const order = await tierOrder(event)
   const now = Math.floor(Date.now() / 1000)

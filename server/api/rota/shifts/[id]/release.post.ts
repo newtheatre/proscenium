@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
 
   const held = await shiftDetail(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such shift' })
+  if (!held) throw noSuch('shift')
   if (held.status !== 'CLAIMED' && held.status !== 'CONFIRMED') {
     throw createError({ statusCode: 409, statusMessage: releaseRefusal(held.status) })
   }

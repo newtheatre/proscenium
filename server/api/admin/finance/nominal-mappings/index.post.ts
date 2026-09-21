@@ -7,6 +7,6 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, nominalMappingForm)
 
   const applied = await setNominalMapping(input, resolved.account.id)
-  if (!applied) throw createError({ statusCode: 404, statusMessage: 'No such kind and source pair' })
+  if (!applied) throw createError({ statusCode: 404, statusMessage: 'No ledger line is ever posted under that kind and source together' })
   return { ok: true }
 })
