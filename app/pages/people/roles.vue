@@ -52,7 +52,6 @@ const { data: register, status, error, refresh } = await useAsyncData(
   { watch: [query], default: empty },
 )
 
-const failure = ref<string | null>(null)
 const listingFailure = useListFailure(error, 'The role register could not be read.')
 const working = ref('')
 
@@ -79,17 +78,28 @@ function choose(role: Role): void {
   set('role', chosen.value === role ? null : { key: 'role', operator: 'is', values: [role] })
 }
 
-async function revoke(holder: Holder): Promise<void> {
+const revoking = ref<Holder | null>(null)
+const revokeFailure = ref<string | null>(null)
+
+function askRevoke(holder: Holder): void {
+  revokeFailure.value = null
+  revoking.value = holder
+}
+
+async function revoke(): Promise<void> {
+  const holder = revoking.value
+  if (!holder) return
   working.value = `${holder.userId}-${holder.role}`
-  failure.value = null
+  revokeFailure.value = null
   try {
     // Query, not body: a DELETE carrying a body hangs the Workers runtime when read (0068).
     await $fetch('/api/admin/roles', { method: 'DELETE', query: { userId: holder.userId, role: holder.role } })
     toast.add({ title: 'Revoked.', description: `${holder.name} no longer holds ${saysRole(holder.role)}.`, icon: 'i-lucide-check', color: 'success' })
+    revoking.value = null
     await refresh()
   }
   catch (refused) {
-    failure.value = refusalText(refused)
+    revokeFailure.value = refusalText(refused)
   }
   finally {
     working.value = ''
@@ -160,7 +170,7 @@ const columns: TableColumn<Holder>[] = [
             'label': 'Revoke',
             'loading': working.value === `${row.original.userId}-${row.original.role}`,
             'data-test': `revoke-${row.original.userId}-${row.original.role}`,
-            'onClick': () => revoke(row.original),
+            'onClick': () => askRevoke(row.original),
           })
         : null,
     ]),
@@ -177,14 +187,6 @@ const columns: TableColumn<Holder>[] = [
       variant="subtle"
       :description="listingFailure.message"
       :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
-    />
-
-    <UAlert
-      v-if="failure"
-      data-test="failure"
-      color="error"
-      variant="subtle"
-      :description="failure"
     />
 
     <UPageCard
@@ -314,7 +316,7 @@ const columns: TableColumn<Holder>[] = [
           variant="ghost"
           label="Revoke"
           :loading="working === `${holder.userId}-${holder.role}`"
-          @click="revoke(holder)"
+          @click="askRevoke(holder)"
         />
       </li>
     </ul>
@@ -373,5 +375,17 @@ const columns: TableColumn<Holder>[] = [
         </li>
       </ul>
     </UPageCard>
+
+    <ConfirmModal
+      :open="revoking !== null"
+      name="revoke-role"
+      :title="revoking ? `Revoke ${saysRole(revoking.role)} from ${revoking.name}` : ''"
+      :verb="revoking ? `Revoke ${saysRole(revoking.role)}` : ''"
+      consequence="Their permission stops now. Nothing they did under it is touched."
+      :loading="working !== ''"
+      :failure="revokeFailure"
+      @update:open="value => { if (!value) revoking = null }"
+      @confirm="revoke"
+    />
   </div>
 </template>

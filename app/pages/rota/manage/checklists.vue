@@ -89,6 +89,30 @@ async function save(): Promise<void> {
   }
 }
 
+// Retiring confirms; reinstating an item does not (K-123 criterion 7).
+const retiring = ref<{ venueId: string, item: Item } | null>(null)
+const retireFailure = ref<string | null>(null)
+const retireWorking = ref(false)
+
+async function retire(): Promise<void> {
+  const asked = retiring.value
+  if (!asked) return
+  retireWorking.value = true
+  retireFailure.value = null
+  try {
+    await $fetch(`/api/admin/checklist/items/${asked.item.id}/status`, { method: 'POST', body: { venueId: asked.venueId, active: false } })
+    toast.add({ title: 'Item retired', icon: 'i-lucide-check', color: 'success' })
+    retiring.value = null
+    await refresh()
+  }
+  catch (error) {
+    retireFailure.value = refusalText(error)
+  }
+  finally {
+    retireWorking.value = false
+  }
+}
+
 async function setActive(venueId: string, item: Item, active: boolean): Promise<void> {
   failure.value = null
   try {
@@ -133,7 +157,10 @@ const columns: TableColumn<VenueChecklist>[] = [
                       h(UButton, {
                         'size': 'xs', 'color': 'neutral', 'variant': 'ghost',
                         'data-test': `retire-item-${item.id}`,
-                        'onClick': () => setActive(row.original.venueId, item, false),
+                        'onClick': () => {
+                          retireFailure.value = null
+                          retiring.value = { venueId: row.original.venueId, item }
+                        },
                       }, () => 'Retire'),
                     ]
                   : [
@@ -306,5 +333,17 @@ const columns: TableColumn<VenueChecklist>[] = [
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="retiring !== null"
+      name="retire-item"
+      title="Retire this item"
+      verb="Retire the item"
+      :consequence="retiring ? `${retiring.item.label} leaves the checklist from the next show night. Nights already signed off keep it.` : ''"
+      :loading="retireWorking"
+      :failure="retireFailure"
+      @update:open="value => { if (!value) retiring = null }"
+      @confirm="retire"
+    />
   </div>
 </template>

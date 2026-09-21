@@ -168,8 +168,15 @@ async function save(): Promise<void> {
   }
 }
 
-async function remove(venue: VenueTemplate): Promise<void> {
-  failure.value = null
+const removing = ref<VenueTemplate | null>(null)
+const removeFailure = ref<string | null>(null)
+const removeWorking = ref(false)
+
+async function remove(): Promise<void> {
+  const venue = removing.value
+  if (!venue) return
+  removeWorking.value = true
+  removeFailure.value = null
   try {
     await $fetch(`/api/admin/rota/templates/${venue.venueId}`, { method: 'DELETE' })
     toast.add({
@@ -177,10 +184,14 @@ async function remove(venue: VenueTemplate): Promise<void> {
       description: `Performances added at ${venue.venueName} from now on stamp nothing. Shifts already in the diary are untouched.`,
       icon: 'i-lucide-check',
     })
+    removing.value = null
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    removeFailure.value = refusalText(error)
+  }
+  finally {
+    removeWorking.value = false
   }
 }
 
@@ -248,7 +259,10 @@ const columns: TableColumn<VenueTemplate>[] = [
                 'color': 'neutral',
                 'variant': 'ghost',
                 'data-test': `remove-template-${row.original.venueId}`,
-                'onClick': () => remove(row.original),
+                'onClick': () => {
+                  removeFailure.value = null
+                  removing.value = row.original
+                },
               }, () => 'Remove'),
         ])),
   },
@@ -434,5 +448,17 @@ const columns: TableColumn<VenueTemplate>[] = [
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="removing !== null"
+      name="remove-template"
+      :title="removing ? `Remove the ${removing.venueName} template` : ''"
+      :verb="removing ? `Remove the ${removing.venueName} template` : ''"
+      consequence="Performances added there from now on stamp nothing. Nights already stamped keep their shifts."
+      :loading="removeWorking"
+      :failure="removeFailure"
+      @update:open="value => { if (!value) removing = null }"
+      @confirm="remove"
+    />
   </div>
 </template>

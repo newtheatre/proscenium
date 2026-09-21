@@ -64,6 +64,37 @@ async function saveType(): Promise<void> {
   }
 }
 
+// Retiring confirms; reinstating does not (K-123 criterion 7).
+const retiringType = ref<MilestoneType | null>(null)
+const typeFailure = ref<string | null>(null)
+const typeWorking = ref(false)
+
+async function retireType(): Promise<void> {
+  const type = retiringType.value
+  if (!type) return
+  typeWorking.value = true
+  typeFailure.value = null
+  try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
+    await $fetch<unknown>(`/api/admin/backstage/milestone-types/${type.id}/status`, { method: 'POST', body: { active: false } })
+    toast.add({ title: 'Milestone type retired', icon: 'i-lucide-check', color: 'success' })
+    retiringType.value = null
+    await refreshTypes()
+  }
+  catch (error) {
+    typeFailure.value = refusalText(error)
+  }
+  finally {
+    typeWorking.value = false
+  }
+}
+
+function toggleType(type: MilestoneType): void {
+  if (!type.active) return void setTypeActive(type, true)
+  typeFailure.value = null
+  retiringType.value = type
+}
+
 async function setTypeActive(type: MilestoneType, active: boolean): Promise<void> {
   failure.value = null
   try {
@@ -114,6 +145,36 @@ async function savePreset(): Promise<void> {
   finally {
     saving.value = false
   }
+}
+
+const retiringPreset = ref<Preset | null>(null)
+const presetFailure = ref<string | null>(null)
+const presetWorking = ref(false)
+
+async function retirePreset(): Promise<void> {
+  const preset = retiringPreset.value
+  if (!preset) return
+  presetWorking.value = true
+  presetFailure.value = null
+  try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
+    await $fetch<unknown>(`/api/admin/backstage/presets/${preset.id}/status`, { method: 'POST', body: { active: false } })
+    toast.add({ title: 'Preset retired', icon: 'i-lucide-check', color: 'success' })
+    retiringPreset.value = null
+    await refreshPresets()
+  }
+  catch (error) {
+    presetFailure.value = refusalText(error)
+  }
+  finally {
+    presetWorking.value = false
+  }
+}
+
+function togglePreset(preset: Preset): void {
+  if (!preset.active) return void setPresetActive(preset, true)
+  presetFailure.value = null
+  retiringPreset.value = preset
 }
 
 async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
@@ -194,7 +255,7 @@ async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
               color="neutral"
               variant="ghost"
               :data-test="`retire-type-${type.id}`"
-              @click="setTypeActive(type, !type.active)"
+              @click="toggleType(type)"
             >
               {{ type.active ? 'Retire' : 'Reinstate' }}
             </UButton>
@@ -262,7 +323,7 @@ async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
               color="neutral"
               variant="ghost"
               :data-test="`retire-preset-${preset.id}`"
-              @click="setPresetActive(preset, !preset.active)"
+              @click="togglePreset(preset)"
             >
               {{ preset.active ? 'Retire' : 'Reinstate' }}
             </UButton>
@@ -379,5 +440,29 @@ async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="retiringType !== null"
+      name="retire-type"
+      :title="retiringType ? `Retire ${retiringType.label}` : ''"
+      :verb="retiringType ? `Retire ${retiringType.label}` : ''"
+      consequence="No new milestone is set against it. Milestones already on a board stay where they are."
+      :loading="typeWorking"
+      :failure="typeFailure"
+      @update:open="value => { if (!value) retiringType = null }"
+      @confirm="retireType"
+    />
+
+    <ConfirmModal
+      :open="retiringPreset !== null"
+      name="retire-preset"
+      :title="retiringPreset ? `Retire ${retiringPreset.label}` : ''"
+      :verb="retiringPreset ? `Retire ${retiringPreset.label}` : ''"
+      consequence="It stops being offered on the board. Messages already sent with it are untouched."
+      :loading="presetWorking"
+      :failure="presetFailure"
+      @update:open="value => { if (!value) retiringPreset = null }"
+      @confirm="retirePreset"
+    />
   </div>
 </template>

@@ -110,9 +110,9 @@ describe('a console list filters by its declaration (K-129)', () => {
 // segment names what it undoes. A status flip is both directions; only the off one confirms.
 const DESTRUCTIVE_ROUTE = /method:\s*'DELETE'|\/(?:cancel|revoke|void|decline|retire|unconfirm|stand-down|status|security)['`]/
 
-// A destructive action that already confirms in a modal of its own, with a verb that names what
-// it destroys. Moving each onto ConfirmModal is mechanical and is K-123's second slice.
-const CONFIRMS_IN_ITS_OWN_MODAL = [
+// A destructive action that already confirms in a dialogue of its own, with a verb naming what it
+// destroys. Moving each onto ConfirmModal is mechanical; the list may shrink and may not grow.
+const CONFIRMS_IN_ITS_OWN_DIALOGUE = [
   'app/pages/bar/categories.vue',
   'app/pages/bar/tabs.vue',
   'app/pages/box-office/content-warnings.vue',
@@ -121,29 +121,23 @@ const CONFIRMS_IN_ITS_OWN_MODAL = [
   'app/pages/box-office/show-categories.vue',
   'app/pages/box-office/ticket-types.vue',
   'app/pages/box-office/venues.vue',
+  'app/pages/people/fellows.vue',
+  'app/pages/people/members.vue',
+  'app/pages/rooms/manage/closures.vue',
+  'app/pages/rota/manage/approvals.vue',
+  'app/pages/training/manage/records.vue',
+  'app/pages/training/manage/requests.vue',
+  'app/pages/training/manage/sessions/[id].vue',
 ]
 
-// The sweep lands module by module: the box office and the bar first, then rota, rooms, training
-// and people. Both lists go when the second lands and the whole console answers to the rule.
-const SWEPT = ['app/pages/bar/', 'app/pages/box-office/']
-const CONFIRMED_EVERYWHERE = false
-
 describe('a destructive action confirms before it happens (K-123, 0032)', () => {
-  const unconfirmed = async (paths: string[]): Promise<string[]> =>
-    (await screens())
-      .filter(screen => paths.some(prefix => screen.path.startsWith(prefix)))
-      .filter(screen => DESTRUCTIVE_ROUTE.test(screen.source))
-      .filter(screen => !screen.source.includes('<ConfirmModal') && !CONFIRMS_IN_ITS_OWN_MODAL.includes(screen.path))
+  test('every console page that destroys something confirms first', async () => {
+    const destructive = (await screens()).filter(screen => DESTRUCTIVE_ROUTE.test(screen.source))
+    expect(destructive.length).toBeGreaterThan(0)
+    const unconfirmed = destructive
+      .filter(screen => !screen.source.includes('<ConfirmModal') && !CONFIRMS_IN_ITS_OWN_DIALOGUE.includes(screen.path))
       .map(screen => screen.path)
-
-  test('every swept module confirms through the one shared component', async () => {
-    const swept = (await screens()).filter(screen => SWEPT.some(prefix => screen.path.startsWith(prefix)))
-    expect(swept.length).toBeGreaterThan(0)
-    expect(await unconfirmed(SWEPT)).toEqual([])
-  })
-
-  test.skipIf(!CONFIRMED_EVERYWHERE)('every console page that destroys something confirms first', async () => {
-    expect(await unconfirmed([PAGES])).toEqual([])
+    expect(unconfirmed).toEqual([])
   })
 
   // The cancel word is read from one place, so the modal-conventions job changes one string.

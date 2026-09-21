@@ -138,9 +138,14 @@ async function submitPlan(): Promise<void> {
   }
 }
 
-async function cancel(opening: Opening): Promise<void> {
+const cancellingOpening = ref<Opening | null>(null)
+const cancelFailure = ref<string | null>(null)
+
+async function cancel(): Promise<void> {
+  const opening = cancellingOpening.value
+  if (!opening) return
   cancelling.value = opening.openingId
-  failure.value = null
+  cancelFailure.value = null
   try {
     const answer = await $fetch<{ shiftsCancelled: number }>(`/api/rota/openings/${opening.openingId}/cancel`, { method: 'POST' })
     toast.add({
@@ -149,24 +154,37 @@ async function cancel(opening: Opening): Promise<void> {
       icon: 'i-lucide-check',
       color: 'success',
     })
+    cancellingOpening.value = null
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    cancelFailure.value = refusalText(error)
   }
   finally {
     cancelling.value = null
   }
 }
 
-async function standDown(slot: Slot): Promise<void> {
-  failure.value = null
+const standingDown = ref<Slot | null>(null)
+const standDownFailure = ref<string | null>(null)
+const standDownWorking = ref(false)
+
+async function standDown(): Promise<void> {
+  const slot = standingDown.value
+  if (!slot) return
+  standDownWorking.value = true
+  standDownFailure.value = null
   try {
     await $fetch(`/api/rota/openings/shifts/${slot.slotId}/unconfirm`, { method: 'POST' })
+    toast.add({ title: `${slot.holderName ?? 'The holder'} stood down`, icon: 'i-lucide-check', color: 'success' })
+    standingDown.value = null
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    standDownFailure.value = refusalText(error)
+  }
+  finally {
+    standDownWorking.value = false
   }
 }
 
@@ -204,7 +222,10 @@ const columns: TableColumn<Opening>[] = [
               'color': 'neutral',
               'variant': 'ghost',
               'data-test': `stand-down-${slot.slotId}`,
-              'onClick': () => standDown(slot),
+              'onClick': () => {
+                standDownFailure.value = null
+                standingDown.value = slot
+              },
             }, () => 'Stand down')]
           : []),
       ]))),
@@ -229,7 +250,10 @@ const columns: TableColumn<Opening>[] = [
           'variant': 'ghost',
           'loading': cancelling.value === row.original.openingId,
           'data-test': `cancel-${row.original.openingId}`,
-          'onClick': () => cancel(row.original),
+          'onClick': () => {
+            cancelFailure.value = null
+            cancellingOpening.value = row.original
+          },
         }, () => 'Cancel')
       : null),
   },
@@ -388,5 +412,29 @@ const columns: TableColumn<Opening>[] = [
         </div>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="cancellingOpening !== null"
+      name="cancel-opening"
+      title="Cancel the opening"
+      :verb="cancellingOpening ? `Cancel the ${cancellingOpening.label} opening` : ''"
+      consequence="Every slot on it is cancelled and everybody holding one is told."
+      :loading="cancelling !== null"
+      :failure="cancelFailure"
+      @update:open="value => { if (!value) cancellingOpening = null }"
+      @confirm="cancel"
+    />
+
+    <ConfirmModal
+      :open="standingDown !== null"
+      name="stand-down"
+      :title="standingDown ? `Stand ${standingDown.holderName ?? 'them'} down` : ''"
+      :verb="standingDown ? `Stand ${standingDown.holderName ?? 'them'} down` : ''"
+      consequence="The slot goes back on offer and they are told they are no longer on it."
+      :loading="standDownWorking"
+      :failure="standDownFailure"
+      @update:open="value => { if (!value) standingDown = null }"
+      @confirm="standDown"
+    />
   </div>
 </template>

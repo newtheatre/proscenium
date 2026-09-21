@@ -254,7 +254,10 @@ describe.skipIf(skip !== null)('the account screen', () => {
       await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="account-name"]')
       expect(await textOf(view)).toContain(person.email)
 
+      // K-123: the press opens the confirmation, and the named verb is what disables.
       await click(view, '[data-test="disable"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="confirm-secure-account-verb"]\')')
+      await click(view, '[data-test="confirm-secure-account-verb"]')
       await waitFor(view, 'document.querySelector(\'[data-test="state-disabled"]\')')
 
       expect(read<{ disabled: number }>('SELECT disabled FROM users WHERE id = ?', person.id)!.disabled).toBe(1)
@@ -282,6 +285,8 @@ describe.skipIf(skip !== null)('the account screen', () => {
       expect(granted?.expires_at).not.toBeNull()
 
       await click(view, '[data-test="revoke-BOX_OFFICE"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="confirm-revoke-role-verb"]\')')
+      await click(view, '[data-test="confirm-revoke-role-verb"]')
       await waitFor(view, '!document.querySelector(\'[data-test="revoke-BOX_OFFICE"]\')')
 
       expect(read('SELECT user_id FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'BOX_OFFICE')).toBeUndefined()
@@ -323,9 +328,12 @@ describe.skipIf(skip !== null)('the account screen', () => {
 
       await visit(view, `${app.baseURL}/people/accounts/${me}`, '[data-test="grants"]')
 
+      // K-123: the refusal renders in the confirmation, not in a page alert behind its overlay.
       await click(view, '[data-test="revoke-ADMIN"]')
-      await waitFor(view, 'document.querySelector(\'[data-test="failure"]\')')
-      expect(await textOf(view, '[data-test="failure"]')).toContain('last administrator')
+      await waitFor(view, 'document.querySelector(\'[data-test="confirm-revoke-role-verb"]\')')
+      await click(view, '[data-test="confirm-revoke-role-verb"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="confirm-revoke-role-failure"]\')')
+      expect(await textOf(view, '[data-test="confirm-revoke-role-failure"]')).toContain('last administrator')
 
       expect(read('SELECT user_id FROM role_grants WHERE user_id = ? AND role = ?', me, 'ADMIN')).toBeDefined()
     }

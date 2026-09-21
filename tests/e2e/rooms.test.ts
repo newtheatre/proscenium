@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession } from '#tests/helpers/accounts'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { adminSession, forgetSpentStep, registerMember, request } from '#tests/helpers/accounts'
+import { generatePassword } from '#tests/helpers/seed'
+import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { codeForStep, stepFor } from '#shared/utils/totp'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // C-101. The bookable estate reflects reality: a room is retired rather than deleted, its hours
@@ -152,4 +154,56 @@ describe.skipIf(skip !== null)('describing the bookable estate (C-101)', () => {
     expect((await send('GET', '/api/admin/rooms', undefined, stranger.cookie)).status).toBe(403)
     expect((await send('POST', '/api/admin/rooms', { name: 'Sneaky' }, stranger.cookie)).status).toBe(403)
   })
+})
+
+// K-123: retiring a room takes it off the calendar, so it asks first and the button names the
+// room. Back leaves the estate exactly as it was.
+describe.skipIf(skip !== null)('retiring a room confirms before anything changes (K-123)', () => {
+  async function signedInView(): Promise<Bun.WebView> {
+    const password = generatePassword()
+    const officer = await registerMember(app, 'rooms-officer', password)
+    const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, officer.cookie)).json() as { secret: string }
+    await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, officer.cookie)
+    await request(app, 'POST', '/api/admin/roles', { userId: officer.id, role: 'THEATRE_MANAGER' }, cookie)
+
+    forgetSpentStep(app, officer.email)
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', officer.email)
+    await fill(view, 'form input[type="password"]', password)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
+    await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(secret, stepFor(new Date()) + 1))
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    return view
+  }
+
+  test('Back retires nothing, and the named verb retires the room', async () => {
+    const name = `Retirable ${crypto.randomUUID().slice(0, 6)}`
+    const id = await addRoom(name)
+
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/rooms/manage`, '[data-test="rooms-table"]')
+      await waitFor(view, `document.querySelector('[data-test="retire-room-${id}"]')`, 30_000)
+
+      await click(view, `[data-test="retire-room-${id}"]`)
+      await waitFor(view, `document.querySelector('[data-test="confirm-retire-room-verb"]')`, 15_000)
+      expect(await textOf(view, '[data-test="confirm-retire-room-verb"]')).toContain(name)
+
+      await click(view, '[data-test="confirm-retire-room-back"]')
+      await waitFor(view, `!document.querySelector('[data-test="confirm-retire-room-verb"]')`, 15_000)
+      expect(read<{ isActive: number }>('SELECT is_active AS isActive FROM rooms WHERE id = ?', id)?.isActive).toBe(1)
+
+      await click(view, `[data-test="retire-room-${id}"]`)
+      await waitFor(view, `document.querySelector('[data-test="confirm-retire-room-verb"]')`, 15_000)
+      await click(view, '[data-test="confirm-retire-room-verb"]')
+      await waitFor(view, `!document.querySelector('[data-test="retire-room-${id}"]')`, 30_000)
+
+      expect(read<{ isActive: number }>('SELECT is_active AS isActive FROM rooms WHERE id = ?', id)?.isActive).toBe(0)
+    }
+    finally {
+      view.close()
+    }
+  }, BOOT_TIMEOUT_MS)
 })

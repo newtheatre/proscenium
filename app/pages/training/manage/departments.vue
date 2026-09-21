@@ -126,15 +126,26 @@ async function appoint(): Promise<void> {
   }
 }
 
-async function standDown(lead: Lead): Promise<void> {
-  failure.value = null
+const standingDown = ref<Lead | null>(null)
+const standDownFailure = ref<string | null>(null)
+const standDownWorking = ref(false)
+
+async function standDown(): Promise<void> {
+  const lead = standingDown.value
+  if (!lead) return
+  standDownWorking.value = true
+  standDownFailure.value = null
   try {
     await $fetch(`/api/admin/training/leads/${lead.id}`, { method: 'DELETE' })
     toast.add({ title: 'Lead removed', description: 'It stops counting on their next request.', icon: 'i-lucide-check' })
+    standingDown.value = null
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    standDownFailure.value = refusalText(error)
+  }
+  finally {
+    standDownWorking.value = false
   }
 }
 
@@ -183,7 +194,10 @@ const columns: TableColumn<Department>[] = [
               'variant': 'ghost',
               'aria-label': `Remove ${lead.name} as a lead of ${row.original.name}`,
               'data-test': `stand-down-${lead.id}`,
-              'onClick': () => standDown(lead),
+              'onClick': () => {
+                standDownFailure.value = null
+                standingDown.value = lead
+              },
             }),
           ])))),
   },
@@ -405,5 +419,17 @@ const columns: TableColumn<Department>[] = [
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="standingDown !== null"
+      name="stand-down-lead"
+      :title="standingDown ? `Remove ${standingDown.name} as lead` : ''"
+      :verb="standingDown ? `Remove ${standingDown.name}` : ''"
+      consequence="They stop leading the department, and it stops counting on their next request."
+      :loading="standDownWorking"
+      :failure="standDownFailure"
+      @update:open="value => { if (!value) standingDown = null }"
+      @confirm="standDown"
+    />
   </div>
 </template>
