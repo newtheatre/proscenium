@@ -637,6 +637,14 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
   4. `/account` redirects to `/my`. Member surfaces stay calm: nothing from the expressive kit.
   5. `scripts/shots.ts` captures the member screens too, and before-and-after captures are
      attached to the pull request.
+  6. The overview leads with what is soonest (the next shift, the next room booking, the next
+     training session), then the standing tiles in one fixed order. A tile with nothing behind
+     it says what would be there and the one action that fills it, or does not exist. One
+     control shape per action kind across the grid, no raw enum value on a tile, and the
+     member is named in a sentence rather than a fragment.
+  7. A member screen that lists something shows a failure with a way to try the read again when
+     the read fails, never its empty state: the empty state's words promise there is nothing,
+     which is untrue of a read that did not finish.
 - Source: Pre-cutover review, 10 September 2026; 0040 named the member's own pages as needing
   shaping and left it to do.
 
