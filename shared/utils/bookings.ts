@@ -51,7 +51,7 @@ export function describePurpose(value: string | null): string {
 // What a member reads for a booking's state. A cancellation carrying a conversion pointer was
 // moved rather than withdrawn, and reading it as "Cancelled" would say the opposite (C-123).
 export function saysBookingState(booking: { status: string, convertedToRequestId?: string | null }): string {
-  if (booking.status === 'CANCELLED' && booking.convertedToRequestId) return 'Moved to a room not listed here'
+  if (booking.status === 'CANCELLED' && booking.convertedToRequestId) return 'Moved to a room we do not manage'
   return BOOKING_STATE[booking.status] ?? booking.status
 }
 
@@ -60,7 +60,7 @@ const BOOKING_STATE: Record<string, string> = {
   PENDING_APPROVAL: 'Waiting on a decision',
   CANCELLED: 'Cancelled',
   REJECTED: 'Turned down',
-  BUMPED: 'Given to a higher priority',
+  BUMPED: 'Given to another booking',
 }
 
 // Only a request waiting on a decision moves: a confirmed booking is somebody's arrangement
@@ -81,7 +81,7 @@ export const CANCELLABLE: readonly BookingStatus[] = ['CONFIRMED', 'PENDING_APPR
 export function refusalToCancel(booking: { userId: string, status: string }, viewerId: string): string | null {
   if (booking.userId !== viewerId) return 'That is not your booking'
   if (!CANCELLABLE.includes(booking.status as BookingStatus)) {
-    return `That booking is already ${booking.status.toLowerCase().replace('_', ' ')}`
+    return `That booking is already ${saysBookingState(booking).toLowerCase()}`
   }
   return null
 }

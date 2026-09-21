@@ -25,8 +25,18 @@ export const SETTLED: readonly BookingStatus[] = ['REJECTED', 'CANCELLED', 'BUMP
 
 export const REJECTION_REASON_LIMIT = 1000
 
+// Wording, never the enum word: "bumped" is a column value, and a refusal that quotes one has
+// told the reader nothing. The shape `saysBookingState` uses, in the middle of a sentence.
+const STATUS_WORDING: Record<string, string> = {
+  CONFIRMED: 'confirmed',
+  PENDING_APPROVAL: 'waiting on a decision',
+  REJECTED: 'turned down',
+  CANCELLED: 'cancelled',
+  BUMPED: 'given to another booking',
+}
+
 export function saysStatus(status: string): string {
-  return status.toLowerCase().replace('_', ' ')
+  return STATUS_WORDING[status] ?? 'settled'
 }
 
 // One refusal per reason, phrased for the officer rather than the requester.

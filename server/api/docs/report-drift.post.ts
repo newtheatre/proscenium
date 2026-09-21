@@ -22,7 +22,12 @@ export default defineEventHandler(async (event) => {
   await Promise.all(admins.map(admin => notify(event, {
     userId: admin.id,
     type: 'docs.drift-reported',
-    context: { name: '', path: input.path, reportedByName: account.name },
+    context: {
+      name: '',
+      path: input.path,
+      reportedByName: account.name,
+      pageUrl: `${useRuntimeConfig(event).public.baseURL}${input.path}`,
+    },
   })))
 
   return { ok: true }

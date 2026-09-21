@@ -11,6 +11,9 @@ import type { TemplateContext } from '#server/utils/templates'
 
 const ROOMS_URL = 'https://newtheatre.org.uk/rooms/mine'
 
+// A part is wrapped for the plain-text reader, so a sentence is matched without its line breaks.
+const flat = (part: string): string => part.replace(/\s+/g, ' ')
+
 // One context wide enough for every template: a template reads only the keys it needs, and
 // `render` refuses any part that came out holding `undefined`.
 const EVERYTHING: TemplateContext = {
@@ -152,7 +155,7 @@ describe('the house words (item 7)', () => {
 
   test('no template carries an em dash or an exclamation mark', () => {
     const offenders = everything()
-      .filter(one => /[—–]|![ <\n]/.test(`${one.subject} ${one.html} ${one.text}`))
+      .filter(one => /[\u2014\u2013]|![ <\n]/.test(`${one.subject} ${one.html} ${one.text}`))
       .map(one => one.name)
     expect([...new Set(offenders)]).toEqual([])
   })
@@ -205,8 +208,8 @@ describe('the rewritten bodies and subjects (item 7)', () => {
 
   test('role-expiring says our year, and names the IT manager', () => {
     const { html } = render('role-expiring', EVERYTHING)
-    expect(html).toContain('Committee roles run to the end of our year')
-    expect(html).toContain(`ask the ${saysRole('ADMIN')} to renew`)
+    expect(flat(html)).toContain('Committee roles run to the end of our year')
+    expect(flat(html)).toContain(`ask the ${saysRole('ADMIN')} to renew`)
   })
 
   test('the unpaid hold calls it a booking and says the seats may be sold', () => {
@@ -219,8 +222,8 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   test('the confirmation says not yet paid in plain weight, and is a booking', () => {
     const { subject, html } = render('reservation-confirmed', EVERYTHING)
     expect(subject).toBe('Your booking for The Tempest')
-    expect(html).toContain('Not yet paid: £9.00 is due at the box office on the night.')
-    expect(html).toContain('This booking holds your seats and is not a purchase until then.')
+    expect(flat(html)).toContain('Not yet paid: £9.00 is due at the box office on the night.')
+    expect(flat(html)).toContain('This booking holds your seats and is not a purchase until then.')
     expect(html).not.toContain('UNPAID')
   })
 
@@ -233,6 +236,11 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   test('the reassignment names the front of house manager', () => {
     expect(render('shift-removed', EVERYTHING).html)
       .toContain(`The ${namesRole('FOH_MANAGER')} has reassigned your door shift`)
+  })
+
+  test('a room request names the theatre manager from the wording map', () => {
+    expect(render('room-requested', EVERYTHING).html)
+      .toContain(`is with the ${namesRole('THEATRE_MANAGER')}`)
   })
 
   test('a declined shift leaves the open list open', () => {
@@ -255,7 +263,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   test('the safety notice links the list rather than describing it', () => {
     const { html } = render('incident-follow-up-required', EVERYTHING)
     expect(html).toContain('https://newtheatre.org.uk/rota/manage/safety')
-    expect(html).not.toContain("Open the safety officer's list to read and close it.")
+    expect(html).not.toContain('Open the safety officer\'s list to read and close it.')
   })
 
   test('a drift report links the page rather than printing it as code', () => {
@@ -272,7 +280,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   test('a scheduled training request leads with the module', () => {
     const { subject, html } = render('training-request-scheduled', EVERYTHING)
     expect(subject).toBe('Working at height is now scheduled')
-    expect(html).toContain('You asked for Working at height to be taught, and a session is now in the diary. Thank you for asking.')
+    expect(flat(html)).toContain('You asked for Working at height to be taught, and a session is now in the diary. Thank you for asking.')
   })
 
   test('a missed session says what it is, and reassures once', () => {
@@ -284,8 +292,8 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   test('the expiry window subject says what it is, and the splice is gone', () => {
     const { subject, html, text } = render('training-expiry-window', EVERYTHING)
     expect(subject).toBe('Your training expires before long')
-    expect(html).toContain('Expired training does not disappear from your record. It just stops counting')
-    expect(text).not.toContain('from your record, it just stops counting')
+    expect(flat(html)).toContain('Expired training does not disappear from your record. It just stops counting')
+    expect(flat(text)).not.toContain('from your record, it just stops counting')
   })
 
   test('joining a waiting list is not contracted', () => {
@@ -304,7 +312,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   })
 
   test('a no-show counts in words', () => {
-    expect(render('room-no-show', EVERYTHING).html).toContain('That is the 3rd booking not used this year.')
+    expect(flat(render('room-no-show', EVERYTHING).html)).toContain('That is the 3rd booking not used this year.')
   })
 
   test('the magic link says the same thing in both parts', () => {
@@ -324,7 +332,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(dry.html).not.toContain('dry-run')
 
     const quiet = render('training-expiry-digest', { ...EVERYTHING, expiring: [], expired: [] })
-    expect(quiet.html).toContain('If this email ever stops arriving, the monthly sweep has stopped running')
+    expect(flat(quiet.html)).toContain('If this email ever stops arriving, the monthly sweep has stopped running')
     expect(quiet.html).not.toContain('clockwork')
   })
 })
@@ -362,10 +370,10 @@ describe('ordinal (item 7)', () => {
 describe('the shared labels (item 8)', () => {
   test('saysStatus never yields an enum word', () => {
     for (const status of ['CONFIRMED', 'PENDING_APPROVAL', 'REJECTED', 'CANCELLED', 'BUMPED', 'SOMETHING_ELSE']) {
-      const said = saysStatus(status)
-      expect(said).not.toMatch(/[A-Z_]{2,}/)
-      expect(said.toUpperCase().replace(' ', '_')).not.toBe(status)
+      expect(saysStatus(status)).not.toMatch(/[A-Z_]/)
     }
+    expect(saysStatus('PENDING_APPROVAL')).toBe('waiting on a decision')
+    expect(saysStatus('SOMETHING_ELSE')).toBe('settled')
   })
 
   test('a bumped booking was given to another booking', () => {

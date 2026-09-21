@@ -34,6 +34,7 @@ export interface WaitingListOfferedContext {
   showTitle: string
   startsAt: number
   expiresAt: number
+  partySize: number
   token: string
 }
 
@@ -49,6 +50,7 @@ export async function sendWaitingListOffered(event: H3Event | undefined, context
       show: context.showTitle,
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       expires: formatLondon(new Date(context.expiresAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      partySize: context.partySize,
       claimUrl: `${base}/waiting-list/entry/${context.token}`,
       removeUrl: `${base}/waiting-list/leave/${context.token}`,
     },

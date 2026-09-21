@@ -13,6 +13,7 @@ export async function notifyWaitingListOffers(event: H3Event | undefined, offere
       showTitle: entry.showTitle,
       startsAt: entry.startsAt,
       expiresAt: entry.expiresAt,
+      partySize: entry.partySize,
       token,
     })
   }

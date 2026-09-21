@@ -1,10 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import { notify } from './notify'
 import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
-import type { Category, Severity } from '#shared/utils/incidents'
 import type { SQL } from 'drizzle-orm'
-import type { H3Event } from 'h3'
 
 // Severity routing to follow-up (E-116). `incident_severity_config` is committee configuration,
 // mutable like `checklist_items`; `incident_followup_closures` is append-only like `incidents`.
@@ -93,19 +90,4 @@ export async function safetyOfficers(): Promise<{ id: string }[]> {
       sql`(${schema.roleGrants.expiresAt} IS NULL OR ${schema.roleGrants.expiresAt} > ${now})`,
       eq(schema.users.disabled, false),
     ))
-}
-
-// Called after a successful write, never before: a notification for an incident that failed to
-// log would be a lie about what happened (criterion 2).
-export async function notifySafetyOfficersIfNeeded(
-  event: H3Event, incidentId: string, category: Category, severity: Severity,
-): Promise<void> {
-  if (!(await requiresFollowUp(severity))) return
-
-  const officers = await safetyOfficers()
-  await Promise.all(officers.map(officer => notify(event, {
-    userId: officer.id,
-    type: 'incident.follow-up-required',
-    context: { name: '', category, severity },
-  })))
 }

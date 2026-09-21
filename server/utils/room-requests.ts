@@ -158,7 +158,13 @@ async function escalate(event: H3Event | undefined, request: Waiting, now: numbe
     await notify(event, {
       type: 'room.request.waiting',
       userId: approver.id,
-      context: { name: approver.name, room: request.room, title: request.title, when: whenOf(request) },
+      context: {
+        name: approver.name,
+        room: request.room,
+        title: request.title,
+        when: whenOf(request),
+        queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/requests`,
+      },
     })
   }
 }

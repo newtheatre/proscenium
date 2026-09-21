@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { toCsv } from '#server/utils/csv'
+import { numberedPdfRows } from '#server/utils/age-checks-export'
 import { buildTablePdf } from '#server/utils/pdf'
 import { saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { formatLondon, startOfLondonDayAfter } from '#shared/utils/london'
@@ -58,24 +59,23 @@ export default defineEventHandler(async (event) => {
       `Generated: ${formatLondon(new Date(), { dateStyle: 'full', timeStyle: 'short' })}`,
     ],
     columns: [
+      { header: 'Row', key: 'row', width: 34 },
       { header: 'When', key: 'when', width: 90 },
       { header: 'Outcome', key: 'outcome', width: 60 },
       { header: 'ID / reason', key: 'idOrReason', width: 100 },
-      { header: 'Description', key: 'description', width: 160 },
-      { header: 'Product', key: 'product', width: 80 },
-      { header: 'Checked by', key: 'checkedBy', width: 90 },
-      { header: 'Supersedes', key: 'supersedesId', width: 90 },
-      { header: 'Superseded by', key: 'supersededBy', width: 90 },
+      { header: 'Description', key: 'description', width: 150 },
+      { header: 'Product', key: 'product', width: 76 },
+      { header: 'Checked by', key: 'checkedBy', width: 86 },
+      { header: 'Supersedes', key: 'supersedes', width: 80 },
+      { header: 'Superseded by', key: 'supersededBy', width: 84 },
     ],
-    rows: rows.map(row => ({
+    rows: numberedPdfRows(rows, row => ({
       when: formatLondon(new Date(row.createdAt * 1000), { dateStyle: 'short', timeStyle: 'short' }),
       outcome: saysOutcome(row.outcome),
       idOrReason: row.idType ? saysIdType(row.idType) : (row.reason ? saysRefusalReason(row.reason) : ''),
       description: row.description,
       product: row.product ?? '',
       checkedBy: row.checkedByName,
-      supersedesId: row.supersedesId ?? '',
-      supersededBy: row.supersededBy ?? '',
     })),
   })
 

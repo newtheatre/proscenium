@@ -24,10 +24,11 @@ or a lapsed membership is not a mistake anyone made.
 Second person for the reader ("you", "your"). "We" for the theatre after the first mention of it
 by name. "The SU" for the Students' Union after the first full mention on a page.
 
-Already inconsistent. `templates.ts`'s `set-password` template says "The theatre has made you an
-account", never "we", while its `membership-recording-failed` template says "We could not record
-the membership you told us about." "We" wins: it is what most of the file already does, and it is
-warmer without being less precise.
+This was inconsistent, and is resolved: `templates.ts`'s `set-password` template said "The theatre
+has made you an account", never "we", while its `membership-recording-failed` template said "We
+could not record the membership you told us about." "We" won, being what most of the file already
+did and warmer without being less precise, and the K-128 sweep moved the rest of the file onto it.
+`tests/unit/templates.test.ts` keeps it that way.
 
 ## 3. Register by shell
 
