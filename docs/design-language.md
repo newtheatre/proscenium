@@ -131,7 +131,7 @@ consequences list. The sidebar carries fifty-four, which is why each group split
 and Set-up first (0082): search finds a screen whose name you already know, and the sections are
 what make an unfamiliar one findable at all.
 
-Seven rules follow:
+Eight rules follow:
 
 1. **A permanently dark region is marked `dark`.** The public header and footer are stage black
    in both colour modes. That is one class on the subtree, after which every semantic token
@@ -176,6 +176,15 @@ so no page draws a heading of its own. The hub at `/tonight` is six
    anchor, so the slot holds `SiteWordmark`, not a `NuxtLink`, and the destination is the `to`
    prop. `UHeader` does not carry its default slot into the mobile panel either, so a header with
    links gives the `#body` slot the same navigation.
+8. **There is one confirmation shape on the console: `ConfirmModal`.** Every destructive or
+   money-moving action opens it (K-123 criterion 7, 0032). Its title states what is about to
+   happen rather than asking a question, its `consequence` line says what follows, its button is
+   the verb and the thing it acts on ("Refund £12.50", "Retire Studio", never a bare "Delete"),
+   and `error` is for destruction while `primary` is for a money or publishing action that is
+   not. A refusal from the route renders inside it, above the footer, because a page-level alert
+   sits behind the overlay where nobody reads it. The cancel word comes from
+   `CONFIRM_BACK_LABEL` in `shared/utils/admin-conventions.ts`, so unifying it later is one
+   string. `tests/unit/admin-conventions.test.ts` is what holds the rule.
 
 ## Photography and show artwork
 

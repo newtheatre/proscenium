@@ -209,6 +209,37 @@ async function record(): Promise<void> {
 // off the till in one batch (F-128 criteria 5 and 6).
 const hiding = ref<{ item: StockItem, products: { id: string, name: string }[] } | null>(null)
 
+// Retiring confirms; putting an item back in stock does not (K-123 criterion 7). A refusal that
+// names the products still pouring it hands over to the batch confirmation above.
+const retiring = ref<StockItem | null>(null)
+const retireFailure = ref<string | null>(null)
+const retireWorking = ref(false)
+
+async function retire(): Promise<void> {
+  const item = retiring.value
+  if (!item) return
+  retireWorking.value = true
+  retireFailure.value = null
+  try {
+    await $fetch(`/api/admin/bar/items/${item.id}/status`, { method: 'POST', body: { status: 'RETIRED', hideDependents: false } })
+    toast.add({ title: `${item.name} is retired`, icon: 'i-lucide-check', color: 'success' })
+    retiring.value = null
+    await reload()
+  }
+  catch (refused) {
+    const dependents = refusalData<{ dependents?: { id: string, name: string }[] }>(refused)?.dependents
+    if (dependents?.length) {
+      retiring.value = null
+      hiding.value = { item, products: dependents }
+      return
+    }
+    retireFailure.value = refusalText(refused)
+  }
+  finally {
+    retireWorking.value = false
+  }
+}
+
 async function setStatus(item: StockItem, status: 'ACTIVE' | 'RETIRED', hideDependents = false): Promise<void> {
   failure.value = null
   try {
@@ -351,7 +382,11 @@ const columns: TableColumn<StockItem>[] = [
         'color': 'neutral',
         'variant': 'ghost',
         'data-test': `status-${row.original.id}`,
-        'onClick': () => setStatus(row.original, row.original.status === 'RETIRED' ? 'ACTIVE' : 'RETIRED'),
+        'onClick': () => {
+          if (row.original.status === 'RETIRED') return void setStatus(row.original, 'ACTIVE')
+          retireFailure.value = null
+          retiring.value = row.original
+        },
       }, () => (row.original.status === 'RETIRED' ? 'Put back' : 'Retire')),
       row.original.hasMovements
         ? null
@@ -791,5 +826,17 @@ const columns: TableColumn<StockItem>[] = [
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="retiring !== null"
+      name="retire-item"
+      :title="retiring ? `Retire ${retiring.name}` : ''"
+      :verb="retiring ? `Retire ${retiring.name}` : ''"
+      consequence="It leaves the stock list and nothing new may be counted against it. Its movements stay."
+      :loading="retireWorking"
+      :failure="retireFailure"
+      @update:open="value => { if (!value) retiring = null }"
+      @confirm="retire"
+    />
   </div>
 </template>

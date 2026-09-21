@@ -69,6 +69,30 @@ async function save(): Promise<void> {
   }
 }
 
+// Retiring confirms; putting a discount back does not (K-123 criterion 7).
+const retiring = ref<Discount | null>(null)
+const retireFailure = ref<string | null>(null)
+const retireWorking = ref(false)
+
+async function retire(): Promise<void> {
+  const discount = retiring.value
+  if (!discount) return
+  retireWorking.value = true
+  retireFailure.value = null
+  try {
+    await $fetch(`/api/admin/bar/discounts/${discount.id}/status`, { method: 'POST', body: { status: 'RETIRED' } })
+    toast.add({ title: `${discount.name} is retired`, icon: 'i-lucide-check', color: 'success' })
+    retiring.value = null
+    await refresh()
+  }
+  catch (refused) {
+    retireFailure.value = refusalText(refused)
+  }
+  finally {
+    retireWorking.value = false
+  }
+}
+
 async function setStatus(discount: Discount, status: Discount['status']): Promise<void> {
   failure.value = null
   try {
@@ -114,7 +138,11 @@ const columns: TableColumn<Discount>[] = [
         'color': 'neutral',
         'variant': 'ghost',
         'data-test': `status-${row.original.id}`,
-        'onClick': () => setStatus(row.original, row.original.status === 'RETIRED' ? 'ACTIVE' : 'RETIRED'),
+        'onClick': () => {
+          if (row.original.status === 'RETIRED') return void setStatus(row.original, 'ACTIVE')
+          retireFailure.value = null
+          retiring.value = row.original
+        },
       }, () => (row.original.status === 'RETIRED' ? 'Put back' : 'Retire')),
     ]),
   },
@@ -261,5 +289,17 @@ const columns: TableColumn<Discount>[] = [
         </UForm>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="retiring !== null"
+      name="retire-discount"
+      :title="retiring ? `Retire ${retiring.name}` : ''"
+      :verb="retiring ? `Retire ${retiring.name}` : ''"
+      consequence="The till stops offering it. Sales that already took it are untouched."
+      :loading="retireWorking"
+      :failure="retireFailure"
+      @update:open="value => { if (!value) retiring = null }"
+      @confirm="retire"
+    />
   </div>
 </template>

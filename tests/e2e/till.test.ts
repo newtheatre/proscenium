@@ -118,7 +118,7 @@ function insertStaleSession(venueId: string, staleNight: string, openedBy: strin
 
 const today = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 
-async function aSellableProduct(pricePence: number, ageRestricted = false): Promise<{ variantId: string }> {
+async function aSellableProduct(pricePence: number, ageRestricted = false): Promise<{ productId: string, variantId: string }> {
   const categoryAnswered = await request(app, 'POST', '/api/admin/bar/categories', { name: `Variance ${crypto.randomUUID().slice(0, 6)}` }, admin.cookie)
   const { id: categoryId } = await categoryAnswered.json() as { id: string }
   const productAnswered = await request(app, 'POST', '/api/admin/bar/products', { name: `Variance ${crypto.randomUUID().slice(0, 6)}`, categoryId, ageRestricted }, admin.cookie)
@@ -127,7 +127,7 @@ async function aSellableProduct(pricePence: number, ageRestricted = false): Prom
   const { id: variantId } = await variantAnswered.json() as { id: string }
   await request(app, 'POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() }, admin.cookie)
   await request(app, 'POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' }, admin.cookie)
-  return { variantId }
+  return { productId, variantId }
 }
 
 let nextSlot = 100
@@ -524,7 +524,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
     const comping = programme('till-comp')
     await openTill(comping.venueId, screenBar.cookie)
-    const { variantId } = await aSellableProduct(300)
+    const { productId } = await aSellableProduct(300)
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -534,7 +534,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${comping.venueId}`, `[data-test="till-open"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
     await click(view, '[data-test="till-comp-chip"]')
     await waitFor(view, `document.querySelector('[data-test="comp-reason"]')`)
@@ -573,7 +573,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
     const comping = programme('till-comp-decline')
     await openTill(comping.venueId, screenBar.cookie)
-    const { variantId } = await aSellableProduct(200)
+    const { productId } = await aSellableProduct(200)
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -583,7 +583,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${comping.venueId}`, `[data-test="till-open"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
     await click(view, '[data-test="till-comp-chip"]')
     await waitFor(view, `document.querySelector('[data-test="comp-reason"]')`)
@@ -610,7 +610,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
     const comping = programme('till-comp-restricted')
     await openTill(comping.venueId, screenBar.cookie)
-    const { variantId } = await aSellableProduct(400, true)
+    const { productId } = await aSellableProduct(400, true)
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -620,7 +620,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${comping.venueId}`, `[data-test="till-open"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
     await click(view, '[data-test="till-comp-chip"]')
     await waitFor(view, `document.querySelector('[data-test="comp-reason"]')`)

@@ -91,6 +91,8 @@ const {
 const {
   basket,
   choosing,
+  sizing,
+  tapProduct,
   tapVariant,
   chooseOption,
   incrementLine,
@@ -507,10 +509,13 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               tabindex="0"
               :categories="categories"
               :products-in="productsIn"
+              :sizing="sizing"
               :choosing="choosing"
+              :tap-product="tapProduct"
               :tap-variant="tapVariant"
               :choose-option="chooseOption"
               @open-allergens="allergenOpen = $event"
+              @close-sizing="sizing = null"
               @close-choosing="choosing = null"
             />
 

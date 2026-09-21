@@ -49,7 +49,20 @@ const active = computed({
 const publishing = ref(false)
 const cascade = ref(true)
 
-async function setPublished(published: boolean): Promise<void> {
+// Taking a show off sale is not destruction, so the confirmation is primary rather than error
+// (K-123 criterion 7). Its refusal stays in the dialogue, not on the page behind it.
+const unpublishing = ref(false)
+const unpublishFailure = ref<string | null>(null)
+
+async function takeOffSale(): Promise<void> {
+  unpublishFailure.value = null
+  await setPublished(false, (message) => {
+    unpublishFailure.value = message
+  })
+  if (!unpublishFailure.value) unpublishing.value = false
+}
+
+async function setPublished(published: boolean, refuse?: (message: string) => void): Promise<void> {
   saving.value = true
   failure.value = null
   try {
@@ -69,7 +82,8 @@ async function setPublished(published: boolean): Promise<void> {
     await refresh()
   }
   catch (refused) {
-    failure.value = refusalText(refused)
+    if (refuse) refuse(refusalText(refused))
+    else failure.value = refusalText(refused)
   }
   finally {
     saving.value = false
@@ -215,7 +229,7 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
           <BoxOfficeShowDangerZone
             :show="show"
             :busy="saving"
-            @unpublish="setPublished(false)"
+            @unpublish="unpublishFailure = null; unpublishing = true"
             @remove="removingShow = true"
           />
         </div>
@@ -275,5 +289,17 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      v-model:open="unpublishing"
+      name="take-off-sale"
+      :title="show ? `Take ${show.title} off sale` : ''"
+      :verb="show ? `Take ${show.title} off sale` : ''"
+      consequence="The public page comes down. Bookings already made are kept."
+      color="primary"
+      :loading="saving"
+      :failure="unpublishFailure"
+      @confirm="takeOffSale"
+    />
   </div>
 </template>
