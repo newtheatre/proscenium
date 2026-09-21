@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { computed, effectScope, ref } from 'vue'
+import { computed, effectScope, nextTick, ref } from 'vue'
 import { useTillBasket } from '#composables/useTillBasket'
 import type { TillBasketDeps } from '#composables/useTillBasket'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
@@ -73,6 +73,7 @@ function setup(products: SaleProduct[] = [aProduct()], over: Partial<TillBasketD
     walkUpsPence: computed(() => 0),
     requestPrice: neverRequested,
     recordAgeCheck: () => Promise.resolve(),
+    online: ref(true),
     ...over,
   }
   const scope = effectScope()
@@ -390,6 +391,63 @@ describe('a refusal at the tap takes the line back out and says so (F-106 criter
     const { basket, scope } = mixed()
     await basket.refuseAgeCheck(refused)
     expect(basket.saleBody(basket.passedAgeCheck.value, 500).ageCheck).toBeNull()
+    scope.stop()
+  })
+})
+
+// K-103, issue 1150 item 7: pricing is a round trip, so a dropped connection has to be a state
+// the screen can say out loud rather than a request that never answers.
+describe('pricing waits for the connection rather than hanging (K-103)', () => {
+  function offlineSetup() {
+    const asked: number[] = []
+    const online = ref(false)
+    const made = setup([aProduct()], {
+      online,
+      requestPrice: () => {
+        asked.push(Date.now())
+        return Promise.resolve(aPriced({ totalPence: 500 }))
+      },
+    })
+    return { ...made, asked, online }
+  }
+
+  test('nothing is asked of the server while the connection is down', async () => {
+    const { basket, asked, scope } = offlineSetup()
+    basket.tapVariant('Lager', aVariant())
+    await basket.recomputeTotal()
+    expect(asked).toHaveLength(0)
+    expect(basket.pricing.value).toBe(false)
+    scope.stop()
+  })
+
+  test('the total is unknown rather than stale, and the screen knows why', async () => {
+    const { basket, scope } = offlineSetup()
+    basket.tapVariant('Lager', aVariant())
+    basket.priced.value = aPriced({ totalPence: 500 })
+    await basket.recomputeTotal()
+    expect(basket.priced.value).toBeNull()
+    expect(basket.grandTotalPence.value).toBeNull()
+    expect(basket.offline.value).toBe(true)
+    scope.stop()
+  })
+
+  test('a dropped connection is not a pricing refusal, so the basket says one thing, not two', async () => {
+    const { basket, scope } = offlineSetup()
+    basket.tapVariant('Lager', aVariant())
+    await basket.recomputeTotal()
+    expect(basket.priceFailure.value).toBeNull()
+    scope.stop()
+  })
+
+  test('pricing resumes on reconnect, with nobody having to touch the basket', async () => {
+    const { basket, asked, online, scope } = offlineSetup()
+    basket.tapVariant('Lager', aVariant())
+    await basket.recomputeTotal()
+    online.value = true
+    await nextTick()
+    await Promise.resolve()
+    expect(asked).toHaveLength(1)
+    expect(basket.offline.value).toBe(false)
     scope.stop()
   })
 })
