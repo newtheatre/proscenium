@@ -228,13 +228,9 @@ const columns: TableColumn<ContentWarning>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-triangle-alert"
-      title="A show warns from this list, never in its own words"
-      description="Two shows warning about the same thing say it in the same words, which is what makes a warning something a theatregoer can weigh. A content warning is graded mentioned, discussed or depicted; a staging warning is a fact about the room and is not graded."
-    />
+    <p class="text-sm text-muted">
+      The vocabulary every show warns from.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

@@ -211,14 +211,6 @@ const artless = computed(() => data.value.items.filter(one => one.status === 'DR
       </p>
     </div>
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-drama"
-      title="Nothing goes on sale by accident"
-      description="A show is a draft, invisible to the public, until you publish it. Publishing can take its performances on sale in one action, and a cancelled performance is never swept back on sale with them."
-    />
-
     <AdminToolbar
       v-model:search="search"
       :placeholder="showsList.search?.placeholder"

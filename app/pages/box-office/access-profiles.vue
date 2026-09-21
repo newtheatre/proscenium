@@ -176,13 +176,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-shield"
-      title="Special category data"
-      description="What is declared here is encrypted at rest and never leaves this screen: the door sees agreed wording only, once a profile is verified and the patron has consented."
-    />
+    <p class="text-sm text-muted">
+      Declarations waiting to be sighted, and the wording the door reads out.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

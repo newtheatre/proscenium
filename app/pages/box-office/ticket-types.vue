@@ -274,13 +274,9 @@ const columns: TableColumn<TicketType>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-tag"
-      title="A ticket type is retired, never destroyed"
-      description="Once anything has been sold under a type, it can only be archived: an archived type stops appearing for new sales and still resolves for every ticket, report and export behind it. A type nothing has ever been sold under can be deleted outright."
-    />
+    <p class="text-sm text-muted">
+      What a seat is sold as, and what it costs.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

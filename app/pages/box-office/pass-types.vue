@@ -292,13 +292,9 @@ const columns: TableColumn<PassType>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-wallet-cards"
-      title="A pass is closed, never destroyed, once anything has been issued against it"
-      description="A pass nothing has ever been issued under can be deleted outright. Extending what a pass covers is free; dropping a show with a live pass against it needs a manager."
-    />
+    <p class="text-sm text-muted">
+      The passes on sale, what each one admits to and what it costs.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

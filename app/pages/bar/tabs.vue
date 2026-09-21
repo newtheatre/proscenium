@@ -136,13 +136,9 @@ const columns: TableColumn<HolderRow>[] = [
       :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-receipt"
-      title="Every holder still carrying a balance"
-      description="A charge to a tab is credit extended, not money taken: settlement clears it at the till, and a void here is the manager's own call, always with a reason on the record."
-    />
+    <p class="text-sm text-muted">
+      Every holder still carrying a balance.
+    </p>
 
     <AdminToolbar
       :searchable="false"

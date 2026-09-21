@@ -55,14 +55,9 @@ const columns: TableColumn<OrderListRow>[] = [
     />
 
     <div class="flex items-center justify-between gap-3">
-      <UAlert
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-truck"
-        title="Advisory only"
-        description="This list is a comparison, not an order: nothing here places one."
-        class="flex-1"
-      />
+      <p class="text-sm text-muted">
+        What is short against its par level, grouped for a supplier.
+      </p>
       <UButton
         data-test="export-order-list"
         color="neutral"

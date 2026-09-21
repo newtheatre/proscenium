@@ -231,13 +231,9 @@ const columns: TableColumn<BarCategory>[] = [
       :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-layout-grid"
-      title="The order here is the order on the till"
-      description="A category's place is read when the till draws its buttons, so a change is a save and never a deploy. A category with products or a price history in it cannot be removed; rename it instead. One with neither can be deleted outright."
-    />
+    <p class="text-sm text-muted">
+      The groups the till shows, in the order it shows them.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

@@ -424,13 +424,9 @@ const columns: TableColumn<StockItem>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-package"
-      title="On hand is the sum of the movements"
-      description="Nothing stores a stock figure. Every quantity here is added up from the movement history, so a mistake is corrected with a reversing movement and the original stays where it is."
-    />
+    <p class="text-sm text-muted">
+      What is stocked, and how much of it is on hand.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

@@ -608,13 +608,9 @@ const priceColumns: TableColumn<VariantPrice>[] = [
       </UButton>
     </div>
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-ruler"
-      title="One stocked thing, sold at many sizes"
-      description="A size carries what pouring it consumes and its own dated price series. Depletion is stated in the stocked item's own units and is independent of price, so a double may deplete twice a single without costing twice as much. No size is ever stored on the product."
-    />
+    <p class="text-sm text-muted">
+      The sizes this product sells at, what each one pours and what it costs.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

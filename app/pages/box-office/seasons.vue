@@ -202,13 +202,9 @@ const columns: TableColumn<AdminSeason>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-calendar-range"
-      title="A season is retired, never destroyed"
-      description="A season a show belongs to can only be retired: it stops being offered for a new show and still names every show that already carries it. A season nothing has ever used can be deleted outright."
-    />
+    <p class="text-sm text-muted">
+      The committee years a show belongs to.
+    </p>
 
     <AdminToolbar
       v-model:search="search"
