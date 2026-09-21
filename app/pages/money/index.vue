@@ -10,7 +10,7 @@ definePageMeta({ layout: 'console', title: 'Season dashboard', middleware: 'cons
 
 const request = useRequestFetch()
 
-const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+const today = londonDay(new Date())
 const currentYear = currentSeasonYear()
 const { data: terms } = await useAsyncData(
   'finance-terms',

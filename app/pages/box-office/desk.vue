@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { DESK_STATUS_FILTERS, DESK_TENDERS, REINSTATE_REASON_LIMIT, reinstateRefusal, uncollectableReason } from '#shared/utils/desk'
-import { formatLondon } from '#shared/utils/london'
+import { saysClock } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskStatusFilter, DeskTender } from '#shared/utils/desk'
 import type { ScannerFailure } from '~/composables/useQrScanner'
@@ -122,7 +122,7 @@ const walkUpHeadroom = computed(() => {
   return Math.max(summary.value.capacity - summary.value.reserved - summary.value.door, 0)
 })
 
-const releaseTime = computed(() => (summary.value ? formatLondon(new Date(summary.value.reservationsReleaseAt * 1000), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : null))
+const releaseTime = computed(() => (summary.value ? saysClock(summary.value.reservationsReleaseAt) : null))
 
 interface SummaryTile { key: string, label: string, value: string }
 

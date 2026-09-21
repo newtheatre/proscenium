@@ -69,7 +69,7 @@ const columns: TableColumn<NominalMapping>[] = [
   { id: 'act', header: '' },
 ]
 
-const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+const today = londonDay(new Date())
 const from = ref(today)
 const to = ref(today)
 

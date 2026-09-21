@@ -2,6 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { EVIDENCE_REF_LIMIT, REVOKE_REASON_LIMIT, saysKind, saysSource } from '#shared/utils/training'
+import { saysDay } from '#shared/utils/when'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -169,7 +170,7 @@ async function revoke(): Promise<void> {
 
 // The award is dated today, in London, which is the day the gate reads (0014).
 function todayInLondon(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date())
+  return londonDay(new Date())
 }
 
 const activeFilters = computed<ActiveFilter[]>(() => {
@@ -200,9 +201,9 @@ const columns: TableColumn<Record>[] = [
     header: 'Held',
     meta: { class: { td: 'text-sm whitespace-nowrap' } },
     cell: ({ row }) => h('div', {}, [
-      h('div', {}, `Awarded ${row.original.awardedOn}`),
+      h('div', {}, `Awarded ${saysDay(row.original.awardedOn)}`),
       h('div', { class: 'text-xs text-muted' },
-        row.original.expiresOn ? `Runs to ${row.original.expiresOn}` : 'Never expires'),
+        row.original.expiresOn ? `Runs to ${saysDay(row.original.expiresOn)}` : 'Never expires'),
     ]),
   },
   {

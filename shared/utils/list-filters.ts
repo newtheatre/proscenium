@@ -215,11 +215,12 @@ export function saysOperator(kind: FilterKind, operator: FilterOperator): string
   }
 }
 
-export const saysDay = (day: string): string =>
+// A chip is a control, not prose: no weekday, and the year always, so two chips sort by eye.
+const saysChipDay = (day: string): string =>
   formatLondon(startOfLondonDay(day), { day: 'numeric', month: 'short', year: 'numeric' })
 
 function saysValue(field: FilterField, value: string, options?: readonly FilterOption[]): string | undefined {
-  if (field.kind === 'date-range') return saysDay(value)
+  if (field.kind === 'date-range') return saysChipDay(value)
   if (field.kind === 'number-range') return value
   return (options ?? field.options)?.find(option => option.value === value)?.label
 }

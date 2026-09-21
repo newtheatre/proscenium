@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysDay, saysWhen } from '#shared/utils/when'
 import { can, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
 import { saysRole } from '#shared/utils/roles'
 
@@ -181,8 +181,6 @@ async function operate(operation: string): Promise<void> {
   }
 }
 
-const when = (at: number): string => formatLondon(new Date(at * 1000), { dateStyle: 'medium', timeStyle: 'short' })
-
 const signsInWith = computed(() => {
   const methods = view.value?.methods
   if (!methods) return []
@@ -292,7 +290,7 @@ onMounted(load)
               <span class="font-mono">{{ grant.role }}</span>
               <span class="text-muted">
                 {{ grant.live ? 'until' : 'lapsed' }}
-                {{ grant.expiresAt ? when(grant.expiresAt) : 'further notice' }}
+                {{ grant.expiresAt ? saysWhen(grant.expiresAt) : 'further notice' }}
               </span>
             </span>
             <UButton
@@ -349,7 +347,7 @@ onMounted(load)
             v-for="membership in view.memberships"
             :key="membership.id"
           >
-            {{ membership.startsOn }} to {{ membership.expiresOn }}
+            {{ saysDay(membership.startsOn) }} to {{ saysDay(membership.expiresOn) }}
             ({{ membership.source.toLowerCase() }}{{ membership.confirmedAt ? ', checked' : ', not yet checked' }})
           </li>
         </ul>
@@ -362,7 +360,7 @@ onMounted(load)
         description="A permanent honour, and the theatre's own record (0023)."
       >
         <p class="text-sm">
-          Awarded {{ view.fellowship.awardedOn }} by {{ view.fellowship.awardedBy }}.
+          Awarded {{ saysDay(view.fellowship.awardedOn) }} by {{ view.fellowship.awardedBy }}.
           <UBadge
             v-if="view.fellowship.revokedAt"
             class="ml-1"
@@ -572,7 +570,7 @@ onMounted(load)
             v-for="entry in view.history"
             :key="`${entry.action}-${entry.createdAt}`"
           >
-            <span class="text-muted">{{ when(entry.createdAt) }}</span>
+            <span class="text-muted">{{ saysWhen(entry.createdAt) }}</span>
             {{ entry.action }}
             <span
               v-if="!entry.byThem"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import { sendLogList } from '#shared/utils/send-log-list'
 import type { DailyCount, SendLogRow } from '#shared/utils/notification-log'
 import type { TableColumn } from '@nuxt/ui'
@@ -57,7 +57,7 @@ async function loadDaily(): Promise<void> {
 
 watch(query, load)
 
-const when = (at: number | null): string => at ? formatLondon(new Date(at * 1000), { dateStyle: 'medium', timeStyle: 'short' }) : 'Not sent'
+const when = (at: number | null): string => at ? saysWhen(at) : 'Not sent'
 
 const columns: TableColumn<SendLogRow>[] = [
   {
@@ -79,7 +79,7 @@ const columns: TableColumn<SendLogRow>[] = [
     header: 'Outcome',
     cell: ({ row }) => h(UBadge, { color: STATUS_COLOR[row.original.status] ?? 'neutral', variant: 'subtle', size: 'sm' }, () => row.original.status),
   },
-  { id: 'createdAt', header: 'Enqueued', cell: ({ row }) => formatLondon(new Date(row.original.createdAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }) },
+  { id: 'createdAt', header: 'Enqueued', cell: ({ row }) => saysWhen(row.original.createdAt) },
   { id: 'sentAt', header: 'Sent', cell: ({ row }) => when(row.original.sentAt) },
   { accessorKey: 'error', header: 'Error', meta: { class: { td: 'text-sm text-muted' } } },
 ]
