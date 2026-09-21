@@ -72,9 +72,11 @@ describe('a blocked close says what is holding it and what to do (criterion 4)',
       .toBe('The checklist cannot close while Till reconciled is still open: tick it or record an exception')
   })
 
-  test('several open items are listed in the order they were given', () => {
+  test('several open items are joined with a final "and", and the verb and pronoun follow the count', () => {
     expect(saysBlockedClose(['Till reconciled', 'Fire exits checked']))
-      .toContain('while Till reconciled, Fire exits checked is still open')
+      .toBe('The checklist cannot close while Till reconciled and Fire exits checked are still open: tick each or record an exception')
+    expect(saysBlockedClose(['Till reconciled', 'Fire exits checked', 'Bar float counted']))
+      .toContain('while Till reconciled, Fire exits checked and Bar float counted are still open')
   })
 
   test('one sentence, so it carries no full stop, and no colon heading is left', () => {

@@ -27,7 +27,10 @@ export function saysSystemCheck(check: SystemCheck): string {
 // One sentence, so no full stop, and the open items are named: a bare "cannot close" leaves a
 // duty manager hunting the list mid-interval (E-114 criterion 4, K-128 criterion 2).
 export function saysBlockedClose(labels: readonly string[]): string {
-  return `The checklist cannot close while ${labels.join(', ')} is still open: tick it or record an exception`
+  const many = labels.length > 1
+  const named = many ? `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}` : labels.join('')
+  return `The checklist cannot close while ${named} ${many ? 'are' : 'is'} still open: `
+    + `tick ${many ? 'each' : 'it'} or record an exception`
 }
 
 const LABEL_LIMIT = 200
