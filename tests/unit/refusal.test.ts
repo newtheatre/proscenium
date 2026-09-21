@@ -7,14 +7,17 @@ function refusal(statusMessage: string, data?: Record<string, unknown>): unknown
   return { data: { statusMessage, data } }
 }
 
+// What `server/utils/validation.ts` now sends instead of a list of field keys (K-128 criterion 2).
+const HOUSE_REFUSAL = 'Something on this form needs another look'
+
 describe('refusalText prefers a field message (issue 913)', () => {
   test('a single field failure is shown by its own message, not the generic sentence', () => {
-    const error = refusal('Invalid request: guest.email', { fields: { 'guest.email': 'Enter a real email address' } })
+    const error = refusal(HOUSE_REFUSAL, { fields: { 'guest.email': 'Enter a real email address' } })
     expect(refusalText(error)).toBe('Enter a real email address')
   })
 
   test('the first field wins when more than one failed', () => {
-    const error = refusal('Invalid request: name, email', {
+    const error = refusal(HOUSE_REFUSAL, {
       fields: { name: 'Enter your name', email: 'Enter a real email address' },
     })
     expect(refusalText(error)).toBe('Enter your name')
@@ -26,8 +29,8 @@ describe('refusalText prefers a field message (issue 913)', () => {
   })
 
   test('a refusal with an empty fields map falls back to the statusMessage', () => {
-    const error = refusal('Invalid request: body', { fields: {} })
-    expect(refusalText(error)).toBe('Invalid request: body')
+    const error = refusal(HOUSE_REFUSAL, { fields: {} })
+    expect(refusalText(error)).toBe(HOUSE_REFUSAL)
   })
 })
 

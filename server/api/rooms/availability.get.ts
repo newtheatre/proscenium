@@ -6,9 +6,9 @@ import { planWindow } from '#shared/utils/availability'
 import type { Conflict } from '#shared/utils/bookings'
 
 const query = z.object({
-  from: z.string().max(10),
-  to: z.string().max(10),
-  roomId: z.string().max(64).optional(),
+  from: z.string('Say which dates you mean').max(10, 'Say which dates you mean'),
+  to: z.string('Say which dates you mean').max(10, 'Say which dates you mean'),
+  roomId: z.string('Say which room you mean').max(64, 'Say which room you mean').optional(),
 })
 
 // What is taken across a span, per room.

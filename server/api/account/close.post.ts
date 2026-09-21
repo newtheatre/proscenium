@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { normaliseEmail } from '#shared/utils/auth'
 
 const body = z.object({
-  email: z.string().email().max(320),
+  email: z.string().email('Type the email address on your account').max(320, 'Type the email address on your account'),
 })
 
 // Close the account: leaving is one decision, not an architecture lesson (A-125).

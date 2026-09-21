@@ -5,7 +5,7 @@ import { joinWaitingListForm } from '#shared/utils/waiting-list'
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const input = await readValidatedBodyOrThrow(event, joinWaitingListForm)
-  if (input.performanceId !== id) throw createError({ statusCode: 400, statusMessage: 'Performance mismatch' })
+  if (input.performanceId !== id) throw createError({ statusCode: 400, statusMessage: 'That waiting list is for a different performance. Open the performance again.' })
 
   const performance = await performanceById(id)
   if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })

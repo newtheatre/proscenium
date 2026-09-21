@@ -5,7 +5,7 @@ import { claimDeclineForm, declineClaimStatements } from '#shared/utils/membersh
 // is mandatory (A-130 criterion 3).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'No claim named' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which claim you mean' })
   const resolved = await requirePermission(event, 'members.write')
   const input = await readValidatedBodyOrThrow(event, claimDeclineForm)
 

@@ -2,7 +2,7 @@
 // the same read the queue itself carries, without the queue's stricter decide-only authority.
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'Which request' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean' })
 
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
   const request = await compRequestById(id, expiryMinutes)

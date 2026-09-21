@@ -2,7 +2,7 @@
 title: System
 description: The console overview, the settings, the audit trail, backups and restore, and how this documentation is kept.
 module: Platform
-updatedOn: 2026-09-15
+updatedOn: 2026-09-21
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -74,7 +74,7 @@ The rest of the overview arrives with the stories that need it, and the screen s
 
 ## If something goes wrong
 
-- **"Not signed in"**: the overview was opened without a session. Sign in and it loads.
+- **"Your sign-in has ended"**: the overview was opened without signing in. Sign in and it loads.
 - **"You do not have permission to do that"**: you hold no administrative permission, or not
   the one this screen needs. Ask an Administrator to check your role; a shift alone never opens
   the console.

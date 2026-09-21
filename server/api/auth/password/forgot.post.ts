@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
 
-const body = z.object({ email: z.string().email().max(320) })
+const body = z.object({ email: z.string().email('Type the email address on your account').max(320, 'Type the email address on your account') })
 const SAME_ANSWER = { ok: true, message: 'If that address has an account, a reset link is on its way' }
 
 // Ask for a password reset link.

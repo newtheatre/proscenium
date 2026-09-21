@@ -5,6 +5,10 @@ import type { NuxtError } from '#app'
 const props = defineProps<{ error: NuxtError }>()
 
 const SAYS: Record<number, { title: string, says: string }> = {
+  401: {
+    title: 'Your sign-in has ended',
+    says: 'Sign in again to carry on',
+  },
   403: {
     title: 'That is not yours to open',
     says: 'Your account does not hold the permission this screen needs. If you think it should, ask the IT Manager.',

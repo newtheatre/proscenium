@@ -7,7 +7,7 @@ import type { MembershipTerm } from '#shared/utils/membership'
 // claim as its evidence, and the claim closed, in one batch (A-130 criterion 2).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'No claim named' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which claim you mean' })
   const resolved = await requirePermission(event, 'members.write')
 
   const claim = await findClaim(id)

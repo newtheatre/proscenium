@@ -4,9 +4,9 @@ import { z } from 'zod'
 // there is one place to change it and no second copy to drift (0012).
 const body = z.object({
   // 320 is the longest address RFC 5321 permits: 64 local, an @, 255 domain.
-  email: z.string().email().max(320),
-  name: z.string().trim().min(1).max(200),
-  password: z.string().min(1).max(ABSOLUTE_PASSWORD_LIMIT),
+  email: z.string().email('That does not look like an email address. Check it and try again.').max(320, 'That does not look like an email address. Check it and try again.'),
+  name: z.string().trim().min(1, 'Type your name').max(200, 'That is too long'),
+  password: z.string().min(1, 'Choose a password').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long'),
 })
 
 // One answer for every outcome, so the caller cannot tell which branch ran.

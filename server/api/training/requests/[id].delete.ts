@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm'
 export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
   const id = getRouterParam(event, 'id')
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'No request named' })
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which request you mean' })
 
   const withdrawn = await db.update(schema.moduleRequests)
     .set({ status: 'WITHDRAWN', decidedAt: Math.floor(Date.now() / 1000) })

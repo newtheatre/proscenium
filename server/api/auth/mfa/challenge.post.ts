@@ -2,8 +2,8 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 const body = z.object({
-  attemptId: z.string().min(10).max(64),
-  code: z.string().min(6).max(20),
+  attemptId: z.string().min(10, 'Start signing in again').max(64, 'Start signing in again'),
+  code: z.string().min(6, 'Enter the six-digit code').max(20, 'Enter the six-digit code'),
 })
 
 // Answer a second-factor challenge with an authenticator code or a recovery code.

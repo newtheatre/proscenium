@@ -30,7 +30,7 @@ const pence = z.number().int().min(0)
 // The officer keys in what the reader shows; the expected figure is never sent by the client,
 // only recomputed server-side at close, the reverse of 0005's usual cross-check direction.
 export const closeTillSessionForm = z.object({
-  id: z.string().trim().min(1, 'Which session to close'),
+  id: z.string().trim().min(1, 'Say which session you mean'),
   actualZPence: pence,
   // Required only when the reader disagrees with the ledger; the route enforces that half, since
   // whether they disagree is only known once the expected figure is recomputed (criterion 3).
