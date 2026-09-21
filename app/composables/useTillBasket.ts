@@ -67,10 +67,23 @@ export function useTillBasket(deps: TillBasketDeps) {
   }
 
   const choosing = ref<{ productName: string, variant: SaleVariant, choice: SaleChoice } | null>(null)
+  const sizing = ref<SaleProduct | null>(null)
+
+  // One tile per product, and what its tap does is the product's own shape (F-103 criterion 1,
+  // 0082): add it, ask which size, or ask which mixer.
+  function tapProduct(product: SaleProduct): void {
+    const only = product.variants.length === 1 ? product.variants[0] : null
+    if (only) {
+      tapVariant(product.name, only)
+      return
+    }
+    sizing.value = product
+  }
 
   // A variant offering a choice prompts before the line lands, so the basket never holds an
   // unresolved mixer waiting to be asked about later (F-103 criterion 2).
   function tapVariant(productName: string, variant: SaleVariant): void {
+    sizing.value = null
     if (variant.choice) {
       choosing.value = { productName, variant, choice: variant.choice }
       return
@@ -211,6 +224,8 @@ export function useTillBasket(deps: TillBasketDeps) {
   return {
     basket,
     choosing,
+    sizing,
+    tapProduct,
     tapVariant,
     chooseOption,
     incrementLine,

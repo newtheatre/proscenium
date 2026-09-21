@@ -1,20 +1,24 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
+import { plural } from '#shared/utils/text'
 import type { SaleCategory, SaleChoice, SaleProduct, SaleVariant } from '#shared/utils/sale'
 
-// The drinks grid (F-103 criterion 2): a size prompts for its choice before the line lands, so
-// the basket never holds an unresolved mixer waiting to be asked about later.
+// The drinks grid (F-103 criterion 1, 0082): one tile per product, sizes in a sheet off the tile,
+// and a size prompts for its choice before the line lands rather than after (criterion 2).
 
 const props = defineProps<{
   categories: SaleCategory[]
   productsIn: (categoryId: string) => SaleProduct[]
+  sizing: SaleProduct | null
   choosing: { productName: string, variant: SaleVariant, choice: SaleChoice } | null
+  tapProduct: (product: SaleProduct) => void
   tapVariant: (productName: string, variant: SaleVariant) => void
   chooseOption: (optionId: string, optionName: string) => void
 }>()
 
 const emit = defineEmits<{
   openAllergens: [{ name: string, state: SaleProduct['allergenState'], note: string | null }]
+  closeSizing: []
   closeChoosing: []
 }>()
 
@@ -23,6 +27,13 @@ const nonEmptyCategories = computed(() => props.categories.filter(category => pr
 
 function jumpTo(categoryId: string): void {
   document.getElementById(`till-category-${categoryId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// What the tile says under the name, so a tile costing a second tap says so before it is tapped.
+function priceLine(product: SaleProduct): string {
+  const prices = product.variants.map(variant => variant.pricePence)
+  if (prices.length === 1) return saysMoney(prices[0]!)
+  return `From ${saysMoney(Math.min(...prices))} · ${plural(prices.length, 'size')}`
 }
 </script>
 
@@ -59,38 +70,69 @@ function jumpTo(categoryId: string): void {
         <div
           v-for="product in productsIn(category.id)"
           :key="product.id"
-          class="rounded-lg border border-default p-2"
-          :data-test="`product-${product.id}`"
+          class="flex items-start justify-between gap-1 rounded-lg border border-default p-2"
         >
-          <div class="flex items-start justify-between gap-1">
-            <span class="text-sm font-medium">{{ product.name }}</span>
-            <UButton
-              size="sm"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-info"
-              class="min-h-12 min-w-12"
-              :aria-label="`Allergens for ${product.name}`"
-              :data-test="`allergen-${product.id}`"
-              @click="emit('openAllergens', { name: product.name, state: product.allergenState, note: product.allergenNote })"
-            />
-          </div>
-          <div class="mt-2 flex flex-wrap gap-2">
-            <UButton
-              v-for="variant in product.variants"
-              :key="variant.id"
-              color="neutral"
-              variant="outline"
-              class="min-h-12 min-w-12"
-              :data-test="`variant-${variant.id}`"
-              @click="tapVariant(product.name, variant)"
-            >
-              {{ variant.label }} · {{ saysMoney(variant.pricePence) }}
-            </UButton>
-          </div>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            class="min-h-12 grow justify-start p-1 text-left"
+            :data-test="`product-${product.id}`"
+            @click="tapProduct(product)"
+          >
+            <span class="flex flex-col items-start gap-0.5">
+              <span class="text-sm font-medium">{{ product.name }}</span>
+              <span class="text-xs text-muted">{{ priceLine(product) }}</span>
+            </span>
+          </UButton>
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-info"
+            class="min-h-12 min-w-12 shrink-0"
+            :aria-label="`Allergens for ${product.name}`"
+            :data-test="`allergen-${product.id}`"
+            @click="emit('openAllergens', { name: product.name, state: product.allergenState, note: product.allergenNote })"
+          />
         </div>
       </div>
     </div>
+
+    <UModal
+      :open="sizing !== null"
+      :title="sizing ? sizing.name : ''"
+      description="Pick a size."
+      @update:open="emit('closeSizing')"
+    >
+      <template #body>
+        <div
+          class="grid grid-cols-2 gap-2"
+          data-test="size-sheet"
+        >
+          <UButton
+            v-for="variant in sizing?.variants ?? []"
+            :key="variant.id"
+            color="neutral"
+            variant="subtle"
+            class="min-h-12"
+            :data-test="`variant-${variant.id}`"
+            @click="tapVariant(sizing!.name, variant)"
+          >
+            {{ variant.label }} {{ saysMoney(variant.pricePence) }}
+          </UButton>
+        </div>
+        <div class="mt-2 flex justify-end">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            class="min-h-12"
+            @click="emit('closeSizing')"
+          >
+            Back
+          </UButton>
+        </div>
+      </template>
+    </UModal>
 
     <UModal
       :open="choosing !== null"
