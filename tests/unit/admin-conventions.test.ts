@@ -161,3 +161,16 @@ describe('a count reads as English', () => {
     expect(plural(1, 'person', 'people')).toBe('1 person')
   })
 })
+
+// A picker reads the whole catalogue or it silently hides part of it: the modules list pages at
+// 25, and a chip wall built from one page cannot offer the twenty-sixth (issue 1146).
+describe('a screen that offers the module catalogue to choose from reads all of it', () => {
+  test('every whole-catalogue read of the admin modules list names MAX_PAGE_SIZE', async () => {
+    const readers = (await screens()).filter(screen => /request<[^>]*>\('\/api\/admin\/training\/modules'/.test(screen.source))
+    expect(readers.length).toBeGreaterThan(0)
+    const partial = readers
+      .filter(screen => !/'\/api\/admin\/training\/modules',\s*\{\s*query:\s*\{\s*pageSize:\s*MAX_PAGE_SIZE/.test(screen.source))
+      .map(screen => screen.path)
+    expect(partial).toEqual([])
+  })
+})

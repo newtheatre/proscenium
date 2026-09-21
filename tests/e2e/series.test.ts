@@ -551,6 +551,37 @@ describe.skipIf(skip !== null)('the screens (C-110, C-111)', () => {
     }
   }, 180_000)
 
+  test('a taken week is left out and the rest are booked from the form, purpose and all (issue 1143)', async () => {
+    const room = await makeRoom()
+    const startsOn = mondayIn(23)
+    // Somebody else holds the second week, so the form is refused once and offered the rest.
+    await bookSeries(room, { startsOn: mondayIn(24), occurrences: 1 }, other.cookie)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await signIn(view)
+      await visit(view, `${app.baseURL}/rooms/book?room=${room}&day=${startsOn}&at=19:00&purpose=REHEARSAL`, '[data-test="booking-form"]')
+      await fill(view, '[data-test="booking-title"]', 'Weekly rehearsal')
+      await click(view, '[data-test="repeat-toggle"]')
+      await waitFor(view, `document.querySelector('[data-test="series-submit"]')`, 30_000)
+      await click(view, '[data-test="series-submit"]')
+
+      await waitFor(view, `document.querySelector('[data-test="series-without-refused"]')`, 30_000)
+      expect(await textOf(view, '[data-test="series-refusals"]')).toContain('somebody already has it')
+      await click(view, '[data-test="series-without-refused"]')
+
+      // The second submit carries everything the first did, so it lands on the member's list
+      // with the three free weeks booked rather than refusing over a field already filled in.
+      await waitFor(view, `document.querySelector('[data-test="mine-list"]')`, 30_000)
+      const held = all<{ id: string }>(
+        `SELECT id FROM room_bookings WHERE room_id = ? AND user_id = ? AND status = 'CONFIRMED'`, room, member.id)
+      expect(held).toHaveLength(3)
+    }
+    finally {
+      view.close()
+    }
+  }, 180_000)
+
   test('cancelling a week asks which, and will not act until told', async () => {
     const room = await makeRoom()
     const { id } = await (await bookSeries(room, { startsOn: mondayIn(22), occurrences: 3 })).json() as SeriesAnswer

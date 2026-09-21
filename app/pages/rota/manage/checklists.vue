@@ -11,7 +11,7 @@ definePageMeta({ layout: 'console', title: 'Checklists', middleware: 'console', 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
 
-interface Item { id: string, phase: Phase, label: string, sort: number, required: boolean, systemCheck: SystemCheck | null }
+interface Item { id: string, phase: Phase, label: string, sort: number, required: boolean, systemCheck: SystemCheck | null, active: boolean }
 interface VenueChecklist { venueId: string, venueName: string, items: Item[] }
 
 interface Listing {
@@ -115,25 +115,34 @@ const columns: TableColumn<VenueChecklist>[] = [
     cell: ({ row }) => (row.original.items.length === 0
       ? h('span', { class: 'text-sm text-muted' }, 'Nothing configured yet')
       : h('div', { class: 'space-y-1' }, row.original.items.map(item =>
-          h('div', { class: 'flex flex-wrap items-center gap-2' }, [
+          h('div', { class: item.active ? 'flex flex-wrap items-center gap-2' : 'flex flex-wrap items-center gap-2 text-muted' }, [
             h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => saysPhase(item.phase)),
             h('span', { class: 'text-sm' }, item.label),
             item.systemCheck ? h(UBadge, { color: 'primary', variant: 'subtle', size: 'sm' }, () => 'System-verified') : null,
             item.required ? null : h('span', { class: 'text-xs text-muted' }, '(optional)'),
+            item.active ? null : h(UBadge, { 'color': 'neutral', 'variant': 'outline', 'size': 'sm', 'data-test': `retired-item-${item.id}` }, () => 'Retired'),
             writes.value === false
               ? null
-              : h('div', { class: 'ml-auto flex gap-1' }, [
-                  h(UButton, {
-                    'size': 'xs', 'color': 'neutral', 'variant': 'ghost',
-                    'data-test': `edit-item-${item.id}`,
-                    'onClick': () => editItem(row.original.venueId, item),
-                  }, () => 'Edit'),
-                  h(UButton, {
-                    'size': 'xs', 'color': 'neutral', 'variant': 'ghost',
-                    'data-test': `retire-item-${item.id}`,
-                    'onClick': () => setActive(row.original.venueId, item, false),
-                  }, () => 'Retire'),
-                ]),
+              : h('div', { class: 'ml-auto flex gap-1' }, item.active
+                  ? [
+                      h(UButton, {
+                        'size': 'xs', 'color': 'neutral', 'variant': 'ghost',
+                        'data-test': `edit-item-${item.id}`,
+                        'onClick': () => editItem(row.original.venueId, item),
+                      }, () => 'Edit'),
+                      h(UButton, {
+                        'size': 'xs', 'color': 'neutral', 'variant': 'ghost',
+                        'data-test': `retire-item-${item.id}`,
+                        'onClick': () => setActive(row.original.venueId, item, false),
+                      }, () => 'Retire'),
+                    ]
+                  : [
+                      h(UButton, {
+                        'size': 'xs', 'color': 'neutral', 'variant': 'ghost',
+                        'data-test': `reinstate-item-${item.id}`,
+                        'onClick': () => setActive(row.original.venueId, item, true),
+                      }, () => 'Reinstate'),
+                    ]),
           ])))),
   },
   {

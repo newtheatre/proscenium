@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  checklistVenuesClause,
   closeStatement,
   ensureStampedStatement,
   exemptStatement,
@@ -12,7 +13,10 @@ import {
   stampsForPerformanceQuery,
   tickStatement,
   updateItemStatement,
+  venueChecklistsQuery,
 } from '#server/utils/checklist'
+import { filterQuerySchema } from '#shared/utils/list-filters'
+import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import { recordIncidentStatement } from '#server/utils/incidents'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
@@ -86,6 +90,21 @@ describe('committee configuration (criterion 1)', () => {
 
       expect(run(database, itemsForVenueQuery(venue.id, false))).toHaveLength(0)
       expect(run(database, itemsForVenueQuery(venue.id, true))).toHaveLength(1)
+    })
+  })
+
+  // The overview is where an item is retired, so it is where one is put back (issue 1147).
+  test('the committee overview still lists a retired item, marked as such, so it can be reinstated', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      run(database, insertItemStatement(item(venue.id), officer, 'ci-live'))
+      run(database, insertItemStatement(item(venue.id, { label: 'Retired later', sort: 2 }), officer, 'ci-gone'))
+      run(database, retireItemStatement('ci-gone', false, officer))
+
+      const clause = checklistVenuesClause(filterQuerySchema(checklistVenuesList).parse({}))
+      const listed = run(database, venueChecklistsQuery(clause, 25, 0)).filter(row => row.venueId === venue.id)
+      expect(listed.map(row => [row.id, row.active])).toEqual([['ci-live', 1], ['ci-gone', 0]])
     })
   })
 })

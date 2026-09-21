@@ -119,6 +119,20 @@ const seriesReady = computed(() =>
   Boolean(state.roomId && state.title.trim() && state.day && state.purpose)
   && (frequency.value === 'DAILY' || weekdays.value.length > 0))
 
+// One body for the first submit and the resubmit without the refused weeks, so the two can never
+// disagree about what a series carries (issue 1143).
+function seriesBody(skip: string[]): Record<string, unknown> {
+  return {
+    roomId: state.roomId,
+    title: state.title,
+    attendees: state.attendees ?? null,
+    tier: state.tier,
+    purpose: state.purpose,
+    ...recurrence.value,
+    skip,
+  }
+}
+
 async function bookSeries(): Promise<void> {
   saving.value = true
   failures.value = []
@@ -127,14 +141,7 @@ async function bookSeries(): Promise<void> {
   try {
     const answer = await $fetch<{ id: string, status: string, occurrences: unknown[] }>('/api/rooms/series', {
       method: 'POST',
-      body: {
-        roomId: state.roomId,
-        title: state.title,
-        attendees: state.attendees ?? null,
-        tier: state.tier,
-        purpose: state.purpose,
-        ...recurrence.value,
-      },
+      body: seriesBody([]),
     })
 
     toast.add({
@@ -166,14 +173,7 @@ async function bookWithoutRefused(): Promise<void> {
   try {
     const answer = await $fetch<{ occurrences: unknown[] }>('/api/rooms/series', {
       method: 'POST',
-      body: {
-        roomId: state.roomId,
-        title: state.title,
-        attendees: state.attendees ?? null,
-        tier: state.tier,
-        ...recurrence.value,
-        skip,
-      },
+      body: seriesBody(skip),
     })
     toast.add({
       title: `${plural(answer.occurrences.length, 'booking')} made`,

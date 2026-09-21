@@ -1,3 +1,4 @@
+import { getCurrentInstance, onMounted, ref, shallowRef } from 'vue'
 import { isHandheldUserAgent } from '#shared/utils/sumup'
 import { deviceNightCacheStore } from './useNightCache'
 
@@ -19,9 +20,12 @@ export interface PendingAttempt<Basket> {
 export function useSumUp<Basket>() {
   // The SumUp app lives on a phone or a tablet; the counter laptop keys the figure (criterion 1).
   const handheld = ref(false)
-  onMounted(() => {
-    handheld.value = isHandheldUserAgent(navigator.userAgent)
-  })
+  // Inside a component only: the unit test drives this with no instance, as useNightCache is.
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      handheld.value = isHandheldUserAgent(navigator.userAgent)
+    })
+  }
 
   const pending = shallowRef<PendingAttempt<Basket> | null>(null)
 

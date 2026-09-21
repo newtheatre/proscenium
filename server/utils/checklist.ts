@@ -82,18 +82,18 @@ export function venueChecklistsQuery(clause: ListClause, limit: number, offset: 
            i.id AS id, i.phase AS phase, i.label AS label, i.sort AS sort,
            i.required AS required, i.system_check AS systemCheck, i.active AS active, i.updated_at AS updatedAt
     FROM venues v
-    LEFT JOIN checklist_items i ON i.venue_id = v.id AND i.active = 1
+    LEFT JOIN checklist_items i ON i.venue_id = v.id
     WHERE v.id IN (
       SELECT vp.id FROM venues vp${predicateOf(clause)}
       ORDER BY ${sql.join(clause.orderBy, sql`, `)}
       LIMIT ${limit} OFFSET ${offset}
     )
-    ORDER BY v.name COLLATE NOCASE, ${phaseOrder(sql`i.phase`)}, i.sort, i.label COLLATE NOCASE
+    ORDER BY v.name COLLATE NOCASE, i.active DESC, ${phaseOrder(sql`i.phase`)}, i.sort, i.label COLLATE NOCASE
   `
 }
 
-// Every matching venue and its active checklist items, for the committee's own overview screen,
-// the same shape `listVenueTemplates()` returns for E-101.
+// Every matching venue and its checklist items, retired ones last, for the committee's own
+// overview screen, the same shape `listVenueTemplates()` returns for E-101.
 export async function listVenueChecklists(clause: ListClause, limit: number, offset: number): Promise<VenueChecklist[]> {
   const rows = await db.all<VenueChecklistRow>(venueChecklistsQuery(clause, limit, offset))
 

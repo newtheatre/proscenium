@@ -381,9 +381,12 @@ describe.skipIf(skip !== null)('the journey, end to end', () => {
 })
 
 describe.skipIf(skip !== null)('the officer screen (G-120, G-122)', () => {
-  test('the records screen renders and hydrates for an officer', async () => {
+  test('the records screen renders and hydrates for an officer, and offers the whole catalogue to sign off', async () => {
     const member = await adminSession(app, { roles: [] })
     await signOff({ userId: member.id, moduleId: await addModule({ name: 'Rigging a lantern' }), awardedOn: today() })
+    // Past one page of the list: a chip wall built from the first page alone would hide the rest
+    // (issue 1146). The suite has added a handful already; this takes the department well past 25.
+    for (let n = 0; n < 26; n += 1) await addModule({ name: `Catalogue filler ${n}` })
 
     forgetSpentStep(app, officer.email)
     const view = await openSignedOutView(app.baseURL)
@@ -404,6 +407,9 @@ describe.skipIf(skip !== null)('the officer screen (G-120, G-122)', () => {
       // A server render cannot see a hydration failure, so the page is read after it is live.
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
       expect(await textOf(view, 'body')).toContain('Whose records')
+
+      await click(view, '[data-test="sign-off"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="sign-SGN-"]').length > 25`, 30_000)
     }
     finally {
       view.close()

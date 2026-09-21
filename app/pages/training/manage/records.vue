@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { EVIDENCE_REF_LIMIT, REVOKE_REASON_LIMIT, saysKind, saysSource } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
@@ -52,7 +53,7 @@ const listFailure = useListFailure(error, 'The records could not be read.')
 
 const { data: catalogue } = await useAsyncData(
   'admin-training-records-modules',
-  () => request<{ items: Module[] }>('/api/admin/training/modules'),
+  () => request<{ items: Module[] }>('/api/admin/training/modules', { query: { pageSize: MAX_PAGE_SIZE } }),
   { default: () => ({ items: [] as Module[] }) },
 )
 

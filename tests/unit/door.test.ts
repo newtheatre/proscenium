@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  doorFailureVerdict,
   doorVerdict,
   isRepeatScan,
   readScannedCode,
@@ -167,5 +168,23 @@ describe('what the card says about tonight, which is what the volunteer reads be
 
   test('an admission cancelled since is named, not silently treated as free', () => {
     expect(saysPassTonight(1000, 'CANCELLED')).toEqual({ line: 'Tonight\'s admission was cancelled', admitted: true })
+  })
+})
+
+describe('no answer is not a refusal (E-129 criterion 7, issue 1145)', () => {
+  test('a transport failure, with no status at all, is shown as unanswered rather than refused', () => {
+    const verdict = doorFailureVerdict(undefined, 'That did not work. Try again.')
+    expect(verdict.state).toBe('UNANSWERED')
+    expect(verdict.headline).not.toContain('OURS')
+    expect(verdict.line).toContain('Try again')
+  })
+
+  test('a refusal the server actually gave keeps its own words and its own headline', () => {
+    const verdict = doorFailureVerdict(409, 'Already checked in at the door.', 'ADMITTED')
+    expect(verdict).toEqual({ state: 'REFUSED', headline: 'ADMITTED', line: 'Already checked in at the door.', note: null })
+  })
+
+  test('the refused headline is what the caller asks for, REFUSED when it asks for nothing', () => {
+    expect(doorFailureVerdict(422, 'No.').headline).toBe('REFUSED')
   })
 })

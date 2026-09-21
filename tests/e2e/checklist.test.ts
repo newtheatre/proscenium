@@ -86,6 +86,16 @@ describe.skipIf(skip !== null)('committee configuration (E-114 criterion 1)', ()
     expect(retired.status).toBe(200)
     const afterRetire = await send('GET', `/api/admin/checklist/items?venueId=${house.venueId}`)
     expect((await afterRetire.json() as { items: Item[] }).items.find(item => item.id === id)).toBeUndefined()
+
+    // Retired is not gone: the overview still carries it, and the same route puts it back (issue 1147).
+    const overview = await send('GET', `/api/admin/checklist?search=${encodeURIComponent('checklist-house')}`)
+    const { venues } = await overview.json() as { venues: { venueId: string, items: (Item & { active: boolean })[] }[] }
+    expect(venues.find(venue => venue.venueId === house.venueId)?.items.find(item => item.id === id)?.active).toBe(false)
+
+    const reinstated = await send('POST', `/api/admin/checklist/items/${id}/status`, { venueId: house.venueId, active: true })
+    expect(reinstated.status).toBe(200)
+    const afterReinstate = await send('GET', `/api/admin/checklist/items?venueId=${house.venueId}`)
+    expect((await afterReinstate.json() as { items: Item[] }).items.find(item => item.id === id)?.label).toBe('Fire exits and extinguishers checked')
   })
 
   test('an ordinary member cannot configure the checklist', async () => {
