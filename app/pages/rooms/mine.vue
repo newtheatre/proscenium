@@ -125,11 +125,13 @@ async function cancelUnlisted(): Promise<void> {
   }
 }
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   () => `my-bookings-${when.value}`,
   () => request<Listing>('/api/rooms/bookings', { query: { when: when.value } }),
   { watch: [when], default: (): Listing => ({ when: 'upcoming', items: [], total: 0 }) },
 )
+
+const listFailure = useListFailure(error, 'Your bookings could not be read.')
 
 const STATES: Record<string, { label: string, color: 'success' | 'warning' | 'neutral' | 'error' }> = {
   CONFIRMED: { label: 'Confirmed', color: 'success' },
@@ -230,6 +232,13 @@ useSeoMeta({ title: 'My bookings' })
       />
       <span>Reading your bookings.</span>
     </div>
+
+    <ReadFailure
+      v-else-if="listFailure"
+      :failure="listFailure"
+      class="mt-8"
+      @retry="refresh()"
+    />
 
     <p
       v-else-if="data.items.length === 0"

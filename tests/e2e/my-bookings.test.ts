@@ -245,4 +245,34 @@ describe.skipIf(skip !== null)('the screen (C-112)', () => {
       view.close()
     }
   }, 120_000)
+
+  // K-127 criterion 7: the empty state says there is nothing booked, which is a lie when the read
+  // did not finish. The read is broken in the page rather than in the server, which stays up.
+  test('a read that fails shows a failure with a way to try again, not the empty state', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', member.email)
+      await fill(view, 'form input[type="password"]', memberPassword)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      await visit(view, `${app.baseURL}/rooms/mine`, '[data-test="mine-list"]')
+      await waitFor(view, `(() => {
+        const real = window.fetch
+        window.fetch = (input, init) => String(typeof input === 'string' ? input : input.url).includes('/api/rooms/bookings')
+          ? Promise.reject(new Error('offline'))
+          : real(input, init)
+        return true
+      })()`)
+
+      await click(view, '[data-test="mine-past"]')
+      await waitFor(view, `document.querySelector('[data-test="read-failure"]')`, 30_000)
+      expect(await textOf(view, '[data-test="read-failure"]')).toContain('Try again')
+      expect(await textOf(view, 'body')).not.toContain('Nothing in the past yet')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
 })

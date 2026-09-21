@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { saysPassStatus } from '#shared/utils/passes'
+import type { PassRequestStatus, PassStatus } from '#shared/utils/passes'
 import type { MySummary } from '#shared/utils/my-summary'
 
 const props = defineProps<{ summary: MySummary }>()
@@ -31,14 +33,14 @@ const request = computed(() => props.summary.passes.request)
         variant="subtle"
         class="mt-2"
       >
-        {{ pass.status }}
+        {{ saysPassStatus(pass.status as PassStatus) }}
       </UBadge>
     </template>
     <p
       v-else-if="request"
       class="text-sm text-muted"
     >
-      A pass request is {{ request.state.toLowerCase() }}
+      Your pass request is {{ saysPassStatus(request.state as PassRequestStatus).toLowerCase() }}
     </p>
   </MyTile>
 </template>

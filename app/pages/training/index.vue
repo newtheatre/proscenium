@@ -30,11 +30,13 @@ interface NextStep {
   safetyCritical: boolean
 }
 
-const { data, status } = await useAsyncData(
+const { data, status, error: recordsError, refresh: refreshRecords } = await useAsyncData(
   'training-records',
   () => request<{ items: Record[], total: number, standing: Standing }>('/api/training/records'),
   { default: () => ({ items: [] as Record[], total: 0, standing: { trainer: false, supervisor: false } }) },
 )
+
+const recordsFailure = useListFailure(recordsError, 'Your training records could not be read.')
 
 // Grouped by department, which is how a member thinks about what they are allowed to do
 // (G-101 criterion 1). Order follows the server's, newest award first inside each group.
@@ -247,6 +249,13 @@ const standings = computed(() => [
       />
       Reading your records
     </div>
+
+    <ReadFailure
+      v-else-if="recordsFailure"
+      :failure="recordsFailure"
+      class="mt-8"
+      @retry="refreshRecords()"
+    />
 
     <p
       v-else-if="groups.length === 0"
