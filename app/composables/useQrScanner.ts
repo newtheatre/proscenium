@@ -1,10 +1,11 @@
 import jsQR from 'jsqr'
 import { isRepeatScan } from '#shared/utils/door'
+import type { ScannerFailure } from '#shared/utils/door'
 
 // The camera half of E-129. `BarcodeDetector` where the browser has it, jsQR everywhere else;
 // either way one decoded string comes out, deduplicated, and every track is stopped on close.
 
-export type ScannerFailure = 'NO_CAMERA' | 'REFUSED' | 'BROKEN'
+export type { ScannerFailure }
 
 // Fast enough to feel instant in a queue, slow enough that a phone is not decoding flat out.
 const FRAME_INTERVAL_MS = 180

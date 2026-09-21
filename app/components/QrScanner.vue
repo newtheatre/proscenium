@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { ScannerFailure } from '~/composables/useQrScanner'
+import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
+import type { ScannerFailure } from '#shared/utils/door'
 
 // The door's camera (E-129). A live view with a scanning frame, and one decoded string out. The
 // screen decides what a code means; nothing here knows about bookings, passes or performances.
@@ -7,12 +8,6 @@ const emit = defineEmits<{ decoded: [value: string], unavailable: [failure: Scan
 
 const video = useTemplateRef<HTMLVideoElement>('video')
 const scanner = useQrScanner(value => emit('decoded', value))
-
-const says: Record<ScannerFailure, string> = {
-  NO_CAMERA: 'This device has no camera the browser can open, so type the reference instead.',
-  REFUSED: 'Camera access was refused, so type the reference instead. Allow it in the browser\'s site settings to scan.',
-  BROKEN: 'The camera would not start, so type the reference instead.',
-}
 
 watch(scanner.failure, (failure) => {
   if (failure) emit('unavailable', failure)
@@ -22,15 +17,16 @@ onMounted(async () => {
   if (video.value) await scanner.start(video.value)
 })
 
-// Stopped here and on unmount both: a screen left open in a pocket keeps the lens and the
-// indicator light running otherwise (criterion 4).
-function stopWhenHidden(): void {
+// Stopped on hidden and on unmount both, or a phone in a pocket films all evening (criterion 4).
+// Coming back reopens it: the component outlives a verdict, so nothing else would restart it.
+async function followVisibility(): Promise<void> {
   if (document.visibilityState === 'hidden') scanner.stop()
+  else if (!scanner.active.value && !scanner.failure.value && video.value) await scanner.start(video.value)
 }
 
-onMounted(() => document.addEventListener('visibilitychange', stopWhenHidden))
+onMounted(() => document.addEventListener('visibilitychange', followVisibility))
 onBeforeUnmount(() => {
-  document.removeEventListener('visibilitychange', stopWhenHidden)
+  document.removeEventListener('visibilitychange', followVisibility)
   scanner.stop()
 })
 
@@ -44,7 +40,7 @@ defineExpose({ stop: scanner.stop })
       color="neutral"
       variant="subtle"
       icon="i-lucide-camera-off"
-      :description="says[scanner.failure.value]"
+      :description="CAMERA_FALLBACK_SAYS[scanner.failure.value]"
       data-test="qr-scanner-unavailable"
     />
 
@@ -67,6 +63,15 @@ defineExpose({ stop: scanner.stop })
         aria-hidden="true"
       >
         <div class="size-2/3 rounded-lg border-2 border-gold-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+      </div>
+
+      <!-- The verdict sits over the live view: unmounting the scanner between two patrons costs
+           a tap and a camera cold start each time (E-129, issue 1150 item 1). -->
+      <div
+        v-if="$slots.overlay"
+        class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-3"
+      >
+        <slot name="overlay" />
       </div>
 
       <UButton

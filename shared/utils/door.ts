@@ -16,6 +16,23 @@ const REFERENCE_SHAPE = new RegExp(`^[${REFERENCE_ALPHABET}]{${RESERVATION_REFER
 // patron: a phone screen sits in front of the lens for a second or two (criterion 3).
 export const SCAN_REPEAT_WINDOW_MS = 4000
 
+// How long a verdict sits over the viewfinder. Shorter than the repeat window, so one code held
+// in front of the lens cannot read a second time into a card still showing its first answer.
+export const VERDICT_HOLD_MS = 3500
+
+// A refusal and a dropped connection are read, not glanced at: the volunteer has to say why.
+export const VERDICT_HOLD_REASON_MS = 8000
+
+// Why the camera is not open, in the show-night register. One set, held here so that the screens
+// opening a camera cannot drift into a wording each.
+export type ScannerFailure = 'NO_CAMERA' | 'REFUSED' | 'BROKEN'
+
+export const CAMERA_FALLBACK_SAYS: Record<ScannerFailure, string> = {
+  NO_CAMERA: 'No camera. Type the reference.',
+  REFUSED: 'Camera not allowed. Type the reference.',
+  BROKEN: 'Camera did not start. Type the reference.',
+}
+
 // The path of an absolute or a relative URL, or null when the text is not one at all. A bare
 // reference has no slash, so it never reaches the URL parser.
 function pathOf(raw: string): string | null {
@@ -99,11 +116,28 @@ export function doorFailureVerdict(status: number | undefined, line: string, ref
   return { state: 'REFUSED', headline: refusedHeadline, line, note: null }
 }
 
+// How long the overlay holds before clearing itself. A tap or the next different code clears it
+// sooner; nothing holds for ever, because the queue is the point (issue 1150 item 1).
+export function verdictHoldMs(state: DoorVerdictState): number {
+  return state === 'REFUSED' || state === 'UNANSWERED' ? VERDICT_HOLD_REASON_MS : VERDICT_HOLD_MS
+}
+
+// What the phone buzzes, in `navigator.vibrate`'s own on-off milliseconds, so a verdict reaches a
+// volunteer who is looking at the patron rather than the screen.
+export const VERDICT_BUZZ: Record<DoorVerdictState, number[]> = {
+  PAID: [40],
+  UNPAID: [40, 120, 40],
+  REFUSED: [400],
+  UNANSWERED: [],
+}
+
+export function verdictBuzz(state: DoorVerdictState): number[] {
+  return VERDICT_BUZZ[state]
+}
+
 // A pass admits its holder and nobody else (D-126 criterion 4), so the card's own button says so
 // rather than offering a number to change.
 export const PASS_ADMISSION_PARTY_SIZE = 1
-
-export const PASS_ADMISSION_CAPTION = 'Creates tonight\'s £0 pass-admission ticket.'
 
 // What the card says a pass covers. A fellowship covers everything the theatre puts on, which is
 // why it carries no rows of its own (D-130, 0023).
