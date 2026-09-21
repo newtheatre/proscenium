@@ -229,7 +229,7 @@ const columns: TableColumn<ContentWarning>[] = [
     />
 
     <p class="text-sm text-muted">
-      The vocabulary every show warns from.
+      The warnings a show can carry.
     </p>
 
     <AdminToolbar
