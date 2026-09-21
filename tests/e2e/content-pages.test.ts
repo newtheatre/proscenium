@@ -31,12 +31,16 @@ const UNWRITTEN = PAGES.filter(page => page.path !== '/get-involved')
 
 describe.skipIf(skip !== null)('editorial pages render from content markdown (D-103)', () => {
   for (const { path, title } of PAGES) {
-    test(`${path} renders and states it awaits committee copy`, async () => {
+    test(`${path} renders`, async () => {
       const response = await fetch(`${app.baseURL}${path}`)
       expect(response.status).toBe(200)
-      const html = await response.text()
-      expect(html).toContain(title)
-      expect(html).toContain('Awaiting committee copy')
+      expect(await response.text()).toContain(title)
+    })
+  }
+
+  for (const { path } of UNWRITTEN) {
+    test(`${path} states that it awaits committee copy`, async () => {
+      expect(await (await fetch(`${app.baseURL}${path}`)).text()).toContain('Awaiting committee copy')
     })
   }
 
@@ -147,12 +151,15 @@ describe.skipIf(skip !== null)('an editorial page reads as a column, not as a wa
     }
   }, CASE_TIMEOUT_MS)
 
-  test('the landing page still renders the sections the committee will fill', async () => {
+  // D-103 criterion 6: the body is empty until the committee writes it, and an empty body is no
+  // column, no heading and no gap rather than four headings over stand-in sentences.
+  test('the landing page renders no prose column while its body is empty', async () => {
     const html = await (await fetch(`${app.baseURL}/get-involved`)).text()
-    for (const heading of ['Joining', 'On stage', 'Off stage', 'Training']) {
-      expect(html).toContain(heading)
+    expect(html).not.toContain('data-test="content-body"')
+    expect(html).not.toContain('Awaiting committee copy')
+    for (const heading of ['Joining', 'On stage', 'Off stage']) {
+      expect(`${heading}: ${html.includes(`>${heading}<`)}`).toBe(`${heading}: false`)
     }
-    expect(html).toContain('Awaiting committee copy')
   })
 
   test('a long policy page carries a table of contents', async () => {

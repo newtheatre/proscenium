@@ -18,11 +18,12 @@ describe('editorial pages are honest about being placeholders (D-103)', () => {
 
   // D-103 criterion 6: an unwritten field is absent, never a stand-in sentence somebody could
   // mistake for a member's own words.
-  test('get-involved is not flagged and carries no stand-in quote', async () => {
+  test('get-involved is not flagged, carries no stand-in quote and has no stand-in prose', async () => {
     const source = await Bun.file('content/get-involved.md').text()
     const front = source.slice(0, source.indexOf('\n---', 4))
     expect(front).not.toContain('placeholder: true')
     expect(front).not.toContain('quote:')
+    expect(source.slice(source.indexOf('\n---', 4) + 4).trim()).toBe('')
   })
 
   // J-111: the landing page's tiles and steps are front matter, so a committee member changing a
