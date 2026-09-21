@@ -622,63 +622,23 @@ function buttonLabels(source: string): string[] {
 }
 
 const CITES_A_RECORD = /\b[A-K]-1[0-9][0-9]\b|\(0[0-9]{3}\)|\bcriterion\b/
-const EXPLAINS_ITSELF = /\b(?:because|so that|which is why|rather than|on purpose)\b/i
+const EXPLAINS_ITSELF = /\b(?:because|so that|which is why|rather than|on purpose)\b|,\s*so nothing\b/i
 const NOT_THE_HOUSE_WORD = /\bvariants?\b|\bpatrons?\b|\bcustomers?\b|\btheatregoers?\b/i
 const NARRATES_THE_MACHINE = /\bsnapshot(?:ted|s)?\b|\boverwritten\b|\bstale read\b|\bin the same write\b|\bconfigured\b|\bthe database\b|\bthe server\b|\bthe system\b|\btombstoned?\b/i
 const THE_PASTED_FAILURE = 'This is not the same as nothing being asked for'
+// A header that asks the reader something, or answers in a clause: a column is named by a noun.
+const CHATTY_HEADER = /^(?:who|what|why|how|where|to whom)\b.*\s/i
 const PRONOUN_LABEL = /^(?:Add|Save|Record|Define|Plan|Note|Close|List|Publish|Delete|Attach|Remove|Take|Set|Show|Send|Turn|Ask|Make|Cancel|Write|Book)\b[^.?!]{0,24}\bit\b[^.?!]{0,10}$/
 
 const saying = async (test: (source: string) => boolean): Promise<string[]> =>
   (await consoleFiles()).filter(file => test(file.source)).map(file => file.path)
 
-// Each list is what the sweep has still to reach, module by module (issue 1151 item 12). Box
-// office, the bar and money are done; every list may shrink and may not grow.
-const CITES_A_RECORD_ON_SCREEN = [
-  'app/pages/admin/backups.vue',
-  'app/pages/admin/settings.vue',
-  'app/pages/people/accounts/[id].vue',
-  'app/pages/people/roles.vue',
-]
-const STILL_EXPLAINS_ITSELF = [
-  'app/components/training/ModuleEditor.vue',
-  'app/pages/dev.vue',
-  'app/pages/rooms/manage/closures.vue',
-  'app/pages/rooms/manage/other.vue',
-  'app/pages/training/manage/records.vue',
-  'app/pages/training/manage/requests.vue',
-]
-const STILL_NARRATES_THE_MACHINE = [
-  'app/pages/admin/audit.vue',
-  'app/pages/admin/backups.vue',
-  'app/pages/people/accounts/[id].vue',
-  'app/pages/training/manage/sessions/index.vue',
-]
-const STILL_PASTES_THE_FAILURE = [
-  'app/components/training/CatalogueTable.vue',
-  'app/pages/rooms/manage/index.vue',
-  'app/pages/rooms/manage/other.vue',
-  'app/pages/rooms/manage/utilisation.vue',
-  'app/pages/training/manage/departments.vue',
-  'app/pages/training/manage/records.vue',
-  'app/pages/training/manage/requests.vue',
-  'app/pages/training/manage/sessions/index.vue',
-]
-const STILL_BUTTONS_A_PRONOUN = [
-  'app/components/training/ModuleEditor.vue',
-  'app/pages/admin/backups.vue',
-  'app/pages/people/fellows.vue',
-  'app/pages/people/members.vue',
-  'app/pages/rooms/manage/other.vue',
-  'app/pages/rooms/manage/requests.vue',
-  'app/pages/rota/manage/backstage.vue',
-  'app/pages/rota/manage/checklists.vue',
-  'app/pages/rota/manage/emergency.vue',
-  'app/pages/rota/manage/openings.vue',
-  'app/pages/rota/manage/safety.vue',
-  'app/pages/rota/manage/templates.vue',
-  'app/pages/training/manage/departments.vue',
-  'app/pages/training/manage/records.vue',
-]
+// The sweep reached every module (issue 1151 item 12). Each list is empty and may not grow.
+const CITES_A_RECORD_ON_SCREEN: string[] = []
+const STILL_EXPLAINS_ITSELF: string[] = []
+const STILL_NARRATES_THE_MACHINE: string[] = []
+const STILL_PASTES_THE_FAILURE: string[] = []
+const STILL_BUTTONS_A_PRONOUN: string[] = []
 
 describe('the console speaks one voice (K-128 criterion 2, issue 1151 item 12)', () => {
   test('no screen quotes a decision or a story at its reader', async () => {
@@ -703,6 +663,11 @@ describe('the console speaks one voice (K-128 criterion 2, issue 1151 item 12)',
   test('no screen narrates the machine to its reader', async () => {
     expect((await saying(source => readerStrings(source).some(one => NARRATES_THE_MACHINE.test(one))))
       .filter(path => !STILL_NARRATES_THE_MACHINE.includes(path))).toEqual([])
+  })
+
+  test('a column header is a noun, not a question put to the reader', async () => {
+    expect(await saying(source => [...source.matchAll(/header:\s*'([^']+)'/g)]
+      .some(match => CHATTY_HEADER.test(match[1])))).toEqual([])
   })
 
   test('a failed read says so in the house shape, not in a pasted paragraph', async () => {
