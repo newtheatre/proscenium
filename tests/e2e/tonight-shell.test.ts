@@ -167,13 +167,42 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
 
 // The pinned slot is the one thing a thumb finds in the dark, so it holds something this viewer
 // can actually do (K-102 criterion 2, issue 1150 items 10 and 14).
-describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 items 10, 14)', () => {
+describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 items 10, 12, 13, 14)', () => {
   test('the glance pins its own refresh where the viewer cannot close the night', async () => {
     const view = await openView(PHONE)
     try {
       await visit(view, `${app.baseURL}/tonight/glance`)
       expect(await textOf(view, '[data-test="night-actions"]')).toContain('Refresh the numbers')
       expect(await textOf(view, '[data-test="night-actions"]')).not.toContain('Close the night')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the board pins its own composer and keeps Reset out of the thumb\'s way', async () => {
+    const view = await openView(PHONE)
+    try {
+      await visit(view, `${app.baseURL}/tonight/board`)
+      const pinned = await textOf(view, '[data-test="night-actions"]')
+      expect(pinned).not.toContain('Reset the board')
+      await waitFor(view, 'document.querySelector(\'[data-test="night-actions"] [data-test="board-free-text-submit"]\')')
+      const reset = await boxOf(view, '[data-test="board-reset-open"]')
+      expect(reset.height).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the incident log pins the incident, with the near miss one tap on from it', async () => {
+    const view = await openView(PHONE)
+    try {
+      await visit(view, `${app.baseURL}/tonight/incidents`)
+      const pinned = await textOf(view, '[data-test="night-actions"]')
+      expect(pinned).toContain('Log an incident')
+      expect(pinned).toContain('Report a near miss')
+      expect(pinned.indexOf('Log an incident')).toBeLessThan(pinned.indexOf('Report a near miss'))
     }
     finally {
       view.close()

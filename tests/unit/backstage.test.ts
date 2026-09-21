@@ -5,6 +5,7 @@ import {
   MAX_FAILED_ATTEMPTS,
   MESSAGE_RETENTION_DAYS,
   boardFeedRows,
+  saysQueuedSend,
   boardJoinForm,
   boardStateFrom,
   currentBoardState,
@@ -239,5 +240,26 @@ describe('the history is the live feed with the other side\'s tick on each row (
 
   test('nothing posted is an empty history, not a crash', () => {
     expect(boardFeedRows([], [])).toEqual([])
+  })
+})
+
+// A send the board refused has to come back in the words it was typed in, where it was typed
+// (E-121 criterion 6, issue 1150 item 12).
+describe('what a refused send reads as (E-121 criterion 6)', () => {
+  const presets = [{ id: 'p-clear', label: 'Clearance' }, { id: 'p-beginners', label: 'Beginners' }]
+
+  test('a preset comes back as the preset it was', () => {
+    expect(saysQueuedSend(presets, { presetId: 'p-clear', body: null })).toBe('Clearance')
+  })
+
+  test('free text comes back as what was typed', () => {
+    expect(saysQueuedSend(presets, { presetId: null, body: 'Hold the house' })).toBe('Hold the house')
+  })
+
+  // A preset retired between the tap and the drain is exactly why the send was refused, so its
+  // row must still say something a person can act on.
+  test('a preset nobody recognises still names a send rather than nothing', () => {
+    expect(saysQueuedSend(presets, { presetId: 'p-gone', body: null })).toBe('A call to backstage')
+    expect(saysQueuedSend(presets, { presetId: null, body: '  ' })).toBe('A call to backstage')
   })
 })
