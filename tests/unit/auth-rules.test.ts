@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { CONFIG_KEYS } from '#shared/utils/config'
 import { ABSOLUTE_PASSWORD_LIMIT, defaultPasswordPolicy, isWorkspaceEmail, normaliseEmail, passwordProblem, sessionIsCurrent } from '#shared/utils/auth'
+import { saysPasswordPolicy } from '#shared/utils/password-messages'
 
 describe('addresses', () => {
   test('an address normalises to lowercase and trimmed', () => {
@@ -87,5 +88,33 @@ describe('session currency (0007)', () => {
   test('no session and no user are both refused', () => {
     expect(sessionIsCurrent(null, user)).toBe(false)
     expect(sessionIsCurrent({ epoch: 3 }, null)).toBe(false)
+  })
+})
+
+// The hint under a password field says only what the policy will accept: the configuration can
+// demand mixed case, a number and a symbol, and a fixed sentence about length contradicts it.
+describe('the hint under a password field reads the policy (0012)', () => {
+  const base = { minLength: 12, maxLength: 100, requireMixedCase: false, requireNumber: false, requireSymbol: false }
+
+  test('a length-only policy says length is what counts', () => {
+    const said = saysPasswordPolicy(base)
+    expect(said).toContain('At least 12 characters')
+    expect(said).toContain('Length beats punctuation')
+  })
+
+  test('a policy that demands more never promises a few words are enough', () => {
+    const said = saysPasswordPolicy({ ...base, requireSymbol: true })
+    expect(said).not.toContain('Length beats punctuation')
+    expect(said).toContain('a symbol')
+  })
+
+  test('every demand the policy makes is named, in one sentence', () => {
+    expect(saysPasswordPolicy({ ...base, requireMixedCase: true, requireNumber: true, requireSymbol: true }))
+      .toBe('At least 12 characters, including upper and lower case, a number and a symbol.')
+  })
+
+  test('two demands are joined without a comma', () => {
+    expect(saysPasswordPolicy({ ...base, requireNumber: true, requireSymbol: true }))
+      .toBe('At least 12 characters, including a number and a symbol.')
   })
 })

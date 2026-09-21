@@ -93,6 +93,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     const paths = [
       '/', '/sign-in', '/register', '/verify', '/reset', '/magic', '/training/modules',
       '/whats-on', `/shows/${showSlug}`, `/book/${performanceId}`, '/about', '/policies/booking',
+      '/shows/no-such-show-at-all',
     ]
     for (const path of paths) {
       const counts = await inspect<Record<string, number>>(path, KIT_COUNTS)
@@ -161,6 +162,34 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     }))()`)
     expect(seen.offBoard).toEqual([])
     expect(seen.dark).toBeGreaterThan(0)
+  })
+
+  // The chrome table's "The way in" row covers five screens, not two: the three a person reaches
+  // from an email look like the way in too, rather than like a card adrift on the page.
+  test('every way in carries the spotlight and the wordmark', async () => {
+    for (const path of ['/sign-in', '/register', '/reset', '/verify', '/magic']) {
+      const seen = await inspect<{ spotlight: number, wordmark: number }>(path, `(() => ({
+        spotlight: document.querySelectorAll('main .nnt-spotlight').length,
+        wordmark: document.querySelectorAll('[data-test=way-in-wordmark]').length,
+      }))()`)
+      expect(`${path}: ${JSON.stringify(seen)}`).toBe(`${path}: {"spotlight":1,"wordmark":1}`)
+    }
+  }, 120_000)
+
+  // A mistyped show URL cost the whole site: the error page rendered outside every layout, and
+  // printed the status code copy-style section 6 forbids (K-133).
+  test('the error page keeps the site around it and shows no status code', async () => {
+    const seen = await inspect<{ header: number, footer: number, ways: string[], text: string }>(
+      '/shows/no-such-show-at-all', `(() => ({
+        header: document.querySelectorAll('header [data-test=site-wordmark]').length,
+        footer: document.querySelectorAll('[data-test=site-footer]').length,
+        ways: [...document.querySelectorAll('[data-test=error-ways] a')].map(a => a.getAttribute('href')),
+        text: document.querySelector('main')?.innerText ?? '',
+      }))()`)
+    expect(seen.header).toBe(1)
+    expect(seen.footer).toBe(1)
+    expect(seen.ways).toEqual(['/whats-on', '/get-involved', '/'])
+    expect(seen.text).not.toMatch(/\b[45]\d\d\b/)
   })
 
   // The Google route refuses with a code; the wording lives on the page that shows it, so an

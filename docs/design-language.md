@@ -120,7 +120,8 @@ from Nuxt UI's structural components:
 | Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar` (its header a link to `/admin`, its `UNavigationMenu` vertical and `type="multiple"`, each group two `type: 'label'` sections), `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
 | Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard |
 | The backstage board | `backstage` | The same dark subtree with nothing in it at all: no header, no footer, no link off the board (E-120 criterion 6) |
-| The way in (`/sign-in`, `/register`) | `default` | The site header and footer as usual, with the page itself a spotlight ground carrying the wordmark over one `UPageCard`. The `signed-out` middleware sends a visitor who already has a session on to `next` or home |
+| The way in (`/sign-in`, `/register`, `/reset`, `/verify`, `/magic`) | `default` | The site header and footer as usual, with `WayIn.vue` drawing the page: a spotlight ground carrying the wordmark over one `UPageCard`. All five wear it, the last three being the screens a person reaches from an email, so the shape lives in one component rather than in five pages. The `signed-out` middleware sends a visitor who already has a session on to `next` or home |
+| The error page (`app/error.vue`) | `default`, through `NuxtLayout` | The same `WayIn` shape inside the site chrome, so a mistyped URL costs the page and not the rest of the site. No status code is shown (`copy-style.md` section 6), and three ways on are offered: what's on, get involved and home. A second-factor refusal keeps its enrolment button above them (A-112, K-133) |
 
 The shell follows the posture of the work, not the URL, and which shell a screen takes is a
 decision record rather than a habit (`decisions/0040-navigation-is-shaped-by-posture-and-filtered-by-ability.md`).

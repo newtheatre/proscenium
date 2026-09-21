@@ -32,9 +32,18 @@ onMounted(async () => {
   }
 })
 
+// Only a path on this site: an absolute URL here would make the link an open redirect.
+const nextPath = computed(() => {
+  const next = route.query.next
+  return typeof next === 'string' && /^\/(?!\/)/.test(next) ? next : '/'
+})
+
+const askAgain = computed(() =>
+  nextPath.value === '/' ? '/sign-in?method=link' : `/sign-in?method=link&next=${encodeURIComponent(nextPath.value)}`)
+
 async function signedIn(): Promise<void> {
   await refresh()
-  await navigateTo('/')
+  await navigateTo(nextPath.value)
 }
 
 useSeoMeta({
@@ -44,40 +53,41 @@ useSeoMeta({
 </script>
 
 <template>
-  <UContainer class="max-w-md py-16">
-    <UPageCard>
-      <div
-        v-if="outcome === 'working'"
-        class="flex items-center gap-3 text-muted"
-      >
-        <UIcon
-          name="i-lucide-loader-circle"
-          class="animate-spin"
-        />
-        <span>Signing you in.</span>
-      </div>
-
-      <MfaChallenge
-        v-else-if="outcome === 'challenge'"
-        :attempt-id="attemptId"
-        @answered="signedIn"
+  <WayIn>
+    <div
+      v-if="outcome === 'working'"
+      class="flex items-center gap-3 text-muted"
+    >
+      <UIcon
+        name="i-lucide-loader-circle"
+        class="animate-spin"
       />
+      <span>Signing you in.</span>
+    </div>
 
-      <div
-        v-else
-        data-test="token-expired"
-        class="space-y-3"
+    <MfaChallenge
+      v-else-if="outcome === 'challenge'"
+      :attempt-id="attemptId"
+      @answered="signedIn"
+    />
+
+    <div
+      v-else
+      data-test="token-expired"
+      class="space-y-3"
+    >
+      <h1 class="nnt-headline text-xl">
+        That link has expired
+      </h1>
+      <p class="text-muted">
+        {{ notice }}
+      </p>
+      <UButton
+        :to="askAgain"
+        data-test="ask-again"
       >
-        <h1 class="nnt-headline text-xl">
-          That link has expired
-        </h1>
-        <p class="text-muted">
-          {{ notice }}
-        </p>
-        <UButton to="/sign-in">
-          Ask for a new one
-        </UButton>
-      </div>
-    </UPageCard>
-  </UContainer>
+        Ask for a new one
+      </UButton>
+    </div>
+  </WayIn>
 </template>
