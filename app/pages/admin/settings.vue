@@ -433,7 +433,7 @@ onMounted(load)
     <UModal
       :open="confirming !== null"
       :title="confirming ? `Confirm: ${confirming.key}` : ''"
-      description="This setting is flagged wide blast radius. Read the count before you type either option below (J-105)."
+      description="This setting reaches a great deal. Read the count before you type either option below."
       @update:open="confirming = null"
     >
       <template #body>

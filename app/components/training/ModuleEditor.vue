@@ -366,7 +366,7 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
           />
           <USwitch
             v-model="state.signoffRequired"
-            label="Awarded by sign-off rather than by a register"
+            label="Awarded by sign-off, not by a register"
           />
           <USwitch
             v-if="confersStanding"
@@ -497,7 +497,7 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
             :loading="saving"
             data-test="module-submit"
           >
-            {{ module ? 'Save it' : 'Add it' }}
+            {{ module ? 'Save the module' : 'Add the module' }}
           </UButton>
           <UButton
             color="neutral"

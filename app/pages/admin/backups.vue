@@ -139,7 +139,7 @@ onMounted(load)
 
     <UPageCard
       title="Restore drill"
-      description="Proves the backup by actually restoring it: row counts and money totals reconciled against production (K-108, J-107)."
+      description="Proves the backup by restoring it: the counts and the money totals are checked against the live ones."
     >
       <template v-if="status">
         <UAlert
@@ -150,8 +150,8 @@ onMounted(load)
           icon="i-lucide-alert-triangle"
           :title="status.lastDrillAt ? 'A drill is overdue' : 'No drill has ever passed'"
           :description="status.intervalDays
-            ? `The configured interval is ${status.intervalDays} days.`
-            : 'No cadence is configured, so this should not be flagged.'"
+            ? `The interval is ${status.intervalDays} days.`
+            : 'No cadence is set, so this should not be flagged.'"
         />
         <p
           v-else
@@ -344,7 +344,7 @@ onMounted(load)
             type="submit"
             data-test="drill-submit"
           >
-            Record it
+            Record the drill
           </UButton>
         </UForm>
       </template>

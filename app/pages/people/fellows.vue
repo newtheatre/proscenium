@@ -310,7 +310,7 @@ onMounted(load)
             type="submit"
             data-test="award-submit"
           >
-            Record it
+            Record the award
           </UButton>
         </UForm>
       </template>
