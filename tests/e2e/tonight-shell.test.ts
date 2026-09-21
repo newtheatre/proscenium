@@ -165,4 +165,33 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
   }, CASE_TIMEOUT_MS)
 })
 
+// The pinned slot is the one thing a thumb finds in the dark, so it holds something this viewer
+// can actually do (K-102 criterion 2, issue 1150 items 10 and 14).
+describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 items 10, 14)', () => {
+  test('the glance pins its own refresh where the viewer cannot close the night', async () => {
+    const view = await openView(PHONE)
+    try {
+      await visit(view, `${app.baseURL}/tonight/glance`)
+      expect(await textOf(view, '[data-test="night-actions"]')).toContain('Refresh the numbers')
+      expect(await textOf(view, '[data-test="night-actions"]')).not.toContain('Close the night')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the emergency card pins Call 999 as a dialling link', async () => {
+    const view = await openView(PHONE)
+    try {
+      await visit(view, `${app.baseURL}/tonight/emergency`)
+      const pinned = await boxOf(view, '[data-test="night-actions"] a[href="tel:999"]')
+      expect(pinned.height).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+      expect(await textOf(view, '[data-test="night-actions"]')).toContain('Call 999')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

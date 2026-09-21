@@ -82,6 +82,19 @@ export async function tonightTeam(performanceId: string): Promise<TonightTeamMem
   return rows.map(readTeamRow)
 }
 
+export interface OnCall { name: string, phone: string }
+
+// Who the emergency card says to ring after 999 (E-113): tonight's own confirmed duty managers,
+// deduplicated so one person across both of a matinee day's houses is one number (E-112).
+export function dutyManagersOnCall(team: readonly TonightTeamMember[]): OnCall[] {
+  const seen = new Map<string, OnCall>()
+  for (const member of team) {
+    if (member.role !== 'DUTY_MANAGER' || !member.filled || !member.name || !member.phone) continue
+    seen.set(`${member.name}\u0000${member.phone}`, { name: member.name, phone: member.phone })
+  }
+  return [...seen.values()]
+}
+
 export interface TonightPerformance {
   performanceId: string
   showId: string
