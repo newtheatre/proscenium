@@ -50,30 +50,46 @@ const showColumns: TableColumn<ShowRow>[] = [
   {
     id: 'show',
     header: 'Show',
-    cell: ({ row }) => h('span', {
+    cell: ({ row }) => h('div', {
       'class': row.original.unattributed ? 'italic' : undefined,
       'data-test': row.original.unattributed ? 'unattributed-row' : 'show-row',
-    }, row.original.showTitle),
+    }, [
+      h('div', {}, row.original.showTitle),
+      // Below sm the split of the gross is hidden: shown here instead, so a phone keeps gross and
+      // net in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.unattributed
+        ? `Refunded ${saysMoney(row.original.refundedPence)}`
+        : `Refunded ${saysMoney(row.original.refundedPence)}, walk-up ${saysMoney(row.original.walkUpPence)}, pre-booked ${saysMoney(row.original.preBookedPence)}, ${plural(row.original.passAdmissions, 'pass admission')}`),
+    ]),
   },
   { id: 'gross', header: 'Gross', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.grossPence) },
-  { id: 'refunded', header: 'Refunded', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.refundedPence) },
+  { id: 'refunded', header: 'Refunded', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => saysMoney(row.original.refundedPence) },
   { id: 'net', header: 'Net', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.netPence) },
-  { id: 'walkUp', header: 'Walk-up', meta: RIGHT_ALIGNED, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.walkUpPence)) },
-  { id: 'preBooked', header: 'Pre-booked', meta: RIGHT_ALIGNED, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.preBookedPence)) },
+  { id: 'walkUp', header: 'Walk-up', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.walkUpPence)) },
+  { id: 'preBooked', header: 'Pre-booked', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.preBookedPence)) },
   {
     id: 'passAdmissions',
     header: 'Pass admissions',
-    meta: RIGHT_ALIGNED,
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
     cell: ({ row }) => (row.original.unattributed ? '' : String(row.original.passAdmissions)),
   },
 ]
 
 const passColumns: TableColumn<PassUtilisationRow>[] = [
-  { id: 'reference', header: 'Pass', cell: ({ row }) => row.original.reference },
-  { id: 'passTypeName', header: 'Type', cell: ({ row }) => row.original.passTypeName },
+  {
+    id: 'reference',
+    header: 'Pass',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.reference),
+      // Below sm the type and the show counts are hidden: shown here instead, so a phone keeps
+      // what was paid in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.passTypeName}, admitted to ${row.original.admittedShows} of ${row.original.coveredShows}`),
+    ]),
+  },
+  { id: 'passTypeName', header: 'Type', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.passTypeName },
   { id: 'pricePaid', header: 'Paid', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.pricePaid) },
-  { id: 'admittedShows', header: 'Shows admitted', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.admittedShows) },
-  { id: 'coveredShows', header: 'Shows covered', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.coveredShows) },
+  { id: 'admittedShows', header: 'Shows admitted', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => String(row.original.admittedShows) },
+  { id: 'coveredShows', header: 'Shows covered', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => String(row.original.coveredShows) },
 ]
 </script>
 

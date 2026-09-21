@@ -207,17 +207,21 @@ const columns: TableColumn<TicketType>[] = [
           : h(UBadge, { color: 'neutral', variant: 'outline', size: 'sm' }, () => 'Off by default'),
       ]),
       row.original.description ? h('div', { class: 'text-xs text-muted' }, row.original.description) : null,
+      // Below sm whether it has ever sold is hidden: shown here instead, so a phone keeps the
+      // price and the row actions in view without losing what it said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.everSold ? 'Has been sold' : 'Never sold'),
     ]),
   },
   {
     id: 'price',
     header: 'Base price',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: RIGHT_ALIGNED,
     cell: ({ row }) => saysPrice(row.original.price),
   },
   {
     id: 'sold',
     header: 'Sold under',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.everSold ? 'Has been sold' : 'Never sold'),
   },
   {

@@ -74,10 +74,20 @@ const expectedColumns: TableColumn<ExpectedRow>[] = [
 ]
 
 const historyColumns: TableColumn<ZReading>[] = [
-  { id: 'reader', header: 'Reader', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.readerPence) },
+  {
+    id: 'reader',
+    header: 'Reader',
+    meta: { class: { td: 'text-right whitespace-nowrap font-mono' } },
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, saysMoney(row.original.readerPence)),
+      // Below sm who entered it and their note are hidden: shown here instead, so a phone keeps
+      // the variance in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, [row.original.enteredByName, row.original.note].filter(Boolean).join(', ')),
+    ]),
+  },
   { id: 'variance', header: 'Variance', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.variancePence) },
-  { id: 'by', header: 'By', cell: ({ row }) => row.original.enteredByName },
-  { id: 'note', header: 'Note', cell: ({ row }) => row.original.note ?? '' },
+  { id: 'by', header: 'By', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.enteredByName },
+  { id: 'note', header: 'Note', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.note ?? '' },
 ]
 
 async function record(): Promise<void> {

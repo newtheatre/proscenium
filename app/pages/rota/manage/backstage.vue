@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { h, resolveComponent } from 'vue'
 import { can, manageBoardConfig } from '#shared/utils/abilities'
+import type { VNode } from 'vue'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Backstage board', middleware: 'console', docs: '/docs/rota/backstage-board-setup' })
 
@@ -190,6 +193,72 @@ async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
   }
 }
 
+const UButton = resolveComponent('UButton')
+
+const retiredNote = (active: boolean): VNode | null =>
+  (active ? null : h('span', { class: 'ml-2 text-xs text-muted' }, '(retired)'))
+
+const typeColumns = computed<TableColumn<MilestoneType>[]>(() => [
+  { id: 'label', header: 'Milestone type', cell: ({ row }) => h('span', { class: 'text-sm' }, [row.original.label, retiredNote(row.original.active)]) },
+  ...(writes.value
+    ? [{
+        id: 'act',
+        header: ACTIONS_HEADER,
+        meta: { class: { td: 'text-right whitespace-nowrap' } },
+        cell: ({ row }: { row: { original: MilestoneType } }) => h('div', { class: 'flex justify-end gap-1' }, [
+          h(UButton, {
+            'size': 'xs',
+            'color': 'neutral',
+            'variant': 'ghost',
+            'data-test': `edit-type-${row.original.id}`,
+            'onClick': () => editType(row.original),
+          }, () => 'Edit'),
+          h(UButton, {
+            'size': 'xs',
+            'color': 'neutral',
+            'variant': 'ghost',
+            'data-test': `retire-type-${row.original.id}`,
+            'onClick': () => toggleType(row.original),
+          }, () => (row.original.active ? 'Retire' : 'Reinstate')),
+        ]),
+      }]
+    : []),
+])
+
+const presetColumns = computed<TableColumn<Preset>[]>(() => [
+  {
+    id: 'label',
+    header: 'Preset',
+    cell: ({ row }) => h('div', {}, [
+      h('p', { class: 'text-sm' }, [row.original.label, retiredNote(row.original.active)]),
+      h('p', { class: 'text-xs text-muted' }, row.original.body),
+    ]),
+  },
+  ...(writes.value
+    ? [{
+        id: 'act',
+        header: ACTIONS_HEADER,
+        meta: { class: { td: 'text-right whitespace-nowrap' } },
+        cell: ({ row }: { row: { original: Preset } }) => h('div', { class: 'flex justify-end gap-1' }, [
+          h(UButton, {
+            'size': 'xs',
+            'color': 'neutral',
+            'variant': 'ghost',
+            'data-test': `edit-preset-${row.original.id}`,
+            'onClick': () => editPreset(row.original),
+          }, () => 'Edit'),
+          h(UButton, {
+            'size': 'xs',
+            'color': 'neutral',
+            'variant': 'ghost',
+            'data-test': `retire-preset-${row.original.id}`,
+            'onClick': () => togglePreset(row.original),
+          }, () => (row.original.active ? 'Retire' : 'Reinstate')),
+        ]),
+      }]
+    : []),
+])
+
 // A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
 // is shown wherever the action was taken.
 const modalOpen = computed(() => typeOpen.value || presetOpen.value || retiringType.value !== null || retiringPreset.value !== null)
@@ -235,47 +304,18 @@ watch(modalOpen, (nowOpen) => {
         </div>
       </template>
 
-      <div class="space-y-2">
-        <div
-          v-for="type in typesData.types"
-          :key="type.id"
-          class="flex items-center justify-between gap-2 border-b border-default py-2 last:border-0"
-        >
-          <span class="text-sm">{{ type.label }}<span
-            v-if="!type.active"
-            class="ml-2 text-xs text-muted"
-          >(retired)</span></span>
-          <div
-            v-if="writes"
-            class="flex gap-1"
-          >
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              :data-test="`edit-type-${type.id}`"
-              @click="editType(type)"
-            >
-              Edit
-            </UButton>
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              :data-test="`retire-type-${type.id}`"
-              @click="toggleType(type)"
-            >
-              {{ type.active ? 'Retire' : 'Reinstate' }}
-            </UButton>
-          </div>
-        </div>
-        <p
-          v-if="typesStatus !== 'pending' && typesData.types.length === 0"
-          class="py-6 text-center text-sm text-muted"
-        >
-          No milestone types yet.
-        </p>
-      </div>
+      <UTable
+        :data="typesData.types"
+        :columns="typeColumns"
+        :loading="typesStatus === 'pending'"
+        data-test="milestone-types-table"
+      >
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            No milestone types yet. Add one, and it becomes a milestone a show can post.
+          </p>
+        </template>
+      </UTable>
     </UCard>
 
     <UCard data-test="presets">
@@ -296,54 +336,18 @@ watch(modalOpen, (nowOpen) => {
         </div>
       </template>
 
-      <div class="space-y-2">
-        <div
-          v-for="preset in presetsData.presets"
-          :key="preset.id"
-          class="flex items-center justify-between gap-2 border-b border-default py-2 last:border-0"
-        >
-          <div>
-            <p class="text-sm">
-              {{ preset.label }}<span
-                v-if="!preset.active"
-                class="ml-2 text-xs text-muted"
-              >(retired)</span>
-            </p>
-            <p class="text-xs text-muted">
-              {{ preset.body }}
-            </p>
-          </div>
-          <div
-            v-if="writes"
-            class="flex gap-1"
-          >
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              :data-test="`edit-preset-${preset.id}`"
-              @click="editPreset(preset)"
-            >
-              Edit
-            </UButton>
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              :data-test="`retire-preset-${preset.id}`"
-              @click="togglePreset(preset)"
-            >
-              {{ preset.active ? 'Retire' : 'Reinstate' }}
-            </UButton>
-          </div>
-        </div>
-        <p
-          v-if="presetsStatus !== 'pending' && presetsData.presets.length === 0"
-          class="py-6 text-center text-sm text-muted"
-        >
-          No presets yet.
-        </p>
-      </div>
+      <UTable
+        :data="presetsData.presets"
+        :columns="presetColumns"
+        :loading="presetsStatus === 'pending'"
+        data-test="presets-table"
+      >
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            No presets yet. Add one, and it becomes a message a show can post in a tap.
+          </p>
+        </template>
+      </UTable>
     </UCard>
 
     <UModal

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { h } from 'vue'
 import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
 import type {
@@ -75,9 +76,18 @@ function exportUrl(section: ReportSection): string {
 }
 
 const salesColumns: TableColumn<SalesRow>[] = [
-  { id: 'category', header: 'Category', cell: ({ row }) => row.original.categoryName },
-  { id: 'product', header: 'Product', cell: ({ row }) => row.original.productName },
-  { id: 'variant', header: 'Variant', cell: ({ row }) => row.original.variantLabel },
+  { id: 'category', header: 'Category', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.categoryName },
+  {
+    id: 'product',
+    header: 'Product',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.productName),
+      // Below sm the category and the variant are hidden: shown here instead, so a phone keeps
+      // the figures in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.variantLabel}, ${row.original.categoryName}`),
+    ]),
+  },
+  { id: 'variant', header: 'Variant', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.variantLabel },
   { id: 'qty', header: 'Qty', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.qty) },
   { id: 'revenue', header: 'Revenue', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.revenuePence) },
 ]
@@ -101,17 +111,35 @@ const compsColumns: TableColumn<CompRow>[] = [
 ]
 
 const wastageColumns: TableColumn<WastageRow>[] = [
-  { id: 'reason', header: 'Reason', cell: ({ row }) => says(row.original.reason) },
-  { id: 'item', header: 'Item', cell: ({ row }) => row.original.itemName },
-  { id: 'category', header: 'Category', cell: ({ row }) => row.original.categoryName },
+  {
+    id: 'reason',
+    header: 'Reason',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, says(row.original.reason)),
+      // Below sm the item and its category are hidden: shown here instead, so a phone keeps the
+      // figures in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.itemName}, ${row.original.categoryName}`),
+    ]),
+  },
+  { id: 'item', header: 'Item', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.itemName },
+  { id: 'category', header: 'Category', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.categoryName },
   { id: 'qty', header: 'Qty', meta: RIGHT_ALIGNED, cell: ({ row }) => saysQuantity(row.original.qtyWasted, row.original.unit) },
   { id: 'cost', header: 'At cost', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.costPence) },
 ]
 
 const discountsColumns: TableColumn<DiscountRow>[] = [
-  { id: 'discount', header: 'Discount', cell: ({ row }) => row.original.discountName },
-  { id: 'percent', header: 'Percent', meta: RIGHT_ALIGNED, cell: ({ row }) => `${row.original.percent}%` },
-  { id: 'timesApplied', header: 'Times applied', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.timesApplied) },
+  {
+    id: 'discount',
+    header: 'Discount',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.discountName),
+      // Below sm the percentage and the count are hidden: shown here instead, so a phone keeps
+      // the money in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.percent}%, applied ${plural(row.original.timesApplied, 'time')}`),
+    ]),
+  },
+  { id: 'percent', header: 'Percent', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => `${row.original.percent}%` },
+  { id: 'timesApplied', header: 'Times applied', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => String(row.original.timesApplied) },
   { id: 'givenAway', header: 'Given away', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.discountedPence) },
 ]
 </script>

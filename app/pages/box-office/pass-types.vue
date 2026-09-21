@@ -220,22 +220,31 @@ const columns: TableColumn<PassType>[] = [
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, `${saysDay(row.original.validFrom)} to ${saysDay(row.original.validUntil)}`),
+      // Below sm the prices, the cap and what it covers are hidden: shown here instead, so a
+      // phone keeps the row actions in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, [
+        row.original.prices.map(price => `${price.label} ${saysPrice(price.price)}`).join(', '),
+        row.original.maxIssued === null ? 'Uncapped' : `Capped at ${row.original.maxIssued}`,
+        `covers ${plural(row.original.showIds.length, 'show')}`,
+      ].filter(Boolean).join(', ')),
     ]),
   },
   {
     id: 'prices',
     header: 'Price points',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('span', { class: 'text-sm' }, row.original.prices.map(price => `${price.label} ${saysPrice(price.price)}`).join(', ')),
   },
   {
     id: 'cap',
     header: 'Cap',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => h('span', { class: 'text-sm' }, row.original.maxIssued === null ? 'Uncapped' : `${row.original.maxIssued}`),
   },
   {
     id: 'shows',
     header: 'Covers',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, plural(row.original.showIds.length, 'show')),
   },
   {

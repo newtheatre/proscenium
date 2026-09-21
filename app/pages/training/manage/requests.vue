@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { h, resolveComponent } from 'vue'
 import { DECLINE_REASON_LIMIT } from '#shared/utils/training'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Requests', middleware: 'console', docs: '/docs/training/requests' })
 
@@ -49,6 +51,39 @@ async function answer(): Promise<void> {
   finally {
     saving.value = false
   }
+}
+
+const UButton = resolveComponent('UButton')
+
+type Requester = Demand['requesters'][number]
+
+// One table a module, so the board keeps its grouping and its order: the busiest module first,
+// and the people asking for it beneath it.
+function requesterColumns(moduleId: string): TableColumn<Requester>[] {
+  return [
+    {
+      id: 'person',
+      header: 'Who is asking',
+      cell: ({ row }) => h('div', {}, [
+        h('span', { class: 'font-medium' }, row.original.name),
+        row.original.note ? h('p', { class: 'text-muted' }, row.original.note) : null,
+      ]),
+    },
+    {
+      id: 'act',
+      header: ACTIONS_HEADER,
+      meta: { class: { td: 'text-right whitespace-nowrap' } },
+      cell: ({ row }) => h(UButton, {
+        'size': 'xs',
+        'color': 'neutral',
+        'variant': 'outline',
+        'data-test': `answer-${moduleId}`,
+        'onClick': () => {
+          answering.value = { id: row.original.id, name: row.original.name, moduleId }
+        },
+      }, () => 'Answer'),
+    },
+  ]
 }
 
 // A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
@@ -141,32 +176,18 @@ watch(modalOpen, (nowOpen) => {
           </UBadge>
         </div>
 
-        <ul class="mt-3 space-y-2">
-          <li
-            v-for="person in demand.requesters"
-            :key="person.id"
-            class="flex flex-wrap items-start justify-between gap-3 text-sm"
-          >
-            <div>
-              <span class="font-medium">{{ person.name }}</span>
-              <p
-                v-if="person.note"
-                class="text-muted"
-              >
-                {{ person.note }}
-              </p>
-            </div>
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="outline"
-              :data-test="`answer-${demand.moduleId}`"
-              @click="answering = { id: person.id, name: person.name, moduleId: demand.moduleId }"
-            >
-              Answer
-            </UButton>
-          </li>
-        </ul>
+        <UTable
+          class="mt-3 text-sm"
+          :data="demand.requesters"
+          :columns="requesterColumns(demand.moduleId)"
+          :data-test="`requesters-${demand.moduleId}`"
+        >
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              Nobody is waiting for this one now.
+            </p>
+          </template>
+        </UTable>
       </section>
 
       <p class="text-sm text-muted">

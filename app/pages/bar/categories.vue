@@ -179,11 +179,26 @@ const columns: TableColumn<BarCategory>[] = [
             'data-test': `category-swatch-${row.original.id}`,
           })
         : null,
-      h('span', {}, row.original.name),
+      h('div', {}, [
+        h('span', {}, row.original.name),
+        // Below sm the order and the product count are hidden: shown here instead, so a phone
+        // keeps the row actions in view without losing what they said (issue 922).
+        h('div', { class: 'sm:hidden text-xs text-muted' }, `${plural(row.original.productCount, 'product')}, ${row.original.sort} on the till`),
+      ]),
     ]),
   },
-  { id: 'sort', header: 'Order on the till', cell: ({ row }) => String(row.original.sort) },
-  { id: 'products', header: 'Products', cell: ({ row }) => plural(row.original.productCount, 'product') },
+  {
+    id: 'sort',
+    header: 'Order on the till',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
+    cell: ({ row }) => String(row.original.sort),
+  },
+  {
+    id: 'products',
+    header: 'Products',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
+    cell: ({ row }) => plural(row.original.productCount, 'product'),
+  },
   {
     id: 'act',
     header: ACTIONS_HEADER,

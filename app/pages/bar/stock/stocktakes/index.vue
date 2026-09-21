@@ -56,16 +56,29 @@ const columns: TableColumn<Stocktake>[] = [
   {
     id: 'status',
     header: 'Status',
-    cell: ({ row }) => h(UBadge, {
-      color: row.original.status === 'OPEN' ? 'warning' : 'neutral',
-      variant: 'subtle',
-      size: 'sm',
-    }, () => label(row.original)),
+    cell: ({ row }) => h('div', {}, [
+      h(UBadge, {
+        color: row.original.status === 'OPEN' ? 'warning' : 'neutral',
+        variant: 'subtle',
+        size: 'sm',
+      }, () => label(row.original)),
+      // Below sm the opened and applied columns are hidden: shown here instead, so a phone keeps
+      // the row's action in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, row.original.appliedAt === null
+        ? `Opened ${saysWhen(row.original.openedAt)}`
+        : `Applied ${saysWhen(row.original.appliedAt)}`),
+    ]),
   },
-  { id: 'opened', header: 'Opened', cell: ({ row }) => saysWhen(row.original.openedAt) },
+  {
+    id: 'opened',
+    header: 'Opened',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
+    cell: ({ row }) => saysWhen(row.original.openedAt),
+  },
   {
     id: 'applied',
     header: 'Applied',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => (row.original.appliedAt === null ? '' : saysWhen(row.original.appliedAt)),
   },
   {

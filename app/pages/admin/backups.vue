@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { h } from 'vue'
 import { backupDrillsList } from '#shared/utils/backup-drills-list'
 import { restoreDrillForm } from '#shared/utils/backup'
 import { saysDay } from '#shared/utils/when'
@@ -88,25 +89,38 @@ async function record(event: FormSubmitEvent<RestoreDrillForm>): Promise<void> {
 
 watch(query, load)
 
+const reconciled = (drill: Drill): string => [
+  drill.rowCountsMatch ? 'Row counts' : null,
+  drill.moneyTotalsMatch ? 'Money totals' : null,
+].filter(Boolean).join(', ') || 'Neither'
+
 const columns: TableColumn<Drill>[] = [
   {
     id: 'ranAt',
     header: 'Ran',
-    cell: ({ row }) => saysDay(row.original.ranAt),
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, saysDay(row.original.ranAt)),
+      // Below sm the operator, the minutes, what reconciled and the notes are hidden: shown here
+      // instead, so a phone keeps the outcome in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, [
+        row.original.operatorName,
+        `${row.original.timeToRestoreMinutes} minutes to restore`,
+        reconciled(row.original),
+        row.original.notes,
+      ].filter(Boolean).join(' · ')),
+    ]),
     meta: { class: { td: 'text-sm whitespace-nowrap' } },
   },
   { accessorKey: 'outcome', header: 'Outcome' },
-  { accessorKey: 'operatorName', header: 'Operator' },
-  { accessorKey: 'timeToRestoreMinutes', header: 'Minutes to restore' },
+  { accessorKey: 'operatorName', header: 'Operator', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
+  { accessorKey: 'timeToRestoreMinutes', header: 'Minutes to restore', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   {
     id: 'reconciled',
     header: 'Reconciled',
-    cell: ({ row }) => [
-      row.original.rowCountsMatch ? 'Row counts' : null,
-      row.original.moneyTotalsMatch ? 'Money totals' : null,
-    ].filter(Boolean).join(', ') || 'Neither',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
+    cell: ({ row }) => reconciled(row.original),
   },
-  { accessorKey: 'notes', header: 'Notes', meta: { class: { td: 'text-sm text-muted' } } },
+  { accessorKey: 'notes', header: 'Notes', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } } },
 ]
 
 onMounted(load)

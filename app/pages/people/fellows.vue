@@ -116,19 +116,27 @@ const columns: TableColumn<Fellow>[] = [
     id: 'awardedOn',
     header: 'Awarded',
     cell: ({ row }) => saysDay(row.original.awardedOn),
-    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm whitespace-nowrap` } },
   },
   {
     id: 'name',
     header: 'Fellow',
-    cell: ({ row }) => h('div', { class: 'flex items-center gap-2' }, [
-      row.original.name,
-      row.original.anonymised ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Erased') : null,
-      row.original.revokedAt ? h(UBadge, { color: 'error', variant: 'subtle', size: 'sm' }, () => 'Revoked') : null,
+    cell: ({ row }) => h('div', {}, [
+      h('div', { class: 'flex items-center gap-2' }, [
+        row.original.name,
+        row.original.anonymised ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Erased') : null,
+        row.original.revokedAt ? h(UBadge, { color: 'error', variant: 'subtle', size: 'sm' }, () => 'Revoked') : null,
+      ]),
+      // Below sm the award day, who resolved it and the citation are hidden: shown here instead,
+      // so a phone keeps the row actions in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, [
+        `${saysDay(row.original.awardedOn)}, resolved by ${row.original.awardedBy}`,
+        row.original.citation,
+      ].filter(Boolean).join(' · ')),
     ]),
   },
-  { accessorKey: 'awardedBy', header: 'Resolved by' },
-  { accessorKey: 'citation', header: 'Citation', meta: { class: { td: 'text-sm text-muted' } } },
+  { accessorKey: 'awardedBy', header: 'Resolved by', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
+  { accessorKey: 'citation', header: 'Citation', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } } },
   {
     id: 'act',
     header: ACTIONS_HEADER,

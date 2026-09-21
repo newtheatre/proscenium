@@ -39,24 +39,29 @@ const columns: TableColumn<LedgerEntry>[] = [
     id: 'happenedAt',
     header: 'When',
     meta: { class: { td: 'whitespace-nowrap' } },
-    cell: ({ row }) => h('span', {}, saysWhen(row.original.happenedAt)),
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, saysWhen(row.original.happenedAt)),
+      // Below sm the source and the tender are hidden: shown here instead, so a phone keeps the
+      // amount in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysEntrySource(row.original.source)}, ${saysTender(row.original.tender)}`),
+    ]),
   },
   {
     id: 'source',
     header: 'Source',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => h('span', {}, saysEntrySource(row.original.source)),
   },
   {
     id: 'tender',
     header: 'Tender',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => h('span', {}, saysTender(row.original.tender)),
   },
   {
     id: 'totalPence',
     header: 'Amount',
-    meta: { class: { td: 'whitespace-nowrap text-right' } },
+    meta: RIGHT_ALIGNED,
     cell: ({ row }) => h('span', {}, saysMoney(row.original.totalPence)),
   },
 ]

@@ -137,11 +137,20 @@ function focusNext(itemId: string): void {
 }
 
 const columns: TableColumn<StocktakeLine>[] = [
-  { id: 'item', header: 'Stocked item', cell: ({ row }) => row.original.itemName },
+  {
+    id: 'item',
+    header: 'Stocked item',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.itemName),
+      // Below sm the expected figure and its cost are hidden: shown here instead, so a phone
+      // keeps the count field in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysQuantity(row.original.expectedQty, row.original.unit)} expected`),
+    ]),
+  },
   {
     id: 'expected',
     header: 'Expected',
-    meta: RIGHT_ALIGNED,
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
     cell: ({ row }) => saysQuantity(row.original.expectedQty, row.original.unit),
   },
   {
@@ -198,7 +207,7 @@ const columns: TableColumn<StocktakeLine>[] = [
   {
     id: 'atCost',
     header: 'At cost',
-    meta: RIGHT_ALIGNED,
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
     cell: ({ row }) => (row.original.varianceCostPence === null ? '' : saysMoney(row.original.varianceCostPence)),
   },
 ]

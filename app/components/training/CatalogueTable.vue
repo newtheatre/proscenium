@@ -68,6 +68,12 @@ const { data, status: loading, refresh, error } = await useAsyncData(
 holder.refresh = refresh
 const failure = useListFailure(error, 'The catalogue could not be read.')
 
+const grants = (module: CatalogueModule): string[] => [
+  module.grantsTrainer ? 'Trainer' : null,
+  module.grantsSupervisor ? 'Supervisor' : null,
+  module.signoffRequired ? 'Sign-off' : null,
+].filter((granted): granted is string => granted !== null)
+
 const columns: TableColumn<CatalogueModule>[] = [
   {
     id: 'name',
@@ -82,12 +88,15 @@ const columns: TableColumn<CatalogueModule>[] = [
       ]),
       h('div', { class: 'text-xs text-muted' },
         `${row.original.department} · ${saysKind(row.original.kind)} · ${saysDeliveryMode(row.original.deliveryMode)}`),
+      // Below sm the lifetime and what it grants are hidden: shown here instead, so a phone keeps
+      // the status and the row's action in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, [describeExpiry(row.original), ...grants(row.original)].join(' · ')),
     ]),
   },
   {
     id: 'expiry',
     header: 'Lifetime',
-    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm whitespace-nowrap` } },
     cell: ({ row }) => h('div', {}, [
       h('div', {}, describeExpiry(row.original)),
       // Computed on the way out of every request: the catalogue stores a policy, and an award
@@ -100,17 +109,9 @@ const columns: TableColumn<CatalogueModule>[] = [
   {
     id: 'grants',
     header: 'Grants',
-    cell: ({ row }) => h('div', { class: 'flex flex-wrap gap-1' }, [
-      row.original.grantsTrainer
-        ? h(UBadge, { color: 'primary', variant: 'subtle', size: 'sm' }, () => 'Trainer')
-        : null,
-      row.original.grantsSupervisor
-        ? h(UBadge, { color: 'primary', variant: 'subtle', size: 'sm' }, () => 'Supervisor')
-        : null,
-      row.original.signoffRequired
-        ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Sign-off')
-        : null,
-    ]),
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
+    cell: ({ row }) => h('div', { class: 'flex flex-wrap gap-1' }, grants(row.original).map(granted =>
+      h(UBadge, { color: granted === 'Sign-off' ? 'neutral' : 'primary', variant: 'subtle', size: 'sm' }, () => granted))),
   },
   {
     id: 'status',

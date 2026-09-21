@@ -158,12 +158,15 @@ const columns: TableColumn<Space>[] = [
       ]),
       h('div', { class: 'text-xs text-muted' },
         [row.original.building, row.original.campus].filter(Boolean).join(', ') || 'Somewhere on campus'),
+      // Below sm what it holds is hidden: shown here instead, so a phone keeps what we know and
+      // the row actions in view without losing what it said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.capacity ? `Holds ${row.original.capacity}` : 'Capacity not recorded'),
     ]),
   },
   {
     id: 'capacity',
     header: 'Holds',
-    meta: { class: { td: 'text-sm text-muted whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted whitespace-nowrap` } },
     cell: ({ row }) => (row.original.capacity ? `${row.original.capacity}` : 'Not recorded'),
   },
   {

@@ -64,30 +64,53 @@ const columns: TableColumn<SendLogRow>[] = [
   {
     id: 'recipient',
     header: 'Recipient',
-    cell: ({ row }) => row.original.userId
-      ? h(UButton, {
-          to: `/comms/operations/accounts/${row.original.userId}`,
-          variant: 'link',
-          color: 'neutral',
-          class: 'p-0',
-        }, () => row.original.recipientName ?? row.original.userId)
-      : 'No account',
+    cell: ({ row }) => h('div', {}, [
+      row.original.userId
+        ? h(UButton, {
+            to: `/comms/operations/accounts/${row.original.userId}`,
+            variant: 'link',
+            color: 'neutral',
+            class: 'p-0',
+          }, () => row.original.recipientName ?? row.original.userId)
+        : h('span', {}, 'No account'),
+      // Below sm the type, the channel, the enqueued time and any error are hidden: shown here
+      // instead, so a phone keeps the outcome and the sent time in view (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, [
+        `${row.original.type}, ${row.original.channel}`,
+        `enqueued ${saysWhen(row.original.createdAt)}`,
+        row.original.error,
+      ].filter(Boolean).join(' · ')),
+    ]),
   },
-  { accessorKey: 'type', header: 'Type', meta: { class: { td: 'font-mono text-sm' } } },
-  { accessorKey: 'channel', header: 'Channel' },
+  { accessorKey: 'type', header: 'Type', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} font-mono text-sm` } } },
+  { accessorKey: 'channel', header: 'Channel', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   {
     id: 'status',
     header: 'Outcome',
     cell: ({ row }) => h(UBadge, { color: STATUS_COLOR[row.original.status] ?? 'neutral', variant: 'subtle', size: 'sm' }, () => saysNotificationStatus(row.original.status)),
   },
-  { id: 'createdAt', header: 'Enqueued', cell: ({ row }) => saysWhen(row.original.createdAt) },
-  { id: 'sentAt', header: 'Sent', cell: ({ row }) => when(row.original.sentAt) },
-  { accessorKey: 'error', header: 'Error', meta: { class: { td: 'text-sm text-muted' } } },
+  {
+    id: 'createdAt',
+    header: 'Enqueued',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
+    cell: ({ row }) => saysWhen(row.original.createdAt),
+  },
+  { id: 'sentAt', header: 'Sent', meta: { class: { td: 'whitespace-nowrap' } }, cell: ({ row }) => when(row.original.sentAt) },
+  { accessorKey: 'error', header: 'Error', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } } },
 ]
 
 const dailyColumns: TableColumn<DailyCount>[] = [
-  { id: 'day', header: 'Day', cell: ({ row }) => row.original.day },
-  { accessorKey: 'type', header: 'Type', meta: { class: { td: 'font-mono text-sm' } } },
+  {
+    id: 'day',
+    header: 'Day',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.day),
+      // Below sm the type is hidden: shown here instead, so a phone keeps the outcome and the
+      // count in view without losing what it said (issue 922).
+      h('div', { class: 'sm:hidden font-mono text-xs text-muted' }, row.original.type),
+    ]),
+  },
+  { accessorKey: 'type', header: 'Type', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} font-mono text-sm` } } },
   { id: 'status', header: 'Outcome', cell: ({ row }) => saysNotificationStatus(row.original.status) },
   { id: 'count', header: 'Count', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.count) },
 ]

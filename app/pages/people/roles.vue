@@ -126,6 +126,13 @@ const columns: TableColumn<Holder>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.name),
       h('div', { class: 'font-mono text-xs text-muted' }, row.original.email),
+      // Below sm the end date and the grant's provenance are hidden: shown here instead, so a
+      // phone keeps the role, the state and the row actions in view (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, [
+        `Until ${when(row.original.expiresAt)}`,
+        `granted ${when(row.original.grantedAt)}${row.original.grantedBy ? ` by ${row.original.grantedBy}` : ''}`,
+        row.original.note,
+      ].filter(Boolean).join(' · ')),
     ]),
   },
   { id: 'role', header: 'Role', cell: ({ row }) => saysRole(row.original.role) },
@@ -141,10 +148,16 @@ const columns: TableColumn<Holder>[] = [
         h(UBadge, { color: mark.color, variant: 'subtle', size: 'sm' }, () => mark.label)))
     },
   },
-  { id: 'expiresAt', header: 'Until', cell: ({ row }) => when(row.original.expiresAt) },
+  {
+    id: 'expiresAt',
+    header: 'Until',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
+    cell: ({ row }) => when(row.original.expiresAt),
+  },
   {
     id: 'provenance',
     header: 'Granted',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('div', {}, [
       h('div', {}, `${when(row.original.grantedAt)}${row.original.grantedBy ? ` by ${row.original.grantedBy}` : ''}`),
       row.original.note ? h('div', { class: 'text-xs text-muted' }, row.original.note) : null,

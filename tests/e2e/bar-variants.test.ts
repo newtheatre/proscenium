@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, fillNumber, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { actionLabels, chooseAction, click, fill, fillNumber, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -709,8 +709,9 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/bar/products/${productId}`, `[data-test="choice-${variantId}"]`)
-    await click(view, `[data-test="choice-${variantId}"]`)
+    // Attaching a choice sits in the row's overflow, behind `more-<id>` (K-123 criterion 10).
+    await visit(view, `${app.baseURL}/bar/products/${productId}`, `[data-test="more-${variantId}"]`)
+    await chooseAction(view, `[data-test="more-${variantId}"]`, 'Add a choice')
     await waitFor(view, `document.querySelector('[data-test="choice-form"]')`)
 
     // Building a new choice group from inside the attach form, not a separate trip to a
@@ -730,11 +731,15 @@ describe.skipIf(skip !== null)('the screen', () => {
     const attached = (await variants(productId)).find(variant => variant.id === variantId)!
     const choice = attached.components.find(component => component.choiceGroupId !== null)
     expect(choice?.choiceGroupName).toBe(groupName)
-    expect(await textOf(view, `[data-test="choice-${variantId}"]`)).toBe('Change choice')
+    expect(await actionLabels(view, `[data-test="more-${variantId}"]`)).toContain('Change choice')
 
-    // Clearing acts straight from the row, no confirmation modal, matching Retire's directness.
-    await click(view, `[data-test="clear-choice-${variantId}"]`)
-    await waitFor(view, `!document.querySelector('[data-test="clear-choice-${variantId}"]')`)
+    // Clearing acts straight from the overflow, no confirmation modal, matching Retire's directness.
+    await chooseAction(view, `[data-test="more-${variantId}"]`, 'Clear choice')
+    let offered = await actionLabels(view, `[data-test="more-${variantId}"]`)
+    for (let attempt = 0; attempt < 10 && offered.includes('Clear choice'); attempt++) {
+      offered = await actionLabels(view, `[data-test="more-${variantId}"]`)
+    }
+    expect(offered).not.toContain('Clear choice')
     const cleared = (await variants(productId)).find(variant => variant.id === variantId)!
     expect(cleared.components.find(component => component.choiceGroupId !== null)).toBeUndefined()
 
