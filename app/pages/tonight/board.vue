@@ -184,10 +184,9 @@ async function reset(): Promise<void> {
       >
         <template #other-unseen="{ message }">
           <UButton
-            size="xs"
             color="neutral"
             variant="subtle"
-            class="ml-1 min-h-8"
+            class="ml-1 min-h-12"
             :data-test="`board-seen-${message.id}`"
             @click="markSeen(message.id)"
           >
@@ -284,10 +283,9 @@ async function reset(): Promise<void> {
             Read it out loud. It never travels by email or notification.
           </p>
           <UButton
-            size="sm"
             color="neutral"
             variant="ghost"
-            class="mt-2"
+            class="mt-2 min-h-12"
             data-test="board-code-hide"
             @click="boardCode = null"
           >
