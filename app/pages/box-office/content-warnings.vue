@@ -464,7 +464,7 @@ const columns: TableColumn<ContentWarning>[] = [
     <UModal
       :open="removing !== null"
       title="Delete this warning"
-      description="No show carries it, so nothing on the public site changes. A warning a show carries can only be retired."
+      description="No show carries it, and nothing on the public site changes. A warning a show carries can only be retired."
       @update:open="value => { if (!value) removing = null }"
     >
       <template #body>

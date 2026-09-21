@@ -756,9 +756,8 @@ const columns: TableColumn<StockItem>[] = [
         <p class="text-sm">
           {{ hiding?.item.name }} is poured by
           {{ hiding?.products.map(product => product.name).join(', ') }}.
-          Retiring it hides those products at the same time, so nothing is left on the till
-          pouring something the bar no longer stocks. Their recipes, prices and history are
-          untouched, and putting the item back is a separate decision.
+          Retiring it hides those products too. Their recipes, prices and history are
+          untouched, and bringing the item back is a separate decision.
         </p>
       </template>
 

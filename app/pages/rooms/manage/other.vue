@@ -171,7 +171,7 @@ const columns: TableColumn<Space>[] = [
   },
   {
     id: 'notes',
-    header: 'What we know',
+    header: 'Notes',
     cell: ({ row }) => (row.original.notes.length === 0
       ? h('span', { class: 'text-sm text-muted' }, 'Nothing recorded')
       : h('div', { class: 'space-y-1' }, row.original.notes.map(one =>
@@ -240,7 +240,7 @@ watch(modalOpen, (nowOpen) => {
       variant="subtle"
       icon="i-lucide-unplug"
       :title="listFailure.message"
-      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :description="READ_AGAIN"
       :actions="listFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listFailure.enrolPath, color: 'error' }] : []"
     />
 
@@ -379,7 +379,7 @@ watch(modalOpen, (nowOpen) => {
             label="Who to ask"
             name="contact"
             hint="Optional"
-            description="Usually a desk rather than a person."
+            description="Usually a desk, not a person."
           >
             <UInput
               v-model="state.contact"
@@ -400,7 +400,7 @@ watch(modalOpen, (nowOpen) => {
               :loading="saving"
               data-test="space-submit"
             >
-              {{ editing ? 'Save it' : 'List it' }}
+              {{ editing ? 'Save the room' : 'List the room' }}
             </UButton>
             <UButton
               color="neutral"
@@ -494,7 +494,7 @@ watch(modalOpen, (nowOpen) => {
           data-test="note-submit"
           @click="saveNote"
         >
-          Note it
+          Add the note
         </UButton>
         <UButton
           color="neutral"

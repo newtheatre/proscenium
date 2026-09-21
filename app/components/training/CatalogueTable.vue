@@ -146,7 +146,7 @@ const columns: TableColumn<CatalogueModule>[] = [
       variant="subtle"
       icon="i-lucide-unplug"
       :title="failure.message"
-      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :description="READ_AGAIN"
       :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 

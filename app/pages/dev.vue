@@ -70,7 +70,7 @@ onMounted(load)
       variant="subtle"
       icon="i-lucide-flask-conical"
       title="Development only"
-      description="These tools sign in without a password. They are not in a production build: nuxt.config leaves the route out of the bundle rather than guarding it at runtime."
+      description="These tools sign in without a password. They are not in a production build."
     />
 
     <UAlert
