@@ -77,7 +77,7 @@ useSeoMeta({ title: 'Set a new password' })
     <UAuthForm
       v-if="outcome === 'choosing'"
       :title="settingFirst ? 'Choose your password' : 'Set a new password'"
-      :description="settingFirst ? 'The theatre made you an account. Choose a password and it is ready to use.' : 'Setting a new password signs you out everywhere else.'"
+      :description="settingFirst ? 'We made you an account. Choose a password and it is ready to use.' : 'Setting a new password signs you out everywhere else.'"
       :schema="schema"
       :fields="fields"
       :validate="checkPassword"

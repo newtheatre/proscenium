@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { saysNoSuch } from '#shared/utils/no-such'
 import { saysWhen, saysWhenLong } from '#shared/utils/when'
-import { saysNightLine } from '#shared/utils/programme'
+import { SAYS_PAYMENT, saysAvailability, saysNightLine } from '#shared/utils/programme'
 import { overCapReason } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
+import { plural } from '#shared/utils/text'
 
 // The reservation flow (D-104): a guest or a signed-in account holds seats online; the box
 // office takes payment in person, on the night. Nothing here ever moves money (0005).
@@ -63,7 +65,7 @@ const performanceId = computed(() => String(route.params.performanceId))
 const { data } = await useFetch<BookingInfo>(() => `/api/performances/${performanceId.value}/booking`)
 
 if (!data.value) {
-  throw createError({ statusCode: 404, statusMessage: 'No such performance', fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNoSuch('performance', 'Go back to what is on and choose another'), fatal: true })
 }
 
 const { account } = useAccount()
@@ -224,7 +226,7 @@ async function redeemPass(): Promise<void> {
 
 useSeoMeta({
   title: 'Book tickets',
-  description: () => `Hold seats for ${data.value?.show.title ?? 'a show'} at the Nottingham New Theatre. Payment is taken at the theatre, in person.`,
+  description: () => `Book seats for ${data.value?.show.title ?? 'a show'} at the Nottingham New Theatre. ${SAYS_PAYMENT}`,
 })
 </script>
 
@@ -257,8 +259,8 @@ useSeoMeta({
         color="success"
         variant="subtle"
         icon="i-lucide-ticket"
-        title="Reservation held"
-        :description="`Reference ${confirmation.reference}. Pay ${saysPrice(confirmation.totalPence)} at the box office on the night; this reservation is unpaid until then.`"
+        title="Booking made"
+        :description="`Reference ${confirmation.reference}. ${SAYS_PAYMENT} ${saysPrice(confirmation.totalPence)} is due.`"
       />
       <p
         v-if="sentTo"
@@ -318,7 +320,7 @@ useSeoMeta({
         color="neutral"
         variant="subtle"
         :icon="data!.refusal.waitingListUrl ? 'i-lucide-clock' : 'i-lucide-ticket-x'"
-        :title="data!.refusal.waitingListUrl ? 'Sold out' : 'Booking is not open'"
+        :title="data!.refusal.waitingListUrl ? saysAvailability('SOLD_OUT', null) : 'Booking is not open'"
         :description="data!.refusal.says"
         data-test="booking-refused"
       />
@@ -339,7 +341,7 @@ useSeoMeta({
         rel="noopener"
         trailing-icon="i-lucide-external-link"
       >
-        Book elsewhere
+        Book tickets elsewhere
       </UButton>
     </div>
 
@@ -353,7 +355,7 @@ useSeoMeta({
           color="info"
           variant="subtle"
           icon="i-lucide-accessibility"
-          :description="`Your access entitlement: ${data!.accessEntitlement.access} access ticket and up to ${data!.accessEntitlement.companion} companion ticket(s) still available for this performance.`"
+          :description="`Your access entitlement: ${plural(data!.accessEntitlement.access, 'access ticket')} and up to ${plural(data!.accessEntitlement.companion, 'companion ticket')} still available for this performance.`"
           data-test="access-entitlement"
         />
 
@@ -577,12 +579,7 @@ useSeoMeta({
           Nothing chosen yet.
         </p>
 
-        <div class="mt-4 flex items-baseline justify-between gap-4 text-sm text-muted">
-          <span>Paid online</span>
-          <span class="font-mono">{{ saysPrice(0) }}, ever</span>
-        </div>
-
-        <div class="mt-2 flex items-baseline justify-between gap-4">
+        <div class="mt-4 flex items-baseline justify-between gap-4">
           <span class="font-medium">To pay at the theatre</span>
           <span
             class="font-mono text-lg"
@@ -590,7 +587,7 @@ useSeoMeta({
           >{{ saysPrice(totalPence) }}</span>
         </div>
         <p class="mt-1 text-sm text-muted">
-          Nothing is paid online, ever. Settle up at the box office when you arrive.
+          {{ SAYS_PAYMENT }}
         </p>
 
         <template #footer>
@@ -636,7 +633,7 @@ useSeoMeta({
             data-test="booking-submit"
             @click="book"
           >
-            {{ seats === 0 ? 'Reserve your seats' : `Reserve ${seats} ${seats === 1 ? 'ticket' : 'tickets'}` }}
+            {{ seats === 0 ? 'Book your seats' : `Book ${plural(seats, 'ticket')}` }}
           </UButton>
           <UButton
             v-if="externalUrl"
@@ -647,14 +644,14 @@ useSeoMeta({
             trailing-icon="i-lucide-external-link"
             block
           >
-            Book elsewhere
+            Book tickets elsewhere
           </UButton>
           <p
             class="mt-3 text-sm text-muted"
             data-test="hold-release"
           >
-            Reservations hold until {{ data!.holdReleaseMinutes }} minutes before curtain, then the
-            tickets go back on sale for walk-ups.
+            An unpaid booking is released {{ data!.holdReleaseMinutes }} minutes before curtain, and
+            the seats go back on sale.
           </p>
         </template>
       </UCard>

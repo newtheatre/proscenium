@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { listingFlag } from '#shared/utils/listing'
 import { saysSeason } from '#shared/utils/london'
-import { ALL_VENUES, venueFilters, venueForFilter } from '#shared/utils/programme'
+import { ALL_VENUES, SAYS_BOOKING_HOLDS, SAYS_PAYMENT, venueFilters, venueForFilter } from '#shared/utils/programme'
 import type { ListedShow } from '#shared/utils/programme'
 
 // Deliberately public: what is on is how somebody decides to come, and no account is needed
@@ -61,8 +61,8 @@ const flagged = computed(() => data.value.items.find(listed => listingFlag(liste
         What's <span class="text-secondary">on</span>
       </template>
       <template #description>
-        Everything here is written, directed, built and performed by students. Booking online
-        holds your seats, and the box office takes payment at the theatre on the night.
+        Everything here is written, directed, built and performed by students.
+        {{ SAYS_BOOKING_HOLDS }} {{ SAYS_PAYMENT }}
       </template>
     </PhotoHero>
 
@@ -163,7 +163,7 @@ const flagged = computed(() => data.value.items.find(listed => listingFlag(liste
               Never miss a first night
             </h2>
             <p class="mt-1 text-sm text-muted">
-              The theatre's mailing list carries what is opening next.
+              Our mailing list carries what is opening next.
             </p>
           </div>
           <UButton

@@ -129,7 +129,7 @@ const from = computed(() => {
           :to="`/book/${bookable.id}`"
           :data-test="`book-${listed.show.slug}`"
         >
-          Book
+          Book tickets
         </UButton>
         <UButton
           v-else-if="elsewhere"
@@ -139,7 +139,7 @@ const from = computed(() => {
           trailing-icon="i-lucide-external-link"
           :data-test="`external-${listed.show.slug}`"
         >
-          Book elsewhere
+          Book tickets elsewhere
         </UButton>
         <UButton
           v-else-if="soldOut"
