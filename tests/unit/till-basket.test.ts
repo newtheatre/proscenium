@@ -42,6 +42,18 @@ function aPriced(over: Partial<PricedBasket> = {}): PricedBasket {
   }
 }
 
+// The register write a refusal makes, captured rather than sent (F-106 criterion 6).
+function recorder() {
+  const recorded: { outcome: string, reason: string | null, description: string, product: string | null }[] = []
+  return {
+    recorded,
+    record: (body: { outcome: string, reason: string | null, description: string, product: string | null }) => {
+      recorded.push(body)
+      return Promise.resolve()
+    },
+  }
+}
+
 // The composable never resolves this in a test: every scope stops before its debounced
 // `watch` could fire the request, and none of these behaviours needs a network reply.
 function neverRequested(): Promise<PricedBasket> {
@@ -60,6 +72,7 @@ function setup(products: SaleProduct[] = [aProduct()], over: Partial<TillBasketD
     ticketsPence: computed(() => 0),
     walkUpsPence: computed(() => 0),
     requestPrice: neverRequested,
+    recordAgeCheck: () => Promise.resolve(),
     ...over,
   }
   const scope = effectScope()
@@ -260,6 +273,123 @@ describe('a pricing failure clears the total rather than leaving the last good f
     expect(basket.priced.value).toBeNull()
     expect(basket.priceFailure.value).toBeTruthy()
     expect(basket.grandTotalPence.value).toBeNull()
+    scope.stop()
+  })
+})
+
+// F-106 criterion 6 (issue 1150 item 5): the ask moves to the tap, so nobody pours first and
+// checks afterwards.
+describe('a restricted tap asks before the drink is poured (F-106 criterion 6)', () => {
+  test('tapping a restricted variant asks, naming the product', () => {
+    const { basket, scope } = setup([aProduct({ name: 'Gin', ageRestricted: true })])
+    basket.tapVariant('Gin', aVariant())
+    expect(basket.askingAgeCheckFor.value).toBe('Gin')
+    scope.stop()
+  })
+
+  test('tapping an unrestricted variant asks nothing', () => {
+    const { basket, scope } = setup([aProduct({ ageRestricted: false })])
+    basket.tapVariant('Lager', aVariant())
+    expect(basket.askingAgeCheckFor.value).toBeNull()
+    scope.stop()
+  })
+
+  test('the restricted line is in the basket while the prompt is open, so nothing is lost by answering', () => {
+    const { basket, scope } = setup([aProduct({ name: 'Gin', ageRestricted: true })])
+    basket.tapVariant('Gin', aVariant())
+    expect(basket.basket.value).toHaveLength(1)
+    scope.stop()
+  })
+
+  test('a basket that already passed does not ask again in the same sale', () => {
+    const second = aProduct({ id: 'p-2', name: 'Vodka', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Single' })] })
+    const { basket, scope } = setup([aProduct({ name: 'Gin', ageRestricted: true }), second])
+    basket.tapVariant('Gin', aVariant())
+    basket.acceptAgeCheck({ outcome: 'ACCEPTED', idType: 'PASSPORT', reason: null, description: 'Checked at the till', notes: null })
+    expect(basket.askingAgeCheckFor.value).toBeNull()
+    basket.tapVariant('Vodka', aVariant({ id: 'variant-2', label: 'Single' }))
+    expect(basket.askingAgeCheckFor.value).toBeNull()
+    scope.stop()
+  })
+
+  test('the accepted outcome is what the charge then sends, with no second prompt', () => {
+    const { basket, scope } = setup([aProduct({ name: 'Gin', ageRestricted: true })])
+    basket.tapVariant('Gin', aVariant())
+    const accepted: InlineAgeCheckInput = { outcome: 'ACCEPTED', idType: 'PASSPORT', reason: null, description: 'Checked at the till', notes: null }
+    basket.acceptAgeCheck(accepted)
+    expect(basket.passedAgeCheck.value).toEqual(accepted)
+    expect(basket.saleBody(basket.passedAgeCheck.value, 500).ageCheck).toEqual(accepted)
+    scope.stop()
+  })
+
+  test('the next sale starts with nothing remembered', () => {
+    const { basket, scope } = setup([aProduct({ name: 'Gin', ageRestricted: true })])
+    basket.tapVariant('Gin', aVariant())
+    basket.acceptAgeCheck({ outcome: 'ACCEPTED', idType: 'PASSPORT', reason: null, description: 'Checked at the till', notes: null })
+    basket.resetBasket()
+    expect(basket.passedAgeCheck.value).toBeNull()
+    expect(basket.refusedLinesNote.value).toBeNull()
+    scope.stop()
+  })
+})
+
+describe('a refusal at the tap takes the line back out and says so (F-106 criteria 3, 6)', () => {
+  const refused: InlineAgeCheckInput = { outcome: 'REFUSED', idType: null, reason: 'NO_ID_SHOWN', description: 'Declined to show ID', notes: null }
+
+  function mixed(over: Partial<TillBasketDeps> = {}) {
+    const restricted = aProduct({ id: 'p-2', name: 'Gin', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Single', pricePence: 300 })] })
+    const made = setup([aProduct(), restricted], over)
+    made.basket.tapVariant('Lager', aVariant())
+    made.basket.tapVariant('Gin', aVariant({ id: 'variant-2', label: 'Single', pricePence: 300 }))
+    return made
+  }
+
+  test('the restricted line goes and the rest of the basket stays', async () => {
+    const { basket, scope } = mixed()
+    await basket.refuseAgeCheck(refused)
+    expect(basket.basket.value).toHaveLength(1)
+    expect(basket.basket.value[0]!.productName).toBe('Lager')
+    expect(basket.needsAgeCheck.value).toBe(false)
+    scope.stop()
+  })
+
+  test('the screen says what is not being sold, naming the product', async () => {
+    const { basket, scope } = mixed()
+    await basket.refuseAgeCheck(refused)
+    expect(basket.refusedLinesNote.value).toContain('Gin')
+    scope.stop()
+  })
+
+  test('the refusal is written to the register there and then, naming the product', async () => {
+    const register = recorder()
+    const { basket, scope } = mixed({ recordAgeCheck: register.record })
+    await basket.refuseAgeCheck(refused)
+    expect(register.recorded).toHaveLength(1)
+    expect(register.recorded[0]).toMatchObject({ outcome: 'REFUSED', reason: 'NO_ID_SHOWN', description: 'Declined to show ID', product: 'Gin' })
+    scope.stop()
+  })
+
+  test('a refusal that could not be written says so, and the lines stay out', async () => {
+    const { basket, scope } = mixed({ recordAgeCheck: () => Promise.reject(new Error('offline')) })
+    await basket.refuseAgeCheck(refused)
+    expect(basket.refusalRecordFailure.value).toBeTruthy()
+    expect(basket.basket.value).toHaveLength(1)
+    scope.stop()
+  })
+
+  test('a refusal is not a pass: a later restricted tap asks again', async () => {
+    const { basket, scope } = mixed()
+    await basket.refuseAgeCheck(refused)
+    expect(basket.passedAgeCheck.value).toBeNull()
+    basket.tapVariant('Gin', aVariant({ id: 'variant-2', label: 'Single', pricePence: 300 }))
+    expect(basket.askingAgeCheckFor.value).toBe('Gin')
+    scope.stop()
+  })
+
+  test('what is left is charged with no outcome attached, because the register already has it', async () => {
+    const { basket, scope } = mixed()
+    await basket.refuseAgeCheck(refused)
+    expect(basket.saleBody(basket.passedAgeCheck.value, 500).ageCheck).toBeNull()
     scope.stop()
   })
 })
