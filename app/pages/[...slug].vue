@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { saysNoSuch } from '#shared/utils/no-such'
 import { resolvePolicyTree, tokensInTree } from '#shared/utils/policy-tokens'
 import type { PolicyValues } from '#shared/utils/policy-tokens'
 
@@ -12,7 +13,7 @@ const request = useRequestFetch()
 const { data: page } = await useAsyncData(`content:${route.path}`, () => queryCollection('content').path(route.path).first())
 
 if (!page.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNoSuch('page', 'Check the address, or start from the home page'), fatal: true })
 }
 
 // Fetched per request rather than baked into the markdown, so changing a setting changes the page

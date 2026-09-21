@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { saysNoSuch } from '#shared/utils/no-such'
 import { saysWhenLong } from '#shared/utils/when'
+import { SAYS_PAYMENT } from '#shared/utils/programme'
 import { saysPrice } from '#shared/utils/ticket-types'
 import { partySizeMismatchReason } from '#shared/utils/waiting-list'
 
@@ -29,7 +31,7 @@ const token = computed(() => String(route.params.token))
 const { data, refresh } = await useFetch<Entry>(() => `/api/waiting-list/${token.value}`)
 
 if (!data.value) {
-  throw createError({ statusCode: 404, statusMessage: 'No such waiting-list entry', fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNoSuch('waiting list entry', 'Ask for a new link from the email we sent you'), fatal: true })
 }
 
 const quantities = reactive<Record<string, number>>({})
@@ -129,7 +131,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         variant="subtle"
         icon="i-lucide-ticket"
         title="Seats claimed"
-        :description="`Reference ${confirmation.reference}. Pay ${saysPrice(confirmation.totalPence)} at the box office on the night; this reservation is unpaid until then.`"
+        :description="`Reference ${confirmation.reference}. ${SAYS_PAYMENT} ${saysPrice(confirmation.totalPence)} is due.`"
       />
       <UButton :to="`/qr/${confirmation.qrToken}`">
         View your booking
@@ -238,7 +240,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         variant="subtle"
         icon="i-lucide-clock"
         title="Still on the list"
-        description="We'll email you the moment a seat frees up."
+        description="We will email you the moment a seat frees up."
       />
       <UButton
         variant="link"

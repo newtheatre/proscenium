@@ -416,7 +416,7 @@ export function saysLatecomerPolicy(policy: string | null): string {
   if (policy === 'ADMITTED') return 'Latecomers admitted'
   if (policy === 'AT_INTERVAL') return 'Latecomers admitted at the interval'
   if (policy === 'NOT_ADMITTED') return 'Latecomers not admitted'
-  return 'Not yet stated'
+  return TO_BE_CONFIRMED
 }
 
 // The performance's own offset, then the show's, then curtain-up. NULL means inherit and an
@@ -549,6 +549,12 @@ export function publicPerformance(performance: PerformanceSaleState & {
   }
 }
 
+// The public shell's settled words (K-128, issue 1152 item 8). A fact nobody has settled reads
+// one way, and money reads one way, wherever a visitor meets it.
+export const TO_BE_CONFIRMED = 'To be confirmed'
+export const SAYS_BOOKING_HOLDS = 'Booking online holds your seats.'
+export const SAYS_PAYMENT = 'You pay at the box office when you arrive.'
+
 // What a visitor is told about a house, computed here so the listing and the show page cannot
 // disagree (D-101 criterion 2). Cancelled and external are carried by the projection beside it.
 export const AVAILABILITY_STATES = ['AVAILABLE', 'LIMITED', 'SOLD_OUT', 'BOOKING_CLOSED'] as const
@@ -623,7 +629,7 @@ export function saysNightLine(
 export function saysAvailability(state: Availability, remaining: number | null): string {
   if (state === 'SOLD_OUT') return 'Sold out'
   if (state === 'BOOKING_CLOSED') return 'Booking closed'
-  if (state === 'LIMITED' && remaining !== null) return `${remaining === 1 ? '1 ticket' : `${remaining} tickets`} left`
+  if (state === 'LIMITED' && remaining !== null) return `${plural(remaining, 'ticket')} left`
   return 'Tickets available'
 }
 

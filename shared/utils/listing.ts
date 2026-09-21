@@ -1,16 +1,17 @@
+import { saysAvailability } from './programme'
 import type { ListedShow } from './programme'
 
 // What the listing says about a whole run, as against what `programme.ts` says about one house.
 // Pure, so the sticker on a card and the test that pins it read the same function (J-111).
 
-export type ListingFlag = 'Selling fast' | 'House full'
+export type ListingFlag = 'Selling fast' | 'Sold out'
 
 // Cancelled nights are not on offer and a closed window is not a sell-out, so neither counts
 // towards the run being full (D-101).
 export function listingFlag(listed: ListedShow): ListingFlag | null {
   const onSale = listed.performances.filter(one => !one.cancelled && one.availability !== 'BOOKING_CLOSED')
   if (onSale.length === 0) return null
-  if (onSale.every(one => one.availability === 'SOLD_OUT')) return 'House full'
+  if (onSale.every(one => one.availability === 'SOLD_OUT')) return saysAvailability('SOLD_OUT', null) as ListingFlag
   return onSale.some(one => one.availability === 'LIMITED') ? 'Selling fast' : null
 }
 

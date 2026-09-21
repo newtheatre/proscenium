@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { saysNoSuch } from '#shared/utils/no-such'
 import { saysWhenLong } from '#shared/utils/when'
 import { MAX_PARTY_SIZE, waitingListGuestJoinForm, waitingListPartyForm } from '#shared/utils/waiting-list'
 import type { FormSubmitEvent } from '@nuxt/ui'
@@ -20,7 +21,7 @@ const { account } = useAccount()
 const { data } = await useFetch<BookingInfo>(() => `/api/performances/${performanceId.value}/booking`)
 
 if (!data.value) {
-  throw createError({ statusCode: 404, statusMessage: 'No such performance', fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNoSuch('performance', 'Go back to what is on and choose another'), fatal: true })
 }
 
 const when = computed(() => saysWhenLong(data.value!.performance.startsAt))
@@ -95,15 +96,15 @@ useSeoMeta({
         color="success"
         variant="subtle"
         icon="i-lucide-clock"
-        title="You're on the list"
-        description="We'll email you the moment seats free up, in the order people joined. Every email carries a link to leave the list."
+        title="You are on the list"
+        description="We will email you the moment seats free up, in the order people joined. Every email carries a link to leave the list."
       />
       <UAlert
         v-else
         color="warning"
         variant="subtle"
         icon="i-lucide-mail-warning"
-        title="You're on the list, but we could not email you"
+        title="You are on the list, but we could not email you"
         description="Your place is held in the order people joined. The confirmation did not go out, so ask the box office to check your entry before the performance."
         data-test="waiting-list-not-emailed"
       />
@@ -167,7 +168,7 @@ useSeoMeta({
             label="Email address"
             name="email"
             required
-            description="We'll email you here the moment a seat is offered."
+            description="We will email you here the moment a seat is offered."
           >
             <UInput
               v-model="state.email"

@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const night = performanceNight(performance.startsAt)
 
   if (!await isDutyManagerOrTicketingManager(account.id, night)) {
-    throw createError({ statusCode: 403, statusMessage: 'A duty manager or ticketing manager decides a comp request' })
+    throw createError({ statusCode: 403, statusMessage: 'A duty manager or the Box Office Manager decides a comp request' })
   }
 
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
