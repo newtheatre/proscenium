@@ -89,3 +89,12 @@ export function overCapacity(capacity: number | null, attendees: number | null):
   if (capacity === null || attendees === null || attendees <= capacity) return null
   return `That is more people than the room holds (${capacity}). It is allowed, but worth checking.`
 }
+
+export interface TapPick { start: number | null, span: { from: number, to: number } | null }
+
+// Picking a span by tapping its ends, because a touch pointer sends no enter events between press
+// and release and so cannot drag across the grid (C-102 criterion 6). Minutes into the day.
+export function tapToSpan(start: number | null, tapped: number, slotMinutes: number): TapPick {
+  if (start === null || tapped < start) return { start: tapped, span: null }
+  return { start: null, span: { from: start, to: tapped + slotMinutes } }
+}

@@ -343,6 +343,8 @@ useSeoMeta({ title: 'My rota' })
         <UButton
           :color="role === undefined ? 'primary' : 'neutral'"
           variant="outline"
+          :aria-pressed="role === undefined"
+          :icon="role === undefined ? 'i-lucide-check' : undefined"
           data-test="role-filter-all"
           @click="selectRole(undefined)"
         >
@@ -353,6 +355,8 @@ useSeoMeta({ title: 'My rota' })
           :key="one"
           :color="role === one ? 'primary' : 'neutral'"
           variant="outline"
+          :aria-pressed="role === one"
+          :icon="role === one ? 'i-lucide-check' : undefined"
           :data-test="`role-filter-${one}`"
           @click="selectRole(one)"
         >

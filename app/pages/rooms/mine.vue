@@ -207,6 +207,8 @@ useSeoMeta({ title: 'My bookings' })
       <UButton
         :color="when === 'upcoming' ? 'primary' : 'neutral'"
         variant="outline"
+        :aria-pressed="when === 'upcoming'"
+        :icon="when === 'upcoming' ? 'i-lucide-check' : undefined"
         data-test="mine-upcoming"
         @click="when = 'upcoming'"
       >
@@ -215,6 +217,8 @@ useSeoMeta({ title: 'My bookings' })
       <UButton
         :color="when === 'past' ? 'primary' : 'neutral'"
         variant="outline"
+        :aria-pressed="when === 'past'"
+        :icon="when === 'past' ? 'i-lucide-check' : undefined"
         data-test="mine-past"
         @click="when = 'past'"
       >

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { TIERS, describePurpose } from '#shared/utils/bookings'
-import { saysRecurrence } from '#shared/utils/series'
-import type { FREQUENCIES } from '#shared/utils/series'
+import { FREQUENCIES, saysRecurrence } from '#shared/utils/series'
 import { overCapacity } from '#shared/utils/rooms'
 import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
 import { fromLondonWallClock, londonWeekday } from '#shared/utils/london'
+import { saysDayLong } from '#shared/utils/when'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
 import { z } from 'zod'
@@ -27,7 +27,7 @@ const request = useRequestFetch()
 
 // The screen mirrors the rules; the API is the authority, so what comes back is what is shown
 // rather than a second copy of the policy (C-106 criterion 3).
-const form = z.object({
+const fields = z.object({
   roomId: z.string().min(1, 'Choose a room'),
   title: z.string().trim().min(1, 'Say what the booking is for').max(200),
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a day'),
@@ -36,36 +36,40 @@ const form = z.object({
   attendees: z.number().int().positive().nullish(),
   tier: z.enum(TIERS),
   purpose: z.string().min(1, 'Say what the room is for'),
-}).refine(booking => booking.to > booking.from, {
-  path: ['to'],
-  message: 'A booking ends after it starts',
+  repeats: z.boolean(),
+  frequency: z.enum(FREQUENCIES),
+  weekdays: z.array(z.number().int()),
+  occurrences: z.number().int().positive(),
+  asking: z.boolean(),
+  reason: z.string().trim().max(REQUEST_REASON_LIMIT),
 })
 
-const state = reactive({
+type BookingForm = z.output<typeof fields>
+
+const state = reactive<BookingForm>({
   roomId: String(route.query.room ?? ''),
   title: '',
   day: String(route.query.day ?? ''),
   from: String(route.query.at ?? '10:00'),
   // A drag across the calendar arrives with both ends; a single click brings one and an hour.
   to: String(route.query.until ?? addMinutes(String(route.query.at ?? '10:00'), 60)),
-  attendees: undefined as number | undefined,
-  tier: 'GENERAL' as (typeof TIERS)[number],
+  attendees: undefined,
+  tier: 'GENERAL',
   // Never defaulted, but taken from the link: a QR code an officer made says what the room is for,
   // and a value nobody chose is the failure the notes exist to remove (C-119).
   purpose: String(route.query.purpose ?? ''),
+  // A term of rehearsals is one action, so repeating is part of this form rather than a screen of
+  // its own (C-110). Off by default: most bookings are one evening.
+  repeats: false,
+  frequency: 'WEEKLY',
+  weekdays: [],
+  occurrences: 4,
+  asking: false,
+  reason: '',
 })
 
 const saving = ref(false)
 const failures = ref<Failure[]>([])
-const askInstead = ref(false)
-const reason = ref('')
-
-// A term of rehearsals is one action, so repeating is part of this form rather than a screen of
-// its own (C-110). Off by default: most bookings are one evening.
-const repeats = ref(false)
-const frequency = ref<(typeof FREQUENCIES)[number]>('WEEKLY')
-const weekdays = ref<number[]>([])
-const occurrences = ref(4)
 const refusals = ref<{ occurrence: number, day: string, failures: Failure[], conflicts: unknown[] }[]>([])
 
 // Read rather than restated: the cap is committee-editable, and a number written into a screen
@@ -79,6 +83,22 @@ const { data: rules } = await useAsyncData(
 const purposeOptions = computed(() =>
   rules.value.purposes.map(purpose => ({ label: describePurpose(purpose), value: purpose })))
 const seriesCap = computed(() => rules.value.seriesCap)
+
+// One schema for all three submits (C-105 criterion 8): what a series or a request needs on top is
+// asked for only when that is what the member is sending.
+const form = computed(() => fields
+  .refine(booking => booking.to > booking.from, { path: ['to'], message: 'A booking ends after it starts' })
+  .superRefine((booking, context) => {
+    if (booking.asking && booking.reason.length === 0) {
+      context.addIssue({ code: 'custom', path: ['reason'], message: 'Say why this one is worth an exception' })
+    }
+    if (booking.repeats && booking.frequency === 'WEEKLY' && booking.weekdays.length === 0) {
+      context.addIssue({ code: 'custom', path: ['weekdays'], message: 'Choose at least one day' })
+    }
+    if (booking.repeats && booking.occurrences > seriesCap.value) {
+      context.addIssue({ code: 'custom', path: ['occurrences'], message: `Up to ${seriesCap.value}` })
+    }
+  }))
 
 // Said before submitting, not after: a member on the ladder should know every booking is going to
 // be checked by a person before they fill the form in (C-116 criterion 4).
@@ -101,23 +121,19 @@ const WEEKDAYS = [
 // The day the member picked, so a weekly series starts on the day they were looking at. Immediate,
 // because a deep link from the calendar arrives with the day already set.
 watch(() => state.day, (day) => {
-  if (!day || weekdays.value.length > 0) return
+  if (!day || state.weekdays.length > 0) return
   const [year, month, date] = day.split('-').map(Number)
-  weekdays.value = [londonWeekday(fromLondonWallClock(year!, month!, date!, 12))]
+  state.weekdays = [londonWeekday(fromLondonWallClock(year!, month!, date!, 12))]
 }, { immediate: true })
 
 const recurrence = computed(() => ({
-  frequency: frequency.value,
-  weekdays: weekdays.value,
+  frequency: state.frequency,
+  weekdays: state.weekdays,
   startsOn: state.day,
   from: state.from,
   to: state.to,
-  occurrences: occurrences.value,
+  occurrences: state.occurrences,
 }))
-
-const seriesReady = computed(() =>
-  Boolean(state.roomId && state.title.trim() && state.day && state.purpose)
-  && (frequency.value === 'DAILY' || weekdays.value.length > 0))
 
 // One body for the first submit and the resubmit without the refused weeks, so the two can never
 // disagree about what a series carries (issue 1143).
@@ -149,8 +165,8 @@ async function bookSeries(): Promise<void> {
         ? `${plural(answer.occurrences.length, 'booking')} made`
         : `${plural(answer.occurrences.length, 'booking')} asked for`,
       description: answer.status === 'CONFIRMED'
-        ? 'Cancelling asks whether you mean one week or the whole run.'
-        : 'The slots are held while somebody decides.',
+        ? `${made()}. Cancelling asks whether you mean one week or the whole run.`
+        : `${made()}. The slots are held while somebody decides.`,
       icon: 'i-lucide-check',
       color: answer.status === 'CONFIRMED' ? 'success' : 'warning',
     })
@@ -177,7 +193,7 @@ async function bookWithoutRefused(): Promise<void> {
     })
     toast.add({
       title: `${plural(answer.occurrences.length, 'booking')} made`,
-      description: `${plural(skip.length, 'week')} left out.`,
+      description: `${made()}. ${plural(skip.length, 'week')} left out.`,
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -202,6 +218,11 @@ const { data: rooms } = await useAsyncData(
 )
 
 const room = computed(() => rooms.value.find(one => one.id === state.roomId))
+
+// What was just made, said on the screen it lands on (C-105 criterion 7).
+function made(): string {
+  return `${room.value?.name ?? 'The room'}, ${saysDayLong(state.day)} from ${state.from} to ${state.to}`
+}
 
 function today(): string {
   return londonDay(new Date())
@@ -229,6 +250,10 @@ const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.
 // right rather than to invent its own wording (A-129).
 const needsMembership = computed(() => failures.value.some(failure => failure.reason === 'NO_MEMBERSHIP'))
 
+const seriesReady = computed(() =>
+  Boolean(state.roomId && state.title.trim() && state.day && state.purpose)
+  && (state.frequency === 'DAILY' || state.weekdays.length > 0))
+
 // Said before submitting, not after: a room somebody else books, or one that always asks, is
 // worth knowing about while the form is still being filled in (C-105 criterion 5).
 const warnsUpFront = computed(() => {
@@ -237,10 +262,17 @@ const warnsUpFront = computed(() => {
   return null
 })
 
-async function book(event: FormSubmitEvent<z.output<typeof form>>): Promise<void> {
+// Everything the form can send goes through the form (C-105 criterion 8): a series and a request
+// are the same fields with more asked of them, never a second path round the schema.
+async function submit(event: FormSubmitEvent<BookingForm>): Promise<void> {
+  if (state.asking) return ask()
+  if (state.repeats) return bookSeries()
+  return book(event)
+}
+
+async function book(event: FormSubmitEvent<BookingForm>): Promise<void> {
   saving.value = true
   failures.value = []
-  askInstead.value = false
 
   try {
     const answer = await $fetch<{ id: string, warning: string | null }>('/api/rooms/bookings', {
@@ -258,17 +290,17 @@ async function book(event: FormSubmitEvent<z.output<typeof form>>): Promise<void
 
     toast.add({
       title: 'Booked',
-      description: answer.warning ?? undefined,
+      description: answer.warning ? `${made()}. ${answer.warning}` : made(),
       icon: 'i-lucide-check',
       color: answer.warning ? 'warning' : 'success',
     })
-    await navigateTo('/rooms')
+    await navigateTo('/rooms/mine')
   }
   catch (error) {
     const data = refusalData<{ failures?: Failure[], canRequest?: boolean, conflicts?: unknown[] }>(error)
     failures.value = data?.failures ?? []
-    askInstead.value = data?.canRequest ?? false
-    if (failures.value.length === 0 && !askInstead.value) toast.add({ title: refusalText(error), color: 'error' })
+    state.asking = data?.canRequest ?? false
+    if (failures.value.length === 0 && !state.asking) toast.add({ title: refusalText(error), color: 'error' })
   }
   finally {
     saving.value = false
@@ -290,13 +322,13 @@ async function ask(): Promise<void> {
         attendees: state.attendees ?? null,
         tier: state.tier,
         purpose: state.purpose,
-        reason: reason.value,
+        reason: state.reason,
       },
     })
 
     toast.add({
       title: 'Asked for',
-      description: 'The slot is held while somebody decides.',
+      description: `${made()}. The slot is held while somebody decides.`,
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -326,7 +358,7 @@ useSeoMeta({ title: 'Book a room' })
         :state="state"
         class="space-y-5"
         data-test="booking-form"
-        @submit="book"
+        @submit="submit"
       >
         <UFormField
           label="Room"
@@ -446,12 +478,12 @@ useSeoMeta({ title: 'Book a room' })
           />
         </UFormField>
 
-        <UCollapsible v-model:open="repeats">
+        <UCollapsible v-model:open="state.repeats">
           <UButton
             color="neutral"
             variant="ghost"
             class="w-full justify-between"
-            :icon="repeats ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+            :icon="state.repeats ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
             data-test="repeat-toggle"
           >
             Repeat this booking
@@ -465,9 +497,12 @@ useSeoMeta({ title: 'Book a room' })
                 you with half of it.
               </p>
 
-              <UFormField label="How often">
+              <UFormField
+                label="How often"
+                name="frequency"
+              >
                 <USelect
-                  v-model="frequency"
+                  v-model="state.frequency"
                   :items="[{ label: 'Every week', value: 'WEEKLY' }, { label: 'Every day', value: 'DAILY' }]"
                   value-key="value"
                   class="w-full"
@@ -476,8 +511,9 @@ useSeoMeta({ title: 'Book a room' })
               </UFormField>
 
               <UFormField
-                v-if="frequency === 'WEEKLY'"
+                v-if="state.frequency === 'WEEKLY'"
                 label="On which days"
+                name="weekdays"
                 required
               >
                 <div class="flex flex-wrap gap-1">
@@ -485,13 +521,14 @@ useSeoMeta({ title: 'Book a room' })
                     v-for="weekday in WEEKDAYS"
                     :key="weekday.value"
                     size="sm"
-                    :color="weekdays.includes(weekday.value) ? 'primary' : 'neutral'"
-                    :variant="weekdays.includes(weekday.value) ? 'solid' : 'outline'"
-                    :aria-pressed="weekdays.includes(weekday.value)"
+                    :color="state.weekdays.includes(weekday.value) ? 'primary' : 'neutral'"
+                    :variant="state.weekdays.includes(weekday.value) ? 'solid' : 'outline'"
+                    :aria-pressed="state.weekdays.includes(weekday.value)"
+                    :icon="state.weekdays.includes(weekday.value) ? 'i-lucide-check' : undefined"
                     :data-test="`repeat-day-${weekday.value}`"
-                    @click="weekdays = weekdays.includes(weekday.value)
-                      ? weekdays.filter(one => one !== weekday.value)
-                      : [...weekdays, weekday.value]"
+                    @click="state.weekdays = state.weekdays.includes(weekday.value)
+                      ? state.weekdays.filter(one => one !== weekday.value)
+                      : [...state.weekdays, weekday.value]"
                   >
                     {{ weekday.label }}
                   </UButton>
@@ -500,10 +537,11 @@ useSeoMeta({ title: 'Book a room' })
 
               <UFormField
                 label="How many times"
+                name="occurrences"
                 :description="`Up to ${seriesCap}.`"
               >
                 <UInputNumber
-                  v-model="occurrences"
+                  v-model="state.occurrences"
                   :min="1"
                   :max="seriesCap"
                   class="w-full"
@@ -547,16 +585,16 @@ useSeoMeta({ title: 'Book a room' })
               data-test="series-without-refused"
               @click="bookWithoutRefused"
             >
-              Book the other {{ plural(occurrences - refusals.length, 'date') }}
+              Book the other {{ plural(state.occurrences - refusals.length, 'date') }}
             </UButton>
           </template>
         </UAlert>
 
         <UAlert
           v-if="failures.length"
-          :color="askInstead ? 'warning' : 'error'"
+          :color="state.asking ? 'warning' : 'error'"
           variant="subtle"
-          :title="askInstead ? 'This one needs somebody to agree to it' : 'That booking cannot be made'"
+          :title="state.asking ? 'This one needs somebody to agree to it' : 'That booking cannot be made'"
           data-test="booking-failures"
         >
           <template #description>
@@ -569,7 +607,7 @@ useSeoMeta({ title: 'Book a room' })
               </li>
             </ul>
             <p
-              v-if="askInstead"
+              v-if="state.asking"
               class="mt-2"
             >
               Ask for it anyway, and somebody will decide. The slot is held while they do.
@@ -588,14 +626,14 @@ useSeoMeta({ title: 'Book a room' })
         </UAlert>
 
         <UFormField
-          v-if="askInstead"
+          v-if="state.asking"
           label="Why this one is worth an exception"
           name="reason"
           required
           :description="`Shown to whoever decides. Up to ${REQUEST_REASON_LIMIT} characters.`"
         >
           <UTextarea
-            v-model="reason"
+            v-model="state.reason"
             :rows="3"
             :maxlength="REQUEST_REASON_LIMIT"
             class="w-full"
@@ -605,22 +643,21 @@ useSeoMeta({ title: 'Book a room' })
 
         <div class="flex flex-wrap gap-2">
           <UButton
-            v-if="askInstead"
+            v-if="state.asking"
+            type="submit"
             :loading="saving"
-            :disabled="!reason.trim() || !state.purpose"
             data-test="request-submit"
-            @click="ask"
           >
             Ask for it
           </UButton>
           <UButton
-            v-else-if="repeats"
+            v-else-if="state.repeats"
+            type="submit"
             :loading="saving"
             :disabled="!seriesReady"
             data-test="series-submit"
-            @click="bookSeries"
           >
-            Book {{ plural(occurrences, 'date') }}
+            Book {{ plural(state.occurrences, 'date') }}
           </UButton>
           <UButton
             v-else

@@ -67,6 +67,14 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   3. All filtering and paging happens server-side in SQL; the browser never receives more than the visible span's bookings. The old app fetched every page of every booking to the client, and that defect must not recur.
   4. The calendar renders in Europe/London, and the weeks containing the March and October clock changes display correctly; both transitions are automated test cases.
   5. The calendar is readable on a phone: day view is the default below tablet width.
+  6. A span is picked by dragging where the pointer can drag, and by tapping its start and then
+     its end where it cannot: a touch pointer sends no enter events between press and release, so
+     dragging alone leaves a phone with no way to pick more than the default hour. Every slot is a
+     touch target on such a pointer.
+  7. A closure names its reason in text on the page. A tooltip is not a reason: it is unreachable
+     by touch and announced by nothing. The legend names each state once, and no state has two
+     words for it.
+  8. A link into the console appears on a member screen only for somebody who can open it.
 - Source: Prompt Book C-1; audit RM-3 (defect observed), RM-7.
 
 ## C-103: Availability search with conflict masking
@@ -110,6 +118,10 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   4. A booking that fails any policy rule is not refused outright: it is offered as an approval request (C-108) with the failed rule named.
   5. A booking for a sensitive-space room always queues for approval, even when fully inside policy, and the form says so before submission.
   6. Bookings wholly in the past are refused at the API, not only in the UI; the old app accepted bookings in the past and three years out.
+  7. A booking, a series and a request each land on the member's own bookings, which is the screen
+     that shows what was just made, and each says what was made.
+  8. Every submit on the booking form goes through the form's schema. A path that writes from the
+     screen's state without validating it is the same defect as no validation at all.
 - Source: Prompt Book C-1; audit RM-1 (policy not enforced).
 
 ## C-106: Policy engine and configurable rules
@@ -325,6 +337,8 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   4. Recording a room noted unsuitable for the request's purpose is refused, and goes ahead only when the officer asserts past it; the audit records that a note existed and was overridden, never its wording.
   5. Where something unsuitable is offered, the officer records it and asks again: the request returns to AWAITING_EXTERNAL with the room it was given cleared, so it never stands as a booking we cannot use. The offer is kept, and the suitability note may be written in the same action.
   6. A member may withdraw at any open step and after confirmation; where the form is already in, the approvers are told, because our arrangement stands until a person cancels it.
+  7. The member's own form is a form over a schema, refusing before it sends, and its times use
+     the shared time field rather than the browser's own.
 - Source: the Theatre Manager's own account of the process; decision 0036; audit RM-6.
 
 ## C-121: Three working days, and the days that are not

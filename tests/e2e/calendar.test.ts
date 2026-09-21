@@ -342,6 +342,37 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
     }
   }, 120_000)
 
+  // C-105 criterion 7: a booking, a series and a request all land on the one screen that shows
+  // what was just made. This is the single booking; the series has its own case in series.test.ts.
+  test('a booking made from the form lands on the member s own bookings', async () => {
+    const password = generatePassword()
+    const lander = await registerMember(app, 'lander', password)
+    giveMembership(lander.id)
+    const room = await makeRoom()
+    const day = new Date()
+    day.setDate(day.getDate() + 21)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', lander.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      const at = day.toISOString().slice(0, 10)
+      await visit(view, `${app.baseURL}/rooms/book?room=${room}&day=${at}&at=14:00&until=15:00&purpose=REHEARSAL`, '[data-test="booking-form"]')
+      await fill(view, '[data-test="booking-title"]', 'Read through')
+      await click(view, '[data-test="booking-submit"]')
+
+      await waitFor(view, `document.querySelector('[data-test="mine-list"]')`, 30_000)
+      expect(await textOf(view, 'body')).toContain('Read through')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
   // How most members will arrive: a QR code or a link somebody sent them, followed while signed
   // out. The query has to survive the round trip or the form opens empty.
   test('a booking link followed signed out lands on the form it named', async () => {
@@ -434,6 +465,55 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       const to = await readTime(view, '[data-test="booking-to"]')
 
       // Four quarter hours, so the far edge of the fourth is an hour after the first.
+      const minutes = (clock: string): number => Number(clock.split(':')[0]) * 60 + Number(clock.split(':')[1])
+      expect(minutes(to) - minutes(from)).toBe(60)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  // C-102 criterion 6: a touch pointer is captured between press and release and sends no enter
+  // events, so the drag above cannot happen on a phone. The span is tapped end to end instead.
+  test('tapping the two ends carries the span to the form, where a finger cannot drag', async () => {
+    const password = generatePassword()
+    const tapper = await registerMember(app, 'tapper', password)
+    giveMembership(tapper.id)
+    const room = await makeRoom()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', tapper.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
+      await click(view, '[data-test="calendar-day"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="slot-${room}-"]').length > 0`, 30_000)
+
+      await view.evaluate(`(() => {
+        const slots = [...document.querySelectorAll('[data-test^="slot-${room}-"]')].filter(one => !one.disabled)
+        const touch = element => element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))
+        touch(slots[8])
+        slots[8].click()
+      })()`)
+
+      // The hint says which tap it is waiting for, which is how the member knows to tap again.
+      await waitFor(view, `document.querySelector('[data-test="grid-tap-hint"]')`, 30_000)
+      expect(await textOf(view, '[data-test="grid-tap-hint"]')).toContain('Now tap where it ends')
+
+      await view.evaluate(`(() => {
+        const slots = [...document.querySelectorAll('[data-test^="slot-${room}-"]')].filter(one => !one.disabled)
+        const touch = element => element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))
+        touch(slots[11])
+        slots[11].click()
+      })()`)
+
+      await waitFor(view, `document.querySelector('[data-test="booking-form"]')`, 30_000)
+      const from = await readTime(view, '[data-test="booking-from"]')
+      const to = await readTime(view, '[data-test="booking-to"]')
       const minutes = (clock: string): number => Number(clock.split(':')[0]) * 60 + Number(clock.split(':')[1])
       expect(minutes(to) - minutes(from)).toBe(60)
     }
