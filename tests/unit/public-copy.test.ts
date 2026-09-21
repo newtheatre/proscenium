@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 // K-128 criterion 2, issue 1152 item 8: the public shell's words, swept once and held here. The
-// member shell's own sweep extends this file rather than starting another.
+// member shell's words are swept and held beside it, in tests/unit/member-copy.test.ts.
 
 // What a visitor actually reads. Everything under app/pages/pay belongs to the show-night shell
 // and is swept with it.

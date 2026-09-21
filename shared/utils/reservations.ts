@@ -214,7 +214,7 @@ export function qrStatusDisplay(
     case 'PENDING':
       return { headline: 'Unpaid', detail: totalDue ? `${totalDue} due at the box office on the night.` : null }
     case 'COLLECTED':
-      return { headline: 'Paid', detail: 'Collected at the box office.' }
+      return { headline: 'Paid', detail: 'You paid for this at the box office.' }
     case 'DOOR':
       return { headline: 'Admitted', detail: 'Already checked in at the door.' }
     case 'EXPIRED':
