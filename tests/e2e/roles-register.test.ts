@@ -288,7 +288,10 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
 
       expect(read<{ role: string }>('SELECT role FROM role_grants WHERE user_id = ?', holder.id)?.role).toBe('BOX_OFFICE')
 
+      // K-123: the press opens the confirmation, and the named verb is what revokes.
       await click(view, `[data-test="revoke-${holder.id}-BOX_OFFICE"]`)
+      await waitFor(view, `document.querySelector('[data-test="confirm-revoke-role-verb"]')`)
+      await click(view, '[data-test="confirm-revoke-role-verb"]')
       await waitFor(view, `!document.body.innerText.includes(${JSON.stringify(holder.name)})`)
       expect(read<{ role: string }>('SELECT role FROM role_grants WHERE user_id = ?', holder.id)).toBeUndefined()
     }
@@ -304,9 +307,12 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
       await waitFor(view, `document.querySelector('[data-test="holders-table"]')`)
       const self = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
 
+      // K-123: the refusal renders in the confirmation, not in a page alert behind its overlay.
       await click(view, `[data-test="revoke-${self}-ADMIN"]`)
-      await waitFor(view, `document.querySelector('[data-test="failure"]')`)
-      expect(await textOf(view, '[data-test="failure"]')).toMatch(/last administrator/i)
+      await waitFor(view, `document.querySelector('[data-test="confirm-revoke-role-verb"]')`)
+      await click(view, '[data-test="confirm-revoke-role-verb"]')
+      await waitFor(view, `document.querySelector('[data-test="confirm-revoke-role-failure"]')`)
+      expect(await textOf(view, '[data-test="confirm-revoke-role-failure"]')).toMatch(/last administrator/i)
     }
     finally {
       view.close()
