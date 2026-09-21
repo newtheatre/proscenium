@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AUDIENCE_KINDS, AUDIENCE_LABELS } from '#shared/utils/announcements'
-import { ROLES } from '#shared/utils/roles'
+import { ROLES, saysRole } from '#shared/utils/roles'
 import type { AudienceKind } from '#shared/utils/announcements'
 
 definePageMeta({ layout: 'console', title: 'Announce', middleware: 'console', docs: '/docs/communications/announcements' })
@@ -116,7 +116,8 @@ async function send(): Promise<void> {
       <USelect
         v-model="role"
         data-test="audience-role"
-        :items="[...ROLES]"
+        :items="ROLES.map(value => ({ label: saysRole(value), value }))"
+        value-key="value"
         class="w-full"
       />
     </UFormField>

@@ -672,6 +672,19 @@ export function says(value: string | null): string {
   return value === null ? '' : WORDS[value] ?? value
 }
 
+// A movement made by another record names that record in words: the table it sits in is the
+// estate's own vocabulary and means nothing to a bar manager (K-128, issue 1151 item 8).
+export const MOVEMENT_SOURCE_TABLES = ['ledger_lines', 'stocktake_lines'] as const
+
+const MOVEMENT_SOURCE_WORDING: Record<string, string> = {
+  ledger_lines: 'a sale',
+  stocktake_lines: 'a stock count',
+}
+
+export function saysMovementSource(table: string): string {
+  return MOVEMENT_SOURCE_WORDING[table] ?? 'another record'
+}
+
 // A display of a sum. On-hand is never a stored figure, so nothing here rounds or caches one
 // (F-114 criterion 2).
 export function saysQuantity(qty: number, unit: StockUnit): string {

@@ -8,6 +8,16 @@ import type { AuditActionName } from './audit-actions'
 
 const accountId = z.string().min(1, 'Say which account you mean').max(64)
 
+// Money is typed in pounds and held in pence (0004, K-123 criterion 2). A figure read off a card
+// reader carries a pound sign and a thousands comma; anything else is refused, never rounded.
+const POUNDS = /^\u00a3?(\d{1,3}(?:,\d{3})*|\d+)(?:\.(\d{2}))?$/
+
+export function penceFromPounds(raw: string): number | null {
+  const match = POUNDS.exec(raw.trim())
+  if (!match) return null
+  return Number(match[1]!.replaceAll(',', '')) * 100 + Number(match[2] ?? 0)
+}
+
 export const awardFellowship = z.object({
   userId: accountId,
   awardedOn: londonDayField,

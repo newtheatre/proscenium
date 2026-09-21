@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { AUDIT_ACTIONS, MANUAL_ACTION_NAMES, describeAction } from '#shared/utils/audit-actions'
 import { auditList } from '#shared/utils/audit-list'
-import { formatLondon } from '#shared/utils/london'
+import { saysDay, saysWhen } from '#shared/utils/when'
 import { manualEntryForm } from '#shared/utils/admin-forms'
 import type { ManualEntryForm } from '#shared/utils/admin-forms'
 import type { AuditActionName } from '#shared/utils/audit-actions'
@@ -146,7 +146,7 @@ function describeDetail(detail: Record<string, unknown> | null): string[] {
 // back into the date it is (0014).
 function readable(key: string, value: unknown): string {
   if (key.endsWith('At') && typeof value === 'number' && Number.isInteger(value)) {
-    return formatLondon(new Date(value * 1000), { dateStyle: 'medium' })
+    return saysDay(value)
   }
   return typeof value === 'string' ? value : JSON.stringify(value)
 }
@@ -171,7 +171,7 @@ const columns: TableColumn<Entry>[] = [
   {
     id: 'createdAt',
     header: 'When',
-    cell: ({ row }) => formatLondon(new Date(row.original.createdAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }),
+    cell: ({ row }) => saysWhen(row.original.createdAt),
   },
   {
     id: 'actor',
@@ -322,7 +322,7 @@ onMounted(load)
         class="rounded-lg border border-default p-3 text-sm"
       >
         <div class="flex items-center justify-between gap-2 text-xs text-muted">
-          <span>{{ formatLondon(new Date(logEntry.createdAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }) }}</span>
+          <span>{{ saysWhen(logEntry.createdAt) }}</span>
           <span v-if="logEntry.actorId === null">System</span>
           <span v-else>{{ logEntry.actorName ?? logEntry.actorId }}</span>
         </div>

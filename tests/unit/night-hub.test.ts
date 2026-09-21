@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { HUB_KPI_LABELS, checklistHint, firstNameOf, groupedBoardCode, hubKpis, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, checklistHint, compApprovalLine, firstNameOf, groupedBoardCode, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
 
 // The show-night hub's wording and numbers (E-112, E-127, issue 905). The screens place these; what
 // they say is decided here, so one test holds it.
@@ -49,7 +49,7 @@ describe('the three tiles the door actually asks about (E-112 criterion 1)', () 
       admitted: 37,
       seatsLeft: 25,
       toCome: 24,
-      admittedPercent: 71,
+      soldPercent: 71,
     })
   })
 
@@ -57,7 +57,7 @@ describe('the three tiles the door actually asks about (E-112 criterion 1)', () 
     expect(hubKpis({ sold: 12, admitted: 3, capacity: null, remaining: null })).toMatchObject({
       capacity: null,
       seatsLeft: null,
-      admittedPercent: null,
+      soldPercent: null,
     })
   })
 
@@ -69,8 +69,8 @@ describe('the three tiles the door actually asks about (E-112 criterion 1)', () 
 // One duty manager reads the hub, the glance, the door and the till in one interval, so the three
 // house numbers carry one word each wherever they appear (issue 1150 item 11).
 describe('one vocabulary for the house numbers (issue 1150 item 11)', () => {
-  test('the labels are sold, in and seats left', () => {
-    expect(HUB_KPI_LABELS).toEqual({ sold: 'sold', admitted: 'in', seatsLeft: 'seats left' })
+  test('the labels are sold, in, to come and seats left', () => {
+    expect(HUB_KPI_LABELS).toEqual({ sold: 'sold', admitted: 'in', seatsLeft: 'seats left', toCome: 'to come' })
   })
 
   test('an uncapped house reads as words a volunteer says out loud, never a symbol', () => {
@@ -174,5 +174,37 @@ describe('tonight\'s board code is read out, not read off (issue 905)', () => {
 
   test('anything that is not six digits is left exactly as it came', () => {
     expect(groupedBoardCode('2530')).toBe('2530')
+  })
+})
+
+// The bar under the numbers counts sold over capacity, so the caption names that and not
+// collected, which is the next number along (issue 1150 item 10).
+describe('the house percentage says what it counts (issue 1150 item 10)', () => {
+  test('a capped house names the sold share in the one vocabulary', () => {
+    expect(housePercentLine(71)).toBe('71% of the house sold')
+  })
+
+  test('nothing sold is still a percentage, not a gap', () => {
+    expect(housePercentLine(0)).toBe('0% of the house sold')
+  })
+
+  test('an uncapped house says there is nothing to read rather than a figure', () => {
+    expect(housePercentLine(null)).toBe('This house is uncapped, so there is no percentage to read.')
+  })
+})
+
+// Approving is one tap and gives money away, so the confirmation reads back the amount and who
+// asked before that tap lands (issue 1150 item 10).
+describe('the comp approval line (D-117, F-110, issue 1150 item 10)', () => {
+  test('a bar round names the money and the person', () => {
+    expect(compApprovalLine('Sam Yates', 1250)).toBe('£12.50 at the bar for Sam Yates.')
+  })
+
+  test('a ticket comp carries no amount and says so rather than nought pounds', () => {
+    expect(compApprovalLine('Sam Yates', null)).toBe('A ticket for Sam Yates.')
+  })
+
+  test('a round that prices at nothing still reads as money, never as a ticket', () => {
+    expect(compApprovalLine('Sam Yates', 0)).toBe('£0.00 at the bar for Sam Yates.')
   })
 })

@@ -294,32 +294,13 @@ describe('the member shell is calm (0084, K-127, issue 1153 item 1)', () => {
 // shared/utils/when.ts, and a bespoke options object is how the two shapes drifted (copy-style §9).
 const BUILDS_ITS_OWN = /formatLondon\(/
 
-// The console and show-night screens this slice did not reach, and the shared helpers whose
-// shapes are not read by a person. The list may shrink and may not grow.
+// What other sweeps own: the show-night screens, the member room pages, the one console file
+// whose shapes feed a form, and the shared helpers. The list may shrink and may not grow.
 const BUILDS_ITS_OWN_ALLOWED = [
   'app/components/box-office/show/Performances.vue',
-  'app/components/box-office/show/Sales.vue',
-  'app/components/box-office/show/StatusStrip.vue',
   'app/components/till/TicketsPane.vue',
-  'app/pages/admin/audit.vue',
-  'app/pages/admin/index.vue',
-  'app/pages/admin/settings.vue',
-  'app/pages/bar/stock/movements.vue',
-  'app/pages/bar/stock/stocktakes/[id].vue',
-  'app/pages/bar/stock/stocktakes/index.vue',
-  'app/pages/bar/tabs.vue',
-  'app/pages/box-office/pass-types.vue',
-  'app/pages/comms/operations/accounts/[id].vue',
-  'app/pages/people/accounts/index.vue',
-  'app/pages/people/roles.vue',
   'app/pages/rooms/index.vue',
-  'app/pages/rooms/manage/requests.vue',
   'app/pages/rooms/mine.vue',
-  'app/pages/rota/manage/approvals.vue',
-  'app/pages/rota/manage/emergency.vue',
-  'app/pages/rota/manage/openings.vue',
-  'app/pages/rota/manage/safety.vue',
-  'app/pages/rota/manage/shifts.vue',
   'app/pages/tonight/emergency.vue',
   'app/pages/tonight/glance.vue',
   'app/pages/tonight/till/index.vue',

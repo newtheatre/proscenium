@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysDayLong } from '#shared/utils/when'
 import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
 import { confirmationOptions } from '#shared/utils/blast-radius'
 import type { BlastRadiusPreview } from '#shared/utils/blast-radius'
@@ -136,7 +136,7 @@ async function save(setting: Setting, value: unknown, confirmation?: string): Pr
     notices[setting.key] = 'Saved'
   }
   catch (error) {
-    failure.value = { message: `${setting.key}: ${refusalText(error)}`, enrolPath: enrolPath(error) }
+    failure.value = { message: refusalText(error), enrolPath: enrolPath(error) }
   }
   finally {
     saving.value = ''
@@ -198,7 +198,7 @@ async function revert(setting: Setting): Promise<void> {
     notices[setting.key] = 'Reverted'
   }
   catch (error) {
-    failure.value = { message: `${setting.key}: ${refusalText(error)}`, enrolPath: enrolPath(error) }
+    failure.value = { message: refusalText(error), enrolPath: enrolPath(error) }
   }
   finally {
     reverting.value = ''
@@ -422,7 +422,7 @@ onMounted(load)
               <span v-if="setting.hasDefault">Ships as <span class="font-mono">{{ asText(setting.default) }}</span>. </span>
               <span v-if="setting.updatedBy && setting.updatedAt">
                 Changed by {{ setting.updatedBy.name }} on
-                {{ formatLondon(new Date(setting.updatedAt * 1000), { dateStyle: 'long' }) }}.
+                {{ saysDayLong(setting.updatedAt) }}.
               </span>
               <span v-else>Never changed.</span>
             </p>

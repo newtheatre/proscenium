@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { readTeamRow, tonightHouseQuery, tonightPerformanceQuery, tonightTeamQuery } from '#server/utils/tonight'
+import { dutyManagersOnCall, readTeamRow, tonightHouseQuery, tonightPerformanceQuery, tonightTeamQuery } from '#server/utils/tonight'
 import { ticketInsertQueries } from '#server/utils/capacity'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
@@ -149,6 +149,70 @@ describe('the performance a screen is asked about', () => {
       const [row] = read<{ latecomerPolicy: string, ageGuidance: string, venueName: string }>(
         database, tonightPerformanceQuery(tonight.performanceId))
       expect(row).toMatchObject({ latecomerPolicy: 'AT_INTERVAL', ageGuidance: 'Contains strobe lighting' })
+    })
+  })
+})
+
+// The emergency card names who to ring after 999, and the number comes from tonight's own rota
+// rather than a standing list (E-113, 0009, issue 1150 item 14).
+describe('who to ring after 999 (E-113 criterion 1)', () => {
+  function shift(database: TestDatabase, id: string, performanceId: string, role: string, userId: string): void {
+    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+      id, performanceId, role, userId, 'CONFIRMED']])
+  }
+
+  function team(database: TestDatabase, performanceIds: string[]): ReturnType<typeof readTeamRow>[] {
+    return performanceIds
+      .flatMap(id => read(database, tonightTeamQuery(id)) as Parameters<typeof readTeamRow>[0][])
+      .map(row => readTeamRow(row))
+  }
+
+  test('a consenting duty manager is the number the card carries', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'dm-consenting')
+      database.batch([['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', who]])
+      shift(database, 'dm-shift', tonight.performanceId, 'DUTY_MANAGER', who)
+
+      expect(dutyManagersOnCall(team(database, [tonight.performanceId])))
+        .toEqual([{ name: 'Someone dm-consenting', phone: '07700 900000' }])
+    })
+  })
+
+  test('a duty manager who has not consented leaves the card with no number (A-114)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'dm-quiet')
+      shift(database, 'dm-quiet-shift', tonight.performanceId, 'DUTY_MANAGER', who)
+
+      expect(dutyManagersOnCall(team(database, [tonight.performanceId]))).toEqual([])
+    })
+  })
+
+  test('the door is not who you ring after 999', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'door-consenting')
+      database.batch([['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', who]])
+      shift(database, 'door-shift', tonight.performanceId, 'DOOR', who)
+
+      expect(dutyManagersOnCall(team(database, [tonight.performanceId]))).toEqual([])
+    })
+  })
+
+  // A matinee day resolves two performances, and the same person holding both is one number to
+  // ring, not two identical rows (E-112 criterion 2, E-127 criterion 1).
+  test('one person across both of tonight\'s houses is one number', async () => {
+    await withDatabase(async (database) => {
+      const matinee = tonightsPerformance(database, { suffix: 'matinee' })
+      const evening = tonightsPerformance(database, { suffix: 'evening' })
+      const who = person(database, 'dm-both')
+      database.batch([['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', who]])
+      shift(database, 'dm-matinee', matinee.performanceId, 'DUTY_MANAGER', who)
+      shift(database, 'dm-evening', evening.performanceId, 'DUTY_MANAGER', who)
+
+      expect(dutyManagersOnCall(team(database, [matinee.performanceId, evening.performanceId])))
+        .toEqual([{ name: 'Someone dm-both', phone: '07700 900000' }])
     })
   })
 })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { fromLondonWallClock, formatLondon, londonClock } from '#shared/utils/london'
+import { fromLondonWallClock, londonClock } from '#shared/utils/london'
+import { saysWhenLong } from '#shared/utils/when'
 import { daysAfter } from '#shared/utils/membership'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { can, manageRota } from '#shared/utils/abilities'
@@ -191,7 +192,7 @@ async function standDown(): Promise<void> {
 const slotsOf = (openingId: string): Slot[] => listing.value.slots.filter(slot => slot.openingId === openingId)
 
 function spanOf(opening: Opening): string {
-  const opens = formatLondon(new Date(opening.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
+  const opens = saysWhenLong(opening.startsAt)
   return `${opens} to ${londonClock(new Date(opening.endsAt * 1000))}`
 }
 

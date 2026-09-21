@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import {
   bookingWindowSource,
   performanceScreenForm,
@@ -248,7 +249,7 @@ const columns: TableColumn<AdminPerformance>[] = [
     header: 'When',
     cell: ({ row }) => h('div', {}, [
       h('div', { class: 'flex flex-wrap items-center gap-2' }, [
-        h('span', {}, formatLondon(new Date(row.original.startsAt * 1000), { dateStyle: 'medium', timeStyle: 'short' })),
+        h('span', {}, saysWhen(row.original.startsAt)),
         h(UBadge, {
           color: row.original.status === 'ON_SALE' ? 'success' : row.original.status === 'CANCELLED' ? 'error' : 'neutral',
           variant: 'subtle',
