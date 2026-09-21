@@ -149,13 +149,9 @@ const columns: TableColumn<StockMovement>[] = [
       :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-arrow-left-right"
-      title="Every movement stays exactly as it was written"
-      description="Nothing here can be edited or deleted. A mistake is corrected with a reversing movement that names the original, and both rows remain, so any on hand figure can be traced to its causes."
-    />
+    <p class="text-sm text-muted">
+      Every delivery, sale, wastage and adjustment, newest first.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

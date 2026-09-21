@@ -311,13 +311,9 @@ const columns: TableColumn<BarProduct>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-beer"
-      title="A product is retired, never destroyed"
-      description="Once anything has been sold as a product it can only be retired: a retired product leaves the till and still resolves for every line, report and export behind it. A product nothing has ever been sold as can be deleted outright."
-    />
+    <p class="text-sm text-muted">
+      Everything the till sells, and the stocked items behind it.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

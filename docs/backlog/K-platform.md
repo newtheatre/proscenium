@@ -542,6 +542,13 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
   10. A row offers at most three actions in line. Where it has more, the primary one stays
      visible and the rest move into a `UDropdownMenu`, because seven ghost buttons in a row read
      as a wall and are the first thing a narrow window loses.
+  11. A console screen introduces itself in at most one sentence, under the navbar title and
+      above its first table or form, saying what the screen is for. Everything longer belongs on
+      the screen's documentation page, which the help button in the navbar opens and which every
+      console screen names. No permanent alert explains a screen: an alert is for a state the
+      reader has to act on, a refusal, a warning about this data or an empty result, and one
+      that is always on screen is read by nobody. No console screen draws a page header of its
+      own, because the navbar already carries the title.
 - Source: Review of the admin surface against the Nuxt UI component matrix, 30 August 2026;
   decision 0021 (the design language is enforced by test, not by review). Criterion 7 comes
   from the console review of 18 September 2026 (issue 1151 item 5), which counted the one-click
@@ -551,7 +558,10 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
   on the page behind an open overlay. Criteria 9 and 10 come from the same review (issue 1151
   item 6), which counted ten hand-written tables across six screens, three div lists where a
   table belonged, `HIDE_BELOW_SM` on four tables of forty-six, nine action columns with an
-  empty header, and rows of up to seven ghost buttons with no overflow.
+  empty header, and rows of up to seven ghost buttons with no overflow. Criterion 11 comes from
+  the same review (issue 1151 item 2), which counted thirty-six permanent explainer alerts
+  across the console, a page header duplicating the navbar title, and bare paragraphs of
+  explanation on the admin screens.
 
 ## K-124: Developer tools that do not ship
 

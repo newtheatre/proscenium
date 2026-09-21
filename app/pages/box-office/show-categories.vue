@@ -189,13 +189,9 @@ const columns: TableColumn<AdminShowCategory>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-layout-grid"
-      title="A category is retired, never destroyed"
-      description="A category a show belongs to can only be retired: it stops being offered for a new show and still names every show that already carries it. A category nothing has ever used can be deleted outright."
-    />
+    <p class="text-sm text-muted">
+      The headings a show is filed under.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

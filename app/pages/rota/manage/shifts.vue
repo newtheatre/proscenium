@@ -196,10 +196,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UPageHeader
-      title="Rota board"
-      description="A confirmed shift is what lights up the show-night screen."
-    />
+    <p class="text-sm text-muted">
+      A confirmed shift is what lights up the show-night screen.
+    </p>
 
     <div
       v-if="status === 'pending'"

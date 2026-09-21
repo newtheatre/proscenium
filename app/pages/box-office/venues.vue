@@ -250,13 +250,9 @@ const columns: TableColumn<AdminVenue>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-map-pin"
-      title="A venue is retired, never destroyed"
-      description="A venue with a performance, an emergency card or any other record against it can only be retired: it stops being offered for a new performance and still serves everything already pointing at it. A venue nothing has ever used can be deleted outright."
-    />
+    <p class="text-sm text-muted">
+      Where a performance happens, and what it seats.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

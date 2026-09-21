@@ -531,3 +531,119 @@ describe('every console list is a UTable the shell knows about (K-123 criteria 9
     expect(walls.map(file => file.path).filter(path => !ROWS_AWAITING_AN_OVERFLOW.includes(path))).toEqual([])
   })
 })
+
+// A console screen says what it is for in one sentence and hands the rest to its documentation
+// page (K-123 criterion 11, J-109, issue 1151 item 2). Three shapes carry the rule.
+
+// Where the introduction ends: the first thing the officer came to the screen to work with.
+const INTRO_ANCHOR = /<UTable\b|<UForm\b|<UCard\b|<UPageCard\b|<AdminToolbar\b|<UModal\b|<UTabs\b|<UDashboard/
+
+// A tag's own attributes, quotes respected, because an arrow function in a prop holds a '>'.
+function openingTags(source: string, tag: string): string[] {
+  const found: string[] = []
+  const opens = new RegExp(`<${tag}\\b`, 'g')
+  let match: RegExpExecArray | null
+  while ((match = opens.exec(source)) !== null) {
+    let index = match.index + match[0].length
+    let quote = ''
+    for (; index < source.length; index++) {
+      const character = source[index]!
+      if (quote) {
+        if (character === quote) quote = ''
+      }
+      else if (character === '"' || character === '\'') quote = character
+      else if (character === '>') break
+    }
+    found.push(source.slice(match.index, index + 1))
+  }
+  return found
+}
+
+const BOUND_TO_STATE = /\sv-if=|\sv-else-if=|\sv-else[\s/>]/
+
+const introOf = (source: string): string => {
+  const template = templateOf(source)
+  const anchor = template.search(INTRO_ANCHOR)
+  return anchor === -1 ? template : template.slice(0, anchor)
+}
+
+// A top-level paragraph of the screen's own prose. Lint fixes the indentation, so four spaces is
+// a child of the root element: anything deeper is a step inside a block or an empty state.
+function introProse(source: string): string[] {
+  return [...introOf(source).matchAll(/\n {4}<p\b([^\n>]*)>([\s\S]*?)<\/p>/g)]
+    .filter(([, attributes, body]) => !BOUND_TO_STATE.test(attributes!) && !body!.includes('{{'))
+    .map(([,, body]) => body!.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim())
+}
+
+const sentences = (prose: string): number => (prose.match(/[.?!](?=\s|$)/g) ?? []).length
+
+// A screen whose explainer has not been swept yet. Box office and bar went first (issue 1151
+// item 2); the list may shrink and may not grow.
+const EXPLAINS_ITSELF_IN_AN_ALERT = [
+  // Developer tools, which never ship (K-124), and whose reader wants the warning in front of
+  // them rather than in a document.
+  'app/pages/dev.vue',
+  'app/pages/people/fellows.vue',
+  'app/pages/people/members.vue',
+  'app/pages/rooms/manage/closures.vue',
+  'app/pages/rooms/manage/index.vue',
+  'app/pages/rooms/manage/other.vue',
+  'app/pages/rooms/manage/requests.vue',
+  'app/pages/rooms/manage/utilisation.vue',
+  'app/pages/rota/manage/age-checks.vue',
+  'app/pages/rota/manage/approvals.vue',
+  'app/pages/rota/manage/backstage.vue',
+  'app/pages/rota/manage/checklists.vue',
+  'app/pages/rota/manage/emergency.vue',
+  'app/pages/rota/manage/openings.vue',
+  'app/pages/rota/manage/safety.vue',
+  'app/pages/rota/manage/templates.vue',
+  'app/pages/training/manage/departments.vue',
+  'app/pages/training/manage/index.vue',
+  'app/pages/training/manage/records.vue',
+  'app/pages/training/manage/requests.vue',
+  'app/pages/training/manage/sessions/index.vue',
+]
+
+// An introduction still running to more than a sentence, for the same sweep. The list may shrink
+// and may not grow.
+const INTRODUCES_ITSELF_AT_LENGTH = [
+  'app/pages/admin/settings.vue',
+  'app/pages/comms/operations/accounts/[id].vue',
+]
+
+describe('a console screen introduces itself in one sentence (K-123 criterion 11, issue 1151 item 2)', () => {
+  test('no screen keeps an alert on the page that no state turns off', async () => {
+    const permanent = (await screens())
+      .filter(screen => openingTags(templateOf(screen.source), 'UAlert').some(tag => !BOUND_TO_STATE.test(tag)))
+      .map(screen => screen.path)
+      .filter(path => !EXPLAINS_ITSELF_IN_AN_ALERT.includes(path))
+    expect(permanent).toEqual([])
+  })
+
+  test('no screen draws a page header, because the navbar carries the title', async () => {
+    expect(await offenders(source => source.includes('<UPageHeader'))).toEqual([])
+  })
+
+  test('an introduction is one paragraph of one sentence, or none at all', async () => {
+    const all = await screens()
+    expect(all.length).toBeGreaterThan(40)
+    const wordy = all
+      .filter((screen) => {
+        const prose = introProse(screen.source)
+        return prose.length > 1 || prose.some(paragraph => sentences(paragraph) > 1)
+      })
+      .map(screen => screen.path)
+      .filter(path => !INTRODUCES_ITSELF_AT_LENGTH.includes(path))
+    expect(wordy).toEqual([])
+  })
+
+  test('every console screen names the documentation page its help button opens', async () => {
+    const nameless = (await screens())
+      .filter(screen => !/definePageMeta\(\{[\s\S]*?docs:\s*'/.test(screen.source))
+      .map(screen => screen.path)
+      // A redirect for an old address, and the developer tools that never ship (K-124).
+      .filter(path => path !== 'app/pages/admin/[...legacy].vue' && path !== 'app/pages/dev.vue')
+    expect(nameless).toEqual([])
+  })
+})

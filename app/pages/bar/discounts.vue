@@ -169,13 +169,9 @@ const columns: TableColumn<Discount>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-percent"
-      title="A percentage, capped by configuration"
-      description="Applying a discount snapshots its percentage onto the sale line at the moment of sale, so a later edit or retirement never restates a charge already made. Retiring stops it applying to a new sale; it is never deleted."
-    />
+    <p class="text-sm text-muted">
+      The percentage discounts the till can offer.
+    </p>
 
     <AdminToolbar
       :searchable="false"
