@@ -55,6 +55,19 @@ export type MembershipState
     | { kind: 'grace', until: string, expiredOn: string }
     | { kind: 'lapsed', expiredOn: string }
 
+// One set of words for the four states, so a badge, a tile and a refusal never disagree
+// (K-128, issue 1153 item 8). The sentence about each lives in `saysMembershipSentence`.
+export const MEMBERSHIP_WORDING: Record<MembershipState['kind'], string> = {
+  current: 'Current',
+  grace: 'In grace',
+  lapsed: 'Lapsed',
+  none: 'None',
+}
+
+export function saysMembershipState(kind: MembershipState['kind']): string {
+  return MEMBERSHIP_WORDING[kind]
+}
+
 export function membershipState(term: Term | null, today: string, graceDays: number): MembershipState {
   if (!term) return { kind: 'none' }
   if (isInGrace(term, today, graceDays)) {

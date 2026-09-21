@@ -270,7 +270,7 @@ useSeoMeta({ title: 'My rota' })
             :data-test="`release-${shift.shiftId}`"
             @click="release(shift)"
           >
-            Release
+            Release the shift
           </UButton>
           <UButton
             v-else-if="shift.status === 'DECLINED'"
@@ -317,7 +317,7 @@ useSeoMeta({ title: 'My rota' })
             :data-test="`release-opening-${slot.slotId}`"
             @click="releaseOpening(slot)"
           >
-            Release
+            Release the shift
           </UButton>
           <UButton
             v-else-if="slot.status === 'DECLINED'"
@@ -387,7 +387,8 @@ useSeoMeta({ title: 'My rota' })
         class="mt-8 text-sm text-muted"
         data-test="open-shifts-empty"
       >
-        Nothing open right now.
+        No shifts are open. A shift appears here as soon as one is put up, and taking it adds it
+        to your rota.
       </p>
 
       <ul

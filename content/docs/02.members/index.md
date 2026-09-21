@@ -2,7 +2,7 @@
 title: Members
 description: What a signed-in member can do for themselves, and what a visitor can do without signing in at all.
 module: Identity
-updatedOn: 2026-09-15
+updatedOn: 2026-09-21
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -15,7 +15,7 @@ account at all; everything else needs a signed-in account, and a few things (boo
 asking for a room we do not manage) also need a current membership with the Students' Union.
 
 Signed in, the member screens sit under **My NNT**, a strip of links across the top of every
-member page: My NNT, My rota, Book a room, My bookings, My training, Training sessions, My tab,
+member page: My NNT, My rota, Book a room, My room bookings, My training, Training sessions, My tab,
 Passes, Access requirements and Membership. The help icon at the top right of each screen opens
 its page here.
 

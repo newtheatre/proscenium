@@ -141,6 +141,21 @@ failed check has no wording of its own, the sentence comes from the house error 
 `shared/utils/house-errors.ts`, registered once on each side, so a reader never sees the
 validation library's own English.
 
+## 5a. The member shell's settled words
+
+The K-128 sweep of the member shell (issue 1153 item 8) settled the wordings that were said
+several ways each, and put each of them in one place.
+
+| Thing | The one wording | Where it comes from |
+| --- | --- | --- |
+| The membership state | "Current", "In grace", "Lapsed", "None" | `MEMBERSHIP_WORDING` and `saysMembershipState()` in `shared/utils/membership.ts`; the sentence beside the badge is `saysMembershipSentence()` in `shared/utils/my-summary.ts`, which the My NNT tile reads too. |
+| A membership a member needs | "Tell us about your membership" | The refusal links to `/account/membership`, which is where telling us happens. Never "Sort out your membership". |
+| What we send | "Notification" | The nav, the settings page and the inbox all say it. Never "message". |
+| Room bookings in the nav | "My room bookings" | `site-nav.ts`. "Bookings" on its own is the reader's word for tickets (section 4), and the notification topic keeps it. |
+| The officer who decides | The role in Title Case where one role decides ("the Theatre Manager", "the Accessibility Officer", "the department lead"); "an officer" where the permission decides and no one role holds it | Never "somebody". A room request has no approver role: whoever holds `rooms.write` may decide it, so "an officer" is the true word there. |
+| A declined training request | "Declined" | `saysRequestStatus()` in `shared/utils/training.ts`. "Answered" hid a refusal behind a softer word. |
+| The people working the door | "the people on the door", "anybody working the door" | Never "the door" as a shorthand for them: a member choosing what is shown is choosing who sees it. |
+
 ## 6. The shape of an error
 
 Something went wrong, distinct from a refusal: say so plainly, say whether to retry, never blame

@@ -196,7 +196,7 @@ useSeoMeta({
                 variant="subtle"
                 size="sm"
               >
-                {{ need.held ? 'Held' : 'Not yet' }}
+                {{ need.held ? 'Held' : 'Not held' }}
               </UBadge>
             </ULink>
           </li>
