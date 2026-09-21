@@ -44,3 +44,52 @@ export function exportQuery(from: number, to: number): SQL {
 export async function exportRows(from: number, to: number): Promise<AgeCheckExportRow[]> {
   return db.all<AgeCheckExportRow>(exportQuery(from, to))
 }
+
+export interface AgeCheckPdfCells {
+  when: string
+  outcome: string
+  idOrReason: string
+  description: string
+  product: string
+  checkedBy: string
+}
+
+// The index signature is what `buildTablePdf` takes its rows as; the named fields are the columns.
+export interface AgeCheckPdfRow extends AgeCheckPdfCells, Record<string, string> {
+  row: string
+  supersedes: string
+  supersededBy: string
+}
+
+// An inspector reads a page, not a database: the correction chain points at a row on the page,
+// and the ids stay in the CSV, which is the half a machine reads (E-119, K-128).
+export function numberedPdfRows(
+  rows: AgeCheckExportRow[],
+  cells: (row: AgeCheckExportRow) => AgeCheckPdfCells = bareCells,
+): AgeCheckPdfRow[] {
+  const numbers = new Map(rows.map((row, at) => [row.id, at + 1]))
+  const points = (id: string | null): string => {
+    if (!id) return ''
+    const at = numbers.get(id)
+    return at === undefined ? 'Outside this period' : `row ${at}`
+  }
+
+  return rows.map((row, at) => ({
+    row: String(at + 1),
+    ...cells(row),
+    supersedes: points(row.supersedesId),
+    supersededBy: points(row.supersededBy),
+  }))
+}
+
+// Dates and outcomes are said by the route, which holds the formatters; this is what is left.
+function bareCells(row: AgeCheckExportRow): AgeCheckPdfCells {
+  return {
+    when: '',
+    outcome: row.outcome,
+    idOrReason: row.idType ?? row.reason ?? '',
+    description: row.description,
+    product: row.product ?? '',
+    checkedBy: row.checkedByName,
+  }
+}

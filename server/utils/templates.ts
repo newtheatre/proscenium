@@ -1,5 +1,7 @@
+import { saysRole } from '#shared/utils/roles'
 import { formatLondon } from '#shared/utils/london'
-import { plural } from '#shared/utils/text'
+import { PRODUCTION_SITE_URL } from '#shared/utils/seo'
+import { ordinal, plural } from '#shared/utils/text'
 
 // Every message carries both parts (H-109 criterion 3), and any date in one is London-pinned,
 // because the worker runs in UTC (0014).
@@ -22,6 +24,11 @@ ${body}
 <p style="font-size:0.875rem;color:#555">The Nottingham New Theatre</p>
 </body></html>`
 }
+
+// Said on any message carrying a link nobody asked for, so a reader can check the address
+// before following it.
+const SITE_HOST = new URL(PRODUCTION_SITE_URL).host
+const GOES_TO_US = `The link goes to ${SITE_HOST}; if it does not, do not open it.`
 
 function expiry(at: Date): string {
   return formatLondon(at, { dateStyle: 'full', timeStyle: 'short' })
@@ -66,18 +73,21 @@ The Nottingham New Theatre`,
     return {
       subject: 'An account has been made for you at the New Theatre',
       html: layout(`<p>Hello ${context.name},</p>
-<p>The theatre has made you an account. Choose a password and it is ready to use.</p>
+<p>We have made you an account. Choose a password and it is ready to use.</p>
 <p><a href="${url}">Choose my password</a></p>
-<p>The link works until ${until}. If you were not expecting this, tell the IT Manager rather than
-ignoring it.</p>`),
+<p>The link works until ${until}. If you were not expecting this, tell the ${saysRole('ADMIN')}
+rather than ignoring it.</p>
+<p>${GOES_TO_US}</p>`),
       text: `Hello ${context.name},
 
-The theatre has made you an account. Choose a password and it is ready to use:
+We have made you an account. Choose a password and it is ready to use:
 
 ${url}
 
-The link works until ${until}. If you were not expecting this, tell the IT Manager rather than
-ignoring it.
+The link works until ${until}. If you were not expecting this, tell the ${saysRole('ADMIN')}
+rather than ignoring it.
+
+${GOES_TO_US}
 
 The Nottingham New Theatre`,
     }
@@ -91,19 +101,22 @@ The Nottingham New Theatre`,
     return {
       subject: 'Finish setting up your account',
       html: layout(`<p>Hello ${context.name},</p>
-<p>This address is already known to the theatre, from a booking or from our old records, but it
-has no way to sign in yet. Choose a password and everything already on it is yours.</p>
+<p>We already know this address, from a booking or from our old records, but it has no way to
+sign in yet. Choose a password and everything already on it is yours.</p>
 <p><a href="${url}">Choose my password</a></p>
 <p>The link works until ${until}. If you were not expecting this, ignore it: nothing has
-changed.</p>`),
+changed.</p>
+<p>${GOES_TO_US}</p>`),
       text: `Hello ${context.name},
 
-This address is already known to the theatre, from a booking or from our old records, but it has
-no way to sign in yet. Choose a password and everything already on it is yours:
+We already know this address, from a booking or from our old records, but it has no way to sign
+in yet. Choose a password and everything already on it is yours:
 
 ${url}
 
 The link works until ${until}. If you were not expecting this, ignore it: nothing has changed.
+
+${GOES_TO_US}
 
 The Nottingham New Theatre`,
     }
@@ -120,7 +133,8 @@ The Nottingham New Theatre`,
 <p>The ${method} sign-in was just removed from your New Theatre account.</p>
 <p>If that was you, there is nothing to do. If it was not, sign in and check your security
 settings now.</p>
-<p><a href="${url}">My security settings</a></p>`),
+<p><a href="${url}">My security settings</a></p>
+<p>${GOES_TO_US}</p>`),
       text: `Hello ${context.name},
 
 The ${method} sign-in was just removed from your New Theatre account.
@@ -129,6 +143,8 @@ If that was you, there is nothing to do. If it was not, sign in and check your s
 now:
 
 ${url}
+
+${GOES_TO_US}
 
 The Nottingham New Theatre`,
     }
@@ -166,15 +182,17 @@ The Nottingham New Theatre`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Your booking of ${room}, ${when}, is cancelled and the slot is free for somebody else.</p>
 <p>${context.title}</p>
-<p>If that was not you, <a href="${String(context.roomsUrl)}">check your bookings</a>.</p>`),
+<p>If that was not you, see what is still booked.</p>
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
       text: `Hello ${context.name},
 
 Your booking of ${room}, ${when}, is cancelled and the slot is free for somebody else.
 
 ${String(context.title)}
 
-If that was not you, check your bookings:
+If that was not you, see what is still booked.
 
+See your bookings:
 ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
@@ -184,17 +202,18 @@ The Nottingham New Theatre`,
   'room-requested': (context: TemplateContext): Rendered => ({
     subject: `Asked for: ${String(context.room)}, ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>Your request for ${context.room}, ${context.when}, is with the Theatre Manager. The slot is held
+<p>Your request for ${context.room}, ${context.when}, is with the ${saysRole('THEATRE_MANAGER')}. The slot is held
 while somebody decides, so nobody else can take it in the meantime.</p>
 <p>${context.title}</p>
 <p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
     text: `Hello ${context.name},
 
-Your request for ${String(context.room)}, ${String(context.when)}, is with the Theatre Manager. The
+Your request for ${String(context.room)}, ${String(context.when)}, is with the ${saysRole('THEATRE_MANAGER')}. The
 slot is held while somebody decides, so nobody else can take it in the meantime.
 
 ${String(context.title)}
 
+See your bookings:
 ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
@@ -223,7 +242,8 @@ The Nottingham New Theatre`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>A request for ${context.room}, ${context.when}, has been waiting for a decision.</p>
 <p>${context.title}</p>
-<p>The slot is held until somebody answers, so nobody else can book it while it waits.</p>`),
+<p>The slot is held until somebody answers, so nobody else can book it while it waits.</p>
+<p><a href="${String(context.queueUrl)}">Open the queue</a></p>`),
     text: `Hello ${context.name},
 
 A request for ${String(context.room)}, ${String(context.when)}, has been waiting for a decision.
@@ -231,6 +251,9 @@ A request for ${String(context.room)}, ${String(context.when)}, has been waiting
 ${String(context.title)}
 
 The slot is held until somebody answers, so nobody else can book it while it waits.
+
+Open the queue:
+${String(context.queueUrl)}
 
 The Nottingham New Theatre`,
   }),
@@ -262,14 +285,14 @@ The Nottingham New Theatre`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${bookings.length === 1 ? 'Your request has been approved.' : 'Your requests have been approved.'} ${moved}</p>
 <ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
-<p><a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
       text: `Hello ${context.name},
 
 ${bookings.length === 1 ? 'Your request has been approved.' : 'Your requests have been approved.'} ${moved}
 
 ${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`).join('\n')}
 
-See what you hold: ${String(context.roomsUrl)}
+See your bookings: ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
     }
@@ -287,7 +310,8 @@ The Nottingham New Theatre`,
 <p>${bookings.length === 1 ? 'Your request was not approved.' : 'Your requests were not approved.'}</p>
 <ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
 <p>Why: ${reason}</p>
-<p>The slot is free again. <a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+<p>The slot is free again.</p>
+<p><a href="${String(context.roomsUrl)}">Find another slot</a></p>`),
       text: `Hello ${context.name},
 
 ${bookings.length === 1 ? 'Your request was not approved.' : 'Your requests were not approved.'}
@@ -296,7 +320,9 @@ ${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`
 
 Why: ${reason}
 
-The slot is free again. See what you hold: ${String(context.roomsUrl)}
+The slot is free again.
+
+Find another slot: ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
     }
@@ -434,7 +460,7 @@ The Nottingham New Theatre`,
 <p>Your claim on the ${context.role} shift for ${context.show} at ${context.venue},
 ${context.when}, was declined.</p>
 <p>Why: ${context.reason}</p>
-<p>The shift is not yours to hold; you are welcome to claim something else on the open list.</p>`),
+<p>The shift stays on the open list, and so does everything else you are welcome to claim.</p>`),
     text: `Hello ${context.name},
 
 Your claim on the ${context.role} shift for ${context.show} at ${context.venue},
@@ -442,7 +468,7 @@ ${context.when}, was declined.
 
 Why: ${context.reason}
 
-The shift is not yours to hold; you are welcome to claim something else on the open list.
+The shift stays on the open list, and so does everything else you are welcome to claim.
 
 The Nottingham New Theatre`,
   }),
@@ -485,12 +511,12 @@ The Nottingham New Theatre`,
   'shift-removed': (context: TemplateContext): Rendered => ({
     subject: `Your ${context.role} shift on ${context.show} has been reassigned`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>The FOH officer has reassigned your ${context.role} shift on ${context.show} at
+<p>The ${saysRole('FOH_MANAGER')} has reassigned your ${context.role} shift on ${context.show} at
 ${context.venue}, ${context.when}, to somebody else.</p>
 <p>There is nothing for you to do. Other shifts you hold are unaffected.</p>`),
     text: `Hello ${context.name},
 
-The FOH officer has reassigned your ${context.role} shift on ${context.show} at
+The ${saysRole('FOH_MANAGER')} has reassigned your ${context.role} shift on ${context.show} at
 ${context.venue}, ${context.when}, to somebody else.
 
 There is nothing for you to do. Other shifts you hold are unaffected.
@@ -525,12 +551,14 @@ The Nottingham New Theatre`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>A ${context.category} incident logged at ${context.severity} severity needs your
 follow-up.</p>
-<p>Open the safety officer's list to read and close it.</p>`),
+<p>Read it and close it on the safety list.</p>
+<p><a href="${String(context.safetyUrl)}">Open the safety list</a></p>`),
     text: `Hello ${context.name},
 
 A ${context.category} incident logged at ${context.severity} severity needs your follow-up.
 
-Open the safety officer's list to read and close it.
+Read it and close it on the safety list:
+${String(context.safetyUrl)}
 
 The Nottingham New Theatre`,
   }),
@@ -539,11 +567,14 @@ The Nottingham New Theatre`,
   'docs-drift-reported': (context: TemplateContext): Rendered => ({
     subject: `Documentation flagged: ${context.path}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>${context.reportedByName} flagged the documentation page <code>${context.path}</code> as out
-of date.</p>`),
+<p>${context.reportedByName} flagged the documentation page ${context.path} as out of date.</p>
+<p><a href="${String(context.pageUrl)}">Open the page</a></p>`),
     text: `Hello ${context.name},
 
 ${context.reportedByName} flagged the documentation page ${context.path} as out of date.
+
+Open the page:
+${String(context.pageUrl)}
 
 The Nottingham New Theatre`,
   }),
@@ -594,7 +625,7 @@ The Nottingham New Theatre`,
   // Distinct subject from a human sign-off's own template (E-125 criterion 3), so a search or a
   // glance tells the two apart without opening either.
   'night-report-auto-closed': (context: TemplateContext): Rendered => ({
-    subject: `Night auto-closed, no signatory: ${context.venueName}, ${context.night}`,
+    subject: `Nobody signed off the night report: ${context.venueName}, ${context.night}`,
     html: layout(`<p>Tonight's report at ${context.venueName} closed itself, twenty-four hours after the show
 night ended with nobody signing it off.</p>
 <p>${context.closingNote}</p>`),
@@ -649,16 +680,16 @@ The Nottingham New Theatre`,
 
   // Asking is what put it in the diary, and saying so is the only feedback a request gives.
   'training-request-scheduled': (context: TemplateContext): Rendered => ({
-    subject: `Being taught: ${String(context.moduleName)}`,
+    subject: `${String(context.moduleName)} is now scheduled`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>You asked to be taught ${context.moduleName} (${context.moduleId}), and it is now in the diary.
-Asking put it there, so thank you for saying.</p>
+<p>You asked for ${context.moduleName} to be taught, and a session is now in the diary. Thank you
+for asking.</p>
 <p>A place is not held for you: <a href="${String(context.sessionsUrl)}">the schedule</a> is where you
 take one.</p>`),
     text: `Hello ${context.name},
 
-You asked to be taught ${context.moduleName} (${context.moduleId}), and it is now in the diary.
-Asking put it there, so thank you for saying.
+You asked for ${context.moduleName} to be taught, and a session is now in the diary. Thank you for
+asking.
 
 A place is not held for you. The schedule is where you take one:
 ${String(context.sessionsUrl)}
@@ -690,12 +721,11 @@ The Nottingham New Theatre`,
   }),
 
   'training-session-absent': (context: TemplateContext): Rendered => ({
-    subject: 'Sorry we missed you',
+    subject: `The session on ${String(context.heldOn)}: no record yet`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>You were signed up for the session on ${context.heldOn} and we did not see you there, so there is
 nothing on your training record for it.</p>
-<p><strong>Nothing has been held against you and nothing has been taken away.</strong> It only means
-this module is still outstanding, so anything that needs it is still waiting on it.</p>
+<p>Nothing on your record has changed; the module is still outstanding.</p>
 <p><a href="${String(context.trainingUrl)}">Your training</a> has the rest, and if there is no date
 that suits you, ask for the module to be taught again and we will know there is demand for it.</p>
 <p>If you did come and this is wrong, tell whoever ran the session and they can put it right.</p>`),
@@ -704,8 +734,7 @@ that suits you, ask for the module to be taught again and we will know there is 
 You were signed up for the session on ${context.heldOn} and we did not see you there, so there is
 nothing on your training record for it.
 
-Nothing has been held against you and nothing has been taken away. It only means this module is
-still outstanding, so anything that needs it is still waiting on it.
+Nothing on your record has changed; the module is still outstanding.
 
 Your training, and asking for a module to be taught again:
 ${String(context.trainingUrl)}
@@ -720,9 +749,9 @@ The Nottingham New Theatre`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>You opened the register for the session on ${context.heldOn} and it has not been marked, so
 <strong>nobody has been given a record for it</strong>.</p>
-<p>Marking the register is what creates the records, so until it is marked, as far as the rest of
-the theatre is concerned that training did not happen. Records date to the day of the session, not
-the day you mark it, so a late register is still correct.</p>
+<p>Marking the register is what creates the records, so until it is marked, nothing that needs
+this training counts it. Records date to the day of the session, not the day you mark it, so a
+late register is still correct.</p>
 <p><a href="${String(context.registerUrl)}">Mark it now</a>. If the session did not happen, cancel it
 instead and everybody signed up will be told.</p>`),
     text: `Hello ${context.name},
@@ -730,9 +759,9 @@ instead and everybody signed up will be told.</p>`),
 You opened the register for the session on ${context.heldOn} and it has not been marked, so nobody
 has been given a record for it.
 
-Marking the register is what creates the records, so until it is marked, as far as the rest of the
-theatre is concerned that training did not happen. Records date to the day of the session, not the
-day you mark it, so a late register is still correct.
+Marking the register is what creates the records, so until it is marked, nothing that needs this
+training counts it. Records date to the day of the session, not the day you mark it, so a late
+register is still correct.
 
 Mark it now:
 ${String(context.registerUrl)}
@@ -748,12 +777,12 @@ The Nottingham New Theatre`,
     const modules = context.modules as { id: string, name: string, expiresOn: string }[]
     const one = modules.length === 1
     return {
-      subject: 'A heads-up about your training',
+      subject: 'Your training expires before long',
       html: layout(`<p>Hello ${context.name},</p>
 <p>${one ? 'A training module you hold expires before long.' : `${modules.length} training modules you hold expire before long.`}</p>
 <ul>${modules.map(module => `<li>${module.name} (${module.id}), until ${module.expiresOn}</li>`).join('')}</ul>
-<p>There is nothing to do today: ${one ? 'it' : 'they'} still count until then. Expired training does
-not disappear from your record, it just stops counting towards the things that need it.</p>
+<p>There is nothing to do today: ${one ? 'it still counts' : 'they still count'} until then. Expired training does
+not disappear from your record. It just stops counting towards the things that need it.</p>
 <p><a href="${String(context.trainingUrl)}">Your training</a> shows what you hold and what you could
 do next. If there is no session that suits you, ask for the module to be taught and we will know
 there is demand for it.</p>`),
@@ -763,8 +792,8 @@ ${one ? 'A training module you hold expires before long.' : `${modules.length} t
 
 ${modules.map(module => `- ${module.name} (${module.id}), until ${module.expiresOn}`).join('\n')}
 
-There is nothing to do today: ${one ? 'it' : 'they'} still count until then. Expired training does not
-disappear from your record, it just stops counting towards the things that need it.
+There is nothing to do today: ${one ? 'it still counts' : 'they still count'} until then. Expired training does not
+disappear from your record. It just stops counting towards the things that need it.
 
 Your training, and what you could do next:
 ${String(context.trainingUrl)}
@@ -784,7 +813,7 @@ The Nottingham New Theatre`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${one ? 'A training module you hold expires within the next fortnight.' : `${modules.length} training modules you hold expire within the next fortnight.`}</p>
 <ul>${modules.map(module => `<li>${module.name} (${module.id}), until ${module.expiresOn}</li>`).join('')}</ul>
-<p>${one ? 'It' : 'They'} still count until then, so nothing has changed yet.</p>
+<p>${one ? 'It still counts' : 'They still count'} until then, so nothing has changed yet.</p>
 <p><a href="${String(context.trainingUrl)}">Your training</a> has the rest, and asking for a module to
 be taught is what tells the department there is demand.</p>`),
       text: `Hello ${context.name},
@@ -793,7 +822,7 @@ ${one ? 'A training module you hold expires within the next fortnight.' : `${mod
 
 ${modules.map(module => `- ${module.name} (${module.id}), until ${module.expiresOn}`).join('\n')}
 
-${one ? 'It' : 'They'} still count until then, so nothing has changed yet.
+${one ? 'It still counts' : 'They still count'} until then, so nothing has changed yet.
 
 Your training:
 ${String(context.trainingUrl)}
@@ -804,7 +833,7 @@ The Nottingham New Theatre`,
     }
   },
 
-  // Sent whether or not it has anything in it: a month with no digest means the clockwork stopped,
+  // Sent whether or not it has anything in it: a month with no digest means the sweep stopped,
   // and that is the thing worth noticing (G-125 criterion 3).
   'training-expiry-digest': (context: TemplateContext): Rendered => {
     const expiring = context.expiring as { name: string, moduleId: string, moduleName: string, expiresOn: string }[]
@@ -819,16 +848,16 @@ The Nottingham New Theatre`,
       subject: `Training expiry digest, ${String(context.period)}`,
       html: layout(`<p>Hello ${context.name},</p>
 ${nothing
-  ? `<p>Nothing is expiring or expired. This email still arrives every month, so that its absence
-means something is wrong with the clockwork rather than that there was nothing to say.</p>`
+  ? `<p>Nothing is expiring or expired. This email still arrives every month. If this email ever
+stops arriving, the monthly sweep has stopped running.</p>`
   : `${expired.length > 0 ? `<p>Already expired:</p><ul>${list(expired)}</ul>` : ''}
 ${expiring.length > 0 ? `<p>Expiring soon:</p><ul>${list(expiring)}</ul>` : ''}`}
 <p><a href="${String(context.trainingUrl)}">Training records</a> has the detail.</p>`),
       text: `Hello ${context.name},
 
 ${nothing
-  ? `Nothing is expiring or expired. This email still arrives every month, so that its absence means
-something is wrong with the clockwork rather than that there was nothing to say.`
+  ? `Nothing is expiring or expired. This email still arrives every month. If this email ever stops
+arriving, the monthly sweep has stopped running.`
   : `${expired.length > 0 ? `Already expired:\n${plain(expired)}\n` : ''}${expiring.length > 0 ? `\nExpiring soon:\n${plain(expiring)}` : ''}`}
 
 Training records:
@@ -848,15 +877,17 @@ The Nottingham New Theatre`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${one ? 'You have a room booked tomorrow.' : 'You have rooms booked tomorrow.'}</p>
 <ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
-<p>If you no longer need ${one ? 'it' : 'them'}, <a href="${String(context.roomsUrl)}">cancel</a> so
-somebody else can have the slot.</p>`),
+<p>If you no longer need ${one ? 'it' : 'them'}, cancel so somebody else can have the slot.</p>
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
       text: `Hello ${context.name},
 
 ${one ? 'You have a room booked tomorrow.' : 'You have rooms booked tomorrow.'}
 
 ${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`).join('\n')}
 
-If you no longer need ${one ? 'it' : 'them'}, cancel so somebody else can have the slot:
+If you no longer need ${one ? 'it' : 'them'}, cancel so somebody else can have the slot.
+
+See your bookings:
 ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
@@ -864,13 +895,13 @@ The Nottingham New Theatre`,
   },
 
   'room-series-booked': (context: TemplateContext): Rendered => ({
-    subject: `Booked: ${String(context.count)} rehearsals in ${String(context.room)}`,
+    subject: `Booked: ${plural(Number(context.count), 'booking')} in ${String(context.room)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>${context.count} bookings in ${context.room} are confirmed, from ${context.first} to
 ${context.last}.</p>
 <p>${context.title}</p>
-<p><a href="${String(context.roomsUrl)}">See what you hold</a>. Cancelling asks whether you mean
-one week or the whole run.</p>`),
+<p>Cancelling asks whether you mean one week or the whole run.</p>
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
     text: `Hello ${context.name},
 
 ${String(context.count)} bookings in ${String(context.room)} are confirmed, from
@@ -878,14 +909,15 @@ ${String(context.first)} to ${String(context.last)}.
 
 ${String(context.title)}
 
-See what you hold: ${String(context.roomsUrl)}
 Cancelling asks whether you mean one week or the whole run.
+
+See your bookings: ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
   }),
 
   'room-series-requested': (context: TemplateContext): Rendered => ({
-    subject: `Asked for: ${String(context.count)} rehearsals in ${String(context.room)}`,
+    subject: `Asked for: ${plural(Number(context.count), 'booking')} in ${String(context.room)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>Your request for ${context.count} bookings in ${context.room}, from ${context.first} to
 ${context.last}, is waiting for a decision.</p>
@@ -963,7 +995,7 @@ ${offered
 you. If it does not suit, cancel it and book something else.</p>`
   : `<p>Nothing equivalent was free nearby, so nothing has been booked in its place. Please find
 another slot.</p>`}
-<p><a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+<p><a href="${String(context.roomsUrl)}">${offered ? 'See your bookings' : 'Find another slot'}</a></p>`),
       text: `Hello ${context.name},
 
 Your booking of ${String(context.room)}, ${String(context.when)}, has been given to something with
@@ -975,7 +1007,7 @@ ${offered
   ? `You have been booked into ${offered} instead, and that slot is held for you. If it does not suit, cancel it and book something else.`
   : 'Nothing equivalent was free nearby, so nothing has been booked in its place. Please find another slot.'}
 
-See what you hold: ${String(context.roomsUrl)}
+${offered ? 'See your bookings' : 'Find another slot'}: ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
     }
@@ -986,7 +1018,8 @@ The Nottingham New Theatre`,
     return {
       subject: stopped ? 'Your bookings now need approving first' : 'A booking you did not use',
       html: layout(`<p>Hello ${context.name},</p>
-<p>${context.room}, ${context.title}, was booked and not used. That is ${context.count} now.</p>
+<p>${context.room}, ${context.title}, was booked and not used. That is the
+${ordinal(Number(context.count))} booking not used this year.</p>
 ${stopped
   ? `<p>From now on every room you book is checked by a person before it is held. That lifts once
 your record is back below ${context.preApprovalAt}.</p>`
@@ -995,8 +1028,8 @@ cannot use a room, cancelling frees it for somebody else and costs you nothing.<
 <p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
       text: `Hello ${context.name},
 
-${String(context.room)}, ${String(context.title)}, was booked and not used. That is
-${String(context.count)} now.
+${String(context.room)}, ${String(context.title)}, was booked and not used. That is the
+${ordinal(Number(context.count))} booking not used this year.
 
 ${stopped
   ? `From now on every room you book is checked by a person before it is held. That lifts once your record is back below ${String(context.preApprovalAt)}.`
@@ -1009,16 +1042,16 @@ The Nottingham New Theatre`,
   },
 
   'external-received': (context: TemplateContext): Rendered => ({
-    subject: `Asked for: a room not listed here, ${String(context.when)}`,
+    subject: `Asked for: a room we do not manage, ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>Your request for a room we do not manage, ${context.when}, is with the Theatre Manager, who
+<p>Your request for a room we do not manage, ${context.when}, is with the ${saysRole('THEATRE_MANAGER')}, who
 fills in the Students' Union's form.</p>
 <p>${context.title}</p>
 <p>The Students' Union decides which room we get, so nothing is held yet. You will hear when the
 form is in, and again when they answer.</p>`),
     text: `Hello ${context.name},
 
-Your request for a room we do not manage, ${String(context.when)}, is with the Theatre Manager,
+Your request for a room we do not manage, ${String(context.when)}, is with the ${saysRole('THEATRE_MANAGER')},
 who fills in the Students' Union's form.
 
 ${String(context.title)}
@@ -1030,7 +1063,7 @@ The Nottingham New Theatre`,
   }),
 
   'external-raised': (context: TemplateContext): Rendered => ({
-    subject: `A room not listed here has been asked for: ${String(context.when)}`,
+    subject: `A room we do not manage has been asked for: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>${context.who} has asked for a room we do not manage, ${context.when}.</p>
 <p>${context.title}</p>
@@ -1051,13 +1084,13 @@ The Nottingham New Theatre`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>The form for ${context.title}, ${context.when}, is in with the Students' Union. They decide
 which room we get, so this may not be the room you asked for.</p>
-<p><a href="${String(context.roomsUrl)}">See what you have asked for</a></p>`),
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
     text: `Hello ${context.name},
 
 The form for ${String(context.title)}, ${String(context.when)}, is in with the Students' Union.
 They decide which room we get, so this may not be the room you asked for.
 
-See what you have asked for: ${String(context.roomsUrl)}
+See your bookings: ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
   }),
@@ -1067,13 +1100,13 @@ The Nottingham New Theatre`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>You have <strong>${context.room}</strong> (${context.where}) for ${context.title},
 ${context.when}.</p>
-<p><a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
     text: `Hello ${context.name},
 
 You have ${String(context.room)} (${String(context.where)}) for
 ${String(context.title)}, ${String(context.when)}.
 
-See what you hold: ${String(context.roomsUrl)}
+See your bookings: ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
   }),
@@ -1083,14 +1116,14 @@ The Nottingham New Theatre`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>We were offered ${context.room} for ${context.title}, ${context.when}, and it is not suitable
 for what you need it for. We have asked again, which adds a few days.</p>
-<p><a href="${String(context.roomsUrl)}">See what you have asked for</a></p>`),
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
     text: `Hello ${context.name},
 
 We were offered ${String(context.room)} for ${String(context.title)},
 ${String(context.when)}, and it is not suitable for what you need it for. We have asked again,
 which adds a few days.
 
-See what you have asked for: ${String(context.roomsUrl)}
+See your bookings: ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
   }),
@@ -1135,7 +1168,7 @@ The Nottingham New Theatre`,
   'external-waiting': (context: TemplateContext): Rendered => {
     const formIsIn = context.formIsIn === true
     return {
-      subject: `Still waiting: a room not listed here, ${String(context.when)}`,
+      subject: `Still waiting: a room we do not manage, ${String(context.when)}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${context.who} asked for a room we do not manage, ${context.when}, and it has been waiting.</p>
 <p>${context.title}</p>
@@ -1164,23 +1197,23 @@ The Nottingham New Theatre`,
     subject: `Now being asked for elsewhere: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>Your request for <strong>${context.room}</strong>, ${context.when}, is being asked for as a room
-not listed here instead.</p>
+we do not manage instead.</p>
 <p>Why: ${context.why}</p>
 <p><strong>${context.room} is free again</strong>, so somebody else may take it. Nothing is held
 for you until whoever manages the new room answers, and the form goes in by
 ${String(context.dueBy)}.</p>
-<p><a href="${String(context.roomsUrl)}">See what you have asked for</a></p>`),
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
     text: `Hello ${context.name},
 
-Your request for ${String(context.room)}, ${String(context.when)}, is being asked for as a room not
-listed here instead.
+Your request for ${String(context.room)}, ${String(context.when)}, is being asked for as a room we
+do not manage instead.
 
 Why: ${String(context.why)}
 
 ${String(context.room)} is free again, so somebody else may take it. Nothing is held for you until
 whoever manages the new room answers, and the form goes in by ${String(context.dueBy)}.
 
-See what you have asked for: ${String(context.roomsUrl)}
+See your bookings: ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
   }),
@@ -1188,24 +1221,24 @@ The Nottingham New Theatre`,
   'request-relisted': (context: TemplateContext): Rendered => {
     const settled = context.settled === true
     return {
-      subject: `${settled ? 'You have' : 'Asked for'} ${String(context.room)}, ${String(context.when)}`,
+      subject: `Asked for: ${String(context.room)}, ${String(context.when)}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${context.title}, ${context.when}, has moved into <strong>${context.room}</strong>, one of ours,
-rather than waiting on a room not listed here.</p>
+rather than waiting on a room we do not manage.</p>
 <p>${settled
   ? 'It is confirmed, and the room is held for you.'
   : 'It still needs a decision, because it falls outside the booking rules, so it is in the queue.'}</p>
-<p><a href="${String(context.roomsUrl)}">See what you hold</a></p>`),
+<p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
       text: `Hello ${context.name},
 
 ${String(context.title)}, ${String(context.when)}, has moved into ${String(context.room)}, one of
-ours, rather than waiting on a room not listed here.
+ours, rather than waiting on a room we do not manage.
 
 ${settled
   ? 'It is confirmed, and the room is held for you.'
   : 'It still needs a decision, because it falls outside the booking rules, so it is in the queue.'}
 
-See what you hold: ${String(context.roomsUrl)}
+See your bookings: ${String(context.roomsUrl)}
 
 The Nottingham New Theatre`,
     }
@@ -1259,15 +1292,14 @@ The Nottingham New Theatre`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Follow this link to sign in. It works once.</p>
 <p><a href="${url}">Sign in</a></p>
-<p>The link works until ${until}. If you did not ask for it, ignore it: it signs nobody in but
-whoever opens it from this mailbox.</p>`),
+<p>The link works until ${until}. If you did not ask for it, ignore it: nothing has changed.</p>`),
       text: `Hello ${context.name},
 
 Follow this link to sign in. It works once:
 
 ${url}
 
-The link works until ${until}. If you did not ask for it, ignore it.
+The link works until ${until}. If you did not ask for it, ignore it: nothing has changed.
 
 The Nottingham New Theatre`,
     }
@@ -1325,15 +1357,15 @@ The Nottingham New Theatre`,
 <p>We could not record the membership you told us about.</p>
 <p>Why: ${reason}</p>
 <p>If that can be put right, <a href="${url}">claim it again</a> with the corrected details, or
-speak to the membership secretary.</p>`),
+speak to the committee.</p>`),
       text: `Hello ${context.name},
 
 We could not record the membership you told us about.
 
 Why: ${reason}
 
-If that can be put right, claim it again with the corrected details, or speak to the membership
-secretary: ${url}
+If that can be put right, claim it again with the corrected details, or speak to the committee:
+${url}
 
 The Nottingham New Theatre`,
     }
@@ -1353,22 +1385,22 @@ The Nottingham New Theatre`,
         : `${roles.length} of your roles lapse soon`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${one ? 'A role you hold lapses soon.' : 'Roles you hold lapse soon.'} Committee roles run to the
-end of the theatre's year, so this is the ordinary handover rather than anything having gone wrong.</p>
+end of our year, so this is the ordinary handover rather than anything having gone wrong.</p>
 <ul>${lines.map(line => `<li>${line}</li>`).join('')}</ul>
-<p>If you are carrying on, ask an administrator to renew ${one ? 'it' : 'them'}. If you are handing
-over, this is the notice to plan it.</p>
+<p>If you are carrying on, ask the ${saysRole('ADMIN')} to renew ${one ? 'it' : 'them'}. If you are
+handing over, this is the notice to plan it.</p>
 <p>This is about your standing role and nothing else. A shift you are confirmed for still opens the
 screens it always did, and your account, bookings and training records are untouched. Your roles are
 listed on <a href="${String(context.accountUrl)}">your account</a>.</p>`),
       text: `Hello ${context.name},
 
 ${one ? 'A role you hold lapses soon.' : 'Roles you hold lapse soon.'} Committee roles run to the end
-of the theatre's year, so this is the ordinary handover rather than anything having gone wrong.
+of our year, so this is the ordinary handover rather than anything having gone wrong.
 
 ${lines.map(line => `- ${line}`).join('\n')}
 
-If you are carrying on, ask an administrator to renew ${one ? 'it' : 'them'}. If you are handing
-over, this is the notice to plan it.
+If you are carrying on, ask the ${saysRole('ADMIN')} to renew ${one ? 'it' : 'them'}. If you are
+handing over, this is the notice to plan it.
 
 This is about your standing role and nothing else. A shift you are confirmed for still opens the
 screens it always did, and your account, bookings and training records are untouched.
@@ -1381,7 +1413,7 @@ The Nottingham New Theatre`,
   },
 
   // Sent whether or not it has anything in it, the same reasoning the training digest uses: a
-  // month with no digest means the clockwork stopped (A-119 criteria 2, 3).
+  // month with no digest means the sweep stopped (A-119 criteria 2, 3).
   'role-expiry-digest': (context: TemplateContext): Rendered => {
     const expiring = context.expiring as { name: string, role: string, lapsesOn: string }[]
     const lapsed = context.lapsed as { name: string, role: string, lapsesOn: string }[]
@@ -1402,8 +1434,7 @@ The Nottingham New Theatre`,
       html: layout(`<p>Hello ${context.name},</p>
 ${nothing
   ? `<p>Nothing is lapsing, nothing has just lapsed, and no grant is permanent. This email still
-arrives every month, so that its absence means the clockwork stopped rather than that there was
-nothing to say.</p>`
+arrives every month. If this email ever stops arriving, the monthly sweep has stopped running.</p>`
   : `${lapsed.length > 0 ? `<p>Lapsed recently:</p><ul>${dated(lapsed)}</ul>` : ''}
 ${expiring.length > 0 ? `<p>Lapsing soon:</p><ul>${dated(expiring)}</ul>` : ''}
 ${permanent.length > 0 ? `<p>Permanent grants, which never lapse and so are worth a look:</p><ul>${standing(permanent)}</ul>` : ''}`}
@@ -1413,8 +1444,7 @@ enforce it. <a href="${String(context.rolesUrl)}">The account directory</a> has 
 
 ${nothing
   ? `Nothing is lapsing, nothing has just lapsed, and no grant is permanent. This email still arrives
-every month, so that its absence means the clockwork stopped rather than that there was nothing to
-say.`
+every month. If this email ever stops arriving, the monthly sweep has stopped running.`
   : `${lapsed.length > 0 ? `Lapsed recently:\n${datedPlain(lapsed)}\n` : ''}${expiring.length > 0 ? `\nLapsing soon:\n${datedPlain(expiring)}\n` : ''}${permanent.length > 0 ? `\nPermanent grants, which never lapse and so are worth a look:\n${standingPlain(permanent)}` : ''}`}
 
 A lapsed grant grants nothing from the instant it expires, so nothing here is waiting on you to
@@ -1435,15 +1465,15 @@ The Nottingham New Theatre`,
     return {
       subject: `Your hold on ${show} releases soon`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>Your unpaid reservation ${reference} for ${show}, ${when}, is held until ${releasesAt}.</p>
+<p>Your unpaid booking ${reference} for ${show}, ${when}, is held until ${releasesAt}.</p>
 <p>Pay at the box office before then to keep your seats, or cancel to free them for somebody
-else. After ${releasesAt} the seats go back on sale and cannot be guaranteed back to you.</p>`),
+else. After ${releasesAt} the seats go back on sale and may be sold to somebody else.</p>`),
       text: `Hello ${context.name},
 
-Your unpaid reservation ${reference} for ${show}, ${when}, is held until ${releasesAt}.
+Your unpaid booking ${reference} for ${show}, ${when}, is held until ${releasesAt}.
 
 Pay at the box office before then to keep your seats, or cancel to free them for somebody else.
-After ${releasesAt} the seats go back on sale and cannot be guaranteed back to you.
+After ${releasesAt} the seats go back on sale and may be sold to somebody else.
 
 The Nottingham New Theatre`,
     }
@@ -1459,18 +1489,18 @@ The Nottingham New Theatre`,
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
     return {
-      subject: `Your reservation for ${show}`,
+      subject: `Your booking for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Reference <strong>${reference}</strong> for ${show}, ${when}.</p>
-<p><strong>UNPAID.</strong> ${totalDue} is due at the box office on the night; this reservation
-holds your seats and is not a purchase until then.</p>
+<p>Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats
+and is not a purchase until then.</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
       text: `Hello ${context.name},
 
 Reference ${reference} for ${show}, ${when}.
 
-UNPAID. ${totalDue} is due at the box office on the night; this reservation holds your seats and
+Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats and
 is not a purchase until then.
 
 Open your booking: ${url}
@@ -1504,21 +1534,21 @@ The Nottingham New Theatre`,
     }
   },
   // D-110 criterion 3: the confirmation this undoes, so the wording answers the same three
-  // questions (which booking, which show, who cancelled it) rather than inventing a fourth shape.
+  // questions (which booking, which show, who cancelled it) rather than a fourth shape.
   'reservation-cancelled': (context: TemplateContext): Rendered => {
     const reference = String(context.reference)
     const show = String(context.show)
     const when = String(context.when)
     return {
-      subject: `Your reservation for ${show} is cancelled`,
+      subject: `Your booking for ${show} is cancelled`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Reference <strong>${reference}</strong> for ${show}, ${when}, is now cancelled at your request.
-Nothing was charged: the reservation was still unpaid.</p>
+Nothing was charged: the booking was still unpaid.</p>
 <p>Changed your mind? Book again from the show's page while seats remain.</p>`),
       text: `Hello ${context.name},
 
 Reference ${reference} for ${show}, ${when}, is now cancelled at your request. Nothing was
-charged: the reservation was still unpaid.
+charged: the booking was still unpaid.
 
 Changed your mind? Book again from the show's page while seats remain.
 
@@ -1557,7 +1587,7 @@ The Nottingham New Theatre`,
     const removeUrl = String(context.removeUrl)
     const seats = partySize === 1 ? '1 seat' : `${partySize} seats`
     return {
-      subject: `You're on the waiting list for ${show}`,
+      subject: `You are on the waiting list for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>You are on the waiting list for ${show}, ${when}, for ${seats}. We will email you the moment
 seats free up, in the order people joined.</p>
@@ -1578,19 +1608,22 @@ The Nottingham New Theatre`,
     const expires = String(context.expires)
     const claimUrl = String(context.claimUrl)
     const removeUrl = String(context.removeUrl)
+    const partySize = Number(context.partySize)
+    const one = partySize === 1
     return {
-      subject: `Seats are free for ${show}: claim by ${expires}`,
+      subject: one ? `A seat has come free for ${show}` : `Seats have come free for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>A seat has freed up for ${show}, ${when}. It is held for you until <strong>${expires}</strong>;
-after that it passes to the next person on the list.</p>
-<p><a href="${claimUrl}">Claim my seats</a></p>
+<p>${plural(partySize, 'seat')} for ${show}, ${when}, ${one ? 'is' : 'are'} held for you until
+<strong>${expires}</strong>; after that ${one ? 'it passes' : 'they pass'} to the next person on
+the list.</p>
+<p><a href="${claimUrl}">Claim my ${one ? 'seat' : 'seats'}</a></p>
 <p>Not coming after all? <a href="${removeUrl}">Leave the waiting list</a>.</p>`),
       text: `Hello ${context.name},
 
-A seat has freed up for ${show}, ${when}. It is held for you until ${expires}; after that it
-passes to the next person on the list.
+${plural(partySize, 'seat')} for ${show}, ${when}, ${one ? 'is' : 'are'} held for you until
+${expires}; after that ${one ? 'it passes' : 'they pass'} to the next person on the list.
 
-Claim your seats: ${claimUrl}
+Claim your ${one ? 'seat' : 'seats'}: ${claimUrl}
 
 Leave the waiting list: ${removeUrl}
 
@@ -1600,14 +1633,14 @@ The Nottingham New Theatre`,
   'health-alert': (context: TemplateContext): Rendered => {
     const since = String(context.since)
     return {
-      subject: 'The estate has been unhealthy for a while',
+      subject: `The site health check has been failing since ${since}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p><code>/api/health</code> has read unhealthy since ${since} and has not recovered.</p>
+<p>The site health check has been failing since ${since} and has not recovered.</p>
 <p>Check the endpoint and the migrate workflow: a schema behind its code, or a missing session
 secret, are the two things it watches for.</p>`),
       text: `Hello ${context.name},
 
-/api/health has read unhealthy since ${since} and has not recovered.
+The site health check has been failing since ${since} and has not recovered.
 
 Check the endpoint and the migrate workflow: a schema behind its code, or a missing session
 secret, are the two things it watches for.
@@ -1650,14 +1683,14 @@ The Nottingham New Theatre`,
   }),
 
   // Sent whether or not it has anything in it, the same reasoning training's own digest uses: a
-  // period with nothing to report still proves the sweep ran.
+  // period with nothing to report still proves the sweep ran. Its absence is the alarm.
   'retention-digest': (context: TemplateContext): Rendered => {
     const capNote = (at: unknown): string => at !== null ? ` (capped at ${String(at)} this run)` : ''
     const warnings = `${String(context.window)} first warnings and ${String(context.final)} final warnings sent this run${capNote(context.warningsCappedAt)}.`
     const anonymiseNote = capNote(context.anonymisationsCappedAt)
     const line = context.armed
       ? `${String(context.anonymised)} accounts anonymised${anonymiseNote}.`
-      : `${String(context.wouldAnonymise)} accounts would have been anonymised${anonymiseNote}, dry-run only.`
+      : `${String(context.wouldAnonymise)} accounts would have been anonymised${anonymiseNote}. Retention is still in rehearsal mode: nothing was anonymised.`
     return {
       subject: 'Retention sweep digest',
       html: layout(`<p>Hello ${context.name},</p>
@@ -1712,6 +1745,8 @@ The Nottingham New Theatre`,
 } as const
 
 export type TemplateName = keyof typeof TEMPLATES
+
+export const TEMPLATE_NAMES = Object.keys(TEMPLATES) as TemplateName[]
 
 // A template rendered against a payload missing a required field fails here rather than
 // sending a message with a blank in it (H-109 criterion 5).

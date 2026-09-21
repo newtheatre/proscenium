@@ -104,6 +104,7 @@ export interface OfferedWaitingListEntry {
   showTitle: string
   startsAt: number
   expiresAt: number
+  partySize: number
 }
 
 export interface OfferWaitingListRun {
@@ -142,7 +143,7 @@ export async function offerWaitingList(event: H3Event | undefined, performanceId
     await db.run(sql`INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${entry.detail !== null ? JSON.stringify(entry.detail) : null})`)
 
     remaining -= candidate.partySize
-    offered.push({ id: candidate.id, userId: candidate.userId, showTitle: performance.showTitle, startsAt: performance.startsAt, expiresAt })
+    offered.push({ id: candidate.id, userId: candidate.userId, showTitle: performance.showTitle, startsAt: performance.startsAt, expiresAt, partySize: candidate.partySize })
   }
 
   return { eligible: candidates.length, offered }
