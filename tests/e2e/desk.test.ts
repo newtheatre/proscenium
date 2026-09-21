@@ -532,3 +532,55 @@ describe.skipIf(skip !== null)('scanning with the camera, with no camera to open
     }
   }, CASE_TIMEOUT_MS)
 })
+
+// K-123: a refund is one press away from happening by accident, so it confirms first and the
+// verb carries the amount going back. Back refunds nothing.
+describe.skipIf(skip !== null)('refunding a ticket confirms before anything moves (K-123)', () => {
+  test('Back refunds nothing, and the named verb refunds the ticket', async () => {
+    expect((await send('PUT', '/api/admin/config/REFUND_PAID_REQUIRES_MANAGER', { value: false }, officer.cookie)).status).toBe(200)
+    try {
+      const { performanceId, ticketTypeId } = await bookableShow(1250)
+      const { reference, id } = await bookedReservation(performanceId, ticketTypeId)
+      expect((await send('POST', `/api/box-office/desk/reservations/${id}/collect`, { expectedTotalPence: 1250, tender: 'CARD' })).status).toBe(200)
+
+      const ticket = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', id)!
+      const refunds = (): unknown[] => queryAll(
+        'SELECT l.id FROM ledger_lines l WHERE l.kind = \'TICKET_REFUND\' AND l.ticket_id = ?', ticket.id,
+      )
+
+      const view = await signInAsBoxOffice(app.baseURL)
+      try {
+        await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+        await waitFor(view, `document.querySelector('[data-test="desk-results"]')?.innerText.includes(${JSON.stringify(reference)})`, 30_000)
+
+        await click(view, `[data-test="desk-open-${id}"]`)
+        await waitFor(view, `document.querySelector('[data-test="desk-refund-${ticket.id}"]')`, 15_000)
+
+        // The press opens the confirmation rather than refunding, and the verb names the amount.
+        await click(view, `[data-test="desk-refund-${ticket.id}"]`)
+        await waitFor(view, `document.querySelector('[data-test="confirm-desk-refund-verb"]')`, 15_000)
+        expect(await textOf(view, '[data-test="confirm-desk-refund-verb"]')).toContain('£12.50')
+
+        await click(view, '[data-test="confirm-desk-refund-back"]')
+        await waitFor(view, `!document.querySelector('[data-test="confirm-desk-refund-verb"]')`, 15_000)
+        expect(refunds()).toEqual([])
+
+        await click(view, `[data-test="desk-refund-${ticket.id}"]`)
+        await waitFor(view, `document.querySelector('[data-test="confirm-desk-refund-verb"]')`, 15_000)
+        await click(view, '[data-test="confirm-desk-refund-verb"]')
+        await waitFor(view, `document.querySelector('[data-test="desk-nothing-owing"]')`, 30_000)
+
+        const refund = query<{ amountPence: number }>(
+          'SELECT amount_pence AS amountPence FROM ledger_lines WHERE kind = \'TICKET_REFUND\' AND ticket_id = ?', ticket.id,
+        )
+        expect(refund?.amountPence).toBe(-1250)
+      }
+      finally {
+        view.close()
+      }
+    }
+    finally {
+      await send('PUT', '/api/admin/config/REFUND_PAID_REQUIRES_MANAGER', { value: true }, officer.cookie)
+    }
+  }, CASE_TIMEOUT_MS)
+})

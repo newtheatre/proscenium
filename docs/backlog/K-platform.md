@@ -522,8 +522,15 @@ Stories: 30. Phases: 24 MVP, 1 V2, 0 Later, 5 resolved.
      table has an empty state that says what would be there.
   6. The conventions are a decision record and a test that fails when a screen departs from
      them, not a review habit.
+  7. A destructive or money-moving action confirms before it happens, through one shared
+     component: the title states what is about to happen, the button names the verb and the
+     thing it acts on, a line says what follows, and a refusal from the route appears inside
+     the dialogue rather than on the page behind it. No console action of that kind is one
+     click.
 - Source: Review of the admin surface against the Nuxt UI component matrix, 30 August 2026;
-  decision 0021 (the design language is enforced by test, not by review).
+  decision 0021 (the design language is enforced by test, not by review). Criterion 7 comes
+  from the console review of 18 September 2026 (issue 1151 item 5), which counted the one-click
+  refunds, revocations and retirements the surface still had.
 
 ## K-124: Developer tools that do not ship
 
