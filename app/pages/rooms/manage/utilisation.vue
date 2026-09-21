@@ -100,13 +100,9 @@ const columns = computed<TableColumn<UtilisationRow>[]>(() => [
       :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-chart-column"
-      title="Booked hours against the hours a room is open"
-      description="A room with no opening hours recorded is always open, so there is no denominator to divide by and it reads as such rather than as nought per cent."
-    />
+    <p class="text-sm text-muted">
+      Booked hours against the hours a room is open.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

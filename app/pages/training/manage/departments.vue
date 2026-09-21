@@ -256,13 +256,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-building-2"
-      title="Departments own their modules, and their leads steward them"
-      description="A lead edits their own department's catalogue without holding an officer role. Standing is read on every request and lapses at handover, so nothing has to be remembered in July."
-    />
+    <p class="text-sm text-muted">
+      The departments that own the catalogue, and who leads each.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

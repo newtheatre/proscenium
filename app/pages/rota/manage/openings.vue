@@ -283,13 +283,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-beer"
-      title="An evening with no performance, staffed like any other"
-      description="A hire, a society social or a get-in. Planning one stamps bar slots from the venue's template, and they are claimed and confirmed exactly as a shift is. It names no show, because there is none."
-    />
+    <p class="text-sm text-muted">
+      An evening with no performance, staffed like any other.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

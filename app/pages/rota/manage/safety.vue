@@ -156,13 +156,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-shield-alert"
-      title="Nothing routes until you opt it in"
-      description="A severity with follow-up off notifies nobody when an incident is logged at it."
-    />
+    <p class="text-sm text-muted">
+      Who hears about an incident, by how serious it is.
+    </p>
 
     <UCard data-test="severity-config">
       <template #header>

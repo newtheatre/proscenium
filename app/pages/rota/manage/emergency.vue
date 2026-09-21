@@ -171,13 +171,9 @@ const columns: TableColumn<VenueCard>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-siren"
-      title="Every edit is a new version, never a rewrite"
-      description="What front of house reads tonight is whichever version was filed last. Nothing here can lose an earlier one."
-    />
+    <p class="text-sm text-muted">
+      What front of house reads if a venue has to be cleared.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

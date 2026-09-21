@@ -205,13 +205,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-list-checks"
-      title="Changes here apply from the next show night"
-      description="A night already touched keeps the checklist it was stamped with, so editing an item tonight changes nothing about tonight."
-    />
+    <p class="text-sm text-muted">
+      What each venue works through on a show night.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

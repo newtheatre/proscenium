@@ -105,13 +105,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-hand"
-      title="What people are asking to be taught"
-      description="A request is a demand signal, never a queue position. Nothing here resolves on a timer: an ask nobody acts on keeps showing up, which is the point of it."
-    />
+    <p class="text-sm text-muted">
+      What people are asking to be taught.
+    </p>
 
     <!-- A failed read and an empty one look the same, and "nobody is asking for anything" is an
       answer a lead would act on. So a failure says so rather than rendering as quiet. -->

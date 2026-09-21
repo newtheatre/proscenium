@@ -230,8 +230,7 @@ onMounted(load)
 <template>
   <div class="space-y-6">
     <p class="text-sm text-muted">
-      Every operational number the system enforces. A change takes effect on the next request, so
-      committee decisions are settings changes rather than releases.
+      Every operational number the theatre works to.
     </p>
 
     <UAlert

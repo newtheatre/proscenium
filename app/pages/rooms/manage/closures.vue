@@ -192,13 +192,9 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
       :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-construction"
-      title="Closing a room cancels what is booked in it"
-      description="Everybody affected is told, with the reason. Reopening restores nothing: a cancelled booking has to be made again, because the slot may be somebody else's by then."
-    />
+    <p class="text-sm text-muted">
+      Rooms shut for a spell, and why.
+    </p>
 
     <AdminToolbar
       v-model:search="search"
