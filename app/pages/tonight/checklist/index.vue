@@ -26,6 +26,7 @@ interface CloseInfo {
   closedByName: string
 }
 
+const route = useRoute()
 const request = useRequestFetch()
 const toast = useToast()
 
@@ -36,26 +37,48 @@ const items = ref<Entry[]>([])
 // Read from the server on every load, never only from `closeNight()`'s own response: otherwise
 // a reload forgets the night is closed and re-enables the close action (E-114 follow-up).
 const close = ref<CloseInfo | null>(null)
-// Carried on every write below: the server resolves tonight's one performance without it, but
-// naming it is what the resolved GET already answered with (no picker yet, docs/known-issues.md).
-const performanceId = ref<string | null>(null)
+// Carried on every write below. The hub and the glance hand the house over in the query, and on a
+// matinee day opened cold the switcher below is what names it (E-127 criterion 2).
+const performanceId = ref<string | null>(typeof route.query.performanceId === 'string' ? route.query.performanceId : null)
+
+// The one list of tonight's houses every show-night screen reads, so none derives "which" a
+// second way (E-127 criterion 2, issue 901).
+const authority = useNightAuthority()
+const choices = computed(() => authority.value.performances.map(one => ({
+  performanceId: one.id,
+  showTitle: one.showTitle,
+  startsAt: one.startsAt,
+})))
+const ambiguous = ref(false)
 
 async function load(): Promise<void> {
   busy.value = true
   failure.value = null
   try {
-    const listed = await request<{ performanceId: string, items: Entry[], close: CloseInfo | null }>('/api/tonight/checklist')
+    const listed = await request<{ performanceId: string, items: Entry[], close: CloseInfo | null }>(
+      '/api/tonight/checklist',
+      { query: performanceId.value ? { performanceId: performanceId.value } : {} },
+    )
     performanceId.value = listed.performanceId
     items.value = listed.items
     close.value = listed.close
+    ambiguous.value = false
     syncedAt.value = new Date()
   }
   catch (refused) {
-    failure.value = refusalText(refused)
+    // More than one house is running and nothing named one: the switcher is the answer, not a
+    // refusal with nothing to tap (issue 1150 item 4).
+    if (!performanceId.value && refusalStatus(refused) === 400) ambiguous.value = true
+    else failure.value = refusalText(refused)
   }
   finally {
     busy.value = false
   }
+}
+
+function choose(chosen: string): void {
+  performanceId.value = chosen
+  load()
 }
 
 onMounted(load)
@@ -65,9 +88,13 @@ const postItems = computed(() => items.value.filter(item => item.phase === 'POST
 const outstandingRequired = computed(() => items.value.filter(item => item.required && !item.done))
 
 const saving = ref(false)
+// Per row, not per screen: one flag spun every Tick on the list when one was pressed (issue 1150
+// item 4).
+const savingId = ref<string | null>(null)
 
 async function tick(entry: Entry): Promise<void> {
   saving.value = true
+  savingId.value = entry.id
   try {
     await $fetch(`/api/tonight/checklist/${entry.id}/tick`, { method: 'POST', body: { performanceId: performanceId.value ?? undefined } })
     await load()
@@ -77,6 +104,7 @@ async function tick(entry: Entry): Promise<void> {
   }
   finally {
     saving.value = false
+    savingId.value = null
   }
 }
 
@@ -144,6 +172,22 @@ async function closeNight(): Promise<void> {
         variant="subtle"
         :description="failure"
       />
+
+      <!-- A matinee day opened cold: name the house rather than refuse into a dead end. -->
+      <div
+        v-else-if="ambiguous"
+        class="space-y-3"
+        data-test="checklist-performance-switcher"
+      >
+        <p class="text-sm text-muted">
+          More than one performance is running tonight. Choose the one you are closing.
+        </p>
+        <NightPerformanceSwitcher
+          :performances="choices"
+          :selected-id="performanceId"
+          @choose="choose"
+        />
+      </div>
 
       <div
         v-else
@@ -213,17 +257,18 @@ async function closeNight(): Promise<void> {
                 />
                 <template v-else-if="!entry.systemCheck">
                   <UButton
-                    size="xs"
-                    :loading="saving"
+                    class="min-h-12 min-w-12 justify-center"
+                    :loading="savingId === entry.id"
+                    :disabled="saving && savingId !== entry.id"
                     :data-test="`tick-${entry.id}`"
                     @click="tick(entry)"
                   >
                     Tick
                   </UButton>
                   <UButton
-                    size="xs"
                     color="neutral"
                     variant="ghost"
+                    class="min-h-12 min-w-12 justify-center"
                     :data-test="`exempt-${entry.id}`"
                     @click="openExempt(entry)"
                   >
@@ -246,16 +291,18 @@ async function closeNight(): Promise<void> {
           v-else-if="outstandingRequired.length > 0"
           class="text-sm text-muted"
         >
-          {{ outstandingRequired.length }} required item{{ outstandingRequired.length === 1 ? '' : 's' }} still needs completing or an exception before closing.
+          {{ plural(outstandingRequired.length, 'required item') }} still open: tick {{ outstandingRequired.length === 1 ? 'it' : 'each' }} or record an exception.
         </p>
       </div>
 
+      <!-- Disabled rather than refused on press, with the server's own 409 still behind it: the
+           screen already knows what is open, so the press need not go and ask (E-114 criterion 4). -->
       <template #actions>
         <NightAction
           label="Close the night"
           icon="i-lucide-door-closed"
           color="primary"
-          :disabled="!!close"
+          :disabled="!!close || ambiguous || outstandingRequired.length > 0"
           :loading="saving"
           data-test="close-night"
           @press="closeNight"
