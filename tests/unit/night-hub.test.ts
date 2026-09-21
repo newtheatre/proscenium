@@ -188,8 +188,9 @@ describe('the house percentage says what it counts (issue 1150 item 10)', () => 
     expect(housePercentLine(0)).toBe('0% of the house sold')
   })
 
-  test('an uncapped house says there is nothing to read rather than a figure', () => {
-    expect(housePercentLine(null)).toBe('This house is uncapped, so there is no percentage to read.')
+  test('an uncapped house reads as the words the tile uses, never a figure', () => {
+    expect(housePercentLine(null)).toBe('No cap on this house')
+    expect(housePercentLine(null)).toContain(saysSeatsLeft(null))
   })
 })
 
