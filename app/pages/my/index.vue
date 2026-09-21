@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import type { MySummary } from '#shared/utils/my-summary'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
@@ -26,8 +26,8 @@ const { data: summary, status } = await useAsyncData(
 
 const membershipLine = computed(() => {
   const membership = summary.value.membership
-  if (membership.state === 'current') return `member until ${formatLondon(startOfLondonDay(membership.until!), { day: 'numeric', month: 'short', year: 'numeric' })}`
-  if (membership.state === 'grace') return `in grace until ${formatLondon(startOfLondonDay(membership.until!), { day: 'numeric', month: 'short', year: 'numeric' })}`
+  if (membership.state === 'current') return `member until ${saysDay(membership.until!, { year: true })}`
+  if (membership.state === 'grace') return `in grace until ${saysDay(membership.until!, { year: true })}`
   if (membership.state === 'lapsed') return 'membership lapsed'
   return 'no membership on record'
 })

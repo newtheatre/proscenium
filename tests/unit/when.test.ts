@@ -71,6 +71,11 @@ describe('an ISO string and an epoch say the same words', () => {
     const at = seconds('2026-10-14T18:30:00Z')
     expect(saysWhen(at * 1000, { now: NOW })).toBe(saysWhen(at, { now: NOW }))
   })
+
+  test('a Date says the same words as the epoch it holds', () => {
+    const at = seconds('2026-10-14T18:30:00Z')
+    expect(saysWhen(new Date(at * 1000), { now: NOW })).toBe(saysWhen(at, { now: NOW }))
+  })
 })
 
 describe('the line between seconds and milliseconds (1e11)', () => {

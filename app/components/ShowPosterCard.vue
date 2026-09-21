@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { Availability, ListedPerformance, ListedShow } from '#shared/utils/programme'
 
@@ -26,7 +26,7 @@ const soldOut = computed(() => onOffer.value.find(one => one.availability === 'S
 const speaks = computed<ListedPerformance | null>(() => bookable.value ?? soldOut.value ?? onOffer.value[0] ?? null)
 
 const day = (at: number): string =>
-  formatLondon(new Date(at * 1000), { weekday: 'short', day: 'numeric', month: 'short' })
+  saysDay(at)
 
 // The run as one line: one night says itself, a run says its first and its last (D-101).
 const runs = computed(() => {

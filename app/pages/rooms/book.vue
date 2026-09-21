@@ -4,7 +4,7 @@ import { saysRecurrence } from '#shared/utils/series'
 import type { FREQUENCIES } from '#shared/utils/series'
 import { overCapacity } from '#shared/utils/rooms'
 import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
-import { formatLondon, fromLondonWallClock, londonWeekday } from '#shared/utils/london'
+import { fromLondonWallClock, londonWeekday } from '#shared/utils/london'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
 import { z } from 'zod'
@@ -204,8 +204,7 @@ const { data: rooms } = await useAsyncData(
 const room = computed(() => rooms.value.find(one => one.id === state.roomId))
 
 function today(): string {
-  return formatLondon(new Date(), { year: 'numeric', month: '2-digit', day: '2-digit' })
-    .split('/').reverse().join('-')
+  return londonDay(new Date())
 }
 
 function addMinutes(clock: string, minutes: number): string {

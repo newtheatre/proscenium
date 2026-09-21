@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhenLong } from '#shared/utils/when'
 import { MAX_PARTY_SIZE, waitingListGuestJoinForm, waitingListPartyForm } from '#shared/utils/waiting-list'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
@@ -23,9 +23,7 @@ if (!data.value) {
   throw createError({ statusCode: 404, statusMessage: 'No such performance', fatal: true })
 }
 
-const when = computed(() => formatLondon(new Date(data.value!.performance.startsAt * 1000), {
-  weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
-}))
+const when = computed(() => saysWhenLong(data.value!.performance.startsAt))
 
 const schema = computed(() => (account.value.signedIn ? waitingListPartyForm : waitingListGuestJoinForm))
 

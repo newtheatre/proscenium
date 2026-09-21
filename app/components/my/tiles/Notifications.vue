@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import type { MySummary } from '#shared/utils/my-summary'
 
 defineProps<{ summary: MySummary }>()
@@ -27,7 +27,7 @@ defineProps<{ summary: MySummary }>()
           {{ item.title }}
         </component>
         <p class="text-xs text-muted">
-          {{ formatLondon(new Date(item.createdAt * 1000), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }}
+          {{ saysWhen(item.createdAt) }}
         </p>
       </li>
     </ul>

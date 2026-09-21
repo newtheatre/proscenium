@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { formatLondon } from './london'
+import { saysWhen } from './when'
 import { plural } from './text'
 
 // The booking flow (D-104): a guest or a signed-in account holds seats online, the box office
@@ -166,9 +166,9 @@ export function belowMinimumTicketsReason(desiredTotal: number): string | null {
 
 // One night in the exchange list: the date leads, because a venue and a state name no night a
 // booker can choose between (D-111 criterion 6).
-export function saysExchangeNight(night: { startsAt: number, venueName: string, says: string }): { label: string, description: string } {
+export function saysExchangeNight(night: { startsAt: number, venueName: string, says: string }, now?: Date): { label: string, description: string } {
   return {
-    label: formatLondon(new Date(night.startsAt * 1000), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+    label: saysWhen(night.startsAt, { now }),
     description: `${night.venueName} · ${night.says}`,
   }
 }

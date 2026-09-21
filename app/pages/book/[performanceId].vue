@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen, saysWhenLong } from '#shared/utils/when'
 import { saysNightLine } from '#shared/utils/programme'
 import { overCapReason } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
@@ -116,14 +116,9 @@ const ordered = computed(() => lines.value.flatMap((line) => {
 const totalPence = computed(() => ordered.value.reduce((total, line) => total + line.pence, 0))
 const seats = computed(() => ordered.value.reduce((total, line) => total + line.quantity, 0))
 
-const when = computed(() => (data.value
-  ? formatLondon(new Date(data.value.performance.startsAt * 1000), {
-      weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
-    })
-  : ''))
+const when = computed(() => (data.value ? saysWhenLong(data.value.performance.startsAt) : ''))
 
-const nightWhen = (at: number): string =>
-  formatLondon(new Date(at * 1000), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+const nightWhen = (at: number): string => saysWhen(at)
 
 const guestName = ref('')
 const guestEmail = ref('')

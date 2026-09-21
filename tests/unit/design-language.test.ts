@@ -214,3 +214,72 @@ describe('a date off the console is read in London (K-127, K-128, issue 1153 ite
     expect(found).toEqual([])
   })
 })
+
+// A screen asks for a shape, it does not build one: formatLondon is the mechanism under
+// shared/utils/when.ts, and a bespoke options object is how the two shapes drifted (copy-style §9).
+const BUILDS_ITS_OWN = /formatLondon\(/
+
+// The console and show-night screens this slice did not reach, and the shared helpers whose
+// shapes are not read by a person. The list may shrink and may not grow.
+const BUILDS_ITS_OWN_ALLOWED = [
+  'app/components/box-office/show/Performances.vue',
+  'app/components/box-office/show/Sales.vue',
+  'app/components/box-office/show/StatusStrip.vue',
+  'app/components/till/TicketsPane.vue',
+  'app/pages/admin/audit.vue',
+  'app/pages/admin/index.vue',
+  'app/pages/admin/settings.vue',
+  'app/pages/bar/stock/movements.vue',
+  'app/pages/bar/stock/stocktakes/[id].vue',
+  'app/pages/bar/stock/stocktakes/index.vue',
+  'app/pages/bar/tabs.vue',
+  'app/pages/box-office/pass-types.vue',
+  'app/pages/comms/operations/accounts/[id].vue',
+  'app/pages/people/accounts/index.vue',
+  'app/pages/people/roles.vue',
+  'app/pages/rooms/index.vue',
+  'app/pages/rooms/manage/requests.vue',
+  'app/pages/rooms/mine.vue',
+  'app/pages/rota/manage/approvals.vue',
+  'app/pages/rota/manage/emergency.vue',
+  'app/pages/rota/manage/openings.vue',
+  'app/pages/rota/manage/safety.vue',
+  'app/pages/rota/manage/shifts.vue',
+  'app/pages/tonight/emergency.vue',
+  'app/pages/tonight/glance.vue',
+  'app/pages/tonight/till/index.vue',
+  'shared/utils/blackouts.ts',
+  'shared/utils/list-filters.ts',
+  'shared/utils/night-hub.ts',
+  'shared/utils/programme.ts',
+]
+
+// london.ts declares formatLondon and when.ts is the one caller the rule exists to route through.
+const THE_MECHANISM = ['shared/utils/london.ts', 'shared/utils/when.ts']
+
+async function sharedFiles(): Promise<string[]> {
+  const glob = new Bun.Glob('**/*.ts')
+  return [...glob.scanSync({ cwd: 'shared', onlyFiles: true })]
+    .map(path => `shared/${path}`)
+    .filter(path => !THE_MECHANISM.includes(path))
+    .sort()
+}
+
+describe('a date shape comes from the shared helpers (K-127, K-128, issue 1153 item 2)', () => {
+  test('no page, component or shared helper builds its own date format', async () => {
+    const found: string[] = []
+    for (const file of [...await appFiles(), ...await sharedFiles()]) {
+      if (BUILDS_ITS_OWN_ALLOWED.includes(file)) continue
+      if (BUILDS_ITS_OWN.test(await Bun.file(file).text())) found.push(file)
+    }
+    expect(found).toEqual([])
+  })
+
+  test('the allow-list names only files that still build one', async () => {
+    const stale: string[] = []
+    for (const file of BUILDS_ITS_OWN_ALLOWED) {
+      if (!BUILDS_ITS_OWN.test(await Bun.file(file).text())) stale.push(file)
+    }
+    expect(stale).toEqual([])
+  })
+})
