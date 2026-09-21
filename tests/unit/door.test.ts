@@ -283,10 +283,4 @@ describe('no screen spells its own camera-failure sentences', () => {
     }
     expect(offenders).toEqual([])
   })
-
-  test('the desk is one of those screens, so neither case passes by the desk having no camera', async () => {
-    const desk = await Bun.file('app/pages/box-office/desk.vue').text()
-    expect(desk).toContain(SETS_NOTE)
-    expect(desk).toContain('CAMERA_FALLBACK_SAYS')
-  })
 })

@@ -232,7 +232,7 @@ describe('one set of camera-failure words (K-128, issue 1150 item 16)', () => {
   })
 
   test('every camera screen reads them from door.ts', async () => {
-    for (const file of ['app/components/QrScanner.vue', 'app/pages/tonight/door/index.vue', 'app/composables/useTillTickets.ts']) {
+    for (const file of ['app/components/QrScanner.vue', 'app/pages/tonight/door/index.vue', 'app/composables/useTillTickets.ts', 'app/pages/box-office/desk.vue']) {
       expect(`${file}: ${(await Bun.file(file).text()).includes('CAMERA_FALLBACK_SAYS')}`).toBe(`${file}: true`)
     }
   })
