@@ -204,13 +204,9 @@ const columns: TableColumn<Room>[] = [
       :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-door-open"
-      title="The bookable estate"
-      description="A room is retired, never deleted, so a booking made last term still names something. A room with no opening hours is open whenever; give it hours and it is shut outside them. Every room here is one we control; the rest live under Other rooms."
-    />
+    <p class="text-sm text-muted">
+      The rooms we control, their hours and their own rules.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

@@ -477,13 +477,9 @@ onMounted(loadRooms)
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-inbox"
-      title="Every request gets an answer"
-      description="A request holds its slot while it waits, so leaving one here keeps the room blocked. One nobody answers is chased up and then lapses on its own."
-    />
+    <p class="text-sm text-muted">
+      Requests for a room, waiting for an answer.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

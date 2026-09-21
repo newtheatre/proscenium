@@ -368,13 +368,9 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
       :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-badge-check"
-      title="Membership is bought at the Students' Union"
-      description="This records what somebody bought and when it runs out. A membership counts from the moment it is recorded: checking it against the SU's own list happens afterwards and never holds up a member price. Current counts the grace window after a term ends; awaiting record is what members have claimed and nobody has written down yet."
-    />
+    <p class="text-sm text-muted">
+      Who is a current member, and who is waiting to be recorded.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

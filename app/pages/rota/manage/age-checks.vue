@@ -16,13 +16,9 @@ const refusal = computed(() => (from.value && to.value && from.value <= to.value
 
 <template>
   <div class="space-y-6">
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-file-down"
-      title="The licensing register"
-      description="Every Challenge 25 check in the range, including superseded entries with their corrections, as a CSV or a formatted PDF for an inspection."
-    />
+    <p class="text-sm text-muted">
+      Every Challenge 25 check in a date range, to hand to an inspector.
+    </p>
 
     <UCard data-test="export-panel">
       <div class="flex flex-wrap items-end gap-4">

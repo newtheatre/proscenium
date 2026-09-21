@@ -249,13 +249,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-map-pin"
-      title="Rooms we do not manage, and cannot promise"
-      description="Nothing here holds a slot or appears on a calendar. It is what a member may state a preference for, and what we have learned about each room, so nobody is sent to a meeting room to rehearse in again."
-    />
+    <p class="text-sm text-muted">
+      Rooms the Students' Union lends us, and what we know about each.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

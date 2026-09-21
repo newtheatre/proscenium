@@ -45,13 +45,9 @@ async function saved(): Promise<void> {
 
 <template>
   <div class="space-y-6">
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-graduation-cap"
-      title="What the theatre teaches, and how long each one is worth"
-      description="A module declares its expiry policy once. Whether somebody currently holds it is worked out from the dates on their record every time it is asked, so nothing here has to be kept up to date."
-    />
+    <p class="text-sm text-muted">
+      What the theatre teaches, and how long each one lasts.
+    </p>
 
     <TrainingCatalogueTable
       ref="table"

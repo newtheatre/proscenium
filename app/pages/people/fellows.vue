@@ -170,13 +170,9 @@ onMounted(load)
       :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-scroll"
-      title="The roll is the theatre's own record"
-      description="No database held it before this one, so the existing Fellows are entered here by hand. A revocation stops future admissions and rewrites nothing."
-    />
+    <p class="text-sm text-muted">
+      The roll of Fellows, and the meeting that admitted each.
+    </p>
 
     <AdminToolbar
       v-model:search="search"
