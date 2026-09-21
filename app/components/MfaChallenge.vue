@@ -59,24 +59,26 @@ async function answer(code: string): Promise<void> {
       :description="notice"
     />
 
-    <UPinInput
-      v-model="digits"
-      :length="CODE_LENGTH"
-      :disabled="working"
-      otp
-      size="lg"
-      autofocus
-      @complete="answer($event.join(''))"
-    />
+    <template v-if="!usingRecoveryCode">
+      <UPinInput
+        v-model="digits"
+        :length="CODE_LENGTH"
+        :disabled="working"
+        otp
+        size="lg"
+        autofocus
+        @complete="answer($event.join(''))"
+      />
 
-    <UButton
-      v-if="!usingRecoveryCode"
-      variant="link"
-      class="px-0"
-      @click="usingRecoveryCode = true"
-    >
-      I do not have my authenticator
-    </UButton>
+      <UButton
+        variant="link"
+        class="min-h-11 justify-start px-0"
+        data-test="use-recovery-code"
+        @click="usingRecoveryCode = true"
+      >
+        I do not have my authenticator
+      </UButton>
+    </template>
 
     <form
       v-else
@@ -100,6 +102,16 @@ async function answer(code: string): Promise<void> {
       >
         Continue
       </UButton>
+      <div>
+        <UButton
+          variant="link"
+          class="min-h-11 justify-start px-0"
+          data-test="use-authenticator"
+          @click="usingRecoveryCode = false"
+        >
+          Use my authenticator instead
+        </UButton>
+      </div>
     </form>
   </div>
 </template>

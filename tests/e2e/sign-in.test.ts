@@ -364,8 +364,8 @@ describe.skipIf(skip !== null)('the way in reads as one journey (A-103, A-112)',
     }
   }, 120_000)
 
-  // "Ask for a new one" used to land on the credentials step, leaving the reader to find the
-  // forgotten-password form again for themselves.
+  // "Ask for a new one" lands on the step that asks, not on credentials: the query names it and
+  // the sign-in screen opens there.
   test('a spent reset link asks for a new one on the forgotten-password step', async () => {
     const view = await openSignedOutView(app.baseURL)
     try {

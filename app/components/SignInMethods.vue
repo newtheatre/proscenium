@@ -210,8 +210,13 @@ onMounted(load)
 
     <template #footer>
       <div class="space-y-4">
+        <!-- The address is said above the field, never as its placeholder: a placeholder made an
+             empty field look filled, so nobody could tell what had been typed (issue 1152 item 1). -->
+        <p class="text-sm text-muted">
+          You sign in as <span data-test="current-email">{{ account.user?.email }}</span>.
+        </p>
         <UFormField
-          label="Email address"
+          label="New email address"
           name="email"
           description="Changing it signs out your other devices and asks the new address to confirm itself."
         >
@@ -219,7 +224,6 @@ onMounted(load)
             <UInput
               v-model="wantedEmail"
               type="email"
-              :placeholder="account.user?.email"
               class="w-full sm:w-80"
               data-test="new-email"
             />

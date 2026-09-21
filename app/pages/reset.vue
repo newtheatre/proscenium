@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import { passwordProblem } from '#shared/utils/auth'
+import { saysPasswordPolicy } from '#shared/utils/password-messages'
 import type { AuthFormField, FormError, FormSubmitEvent } from '@nuxt/ui'
 
 const route = useRoute()
@@ -24,7 +25,7 @@ const fields: AuthFormField[] = [
     type: 'password',
     label: 'New password',
     autocomplete: 'new-password',
-    description: `At least ${policy.value.minLength} characters.`,
+    description: saysPasswordPolicy(policy.value),
     required: true,
   },
 ]
@@ -64,58 +65,59 @@ useSeoMeta({ title: 'Set a new password' })
 </script>
 
 <template>
-  <UContainer class="max-w-md py-16">
-    <UPageCard>
-      <UAlert
-        v-if="notice && outcome === 'choosing'"
-        class="mb-6"
-        color="error"
-        variant="subtle"
-        :description="notice"
-      />
+  <WayIn>
+    <UAlert
+      v-if="notice && outcome === 'choosing'"
+      class="mb-6"
+      color="error"
+      variant="subtle"
+      :description="notice"
+    />
 
-      <UAuthForm
-        v-if="outcome === 'choosing'"
-        :title="settingFirst ? 'Choose your password' : 'Set a new password'"
-        :description="settingFirst ? 'The theatre made you an account. Choose a password and it is ready to use.' : 'Setting a new password signs you out everywhere else.'"
-        :schema="schema"
-        :fields="fields"
-        :validate="checkPassword"
-        :submit="{ label: 'Set my password' }"
-        @submit="reset"
-      />
+    <UAuthForm
+      v-if="outcome === 'choosing'"
+      :title="settingFirst ? 'Choose your password' : 'Set a new password'"
+      :description="settingFirst ? 'The theatre made you an account. Choose a password and it is ready to use.' : 'Setting a new password signs you out everywhere else.'"
+      :schema="schema"
+      :fields="fields"
+      :validate="checkPassword"
+      :submit="{ label: 'Set my password' }"
+      @submit="reset"
+    />
 
-      <div
-        v-else-if="outcome === 'done'"
-        data-test="reset-done"
-        class="space-y-3"
+    <div
+      v-else-if="outcome === 'done'"
+      data-test="reset-done"
+      class="space-y-3"
+    >
+      <h1 class="nnt-headline text-xl">
+        Password set
+      </h1>
+      <p class="text-muted">
+        Every other session on your account has ended. Sign in with the new password.
+      </p>
+      <UButton to="/sign-in">
+        Sign in
+      </UButton>
+    </div>
+
+    <div
+      v-else
+      data-test="token-expired"
+      class="space-y-3"
+    >
+      <h1 class="nnt-headline text-xl">
+        That link has expired
+      </h1>
+      <p class="text-muted">
+        {{ notice }}
+      </p>
+      <UButton
+        to="/sign-in?method=reset"
+        data-test="ask-again"
       >
-        <h1 class="nnt-headline text-xl">
-          Password set
-        </h1>
-        <p class="text-muted">
-          Every other session on your account has ended. Sign in with the new password.
-        </p>
-        <UButton to="/sign-in">
-          Sign in
-        </UButton>
-      </div>
-
-      <div
-        v-else
-        data-test="token-expired"
-        class="space-y-3"
-      >
-        <h1 class="nnt-headline text-xl">
-          That link has expired
-        </h1>
-        <p class="text-muted">
-          {{ notice }}
-        </p>
-        <UButton to="/sign-in">
-          Ask for a new one
-        </UButton>
-      </div>
-    </UPageCard>
-  </UContainer>
+        Ask for a new one
+      </UButton>
+    </div>
+  </WayIn>
 </template>

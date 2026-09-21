@@ -5,7 +5,10 @@ defineProps<{ gold?: boolean }>()
 </script>
 
 <template>
-  <span class="flex flex-col leading-none">
+  <span
+    class="flex flex-col leading-none"
+    data-test="site-wordmark"
+  >
     <span class="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-muted">The Nottingham</span>
     <span class="nnt-headline text-lg">New <span :class="gold ? 'text-secondary' : ''">Theatre</span></span>
   </span>

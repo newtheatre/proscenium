@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { NuxtError } from '#app'
 
-// Calm intensity and none of the expressive kit: an error is not a moment for personality.
+// Inside the site chrome, so a mistyped show URL costs the page and not the rest of the theatre
+// (K-133). No status code reaches the reader: copy-style section 6.
 const props = defineProps<{ error: NuxtError }>()
 
 const SAYS: Record<number, { title: string, says: string }> = {
@@ -35,38 +36,51 @@ const shown = computed(() => {
     says: 'That did not work. Try again, and tell the IT Manager if it keeps happening.',
   }
 })
+
+const WAYS_ON = [
+  { to: '/whats-on', label: 'See what\'s on' },
+  { to: '/get-involved', label: 'Get involved' },
+  { to: '/', label: 'Go to the home page' },
+]
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center p-6">
-    <div class="w-full max-w-md space-y-4 text-center">
-      <p class="font-mono text-sm text-muted">
-        {{ error.statusCode }}
-      </p>
-      <h1 class="text-xl font-semibold">
-        {{ shown.title }}
-      </h1>
-      <p class="text-muted">
-        {{ shown.says }}
-      </p>
-      <div class="flex justify-center gap-3">
+  <NuxtLayout name="default">
+    <WayIn>
+      <div class="space-y-4 text-center">
+        <h1 class="nnt-headline text-2xl text-highlighted">
+          {{ shown.title }}
+        </h1>
+        <p class="text-muted">
+          {{ shown.says }}
+        </p>
+
         <UButton
           v-if="enrol"
           :to="enrol"
           color="primary"
           icon="i-lucide-shield-check"
+          @click="clearError({ redirect: enrol })"
         >
           Set up an authenticator app
         </UButton>
-        <UButton
-          to="/"
-          :variant="enrol ? 'subtle' : 'solid'"
-          icon="i-lucide-arrow-left"
-          @click="clearError({ redirect: '/' })"
+
+        <div
+          class="flex flex-wrap justify-center gap-3"
+          data-test="error-ways"
         >
-          Back to the site
-        </UButton>
+          <UButton
+            v-for="way in WAYS_ON"
+            :key="way.to"
+            :to="way.to"
+            color="neutral"
+            variant="subtle"
+            @click="clearError({ redirect: way.to })"
+          >
+            {{ way.label }}
+          </UButton>
+        </div>
       </div>
-    </div>
-  </div>
+    </WayIn>
+  </NuxtLayout>
 </template>

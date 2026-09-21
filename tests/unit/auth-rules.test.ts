@@ -91,8 +91,8 @@ describe('session currency (0007)', () => {
   })
 })
 
-// The hint under a password field used to contradict the policy, telling a reader length beats
-// punctuation while the rule underneath could demand a symbol (issue 1152 item 1).
+// The hint under a password field says only what the policy will accept: the configuration can
+// demand mixed case, a number and a symbol, and a fixed sentence about length contradicts it.
 describe('the hint under a password field reads the policy (0012)', () => {
   const base = { minLength: 12, maxLength: 100, requireMixedCase: false, requireNumber: false, requireSymbol: false }
 
