@@ -241,13 +241,19 @@ onMounted(load)
       :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
     />
 
-    <UInput
-      v-model="search"
-      icon="i-lucide-search"
-      placeholder="A key, or what it decides"
+    <UFormField
+      label="Search"
+      :ui="{ labelWrapper: 'sr-only' }"
       class="w-full sm:w-96"
-      data-test="config-search"
-    />
+    >
+      <UInput
+        v-model="search"
+        icon="i-lucide-search"
+        placeholder="A key, or what it decides"
+        class="w-full"
+        data-test="config-search"
+      />
+    </UFormField>
 
     <UTabs
       v-model="tab"
@@ -321,6 +327,7 @@ onMounted(load)
               <USwitch
                 v-if="kind(setting) === 'boolean'"
                 :model-value="standing(setting) === true"
+                :aria-label="setting.describes"
                 :loading="saving === setting.key"
                 :data-test="`toggle-${setting.key}`"
                 @update:model-value="attemptSave(setting, $event)"
@@ -332,6 +339,7 @@ onMounted(load)
                   :min="0"
                   :step="0.5"
                   :format-options="{ style: 'currency', currency: 'GBP' }"
+                  :aria-label="setting.describes"
                   class="w-48"
                   :data-test="`input-${setting.key}`"
                   @update:model-value="numbers[setting.key] = pence($event as number)"
@@ -351,6 +359,7 @@ onMounted(load)
                 <UInputNumber
                   v-model="numbers[setting.key]"
                   :min="0"
+                  :aria-label="setting.describes"
                   class="w-40"
                   :data-test="`input-${setting.key}`"
                 />
@@ -368,6 +377,7 @@ onMounted(load)
               <template v-else-if="kind(setting) === 'list'">
                 <UInputTags
                   v-model="lists[setting.key]"
+                  :aria-label="setting.describes"
                   class="min-w-64 flex-1"
                   :data-test="`input-${setting.key}`"
                 />
@@ -385,6 +395,7 @@ onMounted(load)
               <template v-else>
                 <UInput
                   v-model="drafts[setting.key]"
+                  :aria-label="setting.describes"
                   :data-test="`input-${setting.key}`"
                   class="min-w-64 flex-1 font-mono"
                 />

@@ -177,7 +177,7 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
             v-model="active"
             :content="false"
             :items="SHOW_TABS"
-            :ui="{ label: 'hidden sm:inline' }"
+            :ui="{ label: 'sr-only sm:not-sr-only sm:inline' }"
             class="w-full"
             data-test="show-tabs"
           />

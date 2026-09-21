@@ -336,7 +336,9 @@ const columns = computed<TableColumn<Request>[]>(() => [
       cell: ({ row }) => (row.original.kind === 'room'
         ? h(UCheckbox, {
             'modelValue': selected.value.includes(row.original.id),
-            'aria-label': `Select ${row.original.requester}, ${row.original.where}`,
+            'aria-label': row.original.where
+              ? `Select ${row.original.requester}, ${row.original.where}`
+              : `Select ${row.original.requester}`,
             'data-test': `select-${row.original.id}`,
             'onUpdate:modelValue': (on: boolean) => toggle(row.original.id, on),
           })

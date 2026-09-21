@@ -13,6 +13,9 @@ const search = defineModel<string>('search', { default: '' })
 
 withDefaults(defineProps<{
   placeholder?: string
+  // The search box's name, hidden where the row has no space for it; the placeholder is the
+  // example beneath it and never the name (K-101 criterion 5).
+  label?: string
   active?: ActiveFilter[]
   loading?: boolean
   // A page with nothing behind the button says so rather than offering an empty panel.
@@ -22,6 +25,7 @@ withDefaults(defineProps<{
   searchable?: boolean
 }>(), {
   placeholder: 'Search',
+  label: 'Search',
   active: () => [],
   loading: false,
   filterable: true,
@@ -34,16 +38,21 @@ const emit = defineEmits<{ clear: [] }>()
 <template>
   <div class="space-y-3">
     <div class="flex flex-wrap items-center gap-2">
-      <UInput
+      <UFormField
         v-if="searchable"
-        v-model="search"
-        icon="i-lucide-search"
-        :placeholder="placeholder"
-        :aria-label="placeholder"
-        :loading="loading"
+        :label="label"
+        :ui="{ labelWrapper: 'sr-only' }"
         class="w-full sm:w-80"
-        data-test="toolbar-search"
-      />
+      >
+        <UInput
+          v-model="search"
+          icon="i-lucide-search"
+          :placeholder="placeholder"
+          :loading="loading"
+          class="w-full"
+          data-test="toolbar-search"
+        />
+      </UFormField>
 
       <UPopover v-if="filterable">
         <UButton

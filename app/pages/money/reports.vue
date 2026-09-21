@@ -87,6 +87,7 @@ const accessColumns: TableColumn<AccessAdmissionRow>[] = [
         <USelectMenu
           v-if="scopeKind === 'SHOW'"
           v-model="showId"
+          aria-label="Show"
           data-test="scope-show"
           :items="showOptions"
           value-key="value"
@@ -95,10 +96,12 @@ const accessColumns: TableColumn<AccessAdmissionRow>[] = [
         <template v-if="scopeKind === 'PERIOD'">
           <DateField
             v-model="from"
+            aria-label="From"
             data-test="scope-from"
           />
           <DateField
             v-model="to"
+            aria-label="To"
             data-test="scope-to"
           />
         </template>
