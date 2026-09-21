@@ -44,10 +44,18 @@ export interface NavEntry {
   ability: BouncerAbility<Viewer>
   // Overview matches every console route unless it is told not to.
   exact?: boolean
+  // The section within its console group. A group either splits or does not: every item names
+  // one or none does, or some items would sit under a heading that does not describe them (0082).
+  section?: NavSection
   // The footer column this entry sits under. Public entries only, and required of them, so a new
   // public page joins a column by saying which rather than by being listed a second time.
   group?: PublicGroup
 }
+
+// The work of a week against what a committee configures once and leaves alone (0082).
+export const NAV_SECTIONS = ['Every day', 'Set-up'] as const
+
+export type NavSection = (typeof NAV_SECTIONS)[number]
 
 export const PUBLIC_GROUPS = ['Visit', 'Join in', 'About'] as const
 
