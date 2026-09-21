@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDayLong } from '#shared/utils/when'
 import { MEMBERSHIP_TERMS, londonDay } from '#shared/utils/membership'
 import type { MembershipState } from '#shared/utils/membership'
 import { membershipClaimForm } from '#shared/utils/membership-claims'
@@ -40,8 +40,7 @@ const { data, refresh, error } = await useAsyncData<Own>(
 )
 const listFailure = useListFailure(error, 'Your membership could not be read.')
 
-const sayDay = (day: string): string =>
-  formatLondon(startOfLondonDay(day), { day: 'numeric', month: 'long', year: 'numeric' })
+const sayDay = (day: string): string => saysDayLong(day, { year: true })
 
 const termLabel = (years: number): string => `${years} year${years === 1 ? '' : 's'}`
 

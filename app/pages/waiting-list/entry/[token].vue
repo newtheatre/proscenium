@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhenLong } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
 
 // Where a waiting-list link opens: WAITING says so, OFFERED lets it be claimed (D-113 criteria
@@ -97,7 +97,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
       {{ data!.showTitle }}
     </h1>
     <p class="text-muted">
-      {{ formatLondon(new Date(data!.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }) }}
+      {{ saysWhenLong(data!.startsAt) }}
     </p>
 
     <div
@@ -139,7 +139,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         variant="subtle"
         icon="i-lucide-clock"
         title="A seat is free"
-        :description="`Held for you until ${formatLondon(new Date(data!.offerExpiresAt * 1000), { dateStyle: 'full', timeStyle: 'short' })}. Choose ${data!.partySize === 1 ? '1 ticket' : `${data!.partySize} tickets`} to claim it.`"
+        :description="`Held for you until ${saysWhenLong(data!.offerExpiresAt)}. Choose ${data!.partySize === 1 ? '1 ticket' : `${data!.partySize} tickets`} to claim it.`"
       />
 
       <UAlert

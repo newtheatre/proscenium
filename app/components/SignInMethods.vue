@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { refusalToAddPassword } from '#shared/utils/sign-in-methods'
 import type { SignInMethod } from '#shared/utils/sign-in-methods'
 
@@ -25,7 +25,7 @@ async function load(): Promise<void> {
 }
 
 function when(at: number | null): string {
-  return at === null ? 'not recorded' : formatLondon(new Date(at * 1000), { dateStyle: 'medium' })
+  return at === null ? 'not recorded' : saysDay(at)
 }
 
 // A stale session on any of these three opens the modal instead of a toast; the retry is the

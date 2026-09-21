@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import type { MySummary } from '#shared/utils/my-summary'
 
 const props = defineProps<{ summary: MySummary }>()
@@ -35,7 +35,7 @@ const available = computed(() => props.summary.training.available)
         Next session
       </p>
       <p class="text-sm text-muted">
-        {{ summary.training.nextSession.moduleName }} · {{ formatLondon(startOfLondonDay(summary.training.nextSession.heldOn), { weekday: 'short', day: 'numeric', month: 'short' }) }}, {{ summary.training.nextSession.startsAt }}
+        {{ summary.training.nextSession.moduleName }} · {{ saysDay(summary.training.nextSession.heldOn) }}, {{ summary.training.nextSession.startsAt }}
         <template v-if="summary.training.nextSession.place">
           · {{ summary.training.nextSession.place }}
         </template>

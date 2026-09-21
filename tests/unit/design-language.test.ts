@@ -206,8 +206,8 @@ describe('a date off the console is read in London (K-127, K-128, issue 1153 ite
 // shared/utils/when.ts, and a bespoke options object is how the two shapes drifted (copy-style §9).
 const BUILDS_ITS_OWN = /formatLondon\(/
 
-// The console screens the first slice did not reach, and the show-night screens, which are
-// another stream's files. The list may shrink and may not grow.
+// The console and show-night screens this slice did not reach, and the shared helpers whose
+// shapes are not read by a person. The list may shrink and may not grow.
 const BUILDS_ITS_OWN_ALLOWED = [
   'app/components/box-office/show/Performances.vue',
   'app/components/box-office/show/Sales.vue',
@@ -235,12 +235,27 @@ const BUILDS_ITS_OWN_ALLOWED = [
   'app/pages/tonight/emergency.vue',
   'app/pages/tonight/glance.vue',
   'app/pages/tonight/till/index.vue',
+  'shared/utils/blackouts.ts',
+  'shared/utils/list-filters.ts',
+  'shared/utils/night-hub.ts',
+  'shared/utils/programme.ts',
 ]
 
+// london.ts declares formatLondon and when.ts is the one caller the rule exists to route through.
+const THE_MECHANISM = ['shared/utils/london.ts', 'shared/utils/when.ts']
+
+async function sharedFiles(): Promise<string[]> {
+  const glob = new Bun.Glob('**/*.ts')
+  return [...glob.scanSync({ cwd: 'shared', onlyFiles: true })]
+    .map(path => `shared/${path}`)
+    .filter(path => !THE_MECHANISM.includes(path))
+    .sort()
+}
+
 describe('a date shape comes from the shared helpers (K-127, K-128, issue 1153 item 2)', () => {
-  test('no page or component builds its own date format', async () => {
+  test('no page, component or shared helper builds its own date format', async () => {
     const found: string[] = []
-    for (const file of await appFiles()) {
+    for (const file of [...await appFiles(), ...await sharedFiles()]) {
       if (BUILDS_ITS_OWN_ALLOWED.includes(file)) continue
       if (BUILDS_ITS_OWN.test(await Bun.file(file).text())) found.push(file)
     }
