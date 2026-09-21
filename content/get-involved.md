@@ -3,7 +3,6 @@ title: Get involved
 description: How to join the Nottingham New Theatre and what there is to do.
 placeholder: true
 banner: /images/banners/get-involved.webp
-bannerAlt: A performer lit in red, green and blue on the New Theatre stage
 headline: Turn up. Muck in. Take a bow.
 flash: No experience needed
 departments:

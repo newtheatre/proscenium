@@ -6,9 +6,13 @@
 // editorial pages included, stays in the footer (D-103, J-111 criterion 4).
 import { HEADER_NAV } from '#shared/utils/site-nav'
 
+// The booking button already goes to what's on, so the entry is dropped from the rendering here
+// rather than from the declaration, which the footer still reads in full (issue 1152 item 6).
+const BOOKING_TO = '/whats-on'
+
 const { account } = useAccount()
 const links = computed(() => [
-  ...HEADER_NAV.map(entry => ({ label: entry.label, to: entry.to })),
+  ...HEADER_NAV.filter(entry => entry.to !== BOOKING_TO).map(entry => ({ label: entry.label, to: entry.to })),
   ...(account.value.signedIn ? [{ label: 'My NNT', to: '/my' }] : []),
 ])
 </script>
@@ -30,11 +34,14 @@ const links = computed(() => [
         />
 
         <template #right>
+          <!-- The help button is for somebody who is working, so it appears once there is a
+               session behind it (J-109 criterion 1). -->
+          <DocsLink v-if="account.signedIn" />
           <AuthStatus />
           <UButton
             size="sm"
             variant="poster"
-            to="/whats-on"
+            :to="BOOKING_TO"
             data-test="header-book"
           >
             Book tickets
@@ -54,7 +61,7 @@ const links = computed(() => [
           <UButton
             class="mt-6"
             variant="poster"
-            to="/whats-on"
+            :to="BOOKING_TO"
             block
           >
             Book tickets

@@ -36,7 +36,6 @@ const joinTo = computed(() => (account.value.signedIn ? '/account/membership' : 
   <div>
     <PhotoHero
       src="/images/nnt-front.webp"
-      alt="The front of the Nottingham New Theatre on a bright winter day"
       align="start"
       title="A century of first nights."
       description="The country's only entirely student-run theatre. Fourteen shows a term, made from scratch by people who should probably be revising."

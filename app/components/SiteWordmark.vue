@@ -9,7 +9,9 @@ defineProps<{ gold?: boolean }>()
     class="flex flex-col leading-none"
     data-test="site-wordmark"
   >
-    <span class="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-muted">The Nottingham</span>
+    <!-- The theatre's name is read, not decoration, so it clears the small-text floor and takes a
+         foreground that measures against stage black rather than the muted one (K-101). -->
+    <span class="font-mono text-xs uppercase tracking-[0.18em] text-toned">The Nottingham</span>
     <span class="nnt-headline text-lg">New <span :class="gold ? 'text-secondary' : ''">Theatre</span></span>
   </span>
 </template>

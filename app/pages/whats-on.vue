@@ -51,7 +51,6 @@ const flagged = computed(() => data.value.items.find(listed => listingFlag(liste
     <PhotoHero
       compact
       src="/images/banners/whats-on.webp"
-      alt="A company taking a curtain call on the New Theatre stage"
     >
       <template #headline>
         <p class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">

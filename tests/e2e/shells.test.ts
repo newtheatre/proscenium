@@ -112,15 +112,15 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
   // The toggle is a phone visitor's only navigation control, so the panel behind it has to carry
   // the links rather than open empty (#894).
   test('the mobile header panel carries the public links', async () => {
-    const link = `[...document.querySelectorAll('[data-test=header-nav-mobile] a')].find(node => node.innerText.includes("What's on"))`
+    const link = `[...document.querySelectorAll('[data-test=header-nav-mobile] a')].find(node => node.innerText.includes('Get involved'))`
     const view = await openView({ width: 390, height: 780 })
     try {
       await visit(view, `${app.baseURL}/`)
       await click(view, 'header button')
       await waitFor(view, link)
       await view.evaluate(`${link}.click()`)
-      await waitFor(view, `location.pathname === '/whats-on'`)
-      expect(await view.evaluate<string>('location.pathname')).toBe('/whats-on')
+      await waitFor(view, `location.pathname === '/get-involved'`)
+      expect(await view.evaluate<string>('location.pathname')).toBe('/get-involved')
     }
     finally {
       view.close()
@@ -190,6 +190,51 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     expect(seen.footer).toBe(1)
     expect(seen.ways).toEqual(['/whats-on', '/get-involved', '/'])
     expect(seen.text).not.toMatch(/\b[45]\d\d\b/)
+  })
+
+  // Show art is sovereign: the frame is ours and what is inside it is the show's, so the flag
+  // sits on the card body and never over the artwork (docs/design-language.md, rule 2).
+  test('the listing sticker sits outside the poster frame', async () => {
+    const seen = await inspect<{ found: number, overlaps: number }>('/whats-on', `(() => {
+      const stickers = [...document.querySelectorAll('.nnt-sticker')]
+      const overlaps = stickers.filter((sticker) => {
+        const frame = sticker.closest('article')?.querySelector('[data-test=poster-none], [data-test=poster-frame]')
+        if (!frame) return false
+        const a = sticker.getBoundingClientRect()
+        const b = frame.getBoundingClientRect()
+        return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+      })
+      return { found: stickers.length, overlaps: overlaps.length }
+    })()`)
+    expect(seen.found).toBe(1)
+    expect(seen.overlaps).toBe(0)
+  })
+
+  // The header's booking button goes to what's on, so a second "What's on" beside it is the same
+  // destination twice; the footer still carries the entry (J-111 criteria 4 and 10).
+  test('the public header names each destination once', async () => {
+    const seen = await inspect<{ header: string[], footerColumns: string[] }>('/', `(() => ({
+      header: [...document.querySelectorAll('header a[href]')].map(a => a.getAttribute('href')),
+      footerColumns: [...document.querySelectorAll('[data-test=footer-links] p')].map(p => p.innerText.trim()),
+    }))()`)
+    expect(seen.header.filter(href => href === '/whats-on')).toHaveLength(1)
+    expect(seen.footerColumns).toContain('Visit')
+    expect(seen.footerColumns).not.toContain('My theatre')
+    expect(seen.footerColumns).not.toContain('Your account')
+  })
+
+  // The signed return key is the credential, so the page answers a browser holding no session,
+  // and it is a till operator's screen rather than a public one (F-124 criterion 3).
+  test('the payment return screen wears the show-night shell', async () => {
+    const seen = await inspect<{ footer: number, siteNav: number, card: number }>(
+      '/pay/return/not-a-real-key', `(() => ({
+        footer: document.querySelectorAll('[data-test=site-footer]').length,
+        siteNav: document.querySelectorAll('[aria-label=Primary]').length,
+        card: document.querySelectorAll('[data-test=pay-return]').length,
+      }))()`)
+    expect(seen.footer).toBe(0)
+    expect(seen.siteNav).toBe(0)
+    expect(seen.card).toBe(1)
   })
 
   // The Google route refuses with a code; the wording lives on the page that shows it, so an

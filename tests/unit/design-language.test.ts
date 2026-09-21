@@ -108,6 +108,54 @@ describe('colour is never the only thing saying it (K-101)', () => {
   })
 })
 
+// Photography rule: a `PhotoHero` picture is a backdrop behind the headline, so it carries an
+// empty alt and a caller that names it makes a screen reader read the picture before the words.
+describe('the hero photograph is decorative (K-101, docs/design-language.md)', () => {
+  test('PhotoHero declares no alt prop', async () => {
+    const source = await Bun.file('app/components/PhotoHero.vue').text()
+    expect(source).not.toMatch(/\balt\?:/)
+    expect(source).toContain('alt=""')
+  })
+
+  test('no caller passes alt to PhotoHero', async () => {
+    const offenders: string[] = []
+    for (const file of (await appFiles()).filter(path => path.endsWith('.vue'))) {
+      const source = await Bun.file(file).text()
+      for (const hero of source.matchAll(/<PhotoHero\b([\s\S]*?)>/g)) {
+        if (/(^|\s):?alt\s*=/.test(hero[1] ?? '')) offenders.push(`${file}  a hero that names its picture`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
+
+// The house frames show artwork and never overlays it, so the card's flag sits on the card body
+// and not inside the frame (docs/design-language.md, photography rule 2).
+describe('nothing is drawn over show artwork (J-111)', () => {
+  test('the poster card positions nothing over the frame', async () => {
+    const source = await Bun.file('app/components/ShowPosterCard.vue').text()
+    const header = source.slice(source.indexOf('<template #header>'), source.indexOf('</template>', source.indexOf('<PosterFrame')))
+    expect(header).not.toContain('absolute')
+  })
+
+  test('the artless frame floors its own contrast rather than trusting the hash', async () => {
+    const source = await Bun.file('app/components/PosterFrame.vue').text()
+    const artless = source.slice(source.indexOf('nnt-poster-none'))
+    expect(artless).toContain('nnt-scrim')
+  })
+})
+
+// The theatre's name is read, not decoration, so the eyebrow clears the small-text floor rather
+// than sitting at 9.6px in the muted foreground (K-101).
+describe('the wordmark eyebrow is readable (K-101)', () => {
+  test('it is neither sub-11px nor muted', async () => {
+    const source = await Bun.file('app/components/SiteWordmark.vue').text()
+    const eyebrow = source.slice(source.indexOf('The Nottingham') - 200, source.indexOf('The Nottingham'))
+    expect(eyebrow).not.toContain('text-[0.6rem]')
+    expect(eyebrow).not.toContain('text-muted')
+  })
+})
+
 // A raw type="time" hands the control to the OS picker, with none of TimeField's theme or focus
 // ring. Scoped to box office: rooms/book.vue carries the same defect, and is another stream's file.
 describe('a time is always the shared TimeField (#915)', () => {

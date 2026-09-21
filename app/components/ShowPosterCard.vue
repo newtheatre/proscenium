@@ -58,32 +58,33 @@ const from = computed(() => {
     :data-test="`show-${listed.show.slug}`"
   >
     <template #header>
-      <div class="relative">
-        <!-- The frame carries the title, so the heading below it is there for structure and not
-             read twice by anybody, sighted or not (J-111 criterion 6). -->
-        <ULink
-          :to="`/shows/${listed.show.slug}`"
-          :aria-label="listed.show.title"
-          class="block"
-        >
-          <PosterFrame
-            :title="listed.show.title"
-            :slug="listed.show.slug"
-            :poster-url="listed.show.posterUrl"
-          />
-        </ULink>
-        <div
-          v-if="$slots.flag"
-          class="absolute end-3 top-3"
-        >
-          <slot name="flag" />
-        </div>
-      </div>
+      <!-- The frame carries the title, so the heading below it is there for structure and not
+           read twice by anybody, sighted or not (J-111 criterion 6). -->
+      <ULink
+        :to="`/shows/${listed.show.slug}`"
+        :aria-label="listed.show.title"
+        class="block"
+      >
+        <PosterFrame
+          :title="listed.show.title"
+          :slug="listed.show.slug"
+          :poster-url="listed.show.posterUrl"
+        />
+      </ULink>
     </template>
 
     <h3 class="sr-only">
       {{ listed.show.title }}
     </h3>
+
+    <!-- On the body, never over the frame: a production's artwork is the show's and the house
+         puts nothing on top of it (docs/design-language.md, photography rule 2). -->
+    <div
+      v-if="$slots.flag"
+      class="mb-3"
+    >
+      <slot name="flag" />
+    </div>
 
     <div class="flex flex-wrap items-center gap-2 text-sm text-muted">
       <span v-if="runs">{{ runs }}</span>

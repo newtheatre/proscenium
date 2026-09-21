@@ -22,8 +22,9 @@ const publicColumns = PUBLIC_GROUPS.map(heading => ({
 }))
 
 const columns = computed(() => [
-  { label: 'My theatre', links: MY_NAV, public: false },
-  { label: 'Your account', links: ACCOUNT_NAV, public: false },
+  // The same names the navigation uses: the member area is My NNT wherever it is named (0040).
+  { label: 'My NNT', links: MY_NAV, public: false },
+  { label: 'Account', links: ACCOUNT_NAV, public: false },
   ...publicColumns,
 ].filter(column => column.links.length > 0))
 

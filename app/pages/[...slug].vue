@@ -53,7 +53,6 @@ useSchemaOrg([
     <PhotoHero
       v-if="page!.banner"
       :src="page!.banner"
-      :alt="page!.bannerAlt"
       :title="page!.title"
       :description="page!.description"
       data-test="content-hero"

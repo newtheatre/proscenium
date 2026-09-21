@@ -5,6 +5,7 @@ import type { SumupAttemptStatus } from '#shared/utils/sumup'
 
 // Where the SumUp app comes back to (F-124 criterion 3). It may land in a browser holding no
 // session, so the attempt's own signed key in the path is what the answer is accepted on.
+definePageMeta({ layout: 'tonight' })
 useSeoMeta({ title: 'Recording your payment', description: 'Where the SumUp app returns a bar payment to the till.', robots: 'noindex' })
 
 interface Answer { status: SumupAttemptStatus, error: string | null, totalPence: number, receipt: { totalPence: number } | null }
@@ -60,11 +61,8 @@ const detail = computed(() => {
 </script>
 
 <template>
-  <UContainer class="py-10">
-    <UPageCard
-      class="mx-auto max-w-md"
-      data-test="pay-return"
-    >
+  <NightScreen title="Payment">
+    <div data-test="pay-return">
       <p
         v-if="outcome === 'working'"
         class="text-muted"
@@ -74,21 +72,21 @@ const detail = computed(() => {
       </p>
 
       <template v-else-if="outcome === 'answered' && answer">
-        <h1
-          class="nnt-headline text-2xl"
+        <h2
+          class="text-xl font-semibold"
           :data-test="`pay-return-${answer.status.toLowerCase()}`"
         >
           {{ headline }}
-        </h1>
+        </h2>
         <p class="mt-2 text-muted">
           {{ detail }}
         </p>
       </template>
 
       <template v-else>
-        <h1 class="nnt-headline text-2xl">
+        <h2 class="text-xl font-semibold">
           Not recorded here
-        </h1>
+        </h2>
         <UAlert
           class="mt-3"
           color="warning"
@@ -97,15 +95,17 @@ const detail = computed(() => {
           data-test="pay-return-refused"
         />
       </template>
+    </div>
 
+    <template #actions>
       <UButton
         to="/tonight/till"
-        class="mt-6 min-h-12"
+        class="min-h-12"
         block
         data-test="pay-return-till"
       >
         Back to the till
       </UButton>
-    </UPageCard>
-  </UContainer>
+    </template>
+  </NightScreen>
 </template>

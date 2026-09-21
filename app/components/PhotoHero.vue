@@ -1,20 +1,18 @@
 <script setup lang="ts">
-// A photograph under a headline. The scrim always sits between the picture and the words
-// (docs/design-language.md, photography rule 1), and the subtree is dark so the text resolves for it.
+// A photograph under a headline, always decorative: the headline is what the page says, so the
+// picture carries an empty alt and a caller never names it (docs/design-language.md, rule 3).
 const props = withDefaults(defineProps<{
   src: string
   // Absent only when the `title` slot carries the headline instead, as a title with a word of
   // its own colour in it must.
   title?: string
   description?: string
-  // The pictures are backdrops, so the default is the empty alt a decorative image should carry.
-  alt?: string
   // Left is the house's front page: the scrim is heaviest on that edge, so the words sit where
   // the picture is darkest rather than wherever it happens to be busy.
   align?: 'centre' | 'start'
   // A band rather than a hero: the listing leads with its shows, not with a photograph.
   compact?: boolean
-}>(), { title: undefined, description: undefined, alt: '', align: 'centre', compact: false })
+}>(), { title: undefined, description: undefined, align: 'centre', compact: false })
 
 // Every key carries a breakpoint: a bare value files under a 1px screen and the srcset collapses
 // to a two-pixel image (tests/unit/static-assets.test.ts).
@@ -41,7 +39,7 @@ const heroUi = computed(() => ({
   >
     <NuxtImg
       :src="src"
-      :alt="alt"
+      alt=""
       :sizes="SIZES"
       format="auto"
       loading="eager"
