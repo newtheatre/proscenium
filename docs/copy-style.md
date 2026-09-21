@@ -75,6 +75,7 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Certification | Record, module as a loose word | Not a separate object: a module of kind `CERTIFICATION`. A finished course is always a "record". |
 | Pass | Ticket | A `pass_types` entitlement, bought once, admitted against many performances. |
 | Officer | Committee, crew | A person holding a standing role with a permission, expiring each committee year (0009). |
+| Role titles | Title Case: the IT Manager, the Bar Manager, the Safety Officer | A role is a proper title, capitalised wherever it is read, sentence-initial or not. The wording comes from `ROLE_WORDING` in `shared/utils/roles.ts`, never hand-typed. |
 | Committee | Officer, crew | The collective body: "committee direction", "the committee's own words" (0051). |
 | Crew | Officer | Backstage participants who join a show night with a short code, no account (`tonight/board.vue`). |
 | The SU | SU, the union | The Students' Union, abbreviated only after the first full mention on a page. |

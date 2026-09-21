@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { render, TEMPLATE_NAMES } from '#server/utils/templates'
 import { saysStatus } from '#shared/utils/approvals'
 import { saysBookingState } from '#shared/utils/bookings'
-import { namesRole, ROLES, saysRole } from '#shared/utils/roles'
+import { ROLES, saysRole } from '#shared/utils/roles'
 import { ordinal } from '#shared/utils/text'
 import type { TemplateContext } from '#server/utils/templates'
 
@@ -206,7 +206,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(render('account-claim', EVERYTHING).html).toContain('We already know this address, from a booking or from our old records')
   })
 
-  test('role-expiring says our year, and names the IT manager', () => {
+  test('role-expiring says our year, and names the IT Manager', () => {
     const { html } = render('role-expiring', EVERYTHING)
     expect(flat(html)).toContain('Committee roles run to the end of our year')
     expect(flat(html)).toContain(`ask the ${saysRole('ADMIN')} to renew`)
@@ -233,14 +233,14 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(html).toContain('the booking was still unpaid')
   })
 
-  test('the reassignment names the front of house manager', () => {
+  test('the reassignment names the Front of House Manager', () => {
     expect(render('shift-removed', EVERYTHING).html)
-      .toContain(`The ${namesRole('FOH_MANAGER')} has reassigned your door shift`)
+      .toContain(`The ${saysRole('FOH_MANAGER')} has reassigned your door shift`)
   })
 
-  test('a room request names the theatre manager from the wording map', () => {
+  test('a room request names the Theatre Manager from the wording map', () => {
     expect(render('room-requested', EVERYTHING).html)
-      .toContain(`is with the ${namesRole('THEATRE_MANAGER')}`)
+      .toContain(`is with the ${saysRole('THEATRE_MANAGER')}`)
   })
 
   test('a declined shift leaves the open list open', () => {
@@ -300,9 +300,9 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(render('waiting-list-joined', EVERYTHING).subject).toBe('You are on the waiting list for The Tempest')
   })
 
-  test('a series is booked in sessions, not rehearsals', () => {
-    expect(render('room-series-booked', EVERYTHING).subject).toBe('Booked: 3 sessions in The Studio')
-    expect(render('room-series-requested', EVERYTHING).subject).toBe('Asked for: 3 sessions in The Studio')
+  test('a series is booked in bookings, not rehearsals', () => {
+    expect(render('room-series-booked', EVERYTHING).subject).toBe('Booked: 3 bookings in The Studio')
+    expect(render('room-series-requested', EVERYTHING).subject).toBe('Asked for: 3 bookings in The Studio')
   })
 
   test('a relisted request matches its siblings', () => {
@@ -386,21 +386,17 @@ describe('the shared labels (item 8)', () => {
       .toBe('Moved to a room we do not manage')
   })
 
-  test('every role name is sentence case', () => {
+  test('every role name is a Title Case proper title', () => {
     for (const role of ROLES) {
-      const said = saysRole(role)
-      // An acronym keeps its capitals; nothing else takes one past the first word.
-      const words = said.split(' ').slice(1)
-      expect(words.filter(word => /^[A-Z]/.test(word))).toEqual([])
+      // "of" is the one word a title leaves lower case; everything else is capitalised.
+      const lower = saysRole(role).split(' ').filter(word => !/^[A-Z]/.test(word))
+      expect(lower.filter(word => word !== 'of')).toEqual([])
     }
+    expect(saysRole('ADMIN')).toBe('IT Manager')
+    expect(saysRole('FOH_MANAGER')).toBe('Front of House Manager')
   })
 
   test('the box office role names a person, not a desk', () => {
-    expect(saysRole('BOX_OFFICE')).toBe('Box office manager')
-  })
-
-  test('naming a role inside a sentence keeps an acronym but drops a leading capital', () => {
-    expect(namesRole('FOH_MANAGER')).toBe('front of house manager')
-    expect(namesRole('ADMIN')).toBe('IT manager')
+    expect(saysRole('BOX_OFFICE')).toBe('Box Office Manager')
   })
 })

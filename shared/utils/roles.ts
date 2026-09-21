@@ -195,19 +195,19 @@ export function defaultRoleExpiry(now: Date): number {
   return Math.floor(nextCommitteeYearEnd(now).getTime() / 1000)
 }
 
-// Sentence case, like every other label: a role is a job, not a proper title. An acronym keeps
-// its capitals, which is why `namesRole` cannot simply lowercase the first letter.
+// Proper titles, Title Case wherever they are read, sentence-initial or not: the rest of the
+// codebase writes "the IT Manager", and a sentence-case map would split it two ways (K-128).
 const ROLE_WORDING: Record<Role, string> = {
-  ADMIN: 'IT manager',
+  ADMIN: 'IT Manager',
   MANAGER: 'Manager',
-  THEATRE_MANAGER: 'Theatre manager',
-  TRAINING_MANAGER: 'Training manager',
-  BOX_OFFICE: 'Box office manager',
-  FOH_MANAGER: 'Front of house manager',
-  FRONT_OF_HOUSE: 'Front of house',
-  BAR_MANAGER: 'Bar manager',
-  ACCESSIBILITY_OFFICER: 'Accessibility officer',
-  SAFETY_OFFICER: 'Safety officer',
+  THEATRE_MANAGER: 'Theatre Manager',
+  TRAINING_MANAGER: 'Training Manager',
+  BOX_OFFICE: 'Box Office Manager',
+  FOH_MANAGER: 'Front of House Manager',
+  FRONT_OF_HOUSE: 'Front of House',
+  BAR_MANAGER: 'Bar Manager',
+  ACCESSIBILITY_OFFICER: 'Accessibility Officer',
+  SAFETY_OFFICER: 'Safety Officer',
   TREASURER: 'Treasurer',
   COMMITTEE: 'Committee',
 }
@@ -216,12 +216,4 @@ const ROLE_WORDING: Record<Role, string> = {
 // the workshop signs the mapping, so an unregistered role reads as itself (0027's habit).
 export function saysRole(role: string): string {
   return ROLE_WORDING[role as Role] ?? role
-}
-
-// The same name inside a sentence rather than starting one: "ask the IT manager", "the front of
-// house manager has reassigned". A leading acronym keeps its capitals.
-export function namesRole(role: string): string {
-  const said = saysRole(role)
-  if (/^[A-Z]{2,}/.test(said)) return said
-  return said.charAt(0).toLowerCase() + said.slice(1)
 }

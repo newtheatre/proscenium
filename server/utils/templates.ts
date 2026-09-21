@@ -1,4 +1,4 @@
-import { namesRole, saysRole } from '#shared/utils/roles'
+import { saysRole } from '#shared/utils/roles'
 import { formatLondon } from '#shared/utils/london'
 import { PRODUCTION_SITE_URL } from '#shared/utils/seo'
 import { ordinal, plural } from '#shared/utils/text'
@@ -182,7 +182,7 @@ The Nottingham New Theatre`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Your booking of ${room}, ${when}, is cancelled and the slot is free for somebody else.</p>
 <p>${context.title}</p>
-<p>If that was not you, look at what you still hold.</p>
+<p>If that was not you, see what is still booked.</p>
 <p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
       text: `Hello ${context.name},
 
@@ -190,7 +190,7 @@ Your booking of ${room}, ${when}, is cancelled and the slot is free for somebody
 
 ${String(context.title)}
 
-If that was not you, look at what you still hold.
+If that was not you, see what is still booked.
 
 See your bookings:
 ${String(context.roomsUrl)}
@@ -202,13 +202,13 @@ The Nottingham New Theatre`,
   'room-requested': (context: TemplateContext): Rendered => ({
     subject: `Asked for: ${String(context.room)}, ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>Your request for ${context.room}, ${context.when}, is with the ${namesRole('THEATRE_MANAGER')}. The slot is held
+<p>Your request for ${context.room}, ${context.when}, is with the ${saysRole('THEATRE_MANAGER')}. The slot is held
 while somebody decides, so nobody else can take it in the meantime.</p>
 <p>${context.title}</p>
 <p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
     text: `Hello ${context.name},
 
-Your request for ${String(context.room)}, ${String(context.when)}, is with the ${namesRole('THEATRE_MANAGER')}. The
+Your request for ${String(context.room)}, ${String(context.when)}, is with the ${saysRole('THEATRE_MANAGER')}. The
 slot is held while somebody decides, so nobody else can take it in the meantime.
 
 ${String(context.title)}
@@ -511,12 +511,12 @@ The Nottingham New Theatre`,
   'shift-removed': (context: TemplateContext): Rendered => ({
     subject: `Your ${context.role} shift on ${context.show} has been reassigned`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>The ${namesRole('FOH_MANAGER')} has reassigned your ${context.role} shift on ${context.show} at
+<p>The ${saysRole('FOH_MANAGER')} has reassigned your ${context.role} shift on ${context.show} at
 ${context.venue}, ${context.when}, to somebody else.</p>
 <p>There is nothing for you to do. Other shifts you hold are unaffected.</p>`),
     text: `Hello ${context.name},
 
-The ${namesRole('FOH_MANAGER')} has reassigned your ${context.role} shift on ${context.show} at
+The ${saysRole('FOH_MANAGER')} has reassigned your ${context.role} shift on ${context.show} at
 ${context.venue}, ${context.when}, to somebody else.
 
 There is nothing for you to do. Other shifts you hold are unaffected.
@@ -895,7 +895,7 @@ The Nottingham New Theatre`,
   },
 
   'room-series-booked': (context: TemplateContext): Rendered => ({
-    subject: `Booked: ${plural(Number(context.count), 'session')} in ${String(context.room)}`,
+    subject: `Booked: ${plural(Number(context.count), 'booking')} in ${String(context.room)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>${context.count} bookings in ${context.room} are confirmed, from ${context.first} to
 ${context.last}.</p>
@@ -917,7 +917,7 @@ The Nottingham New Theatre`,
   }),
 
   'room-series-requested': (context: TemplateContext): Rendered => ({
-    subject: `Asked for: ${plural(Number(context.count), 'session')} in ${String(context.room)}`,
+    subject: `Asked for: ${plural(Number(context.count), 'booking')} in ${String(context.room)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>Your request for ${context.count} bookings in ${context.room}, from ${context.first} to
 ${context.last}, is waiting for a decision.</p>
@@ -1044,14 +1044,14 @@ The Nottingham New Theatre`,
   'external-received': (context: TemplateContext): Rendered => ({
     subject: `Asked for: a room we do not manage, ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>Your request for a room we do not manage, ${context.when}, is with the ${namesRole('THEATRE_MANAGER')}, who
+<p>Your request for a room we do not manage, ${context.when}, is with the ${saysRole('THEATRE_MANAGER')}, who
 fills in the Students' Union's form.</p>
 <p>${context.title}</p>
 <p>The Students' Union decides which room we get, so nothing is held yet. You will hear when the
 form is in, and again when they answer.</p>`),
     text: `Hello ${context.name},
 
-Your request for a room we do not manage, ${String(context.when)}, is with the ${namesRole('THEATRE_MANAGER')},
+Your request for a room we do not manage, ${String(context.when)}, is with the ${saysRole('THEATRE_MANAGER')},
 who fills in the Students' Union's form.
 
 ${String(context.title)}
