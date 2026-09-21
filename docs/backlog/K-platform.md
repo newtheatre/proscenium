@@ -46,6 +46,12 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
      pair colour with text or shape, verified by the CI checks above.
   4. Focus order, visible focus and minimum contrast are enforced by design-system tokens, so a
      new screen inherits compliance by default rather than opting into it.
+  5. Every control carries a name, and a placeholder is an example rather than the name: an
+     input is labelled by the form field it sits in, or by an `aria-label` where the layout
+     genuinely cannot hold a visible label; an icon-only control and a row action repeated down
+     a column name what they act on; a tab keeps its label at every width; a chooser is a radio
+     group reachable from the keyboard, not a card that only takes a click; and a name assembled
+     from a value never reads an empty field back. A test over the screens holds the rule.
 - Source: Prompt Book K-1 (accessibility); audit PR-5, PR-9 (as-built operational screens);
   Get-In part 5 (standards)
 
