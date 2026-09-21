@@ -44,7 +44,6 @@ async function save(cell: Cell, channel: 'email' | 'push', wanted: boolean): Pro
     await $fetch('/api/account/notifications', { method: 'PUT', body })
     cell[channel] = wanted
     cell.stored = true
-    toast.add({ title: 'Saved', description: 'It takes effect on the next message.', icon: 'i-lucide-check', color: 'success' })
   }
   catch (error) {
     toast.add({ title: refusalText(error), color: 'error' })
@@ -67,7 +66,7 @@ useSeoMeta({ title: 'Notifications' })
   <AccountSettings
     data-test="account-notifications-page"
     title="Notifications"
-    description="Choose what we tell you about, by topic rather than by which part of the theatre sends it. Tickets, receipts, security emails and safety notices always arrive: those answer something you just did, and no preference here silences one."
+    description="Choose what we tell you about, by topic. Each switch saves as you set it. Tickets, receipts, security emails and safety notices always arrive."
   >
     <UPageCard>
       <div
@@ -119,26 +118,12 @@ useSeoMeta({ title: 'Notifications' })
               :data-test="`email-${cell.topic}`"
               @update:model-value="value => save(cell, 'email', value)"
             />
-            <USwitch
-              :model-value="cell.push"
-              label="Push"
-              :description="saysDefault(cell.pushDefault)"
-              :loading="saving === `${cell.topic}-push`"
-              :data-test="`push-${cell.topic}`"
-              @update:model-value="value => save(cell, 'push', value)"
-            />
             <div class="text-sm text-muted">
               <span class="font-medium text-default">In-app</span>
               <span :data-test="`inbox-${cell.topic}`"> always on</span>
             </div>
           </div>
         </div>
-
-        <p class="text-sm text-muted">
-          Push notifications are recorded here but nothing delivers them yet. Switching one on now
-          means you are subscribed the day they start working, and we will ask again on the device
-          itself before anything is sent.
-        </p>
       </div>
     </UPageCard>
 

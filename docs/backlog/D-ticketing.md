@@ -576,6 +576,10 @@ Open questions:
   4. Covered shows can be extended during the season (additive); removing a covered show from a
      product with live passes requires a manager role and is audited.
   5. Product creation and changes are audited with actor and diff.
+  6. A price point is integer pence and is read out through the shared money wording, never
+     assembled on a screen.
+  7. A pass a member may ask for is shown with what it costs and what it is, beside its name. A
+     list of names alone asks somebody to request a thing they cannot price.
 - Source: Prompt Book D-7; audit PR-8; Get-In constraint 7, part 2 (passes: carry, now MVP)
 
 ## D-124: Pass issue at the desk and online request-and-collect

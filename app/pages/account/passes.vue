@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysPrice } from '#shared/utils/ticket-types'
-import { saysPassStatus } from '#shared/utils/passes'
+import { saysPassPrices, saysPassStatus } from '#shared/utils/passes'
 import type { PassRequestStatus, PassStatus } from '#shared/utils/passes'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/passes' })
@@ -9,6 +9,7 @@ interface SellablePassType {
   id: string
   name: string
   description: string | null
+  prices: { id: string, label: string, price: number }[]
 }
 
 interface HeldPass {
@@ -83,15 +84,12 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
       description="Passes you hold, and any request still with an officer."
     />
 
-    <UAlert
+    <ReadFailure
       v-if="listFailure"
+      :failure="listFailure"
       class="mt-6"
       data-test="load-failed"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-unplug"
-      :title="listFailure.message"
-      description="This is not the same as holding nothing. Reload, and if it keeps happening say so."
+      @retry="refresh()"
     />
 
     <div class="mt-6 space-y-6">
@@ -164,13 +162,29 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
           class="mb-4"
         />
 
-        <ul class="space-y-2 text-sm">
+        <ul class="space-y-4 text-sm">
           <li
             v-for="type in data.sellable"
             :key="type.id"
-            class="flex items-center justify-between"
+            class="flex flex-wrap items-start justify-between gap-3"
           >
-            <span>{{ type.name }}</span>
+            <div class="min-w-0 flex-1">
+              <p class="font-medium">
+                {{ type.name }}
+              </p>
+              <p
+                class="text-muted"
+                :data-test="`account-pass-price-${type.id}`"
+              >
+                {{ saysPassPrices(type.prices) }}
+              </p>
+              <p
+                v-if="type.description"
+                class="mt-1 text-muted"
+              >
+                {{ type.description }}
+              </p>
+            </div>
             <UButton
               size="sm"
               variant="subtle"

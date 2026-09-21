@@ -71,6 +71,15 @@ const begin = (): Promise<void> => attempt(async () => {
   step.value = 'enrolling'
 })
 
+// A way out before the codes are shown (A-112 criterion 6). An enrolment nobody confirmed already
+// reads as none on the next load, so leaving here leaves nothing half done behind.
+function abandon(): void {
+  digits.value = []
+  secret.value = ''
+  qr.value = ''
+  step.value = 'none'
+}
+
 const confirm = (entered: string[]): Promise<void> => attempt(async () => {
   try {
     const done = await $fetch<{ recoveryCodes: string[] }>('/api/account/mfa/confirm', {
@@ -209,6 +218,16 @@ useSeoMeta({ title: 'Security' })
             />
           </UFormField>
         </UForm>
+
+        <UButton
+          color="neutral"
+          variant="ghost"
+          data-test="mfa-cancel"
+          :disabled="working"
+          @click="abandon"
+        >
+          Stop setting this up
+        </UButton>
       </div>
 
       <div

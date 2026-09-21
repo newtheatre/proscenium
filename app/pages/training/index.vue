@@ -190,7 +190,7 @@ const standings = computed(() => [
             :data-test="`ask-expired-${record.moduleId}`"
             @click="asking = record.moduleId"
           >
-            {{ openAsks.has(record.moduleId) ? `Asked for ${record.moduleId}` : `Ask for ${record.moduleId}` }}
+            {{ openAsks.has(record.moduleId) ? `Asked for ${record.moduleName}` : `Ask for ${record.moduleName}` }}
           </UButton>
         </div>
       </template>
@@ -221,7 +221,7 @@ const standings = computed(() => [
             :data-test="`ask-expiring-${record.moduleId}`"
             @click="asking = record.moduleId"
           >
-            {{ openAsks.has(record.moduleId) ? `Asked for ${record.moduleId}` : `Ask for ${record.moduleId}` }}
+            {{ openAsks.has(record.moduleId) ? `Asked for ${record.moduleName}` : `Ask for ${record.moduleName}` }}
           </UButton>
         </div>
       </template>
@@ -416,6 +416,17 @@ const standings = computed(() => [
               {{ step.department }} · {{ saysKind(step.kind) }}
             </p>
           </div>
+
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="outline"
+            :disabled="openAsks.has(step.id)"
+            :data-test="`ask-next-${step.id}`"
+            @click="asking = step.id"
+          >
+            {{ openAsks.has(step.id) ? `Asked for ${step.name}` : `Ask for ${step.name}` }}
+          </UButton>
         </li>
       </ul>
     </section>

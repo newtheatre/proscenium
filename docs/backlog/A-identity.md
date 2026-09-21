@@ -196,6 +196,9 @@ Open questions for the committee:
   3. Removing the last factor is refused while the account holds a role that requires one.
   4. Which roles count as privileged is configuration (J-3), and changing it is audited.
   5. Privileged accounts without a factor appear as a standing warning banner with a count on the admin directory (A-121).
+  6. Enrolment has a way out at every step before the codes are shown: somebody who began it by
+     mistake, or cannot reach their phone, leaves without an unfinished factor and without
+     hunting for the back button.
 - Source: Prompt Book A-4 and module 0 roles table; audit SD-5, SD-8.
 
 ## A-113: Manage sign-in methods on one account

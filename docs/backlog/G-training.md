@@ -28,6 +28,9 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   4. The EXPIRING state begins when the record is within the configured warning window (default 60 days) of its expiry date.
   5. Briefs appear with their last-attended date and no expiry state, because briefs never expire.
   6. Revoked and superseded records are hidden from the member's own dashboard and visible only to leads and administrators in a history view.
+  7. A module is named on a member's screen by the name the catalogue carries, never by its code
+     alone: a button reading "Ask for LX-2" asks a member to know a vocabulary the catalogue
+     exists to spare them.
 - Source: Prompt Book G-1; audit TR-1
 
 ## G-102: The what's-next list and gate signposting
@@ -42,6 +45,10 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   3. Every gated surface elsewhere in the system (a shift claim, the till, a kit loan) names the specific module that would unlock it, by its published human id and title.
   4. The list updates on the next read after a record is awarded, revoked or expires; no cached copy survives longer than the page load.
   5. Draft modules never appear in the list for members.
+  6. Every suggestion on the list carries the one action that acts on it, in place: a list of
+     things a member could do next, with nothing to press, is a list of things they cannot do.
+  7. What a sign-up says back matches what it did. A waiting place is never told it has a place,
+     whatever else the same message goes on to say.
 - Source: Prompt Book G-1; audit TR-1
 
 ## G-103: Browse the module catalogue
