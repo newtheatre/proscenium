@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysDay } from '#shared/utils/when'
+import { orderMyTiles, saysMembershipSentence } from '#shared/utils/my-summary'
 import type { MySummary } from '#shared/utils/my-summary'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
@@ -18,18 +18,22 @@ const EMPTY: MySummary = {
   nextShow: null,
 }
 
-const { data: summary, status } = await useAsyncData(
+const { data: summary, error, refresh } = await useAsyncData(
   'my-summary',
   () => request<MySummary>('/api/my/summary'),
   { default: () => EMPTY },
 )
 
-const membershipLine = computed(() => {
-  const membership = summary.value.membership
-  if (membership.state === 'current') return `member until ${saysDay(membership.until!, { year: true })}`
-  if (membership.state === 'grace') return `in grace until ${saysDay(membership.until!, { year: true })}`
-  if (membership.state === 'lapsed') return 'membership lapsed'
-  return 'no membership on record'
+const failure = useListFailure(error, 'Your overview could not be read.')
+
+// The order is a fact about the data, not about the template: what is soonest leads (K-127
+// criterion 6).
+const tiles = computed(() => orderMyTiles(summary.value))
+
+const greeting = computed(() => {
+  const name = account.value.user?.name
+  const sentence = saysMembershipSentence(summary.value.membership)
+  return name ? `You are signed in as ${name}. ${sentence}` : sentence
 })
 </script>
 
@@ -40,30 +44,53 @@ const membershipLine = computed(() => {
   >
     <UPageHeader
       title="My NNT"
-      :description="`${account.user?.name ?? ''}, ${membershipLine}`"
+      :description="failure ? undefined : greeting"
     />
 
-    <UAlert
-      v-if="status === 'error'"
-      data-test="failure"
-      color="error"
-      variant="subtle"
-      title="Could not load your summary"
+    <ReadFailure
+      v-if="failure"
+      :failure="failure"
       class="mt-6"
+      @retry="refresh()"
     />
 
     <UPageGrid
       v-else
       :ui="{ base: 'gap-4 mt-6' }"
     >
-      <MyTilesNextShift :summary="summary" />
-      <MyTilesMembership :summary="summary" />
-      <MyTilesTraining :summary="summary" />
-      <MyTilesRoomBooking :summary="summary" />
-      <MyTilesPasses :summary="summary" />
-      <MyTilesNotifications :summary="summary" />
-      <MyTilesNextShow :summary="summary" />
-      <MyTilesTickets />
+      <template
+        v-for="tile in tiles"
+        :key="tile"
+      >
+        <MyTilesNextShift
+          v-if="tile === 'shift'"
+          :summary="summary"
+        />
+        <MyTilesRoomBooking
+          v-else-if="tile === 'room'"
+          :summary="summary"
+        />
+        <MyTilesTraining
+          v-else-if="tile === 'training'"
+          :summary="summary"
+        />
+        <MyTilesMembership
+          v-else-if="tile === 'membership'"
+          :summary="summary"
+        />
+        <MyTilesPasses
+          v-else-if="tile === 'passes'"
+          :summary="summary"
+        />
+        <MyTilesNotifications
+          v-else-if="tile === 'notifications'"
+          :summary="summary"
+        />
+        <MyTilesNextShow
+          v-else
+          :summary="summary"
+        />
+      </template>
     </UPageGrid>
   </UContainer>
 </template>

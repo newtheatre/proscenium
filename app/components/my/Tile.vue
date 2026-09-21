@@ -1,5 +1,7 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
+// One control shape per action kind across the grid (K-127 criterion 6): going to a screen is a
+// link on every tile, whether the tile is full or empty.
+const props = withDefaults(defineProps<{
   title: string
   to: string
   label: string
@@ -8,6 +10,8 @@ withDefaults(defineProps<{
   emptyTitle?: string
   emptyLabel?: string
 }>(), { highlight: false, empty: false, emptyTitle: undefined, emptyLabel: undefined })
+
+const footerLabel = computed(() => (props.empty ? props.emptyLabel ?? props.label : props.label))
 </script>
 
 <template>
@@ -23,19 +27,15 @@ withDefaults(defineProps<{
       variant="naked"
       size="sm"
       :title="emptyTitle"
-      :actions="emptyLabel ? [{ label: emptyLabel, to, variant: 'subtle', color: 'neutral' }] : []"
     />
     <slot v-else />
 
-    <template
-      v-if="!empty"
-      #footer
-    >
+    <template #footer>
       <ULink
         :to="to"
         class="text-sm font-medium text-primary"
       >
-        {{ label }}
+        {{ footerLabel }}
       </ULink>
     </template>
   </UPageCard>

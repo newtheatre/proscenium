@@ -6,6 +6,7 @@ const props = defineProps<{ summary: MySummary }>()
 
 const held = computed(() => props.summary.training.held)
 const available = computed(() => props.summary.training.available)
+const progressLine = computed(() => `${held.value} of ${plural(available.value, 'module')} held`)
 </script>
 
 <template>
@@ -18,12 +19,16 @@ const available = computed(() => props.summary.training.available)
     empty-label="See what we teach"
     class="lg:row-span-2"
   >
-    <p class="text-sm text-muted">
-      {{ held }} of {{ available }} modules held
+    <p
+      id="my-training-progress"
+      class="text-sm text-muted"
+    >
+      {{ progressLine }}
     </p>
     <UProgress
       :model-value="held"
       :max="Math.max(available, 1)"
+      aria-labelledby="my-training-progress"
       class="mt-2"
     />
 
