@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  CAMERA_FALLBACK_SAYS,
   doorFailureVerdict,
   doorVerdict,
   isRepeatScan,
@@ -8,6 +9,8 @@ import {
   saysPassCoverage,
   saysPassTonight,
   SCAN_REPEAT_WINDOW_MS,
+  verdictBuzz,
+  verdictHoldMs,
 } from '#shared/utils/door'
 
 // E-129 criteria 2 and 3: what a decoded QR resolves to, and why one code held in front of the
@@ -186,5 +189,69 @@ describe('no answer is not a refusal (E-129 criterion 7, issue 1145)', () => {
 
   test('the refused headline is what the caller asks for, REFUSED when it asks for nothing', () => {
     expect(doorFailureVerdict(422, 'No.').headline).toBe('REFUSED')
+  })
+})
+
+describe('the verdict clears itself, and a reason is held long enough to read (issue 1150 item 1)', () => {
+  test('an admitting verdict is gone before the same code could be read a second time', () => {
+    expect(verdictHoldMs('PAID')).toBeGreaterThanOrEqual(3000)
+    expect(verdictHoldMs('PAID')).toBeLessThan(SCAN_REPEAT_WINDOW_MS)
+  })
+
+  test('unpaid holds for as long as paid: both are read in one glance', () => {
+    expect(verdictHoldMs('UNPAID')).toBe(verdictHoldMs('PAID'))
+  })
+
+  test('a refusal and a dropped connection hold longer, because the reason is the whole point', () => {
+    expect(verdictHoldMs('REFUSED')).toBeGreaterThan(verdictHoldMs('PAID'))
+    expect(verdictHoldMs('UNANSWERED')).toBe(verdictHoldMs('REFUSED'))
+  })
+})
+
+describe('each verdict buzzes differently, so a phone held at arm\'s length is read by hand (issue 1150 item 1)', () => {
+  test('one buzz admits', () => {
+    expect(verdictBuzz('PAID')).toHaveLength(1)
+  })
+
+  test('unpaid is two buzzes, which is a pause between two lengths', () => {
+    expect(verdictBuzz('UNPAID')).toHaveLength(3)
+  })
+
+  test('a refusal is one long buzz, longer than the admitting one', () => {
+    expect(verdictBuzz('REFUSED')).toHaveLength(1)
+    expect(verdictBuzz('REFUSED')[0]!).toBeGreaterThan(verdictBuzz('PAID')[0]!)
+  })
+
+  test('no answer buzzes not at all, since nothing was decided', () => {
+    expect(verdictBuzz('UNANSWERED')).toEqual([])
+  })
+
+  test('no two verdicts share a pattern', () => {
+    const patterns = (['PAID', 'UNPAID', 'REFUSED', 'UNANSWERED'] as const).map(state => verdictBuzz(state).join(','))
+    expect(new Set(patterns).size).toBe(patterns.length)
+  })
+})
+
+describe('one set of camera-failure sentences, in the show-night register (issue 1150 item 2)', () => {
+  const sentences = Object.values(CAMERA_FALLBACK_SAYS)
+
+  test('a device with no camera, a refused one and a broken one each read differently', () => {
+    expect(new Set(sentences).size).toBe(3)
+  })
+
+  test('each is two sentences, and each sentence carries its stop', () => {
+    for (const says of sentences) {
+      const parts = says.split('. ')
+      expect(parts).toHaveLength(2)
+      expect(says.endsWith('.')).toBe(true)
+    }
+  })
+
+  test('none of them explains itself: the instruction is on screen, the reasoning is not', () => {
+    for (const says of sentences) expect(says).not.toMatch(/\bso\b/i)
+  })
+
+  test('each one says what to do instead', () => {
+    for (const says of sentences) expect(says.toLowerCase()).toContain('type the reference')
   })
 })
