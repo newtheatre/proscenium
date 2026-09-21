@@ -109,6 +109,66 @@ describe('tapping a variant twice merges into one line, up to the cap (F-103 cri
   })
 })
 
+describe('what a tap on a tile does depends on the product\'s sizes (F-103 criterion 1, 0083)', () => {
+  test('one size with no choice adds to the basket at once', () => {
+    const { basket, scope } = setup()
+    basket.tapProduct(aProduct())
+    expect(basket.basket.value).toHaveLength(1)
+    expect(basket.basket.value[0]!.variantLabel).toBe('Pint')
+    expect(basket.sizing.value).toBeNull()
+    scope.stop()
+  })
+
+  test('one size offering a choice opens the mixer rather than the size sheet', () => {
+    const { basket, scope } = setup()
+    const withChoice = aVariant({ choice: { id: 'choice-1', name: 'Mixer', options: [{ id: 'opt-1', itemName: 'Tonic' }] } })
+    basket.tapProduct(aProduct({ name: 'Gin', variants: [withChoice] }))
+    expect(basket.basket.value).toHaveLength(0)
+    expect(basket.sizing.value).toBeNull()
+    expect(basket.choosing.value?.choice.name).toBe('Mixer')
+    scope.stop()
+  })
+
+  test('several sizes open the size sheet and add nothing yet', () => {
+    const { basket, scope } = setup()
+    const wine = aProduct({
+      name: 'House red',
+      variants: [aVariant({ id: 'variant-175', label: '175ml glass', pricePence: 350 }), aVariant({ id: 'variant-250', label: '250ml glass', pricePence: 480 })],
+    })
+    basket.tapProduct(wine)
+    expect(basket.basket.value).toHaveLength(0)
+    expect(basket.sizing.value?.name).toBe('House red')
+    scope.stop()
+  })
+
+  test('choosing a size from the sheet adds it and closes the sheet', () => {
+    const { basket, scope } = setup()
+    const small = aVariant({ id: 'variant-175', label: '175ml glass', pricePence: 350 })
+    const wine = aProduct({ name: 'House red', variants: [small, aVariant({ id: 'variant-250', label: '250ml glass', pricePence: 480 })] })
+    basket.tapProduct(wine)
+    basket.tapVariant(wine.name, small)
+    expect(basket.basket.value).toHaveLength(1)
+    expect(basket.basket.value[0]!.variantLabel).toBe('175ml glass')
+    expect(basket.sizing.value).toBeNull()
+    scope.stop()
+  })
+
+  test('choosing a size that offers a choice opens the mixer next, with the size sheet gone', () => {
+    const { basket, scope } = setup()
+    const double = aVariant({ id: 'variant-double', label: 'Double', pricePence: 450, choice: { id: 'choice-1', name: 'Mixer', options: [{ id: 'opt-1', itemName: 'Tonic' }] } })
+    const gin = aProduct({ name: 'Gin', variants: [aVariant({ id: 'variant-single', label: 'Single' }), double] })
+    basket.tapProduct(gin)
+    basket.tapVariant(gin.name, double)
+    expect(basket.sizing.value).toBeNull()
+    expect(basket.choosing.value?.choice.name).toBe('Mixer')
+    expect(basket.basket.value).toHaveLength(0)
+    basket.chooseOption('opt-1', 'Tonic')
+    expect(basket.basket.value).toHaveLength(1)
+    expect(basket.basket.value[0]!.choiceItemName).toBe('Tonic')
+    scope.stop()
+  })
+})
+
 describe('a restricted line is read off the catalogue, never asked for twice (F-106 criteria 1, 5)', () => {
   test('a basket with no age-restricted product needs no check', () => {
     const { basket, scope } = setup([aProduct({ ageRestricted: false })])

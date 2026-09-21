@@ -280,8 +280,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="choice-option-${await optionIdFor(groupId, itemId)}"]')`)
     await click(view, `[data-test="choice-option-${await optionIdFor(groupId, itemId)}"]`)
 
@@ -299,7 +299,43 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, `[data-test="line-remove-${lineId}"]`)
     await waitFor(view, `!document.querySelector('[data-test="basket"]')`)
 
-    void productId
+    view.close()
+  }, 120_000)
+
+  // 0083: the sizes are a sheet off the tile, so a wine at 360 pixels is two large taps rather
+  // than four pills wrapped inside half a card.
+  test('a product with several sizes opens the size sheet, and the size chosen there lands in the basket', async () => {
+    const { venueId } = programme('sale-sizes')
+    const categoryId = await aCategory()
+    const productId = await aProductIn(categoryId, { name: named('Screen red') })
+    const small = await addVariant(productId, { servingKind: '175ml', label: '175ml glass' })
+    const large = await addVariant(productId, { servingKind: '250ml', label: '250ml glass' })
+    await priceVariant(small, 350)
+    await priceVariant(large, 480)
+    await activate(productId)
+    await openTill(venueId)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    expect(await textOf(view, `[data-test="product-${productId}"]`)).toContain('From £3.50')
+
+    // The tile adds nothing on its own: the sizes are the sheet's, and the sheet is titled for
+    // the product it came from.
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="size-sheet"]')`)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="basket"]')`)).toBe(false)
+    expect(await textOf(view, '[data-test="size-sheet"]')).toContain('£4.80')
+
+    await click(view, `[data-test="variant-${large}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket"]')`)
+    await waitFor(view, `!document.querySelector('[data-test="size-sheet"]')`)
+    expect(await textOf(view, '[data-test="basket"]')).toContain('250ml glass')
     view.close()
   }, 120_000)
 
@@ -330,7 +366,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect(await textOf(view, '[data-test="allergen-note"]')).toContain('Contains nuts')
 
     // Closing the note returns to the same basket, not away from it.
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="basket"]')`)
     expect(await textOf(view, '[data-test="basket"]')).toContain('Screen note')
     view.close()
@@ -358,8 +394,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="basket"]')`)
 
     await view.evaluate(`document.querySelector('[data-test="basket"] [aria-label^="Allergens for"]').click()`)
