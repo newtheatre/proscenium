@@ -255,3 +255,38 @@ describe('one set of camera-failure sentences, in the show-night register (issue
     for (const says of sentences) expect(says.toLowerCase()).toContain('type the reference')
   })
 })
+
+// Issue 1151 item 9: the desk kept three sentences of its own beside the shared ones, so one
+// camera failure read one way at the door and another at the box office.
+describe('no screen spells its own camera-failure sentences', () => {
+  function appFiles(): string[] {
+    const glob = new Bun.Glob('**/*.{vue,ts}')
+    return [...glob.scanSync({ cwd: 'app', onlyFiles: true })].map(path => `app/${path}`).sort()
+  }
+
+  test('the shared map is the only map of a scanner failure to words', async () => {
+    const offenders: string[] = []
+    for (const file of appFiles()) {
+      if ((await Bun.file(file).text()).includes('Record<ScannerFailure, string>')) offenders.push(file)
+    }
+    expect(offenders).toEqual([])
+  })
+
+  // Setting the note is the test, not showing one: a pane handed the note as a prop spells nothing.
+  const SETS_NOTE = 'cameraNote.value ='
+
+  test('every screen that sets a camera note takes that note from the shared map', async () => {
+    const offenders: string[] = []
+    for (const file of appFiles()) {
+      const source = await Bun.file(file).text()
+      if (source.includes(SETS_NOTE) && !source.includes('CAMERA_FALLBACK_SAYS')) offenders.push(file)
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('the desk is one of those screens, so neither case passes by the desk having no camera', async () => {
+    const desk = await Bun.file('app/pages/box-office/desk.vue').text()
+    expect(desk).toContain(SETS_NOTE)
+    expect(desk).toContain('CAMERA_FALLBACK_SAYS')
+  })
+})

@@ -98,12 +98,14 @@ const named = (prefix: string): string => `${prefix} ${crypto.randomUUID().slice
 const slugged = (title: string): string => title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 const weekOffsetSeconds = 7 * 86_400
 
-async function bookableShow(price = 900): Promise<{ performanceId: string, ticketTypeId: string, startsAt: number, night: string }> {
+// The offset is a parameter because the desk screen opens on tonight and nothing else: a case
+// driving the screen needs a performance inside the night in progress, not one a week out.
+async function bookableShow(price = 900, offsetSeconds = weekOffsetSeconds): Promise<{ performanceId: string, ticketTypeId: string, startsAt: number, night: string }> {
   const title = named('The Seagull')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) }, officer.cookie)
   const showId = (await show.json() as { id: string }).id
 
-  const startsAt = Math.floor(Date.now() / 1000) + weekOffsetSeconds
+  const startsAt = Math.floor(Date.now() / 1000) + offsetSeconds
   const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt }, officer.cookie)
   const performanceId = (await performance.json() as { id: string }).id
 
@@ -581,6 +583,81 @@ describe.skipIf(skip !== null)('refunding a ticket confirms before anything move
     }
     finally {
       await send('PUT', '/api/admin/config/REFUND_PAID_REQUIRES_MANAGER', { value: true }, officer.cookie)
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+const twoHoursSeconds = 2 * 3_600
+
+// D-115 criterion 7, issue 1151 item 9: the route and its schema were both there and the screen
+// offered no way to reach them, so a walk-up could only be sold by the till.
+describe.skipIf(skip !== null)('what a walk-up may be sold as at the desk (D-115 criterion 7)', () => {
+  test('the desk reads the performance\'s own bookable types at the desk price', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(1100)
+
+    const answered = await send('GET', `/api/box-office/desk/ticket-types?performanceId=${performanceId}`)
+    expect(answered.status).toBe(200)
+
+    const body = await answered.json() as { options: { id: string, name: string, price: number }[] }
+    const option = body.options.find(each => each.id === ticketTypeId)
+    expect(option?.price).toBe(1100)
+  }, CASE_TIMEOUT_MS)
+
+  test('a performance nobody has is a missing performance, not an empty list', async () => {
+    expect((await send('GET', '/api/box-office/desk/ticket-types?performanceId=not-a-performance')).status).toBe(404)
+  }, CASE_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('selling a walk-up from the desk screen (D-115 criterion 7)', () => {
+  test('the total is read out, the sale lands as a door booking and the tiles move', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(1100, twoHoursSeconds)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-walk-up"]')`, 30_000)
+
+      // Nothing chosen: the sale names what it still needs rather than sitting dead.
+      expect(await textOf(view, '[data-test="desk-walk-up-blocked"]')).toContain('ticket')
+
+      await fill(view, `[data-test="desk-walk-up-quantity-${ticketTypeId}"]`, '2')
+      await fill(view, '[data-test="desk-walk-up-name"]', 'Walk Up')
+      await fill(view, '[data-test="desk-walk-up-email"]', registrableAddress('walkup'))
+      await waitFor(view, `document.querySelector('[data-test="desk-walk-up-total"]')?.innerText.includes('£22.00')`, 15_000)
+
+      await click(view, '[data-test="desk-walk-up-sell"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-summary-door"]')?.innerText.includes('2')`, 30_000)
+
+      const sold = queryAll<{ source: string, status: string }>(
+        'SELECT source, status FROM reservations WHERE performance_id = ?', performanceId,
+      )
+      expect(sold).toHaveLength(1)
+      expect(sold[0]).toEqual({ source: 'DOOR', status: 'DOOR' })
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+// D-114 criterion 9: the card searched on its own the moment a performance was chosen, then said
+// "No results yet" about a search that had already run.
+describe.skipIf(skip !== null)('an empty results card says which kind of empty it is (D-114 criterion 9)', () => {
+  test('a house with no bookings reads differently from a search that matched nothing', async () => {
+    await bookableShow(900, twoHoursSeconds)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-empty"]')`, 30_000)
+      expect(await textOf(view, '[data-test="desk-empty"]')).toContain('No bookings on this performance')
+
+      await fill(view, '[data-test="desk-search"]', 'Nobody At All')
+      await click(view, '[data-test="desk-search-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-empty"]')?.innerText.includes('No booking matches')`, 15_000)
+    }
+    finally {
+      view.close()
     }
   }, CASE_TIMEOUT_MS)
 })

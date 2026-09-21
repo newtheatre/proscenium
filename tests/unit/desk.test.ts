@@ -6,9 +6,14 @@ import {
   REINSTATE_REASON_LIMIT,
   amountDueFor,
   collectForm,
+  compBlockedSays,
+  deskEmptySays,
   deskSaleForm,
   deskSearchForm,
   readDeskScan,
+  saysDeskNight,
+  walkUpRefusal,
+  walkUpTotalPence,
   refundTicketForm,
   reinstateRefusal,
   reinstateReservationForm,
@@ -222,5 +227,145 @@ describe('a booking status never reaches the desk as its stored value', () => {
   test('a status nobody named reads as its wording', () => {
     expect(uncollectableReason('NO_SHOW')).toContain('no-show')
     expect(reinstateRefusal('NO_SHOW', null)).toContain('No-show')
+  })
+})
+
+// Issue 1151 item 9, D-114 criterion 9. The night ran as its stored label with a "Today" button
+// beside it, which is a calendar day and not the 04:00-to-04:00 night the desk actually works to.
+describe('the desk names the night it is showing, not the label it stores it under', () => {
+  const EVENING = new Date('2026-10-14T20:00:00Z')
+  const AFTER_MIDNIGHT = new Date('2026-10-15T01:00:00Z')
+
+  test('the night in progress is named as tonight, with its day beside it', () => {
+    expect(saysDeskNight('2026-10-14', EVENING)).toBe('Tonight, Wed 14 Oct')
+  })
+
+  test('at one in the morning the night is still the evening it began', () => {
+    expect(saysDeskNight('2026-10-14', AFTER_MIDNIGHT)).toBe('Tonight, Wed 14 Oct')
+    expect(saysDeskNight('2026-10-15', AFTER_MIDNIGHT)).toBe('Thu 15 Oct')
+  })
+
+  test('any other night is its day alone', () => {
+    expect(saysDeskNight('2026-10-15', EVENING)).toBe('Thu 15 Oct')
+    expect(saysDeskNight('2026-10-13', EVENING)).toBe('Tue 13 Oct')
+  })
+
+  test('no night reaches the screen as the label it is stored under', () => {
+    for (const night of ['2026-10-13', '2026-10-14', '2026-10-15']) {
+      expect(saysDeskNight(night, EVENING)).not.toContain(night)
+    }
+  })
+})
+
+// D-115 criterion 7: the sum the officer reads into the reader, and what the screen sends as its
+// expected total, are one computation (0004, 0005).
+describe('a walk-up totals the lines it holds', () => {
+  test('nothing chosen is nothing due', () => {
+    expect(walkUpTotalPence([])).toBe(0)
+  })
+
+  test('a quantity multiplies its own price', () => {
+    expect(walkUpTotalPence([{ pricePence: 650, quantity: 3 }])).toBe(1950)
+  })
+
+  test('lines of different ticket types add up', () => {
+    expect(walkUpTotalPence([{ pricePence: 650, quantity: 2 }, { pricePence: 450, quantity: 1 }])).toBe(1750)
+  })
+
+  test('a line with no quantity contributes nothing, so a cleared field is not a free ticket', () => {
+    expect(walkUpTotalPence([{ pricePence: 650, quantity: 0 }, { pricePence: 450, quantity: 2 }])).toBe(900)
+  })
+})
+
+describe('a walk-up says what it still needs before any money moves', () => {
+  const GUEST = { name: 'Ada Kowalski', email: 'ada@example.com' }
+  const LINE = [{ pricePence: 650, quantity: 1 }]
+
+  test('with nothing chosen it asks for a ticket', () => {
+    expect(walkUpRefusal([], GUEST)).toContain('ticket')
+  })
+
+  test('with no name it asks for the booker', () => {
+    expect(walkUpRefusal(LINE, { name: '  ', email: 'ada@example.com' })).toContain('name')
+  })
+
+  test('with no email it asks for that', () => {
+    expect(walkUpRefusal(LINE, { name: 'Ada Kowalski', email: '' })).toContain('email')
+  })
+
+  test('a sale that is ready has nothing to say', () => {
+    expect(walkUpRefusal(LINE, GUEST)).toBeNull()
+  })
+
+  test('nothing it says explains itself or names the machine', () => {
+    const said = [walkUpRefusal([], GUEST), walkUpRefusal(LINE, { name: '', email: '' })]
+    for (const says of said) {
+      expect(says).not.toMatch(/\b(because|so that|reservation|row|write)\b/i)
+      expect(says?.endsWith('.')).toBe(true)
+    }
+  })
+})
+
+// The results card searches on its own the moment a performance is chosen, so "No results yet"
+// was shown for a search that had already run and matched nothing.
+describe('the results card tells a search that has not run from one that matched nothing', () => {
+  test('before anything has run it says what to do', () => {
+    expect(deskEmptySays({ searched: false, narrowed: false })).toContain('Scan')
+  })
+
+  test('a narrowed search that matched nothing says so, and what to try', () => {
+    const says = deskEmptySays({ searched: true, narrowed: true })
+    expect(says).toContain('No booking matches')
+    expect(says.toLowerCase()).toContain('name')
+  })
+
+  test('an unnarrowed search that matched nothing says the house has no bookings', () => {
+    expect(deskEmptySays({ searched: true, narrowed: false })).toContain('No bookings on this performance')
+  })
+
+  test('the three read differently, and none of them is the old "no results yet"', () => {
+    const said = [
+      deskEmptySays({ searched: false, narrowed: false }),
+      deskEmptySays({ searched: true, narrowed: false }),
+      deskEmptySays({ searched: true, narrowed: true }),
+    ]
+    expect(new Set(said).size).toBe(3)
+    for (const says of said) expect(says.toLowerCase()).not.toContain('no results')
+  })
+})
+
+// D-114 criterion 9: Collect sat disabled on a comp with nothing beside it saying why.
+describe('a comp the desk cannot collect says why', () => {
+  const APPROVED = { status: 'APPROVED' as const, expired: false, declineReason: null }
+
+  test('an approved, unexpired request blocks nothing', () => {
+    expect(compBlockedSays(APPROVED)).toBeNull()
+  })
+
+  test('with no request at all it asks for one', () => {
+    expect(compBlockedSays(null)).toContain('Ask')
+  })
+
+  test('a request still waiting names who decides it', () => {
+    expect(compBlockedSays({ status: 'PENDING', expired: false, declineReason: null })).toContain('duty manager')
+  })
+
+  test('a declined request carries the reason it was declined with', () => {
+    expect(compBlockedSays({ status: 'DECLINED', expired: false, declineReason: 'Sold out' })).toContain('Sold out')
+  })
+
+  test('a lapsed request says to ask again, whatever it was decided as', () => {
+    expect(compBlockedSays({ status: 'APPROVED', expired: true, declineReason: null })).toContain('again')
+    expect(compBlockedSays({ status: 'PENDING', expired: true, declineReason: null })).toContain('again')
+  })
+
+  test('each reason reads differently, so the button never points at the wrong one', () => {
+    const said = [
+      compBlockedSays(null),
+      compBlockedSays({ status: 'PENDING', expired: false, declineReason: null }),
+      compBlockedSays({ status: 'DECLINED', expired: false, declineReason: 'Sold out' }),
+      compBlockedSays({ status: 'PENDING', expired: true, declineReason: null }),
+    ]
+    expect(new Set(said).size).toBe(said.length)
   })
 })
