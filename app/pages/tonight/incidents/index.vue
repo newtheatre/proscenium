@@ -344,9 +344,9 @@ async function submitCorrect(): Promise<void> {
                 </UButton>
                 <UButton
                   v-if="!entry.supersededBy"
-                  size="xs"
                   color="neutral"
                   variant="ghost"
+                  class="min-h-12"
                   :data-test="`correct-${entry.id}`"
                   @click="openCorrect(entry)"
                 >
