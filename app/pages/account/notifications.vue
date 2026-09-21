@@ -93,7 +93,7 @@ useSeoMeta({ title: 'Notifications' })
           :data-test="`topic-${cell.topic}`"
         >
           <div class="flex flex-wrap items-baseline gap-x-3">
-            <h3 class="font-medium">
+            <h3 class="text-base font-semibold">
               {{ TOPIC_LABELS[cell.topic] }}
             </h3>
             <UBadge

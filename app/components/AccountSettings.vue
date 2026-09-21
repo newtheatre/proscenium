@@ -9,7 +9,7 @@ const links = ACCOUNT_NAV.map(entry => ({ label: entry.label, icon: entry.icon, 
 </script>
 
 <template>
-  <UContainer class="max-w-5xl py-10">
+  <UContainer :class="MEMBER_PAGE_WIDE">
     <UPage>
       <template #left>
         <UPageAside>

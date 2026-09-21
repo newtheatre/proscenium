@@ -36,7 +36,7 @@ const membershipLine = computed(() => {
 <template>
   <UContainer
     data-test="my-page"
-    class="max-w-5xl py-10"
+    :class="MEMBER_PAGE_WIDE"
   >
     <UPageHeader
       title="My NNT"

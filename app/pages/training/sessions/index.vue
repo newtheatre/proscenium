@@ -113,7 +113,7 @@ const sessionDay = (session: Session): string =>
 
 <template>
   <UContainer
-    class="max-w-3xl py-16"
+    :class="MEMBER_PAGE_READING"
     data-test="sessions-page"
   >
     <UPageHeader
@@ -147,7 +147,7 @@ const sessionDay = (session: Session): string =>
       class="mt-8"
       data-test="my-sessions"
     >
-      <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+      <h2 class="text-lg font-semibold">
         What you are signed up to
       </h2>
 
@@ -212,7 +212,7 @@ const sessionDay = (session: Session): string =>
       class="mt-12"
       data-test="open-sessions"
     >
-      <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+      <h2 class="text-lg font-semibold">
         Coming up
       </h2>
 
