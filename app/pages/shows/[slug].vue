@@ -171,7 +171,7 @@ function saysInterval(performance: ListedPerformance): string {
 
           <!-- Four facts, in the body face: the ones somebody decides on. Interval and latecomers
                are practical detail and sit with the prose below (show-page.png, D-102). -->
-          <dl class="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 text-default sm:grid-cols-4">
+          <dl class="mt-8 grid grid-cols-1 gap-x-6 gap-y-5 text-default sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <dt class="text-sm text-muted">
                 Dates
@@ -311,10 +311,13 @@ function saysInterval(performance: ListedPerformance): string {
                 </h3>
                 <span class="text-xs text-muted">{{ group.hint }}</span>
               </div>
-              <ul class="flex flex-wrap gap-2">
+              <!-- The description is text beside the badge, never a hover title: a phone has no
+                   hover and a screen reader reads no `title` (D-102 criterion 5). -->
+              <ul class="space-y-2">
                 <li
                   v-for="warning in group.warnings"
                   :key="warning.slug"
+                  class="flex flex-wrap items-baseline gap-x-2 gap-y-1"
                   :data-test="`warning-${warning.slug}`"
                 >
                   <UBadge
@@ -322,8 +325,11 @@ function saysInterval(performance: ListedPerformance): string {
                     variant="subtle"
                     :icon="warning.icon ?? undefined"
                     :label="warning.title"
-                    :title="warning.description ?? undefined"
                   />
+                  <span
+                    v-if="warning.description"
+                    class="text-sm text-muted"
+                  >{{ warning.description }}</span>
                 </li>
               </ul>
             </section>
@@ -344,7 +350,7 @@ function saysInterval(performance: ListedPerformance): string {
           variant="subtle"
           icon="i-lucide-accessibility"
           title="Access"
-          description="Tell us what you need when you book, or ask the box office. Signed-in members can record their access requirements once and have them travel with every booking."
+          description="Members record what they need once in their account, and it travels with every booking. Anybody else speaks to the box office at the theatre, on the night or before it."
           data-test="show-access"
         />
       </div>

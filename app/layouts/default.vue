@@ -4,6 +4,7 @@
 
 // The header carries the visitor's few destinations from HEADER_NAV; the full public nav,
 // editorial pages included, stays in the footer (D-103, J-111 criterion 4).
+import { withoutPlaceholders } from '#shared/utils/editorial'
 import { HEADER_NAV } from '#shared/utils/site-nav'
 
 // The booking button already goes to what's on, so the entry is dropped from the rendering here
@@ -11,8 +12,13 @@ import { HEADER_NAV } from '#shared/utils/site-nav'
 const BOOKING_TO = '/whats-on'
 
 const { account } = useAccount()
+const unwritten = usePlaceholderPaths()
+
+// The same filter the footer applies: a page awaiting the committee's copy is linked from neither
+// end of the shell (D-103 criterion 6).
 const links = computed(() => [
-  ...HEADER_NAV.filter(entry => entry.to !== BOOKING_TO).map(entry => ({ label: entry.label, to: entry.to })),
+  ...withoutPlaceholders(HEADER_NAV.filter(entry => entry.to !== BOOKING_TO), unwritten.value)
+    .map(entry => ({ label: entry.label, to: entry.to })),
   ...(account.value.signedIn ? [{ label: 'My NNT', to: '/my' }] : []),
 ])
 </script>

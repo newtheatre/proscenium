@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { withoutPlaceholders } from '#shared/utils/editorial'
 import { SITE_ADDRESS } from '#shared/utils/seo'
 import { ACCOUNT_NAV, MY_NAV, PUBLIC_GROUPS, PUBLIC_NAV } from '#shared/utils/site-nav'
 import type { NavEntry } from '#shared/utils/site-nav'
@@ -13,19 +14,21 @@ function href(entry: NavEntry): string {
   return account.value.signedIn ? entry.to : `/sign-in?next=${encodeURIComponent(entry.to)}`
 }
 
-// The public half groups by the heading each entry declares, so a new page joins a column by
-// saying which one rather than by being listed twice (0040).
-const publicColumns = PUBLIC_GROUPS.map(heading => ({
+const unwritten = usePlaceholderPaths()
+
+// The public half groups by the heading each entry declares (0040), and a page the committee has
+// not written yet is left out of every column until it has copy (D-103 criterion 6).
+const publicColumns = computed(() => PUBLIC_GROUPS.map(heading => ({
   label: heading as string,
-  links: PUBLIC_NAV.filter(entry => entry.group === heading),
+  links: withoutPlaceholders(PUBLIC_NAV.filter(entry => entry.group === heading), unwritten.value),
   public: true,
-}))
+})))
 
 const columns = computed(() => [
   // The same names the navigation uses: the member area is My NNT wherever it is named (0040).
   { label: 'My NNT', links: MY_NAV, public: false },
   { label: 'Account', links: ACCOUNT_NAV, public: false },
-  ...publicColumns,
+  ...publicColumns.value,
 ].filter(column => column.links.length > 0))
 
 const year = new Date().getFullYear()

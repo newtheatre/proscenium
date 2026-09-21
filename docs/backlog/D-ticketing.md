@@ -69,6 +69,8 @@ Open questions:
      tickets, guidance); interval and latecomers are practical detail and sit with the prose.
   4. Warnings and age guidance set on the show flow through to the e-ticket (D-108) and the
      show-night screens (module E) from the same rows, never re-entered.
+  5. A warning's description is text on the page beside the warning it describes, never only a
+     hover title: a phone and a screen reader get the same words a mouse does.
 - Source: Prompt Book D-1; audit PR-7 (vocabulary, confirmed-none, the grouped presentation, the
   graded editor and the content notes beside the list carried from proscenium)
 
@@ -94,6 +96,10 @@ Open questions:
      through content, numbers come from configuration instantly.
   5. The four pages the old estate carried migrate with their copy; the empty stagecraft
      collection and the commented-out technical specification are rewritten, not imported blank.
+  6. A page still flagged `placeholder` is reachable by its own address and linked from nowhere:
+     the header's links and the footer's columns both drop it. A stand-in sentence is never
+     written into front matter; an unwritten field is left absent, and the furniture it would have
+     filled does not render.
 - Source: Prompt Book D-1; committee direction 26 August (Nuxt Content with Studio-style
   editing); audit PR-1; Get-In part 2 (content pages: rebuild)
 
@@ -122,6 +128,12 @@ Open questions:
      from the run, choose tickets, give your details, with the order as a ticket stub beside them
      carrying the view's one marquee. The stub quotes the hold-release figure from configuration
      rather than saying "shortly before curtain".
+  8. The screen answers a screen reader as fully as it answers a mouse: a refusal to reserve is
+     announced where it appears and is named by the control it refuses; the night being booked
+     carries a word and not only a colour; each night in the picker says its own availability in
+     the same terms the show page uses; a signed-out visitor looking at a run that also prices a
+     member ticket is offered the way in to see it; and the confirmation names the address the
+     booking has been emailed to (D-108 criterion 2).
 - Source: Prompt Book D-2; audit PR-2; booking.png
 
 ## D-105: Capacity enforced by the database

@@ -130,3 +130,99 @@ describe.skipIf(skip !== null)('a bad detail is refused on its own field, in hou
     }
   }, CASE_TIMEOUT_MS)
 })
+
+// Issue 1152 item 4, D-104 criterion 8: what the screen tells a mouse it also tells a keyboard, a
+// screen reader and a phone, and the confirmation says where the booking has been sent.
+describe.skipIf(skip !== null)('the screen answers everybody the same way (criterion 8)', () => {
+  test('each night says its own availability and the chosen one carries a word', async () => {
+    const { first, second } = await twoNightRun()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/book/${first}`, '[data-test="book-page"]')
+      await waitFor(view, `document.querySelector('[data-test="night-${second}"]')`)
+
+      expect(await textOf(view, `[data-test="night-${first}"]`)).toContain('Booking this night')
+      expect(await textOf(view, `[data-test="night-${second}"]`)).toContain('Tickets available')
+      expect(await textOf(view, `[data-test="night-${second}"]`)).not.toContain('Booking this night')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a refusal to reserve is announced and named by the button that refused', async () => {
+    const { first } = await twoNightRun()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/book/${first}`, '[data-test="book-page"]')
+      await click(view, '[data-test="booking-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="booking-notice"]')`)
+
+      const seen = await view.evaluate<string>(`JSON.stringify((() => {
+        const live = document.querySelector('[data-test="booking-live"]')
+        const submit = document.querySelector('[data-test="booking-submit"]')
+        const described = (submit?.getAttribute('aria-describedby') ?? '').split(/\\s+/).filter(Boolean)
+        return {
+          announced: live?.getAttribute('role') ?? null,
+          names: described.map(id => document.getElementById(id) !== null),
+          notice: document.querySelector('[data-test="booking-notice"]')?.id ?? null,
+          describedBy: described,
+        }
+      })())`)
+      const read = JSON.parse(seen) as { announced: string | null, names: boolean[], notice: string | null, describedBy: string[] }
+
+      expect(read.announced).toBe('alert')
+      expect(read.notice).not.toBeNull()
+      expect(read.describedBy).toContain(read.notice!)
+      expect(read.names.every(Boolean)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the confirmation names the address the booking has gone to', async () => {
+    const { first } = await twoNightRun()
+    const address = `vanya-${crypto.randomUUID().slice(0, 8)}@example.com`
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/book/${first}`, '[data-test="book-page"]')
+      await fillNumber(view, '[data-test^="quantity-"]', '1')
+      await fill(view, '[data-test="guest-name"]', 'Sonya Serebryakova')
+      await fill(view, '[data-test="guest-email"]', address)
+      await click(view, '[data-test="booking-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="booking-confirmed"]')`)
+
+      const confirmed = await textOf(view, '[data-test="booking-confirmed"]')
+      expect(confirmed).toContain(address)
+      expect(confirmed).toContain('emailed')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a signed-out visitor looking at a member price is offered the way in', async () => {
+    const title = named('The Seagull')
+    const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
+    const showId = (await show.json() as { id: string }).id
+    const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: nextWeek() })
+    const performanceId = (await performance.json() as { id: string }).id
+    await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
+    await send('POST', '/api/admin/ticket-types', { name: named('Member'), price: 400, restrictedTo: 'MEMBER' })
+    expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/book/${performanceId}`, '[data-test="book-page"]')
+      await waitFor(view, `document.querySelector('[data-test="member-prices"]')`)
+      expect(await textOf(view, '[data-test="member-prices"]')).toContain('member')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})

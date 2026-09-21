@@ -3,7 +3,9 @@ import { describe, expect, test } from 'bun:test'
 // D-103, as Matt narrowed criterion 5 on 5 September 2026: nothing invented reaches the public
 // site, so every editorial page ships marked as awaiting the committee until real copy lands.
 
-const PAGES = ['about', 'history', 'get-involved', 'technical-specification']
+// Get involved is written: its hero, its tiles and its steps are the page, and the home page and
+// the error page both offer it. The other three are still the committee's to write.
+const PAGES = ['about', 'history', 'technical-specification']
 
 describe('editorial pages are honest about being placeholders (D-103)', () => {
   for (const slug of PAGES) {
@@ -14,12 +16,22 @@ describe('editorial pages are honest about being placeholders (D-103)', () => {
     })
   }
 
+  // D-103 criterion 6: an unwritten field is absent, never a stand-in sentence somebody could
+  // mistake for a member's own words.
+  test('get-involved is not flagged, carries no stand-in quote and has no stand-in prose', async () => {
+    const source = await Bun.file('content/get-involved.md').text()
+    const front = source.slice(0, source.indexOf('\n---', 4))
+    expect(front).not.toContain('placeholder: true')
+    expect(front).not.toContain('quote:')
+    expect(source.slice(source.indexOf('\n---', 4) + 4).trim()).toBe('')
+  })
+
   // J-111: the landing page's tiles and steps are front matter, so a committee member changing a
   // department's wording never opens a Vue file.
   test('get-involved carries its landing furniture in front matter', async () => {
     const source = await Bun.file('content/get-involved.md').text()
     const front = source.slice(0, source.indexOf('\n---', 4))
-    for (const field of ['headline:', 'flash:', 'departments:', 'steps:', 'quote:']) {
+    for (const field of ['headline:', 'flash:', 'departments:', 'steps:']) {
       expect(`${field} ${front.includes(field)}`).toBe(`${field} true`)
     }
   })
