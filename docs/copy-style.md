@@ -176,6 +176,12 @@ No em dash anywhere, in any string. K-128 criterion 4 adds a unit test enforcing
 `shared/` and `content/`; name it as coming when you touch a string, because it will fail a build
 that reintroduces one.
 
+A stored value never reaches a screen. An enum value, a permission or audit code, a table name
+and a configuration key are the estate's own vocabulary, not the reader's: each has a `says*`
+helper or a `*_WORDING` map beside the enum in `shared/utils/`, and that is what a page shows,
+including in a select's options. `tests/unit/admin-conventions.test.ts` fails a console screen
+that shows one, and `tests/unit/code-wording.test.ts` fails a value nobody has worded.
+
 British spellings, the ones that recur: organise, colour, recognise, apologise, licence (noun),
 practise (verb), programme (except a computer program). Already the practice throughout the
 codebase, for example `shared/utils/seasons.ts`.
@@ -192,7 +198,8 @@ spelled with two Ls everywhere, for example `shared/utils/audit-coverage.ts`'s
    three words on `tonight`.
 3. Glossary word used correctly: performance vs show, room vs venue vs space, shift vs rota.
 4. A refusal says what happened, what to do, where to go, in that order, in the policy's own words.
-5. An error never blames the reader and never shows an id, a table name or a status code.
+5. An error never blames the reader and never shows an id, a table name or a status code, and
+   no screen shows an enum value, a permission or audit code or a configuration key.
 6. An empty state names the one action that fills it; never a bare "No X yet."
 7. A button is verb first, sentence case, no trailing punctuation; a destructive one names what it
    destroys.

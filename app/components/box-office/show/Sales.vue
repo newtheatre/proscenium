@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import { soldShare } from '#shared/utils/show-strip'
 import type { TableColumn } from '@nuxt/ui'
 import type { VNode } from 'vue'
@@ -30,7 +30,7 @@ const columns = computed<TableColumn<AdminPerformance>[]>(() => [
     header: 'Performance',
     footer: () => h('span', { class: 'text-sm font-semibold' }, 'The run'),
     cell: ({ row }) => h('div', {}, [
-      h('div', { class: 'text-sm' }, formatLondon(new Date(row.original.startsAt * 1000), { dateStyle: 'medium', timeStyle: 'short' })),
+      h('div', { class: 'text-sm' }, saysWhen(row.original.startsAt)),
       h('div', { class: 'text-xs text-muted' }, row.original.venueName),
     ]),
   },

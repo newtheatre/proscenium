@@ -2,6 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { saysWhen } from '#shared/utils/when'
 import { sendLogList } from '#shared/utils/send-log-list'
+import { saysNotificationStatus } from '#shared/utils/notifications'
 import type { DailyCount, SendLogRow } from '#shared/utils/notification-log'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -77,7 +78,7 @@ const columns: TableColumn<SendLogRow>[] = [
   {
     id: 'status',
     header: 'Outcome',
-    cell: ({ row }) => h(UBadge, { color: STATUS_COLOR[row.original.status] ?? 'neutral', variant: 'subtle', size: 'sm' }, () => row.original.status),
+    cell: ({ row }) => h(UBadge, { color: STATUS_COLOR[row.original.status] ?? 'neutral', variant: 'subtle', size: 'sm' }, () => saysNotificationStatus(row.original.status)),
   },
   { id: 'createdAt', header: 'Enqueued', cell: ({ row }) => saysWhen(row.original.createdAt) },
   { id: 'sentAt', header: 'Sent', cell: ({ row }) => when(row.original.sentAt) },
@@ -134,7 +135,7 @@ onMounted(() => {
               {{ row.day }}
             </td><td class="font-mono">
               {{ row.type }}
-            </td><td>{{ row.status }}</td><td>{{ row.count }}</td>
+            </td><td>{{ saysNotificationStatus(row.status) }}</td><td>{{ row.count }}</td>
           </tr>
         </tbody>
       </table>

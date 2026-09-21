@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 
 definePageMeta({ layout: 'console', title: 'Overview', middleware: 'console', docs: '/docs/system' })
 
@@ -100,7 +100,7 @@ onMounted(() => {
           <span class="font-mono text-xs text-muted">{{ entry.type }}</span>
           <span class="text-muted">{{ saysWhy(entry) }}</span>
           <span class="ms-auto text-xs text-muted">
-            {{ formatLondon(new Date(entry.at * 1000), { dateStyle: 'medium', timeStyle: 'short' }) }}
+            {{ saysWhen(entry.at) }}
           </span>
         </li>
       </ul>

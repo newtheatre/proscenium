@@ -18,9 +18,10 @@ const STATUS_WORDING: Record<ReservationStatus, string> = {
   NO_SHOW: 'No-show',
 }
 
-// For a report a person reads (D-129), not a console filter.
-export function saysReservationStatus(status: ReservationStatus): string {
-  return STATUS_WORDING[status]
+// For a report a person reads (D-129), not a console filter. A row types its status as free text,
+// and a state nobody registered reads as itself rather than as nothing (0027's habit).
+export function saysReservationStatus(status: string): string {
+  return STATUS_WORDING[status as ReservationStatus] ?? status
 }
 
 // Held: somebody is coming, or has paid and is coming. A ticket under one of these occupies a seat.

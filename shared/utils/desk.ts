@@ -3,6 +3,7 @@ import { readScannedCode } from './door'
 import { guestDetailsForm } from './reservations'
 import { pageQuery } from './pagination'
 import { saysPrice } from './ticket-types'
+import { saysReservationStatus } from './capacity'
 
 // D-114: finding a booking at the desk and taking payment for it. Collection is the payment
 // boundary (criterion 2); this file is the pure shape of what crosses it.
@@ -41,6 +42,10 @@ export const collectForm = z.object({
 
 export type CollectInput = z.output<typeof collectForm> & { reservationId: string }
 
+// A status the branches below do not name still reads as words: the stored value is the estate's
+// vocabulary and never reaches the desk (K-128, issue 1151 item 8).
+const saysStatus = (status: string): string => saysReservationStatus(status)
+
 // What a booking's own status says about whether it can be collected right now, in the
 // booker-facing words the desk screen shows. Null means it can.
 export function uncollectableReason(status: string): string | null {
@@ -58,7 +63,7 @@ export function uncollectableReason(status: string): string | null {
     case 'NO_SHOW':
       return 'This booking was recorded as a no-show and cannot be collected.'
     default:
-      return `This booking is ${status.toLowerCase()} and cannot be collected.`
+      return `${saysStatus(status)} bookings cannot be collected.`
   }
 }
 
@@ -126,7 +131,7 @@ export function reinstateRefusal(status: string, cancelledBy: string | null): st
   if (status === 'CANCELLED') {
     return 'This booking was refunded and cancelled at the desk: reinstating it would bring back a sale that was already handed back. Take a new booking instead.'
   }
-  return `This booking is ${status.toLowerCase()} and cannot be reinstated.`
+  return `${saysStatus(status)} bookings cannot be reinstated.`
 }
 
 // What the desk's scan field resolves to (criterion 8): the door's four forms less the pass, plus

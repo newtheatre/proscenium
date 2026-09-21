@@ -209,12 +209,13 @@ describe('a scanned code resolves to a token or a reference, whichever way it ar
 // K-128, issue 1151 item 8: a status the switch does not name still reads as words rather than as
 // the value lowercased, which is how NO_SHOW reached the desk as "no_show".
 describe('a booking status never reaches the desk as its stored value', () => {
-  test('no reason quotes the status it refuses', () => {
+  test('no reason carries the stored value', () => {
     for (const status of RESERVATION_STATUSES) {
-      const reason = uncollectableReason(status)
-      if (reason !== null) expect(reason.toLowerCase()).not.toContain(status.toLowerCase())
-      const refusal = reinstateRefusal(status, null)
-      if (refusal !== null) expect(refusal.toLowerCase()).not.toContain(status.toLowerCase())
+      for (const said of [uncollectableReason(status), reinstateRefusal(status, null)]) {
+        if (said === null) continue
+        expect(said).not.toContain('_')
+        expect(said).not.toContain(status)
+      }
     }
   })
 

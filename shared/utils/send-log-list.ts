@@ -1,4 +1,4 @@
-import { CHANNELS, NOTIFICATION_STATUSES, NOTIFICATION_TOPICS, TOPIC_LABELS } from './notifications'
+import { CHANNELS, NOTIFICATION_STATUSES, NOTIFICATION_TOPICS, TOPIC_LABELS, saysChannel, saysNotificationStatus } from './notifications'
 import type { ListSpec } from './list-filters'
 
 // The send log's declaration (K-129, H-106). Type stays free text: the catalogue is too wide for
@@ -15,8 +15,8 @@ export const sendLogList = {
       operators: ['is'],
       icon: 'i-lucide-layers',
     },
-    { key: 'channel', label: 'Channel', kind: 'list', column: 'channel', options: CHANNELS.map(value => ({ value, label: value })), icon: 'i-lucide-radio' },
-    { key: 'status', label: 'Outcome', kind: 'list', column: 'status', options: NOTIFICATION_STATUSES.map(value => ({ value, label: value })), icon: 'i-lucide-flag' },
+    { key: 'channel', label: 'Channel', kind: 'list', column: 'channel', options: CHANNELS.map(value => ({ value, label: saysChannel(value) })), icon: 'i-lucide-radio' },
+    { key: 'status', label: 'Outcome', kind: 'list', column: 'status', options: NOTIFICATION_STATUSES.map(value => ({ value, label: saysNotificationStatus(value) })), icon: 'i-lucide-flag' },
     { key: 'createdAt', label: 'Sent', kind: 'date-range', column: 'created_at', dateAs: 'unix', icon: 'i-lucide-calendar' },
   ],
   sort: {

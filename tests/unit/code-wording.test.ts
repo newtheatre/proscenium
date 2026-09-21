@@ -13,7 +13,7 @@ import { ROLES, saysRole } from '#shared/utils/roles'
 
 const isCode = (said: string): boolean => /^[A-Z0-9_]+$/.test(said)
 
-function everyValueReads(values: readonly string[], says: (value: string) => string): void {
+function everyValueReads<T extends string>(values: readonly T[], says: (value: T) => string): void {
   expect(values.length).toBeGreaterThan(0)
   const unworded = values.filter(value => says(value).trim() === '' || isCode(says(value)))
   expect(unworded).toEqual([])
