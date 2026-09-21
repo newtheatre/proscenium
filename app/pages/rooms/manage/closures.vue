@@ -141,9 +141,14 @@ const columns: TableColumn<Closure>[] = [
   {
     id: 'room',
     header: 'Room',
-    cell: ({ row }) => (row.original.room
-      ? h('span', {}, row.original.room)
-      : h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Every room')),
+    cell: ({ row }) => h('div', {}, [
+      row.original.room
+        ? h('div', {}, row.original.room)
+        : h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Every room'),
+      // Below sm the reason and who closed it are hidden: shown here instead, so a phone keeps
+      // the span and Reopen in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.reason}, closed by ${row.original.by}`),
+    ]),
   },
   {
     id: 'span',
@@ -151,8 +156,8 @@ const columns: TableColumn<Closure>[] = [
     meta: { class: { td: 'whitespace-nowrap text-sm' } },
     cell: ({ row }) => saysSpan(new Date(row.original.startsAt * 1000), new Date(row.original.endsAt * 1000)),
   },
-  { accessorKey: 'reason', header: 'Why' },
-  { accessorKey: 'by', header: 'Closed by', meta: { class: { td: 'text-sm text-muted' } } },
+  { accessorKey: 'reason', header: 'Why', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
+  { accessorKey: 'by', header: 'Closed by', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } } },
   {
     id: 'remove',
     header: ACTIONS_HEADER,

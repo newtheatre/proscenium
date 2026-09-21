@@ -248,45 +248,34 @@ const columns: TableColumn<BarProduct>[] = [
         'data-test': `edit-${row.original.id}`,
         'onClick': () => edit(row.original),
       }, () => 'Edit'),
-      row.original.status === 'ACTIVE'
-        ? h(UButton, {
-            'size': 'sm',
-            'color': 'neutral',
-            'variant': 'ghost',
-            'data-test': `hide-${row.original.id}`,
-            'onClick': () => setStatus(row.original, 'HIDDEN'),
-          }, () => 'Hide')
-        : h(UButton, {
-            'size': 'sm',
-            'color': 'neutral',
-            'variant': 'ghost',
-            'data-test': `activate-${row.original.id}`,
-            'onClick': () => setStatus(row.original, 'ACTIVE'),
-          }, () => 'Put on the till'),
-      row.original.status === 'RETIRED'
-        ? null
-        : h(UButton, {
-            'size': 'sm',
-            'color': 'neutral',
-            'variant': 'ghost',
-            'data-test': `retire-${row.original.id}`,
-            'onClick': () => {
-              retireFailure.value = null
-              retiring.value = row.original
-            },
-          }, () => 'Retire'),
-      row.original.everSold
-        ? null
-        : h(UButton, {
-            'size': 'sm',
-            'color': 'error',
-            'variant': 'ghost',
-            'data-test': `delete-${row.original.id}`,
-            'onClick': () => {
-              failure.value = null
-              removing.value = row.original
-            },
-          }, () => 'Delete'),
+      h(UButton, {
+        'size': 'sm',
+        'color': 'neutral',
+        'variant': 'ghost',
+        'data-test': row.original.status === 'ACTIVE' ? `hide-${row.original.id}` : `activate-${row.original.id}`,
+        'onClick': () => setStatus(row.original, row.original.status === 'ACTIVE' ? 'HIDDEN' : 'ACTIVE'),
+      }, () => (row.original.status === 'ACTIVE' ? 'Hide' : 'Put on the till')),
+      rowOverflow(row.original.id, [
+        ...(row.original.status === 'RETIRED'
+          ? []
+          : [{
+              label: 'Retire',
+              onSelect: () => {
+                retireFailure.value = null
+                retiring.value = row.original
+              },
+            }]),
+        ...(row.original.everSold
+          ? []
+          : [{
+              label: 'Delete',
+              color: 'error' as const,
+              onSelect: () => {
+                failure.value = null
+                removing.value = row.original
+              },
+            }]),
+      ]),
     ]),
   },
 ]

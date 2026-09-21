@@ -9,9 +9,9 @@ definePageMeta({ layout: 'console', title: 'Periods', middleware: 'console', doc
 
 const columns: TableColumn<PeriodLock>[] = [
   { id: 'range', header: 'Range' },
-  { id: 'label', header: 'Label' },
+  { id: 'label', header: 'Label', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   { id: 'action', header: 'Action' },
-  { id: 'actor', header: 'By' },
+  { id: 'actor', header: 'By', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   { id: 'act', header: ACTIONS_HEADER },
 ]
 
@@ -235,7 +235,14 @@ async function confirmReopen(): Promise<void> {
       :columns="columns"
     >
       <template #range-cell="{ row }">
-        {{ saysDay(row.original.fromDay) }} to {{ saysDay(row.original.toDay) }}
+        <div>
+          {{ saysDay(row.original.fromDay) }} to {{ saysDay(row.original.toDay) }}
+          <!-- Below sm the label and who acted are hidden: shown here instead, so a phone keeps
+            what happened and Reopen in view without losing what they said (issue 922). -->
+          <div class="text-xs text-muted sm:hidden">
+            {{ row.original.label ?? 'None' }}, {{ row.original.actorName }}, {{ saysWhen(row.original.createdAt) }}
+          </div>
+        </div>
       </template>
       <template #label-cell="{ row }">
         {{ row.original.label ?? 'None' }}

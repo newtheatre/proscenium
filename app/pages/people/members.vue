@@ -229,13 +229,16 @@ const columns: TableColumn<Member>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.name),
       h('div', { class: 'font-mono text-xs text-muted' }, row.original.studentId ?? row.original.email),
+      // Below sm the start day and the source are hidden: shown here instead, so a phone keeps
+      // the end date and whether it is checked in view (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `From ${saysDay(row.original.startsOn)}, ${row.original.source}`),
     ]),
   },
   {
     id: 'startsOn',
     header: 'From',
     cell: ({ row }) => saysDay(row.original.startsOn),
-    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm whitespace-nowrap` } },
   },
   {
     id: 'expiresOn',
@@ -247,7 +250,7 @@ const columns: TableColumn<Member>[] = [
         : null,
     ]),
   },
-  { accessorKey: 'source', header: 'Source', meta: { class: { td: 'text-sm text-muted' } } },
+  { accessorKey: 'source', header: 'Source', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } } },
   {
     id: 'confirmed',
     header: 'Checked',
@@ -283,6 +286,9 @@ const claimColumns: TableColumn<Claim>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.name),
       h('div', { class: 'text-xs text-muted' }, row.original.email),
+      // Below sm the buying day and the term are hidden: shown here instead, so a phone keeps
+      // the student number and the decision in view (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `Bought ${saysDay(row.original.startsOn)}, ${plural(row.original.term, 'year')}`),
     ]),
   },
   {
@@ -299,13 +305,13 @@ const claimColumns: TableColumn<Claim>[] = [
     id: 'startsOn',
     header: 'Bought',
     cell: ({ row }) => saysDay(row.original.startsOn),
-    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm whitespace-nowrap` } },
   },
   {
     id: 'term',
     header: 'Term',
-    cell: ({ row }) => `${row.original.term} year${row.original.term === 1 ? '' : 's'}`,
-    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+    cell: ({ row }) => plural(row.original.term, 'year'),
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm whitespace-nowrap` } },
   },
   {
     id: 'since',

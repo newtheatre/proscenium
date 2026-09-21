@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { h, resolveComponent } from 'vue'
 import { can, manageSafety } from '#shared/utils/abilities'
 import { closeFollowUpForm } from '#shared/utils/incident-safety'
 import { saysCategory, saysSeverity, SEVERITIES } from '#shared/utils/incidents'
 import { saysWhen } from '#shared/utils/when'
 import type { Category, Severity } from '#shared/utils/incidents'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Safety', middleware: 'console', docs: '/docs/rota/safety' })
 
@@ -83,6 +85,58 @@ async function close(): Promise<void> {
   }
 }
 
+const USwitch = resolveComponent('USwitch')
+const UBadge = resolveComponent('UBadge')
+const UButton = resolveComponent('UButton')
+
+const severityColumns: TableColumn<SeverityRow>[] = [
+  { id: 'severity', header: 'Severity', cell: ({ row }) => h('span', { class: 'text-sm' }, saysSeverity(row.original.severity)) },
+  {
+    id: 'routing',
+    header: 'Routes to follow-up',
+    meta: { class: { td: 'text-right' } },
+    cell: ({ row }) => h(USwitch, {
+      'modelValue': row.original.requiresFollowUp,
+      'disabled': writes.value === false,
+      'loading': saving.value === row.original.severity,
+      'data-test': `severity-toggle-${row.original.severity}`,
+      'onUpdate:modelValue': (value: boolean) => toggle(row.original, value),
+    }),
+  },
+]
+
+const openColumns = computed<TableColumn<OpenItem>[]>(() => [
+  {
+    id: 'incident',
+    header: 'What happened',
+    cell: ({ row }) => h('div', { class: 'space-y-1' }, [
+      h('div', { class: 'flex items-center gap-2' }, [
+        h(UBadge, { color: 'error', variant: 'subtle', size: 'sm' }, () => saysSeverity(row.original.severity)),
+        h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => saysCategory(row.original.category)),
+      ]),
+      h('p', { class: 'text-sm' }, row.original.body),
+      // Below sm the when and the reporter are hidden: shown here instead, so a phone keeps the
+      // row's action in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${when(row.original.happenedAt)} · ${row.original.reportedByName}`),
+    ]),
+  },
+  { id: 'when', header: 'When', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap text-xs text-muted` } }, cell: ({ row }) => when(row.original.happenedAt) },
+  { id: 'by', header: 'Reported by', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-xs text-muted` } }, cell: ({ row }) => row.original.reportedByName },
+  ...(writes.value
+    ? [{
+        id: 'act',
+        header: ACTIONS_HEADER,
+        meta: { class: { td: 'text-right whitespace-nowrap' } },
+        cell: ({ row }: { row: { original: OpenItem } }) => h(UButton, {
+          'size': 'sm',
+          'variant': 'subtle',
+          'data-test': `close-item-${row.original.id}`,
+          'onClick': () => startClose(row.original),
+        }, () => 'Close'),
+      }]
+    : []),
+])
+
 // A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
 // is shown wherever the action was taken.
 const modalOpen = computed(() => open.value)
@@ -117,28 +171,18 @@ watch(modalOpen, (nowOpen) => {
         </h2>
       </template>
 
-      <div class="space-y-3">
-        <div
-          v-for="row in severities"
-          :key="row.severity"
-          class="flex items-center justify-between gap-4"
-        >
-          <span class="text-sm">{{ saysSeverity(row.severity) }}</span>
-          <USwitch
-            :model-value="row.requiresFollowUp"
-            :disabled="writes === false"
-            :loading="saving === row.severity"
-            :data-test="`severity-toggle-${row.severity}`"
-            @update:model-value="value => toggle(row, value)"
-          />
-        </div>
-        <p
-          v-if="severityStatus === 'pending'"
-          class="text-sm text-muted"
-        >
-          Loading…
-        </p>
-      </div>
+      <UTable
+        :data="severities"
+        :columns="severityColumns"
+        :loading="severityStatus === 'pending'"
+        data-test="severity-table"
+      >
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            No severities to route yet.
+          </p>
+        </template>
+      </UTable>
     </UCard>
 
     <UCard data-test="open-items">
@@ -148,55 +192,18 @@ watch(modalOpen, (nowOpen) => {
         </h2>
       </template>
 
-      <p
-        v-if="openStatus !== 'pending' && openData.items.length === 0"
-        class="py-6 text-center text-sm text-muted"
+      <UTable
+        :data="openData.items"
+        :columns="openColumns"
+        :loading="openStatus === 'pending'"
+        data-test="open-items-table"
       >
-        Nothing open.
-      </p>
-
-      <div
-        v-else
-        class="space-y-3"
-      >
-        <div
-          v-for="item in openData.items"
-          :key="item.id"
-          class="flex flex-wrap items-start justify-between gap-2 border-b border-default pb-3 last:border-0 last:pb-0"
-        >
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <UBadge
-                color="error"
-                variant="subtle"
-                size="sm"
-              >
-                {{ saysSeverity(item.severity) }}
-              </UBadge>
-              <UBadge
-                color="neutral"
-                variant="subtle"
-                size="sm"
-              >
-                {{ saysCategory(item.category) }}
-              </UBadge>
-              <span class="text-xs text-muted">{{ when(item.happenedAt) }} · {{ item.reportedByName }}</span>
-            </div>
-            <p class="text-sm">
-              {{ item.body }}
-            </p>
-          </div>
-          <UButton
-            v-if="writes"
-            size="sm"
-            variant="subtle"
-            :data-test="`close-item-${item.id}`"
-            @click="startClose(item)"
-          >
-            Close
-          </UButton>
-        </div>
-      </div>
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            Nothing open. An incident logged at a severity that routes appears here.
+          </p>
+        </template>
+      </UTable>
     </UCard>
 
     <UModal

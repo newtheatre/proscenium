@@ -122,11 +122,17 @@ const columns: TableColumn<VenueCard>[] = [
   {
     id: 'venue',
     header: 'Venue',
-    cell: ({ row }) => h('span', {}, row.original.venueName),
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.venueName),
+      // Below sm the address and the filing date are hidden: shown here instead, so a phone keeps
+      // the assembly point and the row's action in view (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.address ?? 'Not filed'}, as of ${asOf(row.original.updatedAt)}`),
+    ]),
   },
   {
     id: 'address',
     header: 'Address',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => row.original.address ?? 'Not filed',
   },
   {
@@ -137,6 +143,7 @@ const columns: TableColumn<VenueCard>[] = [
   {
     id: 'asOf',
     header: 'As of',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => asOf(row.original.updatedAt),
   },
   {

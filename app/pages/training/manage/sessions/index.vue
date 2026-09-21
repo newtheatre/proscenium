@@ -352,11 +352,16 @@ const columns: TableColumn<Session>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', {}, sessionDay(row.original.heldOn)),
       h('div', { class: 'text-xs text-muted' }, `${row.original.startsAt} to ${row.original.endsAt}`),
+      // Below sm what it teaches and what it holds are hidden: shown here instead, so a phone
+      // keeps the status and the way in in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' },
+        `${row.original.modules.map(module => module.id).join(', ')} · ${row.original.trainerName} · ${plural(row.original.capacity, 'place')}`),
     ]),
   },
   {
     id: 'teaches',
     header: 'Teaches',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('div', {}, [
       h('div', { class: 'flex flex-wrap gap-1' }, row.original.modules.map(module =>
         h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => module.id))),
@@ -367,7 +372,7 @@ const columns: TableColumn<Session>[] = [
   {
     id: 'capacity',
     header: 'Holds',
-    meta: { class: { td: 'text-sm text-muted whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted whitespace-nowrap` } },
     cell: ({ row }) => plural(row.original.capacity, 'place'),
   },
   {

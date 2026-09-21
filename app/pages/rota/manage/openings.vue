@@ -203,6 +203,9 @@ const columns: TableColumn<Opening>[] = [
     cell: ({ row }) => h('div', { 'data-test': `opening-${row.original.openingId}` }, [
       h('p', { class: 'font-medium' }, `${row.original.label}, ${row.original.venueName}`),
       h('p', { class: 'text-sm text-muted' }, spanOf(row.original)),
+      // Below sm the status is hidden: shown here instead, so a phone keeps the staffing and the
+      // row's action in view without losing what it said (issue 922).
+      h('p', { class: 'sm:hidden text-xs text-muted' }, saysBarOpeningStatus(row.original.status)),
     ]),
   },
   {
@@ -234,6 +237,7 @@ const columns: TableColumn<Opening>[] = [
   {
     accessorKey: 'status',
     header: 'Status',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h(UBadge, {
       color: row.original.status === 'PLANNED' ? 'success' : 'neutral',
       variant: 'subtle',

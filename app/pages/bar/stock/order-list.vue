@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { h } from 'vue'
 import { saysQuantity } from '#shared/utils/bar'
 import type { OrderListRow, UnconfiguredRow } from '#shared/utils/ordering'
 import type { TableColumn } from '@nuxt/ui'
@@ -30,9 +31,28 @@ const grouped = computed(() => {
 })
 
 const columns: TableColumn<OrderListRow>[] = [
-  { id: 'name', header: 'Stocked item', cell: ({ row }) => row.original.name },
-  { id: 'onHand', header: 'On hand', meta: RIGHT_ALIGNED, cell: ({ row }) => saysQuantity(row.original.onHand, row.original.unit) },
-  { id: 'par', header: 'Par', meta: RIGHT_ALIGNED, cell: ({ row }) => saysQuantity(row.original.parQty, row.original.unit) },
+  {
+    id: 'name',
+    header: 'Stocked item',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.name),
+      // Below sm the on hand and par columns are hidden: shown here instead, so a phone keeps the
+      // shortfall in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysQuantity(row.original.onHand, row.original.unit)} on hand, par ${saysQuantity(row.original.parQty, row.original.unit)}`),
+    ]),
+  },
+  {
+    id: 'onHand',
+    header: 'On hand',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
+    cell: ({ row }) => saysQuantity(row.original.onHand, row.original.unit),
+  },
+  {
+    id: 'par',
+    header: 'Par',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
+    cell: ({ row }) => saysQuantity(row.original.parQty, row.original.unit),
+  },
   {
     id: 'shortfall',
     header: 'Shortfall',

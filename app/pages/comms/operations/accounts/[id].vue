@@ -53,15 +53,29 @@ function clearType(): void {
 const when = (at: number | null): string => at ? saysWhen(at) : 'Not sent'
 
 const columns: TableColumn<PersonHistoryRow>[] = [
-  { accessorKey: 'type', header: 'Type', meta: { class: { td: 'font-mono text-sm' } } },
-  { accessorKey: 'channel', header: 'Channel' },
+  {
+    accessorKey: 'type',
+    header: 'Type',
+    cell: ({ row }) => h('div', {}, [
+      h('div', { class: 'font-mono text-sm' }, row.original.type),
+      // Below sm the channel and the enqueued time are hidden: shown here instead, so a phone
+      // keeps the outcome and the sent time in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.channel}, enqueued ${saysWhen(row.original.createdAt)}`),
+    ]),
+  },
+  { accessorKey: 'channel', header: 'Channel', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   {
     id: 'status',
     header: 'Outcome',
     cell: ({ row }) => h(UBadge, { variant: 'subtle', size: 'sm' }, () => saysNotificationStatus(row.original.status)),
   },
-  { id: 'createdAt', header: 'Enqueued', cell: ({ row }) => saysWhen(row.original.createdAt) },
-  { id: 'sentAt', header: 'Sent', cell: ({ row }) => when(row.original.sentAt) },
+  {
+    id: 'createdAt',
+    header: 'Enqueued',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
+    cell: ({ row }) => saysWhen(row.original.createdAt),
+  },
+  { id: 'sentAt', header: 'Sent', meta: { class: { td: 'whitespace-nowrap' } }, cell: ({ row }) => when(row.original.sentAt) },
 ]
 
 const activeFilters = computed<ActiveFilter[]>(() =>

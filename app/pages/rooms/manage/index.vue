@@ -184,8 +184,8 @@ function openDays(room: Room): string {
 
 const columns: TableColumn<Room>[] = [
   { id: 'name', header: 'Room', accessorKey: 'name' },
-  { id: 'capacity', header: 'Capacity' },
-  { id: 'hours', header: 'Open' },
+  { id: 'capacity', header: 'Capacity', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
+  { id: 'hours', header: 'Open', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   { id: 'state', header: 'State' },
   { id: 'actions', header: ACTIONS_HEADER },
 ]
@@ -273,6 +273,11 @@ const columns: TableColumn<Room>[] = [
             class="text-sm text-muted"
           >
             {{ row.original.description }}
+          </p>
+          <!-- Below sm the capacity and the opening days are hidden: shown here instead, so a
+            phone keeps the state and the row actions in view (issue 922). -->
+          <p class="text-xs text-muted sm:hidden">
+            {{ row.original.capacity ?? 'Uncapped' }}, {{ openDays(row.original) }}
           </p>
         </div>
       </template>

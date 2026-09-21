@@ -168,17 +168,21 @@ const columns: TableColumn<ContentWarning>[] = [
           : null,
       ]),
       row.original.description ? h('div', { class: 'text-xs text-muted' }, row.original.description) : null,
+      // Below sm the group and the show count are hidden: shown here instead, so a phone keeps
+      // the row actions in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.category ?? 'Nothing'}, carried by ${plural(row.original.showCount, 'show')}`),
     ]),
   },
   {
     id: 'category',
     header: 'Grouped under',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.category ?? 'Nothing'),
   },
   {
     id: 'shows',
     header: 'Carried by',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, plural(row.original.showCount, 'show')),
   },
   {

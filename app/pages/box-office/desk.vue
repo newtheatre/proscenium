@@ -423,8 +423,17 @@ const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
 
 const resultColumns: TableColumn<SearchRow>[] = [
-  { id: 'reference', header: 'Booking', meta: { class: { td: 'font-mono' } }, cell: ({ row }) => row.original.reference },
-  { id: 'booker', header: 'Booked by', cell: ({ row }) => row.original.bookerName },
+  {
+    id: 'reference',
+    header: 'Booking',
+    cell: ({ row }) => h('div', {}, [
+      h('div', { class: 'font-mono' }, row.original.reference),
+      // Below sm the booker is hidden: shown here instead, so a phone keeps the state, the total
+      // and Open in view without losing what it said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.bookerName),
+    ]),
+  },
+  { id: 'booker', header: 'Booked by', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.bookerName },
   {
     id: 'status',
     header: 'State',

@@ -194,12 +194,16 @@ const columns: TableColumn<Record>[] = [
       ]),
       h('div', { class: 'text-xs text-muted' },
         `${row.original.department} · ${saysKind(row.original.kind)} · ${saysSource(row.original.source)}`),
+      // Below sm the award and expiry days are hidden: shown here instead, so a phone keeps the
+      // state and the row's action in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' },
+        `Awarded ${saysDay(row.original.awardedOn)}, ${row.original.expiresOn ? `runs to ${saysDay(row.original.expiresOn)}` : 'never expires'}`),
     ]),
   },
   {
     id: 'when',
     header: 'Held',
-    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm whitespace-nowrap` } },
     cell: ({ row }) => h('div', {}, [
       h('div', {}, `Awarded ${saysDay(row.original.awardedOn)}`),
       h('div', { class: 'text-xs text-muted' },

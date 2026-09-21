@@ -484,40 +484,7 @@ const columns: TableColumn<ProductVariant>[] = [
     id: 'act',
     header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
-      h(UButton, {
-        'size': 'sm',
-        'color': 'neutral',
-        'variant': 'ghost',
-        'data-test': `recipe-${row.original.id}`,
-        'onClick': () => editRecipe(row.original),
-      }, () => 'What it depletes'),
-      h(UButton, {
-        'size': 'sm',
-        'color': 'neutral',
-        'variant': 'ghost',
-        'data-test': `choice-${row.original.id}`,
-        'onClick': () => editChoice(row.original),
-      }, () => (choiceGroupOf(row.original) ? 'Change choice' : 'Add a choice')),
-      choiceGroupOf(row.original)
-        ? h(UButton, {
-            'size': 'sm',
-            'color': 'neutral',
-            'variant': 'ghost',
-            'data-test': `clear-choice-${row.original.id}`,
-            'onClick': () => {
-              clearFailure.value = null
-              clearing.value = row.original
-            },
-          }, () => 'Clear choice')
-        : null,
-      h(UButton, {
-        'size': 'sm',
-        'color': 'neutral',
-        'variant': 'ghost',
-        'data-test': `prices-${row.original.id}`,
-        'onClick': () => editPrices(row.original),
-      }, () => 'Prices'),
+    cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
       h(UButton, {
         'size': 'sm',
         'color': 'neutral',
@@ -529,25 +496,46 @@ const columns: TableColumn<ProductVariant>[] = [
         'size': 'sm',
         'color': 'neutral',
         'variant': 'ghost',
-        'data-test': `status-${row.original.id}`,
-        'onClick': () => {
-          if (row.original.status === 'RETIRED') return void setStatus(row.original, 'ACTIVE')
-          retireFailure.value = null
-          retiring.value = row.original
+        'data-test': `prices-${row.original.id}`,
+        'onClick': () => editPrices(row.original),
+      }, () => 'Prices'),
+      h(UButton, {
+        'size': 'sm',
+        'color': 'neutral',
+        'variant': 'ghost',
+        'data-test': `recipe-${row.original.id}`,
+        'onClick': () => editRecipe(row.original),
+      }, () => 'What it depletes'),
+      rowOverflow(row.original.id, [
+        { label: choiceGroupOf(row.original) ? 'Change choice' : 'Add a choice', onSelect: () => editChoice(row.original) },
+        ...(choiceGroupOf(row.original)
+          ? [{
+              label: 'Clear choice',
+              onSelect: () => {
+                clearFailure.value = null
+                clearing.value = row.original
+              },
+            }]
+          : []),
+        {
+          label: row.original.status === 'RETIRED' ? 'Put back' : 'Retire',
+          onSelect: () => {
+            if (row.original.status === 'RETIRED') return void setStatus(row.original, 'ACTIVE')
+            retireFailure.value = null
+            retiring.value = row.original
+          },
         },
-      }, () => (row.original.status === 'RETIRED' ? 'Put back' : 'Retire')),
-      row.original.everSold || row.original.everPriced
-        ? null
-        : h(UButton, {
-            'size': 'sm',
-            'color': 'error',
-            'variant': 'ghost',
-            'data-test': `delete-${row.original.id}`,
-            'onClick': () => {
-              failure.value = null
-              removing.value = row.original
-            },
-          }, () => 'Delete'),
+        ...(row.original.everSold || row.original.everPriced
+          ? []
+          : [{
+              label: 'Delete',
+              color: 'error' as const,
+              onSelect: () => {
+                failure.value = null
+                removing.value = row.original
+              },
+            }]),
+      ]),
     ]),
   },
 ]

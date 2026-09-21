@@ -388,18 +388,16 @@ const columns: TableColumn<StockItem>[] = [
           retiring.value = row.original
         },
       }, () => (row.original.status === 'RETIRED' ? 'Put back' : 'Retire')),
-      row.original.hasMovements
-        ? null
-        : h(UButton, {
-            'size': 'sm',
-            'color': 'error',
-            'variant': 'ghost',
-            'data-test': `delete-${row.original.id}`,
-            'onClick': () => {
+      rowOverflow(row.original.id, row.original.hasMovements
+        ? []
+        : [{
+            label: 'Delete',
+            color: 'error',
+            onSelect: () => {
               failure.value = null
               removing.value = row.original
             },
-          }, () => 'Delete'),
+          }]),
     ]),
   },
 ]

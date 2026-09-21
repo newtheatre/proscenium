@@ -53,6 +53,11 @@ const REPORTS_WITHOUT_A_TOOLBAR = [
   // The desk searches by reference and scans a code: its results are what one lookup returned,
   // and the status pills beside the search are the only narrowing there is (D-114).
   'app/pages/box-office/desk.vue',
+  // Set-up screens holding one short fixed list each, and a board of everything outstanding:
+  // there is nothing to search across and nothing to filter by (E-120, G-108, H-112).
+  'app/pages/rota/manage/backstage.vue',
+  'app/pages/rota/manage/safety.vue',
+  'app/pages/training/manage/requests.vue',
 ]
 
 describe('an input is the component for its value (0032)', () => {
@@ -434,7 +439,7 @@ async function consoleFiles(): Promise<{ path: string, source: string }[]> {
 // read its neighbour's buttons.
 function columnEntries(source: string): string[][] {
   const blocks: string[][] = []
-  const opening = /columns[^=\n]*=\s*\[/g
+  const opening = /[Cc]olumns[^=\n]*=\s*\[/g
   let match: RegExpExecArray | null
   while ((match = opening.exec(source)) !== null) {
     const entries: string[] = []
@@ -456,55 +461,20 @@ function columnEntries(source: string): string[][] {
   return blocks
 }
 
-// A table whose narrow view is still to be swept (issue 1151 item 6). Each takes HIDE_BELOW_SM on
+// A table whose narrow view has not been swept (issue 1151 item 6). Each takes HIDE_BELOW_SM on
 // the columns a phone cannot hold; the list may shrink and may not grow.
-const TABLES_AWAITING_A_NARROW_VIEW = [
-  'app/components/box-office/show/Performances.vue',
-  'app/components/training/CatalogueTable.vue',
-  'app/pages/admin/audit.vue',
-  'app/pages/admin/backups.vue',
-  'app/pages/bar/categories.vue',
-  'app/pages/bar/stock/movements.vue',
-  'app/pages/bar/stock/order-list.vue',
-  'app/pages/bar/stock/stocktakes/[id].vue',
-  'app/pages/bar/stock/stocktakes/index.vue',
-  'app/pages/box-office/access-profiles.vue',
-  'app/pages/box-office/content-warnings.vue',
-  'app/pages/box-office/pass-types.vue',
-  'app/pages/box-office/seasons.vue',
-  'app/pages/box-office/ticket-types.vue',
-  'app/pages/box-office/desk.vue',
-  'app/pages/box-office/venues.vue',
-  'app/pages/comms/operations/accounts/[id].vue',
-  'app/pages/comms/operations/index.vue',
-  'app/pages/money/entries.vue',
-  'app/pages/money/exports.vue',
-  'app/pages/money/index.vue',
-  'app/pages/money/periods.vue',
-  'app/pages/money/reconciliation.vue',
-  'app/pages/money/reports.vue',
-  'app/pages/money/shows.vue',
-  'app/pages/people/accounts/index.vue',
-  'app/pages/people/fellows.vue',
-  'app/pages/people/members.vue',
-  'app/pages/people/roles.vue',
-  'app/pages/rooms/manage/closures.vue',
-  'app/pages/rooms/manage/index.vue',
-  'app/pages/rooms/manage/other.vue',
-  'app/pages/rota/manage/emergency.vue',
-  'app/pages/rota/manage/openings.vue',
-  'app/pages/training/manage/records.vue',
-  'app/pages/training/manage/sessions/index.vue',
-]
+const TABLES_AWAITING_A_NARROW_VIEW: string[] = []
 
-// A row of actions still to be swept. Each keeps its primary action in line and puts the rest in
-// a UDropdownMenu; the list may shrink and may not grow.
-const ROWS_AWAITING_AN_OVERFLOW = [
-  'app/components/box-office/show/Performances.vue',
-  'app/pages/bar/products/[id].vue',
-  'app/pages/bar/products/index.vue',
-  'app/pages/bar/stock/index.vue',
-  'app/pages/box-office/venues.vue',
+// A row of actions not yet swept. Each keeps its primary action in line and puts the rest in a
+// UDropdownMenu; the list may shrink and may not grow.
+const ROWS_AWAITING_AN_OVERFLOW: string[] = []
+
+// The screens that listed their records as divs (issue 1151 item 6). A list of records is a table
+// wherever it sits, and markup that only looks like one carries none of the rules.
+const LISTS_THAT_WERE_DIVS = [
+  'app/pages/rota/manage/backstage.vue',
+  'app/pages/rota/manage/safety.vue',
+  'app/pages/training/manage/requests.vue',
 ]
 
 describe('every console list is a UTable the shell knows about (K-123 criteria 9 and 10)', () => {
@@ -517,6 +487,11 @@ describe('every console list is a UTable the shell knows about (K-123 criteria 9
   test('no action column leaves its header empty', async () => {
     const all = await consoleFiles()
     expect(all.filter(file => /header:\s*''/.test(file.source)).map(file => file.path)).toEqual([])
+  })
+
+  test('a screen that lists records lists them in a table', async () => {
+    const sources = new Map((await screens()).map(screen => [screen.path, screen.source]))
+    expect(LISTS_THAT_WERE_DIVS.filter(path => !(sources.get(path) ?? '').includes('<UTable'))).toEqual([])
   })
 
   test('a table of more than three columns says which of them a phone drops', async () => {

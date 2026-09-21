@@ -85,7 +85,7 @@ const columns: TableColumn<StockMovement>[] = [
   {
     id: 'when',
     header: 'When',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => saysWhen(row.original.createdAt),
   },
   {
@@ -96,6 +96,11 @@ const columns: TableColumn<StockMovement>[] = [
       row.original.refTable
         ? h('div', { class: 'text-xs text-muted' }, `From ${saysMovementSource(row.original.refTable)}`)
         : null,
+      // Below sm the when and the cost are hidden: shown here instead, so a phone keeps the row
+      // actions in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.unitCostPence === null
+        ? saysWhen(row.original.createdAt)
+        : `${saysWhen(row.original.createdAt)}, ${saysMoney(row.original.unitCostPence)} a unit`),
     ]),
   },
   {
@@ -115,6 +120,7 @@ const columns: TableColumn<StockMovement>[] = [
   {
     id: 'cost',
     header: 'Cost a unit',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
     cell: ({ row }) => (row.original.unitCostPence === null ? '' : saysMoney(row.original.unitCostPence)),
   },
   {

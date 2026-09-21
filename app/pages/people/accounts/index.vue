@@ -85,9 +85,23 @@ const totalLine = computed(() => listing.value.shadowHidden
 const seen = (at: number | null): string =>
   at ? saysDay(at) : 'Never'
 
+const methods = (account: Account): string => [
+  account.hasPassword ? 'password' : null,
+  account.hasGoogle ? 'Google' : null,
+].filter(Boolean).join(', ') || 'nothing yet'
+
 const columns: TableColumn<Account>[] = [
-  { accessorKey: 'name', header: 'Name' },
-  { accessorKey: 'email', header: 'Email', meta: { class: { td: 'font-mono text-sm' } } },
+  {
+    id: 'name',
+    header: 'Name',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.name),
+      // Below sm the address, the sign-in methods and the last seen day are hidden: shown here
+      // instead, so a phone keeps the state and the way in in view (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.email} · ${methods(row.original)} · seen ${seen(row.original.lastLoginAt)}`),
+    ]),
+  },
+  { accessorKey: 'email', header: 'Email', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} font-mono text-sm` } } },
   {
     id: 'state',
     header: 'State',
@@ -106,12 +120,15 @@ const columns: TableColumn<Account>[] = [
   {
     id: 'methods',
     header: 'Signs in with',
-    cell: ({ row }) => [
-      row.original.hasPassword ? 'password' : null,
-      row.original.hasGoogle ? 'Google' : null,
-    ].filter(Boolean).join(', ') || 'nothing yet',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
+    cell: ({ row }) => methods(row.original),
   },
-  { id: 'lastLoginAt', header: 'Last seen', cell: ({ row }) => seen(row.original.lastLoginAt) },
+  {
+    id: 'lastLoginAt',
+    header: 'Last seen',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
+    cell: ({ row }) => seen(row.original.lastLoginAt),
+  },
   {
     id: 'open',
     header: ACTIONS_HEADER,

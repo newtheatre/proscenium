@@ -589,6 +589,28 @@ export async function pickPerson(view: Bun.WebView, selector: string, term: stri
   await view.evaluate(`[...document.querySelectorAll('[role="option"]')].find(option => option.innerText.includes(${JSON.stringify(name)})).click()`)
 }
 
+// A row keeps three actions in line and the rest behind `more-<id>` (K-123 criterion 10), so a
+// test presses the overflow and then the action by the words on it.
+export async function chooseAction(view: Bun.WebView, trigger: string, label: string): Promise<void> {
+  await click(view, trigger)
+  const item = `[...document.querySelectorAll('[role="menuitem"]')].find(one => one.innerText.trim() === ${JSON.stringify(label)})`
+  await waitFor(view, item)
+  await view.evaluate(`${item}.click()`)
+  await Bun.sleep(300)
+}
+
+/** What a row's overflow offers, by the words on it. */
+export async function actionLabels(view: Bun.WebView, trigger: string): Promise<string[]> {
+  await click(view, trigger)
+  await waitFor(view, `document.querySelector('[role="menuitem"]')`)
+  const found = await view.evaluate<string>(
+    `JSON.stringify([...document.querySelectorAll('[role="menuitem"]')].map(one => one.innerText.trim()))`,
+  )
+  await view.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+  await Bun.sleep(200)
+  return JSON.parse(found) as string[]
+}
+
 export async function click(view: Bun.WebView, selector: string): Promise<void> {
   await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
   await view.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`)

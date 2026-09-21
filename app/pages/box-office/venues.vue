@@ -175,16 +175,21 @@ const columns: TableColumn<AdminVenue>[] = [
           : null,
       ]),
       row.original.address ? h('div', { class: 'text-xs text-muted' }, row.original.address) : null,
+      // Below sm the capacity and whether anything uses it are hidden: shown here instead, so a
+      // phone keeps the row actions in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.capacity === null ? 'Uncapped' : `${row.original.capacity} seats`}, ${row.original.inUse ? 'has records against it' : 'nothing yet'}`),
     ]),
   },
   {
     id: 'capacity',
     header: 'Capacity',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
     cell: ({ row }) => row.original.capacity ?? 'Uncapped',
   },
   {
     id: 'inUse',
     header: 'In use',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.inUse ? 'Has records against it' : 'Nothing yet'),
   },
   {
@@ -217,16 +222,14 @@ const columns: TableColumn<AdminVenue>[] = [
       }, () => (row.original.archived ? 'Bring back' : 'Retire')),
       row.original.inUse
         ? null
-        : h(UButton, {
-            'size': 'sm',
-            'color': 'error',
-            'variant': 'ghost',
-            'data-test': `delete-${row.original.id}`,
-            'onClick': () => {
+        : rowOverflow(row.original.id, [{
+            label: 'Delete',
+            color: 'error',
+            onSelect: () => {
               failure.value = null
               removing.value = row.original
             },
-          }, () => 'Delete'),
+          }]),
     ]),
   },
 ]

@@ -128,6 +128,9 @@ const columns: TableColumn<Summary>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.name),
       h('div', { class: 'font-mono text-xs text-muted' }, row.original.email),
+      // Below sm the companion count is hidden: shown here instead, so a phone keeps the status
+      // and the row's action in view without losing what it said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, plural(row.original.companions, 'companion')),
     ]),
   },
   {
@@ -135,7 +138,7 @@ const columns: TableColumn<Summary>[] = [
     header: 'Status',
     cell: ({ row }) => h(UBadge, { color: STATUS_COLOURS[row.original.status], variant: 'subtle', size: 'sm' }, () => saysAccessProfileStatus(row.original.status)),
   },
-  { accessorKey: 'companions', header: 'Companions' },
+  { accessorKey: 'companions', header: 'Companions', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   {
     id: 'open',
     header: ACTIONS_HEADER,

@@ -131,21 +131,28 @@ const columns: TableColumn<AdminSeason>[] = [
   {
     id: 'name',
     header: 'Season',
-    cell: ({ row }) => h('div', { class: 'flex flex-wrap items-center gap-2' }, [
-      h('span', {}, row.original.name),
-      row.original.archived
-        ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Retired')
-        : null,
+    cell: ({ row }) => h('div', {}, [
+      h('div', { class: 'flex flex-wrap items-center gap-2' }, [
+        h('span', {}, row.original.name),
+        row.original.archived
+          ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Retired')
+          : null,
+      ]),
+      // Below sm the run and whether anything uses it are hidden: shown here instead, so a phone
+      // keeps the row actions in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysDay(row.original.startsOn)} to ${saysDay(row.original.endsOn)}, ${row.original.inUse ? 'a show belongs to it' : 'nothing yet'}`),
     ]),
   },
   {
     id: 'window',
     header: 'Runs',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => `${saysDay(row.original.startsOn)} to ${saysDay(row.original.endsOn)}`,
   },
   {
     id: 'inUse',
     header: 'In use',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.inUse ? 'A show belongs to it' : 'Nothing yet'),
   },
   {

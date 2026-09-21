@@ -260,17 +260,23 @@ const columns: TableColumn<AdminPerformance>[] = [
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, row.original.venueName),
+      // Below sm the booking window and the house figures are hidden: shown here instead, so a
+      // phone keeps the row actions in view without losing what they said (issue 922).
+      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.externalBookingUrl
+        ? windowOf(row.original)
+        : `${windowOf(row.original)} · ${row.original.soldTickets} sold of ${row.original.capacityOverride ?? row.original.venueCapacity ?? 'an uncapped house'}`),
     ]),
   },
   {
     id: 'window',
     header: 'Online booking',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('span', { class: 'text-sm' }, windowOf(row.original)),
   },
   {
     id: 'capacity',
     header: 'Capacity',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => {
       // Tickets for this performance are sold elsewhere, so a house figure would answer a
       // question nobody asked here (D-122 criterion 2).
@@ -321,30 +327,28 @@ const columns: TableColumn<AdminPerformance>[] = [
             'data-test': `sale-${row.original.id}`,
             'onClick': () => setOnSale(row.original, row.original.status !== 'ON_SALE'),
           }, () => (row.original.status === 'ON_SALE' ? 'Off sale' : 'On sale')),
-      row.original.status === 'CANCELLED'
-        ? null
-        : h(UButton, {
-            'size': 'sm',
-            'color': 'warning',
-            'variant': 'ghost',
-            'data-test': `cancel-${row.original.id}`,
-            'onClick': () => {
-              failure.value = null
-              cancelling.value = row.original
-            },
-          }, () => 'Cancel'),
-      row.original.soldTickets > 0
-        ? null
-        : h(UButton, {
-            'size': 'sm',
-            'color': 'error',
-            'variant': 'ghost',
-            'data-test': `delete-performance-${row.original.id}`,
-            'onClick': () => {
-              failure.value = null
-              removing.value = row.original
-            },
-          }, () => 'Delete'),
+      rowOverflow(row.original.id, [
+        ...(row.original.status === 'CANCELLED'
+          ? []
+          : [{
+              label: 'Cancel the performance',
+              color: 'warning' as const,
+              onSelect: () => {
+                failure.value = null
+                cancelling.value = row.original
+              },
+            }]),
+        ...(row.original.soldTickets > 0
+          ? []
+          : [{
+              label: 'Delete',
+              color: 'error' as const,
+              onSelect: () => {
+                failure.value = null
+                removing.value = row.original
+              },
+            }]),
+      ]),
     ]),
   },
 ]

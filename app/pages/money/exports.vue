@@ -64,7 +64,7 @@ async function save(): Promise<void> {
 
 const columns: TableColumn<NominalMapping>[] = [
   { id: 'kind', header: 'Ledger line' },
-  { id: 'source', header: 'Source' },
+  { id: 'source', header: 'Source', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   { id: 'code', header: 'SU nominal code' },
   { id: 'act', header: ACTIONS_HEADER },
 ]
@@ -133,7 +133,14 @@ const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParam
         data-test="mappings-table"
       >
         <template #kind-cell="{ row }">
-          {{ describeKind(row.original.kind) }}
+          <div>
+            {{ describeKind(row.original.kind) }}
+            <!-- Below sm the source is hidden: shown here instead, so a phone keeps the code and
+              Edit in view without losing what it said (issue 922). -->
+            <div class="text-xs text-muted sm:hidden">
+              {{ saysSource(row.original.source) }}
+            </div>
+          </div>
         </template>
         <template #source-cell="{ row }">
           {{ saysSource(row.original.source) }}
