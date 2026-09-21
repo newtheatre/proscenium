@@ -108,8 +108,6 @@ describe('colour is never the only thing saying it (K-101)', () => {
   })
 })
 
-// A raw type="time" hands the control to the OS picker, with none of TimeField's theme or focus
-// ring. Scoped to box office: rooms/book.vue carries the same defect, and is another stream's file.
 // Photography rule: a `PhotoHero` picture is a backdrop behind the headline, so it carries an
 // empty alt and a caller that names it makes a screen reader read the picture before the words.
 describe('the hero photograph is decorative (K-101, docs/design-language.md)', () => {
@@ -158,6 +156,8 @@ describe('the wordmark eyebrow is readable (K-101)', () => {
   })
 })
 
+// A raw type="time" hands the control to the OS picker, with none of TimeField's theme or focus
+// ring. Scoped to box office: rooms/book.vue carries the same defect, and is another stream's file.
 describe('a time is always the shared TimeField (#915)', () => {
   test('no UInput in box office takes type="time"', async () => {
     const offenders: string[] = []
