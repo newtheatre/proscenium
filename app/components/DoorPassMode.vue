@@ -174,15 +174,16 @@ async function admit(pass: PassCard): Promise<void> {
         :data-test="`pass-refusal-${pass.reference}`"
       />
 
-      <!-- Gold, filled, with ash text on top: the one admit button on the screen it belongs to
-           (docs/design-language.md, the gold contrast floor). -->
+      <!-- The limelight, filled: the one admit button on the screen it belongs to, through the
+           theme's own secondary rather than a scale name (docs/design-language.md). -->
       <UButton
         v-else
         size="xl"
         block
+        color="secondary"
         icon="i-lucide-check"
         :loading="admitting === pass.id"
-        class="min-h-12 bg-gold-400 text-ash-950 hover:bg-gold-300 focus-visible:bg-gold-300"
+        class="min-h-12"
         :data-test="`pass-admit-${pass.reference}`"
         @click="admit(pass)"
       >

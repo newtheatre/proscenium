@@ -62,7 +62,7 @@ defineExpose({ stop: scanner.stop })
         class="pointer-events-none absolute inset-0 flex items-center justify-center"
         aria-hidden="true"
       >
-        <div class="size-2/3 rounded-lg border-2 border-gold-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+        <div class="size-2/3 rounded-lg border-2 border-secondary shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
       </div>
 
       <!-- The verdict sits over the live view: unmounting the scanner between two patrons costs

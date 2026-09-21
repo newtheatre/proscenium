@@ -8,7 +8,7 @@ const emit = defineEmits<{ dismiss: [] }>()
 
 const cardClass: Record<DoorVerdict['state'], string> = {
   PAID: 'border-success bg-success/10 text-success',
-  UNPAID: 'border-gold-400 bg-gold-400/10 text-gold-400',
+  UNPAID: 'border-secondary bg-secondary/10 text-secondary',
   REFUSED: 'border-error bg-error/10 text-error',
   UNANSWERED: 'border-warning bg-warning/10 text-warning',
 }

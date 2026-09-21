@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { saysQueuedSend } from '#shared/utils/backstage'
 import { groupedBoardCode } from '#shared/utils/night-hub'
 import type { BoardSide } from '#shared/utils/backstage'
 
@@ -91,6 +92,13 @@ function sendPreset(id: string): void {
   writeQueue.enqueue('preset', { presetId: id, body: null })
 }
 
+// The queue never revisits its own decision, so trying again is a fresh send carrying the same
+// words, and the refused row leaves the list either way (K-104).
+function sendAgain(id: string, payload: QueuedMessage): void {
+  writeQueue.dismiss(id)
+  writeQueue.enqueue(payload.presetId ? 'preset' : 'free-text', payload)
+}
+
 function sendFreeText(): void {
   const body = freeText.value.trim()
   if (!body) return
@@ -98,13 +106,20 @@ function sendFreeText(): void {
   freeText.value = ''
 }
 
+const seenFailure = ref<string | null>(null)
+
+// A tick that did not record must say so: the other end reads "seen" off this, and a silent
+// failure leaves both ends believing a call was acknowledged (E-121 criterion 4).
 async function markSeen(messageId: string): Promise<void> {
+  seenFailure.value = null
   try {
     // @ts-expect-error an options-carrying call has no working generic form yet (0053).
     await $fetch<unknown>('/api/tonight/board/seen', { method: 'POST', body: { messageId } })
     await load()
   }
-  catch { /* a tick that failed to record is a tick the duty manager can tap again */ }
+  catch (error) {
+    seenFailure.value = refusalText(error)
+  }
 }
 
 const resetting = ref(false)
@@ -154,6 +169,14 @@ async function reset(): Promise<void> {
         {{ writeQueue.connection.value.queued }} message{{ writeQueue.connection.value.queued === 1 ? '' : 's' }} waiting to send.
       </p>
 
+      <UAlert
+        v-if="seenFailure"
+        data-test="board-seen-failure"
+        color="warning"
+        variant="subtle"
+        :description="seenFailure"
+      />
+
       <BoardFeed
         side="FOH"
         :messages="messages"
@@ -161,10 +184,9 @@ async function reset(): Promise<void> {
       >
         <template #other-unseen="{ message }">
           <UButton
-            size="xs"
             color="neutral"
             variant="subtle"
-            class="ml-1 min-h-8"
+            class="ml-1 min-h-12"
             :data-test="`board-seen-${message.id}`"
             @click="markSeen(message.id)"
           >
@@ -201,28 +223,46 @@ async function reset(): Promise<void> {
             No presets are configured yet.
           </p>
 
-          <form
-            class="mt-3 flex gap-3"
-            data-test="board-free-text-form"
-            @submit.prevent="sendFreeText"
+          <!-- A send the board refused comes back here, in the words it was typed in: a call
+               that vanished is a call both ends think was made (E-121 criterion 6). -->
+          <ul
+            v-if="writeQueue.rejected.value.length"
+            class="mt-3 space-y-2"
+            data-test="board-rejected"
           >
-            <UInput
-              v-model="freeText"
-              placeholder="Free text..."
-              size="xl"
-              class="w-full"
-              data-test="board-free-text-input"
-            />
-            <UButton
-              type="submit"
-              color="secondary"
-              icon="i-lucide-send"
-              size="xl"
-              aria-label="Send to backstage"
-              class="min-h-14 min-w-14 justify-center"
-              data-test="board-free-text-submit"
-            />
-          </form>
+            <li
+              v-for="refused in writeQueue.rejected.value"
+              :key="refused.id"
+              class="space-y-2 rounded-xl bg-error/10 p-3 ring-1 ring-error/60"
+              :data-test="`board-rejected-${refused.id}`"
+            >
+              <p class="font-semibold">
+                {{ saysQueuedSend(presets, refused.payload) }}
+              </p>
+              <p class="text-sm">
+                Not sent. {{ refused.reason }}
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <UButton
+                  color="secondary"
+                  class="min-h-12"
+                  :data-test="`board-rejected-retry-${refused.id}`"
+                  @click="sendAgain(refused.id, refused.payload)"
+                >
+                  Try again
+                </UButton>
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  class="min-h-12"
+                  :data-test="`board-rejected-discard-${refused.id}`"
+                  @click="writeQueue.dismiss(refused.id)"
+                >
+                  Discard the message
+                </UButton>
+              </div>
+            </li>
+          </ul>
         </section>
       </BoardFeed>
 
@@ -243,10 +283,9 @@ async function reset(): Promise<void> {
             Read it out loud. It never travels by email or notification.
           </p>
           <UButton
-            size="sm"
             color="neutral"
             variant="ghost"
-            class="mt-2"
+            class="mt-2 min-h-12"
             data-test="board-code-hide"
             @click="boardCode = null"
           >
@@ -264,17 +303,46 @@ async function reset(): Promise<void> {
           Show tonight's code
         </UButton>
       </NightBlock>
+      <div class="flex justify-center pt-2">
+        <UButton
+          color="error"
+          variant="outline"
+          icon="i-lucide-radio"
+          class="min-h-12"
+          :loading="resetting"
+          data-test="board-reset-open"
+          @click="confirmingReset = true"
+        >
+          Reset the board
+        </UButton>
+      </div>
     </div>
 
     <template #actions>
-      <NightAction
-        label="Reset the board"
-        icon="i-lucide-radio"
-        color="error"
-        :loading="resetting"
-        data-test="board-reset-open"
-        @press="confirmingReset = true"
-      />
+      <!-- The board's own first action is a call, so the composer is what sits under the thumb;
+           Reset lives under the list, where a red pinned button cannot be hit by mistake. -->
+      <form
+        class="flex gap-3"
+        data-test="board-free-text-form"
+        @submit.prevent="sendFreeText"
+      >
+        <UInput
+          v-model="freeText"
+          placeholder="Free text..."
+          size="xl"
+          class="w-full"
+          data-test="board-free-text-input"
+        />
+        <UButton
+          type="submit"
+          color="secondary"
+          icon="i-lucide-send"
+          size="xl"
+          aria-label="Send to backstage"
+          class="min-h-14 min-w-14 justify-center"
+          data-test="board-free-text-submit"
+        />
+      </form>
     </template>
 
     <UModal
@@ -299,7 +367,7 @@ async function reset(): Promise<void> {
           data-test="board-reset-confirm"
           @click="reset"
         >
-          Reset it
+          Reset the board
         </UButton>
         <UButton
           color="neutral"

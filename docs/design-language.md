@@ -171,6 +171,12 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    looks right on a desk monitor is wrong for the surface it is on. Every control on one clears
    48 by 48 pixels, not only the primary actions K-102 criterion 2 names: a cold hand in a dark
    foyer does not aim, and a secondary control missed twice costs more than the room it saved.
+   That floor is one rule, `.nnt-night` in `app/assets/css/theme.css`, and the two show-night
+   layouts put the class on the body so a teleported modal is inside it too; a screen never asks
+   for it field by field. The shells stand on `min-h-dvh` rather than `min-h-screen`, and the
+   pinned area pads by `env(safe-area-inset-bottom)`, so a phone's own browser chrome and home
+   indicator never sit on top of the action under the thumb. `tests/unit/night-shell.test.ts`
+   holds all three.
 5. **Navigation is declared once and filtered by ability.** Every destination in the console
    sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu, the
    public header (`HEADER_NAV`, a derived slice of `PUBLIC_NAV`) and the footer comes from

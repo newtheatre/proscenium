@@ -52,6 +52,13 @@ const refusedNeedsReason = (input: OutcomeShape): boolean => input.outcome !== '
 const acceptedHasNoReason = (input: OutcomeShape): boolean => input.outcome !== 'ACCEPTED' || input.reason === null
 const refusedHasNoIdType = (input: OutcomeShape): boolean => input.outcome !== 'REFUSED' || input.idType === null
 
+// Whether the standalone register has what an entry needs, which is what the submit reads: the
+// same pair of shape rules the schema refines, so the screen never offers a write it would refuse.
+export function ageCheckReady(form: { outcome: AgeCheckOutcome, idType: IdType | null, reason: RefusalReason | null, description: string }): boolean {
+  if (form.description.trim().length === 0) return false
+  return form.outcome === 'ACCEPTED' ? form.idType !== null : form.reason !== null
+}
+
 export const ageCheckForm = z.object({
   performanceId: z.string().min(1, 'Say which performance you mean').nullish().transform(value => value ?? null),
   ...outcomeFields,

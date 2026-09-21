@@ -37,6 +37,7 @@ setNightEyebrow(() => props.title)
     <div
       v-if="$slots.actions"
       class="sticky bottom-0 flex flex-col gap-3 bg-default pb-4 pt-3"
+      style="padding-bottom: calc(1rem + env(safe-area-inset-bottom))"
       data-test="night-actions"
     >
       <slot name="actions" />
