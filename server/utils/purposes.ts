@@ -7,8 +7,5 @@ export async function requirePurpose(event: H3Event | undefined, value: string):
   const allowed = await configValue(event, 'ROOM_PURPOSES')
   if (allowed.includes(value)) return value
 
-  throw createError({
-    statusCode: 422,
-    statusMessage: `A booking is for one of: ${allowed.join(', ')}`,
-  })
+  throw createError({ statusCode: 422, statusMessage: 'Choose what the room is for from the list' })
 }

@@ -47,5 +47,5 @@ export default defineEventHandler(async (event) => {
     if (held) return { ok: true, opened: won, stocktake: held, lines: await stocktakeLines(held.id) }
   }
 
-  throw createError({ statusCode: 500, statusMessage: 'The stocktake did not open' })
+  throw createError({ statusCode: 500, statusMessage: 'That did not save. Try again, and tell the IT Manager if it keeps happening.' })
 })

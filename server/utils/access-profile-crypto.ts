@@ -18,7 +18,10 @@ async function encryptionKey(): Promise<CryptoKey> {
   const { useRuntimeConfig } = await import('nitropack/runtime')
   const raw = useRuntimeConfig().accessProfileEncryptionKey
   if (!raw) {
-    throw createError({ statusCode: 500, statusMessage: 'Access profile encryption is not configured' })
+    // Which secret is missing is the operator's to know, never the member's: this reaches a
+    // booking page (K-128 criterion 2).
+    console.error('runtime config: accessProfileEncryptionKey is not set')
+    throw createError({ statusCode: 500, statusMessage: 'This part of the site is not set up yet. Tell the IT Manager.' })
   }
   key ??= importAccessProfileKey(raw)
   return key

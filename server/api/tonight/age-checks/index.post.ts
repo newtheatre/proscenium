@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   })
 
   const created = await withAgeCheckConstraints(() => auditedWrite(db.all<{ id: string }>(write.statement), entry))
-  if (!created) throw createError({ statusCode: 500, statusMessage: 'Could not log that check' })
+  if (!created) throw createError({ statusCode: 500, statusMessage: 'That did not save. Try again, and tell the IT Manager if it keeps happening.' })
 
   return { ok: true, id: write.id }
 })

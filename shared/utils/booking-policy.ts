@@ -121,7 +121,7 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
     fail('NO_MEMBERSHIP', 'Booking a room needs a current membership. Renew it at the Students\' Union.')
   }
   if (proposal.endsAt.getTime() <= context.now.getTime()) {
-    fail('IN_THE_PAST', 'That slot has already happened.')
+    fail('IN_THE_PAST', 'That slot has already happened')
   }
   if (!room.isActive) {
     fail('ROOM_RETIRED', 'That room is no longer in use.')
@@ -129,7 +129,7 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
 
   // A room with no hours recorded is open; one that has said when it opens is shut outside them.
   if (closedOn(room.hours, weekday)) {
-    fail('ROOM_CLOSED', 'The room is closed that day.')
+    fail('ROOM_CLOSED', 'The room is closed that day')
   }
   else if (!isOpenAt(room.hours, weekday, londonClock(proposal.startsAt), londonClock(proposal.endsAt))) {
     fail('OUT_OF_HOURS', 'That is outside the hours the room opens.')

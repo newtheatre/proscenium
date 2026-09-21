@@ -8,13 +8,13 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, reopenPeriodForm)
 
   const lock = await periodLockById(id)
-  if (!lock) throw createError({ statusCode: 404, statusMessage: 'No such period lock' })
+  if (!lock) throw noSuch('period lock')
   if (lock.fromDay !== input.confirmFromDay || lock.toDay !== input.confirmToDay) {
     throw createError({ statusCode: 409, statusMessage: 'The typed range does not match this lock: check what you are reopening and try again' })
   }
 
   const result = await reopenPeriod(id, resolved.account.id)
   if (!result) throw createError({ statusCode: 409, statusMessage: 'This period is not currently closed' })
-  if (!result.applied) throw createError({ statusCode: 500, statusMessage: 'The reopen was not recorded' })
+  if (!result.applied) throw createError({ statusCode: 500, statusMessage: 'That did not save. Try again, and tell the IT Manager if it keeps happening.' })
   return { ok: true, id: result.id }
 })

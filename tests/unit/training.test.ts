@@ -606,8 +606,8 @@ describe('an unmarked register is nagged weekly (G-119 criteria 1 and 2)', () =>
   })
 })
 
-// K-128 criterion 2. The loop refusal used to read "Adding this would close a loop: A -> B -> A",
-// which is a developer's diagram; the path still names every module, in words (G-108 criterion 2).
+// The path is named in words, not drawn: "that would make a cycle" is not actionable when the
+// loop runs through modules nobody is looking at (G-108 criterion 2, K-128 criterion 2).
 describe('a prerequisite loop is refused in a sentence that names the path', () => {
   test('the module is named as a prerequisite of itself', async () => {
     const { saysCycle } = await import('#shared/utils/training')

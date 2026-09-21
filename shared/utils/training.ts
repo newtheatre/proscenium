@@ -525,6 +525,12 @@ export function saysGaps(gaps: readonly PrerequisiteNeed[]): string {
   return gaps.map(gap => `${gap.requiresId} ${gap.requiresName}`).join(', ')
 }
 
+// `cyclePath` joins the path with an ASCII arrow, which is its own delimiter and not something a
+// reader should meet; the words are the same path (G-108 criterion 2, K-128 criterion 2).
+export function saysCycle(moduleId: string, path: string): string {
+  return `That would make ${moduleId} a prerequisite of itself, through ${path.replaceAll(' -> ', ', then ')}`
+}
+
 // A room's worth of people and an evening's worth of modules: the same ceilings a scheduled
 // session carries, so a log cannot quietly become a bulk import (G-118).
 export const DELIVERY_ATTENDEES_MAX = SESSION_CAPACITY_MAX

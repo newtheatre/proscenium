@@ -64,8 +64,8 @@ describe('the display wording names every value (0009: no member reads a bare co
   })
 })
 
-// K-128 criterion 2. The blocked close used to read "Cannot close: <labels> still needs
-// completing or an exception recorded", a developer's colon heading rather than a sentence.
+// A sentence, not a colon heading: a duty manager mid-interval needs the open items and the two
+// ways out in one read (E-114 criterion 4, K-128 criterion 2).
 describe('a blocked close says what is holding it and what to do (criterion 4)', () => {
   test('one open item is named inside a sentence', () => {
     expect(saysBlockedClose(['Till reconciled']))

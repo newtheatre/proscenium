@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
 
   const { id, actualZPence, varianceNote } = await readValidatedBodyOrThrow(event, closeTillSessionForm)
   const session = await sessionById(id)
-  if (!session) throw createError({ statusCode: 404, statusMessage: 'No such till session' })
+  if (!session) throw noSuch('till session')
   if (!isOpen(session)) throw createError({ statusCode: 409, statusMessage: 'That session is already closed' })
 
   const account = await closerFor(event, session)
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
   if (variancePence !== 0 && !varianceNote) {
     throw createError({
       statusCode: 400,
-      statusMessage: `The reader read ${saysMoney(actualZPence)}; the ledger expects ${saysMoney(bar.expectedPence)}. `
+      statusMessage: `The reader read ${saysMoney(actualZPence)}; we expect ${saysMoney(bar.expectedPence)}. `
         + 'That difference needs a note before it can be recorded.',
     })
   }

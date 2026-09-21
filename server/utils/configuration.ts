@@ -43,9 +43,12 @@ export async function configValue<K extends ConfigKey>(event: H3Event | undefine
   if (set.has(key)) return set.get(key) as ConfigValue<K>
 
   if (!hasDefault(key)) {
+    // The key belongs in the operator's log, never in the sentence: a reader cannot act on a
+    // configuration key, and the IT Manager needs to know which one (0012, K-128 criterion 2).
+    console.warn(`configuration: ${key} has no override and no shipped default`)
     throw createError({
       statusCode: 503,
-      statusMessage: `${key} has not been set yet, so the feature that needs it cannot run`,
+      statusMessage: 'A setting this needs is empty. Ask the IT Manager to set it under Settings.',
     })
   }
 
