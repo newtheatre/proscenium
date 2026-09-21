@@ -66,9 +66,9 @@ export function isRepeatScan(
   return last !== null && last.value === value && at - last.at < windowMs
 }
 
-// The three answers door mode gives. Admit, send to the bar, or refuse with the reason named:
-// there is no fourth, and none of them carries a figure (show-night design 2.1).
-export type DoorVerdictState = 'PAID' | 'UNPAID' | 'REFUSED'
+// The three answers door mode gives. Admit, send to the bar, or refuse with the reason named;
+// none of them carries a figure (show-night design 2.1). UNANSWERED is no answer at all.
+export type DoorVerdictState = 'PAID' | 'UNPAID' | 'REFUSED' | 'UNANSWERED'
 
 export interface DoorVerdict { state: DoorVerdictState, headline: string, line: string, note: string | null }
 
@@ -88,6 +88,15 @@ export function doorVerdict(
     }
   }
   return { state: 'REFUSED', headline: outcome.headline.toUpperCase(), line: outcome.detail ?? outcome.headline, note: null }
+}
+
+// A request that never got an answer is not a refusal: the ticket may be perfectly good, and a
+// red card would send its holder to the bar for nothing (issue 1145).
+export function doorFailureVerdict(status: number | undefined, line: string, refusedHeadline = 'REFUSED'): DoorVerdict {
+  if (status === undefined) {
+    return { state: 'UNANSWERED', headline: 'NO ANSWER', line: 'The connection dropped, so nothing was checked. Try again.', note: null }
+  }
+  return { state: 'REFUSED', headline: refusedHeadline, line, note: null }
 }
 
 // A pass admits its holder and nobody else (D-126 criterion 4), so the card's own button says so

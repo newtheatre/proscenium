@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysDoorParty } from '#shared/utils/door'
+import { doorFailureVerdict, saysDoorParty } from '#shared/utils/door'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { DoorVerdict } from '#shared/utils/door'
 import type { ScannerFailure } from '~/composables/useQrScanner'
@@ -104,7 +104,7 @@ async function admitScanned(scanned: string): Promise<void> {
     await admit(resolved.reference)
   }
   catch (refused) {
-    show({ state: 'REFUSED', headline: 'NOT OURS', line: refusalText(refused), note: null }, '', null, 0)
+    showRefusal(refused, '', 'NOT OURS')
   }
   finally {
     scanning.value = false
@@ -139,14 +139,14 @@ async function admit(code: string): Promise<void> {
 }
 
 // A route that carries its own door wording is trusted with it; anything else is refused with
-// the message it gave, which is still a named reason rather than a shrug (criterion 7).
-function showRefusal(refused: unknown, code: string): void {
+// the message it gave (criterion 7), unless no answer came at all, which is not a refusal.
+function showRefusal(refused: unknown, code: string, headline = 'REFUSED'): void {
   const carried = (refused as { data?: { data?: RefusalData } }).data?.data
   if (carried?.verdict) {
     show(carried.verdict, carried.reference ?? code, carried.holderName ?? null, carried.partySize ?? 0)
     return
   }
-  show({ state: 'REFUSED', headline: 'REFUSED', line: refusalText(refused), note: null }, code, null, 0)
+  show(doorFailureVerdict(refusalStatus(refused), refusalText(refused), headline), code, null, 0)
 }
 
 // The typed field takes the same four forms the camera does: a hardware scanner acting as a
@@ -181,12 +181,14 @@ const cardClass: Record<DoorVerdict['state'], string> = {
   PAID: 'border-success bg-success/10 text-success',
   UNPAID: 'border-gold-400 bg-gold-400/10 text-gold-400',
   REFUSED: 'border-error bg-error/10 text-error',
+  UNANSWERED: 'border-warning bg-warning/10 text-warning',
 }
 
 const cardIcon: Record<DoorVerdict['state'], string> = {
   PAID: 'i-lucide-circle-check',
   UNPAID: 'i-lucide-circle-alert',
   REFUSED: 'i-lucide-circle-x',
+  UNANSWERED: 'i-lucide-wifi-off',
 }
 </script>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { formatLondon, fromLondonWallClock, londonParts, startOfLondonDay } from '#shared/utils/london'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
@@ -75,7 +76,7 @@ const listFailure = useListFailure(error, 'The sessions could not be read.')
 
 const { data: catalogue } = await useAsyncData(
   'training-sessions-modules',
-  () => request<{ items: Module[] }>('/api/admin/training/modules'),
+  () => request<{ items: Module[] }>('/api/admin/training/modules', { query: { pageSize: MAX_PAGE_SIZE } }),
   { default: () => ({ items: [] as Module[] }) },
 )
 

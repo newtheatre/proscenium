@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onMounted, ref, watch } from 'vue'
 import { usePendingPoll } from './usePendingPoll'
 import { useSumUp } from './useSumUp'
 import { refusalText } from '../utils/refusal'
@@ -23,7 +23,12 @@ export interface ChargedReceipt {
 
 export type SumUpSnapshot = { bar: BasketLine[], tickets: TillBooking[], walkUps: WalkUpLine[], discountId: string | null }
 
+// What the till reaches the payment routes with. A dependency rather than the `$fetch` global so
+// the unit test can answer for the app (tests/unit/sumup-charge.test.ts).
+export type SumUpRequest = <T>(path: string, options?: { method?: 'POST', body?: Record<string, unknown>, query?: Record<string, string> }) => Promise<T>
+
 export interface SumUpChargeDeps {
+  request: SumUpRequest
   venueId: Ref<string | null>
   sumupEnabled: Ref<boolean>
   selectedTabHolderId: Ref<string | null>
@@ -40,7 +45,7 @@ export interface SumUpChargeDeps {
 }
 
 export function useSumUpCharge(deps: SumUpChargeDeps) {
-  const { venueId, sumupEnabled, selectedTabHolderId, session, basket, ticketLines, walkUpLines, selectedDiscountId, charged, chargeFailure, resetSelections } = deps
+  const { request, venueId, sumupEnabled, selectedTabHolderId, session, basket, ticketLines, walkUpLines, selectedDiscountId, charged, chargeFailure, resetSelections } = deps
 
   const sumup = useSumUp<SumUpSnapshot>()
   const sumupAvailable = computed(() => sumupEnabled.value && sumup.handheld.value && selectedTabHolderId.value === null)
@@ -57,7 +62,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     const pending = sumup.pending.value
     if (!pending) return
     try {
-      const answered = await $fetch<{ attempt: SumupAttemptView }>(`/api/till/payments/${pending.id}`)
+      const answered = await request<{ attempt: SumupAttemptView }>(`/api/till/payments/${pending.id}`)
       waiting.value = answered.attempt
       waitingFailure.value = null
       settleAttempt(answered.attempt.status, pending)
@@ -87,7 +92,11 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       ticketLines.value = pending.basket.tickets
       walkUpLines.value = pending.basket.walkUps
       selectedDiscountId.value = pending.basket.discountId
-      chargeFailure.value = status === 'FAILED' ? 'The SumUp app reported the payment did not go through. The basket is back.' : 'That hand-off was abandoned. The basket is back; if the reader did take the money, ring it up again.'
+      // After the restore has flushed: the till clears this on any basket edit, and the restore
+      // itself is one (issue 1144).
+      void nextTick(() => {
+        chargeFailure.value = status === 'FAILED' ? 'The SumUp app reported the payment did not go through. The basket is back.' : 'That hand-off was abandoned. The basket is back; if the reader did take the money, ring it up again.'
+      })
       sumup.forget()
       waiting.value = null
       void refreshOpenAttempts()
@@ -108,19 +117,22 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     pendingPoll.stop()
   }
 
-  onMounted(() => {
-    if (sumup.recall()) {
-      void checkAttempt()
-      startWatching()
-    }
-  })
+  // Inside a component only: the unit test drives this with no instance, as useNightCache is.
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      if (sumup.recall()) {
+        void checkAttempt()
+        startWatching()
+      }
+    })
+  }
 
   // "Did it go through?" (criterion 5), for the attempt this screen started or one listed below.
   async function resolveAttempt(id: string, outcome: 'succeeded' | 'abandoned', note: string | null = null): Promise<void> {
     resolving.value = true
     waitingFailure.value = null
     try {
-      const answered = await $fetch<{ status: SumupAttemptStatus, error: string | null }>(`/api/till/payments/${id}/resolve`, {
+      const answered = await request<{ status: SumupAttemptStatus, error: string | null }>(`/api/till/payments/${id}/resolve`, {
         method: 'POST',
         body: { outcome, smpTxCode: smpTxCodeTyped.value.trim() || null, note },
       })
@@ -151,7 +163,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
   async function refreshOpenAttempts(): Promise<void> {
     if (!venueId.value || !sumupEnabled.value) return
     try {
-      const answered = await $fetch<{ attempts: SumupAttemptView[] }>('/api/till/payments', { query: { venueId: venueId.value } })
+      const answered = await request<{ attempts: SumupAttemptView[] }>('/api/till/payments', { query: { venueId: venueId.value } })
       openAttempts.value = answered.attempts.filter(attempt => attempt.id !== sumup.pending.value?.id)
     }
     catch { /* the strip is a convenience; the till still sells */ }

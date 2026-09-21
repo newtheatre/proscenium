@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PASS_ADMISSION_CAPTION, PASS_ADMISSION_PARTY_SIZE } from '#shared/utils/door'
+import { PASS_ADMISSION_CAPTION, PASS_ADMISSION_PARTY_SIZE, doorFailureVerdict } from '#shared/utils/door'
 import type { DoorVerdict } from '#shared/utils/door'
 
 // Admitting a pass holder (D-126). The search and the card; the verdict afterwards is the door
@@ -66,7 +66,7 @@ async function admit(pass: PassCard): Promise<void> {
   catch (refused) {
     emit('admitted', {
       reference: pass.reference,
-      verdict: { state: 'REFUSED', headline: 'REFUSED', line: refusalText(refused), note: null },
+      verdict: doorFailureVerdict(refusalStatus(refused), refusalText(refused)),
       holderName: pass.holderName,
       partySize: 0,
     })

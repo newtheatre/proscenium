@@ -153,6 +153,7 @@ const {
   checkAttempt,
   resolveAttempt,
 } = useSumUpCharge({
+  request: (path, options) => $fetch(path, options),
   venueId,
   sumupEnabled,
   selectedTabHolderId,
