@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { saysWhen } from './when'
 import { plural } from './text'
 
 // The booking flow (D-104): a guest or a signed-in account holds seats online, the box office
@@ -161,6 +162,15 @@ export function ticketEditDelta(current: TicketTypeCount[], desired: TicketTypeC
 export function belowMinimumTicketsReason(desiredTotal: number): string | null {
   if (desiredTotal >= 1) return null
   return 'A booking must keep at least one ticket. Cancel it instead if none are wanted.'
+}
+
+// One night in the exchange list: the date leads, because a venue and a state name no night a
+// booker can choose between (D-111 criterion 6).
+export function saysExchangeNight(night: { startsAt: number, venueName: string, says: string }, now?: Date): { label: string, description: string } {
+  return {
+    label: saysWhen(night.startsAt, { now }),
+    description: `${night.venueName} · ${night.says}`,
+  }
 }
 
 // Criterion 3: cancellation this close to curtain has nowhere useful to send the freed seats.
