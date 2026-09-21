@@ -98,7 +98,7 @@ useSeoMeta({ title: 'Membership' })
 </script>
 
 <template>
-  <UContainer class="max-w-xl py-16">
+  <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       title="Membership"
       description="What the theatre holds about your membership, and how to tell us about one you have bought."
@@ -128,7 +128,7 @@ useSeoMeta({ title: 'Membership' })
 
       <UPageCard>
         <template #header>
-          <h2 class="nnt-headline text-lg">
+          <h2 class="text-lg font-semibold">
             Your membership
           </h2>
         </template>
@@ -192,7 +192,7 @@ useSeoMeta({ title: 'Membership' })
 
       <UPageCard v-if="open">
         <template #header>
-          <h2 class="nnt-headline text-lg">
+          <h2 class="text-lg font-semibold">
             Your claim
           </h2>
         </template>
@@ -241,7 +241,7 @@ useSeoMeta({ title: 'Membership' })
 
       <UPageCard v-else>
         <template #header>
-          <h2 class="nnt-headline text-lg">
+          <h2 class="text-lg font-semibold">
             Tell us about a membership
           </h2>
         </template>

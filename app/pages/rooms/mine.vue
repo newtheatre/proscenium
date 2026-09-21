@@ -193,7 +193,7 @@ useSeoMeta({ title: 'My bookings' })
 
 <template>
   <UContainer
-    class="max-w-3xl py-16"
+    :class="MEMBER_PAGE_READING"
     data-test="rooms-mine-page"
   >
     <UPageHeader
@@ -339,7 +339,7 @@ useSeoMeta({ title: 'My bookings' })
       class="mt-10"
       data-test="unlisted-list"
     >
-      <h2 class="nnt-headline text-lg">
+      <h2 class="text-lg font-semibold">
         Rooms we do not manage
       </h2>
       <p class="mt-1 text-sm text-muted">

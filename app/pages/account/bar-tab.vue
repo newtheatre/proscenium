@@ -51,7 +51,7 @@ function describe(charge: ItemisedTab['charges'][number]): string {
 
 <template>
   <UContainer
-    class="max-w-3xl py-10"
+    :class="MEMBER_PAGE_READING"
     data-test="account-tab-page"
   >
     <UPageHeader
@@ -77,7 +77,7 @@ function describe(charge: ItemisedTab['charges'][number]): string {
       <UCard data-test="account-tab-balance">
         <template #header>
           <div class="flex items-center justify-between">
-            <h2 class="nnt-headline text-lg">
+            <h2 class="text-lg font-semibold">
               Outstanding
             </h2>
             <UButton
@@ -108,7 +108,7 @@ function describe(charge: ItemisedTab['charges'][number]): string {
 
       <UCard data-test="account-tab-charges">
         <template #header>
-          <h2 class="nnt-headline text-lg">
+          <h2 class="text-lg font-semibold">
             Charges
           </h2>
         </template>

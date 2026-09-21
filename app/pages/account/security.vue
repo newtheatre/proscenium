@@ -171,7 +171,7 @@ useSeoMeta({ title: 'Security' })
         class="space-y-6"
       >
         <div class="space-y-2">
-          <h2 class="nnt-headline text-xl">
+          <h2 class="text-lg font-semibold">
             Scan this with your authenticator app
           </h2>
           <p class="text-sm text-muted">
@@ -216,7 +216,7 @@ useSeoMeta({ title: 'Security' })
         class="space-y-4"
       >
         <div class="space-y-2">
-          <h2 class="nnt-headline text-xl">
+          <h2 class="text-lg font-semibold">
             Save your recovery codes
           </h2>
           <p class="text-sm text-muted">

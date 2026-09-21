@@ -141,7 +141,7 @@ useSeoMeta({ title: 'Rooms' })
 </script>
 
 <template>
-  <UContainer class="py-8">
+  <UContainer :class="MEMBER_PAGE_WIDE">
     <UPageHeader
       title="Rooms"
       description="What is free, and when. Click a free slot to book an hour, or drag across several. A slot somebody else holds reads as booked and nothing more."
@@ -314,7 +314,7 @@ useSeoMeta({ title: 'Rooms' })
     <template v-else>
       <h2
         v-if="!everyRoom && rooms[0]"
-        class="nnt-headline mt-6 text-lg"
+        class="mt-6 text-lg font-semibold"
       >
         {{ rooms[0]?.name }}
       </h2>

@@ -314,7 +314,7 @@ useSeoMeta({ title: 'Book a room' })
 </script>
 
 <template>
-  <UContainer class="max-w-xl py-16">
+  <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       title="Book a room"
       description="A booking inside the rules is held straight away. One outside them is a request somebody decides on."

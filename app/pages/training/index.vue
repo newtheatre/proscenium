@@ -146,7 +146,7 @@ const standings = computed(() => [
 
 <template>
   <UContainer
-    class="max-w-3xl py-16"
+    :class="MEMBER_PAGE_READING"
     data-test="training-page"
   >
     <UPageHeader
@@ -265,7 +265,7 @@ const standings = computed(() => [
         v-for="[department, records] in groups"
         :key="department"
       >
-        <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+        <h2 class="text-lg font-semibold">
           {{ department }}
         </h2>
 
@@ -314,7 +314,7 @@ const standings = computed(() => [
       class="mt-12"
       data-test="my-sessions"
     >
-      <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+      <h2 class="text-lg font-semibold">
         What you are signed up to
       </h2>
 
@@ -375,7 +375,7 @@ const standings = computed(() => [
       class="mt-12"
       data-test="whats-next"
     >
-      <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+      <h2 class="text-lg font-semibold">
         What you could do next
       </h2>
       <p class="mt-1 text-sm text-muted">
@@ -415,7 +415,7 @@ const standings = computed(() => [
       class="mt-12"
       data-test="my-asks"
     >
-      <h2 class="text-sm font-semibold text-muted uppercase tracking-wide">
+      <h2 class="text-lg font-semibold">
         What you have asked for
       </h2>
       <p class="mt-1 text-sm text-muted">
