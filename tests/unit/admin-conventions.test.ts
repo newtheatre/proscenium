@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
+import { penceFromPounds } from '#shared/utils/admin-forms'
+import { saysMoney } from '#shared/utils/bar'
 import { plural } from '#shared/utils/text'
 
 // The admin conventions are a test rather than a review habit (0032), the same way the design
@@ -200,6 +202,36 @@ describe('money reads in pounds and is stored in pence', () => {
   })
 })
 
+// The reader is read in pounds and pence off the SumUp reader, and the route still takes pence
+// (K-123 criterion 2, 0004). The parser is the one place the two meet.
+describe('a figure read off the card reader is typed as pounds and pence', () => {
+  test('pounds and pence come back as whole pence', () => {
+    expect(penceFromPounds('123.45')).toBe(12345)
+    expect(penceFromPounds('0.05')).toBe(5)
+  })
+
+  test('a bare number of pounds is pounds, not pence', () => {
+    expect(penceFromPounds('123')).toBe(12300)
+  })
+
+  test('a thousands comma and a pound sign are read through', () => {
+    expect(penceFromPounds('1,234.50')).toBe(123450)
+    expect(penceFromPounds('\u00a3123.45')).toBe(12345)
+    expect(penceFromPounds(' \u00a31,234.50 ')).toBe(123450)
+  })
+
+  test('anything else is refused rather than guessed', () => {
+    for (const raw of ['', '  ', 'abc', '12.345', '1.2.3', '-5', '12p', '\u00a3']) {
+      expect(penceFromPounds(raw)).toBeNull()
+    }
+  })
+
+  test('what is typed round-trips to what the screen shows beside it', () => {
+    expect(saysMoney(penceFromPounds('123.45')!)).toBe('\u00a3123.45')
+    expect(saysMoney(penceFromPounds('1,234.50')!)).toBe('\u00a31234.50')
+  })
+})
+
 // Every screen that counts something says the count in words a reader would use.
 describe('a count reads as English', () => {
   test('one is singular and everything else is not', () => {
@@ -336,5 +368,47 @@ describe('a console date is read in London (K-128, issue 1151 item 8)', () => {
 
   test('no console screen puts an ISO instant on the page', async () => {
     expect(await offenders(source => templateOf(source).includes('toISOString('))).toEqual([])
+  })
+})
+
+// A machine word a reader can see: an enum value, a permission or audit code, a table name, a
+// configuration key. The console says what the value means (K-128 criterion 1, copy-style §3).
+const CODE_FIELDS = 'status|kind|role|action|outcome|refTable|scope'
+const BARE_IN_TEMPLATE = new RegExp(String.raw`\{\{\s*[A-Za-z_$][\w.?]*\.(?:${CODE_FIELDS})\s*\}\}`)
+// The whole cell, so a code compared against rather than rendered is not mistaken for one shown.
+const BARE_IN_A_CELL = new RegExp(String.raw`=>\s*row\.original\.(?:${CODE_FIELDS})(?!\s*[\w=!.?[(])`)
+// Spacing a code out is not wording it: "stocktake lines" is still the table's name.
+const CODE_DRESSED_UP = /\.replaceAll\('_', ' '\)/
+// A select whose options are the values themselves, spread or spelled.
+const CODES_AS_OPTIONS = /:items="\[(?:\.\.\.[A-Z][A-Z_]+|\s*'[A-Z][A-Z_]*'|\s*"[A-Z][A-Z_]*")/
+// A refusal that opens with the key it concerns rather than with what happened.
+const KEY_BEFORE_THE_REFUSAL = /\$\{[\w.]+\.key\}:/
+
+// The developer tools never ship (K-124) and their reader wants the value the estate stores.
+const READS_THE_MACHINE = ['app/pages/dev.vue']
+
+describe('no code reaches a reader on the console (K-128, issue 1151 item 8)', () => {
+  test('no screen shows an enum value as it is stored', async () => {
+    expect((await offenders(source =>
+      BARE_IN_TEMPLATE.test(templateOf(source)) || BARE_IN_A_CELL.test(source) || CODE_DRESSED_UP.test(source),
+    )).filter(path => !READS_THE_MACHINE.includes(path))).toEqual([])
+  })
+
+  test('no screen offers codes as the options of a select', async () => {
+    expect((await offenders(source => CODES_AS_OPTIONS.test(source)))
+      .filter(path => !READS_THE_MACHINE.includes(path))).toEqual([])
+  })
+
+  test('no refusal opens with a configuration key', async () => {
+    expect(await offenders(source => KEY_BEFORE_THE_REFUSAL.test(source))).toEqual([])
+  })
+
+  test('the shared desk wording never lowercases a status into place', async () => {
+    const wording = await Bun.file('shared/utils/desk.ts').text()
+    expect(wording.includes('status.toLowerCase()')).toBe(false)
+  })
+
+  test('no console screen carries an en dash', async () => {
+    expect(await offenders(source => source.includes('–'))).toEqual([])
   })
 })

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { can, manageEmergencyCard } from '#shared/utils/abilities'
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -115,7 +115,7 @@ async function save(): Promise<void> {
 }
 
 function asOf(at: number | null): string {
-  return at === null ? 'Never set' : formatLondon(new Date(at * 1000), { dateStyle: 'medium', timeStyle: 'short' })
+  return at === null ? 'Never set' : saysWhen(at)
 }
 
 const columns: TableColumn<VenueCard>[] = [

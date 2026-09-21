@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { accountsList } from '#shared/utils/accounts-list'
-import { formatLondon } from '#shared/utils/london'
-import { ROLES } from '#shared/utils/roles'
+import { saysDay } from '#shared/utils/when'
+import { ROLES, saysRole } from '#shared/utils/roles'
 import type { FieldKey } from '#shared/utils/list-filters'
 import type { Role } from '#shared/utils/roles'
 import type { TableColumn } from '@nuxt/ui'
@@ -83,7 +83,7 @@ const totalLine = computed(() => listing.value.shadowHidden
   : plural(listing.value.total, 'account'))
 
 const seen = (at: number | null): string =>
-  at ? formatLondon(new Date(at * 1000), { dateStyle: 'medium' }) : 'Never'
+  at ? saysDay(at) : 'Never'
 
 const columns: TableColumn<Account>[] = [
   { accessorKey: 'name', header: 'Name' },
@@ -272,7 +272,8 @@ const columns: TableColumn<Account>[] = [
               v-model="invitation.roles"
               data-test="invite-roles"
               multiple
-              :items="[...ROLES]"
+              :items="ROLES.map(value => ({ label: saysRole(value), value }))"
+              value-key="value"
             />
           </UFormField>
           <UButton

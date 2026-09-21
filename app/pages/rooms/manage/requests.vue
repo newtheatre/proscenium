@@ -4,7 +4,7 @@ import { BULK_LIMIT, REJECTION_REASON_LIMIT } from '#shared/utils/approvals'
 import { describePurpose, saysBookingState } from '#shared/utils/bookings'
 import { EXTERNAL_REASON_LIMIT, saysExternalState, saysExternalStatus } from '#shared/utils/external-requests'
 import { saysVerdict } from '#shared/utils/external-spaces'
-import { formatLondon } from '#shared/utils/london'
+import { saysClock, saysWhen } from '#shared/utils/when'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { TableColumn } from '@nuxt/ui'
@@ -262,8 +262,8 @@ function toggle(id: string, on: boolean): void {
 }
 
 function span(request: Request): string {
-  const from = formatLondon(new Date(request.startsAt * 1000), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-  const to = formatLondon(new Date(request.endsAt * 1000), { hour: '2-digit', minute: '2-digit' })
+  const from = saysWhen(request.startsAt)
+  const to = saysClock(request.endsAt)
   return `${from} to ${to}`
 }
 

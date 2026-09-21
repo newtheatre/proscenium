@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import { saysHouse, saysOnSale, saysOnSaleCount, saysUnpaid, soldShare } from '#shared/utils/show-strip'
 import type { AdminShow } from '#shared/utils/programme'
 
@@ -14,7 +14,7 @@ const share = computed(() => soldShare(props.show.soldTickets, props.show.capaci
 const nextPerformance = computed(() => {
   const at = props.show.nextPerformanceAt
   if (at === null) return null
-  return formatLondon(new Date(at * 1000), { dateStyle: 'medium', timeStyle: 'short' })
+  return saysWhen(at)
 })
 </script>
 

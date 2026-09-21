@@ -201,7 +201,7 @@ const columns: TableColumn<HolderRow>[] = [
                 {{ describe(charge) }}
               </p>
               <p class="text-xs text-muted">
-                {{ formatLondon(new Date(charge.happenedAt * 1000), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }}
+                {{ saysWhen(charge.happenedAt) }}
                 · {{ saysMoney(charge.totalPence) }}
                 <UBadge
                   v-if="charge.voided"

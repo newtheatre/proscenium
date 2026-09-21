@@ -627,7 +627,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
                   :color="statusColor[row.status] ?? 'neutral'"
                   variant="subtle"
                 >
-                  {{ row.status }}
+                  {{ saysReservationStatus(row.status) }}
                 </UBadge>
               </td>
               <td class="py-2 text-right">

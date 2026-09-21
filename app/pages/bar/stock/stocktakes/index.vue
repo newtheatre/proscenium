@@ -28,9 +28,6 @@ const { data, status, error } = await useAsyncData(
   { watch: [query], default: noStocktakes },
 )
 
-const when = (at: number): string =>
-  formatLondon(new Date(at * 1000), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-
 const label = (item: Stocktake): string => saysStocktakeStatus(item.status)
 
 async function openStocktake(): Promise<void> {
@@ -65,11 +62,11 @@ const columns: TableColumn<Stocktake>[] = [
       size: 'sm',
     }, () => label(row.original)),
   },
-  { id: 'opened', header: 'Opened', cell: ({ row }) => when(row.original.openedAt) },
+  { id: 'opened', header: 'Opened', cell: ({ row }) => saysWhen(row.original.openedAt) },
   {
     id: 'applied',
     header: 'Applied',
-    cell: ({ row }) => (row.original.appliedAt === null ? '' : when(row.original.appliedAt)),
+    cell: ({ row }) => (row.original.appliedAt === null ? '' : saysWhen(row.original.appliedAt)),
   },
   {
     id: 'act',

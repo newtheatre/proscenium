@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { endOfLondonDay, formatLondon, londonParts, startOfLondonDay } from '#shared/utils/london'
+import { endOfLondonDay, londonParts, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import {
   PASS_TYPE_STATUSES,
   newPassTypeScreenForm,
@@ -218,7 +219,7 @@ const columns: TableColumn<PassType>[] = [
           ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Issued')
           : null,
       ]),
-      h('div', { class: 'text-xs text-muted' }, `${formatLondon(new Date(row.original.validFrom * 1000), { dateStyle: 'medium' })} – ${formatLondon(new Date(row.original.validUntil * 1000), { dateStyle: 'medium' })}`),
+      h('div', { class: 'text-xs text-muted' }, `${saysDay(row.original.validFrom)} to ${saysDay(row.original.validUntil)}`),
     ]),
   },
   {
