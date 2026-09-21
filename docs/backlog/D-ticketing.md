@@ -69,6 +69,8 @@ Open questions:
      tickets, guidance); interval and latecomers are practical detail and sit with the prose.
   4. Warnings and age guidance set on the show flow through to the e-ticket (D-108) and the
      show-night screens (module E) from the same rows, never re-entered.
+  5. A warning's description is text on the page beside the warning it describes, never only a
+     hover title: a phone and a screen reader get the same words a mouse does.
 - Source: Prompt Book D-1; audit PR-7 (vocabulary, confirmed-none, the grouped presentation, the
   graded editor and the content notes beside the list carried from proscenium)
 
@@ -94,6 +96,10 @@ Open questions:
      through content, numbers come from configuration instantly.
   5. The four pages the old estate carried migrate with their copy; the empty stagecraft
      collection and the commented-out technical specification are rewritten, not imported blank.
+  6. A page still flagged `placeholder` is reachable by its own address and linked from nowhere:
+     the header's links and the footer's columns both drop it. A stand-in sentence is never
+     written into front matter; an unwritten field is left absent, and the furniture it would have
+     filled does not render.
 - Source: Prompt Book D-1; committee direction 26 August (Nuxt Content with Studio-style
   editing); audit PR-1; Get-In part 2 (content pages: rebuild)
 
@@ -122,6 +128,12 @@ Open questions:
      from the run, choose tickets, give your details, with the order as a ticket stub beside them
      carrying the view's one marquee. The stub quotes the hold-release figure from configuration
      rather than saying "shortly before curtain".
+  8. The screen answers a screen reader as fully as it answers a mouse: a refusal to reserve is
+     announced where it appears and is named by the control it refuses; the night being booked
+     carries a word and not only a colour; each night in the picker says its own availability in
+     the same terms the show page uses; a signed-out visitor looking at a run that also prices a
+     member ticket is offered the way in to see it; and the confirmation names the address the
+     booking has been emailed to (D-108 criterion 2).
 - Source: Prompt Book D-2; audit PR-2; booking.png
 
 ## D-105: Capacity enforced by the database
@@ -258,6 +270,11 @@ Open questions:
      surface offers only the refund policy text and the box office contact (D-116).
   5. The booking's QR is unchanged by any edit (D-108): it retrieves the booking's current
      state, so nothing needs reissuing and nothing saved in a wallet goes stale.
+  6. The self-service screen offers no quantity the write path would refuse: each ticket type is
+     priced and capped at the order cap (D-104 criterion 2). Cancelling is the screen's one
+     destructive action and opens `ConfirmModal` with the booking named on its button; the way
+     out of an edit or an exchange form is `CONFIRM_BACK_LABEL`, so no bare "Cancel" sits beside
+     a "Cancel booking" meaning something else.
 - Source: Prompt Book D-4; audit PR-3
 
 ## D-111: Self-service exchange to another performance
@@ -277,6 +294,8 @@ Open questions:
   4. The exchange is recorded on the reservation history, the e-ticket re-issues and the old QR
      invalidates.
   5. Exchange to a different show is refused; that path is cancel and rebook.
+  6. Every night offered is named by its date and time first, in the short London form lists use,
+     with the venue and the availability beside it: a venue and a state alone name no night.
 - Source: Prompt Book D-4; audit PR-3 (edit-while-PENDING carried, exchange is new)
 
 ## D-112: Booking window per performance
@@ -319,6 +338,10 @@ Open questions:
      says so on the page, on both the leave page and the entry page's own leave button.
   5. The desk sees the list's length and next entries on the performance screen, and can offer to
      the list manually.
+  6. The join screen names the show and the night it is a list for before it asks for anything,
+     and validates its own fields in house copy rather than sending blanks for the server to
+     refuse. The entry screen says a claim takes the whole party before the reader tries it, and
+     leaving is a named confirmation stating what follows, never one click.
 - Source: Prompt Book D-1, D-2, D-5; audit PR-15 (no predecessor: new behaviour)
 
 ## D-114: Desk search and collection with expected-total cross-check

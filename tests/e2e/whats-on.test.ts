@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, openSignedOutView, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -628,4 +628,94 @@ describe.skipIf(skip !== null)('the box office console administers the vocabular
     })
     expect(again.status).toBe(409)
   })
+})
+
+// Issue 1152 item 7, J-111 criterion 19, and item 4's two findings on the show page.
+describe.skipIf(skip !== null)('the public pages say which nothing they mean (J-111 criterion 19)', () => {
+  function namedVenue(name: string): string {
+    const database = new Database(app.databaseFile)
+    try {
+      return testVenue(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8), capacity: 40, name }).id
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  test('a venue filter that empties the listing says so and offers to clear it', async () => {
+    const other = named('The Studio')
+    const otherVenueId = namedVenue(other)
+    await publishedShow({ title: named('Ivanov') })
+    const elsewhere = await newShow({ title: named('Three Sisters') })
+    await addPerformance(elsewhere.id, { venueId: otherVenueId })
+    await publish(elsewhere.id)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/whats-on`, '[data-test="whats-on-page"]')
+      await waitFor(view, `document.querySelector('[data-test="show-${elsewhere.slug}"]') !== null`)
+
+      // The run comes off sale while the page is open, so the filter now empties the list.
+      expect((await send('POST', `/api/admin/shows/${elsewhere.id}/publish`, { published: false })).status).toBe(200)
+
+      await click(view, `#venue-${slugged(other)}`)
+      await waitFor(view, `document.querySelector('[data-test="whats-on-filtered-empty"]') !== null`)
+
+      const says = await textOf(view, '[data-test="whats-on-filtered-empty"]')
+      expect(says).toContain(other)
+      expect(says).not.toContain('Nothing is on sale at the moment')
+
+      await click(view, '[data-test="whats-on-clear-venue"]')
+      await waitFor(view, `document.querySelector('[data-test="whats-on-filtered-empty"]') === null`)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a content warning carries its description as text, not as a hover title', async () => {
+    const show = await publishedShow({ title: named('Woyzeck') })
+    const slug = `stage-blood-${crypto.randomUUID().slice(0, 8)}`
+    const description = 'Blood is used on stage in the second half.'
+    const created = await send('POST', '/api/admin/content-warnings', {
+      slug, title: 'Stage blood', kind: 'GENERAL', description, icon: 'i-lucide-flame',
+    })
+    expect(created.status).toBe(200)
+    const warningId = (await created.json() as { id: string }).id
+
+    expect((await send('PUT', `/api/admin/shows/${show.id}/warnings`, {
+      confirmedNone: false,
+      warnings: [{ warningId, level: 'DEPICTED' }],
+    })).status).toBe(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/shows/${show.slug}`, '[data-test="show-page"]')
+      await waitFor(view, `document.querySelector('[data-test="warning-${slug}"]') !== null`)
+
+      expect(await textOf(view, `[data-test="warning-${slug}"]`)).toContain(description)
+      const hovered = await view.evaluate<number>(`document.querySelectorAll('[data-test="warnings-list"] [title]').length`)
+      expect(hovered).toBe(0)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the four practical facts stand in one column on a phone', async () => {
+    const show = await publishedShow({ title: named('The Cherry Orchard') })
+
+    const view = await openView({ width: 390, height: 844 })
+    try {
+      await visit(view, `${app.baseURL}/shows/${show.slug}`, '[data-test="show-page"]')
+      const columns = await view.evaluate<number>(`(() => {
+        const facts = document.querySelector('[data-test="show-dates"]').closest('dl')
+        return getComputedStyle(facts).gridTemplateColumns.split(' ').length
+      })()`)
+      expect(columns).toBe(1)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
 })

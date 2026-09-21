@@ -15,6 +15,7 @@ import {
   reservationForm,
   reservationResendForm,
   sameNightReason,
+  saysExchangeNight,
   ticketEditDelta,
   totalTickets,
 } from '#shared/utils/reservations'
@@ -336,5 +337,29 @@ describe('an exchange into the performance already held is not a real exchange',
 
   test('the same performance is refused', () => {
     expect(sameNightReason('perf-1', 'perf-1')).not.toBeNull()
+  })
+})
+
+// Issue 1152 item 5: the exchange list offered "The Test House: Tickets available" with no date,
+// so a booker picked a night by guessing which radio was which.
+describe('a night in the exchange list is named by its date (D-111 criterion 1)', () => {
+  // 14 October 2026, 19:30 London.
+  const AT = Math.floor(new Date('2026-10-14T18:30:00Z').getTime() / 1000)
+
+  test('the label is the short London form, and the venue and state sit under it', () => {
+    const said = saysExchangeNight({ startsAt: AT, venueName: 'The New Theatre', says: 'Tickets available' })
+    expect(said.label).toBe('Wed 14 Oct, 19:30')
+    expect(said.description).toBe('The New Theatre · Tickets available')
+  })
+
+  test('a night in the small hours reads as the London date, not the UTC one', () => {
+    const late = Math.floor(new Date('2026-06-30T23:30:00Z').getTime() / 1000)
+    expect(saysExchangeNight({ startsAt: late, venueName: 'Studio', says: 'Sold out' }).label).toBe('Wed 1 Jul, 00:30')
+  })
+
+  test('two nights of the same run never share a label', () => {
+    const first = saysExchangeNight({ startsAt: AT, venueName: 'The New Theatre', says: 'Tickets available' })
+    const second = saysExchangeNight({ startsAt: AT + 86_400, venueName: 'The New Theatre', says: 'Tickets available' })
+    expect(first.label).not.toBe(second.label)
   })
 })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
+import { partySizeMismatchReason } from '#shared/utils/waiting-list'
 
 // Where a waiting-list link opens: WAITING says so, OFFERED lets it be claimed (D-113 criteria
 // 2, 4), and CLAIMED, LAPSED and REMOVED are terminal states with nothing left to do here.
@@ -44,7 +45,12 @@ const lines = computed(() => Object.entries(quantities)
 
 const requested = computed(() => lines.value.reduce((total, line) => total + line.quantity, 0))
 
+// Criterion 2 commits the claim to the whole party, so the screen says the rule rather than
+// leaving a disabled button to imply it.
+const mismatch = computed(() => partySizeMismatchReason(requested.value, data.value?.partySize ?? 0))
+
 const submitting = ref(false)
+const leaving = ref(false)
 const removing = ref(false)
 const notice = ref<string | null>(null)
 const confirmation = ref<Confirmation | null>(null)
@@ -52,6 +58,10 @@ const removed = ref(false)
 
 async function claim(): Promise<void> {
   notice.value = null
+  if (mismatch.value) {
+    notice.value = mismatch.value
+    return
+  }
   submitting.value = true
   try {
     confirmation.value = await $fetch<Confirmation>(`/api/waiting-list/${token.value}/claim`, {
@@ -68,22 +78,31 @@ async function claim(): Promise<void> {
   }
 }
 
+const leaveFailure = ref<string | null>(null)
+
 async function leave(): Promise<void> {
-  notice.value = null
+  leaveFailure.value = null
   removing.value = true
   try {
     await $fetch(`/api/waiting-list/${token.value}/remove`, { method: 'POST' })
+    leaving.value = false
     removed.value = true
   }
   catch {
     // The route refuses a forged, rotated or purged token alike, and cannot tell them apart:
     // one sentence covers all three without guessing which happened.
-    notice.value = 'That link has already been used or is no longer valid.'
+    leaveFailure.value = 'That link has already been used or is no longer valid.'
   }
   finally {
     removing.value = false
   }
 }
+
+// An offer standing right now costs the next person their turn; a plain place on the list does
+// not, so the consequence says which it is (D-113 criteria 3 and 6).
+const leaveConsequence = computed(() => (data.value?.status === 'OFFERED'
+  ? 'The seat held for you goes to the next person on the list, and this link stops working.'
+  : 'Your place on the list goes, and we stop emailing you about this performance.'))
 
 useSeoMeta({ title: 'Your waiting-list entry' })
 </script>
@@ -139,8 +158,17 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         variant="subtle"
         icon="i-lucide-clock"
         title="A seat is free"
-        :description="`Held for you until ${formatLondon(new Date(data!.offerExpiresAt * 1000), { dateStyle: 'full', timeStyle: 'short' })}. Choose ${data!.partySize === 1 ? '1 ticket' : `${data!.partySize} tickets`} to claim it.`"
+        :description="`Held for you until ${formatLondon(new Date(data!.offerExpiresAt * 1000), { dateStyle: 'full', timeStyle: 'short' })}.`"
       />
+
+      <p
+        class="text-sm text-muted"
+        data-test="waiting-list-claim-rule"
+      >
+        An offer covers the whole party, so choose
+        {{ data!.partySize === 1 ? '1 ticket' : `all ${data!.partySize} tickets` }} to claim it.
+        Give seats back afterwards from your booking, or leave the list below.
+      </p>
 
       <UAlert
         v-if="notice"
@@ -183,7 +211,6 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         </p>
         <UButton
           :loading="submitting"
-          :disabled="requested !== data!.partySize"
           data-test="waiting-list-claim-submit"
           @click="claim"
         >
@@ -194,9 +221,8 @@ useSeoMeta({ title: 'Your waiting-list entry' })
       <UButton
         variant="link"
         color="neutral"
-        :loading="removing"
         data-test="waiting-list-leave"
-        @click="leave"
+        @click="leaving = true"
       >
         Leave the waiting list instead
       </UButton>
@@ -214,19 +240,11 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         title="Still on the list"
         description="We'll email you the moment a seat frees up."
       />
-      <UAlert
-        v-if="notice"
-        color="error"
-        variant="subtle"
-        :description="notice"
-        data-test="waiting-list-leave-notice"
-      />
       <UButton
         variant="link"
         color="neutral"
-        :loading="removing"
         data-test="waiting-list-leave"
-        @click="leave"
+        @click="leaving = true"
       >
         Leave the waiting list
       </UButton>
@@ -247,5 +265,16 @@ useSeoMeta({ title: 'Your waiting-list entry' })
             : 'You already left this waiting list.'"
       />
     </div>
+
+    <ConfirmModal
+      v-model:open="leaving"
+      name="leave-waiting-list"
+      title="Leave the waiting list"
+      verb="Leave the waiting list"
+      :consequence="leaveConsequence"
+      :loading="removing"
+      :failure="leaveFailure"
+      @confirm="leave"
+    />
   </UContainer>
 </template>

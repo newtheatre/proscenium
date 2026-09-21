@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { backupDrillsList } from '#shared/utils/backup-drills-list'
 import { restoreDrillForm } from '#shared/utils/backup'
+import { saysDay } from '#shared/utils/when'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { RestoreDrillForm } from '#shared/utils/backup'
 
@@ -88,7 +89,12 @@ async function record(event: FormSubmitEvent<RestoreDrillForm>): Promise<void> {
 watch(query, load)
 
 const columns: TableColumn<Drill>[] = [
-  { accessorKey: 'ranAt', header: 'Ran', meta: { class: { td: 'font-mono text-sm whitespace-nowrap' } } },
+  {
+    id: 'ranAt',
+    header: 'Ran',
+    cell: ({ row }) => saysDay(row.original.ranAt),
+    meta: { class: { td: 'text-sm whitespace-nowrap' } },
+  },
   { accessorKey: 'outcome', header: 'Outcome' },
   { accessorKey: 'operatorName', header: 'Operator' },
   { accessorKey: 'timeToRestoreMinutes', header: 'Minutes to restore' },
@@ -138,7 +144,7 @@ onMounted(load)
           data-test="drill-current"
           class="text-sm text-muted"
         >
-          Last passing drill: {{ status.lastDrillAt ?? 'never' }}.
+          Last passing drill: {{ status.lastDrillAt ? saysDay(status.lastDrillAt) : 'never' }}.
           <span v-if="status.lastDrillOutcome === 'FAIL'"> The most recent attempt failed and is not counted.</span>
         </p>
       </template>
@@ -203,8 +209,8 @@ onMounted(load)
         :key="drillRow.id"
         class="rounded-lg border border-default p-3 text-sm"
       >
-        <div class="flex items-center justify-between gap-2 font-mono">
-          <span>{{ drillRow.ranAt }}</span>
+        <div class="flex items-center justify-between gap-2">
+          <span>{{ saysDay(drillRow.ranAt) }}</span>
           <UBadge
             :color="drillRow.outcome === 'PASS' ? 'success' : 'error'"
             variant="subtle"

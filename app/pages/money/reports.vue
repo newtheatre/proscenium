@@ -9,7 +9,7 @@ interface ShowOption { id: string, title: string, status: string }
 
 const request = useRequestFetch()
 
-const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+const today = londonDay(new Date())
 const scopeKind = ref<'SHOW' | 'PERIOD'>('PERIOD')
 const showId = ref<string | undefined>(undefined)
 const from = ref(today)

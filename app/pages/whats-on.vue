@@ -88,8 +88,28 @@ const flagged = computed(() => data.value.items.find(listed => listingFlag(liste
         />
       </div>
 
+      <!-- Two different nothings: the season having nothing in it, and this filter having emptied
+           a season that does (J-111 criterion 19). -->
+      <div
+        v-if="status !== 'pending' && data.items.length === 0 && wanted"
+        data-test="whats-on-filtered-empty"
+      >
+        <p class="text-muted">
+          Nothing is on at {{ wanted }} at the moment. Other venues have shows on sale.
+        </p>
+        <UButton
+          class="mt-3"
+          variant="subtle"
+          size="sm"
+          data-test="whats-on-clear-venue"
+          @click="venue = ALL_VENUES"
+        >
+          Show every venue
+        </UButton>
+      </div>
+
       <p
-        v-if="status !== 'pending' && data.items.length === 0"
+        v-else-if="status !== 'pending' && data.items.length === 0"
         class="text-muted"
         data-test="whats-on-empty"
       >

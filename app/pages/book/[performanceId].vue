@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatLondon } from '#shared/utils/london'
+import { saysNightLine } from '#shared/utils/programme'
 import { overCapReason } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 
@@ -49,9 +50,11 @@ interface RunPerformance {
   startsAt: number
   venueName: string
   availability: 'AVAILABLE' | 'LIMITED' | 'SOLD_OUT' | 'BOOKING_CLOSED'
+  remaining: number | null
   says: string
   cancelled: boolean
   externalBookingUrl: string | null
+  prices: { name: string, price: number, restrictedTo: string | null }[]
 }
 
 const route = useRoute()
@@ -70,6 +73,18 @@ const { account } = useAccount()
 const { data: run } = await useFetch<{ performances: RunPerformance[] }>(() => `/api/shows/${data.value?.show.slug ?? ''}`)
 
 const nights = computed(() => (run.value?.performances ?? []).filter(one => !one.cancelled && !one.externalBookingUrl))
+
+// The venue is only worth a line where the run moves between them; otherwise the header has
+// already said it once (D-104 criterion 8).
+const acrossVenues = computed(() => new Set(nights.value.map(one => one.venueName)).size > 1)
+
+// A member price the server has not offered this caller, because they are signed out: the listing
+// prices the whole run publicly, so the page can say it exists without ever quoting it (D-109).
+const memberPrice = computed(() => {
+  if (account.value.signedIn) return false
+  const tonight = (run.value?.performances ?? []).find(one => one.id === performanceId.value)
+  return (tonight?.prices ?? []).some(price => price.restrictedTo === 'MEMBER')
+})
 
 const quantities = reactive<Record<string, number>>(
   Object.fromEntries(data.value.ticketTypes.map(type => [type.id, 0])),
@@ -113,10 +128,21 @@ const nightWhen = (at: number): string =>
 const guestName = ref('')
 const guestEmail = ref('')
 
+// Where the confirmation went, kept from the request rather than read back, so the screen names
+// the same address the email was addressed to (D-108 criterion 2).
+const sentTo = ref<string | null>(null)
+
 const submitting = ref(false)
 const notice = ref<string | null>(null)
 const externalUrl = ref<string | null>(null)
 const confirmation = ref<Confirmation | null>(null)
+
+// The reserve button owns both refusals, so a reader who lands on it hears why it will not do
+// what it says rather than finding the sentence in a card footer they never reach (K-101).
+const describedBy = computed(() => [
+  notice.value ? 'booking-refusal' : null,
+  capReason.value ? 'booking-cap' : null,
+].filter(Boolean).join(' ') || undefined)
 
 // Field-level, in the house's words: the server's own "Invalid request: guest.email" never
 // reaches a reader, and neither does a Zod default (K-128, docs/copy-style.md).
@@ -164,6 +190,7 @@ async function book(): Promise<void> {
     if (!account.value.signedIn) body.guest = { name: guestName.value.trim(), email: guestEmail.value.trim() }
 
     const result = await $fetch<Confirmation>('/api/reservations', { method: 'POST', body })
+    sentTo.value = body.guest?.email ?? account.value.user?.email ?? null
     confirmation.value = result
   }
   catch (error) {
@@ -238,6 +265,14 @@ useSeoMeta({
         title="Reservation held"
         :description="`Reference ${confirmation.reference}. Pay ${saysPrice(confirmation.totalPence)} at the box office on the night; this reservation is unpaid until then.`"
       />
+      <p
+        v-if="sentTo"
+        class="text-sm text-muted"
+        data-test="booking-emailed"
+      >
+        We have emailed the reference and your QR code to {{ sentTo }}. Bring either one to the
+        box office.
+      </p>
       <div class="flex flex-wrap gap-2">
         <UButton
           :to="`/qr/${confirmation.qrToken}`"
@@ -378,14 +413,20 @@ useSeoMeta({
               :aria-current="night.id === performanceId ? 'page' : undefined"
               :data-test="`night-${night.id}`"
             >
-              <p class="font-medium">
-                {{ nightWhen(night.startsAt) }}
+              <p class="flex flex-wrap items-baseline gap-x-2 font-medium">
+                <span>{{ nightWhen(night.startsAt) }}</span>
+                <!-- The chosen night is marked by a word as well as by its border, because a
+                     border is a colour and state is never only a colour (K-101 criterion 3). -->
+                <span
+                  v-if="night.id === performanceId"
+                  class="font-mono text-xs uppercase tracking-wide text-primary"
+                >Booking this night</span>
               </p>
               <p
                 class="text-sm"
                 :class="night.availability === 'LIMITED' ? 'text-gold-700 dark:text-gold-400' : 'text-muted'"
               >
-                {{ night.availability === 'SOLD_OUT' ? 'Full' : night.availability === 'AVAILABLE' ? night.venueName : night.says }}
+                {{ saysNightLine(night, acrossVenues) }}
               </p>
             </NuxtLink>
           </div>
@@ -395,6 +436,25 @@ useSeoMeta({
           <h2 class="nnt-headline text-xl">
             {{ nights.length > 1 ? '2' : '1' }} · Tickets
           </h2>
+
+          <div
+            v-if="memberPrice"
+            class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-elevated p-4"
+            data-test="member-prices"
+          >
+            <p class="text-sm">
+              Current members pay less for this performance. The prices below are the ones anybody
+              can book.
+            </p>
+            <UButton
+              :to="`/sign-in?next=${encodeURIComponent(`/book/${performanceId}`)}`"
+              variant="subtle"
+              size="sm"
+              class="shrink-0"
+            >
+              Sign in for member prices
+            </UButton>
+          </div>
 
           <ul class="mt-4 divide-y divide-default">
             <li
@@ -539,28 +599,45 @@ useSeoMeta({
         </p>
 
         <template #footer>
-          <UAlert
-            v-if="notice"
-            class="mb-3"
-            color="error"
-            variant="subtle"
-            :description="notice"
-            data-test="booking-notice"
-          />
-          <UAlert
-            v-if="capReason"
-            class="mb-3"
-            color="warning"
-            variant="subtle"
-            :description="capReason"
-            data-test="booking-over-cap"
-          />
+          <!-- Rendered whether or not it holds anything, so a refusal that appears later is
+               announced rather than arriving in a region the reader's software never saw. -->
+          <div
+            role="alert"
+            aria-live="polite"
+            data-test="booking-live"
+          >
+            <div
+              v-if="notice"
+              id="booking-refusal"
+              data-test="booking-notice"
+            >
+              <UAlert
+                class="mb-3"
+                color="error"
+                variant="subtle"
+                :description="notice"
+              />
+            </div>
+            <div
+              v-if="capReason"
+              id="booking-cap"
+              data-test="booking-over-cap"
+            >
+              <UAlert
+                class="mb-3"
+                color="warning"
+                variant="subtle"
+                :description="capReason"
+              />
+            </div>
+          </div>
           <UButton
             variant="marquee"
             size="lg"
             block
             :loading="submitting"
-            :disabled="lines.length === 0 || capReason !== null"
+            :disabled="capReason !== null"
+            :aria-describedby="describedBy"
             data-test="booking-submit"
             @click="book"
           >

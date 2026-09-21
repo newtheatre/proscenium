@@ -25,14 +25,22 @@ const PAGES = [
   { path: '/technical-specification', title: 'Technical specification' },
 ]
 
+// Get involved is written: its hero, its tiles and its steps are the page, and the home page and
+// the error page both offer it. The other three are still the committee's to write.
+const UNWRITTEN = PAGES.filter(page => page.path !== '/get-involved')
+
 describe.skipIf(skip !== null)('editorial pages render from content markdown (D-103)', () => {
   for (const { path, title } of PAGES) {
-    test(`${path} renders and states it awaits committee copy`, async () => {
+    test(`${path} renders`, async () => {
       const response = await fetch(`${app.baseURL}${path}`)
       expect(response.status).toBe(200)
-      const html = await response.text()
-      expect(html).toContain(title)
-      expect(html).toContain('Awaiting committee copy')
+      expect(await response.text()).toContain(title)
+    })
+  }
+
+  for (const { path } of UNWRITTEN) {
+    test(`${path} states that it awaits committee copy`, async () => {
+      expect(await (await fetch(`${app.baseURL}${path}`)).text()).toContain('Awaiting committee copy')
     })
   }
 
@@ -41,11 +49,23 @@ describe.skipIf(skip !== null)('editorial pages render from content markdown (D-
     expect(response.status).toBe(404)
   })
 
-  test('the public nav links to all four pages', async () => {
+  // D-103 criterion 6: neither end of the shell links a page awaiting copy. The pages stay
+  // reachable by address, which is how an editor previews one.
+  test('neither the header nor the footer links a page that still awaits committee copy', async () => {
     const html = await (await fetch(`${app.baseURL}/`)).text()
-    for (const { path } of PAGES) {
-      expect(html).toContain(`href="${path}"`)
+    const footer = html.slice(html.indexOf('data-test="footer-links"'))
+    const header = html.slice(0, html.indexOf('data-test="footer-links"'))
+
+    for (const { path } of UNWRITTEN) {
+      expect(`footer ${path}: ${footer.includes(`href="${path}"`)}`).toBe(`footer ${path}: false`)
+      expect(`header ${path}: ${header.includes(`href="${path}"`)}`).toBe(`header ${path}: false`)
     }
+
+    // The written pages are still reached from both ends.
+    expect(header).toContain('href="/get-involved"')
+    expect(footer).toContain('href="/get-involved"')
+    expect(footer).toContain('href="/policies/booking"')
+    expect(footer).toContain('href="/whats-on"')
   })
 })
 
@@ -97,7 +117,7 @@ describe.skipIf(skip !== null)('an editorial page reads as a column, not as a wa
 
   // J-111: get-involved is a landing page rather than a reading column, and everything on it is
   // drawn from the content file rather than written into the Vue.
-  test('get-involved lays out its departments, its steps and its quote', async () => {
+  test('get-involved lays out its departments and its steps, and holds its quote back', async () => {
     const view = await openSignedOutView(app.baseURL)
     try {
       await visit(view, `${app.baseURL}/get-involved`, '[data-test="get-involved"]')
@@ -115,10 +135,13 @@ describe.skipIf(skip !== null)('an editorial page reads as a column, not as a wa
 
       expect(counts.departments).toBeGreaterThan(3)
       expect(counts.steps).toBe(3)
-      expect(counts.quote).toBe(1)
+      // No quote in the front matter and so no band: nobody is quoted until somebody has said it
+      // (D-103 criterion 6).
+      expect(counts.quote).toBe(0)
       expect(counts.join).toBeGreaterThan(0)
-      // The placeholder treatment stays until the committee's words land (D-103 criterion 5).
-      expect(counts.placeholder).toBe(1)
+      // The page's own furniture is written, so the page-level placeholder treatment is gone; its
+      // prose sections still say what belongs under them (J-111 criterion 18).
+      expect(counts.placeholder).toBe(0)
       for (const element of ['marquee', 'sticker', 'spotlight']) {
         expect(`${element}: ${counts[element]! <= 1}`).toBe(`${element}: true`)
       }
@@ -128,12 +151,15 @@ describe.skipIf(skip !== null)('an editorial page reads as a column, not as a wa
     }
   }, CASE_TIMEOUT_MS)
 
-  test('the landing page still renders the sections the committee will fill', async () => {
+  // D-103 criterion 6: the body is empty until the committee writes it, and an empty body is no
+  // column, no heading and no gap rather than four headings over stand-in sentences.
+  test('the landing page renders no prose column while its body is empty', async () => {
     const html = await (await fetch(`${app.baseURL}/get-involved`)).text()
-    for (const heading of ['Joining', 'On stage', 'Off stage', 'Training']) {
-      expect(html).toContain(heading)
+    expect(html).not.toContain('data-test="content-body"')
+    expect(html).not.toContain('Awaiting committee copy')
+    for (const heading of ['Joining', 'On stage', 'Off stage']) {
+      expect(`${heading}: ${html.includes(`>${heading}<`)}`).toBe(`${heading}: false`)
     }
-    expect(html).toContain('Awaiting committee copy')
   })
 
   test('a long policy page carries a table of contents', async () => {

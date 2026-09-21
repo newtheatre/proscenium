@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { can, closeFinancePeriods, reopenFinancePeriods } from '#shared/utils/abilities'
 import { hasBlockingConditions } from '#shared/utils/period-locks'
-import { formatLondon } from '#shared/utils/london'
+import { saysDay, saysWhen } from '#shared/utils/when'
 import type { TableColumn } from '@nuxt/ui'
 import type { BlockingConditions, Period, PeriodLock } from '#shared/utils/period-locks'
 
@@ -94,7 +94,7 @@ async function confirmClose(): Promise<void> {
       method: 'POST',
       body: { fromDay: fromDay.value, toDay: toDay.value, label: label.value.trim() || undefined },
     })
-    toast.add({ title: 'Period closed', description: `${fromDay.value} to ${toDay.value} is now closed.`, icon: 'i-lucide-lock', color: 'success' })
+    toast.add({ title: 'Period closed', description: `${saysDay(fromDay.value)} to ${saysDay(toDay.value)} is now closed.`, icon: 'i-lucide-lock', color: 'success' })
     closeOpen.value = false
     await refresh()
   }
@@ -166,7 +166,7 @@ async function confirmReopen(): Promise<void> {
       method: 'POST',
       body: { confirmFromDay: confirmFromDay.value, confirmToDay: confirmToDay.value },
     })
-    toast.add({ title: 'Period reopened', description: `${reopenTarget.value.fromDay} to ${reopenTarget.value.toDay} is open again.`, icon: 'i-lucide-lock-open', color: 'success' })
+    toast.add({ title: 'Period reopened', description: `${saysDay(reopenTarget.value.fromDay)} to ${saysDay(reopenTarget.value.toDay)} is open again.`, icon: 'i-lucide-lock-open', color: 'success' })
     reopenTarget.value = null
     await refresh()
   }
@@ -224,7 +224,7 @@ async function confirmReopen(): Promise<void> {
         :key="one.id"
         class="text-sm text-muted"
       >
-        {{ one.label }}: {{ one.fromDay }} to {{ one.toDay }}, named by {{ one.createdByName }}
+        {{ one.label }}: {{ saysDay(one.fromDay) }} to {{ saysDay(one.toDay) }}, named by {{ one.createdByName }}
       </p>
     </section>
 
@@ -235,7 +235,7 @@ async function confirmReopen(): Promise<void> {
       :columns="columns"
     >
       <template #range-cell="{ row }">
-        {{ row.original.fromDay }} to {{ row.original.toDay }}
+        {{ saysDay(row.original.fromDay) }} to {{ saysDay(row.original.toDay) }}
       </template>
       <template #label-cell="{ row }">
         {{ row.original.label ?? 'None' }}
@@ -249,7 +249,7 @@ async function confirmReopen(): Promise<void> {
         </UBadge>
       </template>
       <template #actor-cell="{ row }">
-        {{ row.original.actorName }}, {{ formatLondon(new Date(row.original.createdAt * 1000), { dateStyle: 'short', timeStyle: 'short' }) }}
+        {{ row.original.actorName }}, {{ saysWhen(row.original.createdAt) }}
       </template>
       <template #act-cell="{ row }">
         <UButton
@@ -425,7 +425,7 @@ async function confirmReopen(): Promise<void> {
             :description="reopenFailure"
           />
           <p class="text-sm">
-            Reopening <span class="font-medium">{{ reopenTarget.fromDay }} to {{ reopenTarget.toDay }}</span>.
+            Reopening <span class="font-medium">{{ saysDay(reopenTarget.fromDay) }} to {{ saysDay(reopenTarget.toDay) }}</span>.
             Nothing else here is undone.
           </p>
           <UFormField :label="`Type ${reopenTarget.fromDay} to confirm the start`">

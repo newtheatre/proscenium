@@ -90,7 +90,7 @@ async function create(): Promise<void> {
 
 const mayExport = computed(() => can(useViewer().value, exportTickets))
 
-const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+const today = londonDay(new Date())
 const exportFrom = ref(today)
 const exportTo = ref(today)
 

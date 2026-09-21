@@ -12,6 +12,10 @@ if (!page.value) {
 const departments = computed(() => page.value?.departments ?? [])
 const steps = computed(() => page.value?.steps ?? [])
 
+// The furniture above is the page until the committee writes prose; a body with nothing in it
+// renders nothing at all rather than an empty column (D-103 criterion 6).
+const prose = computed(() => (page.value?.body?.value?.length ?? 0) > 0)
+
 // Joining is a membership, so a member goes to their own record and everybody else starts with
 // an account. The home page's invitation lands here and this is the step after it.
 const joinTo = computed(() => (account.value.signedIn ? '/account/membership' : '/register'))
@@ -137,7 +141,8 @@ useSchemaOrg([
       </section>
     </UContainer>
 
-    <!-- The view's one spotlight. A member's own words, once the committee has chosen whose. -->
+    <!-- The view's one spotlight. No quote in the front matter is no band: a stand-in sentence is
+         never written there in the first place (D-103 criterion 6). -->
     <div
       v-if="page!.quote"
       class="dark nnt-spotlight"
@@ -158,7 +163,10 @@ useSchemaOrg([
       </UContainer>
     </div>
 
-    <UContainer class="py-16">
+    <UContainer
+      v-if="prose"
+      class="py-16"
+    >
       <UPage>
         <UPageBody
           class="max-w-prose"

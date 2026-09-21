@@ -183,3 +183,34 @@ describe('printing takes the pass alone, light on white (K-102)', () => {
     expect(print).toContain('color-scheme: light')
   })
 })
+
+// The member and public shells, the console's half of the same rule being in
+// admin-conventions.test.ts. A locale format takes the runtime's zone, which is UTC (0014).
+const LOCALE_FORMAT = /\.toLocale(?:Date|Time)?String\(/
+const CONSOLE_LAYOUT = /layout:\s*['"`]console['"`]/
+
+// Machine values a reader never sees. The list may shrink and may not grow.
+const MEMBER_RAW_DATES: string[] = []
+
+describe('a date off the console is read in London (K-127, K-128, issue 1153 item 2)', () => {
+  test('no member or public file formats a date by locale', async () => {
+    const found: string[] = []
+    for (const file of await appFiles()) {
+      const source = await Bun.file(file).text()
+      if (CONSOLE_LAYOUT.test(source) || MEMBER_RAW_DATES.includes(file)) continue
+      if (LOCALE_FORMAT.test(source)) found.push(file)
+    }
+    expect(found).toEqual([])
+  })
+
+  test('no member or public page puts an ISO instant on the page', async () => {
+    const found: string[] = []
+    for (const file of await appFiles()) {
+      const source = await Bun.file(file).text()
+      if (CONSOLE_LAYOUT.test(source)) continue
+      const start = source.search(/^<template>$/m)
+      if (start !== -1 && source.slice(start).includes('toISOString(')) found.push(file)
+    }
+    expect(found).toEqual([])
+  })
+})
