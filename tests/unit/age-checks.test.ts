@@ -3,6 +3,7 @@ import {
   AGE_CHECK_CONSTRAINT_REFUSALS,
   ageCheckConstraintRefusal,
   ageCheckForm,
+  ageCheckReady,
   inlineAgeCheckForm,
   saysIdType,
   saysOutcome,
@@ -117,5 +118,28 @@ describe('a constraint violation is a handled refusal (0047)', () => {
     for (const refusal of AGE_CHECK_CONSTRAINT_REFUSALS) expect(refusal.says.length).toBeGreaterThan(10)
     const violated = AGE_CHECK_CONSTRAINT_REFUSALS.map(refusal => refusal.violated)
     expect(violated.length).toBe(new Set(violated).size)
+  })
+})
+
+// The routine case is a check that passed on an ID shown, and the standalone form must be able to
+// tell when it has that and nothing more is owed (E-118 criterion 1, issue 1150 item 13).
+describe('when the register has what it needs (E-118 criterion 1)', () => {
+  const accepted = { outcome: 'ACCEPTED' as const, idType: 'PASSPORT' as const, reason: null, description: 'Tall man, grey coat' }
+
+  test('an accepted check with an ID and a description is ready', () => {
+    expect(ageCheckReady(accepted)).toBe(true)
+  })
+
+  test('an accepted check with no ID named is not', () => {
+    expect(ageCheckReady({ ...accepted, idType: null })).toBe(false)
+  })
+
+  test('a refusal needs its reason, and an ID type is not one', () => {
+    expect(ageCheckReady({ outcome: 'REFUSED', idType: null, reason: null, description: 'Tall man, grey coat' })).toBe(false)
+    expect(ageCheckReady({ outcome: 'REFUSED', idType: null, reason: 'NO_ID_SHOWN', description: 'Tall man, grey coat' })).toBe(true)
+  })
+
+  test('a description of whitespace is no description at all', () => {
+    expect(ageCheckReady({ ...accepted, description: '   ' })).toBe(false)
   })
 })
