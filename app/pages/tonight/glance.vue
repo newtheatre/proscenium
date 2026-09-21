@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysWarningLevel } from '#shared/utils/content-warnings'
 import { formatLondon } from '#shared/utils/london'
-import { groupedBoardCode, hubKpis, nightHeaderLine, passPressureAdvice, runningTimeLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, compApprovalLine, groupedBoardCode, housePercentLine, hubKpis, nightHeaderLine, passPressureAdvice, runningTimeLine, saysSeatsLeft } from '#shared/utils/night-hub'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { saysShiftRole } from '#shared/utils/rota'
 import { saysPrice } from '#shared/utils/ticket-types'
@@ -106,6 +106,8 @@ const pendingComps = computed(() => [
 ])
 
 const deciding = ref<string | null>(null)
+const approving = ref<{ queue: 'TICKET' | 'BAR', id: string, line: string } | null>(null)
+const approveFailure = ref<string | null>(null)
 const declining = ref<{ queue: 'TICKET' | 'BAR', id: string } | null>(null)
 const declineReason = ref('')
 const declineFailure = ref<string | null>(null)
@@ -120,15 +122,26 @@ function houseOf(performanceId: string | null | undefined): string | null {
 const compRoute = (queue: 'TICKET' | 'BAR', id: string): string =>
   (queue === 'TICKET' ? `/api/box-office/desk/comp-requests/${id}` : `/api/till/comp-requests/${id}`)
 
-async function approveComp(queue: 'TICKET' | 'BAR', id: string): Promise<void> {
-  deciding.value = id
+// One tap gives money away, so the amount and who asked are read back first; declining already
+// stops for a reason, and this is the other half of that pair (issue 1150 item 10).
+function openApprove(queue: 'TICKET' | 'BAR', id: string, requestedByName: string, totalPence: number | null): void {
+  approving.value = { queue, id, line: compApprovalLine(requestedByName, totalPence) }
+  approveFailure.value = null
+}
+
+async function approveComp(): Promise<void> {
+  const target = approving.value
+  if (!target) return
+  deciding.value = target.id
+  approveFailure.value = null
   try {
-    await $fetch(`${compRoute(queue, id)}/approve`, { method: 'POST' })
+    await $fetch(`${compRoute(target.queue, target.id)}/approve`, { method: 'POST' })
     toast.add({ title: 'Comp approved', icon: 'i-lucide-check', color: 'success' })
+    approving.value = null
     if (selectedId.value) await loadComps(selectedId.value)
   }
   catch (refused) {
-    toast.add({ title: 'Not approved', description: refusalText(refused), icon: 'i-lucide-triangle-alert', color: 'error' })
+    approveFailure.value = refusalText(refused)
   }
   finally {
     deciding.value = null
@@ -164,6 +177,10 @@ setNightSubject(() => ({
   title: selected.value?.showTitle ?? 'Tonight',
   meta: selected.value ? nightHeaderLine(selected.value.startsAt, selected.value.venueName) : null,
 }))
+
+// `/api/tonight/duty-manager` answers only a duty manager, so an answer is the fact that this
+// viewer can close tonight; a door or bar shift gets the screen's own action instead (0009).
+const canClose = computed(() => data.value !== null)
 
 const guidance = computed(() => {
   const performance = selected.value
@@ -270,58 +287,43 @@ onUnmounted(() => {
           title="The numbers"
           data-test="glance-numbers"
         >
-          <div class="grid grid-cols-4 gap-1 text-center">
-            <div>
-              <p class="font-mono text-xl font-bold tabular-nums">
-                {{ kpis.sold }}
-              </p>
-              <p class="text-xs text-muted">
-                reserved
-              </p>
-            </div>
-            <div>
-              <p class="font-mono text-xl font-bold tabular-nums text-secondary">
-                {{ kpis.admitted }}
-              </p>
-              <p class="text-xs text-muted">
-                collected
-              </p>
-            </div>
-            <div>
-              <p class="font-mono text-xl font-bold tabular-nums">
-                {{ kpis.toCome }}
-              </p>
-              <p class="text-xs text-muted">
-                to come
-              </p>
-            </div>
-            <div>
-              <p class="font-mono text-xl font-bold tabular-nums text-success">
-                {{ kpis.seatsLeft === null ? '∞' : kpis.seatsLeft }}
-              </p>
-              <p class="text-xs text-muted">
-                walk-ups OK
-              </p>
-            </div>
+          <!-- The hub's own tiles and its own words: one duty manager reads both screens in one
+               interval, and a second vocabulary is a second house (issue 1150 item 10). -->
+          <div class="grid grid-cols-4 gap-1">
+            <NightKpi
+              :value="String(kpis.sold)"
+              :of="kpis.capacity === null ? null : String(kpis.capacity)"
+              :label="HUB_KPI_LABELS.sold"
+            />
+            <NightKpi
+              :value="String(kpis.admitted)"
+              :label="HUB_KPI_LABELS.admitted"
+              tone="gold"
+            />
+            <NightKpi
+              :value="String(kpis.toCome)"
+              :label="HUB_KPI_LABELS.toCome"
+            />
+            <NightKpi
+              :value="saysSeatsLeft(kpis.seatsLeft)"
+              :label="HUB_KPI_LABELS.seatsLeft"
+              tone="good"
+            />
           </div>
 
-          <template v-if="kpis.admittedPercent !== null">
-            <UProgress
-              :model-value="kpis.admittedPercent"
-              color="secondary"
-              size="md"
-              class="mt-4"
-              data-test="glance-progress"
-            />
-            <p class="mt-2 text-sm text-muted">
-              {{ kpis.admittedPercent }}% of house collected or expected
-            </p>
-          </template>
+          <UProgress
+            v-if="kpis.soldPercent !== null"
+            :model-value="kpis.soldPercent"
+            color="secondary"
+            size="md"
+            class="mt-4"
+            data-test="glance-progress"
+          />
           <p
-            v-else
-            class="mt-3 text-sm text-muted"
+            class="mt-2 text-sm text-muted"
+            data-test="glance-percent"
           >
-            This house is uncapped, so there is no percentage to read.
+            {{ housePercentLine(kpis.soldPercent) }}
           </p>
         </NightBlock>
 
@@ -374,9 +376,8 @@ onUnmounted(() => {
                 <UButton
                   color="secondary"
                   class="min-h-12"
-                  :loading="deciding === pending.request.id"
                   :data-test="`approve-comp-${pending.request.id}`"
-                  @click="approveComp(pending.queue, pending.request.id)"
+                  @click="openApprove(pending.queue, pending.request.id, pending.request.requestedByName, pending.priced?.totalPence ?? null)"
                 >
                   Approve
                 </UButton>
@@ -583,6 +584,48 @@ onUnmounted(() => {
     </div>
 
     <UModal
+      :open="approving !== null"
+      title="Approve this comp"
+      :description="approving?.line"
+      @update:open="approving = null"
+    >
+      <template #body>
+        <div
+          class="space-y-4"
+          data-test="approve-comp-form"
+        >
+          <UAlert
+            v-if="approveFailure"
+            data-test="approve-comp-failure"
+            color="error"
+            variant="subtle"
+            :description="approveFailure"
+          />
+
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              color="secondary"
+              class="min-h-12"
+              :loading="deciding !== null"
+              data-test="approve-comp-submit"
+              @click="approveComp()"
+            >
+              Approve the comp
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              class="min-h-12"
+              @click="approving = null"
+            >
+              Back
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
       :open="declining !== null"
       title="Decline this comp"
       description="The reason goes on the record and the person who asked sees it."
@@ -638,15 +681,22 @@ onUnmounted(() => {
 
     <template #actions>
       <NightAction
+        v-if="canClose"
         label="Close the night"
         icon="i-lucide-moon-star"
         color="neutral"
         variant="outline"
         :to="selectedId ? `/tonight/checklist?performanceId=${selectedId}` : '/tonight/checklist'"
       />
-      <p class="text-center text-xs text-muted">
-        Duty manager only: releases no-shows and sends the report.
-      </p>
+      <NightAction
+        v-else
+        label="Refresh the numbers"
+        icon="i-lucide-refresh-cw"
+        color="neutral"
+        variant="outline"
+        :loading="!asked"
+        @press="refresh()"
+      />
     </template>
   </NightScreen>
 </template>

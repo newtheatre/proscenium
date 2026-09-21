@@ -1,5 +1,6 @@
 import { formatLondon } from './london'
 import { plural } from './text'
+import { saysPrice } from './ticket-types'
 
 // What the show-night header and the hub's tiles read (E-112). Pure: the numbers and the wording
 // are decided here so one test holds them, and the screens only place them.
@@ -39,12 +40,12 @@ export interface HubKpis {
   admitted: number
   seatsLeft: number | null
   toCome: number
-  admittedPercent: number | null
+  soldPercent: number | null
 }
 
 // One duty manager reads the hub, the glance, the door and the till in one interval, so the three
 // house numbers carry one word each wherever they are placed (issue 1150 item 11).
-export const HUB_KPI_LABELS = { sold: 'sold', admitted: 'in', seatsLeft: 'seats left' } as const
+export const HUB_KPI_LABELS = { sold: 'sold', admitted: 'in', seatsLeft: 'seats left', toCome: 'to come' } as const
 
 /** An uncapped house in words a volunteer says out loud, never a symbol at arm's length. */
 export function saysSeatsLeft(seatsLeft: number | null): string {
@@ -61,8 +62,22 @@ export function hubKpis(house: HubHouse): HubKpis {
     admitted: house.admitted,
     seatsLeft: house.remaining,
     toCome: Math.max(0, house.sold - house.admitted),
-    admittedPercent: percent,
+    soldPercent: percent,
   }
+}
+
+// The bar under the numbers is sold over capacity, so it is the sold share it names: "collected"
+// is the next number along, and reading one for the other overstates the room (issue 1150 item 10).
+export function housePercentLine(soldPercent: number | null): string {
+  if (soldPercent === null) return 'This house is uncapped, so there is no percentage to read.'
+  return `${soldPercent}% of the house sold`
+}
+
+// Read back before the one tap that gives money away (D-117, F-110). A ticket comp prices nothing
+// here, so it says what it is rather than an amount of nought.
+export function compApprovalLine(requestedByName: string, totalPence: number | null): string {
+  const what = totalPence === null ? 'A ticket' : `${saysPrice(totalPence)} at the bar`
+  return `${what} for ${requestedByName}.`
 }
 
 export interface ChecklistPhaseEntry { phase: 'PRE' | 'POST', done: boolean }

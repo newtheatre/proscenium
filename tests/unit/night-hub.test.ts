@@ -177,8 +177,8 @@ describe('tonight\'s board code is read out, not read off (issue 905)', () => {
   })
 })
 
-// The bar under the numbers is sold over capacity, and the caption used to call it collected, which
-// is the next number along (issue 1150 item 10).
+// The bar under the numbers counts sold over capacity, so the caption names that and not
+// collected, which is the next number along (issue 1150 item 10).
 describe('the house percentage says what it counts (issue 1150 item 10)', () => {
   test('a capped house names the sold share in the one vocabulary', () => {
     expect(housePercentLine(71)).toBe('71% of the house sold')

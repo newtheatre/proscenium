@@ -165,7 +165,6 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
   }, CASE_TIMEOUT_MS)
 })
 
-
 // The pinned slot is the one thing a thumb finds in the dark, so it holds something this viewer
 // can actually do (K-102 criterion 2, issue 1150 items 10 and 14).
 describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 items 10, 14)', () => {
