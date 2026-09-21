@@ -424,6 +424,18 @@ const columns: TableColumn<TicketType>[] = [
               data-test="ticket-type-access"
             />
           </UFormField>
+          <UFormField
+            v-else
+            label="Access or companion"
+            description="Set when the type was added, and not changed afterwards."
+          >
+            <p
+              class="text-sm"
+              data-test="ticket-type-access-fixed"
+            >
+              {{ saysAccessKind(editing.accessKind) ?? 'Neither' }}
+            </p>
+          </UFormField>
 
           <UFormField
             v-if="!editing"
@@ -437,6 +449,18 @@ const columns: TableColumn<TicketType>[] = [
               class="w-full"
               data-test="ticket-type-restriction"
             />
+          </UFormField>
+          <UFormField
+            v-else
+            label="Who may book it online"
+            description="Set when the type was added, and not changed afterwards."
+          >
+            <p
+              class="text-sm"
+              data-test="ticket-type-restriction-fixed"
+            >
+              {{ saysRestriction(editing.restrictedTo) ?? 'Nobody, open to all' }}
+            </p>
           </UFormField>
 
           <USwitch

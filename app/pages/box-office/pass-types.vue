@@ -66,6 +66,13 @@ function endOfDay(iso: string): number | null {
 interface PriceRow { label: string, pounds: number }
 
 const editing = ref<PassType | null>(null)
+
+// D-123 criterion 8: the edit form cannot change these, so it names them rather than hiding them.
+const coveredShowNames = computed(() => {
+  const covered = editing.value?.showIds ?? []
+  const names = covered.map(id => shows.value.find(one => one.id === id)?.title).filter(Boolean)
+  return names.length > 0 ? names.join(', ') : 'No shows yet'
+})
 const open = ref(false)
 const removing = ref<PassType | null>(null)
 const managingShows = ref<PassType | null>(null)
@@ -550,6 +557,18 @@ const columns: TableColumn<PassType>[] = [
               class="w-full"
               data-test="pass-type-shows"
             />
+          </UFormField>
+          <UFormField
+            v-else
+            label="Covers"
+            description="Change these with Covered shows, beside the pass in the list."
+          >
+            <p
+              class="text-sm"
+              data-test="pass-type-shows-fixed"
+            >
+              {{ coveredShowNames }}
+            </p>
           </UFormField>
 
           <div class="flex flex-wrap gap-2">

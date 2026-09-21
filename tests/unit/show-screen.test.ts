@@ -30,7 +30,9 @@ describe('the show screen is split into sections (criterion 1)', () => {
     // The forms and the table belong to their sections now, so the page carries neither.
     expect(source).not.toContain('<UTable')
     expect(source).not.toContain('data-test="show-copy"')
-    expect(source.split('\n').length).toBeLessThan(320)
+    // The ceiling holds the sections in their own files. It moved once, for the guard the page
+    // has to own because the section it guards is the one that unmounts (criterion 9).
+    expect(source.split('\n').length).toBeLessThan(340)
   })
 
   test('every marker the e2e suites drive still exists, in one section or another', async () => {
@@ -96,7 +98,7 @@ describe('unsaved detail edits are not thrown away by opening another section', 
     description: 'A comedy in four acts.',
     longDescription: null,
     ageGuidance: null,
-    latecomerPolicy: 'INTERVAL' as const,
+    latecomerPolicy: 'AT_INTERVAL' as const,
     bookingClosesHoursBefore: null,
     categoryId: 'cat-1',
     seasonId: null,
@@ -108,7 +110,7 @@ describe('unsaved detail edits are not thrown away by opening another section', 
     description: 'A comedy in four acts.',
     longDescription: '',
     ageGuidance: '',
-    latecomerPolicy: 'INTERVAL' as const,
+    latecomerPolicy: 'AT_INTERVAL' as const,
     bookingClosesHoursBefore: null,
     categoryId: 'cat-1',
     seasonId: null,
@@ -128,7 +130,7 @@ describe('unsaved detail edits are not thrown away by opening another section', 
 
   test('a changed word, a changed policy and a changed season are each a change', () => {
     expect(showCopyChanged({ ...draft, title: 'The Cherry Orchard' }, saved)).toBe(true)
-    expect(showCopyChanged({ ...draft, latecomerPolicy: 'NEVER' }, saved)).toBe(true)
+    expect(showCopyChanged({ ...draft, latecomerPolicy: 'NOT_ADMITTED' }, saved)).toBe(true)
     expect(showCopyChanged({ ...draft, seasonId: 'season-1' }, saved)).toBe(true)
   })
 

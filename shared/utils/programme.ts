@@ -645,3 +645,48 @@ export function listingCacheSeconds(boundaries: number[], at: Date = new Date())
   if (soonest === undefined) return LISTED_CACHE_MAX_SECONDS
   return Math.max(0, Math.min(LISTED_CACHE_MAX_SECONDS, soonest - now))
 }
+
+// D-132 criterion 9: why a performance cannot be added, in the words that sit beside the button.
+export function addPerformanceRefusal(bookableVenues: number): string | null {
+  if (bookableVenues > 0) return null
+  return 'A performance needs a venue, and none is open. Add or reopen one under Box office, Venues.'
+}
+
+// The details form as it is typed: every optional field is a string here, because an input holds
+// no nulls, and a saved row holds no empty strings.
+export interface ShowCopyDraft {
+  title: string
+  slug: string
+  subtitle: string
+  description: string
+  longDescription: string
+  ageGuidance: string
+  latecomerPolicy: LatecomerPolicy | null
+  bookingClosesHoursBefore: number | null
+  categoryId: string | null
+  seasonId: string | null
+}
+
+export type ShowCopySaved = Omit<ShowCopyDraft, 'subtitle' | 'description' | 'longDescription' | 'ageGuidance'> & {
+  subtitle: string | null
+  description: string | null
+  longDescription: string | null
+  ageGuidance: string | null
+}
+
+const sameText = (typed: string, saved: string | null): boolean => typed.trim() === (saved ?? '')
+
+// D-132 criterion 9: the details section unmounts when another is opened, so what it is holding
+// has to be comparable to what was loaded before anything throws it away.
+export function showCopyChanged(draft: ShowCopyDraft, saved: ShowCopySaved): boolean {
+  return !sameText(draft.title, saved.title)
+    || !sameText(draft.slug, saved.slug)
+    || !sameText(draft.subtitle, saved.subtitle)
+    || !sameText(draft.description, saved.description)
+    || !sameText(draft.longDescription, saved.longDescription)
+    || !sameText(draft.ageGuidance, saved.ageGuidance)
+    || draft.latecomerPolicy !== saved.latecomerPolicy
+    || draft.bookingClosesHoursBefore !== saved.bookingClosesHoursBefore
+    || draft.categoryId !== saved.categoryId
+    || draft.seasonId !== saved.seasonId
+}
