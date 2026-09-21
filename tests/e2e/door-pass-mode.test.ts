@@ -162,8 +162,9 @@ describe.skipIf(skip !== null)('the screen at /tonight/door?mode=pass', () => {
       await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
       await visit(view, `${app.baseURL}/tonight/door?mode=pass`, '[data-test="door-pass-mode"]')
-      // D-126 criterion 2's wording stands whether or not a card is on screen.
-      expect(await textOf(view, '[data-test="pass-refusal-panel"]')).toContain('always the bar')
+      // D-126 criterion 2's wording stands whether or not a card is on screen, as one line in
+      // the screen's own hint rather than a panel taking a third of a phone (issue 1150 item 2).
+      expect(await textOf(view, '[data-test="door-screen"]')).toContain('Send them to the bar')
 
       await fill(view, '[data-test="pass-search"]', reference)
       await waitFor(view, `document.querySelector('[data-test="pass-card-${reference}"]')`)
@@ -172,7 +173,6 @@ describe.skipIf(skip !== null)('the screen at /tonight/door?mode=pass', () => {
       expect(card).toContain(holder.name)
       expect(card).toContain(reference)
       expect(card).toContain('Admit, party of 1')
-      expect(card).toContain('£0 pass-admission ticket')
 
       // Admitting hands over to the door's own verdict card, so one admission reads the same
       // whichever way the reference arrived.

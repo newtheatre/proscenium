@@ -69,6 +69,14 @@ function booking(status: string, holderId: string | null = null, seats = 1): str
   return reference
 }
 
+async function signIn(view: Bun.WebView): Promise<void> {
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', door.email)
+  await fill(view, 'form input[type="password"]', doorPassword)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+}
+
 const resolve = (scanned: string): Promise<Response> =>
   send('POST', '/api/tonight/door/resolve', { scanned, performanceId })
 
@@ -146,7 +154,7 @@ describe.skipIf(skip !== null)('the screen, with no camera to open (criteria 5, 
       // The headless view opens no camera, which is exactly criterion 5's fallback.
       await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')
       await waitFor(view, `document.querySelector('[data-test="door-reference"]')`)
-      expect(await textOf(view, '[data-test="door-camera-note"]')).toContain('type the reference')
+      expect((await textOf(view, '[data-test="door-camera-note"]')).toLowerCase()).toContain('type the reference')
 
       // The value a decode hands the screen, put in by hand: the resolve route turns it into the
       // reference, and the same admission path runs from there.
@@ -160,7 +168,81 @@ describe.skipIf(skip !== null)('the screen, with no camera to open (criteria 5, 
       expect(card).toContain('party of 2')
       expect(card).toContain(reference)
       expect(card).not.toContain('£')
-      expect(card).toContain('Door mode')
+      expect(await textOf(view, '[data-test="door-screen"]')).toContain('Admit, or send to the bar')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('two references in a row need no tap between them: the field stays where it is', async () => {
+    const first = booking('COLLECTED', door.id, 1)
+    const second = booking('COLLECTED', door.id, 2)
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await signIn(view)
+      await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')
+      await waitFor(view, `document.querySelector('[data-test="door-reference"]')`)
+
+      await fill(view, '[data-test="door-reference"]', first)
+      await click(view, '[data-test="door-scan"]')
+      await waitFor(view, `document.querySelector('[data-test="door-verdict"]')?.innerText.includes(${JSON.stringify(first)})`)
+
+      // No "Scan next" in between: the field is still on screen, emptied and ready.
+      expect(await view.evaluate<string>(`document.querySelector('[data-test="door-reference"]').value`)).toBe('')
+      await fill(view, '[data-test="door-reference"]', second)
+      await click(view, '[data-test="door-scan"]')
+      await waitFor(view, `document.querySelector('[data-test="door-verdict"]')?.innerText.includes(${JSON.stringify(second)})`)
+
+      const card = await textOf(view, '[data-test="door-verdict"]')
+      expect(card).toContain('PAID')
+      expect(card).not.toContain(first)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the reference field is set up for a reference typed in the dark (issue 1150 item 2)', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await signIn(view)
+      await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')
+      await waitFor(view, `document.querySelector('[data-test="door-reference"]')`)
+
+      const attributes = await view.evaluate<Record<string, string | null>>(`(() => {
+        const field = document.querySelector('[data-test="door-reference"]')
+        return {
+          autocapitalize: field.getAttribute('autocapitalize'),
+          autocomplete: field.getAttribute('autocomplete'),
+          autocorrect: field.getAttribute('autocorrect'),
+          spellcheck: field.getAttribute('spellcheck'),
+          inputmode: field.getAttribute('inputmode'),
+        }
+      })()`)
+
+      expect(attributes.autocapitalize).toBe('characters')
+      expect(attributes.autocomplete).toBe('off')
+      expect(attributes.autocorrect).toBe('off')
+      expect(attributes.spellcheck).toBe('false')
+      expect(attributes.inputmode).toBe('text')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the pinned action in typing mode says what it does, and the abbreviation is gone', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await signIn(view)
+      await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')
+      await waitFor(view, `document.querySelector('[data-test="door-scan"]')`)
+
+      expect(await textOf(view, '[data-test="door-scan"]')).toContain('Check')
+      const screen = await textOf(view, '[data-test="door-screen"]')
+      expect(screen).not.toContain('Scan next')
+      expect(screen).not.toContain('Door mode')
     }
     finally {
       view.close()

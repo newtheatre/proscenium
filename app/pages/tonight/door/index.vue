@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { doorFailureVerdict, saysDoorParty } from '#shared/utils/door'
+import { CAMERA_FALLBACK_SAYS, doorFailureVerdict, saysDoorParty, verdictBuzz, verdictHoldMs } from '#shared/utils/door'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
-import type { DoorVerdict } from '#shared/utils/door'
-import type { ScannerFailure } from '~/composables/useQrScanner'
+import type { DoorVerdict, ScannerFailure } from '#shared/utils/door'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/show-night/the-door' })
 useSeoMeta({ title: 'Door' })
@@ -68,20 +67,37 @@ const scanning = ref(false)
 
 interface Shown { verdict: DoorVerdict, reference: string, party: string | null }
 const shown = ref<Shown | null>(null)
-
-const cameraSays: Record<ScannerFailure, string> = {
-  NO_CAMERA: 'No camera on this device, so type the reference.',
-  REFUSED: 'Camera access refused, so type the reference.',
-  BROKEN: 'The camera would not start, so type the reference.',
-}
+let holdTimer: ReturnType<typeof setTimeout> | undefined
 
 function fallBackToTyping(failure: ScannerFailure): void {
-  cameraNote.value = cameraSays[failure]
+  cameraNote.value = CAMERA_FALLBACK_SAYS[failure]
   mode.value = 'TYPING'
 }
 
+// The card clears itself so the queue keeps moving; a refusal holds longer, because the reason
+// is what the volunteer has to read out (issue 1150 item 1).
 function show(verdict: DoorVerdict, reference: string, holderName: string | null, partySize: number): void {
+  clearVerdict()
   shown.value = { verdict, reference, party: partySize > 0 ? saysDoorParty(holderName, partySize) : null }
+  buzz(verdict)
+  if (mode.value === 'CAMERA') holdTimer = setTimeout(clearVerdict, verdictHoldMs(verdict.state))
+}
+
+function clearVerdict(): void {
+  if (holdTimer) clearTimeout(holdTimer)
+  holdTimer = undefined
+  shown.value = null
+}
+
+onBeforeUnmount(clearVerdict)
+
+// A pattern per verdict, for a volunteer whose eyes are on the patron. Older browsers and iOS
+// have no `vibrate` at all, so nothing here may assume one.
+function buzz(verdict: DoorVerdict): void {
+  const pattern = verdictBuzz(verdict.state)
+  if (pattern.length > 0 && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+    navigator.vibrate(pattern)
+  }
 }
 
 // Whatever the lens read: this build's signed booking and pass URLs, the `/t/<ref>` form, or a
@@ -97,6 +113,7 @@ async function admitScanned(scanned: string): Promise<void> {
     // A pass QR opens the holder's own card rather than admitting blind: the volunteer reads what
     // it covers and what tonight already holds before pressing Admit (D-126 criterion 1).
     if (resolved.kind === 'PASS_TOKEN') {
+      clearVerdict()
       passPrefill.value = resolved.reference
       mode.value = 'PASS'
       return
@@ -151,21 +168,20 @@ function showRefusal(refused: unknown, code: string, headline = 'REFUSED'): void
 
 // The typed field takes the same four forms the camera does: a hardware scanner acting as a
 // keyboard types the whole URL out of a QR, not the reference inside it (criterion 2).
-async function scanTyped(): Promise<void> {
+async function checkTyped(): Promise<void> {
   if (!reference.value.trim() || !performanceId.value) return
   const typed = reference.value.trim()
   reference.value = ''
   await admitScanned(typed)
 }
 
-function scanNext(): void {
-  shown.value = null
-  passPrefill.value = ''
-  mode.value = cameraNote.value ? 'TYPING' : 'CAMERA'
+function useTheCamera(): void {
+  clearVerdict()
+  mode.value = 'CAMERA'
 }
 
 function typeInstead(): void {
-  shown.value = null
+  clearVerdict()
   mode.value = 'TYPING'
 }
 
@@ -173,29 +189,16 @@ function showPassAdmission(result: { reference: string, verdict: DoorVerdict, ho
   show(result.verdict, result.reference, result.holderName, result.partySize)
 }
 
-const hint = computed(() => mode.value === 'PASS'
-  ? 'Find the holder by name, or by the reference on the pass.'
-  : 'Point the camera at the code, or type the reference.')
-
-const cardClass: Record<DoorVerdict['state'], string> = {
-  PAID: 'border-success bg-success/10 text-success',
-  UNPAID: 'border-gold-400 bg-gold-400/10 text-gold-400',
-  REFUSED: 'border-error bg-error/10 text-error',
-  UNANSWERED: 'border-warning bg-warning/10 text-warning',
-}
-
-const cardIcon: Record<DoorVerdict['state'], string> = {
-  PAID: 'i-lucide-circle-check',
-  UNPAID: 'i-lucide-circle-alert',
-  REFUSED: 'i-lucide-circle-x',
-  UNANSWERED: 'i-lucide-wifi-off',
-}
+const hint = computed(() => {
+  if (mode.value === 'PASS') return 'Find the holder, or the reference on the pass. Refused? Send them to the bar.'
+  return 'Point the camera at the code, or type the reference.'
+})
 </script>
 
 <template>
   <NightScreen
     :title="mode === 'PASS' && !shown ? 'Admit pass holder' : 'Door'"
-    :hint="shown ? undefined : hint"
+    :hint="hint"
     :stale="syncedAt"
     :busy="busy"
     data-test="door-screen"
@@ -208,60 +211,9 @@ const cardIcon: Record<DoorVerdict['state'], string> = {
         color="neutral"
         variant="subtle"
         icon="i-lucide-lock"
-        :description="authorityFailure ?? 'Resolving your authority for tonight…'"
+        :description="authorityFailure ?? 'Checking your shift…'"
         data-test="door-not-authorised"
       />
-    </div>
-
-    <!-- The verdict takes the whole screen: at a door in the dark it is read at arm's length,
-         and nothing else on it is worth a glance (show-night design 2.1). -->
-    <div
-      v-else-if="shown"
-      class="flex flex-col gap-4"
-      data-test="door-verdict"
-    >
-      <div
-        class="flex min-h-[45vh] flex-col items-center justify-center gap-3 rounded-2xl border-2 p-6 text-center"
-        :class="cardClass[shown.verdict.state]"
-        :data-test="`door-verdict-${shown.verdict.state.toLowerCase()}`"
-      >
-        <UIcon
-          :name="cardIcon[shown.verdict.state]"
-          class="size-16"
-        />
-        <p
-          v-if="shown.reference"
-          class="font-mono text-lg tracking-widest text-muted"
-          data-test="door-verdict-reference"
-        >
-          {{ shown.reference }}
-        </p>
-        <p class="nnt-headline text-5xl font-bold">
-          {{ shown.verdict.headline }}
-        </p>
-        <p class="text-xl font-semibold text-default">
-          {{ shown.verdict.line }}
-        </p>
-        <UBadge
-          v-if="shown.party"
-          color="neutral"
-          variant="subtle"
-          size="lg"
-          data-test="door-verdict-party"
-        >
-          {{ shown.party }}
-        </UBadge>
-        <p
-          v-if="shown.verdict.note"
-          class="text-sm text-muted"
-        >
-          {{ shown.verdict.note }}
-        </p>
-      </div>
-
-      <p class="text-center text-xs text-muted">
-        Door mode: no prices, no emails, no history. Admit or redirect.
-      </p>
     </div>
 
     <div
@@ -280,20 +232,50 @@ const cardIcon: Record<DoorVerdict['state'], string> = {
         />
       </UFormField>
 
-      <DoorPassMode
-        v-if="mode === 'PASS'"
-        :performance-id="performanceId"
-        :prefill="passPrefill"
-        @admitted="showPassAdmission"
-      />
+      <template v-if="mode === 'PASS'">
+        <DoorVerdictCard
+          v-if="shown"
+          :verdict="shown.verdict"
+          :reference="shown.reference"
+          :party="shown.party"
+          @dismiss="clearVerdict"
+        />
+        <DoorPassMode
+          v-else
+          :performance-id="performanceId"
+          :prefill="passPrefill"
+          @admitted="showPassAdmission"
+        />
+      </template>
 
+      <!-- The camera stays open behind the verdict: a queue of two hundred is two hundred taps
+           and two hundred cold starts otherwise (E-129, issue 1150 item 1). -->
       <QrScanner
         v-else-if="mode === 'CAMERA'"
         @decoded="admitScanned"
         @unavailable="fallBackToTyping"
-      />
+      >
+        <template #overlay>
+          <DoorVerdictCard
+            v-if="shown"
+            overlay
+            :verdict="shown.verdict"
+            :reference="shown.reference"
+            :party="shown.party"
+            @dismiss="clearVerdict"
+          />
+        </template>
+      </QrScanner>
 
       <template v-else>
+        <DoorVerdictCard
+          v-if="shown"
+          :verdict="shown.verdict"
+          :reference="shown.reference"
+          :party="shown.party"
+          @dismiss="clearVerdict"
+        />
+
         <UAlert
           v-if="cameraNote"
           color="neutral"
@@ -309,9 +291,14 @@ const cardIcon: Record<DoorVerdict['state'], string> = {
             class="w-full"
             size="xl"
             autofocus
+            autocapitalize="characters"
+            autocorrect="off"
+            autocomplete="off"
+            inputmode="text"
+            :spellcheck="false"
             placeholder="e.g. K7M4PQ"
             data-test="door-reference"
-            @keyup.enter="scanTyped"
+            @keyup.enter="checkTyped"
           />
         </UFormField>
       </template>
@@ -331,46 +318,46 @@ const cardIcon: Record<DoorVerdict['state'], string> = {
       </UButton>
 
       <p class="text-center text-xs text-muted">
-        Door mode: no prices, no emails, no history. Admit or redirect.
+        Admit, or send to the bar.
       </p>
     </div>
 
     <template #actions>
-      <template v-if="authorised && shown">
-        <!-- Quiet on purpose: the card is the signal, and these two are the ways on from it. -->
-        <UButton
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-scan-line"
-          size="xl"
-          class="min-h-12 w-full justify-center text-lg font-semibold"
-          data-test="door-scan-next"
-          @click="scanNext"
-        >
-          Scan next
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          icon="i-lucide-keyboard"
-          size="lg"
-          class="min-h-12 w-full justify-center"
-          data-test="door-type-a-ref"
-          @click="typeInstead"
-        >
-          Type a ref
-        </UButton>
-      </template>
-
       <NightAction
-        v-else-if="authorised && mode === 'TYPING'"
-        label="Scan"
-        icon="i-lucide-scan-line"
+        v-if="authorised && mode === 'TYPING'"
+        label="Check"
+        icon="i-lucide-search"
         :loading="scanning"
         :disabled="!reference.trim() || !performanceId"
         data-test="door-scan"
-        @press="scanTyped"
+        @press="checkTyped"
       />
+
+      <UButton
+        v-if="authorised && mode === 'TYPING' && !cameraNote"
+        color="neutral"
+        variant="ghost"
+        icon="i-lucide-scan-line"
+        size="lg"
+        class="min-h-12 w-full justify-center"
+        data-test="door-use-camera"
+        @click="useTheCamera"
+      >
+        Use the camera
+      </UButton>
+
+      <UButton
+        v-else-if="authorised && mode === 'CAMERA'"
+        color="neutral"
+        variant="ghost"
+        icon="i-lucide-keyboard"
+        size="lg"
+        class="min-h-12 w-full justify-center"
+        data-test="door-type-a-ref"
+        @click="typeInstead"
+      >
+        Type a reference
+      </UButton>
     </template>
   </NightScreen>
 </template>

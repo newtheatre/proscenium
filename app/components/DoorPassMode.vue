@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PASS_ADMISSION_CAPTION, PASS_ADMISSION_PARTY_SIZE, doorFailureVerdict } from '#shared/utils/door'
+import { PASS_ADMISSION_PARTY_SIZE, doorFailureVerdict } from '#shared/utils/door'
 import type { DoorVerdict } from '#shared/utils/door'
 
 // Admitting a pass holder (D-126). The search and the card; the verdict afterwards is the door
@@ -174,39 +174,20 @@ async function admit(pass: PassCard): Promise<void> {
         :data-test="`pass-refusal-${pass.reference}`"
       />
 
-      <template v-else>
-        <!-- Gold, filled, with ash text on top: the one admit button on the screen it belongs to
-             (docs/design-language.md, the gold contrast floor). -->
-        <UButton
-          size="xl"
-          block
-          icon="i-lucide-check"
-          :loading="admitting === pass.id"
-          class="min-h-12 bg-gold-400 text-ash-950 hover:bg-gold-300 focus-visible:bg-gold-300"
-          :data-test="`pass-admit-${pass.reference}`"
-          @click="admit(pass)"
-        >
-          Admit, party of {{ PASS_ADMISSION_PARTY_SIZE }}
-        </UButton>
-        <p class="text-center text-xs text-muted">
-          {{ PASS_ADMISSION_CAPTION }}
-        </p>
-      </template>
-    </div>
-
-    <!-- The wording D-126 criterion 2 asks for, standing whether or not a card is on screen: the
-         answer to a refused pass is the bar, not an argument at the door. -->
-    <div
-      class="rounded-xl border border-error/40 bg-error/5 p-4"
-      data-test="pass-refusal-panel"
-    >
-      <p class="text-sm font-semibold text-error">
-        If Admit is refused
-      </p>
-      <p class="mt-1 text-sm text-muted">
-        The screen says why in plain words: already used tonight, pass expired, show not covered.
-        The answer is always the bar, never an argument at the door.
-      </p>
+      <!-- Gold, filled, with ash text on top: the one admit button on the screen it belongs to
+           (docs/design-language.md, the gold contrast floor). -->
+      <UButton
+        v-else
+        size="xl"
+        block
+        icon="i-lucide-check"
+        :loading="admitting === pass.id"
+        class="min-h-12 bg-gold-400 text-ash-950 hover:bg-gold-300 focus-visible:bg-gold-300"
+        :data-test="`pass-admit-${pass.reference}`"
+        @click="admit(pass)"
+      >
+        Admit, party of {{ PASS_ADMISSION_PARTY_SIZE }}
+      </UButton>
     </div>
   </div>
 </template>

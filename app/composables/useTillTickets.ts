@@ -1,8 +1,9 @@
 import { computed, ref, watch } from 'vue'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
+import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
 import type { TillBooking, WalkUpOption } from '#shared/utils/sale'
-import type { ScannerFailure } from './useQrScanner'
+import type { ScannerFailure } from '#shared/utils/door'
 import type { WalkUpLine } from './useTillBasket'
 
 // The Tickets pane (F-122, F-123): a booking found by camera, reference or name, and a walk-up
@@ -16,12 +17,6 @@ export function useTillTickets(venueId: Ref<string | null>) {
   const lookupFailure = ref<string | null>(null)
   const found = ref<TillBooking[]>([])
 
-  const cameraSays: Record<ScannerFailure, string> = {
-    NO_CAMERA: 'No camera on this device, so type the reference or a name.',
-    REFUSED: 'Camera access refused, so type the reference or a name. Allow it in the site settings to scan.',
-    BROKEN: 'The camera would not start, so type the reference or a name.',
-  }
-
   function openCamera(): void {
     cameraNote.value = null
     lookupFailure.value = null
@@ -30,7 +25,7 @@ export function useTillTickets(venueId: Ref<string | null>) {
 
   function fallBackToTyping(failure: ScannerFailure): void {
     cameraOpen.value = false
-    cameraNote.value = cameraSays[failure]
+    cameraNote.value = CAMERA_FALLBACK_SAYS[failure]
   }
 
   async function lookUp(): Promise<void> {

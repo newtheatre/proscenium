@@ -853,6 +853,16 @@ admission state machine. `shared/utils/door.ts` holds the pure half: `readScanne
 outcome into the PAID, UNPAID or refused card the screen paints and is where the box office's
 "amount due" wording is dropped for "Send to the bar to pay".
 
+In camera mode the card is drawn over the live view through `QrScanner`'s `overlay` slot rather
+than in place of it, so the component is never unmounted between two patrons and the camera never
+cold-starts again mid-queue (E-129, issue 1150). `verdictHoldMs()` says how long it holds before
+clearing itself: shorter than the repeat window where the door admitted, longer where it refused
+or got no answer at all, because somebody has to read the reason out. The next different code and
+a tap both clear it sooner. `verdictBuzz()` is the vibration pattern per verdict, passed to
+`navigator.vibrate` where the browser has it, so a volunteer looking at the patron still gets the
+answer. `CAMERA_FALLBACK_SAYS` is the one set of camera-failure sentences, shown by the door and
+the till alike; the box office desk still carries its own wording.
+
 ## The rota (E-101, E-102, E-106, 0046)
 
 A venue's shift template is one row per role with a count, and stamping expands it into one open

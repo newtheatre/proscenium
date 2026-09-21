@@ -44,7 +44,6 @@ export const showNight: Shot[] = [
     width: PHONE_WIDTH,
     annotations: [
       { selector: '[data-test="pass-search"]', label: 'Find the holder' },
-      { selector: '[data-test="pass-refusal-panel"]', label: 'If Admit is refused' },
       { selector: '[data-test="door-performance"]', label: 'Performance' },
     ],
   },
