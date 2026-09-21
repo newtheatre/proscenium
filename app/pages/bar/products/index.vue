@@ -129,6 +129,30 @@ async function save(): Promise<void> {
   }
 }
 
+// Retiring confirms; hiding and putting back on the till are reversible (K-123 criterion 7).
+const retiring = ref<BarProduct | null>(null)
+const retireFailure = ref<string | null>(null)
+const retireWorking = ref(false)
+
+async function retire(): Promise<void> {
+  const product = retiring.value
+  if (!product) return
+  retireWorking.value = true
+  retireFailure.value = null
+  try {
+    await $fetch(`/api/admin/bar/products/${product.id}/status`, { method: 'POST', body: { status: 'RETIRED' } })
+    toast.add({ title: `${product.name} is retired`, icon: 'i-lucide-check', color: 'success' })
+    retiring.value = null
+    await reload()
+  }
+  catch (refused) {
+    retireFailure.value = refusalText(refused)
+  }
+  finally {
+    retireWorking.value = false
+  }
+}
+
 async function setStatus(product: BarProduct, status: ProductStatus): Promise<void> {
   failure.value = null
   try {
@@ -246,7 +270,10 @@ const columns: TableColumn<BarProduct>[] = [
             'color': 'neutral',
             'variant': 'ghost',
             'data-test': `retire-${row.original.id}`,
-            'onClick': () => setStatus(row.original, 'RETIRED'),
+            'onClick': () => {
+              retireFailure.value = null
+              retiring.value = row.original
+            },
           }, () => 'Retire'),
       row.original.everSold
         ? null
@@ -522,5 +549,17 @@ const columns: TableColumn<BarProduct>[] = [
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="retiring !== null"
+      name="retire-product"
+      :title="retiring ? `Retire ${retiring.name}` : ''"
+      :verb="retiring ? `Retire ${retiring.name}` : ''"
+      consequence="It comes off the till. Anything sold as it stays on every line and report."
+      :loading="retireWorking"
+      :failure="retireFailure"
+      @update:open="value => { if (!value) retiring = null }"
+      @confirm="retire"
+    />
   </div>
 </template>

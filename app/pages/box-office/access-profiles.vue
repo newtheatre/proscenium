@@ -95,17 +95,24 @@ async function verify(event: FormSubmitEvent<{ fohNote: string }>): Promise<void
   }
 }
 
+// The route takes no reason, so the confirmation carries no field: it states what declining does
+// and asks for the word (K-123 criterion 7).
+const declining = ref(false)
+const declineFailure = ref<string | null>(null)
+
 async function decline(): Promise<void> {
   if (!reviewing.value) return
   deciding.value = true
+  declineFailure.value = null
   try {
     await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/decline`, { method: 'POST' })
     toast.add({ title: `${reviewing.value.name}'s access profile declined`, icon: 'i-lucide-x', color: 'neutral' })
+    declining.value = false
     reviewing.value = null
     await load()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    declineFailure.value = refusalText(error)
   }
   finally {
     deciding.value = false
@@ -316,9 +323,8 @@ const columns: TableColumn<Summary>[] = [
               <UButton
                 variant="subtle"
                 color="error"
-                :loading="deciding"
                 data-test="decline"
-                @click="decline"
+                @click="declineFailure = null; declining = true"
               >
                 Decline
               </UButton>
@@ -334,5 +340,16 @@ const columns: TableColumn<Summary>[] = [
         </div>
       </template>
     </UModal>
+
+    <ConfirmModal
+      v-model:open="declining"
+      name="decline-declaration"
+      :title="reviewing ? `Decline ${reviewing.name}'s declaration` : ''"
+      verb="Decline the declaration"
+      consequence="The Access Card number is cleared and the door is given no wording for them. They may declare again."
+      :loading="deciding"
+      :failure="declineFailure"
+      @confirm="decline"
+    />
   </div>
 </template>
