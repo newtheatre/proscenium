@@ -41,11 +41,16 @@ describe.skipIf(skip !== null)('editorial pages render from content markdown (D-
     expect(response.status).toBe(404)
   })
 
-  test('the public nav links to all four pages', async () => {
+  // D-103 criterion 6: all four are still placeholders, so the footer carries none of them. The
+  // pages stay reachable by address, which is how an editor previews one.
+  test('the footer links no page that still awaits committee copy', async () => {
     const html = await (await fetch(`${app.baseURL}/`)).text()
+    const footer = html.slice(html.indexOf('data-test="footer-links"'))
     for (const { path } of PAGES) {
-      expect(html).toContain(`href="${path}"`)
+      expect(`${path}: ${footer.includes(`href="${path}"`)}`).toBe(`${path}: false`)
     }
+    expect(footer).toContain('href="/policies/booking"')
+    expect(footer).toContain('href="/whats-on"')
   })
 })
 
@@ -97,7 +102,7 @@ describe.skipIf(skip !== null)('an editorial page reads as a column, not as a wa
 
   // J-111: get-involved is a landing page rather than a reading column, and everything on it is
   // drawn from the content file rather than written into the Vue.
-  test('get-involved lays out its departments, its steps and its quote', async () => {
+  test('get-involved lays out its departments and its steps, and holds its quote back', async () => {
     const view = await openSignedOutView(app.baseURL)
     try {
       await visit(view, `${app.baseURL}/get-involved`, '[data-test="get-involved"]')
@@ -115,7 +120,8 @@ describe.skipIf(skip !== null)('an editorial page reads as a column, not as a wa
 
       expect(counts.departments).toBeGreaterThan(3)
       expect(counts.steps).toBe(3)
-      expect(counts.quote).toBe(1)
+      // Nobody has said this yet, so nobody is quoted saying it (D-103 criterion 6).
+      expect(counts.quote).toBe(0)
       expect(counts.join).toBeGreaterThan(0)
       // The placeholder treatment stays until the committee's words land (D-103 criterion 5).
       expect(counts.placeholder).toBe(1)

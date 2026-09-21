@@ -229,6 +229,10 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
       and the quote are front-matter fields of `content/get-involved.md`, so a committee member
       changing a department or a step never opens a Vue file. It keeps the placeholder treatment
       until the committee's words land (D-103 criterion 5).
+  19. A listing emptied by one of its own filters says that the filter emptied it and offers to
+      clear it, which is a different answer from the season having nothing in it. The show page's
+      four practical facts stand in one column below `sm`, where two columns break the longest of
+      them across three lines.
 - Source: Pre-cutover review, 10 September 2026; the known-issues row on unsigned-off policy
   prose; 0012, 0051. Criteria 6 to 9 added 11 September 2026, after the committee's review of the
   public-site mockups widened the story from the policy wording to the whole public site.
