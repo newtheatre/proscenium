@@ -186,7 +186,7 @@ const columns: TableColumn<BarCategory>[] = [
   { id: 'products', header: 'Products', cell: ({ row }) => plural(row.original.productCount, 'product') },
   {
     id: 'act',
-    header: '',
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
       h(resolveComponent('UButton'), {

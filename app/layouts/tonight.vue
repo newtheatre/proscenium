@@ -17,6 +17,10 @@ const badge = computed(() => onShiftLabel(authority.value.via, account.value.use
 
 resolveNightAuthority()
 
+// On the body rather than the subtree, so a modal teleported out of it inherits the shell's
+// target floor too (docs/design-language.md rule 4).
+useHead({ bodyAttrs: { class: 'nnt-night' } })
+
 // A screen that names no show still sits on one: whichever house is running now fills the header
 // in, and a screen that knows better (the hub, the glance) overrides it.
 setNightFallbackSubject(() => {
@@ -41,8 +45,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="dark flex min-h-screen flex-col bg-default text-default [color-scheme:dark]">
-    <div class="mx-auto flex h-10 w-full max-w-md items-center justify-end gap-1 px-2">
+  <div class="dark flex min-h-dvh flex-col bg-default text-default [color-scheme:dark]">
+    <div class="mx-auto flex min-h-12 w-full max-w-md items-center justify-end gap-1 px-2">
       <DocsLink />
       <AuthStatus />
     </div>

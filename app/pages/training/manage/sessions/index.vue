@@ -381,7 +381,7 @@ const columns: TableColumn<Session>[] = [
   },
   {
     id: 'open',
-    header: '',
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => h(UButton, {
       'to': `/training/manage/sessions/${row.original.id}`,

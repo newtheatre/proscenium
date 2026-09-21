@@ -189,7 +189,7 @@ const columns: TableColumn<AdminVenue>[] = [
   },
   {
     id: 'act',
-    header: () => h('span', { class: 'sr-only' }, 'Actions'),
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
       seeEmergencyCards.value

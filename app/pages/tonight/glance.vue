@@ -511,7 +511,6 @@ onUnmounted(() => {
                 <UButton
                   v-if="member.phone"
                   :to="`tel:${member.phone}`"
-                  size="xs"
                   variant="subtle"
                   icon="i-lucide-phone"
                   class="min-h-12 min-w-12 justify-center"

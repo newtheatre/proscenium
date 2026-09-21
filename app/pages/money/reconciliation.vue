@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { h } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { penceFromPounds } from '#shared/utils/admin-forms'
 import { describeKind } from '#shared/utils/ledger'
 import { can, recordZReadings } from '#shared/utils/abilities'
 import { currentShowNight } from '#shared/utils/show-night'
 import type { NightExpected, OutstandingNight, ZReading } from '#shared/utils/night-reconciliation'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Daily reconciliation', middleware: 'console', docs: '/docs/money/reconciliation' })
 
@@ -37,6 +39,46 @@ const { data: outstanding, refresh: refreshOutstanding } = await useAsyncData(
 const reconciliationFailure = computed(() => (error.value ? refusalText(error.value, 'The reconciliation could not be read.') : null))
 
 const mayRecord = computed(() => can(useViewer().value, recordZReadings))
+
+// The expected sheet is a list of amounts, its totals rows of the same table: a total read
+// somewhere else is a total nobody checks against the lines above it.
+interface ExpectedRow { label: string, pence: number, test?: string, strong?: boolean }
+
+const expectedRows = computed<ExpectedRow[]>(() => {
+  if (!data.value) return []
+  const expected = data.value.expected
+  return [
+    ...expected.deskByKind.map(row => ({ label: describeKind(row.kind), pence: row.totalPence })),
+    { label: 'Desk total', pence: expected.deskTakingsPence },
+    { label: 'Bar card sales', pence: expected.bar.cardSalesPence + expected.bar.ticketsPence },
+    { label: 'Bar tab settlements', pence: expected.bar.tabSettlementsPence },
+    { label: 'Expected total', pence: expected.expectedPence, test: 'expected-total', strong: true },
+  ]
+})
+
+const expectedColumns: TableColumn<ExpectedRow>[] = [
+  {
+    id: 'label',
+    header: 'Desk, by kind',
+    cell: ({ row }) => h('span', { class: row.original.strong ? 'font-semibold' : undefined }, row.original.label),
+  },
+  {
+    id: 'amount',
+    header: 'Amount',
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => h('span', {
+      'class': row.original.strong ? 'font-semibold' : undefined,
+      'data-test': row.original.test,
+    }, saysMoney(row.original.pence)),
+  },
+]
+
+const historyColumns: TableColumn<ZReading>[] = [
+  { id: 'reader', header: 'Reader', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.readerPence) },
+  { id: 'variance', header: 'Variance', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.variancePence) },
+  { id: 'by', header: 'By', cell: ({ row }) => row.original.enteredByName },
+  { id: 'note', header: 'Note', cell: ({ row }) => row.original.note ?? '' },
+]
 
 async function record(): Promise<void> {
   if (readerPence.value === null) return
@@ -120,52 +162,17 @@ async function record(): Promise<void> {
         <h2 class="font-semibold">
           Expected for the night of {{ data.night }}
         </h2>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Desk, by kind
-              </th><th>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.expected.deskByKind"
-              :key="row.kind"
-            >
-              <td class="py-2">
-                {{ describeKind(row.kind) }}
-              </td>
-              <td>{{ saysMoney(row.totalPence) }}</td>
-            </tr>
-            <tr class="border-t">
-              <td class="py-2">
-                Desk total
-              </td>
-              <td>{{ saysMoney(data.expected.deskTakingsPence) }}</td>
-            </tr>
-            <tr>
-              <td class="py-2">
-                Bar card sales
-              </td>
-              <td>{{ saysMoney(data.expected.bar.cardSalesPence + data.expected.bar.ticketsPence) }}</td>
-            </tr>
-            <tr>
-              <td class="py-2">
-                Bar tab settlements
-              </td>
-              <td>{{ saysMoney(data.expected.bar.tabSettlementsPence) }}</td>
-            </tr>
-            <tr class="border-t font-semibold">
-              <td class="py-2">
-                Expected total
-              </td>
-              <td data-test="expected-total">
-                {{ saysMoney(data.expected.expectedPence) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <UTable
+          :data="expectedRows"
+          :columns="expectedColumns"
+          data-test="expected-table"
+        >
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              Nothing was taken on this night.
+            </p>
+          </template>
+        </UTable>
         <p class="text-sm text-muted">
           Desk comps {{ saysMoney(data.expected.deskCompsPence) }}, desk discounts {{ saysMoney(data.expected.deskDiscountsPence) }},
           bar comps {{ saysMoney(data.expected.bar.compsForegonePence) }}, bar discounts {{ saysMoney(data.expected.bar.discountsPence) }},
@@ -251,29 +258,17 @@ async function record(): Promise<void> {
         <h2 class="font-semibold">
           History
         </h2>
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b text-left text-muted">
-              <th class="py-2">
-                Reader
-              </th><th>Variance</th><th>By</th><th>Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in data.history"
-              :key="row.id"
-              data-test="history-row"
-            >
-              <td class="py-2">
-                {{ saysMoney(row.readerPence) }}
-              </td>
-              <td>{{ saysMoney(row.variancePence) }}</td>
-              <td>{{ row.enteredByName }}</td>
-              <td>{{ row.note ?? '' }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <UTable
+          :data="data.history"
+          :columns="historyColumns"
+          data-test="history-table"
+        >
+          <template #empty>
+            <p class="py-6 text-center text-sm text-muted">
+              No reading has been recorded for this night.
+            </p>
+          </template>
+        </UTable>
       </section>
     </template>
   </div>

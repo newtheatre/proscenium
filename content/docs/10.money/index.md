@@ -2,7 +2,7 @@
 title: Money
 description: The season dashboard, the reports built on the ledger, daily reconciliation, period close and the SU export.
 module: Finance
-updatedOn: 2026-09-15
+updatedOn: 2026-09-21
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -57,7 +57,7 @@ period: a day, a week, a month, a term or a season. The season runs from {{ SEAS
    handed back, the value given away rather than taken, and the sum of every night's reader
    reading that still disagrees with the ledger and has not been written off.
 
-The range the figures cover is printed above the tables, from and to, as London dates.
+The range the figures cover is printed above them, from and to, as London dates.
 
 ## The pages
 
