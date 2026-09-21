@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, emergencyCardForm)
 
   const venue = (await listVenues()).find(one => one.id === venueId)
-  if (!venue) throw createError({ statusCode: 404, statusMessage: 'No such venue' })
+  if (!venue) throw noSuch('venue')
 
   const id = newId()
   await db.batch([

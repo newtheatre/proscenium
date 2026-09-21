@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, revokeForm)
 
   const record = await recordById(id)
-  if (!record) throw createError({ statusCode: 404, statusMessage: 'No such record' })
+  if (!record) throw noSuch('record')
 
   const entry = auditEntry({
     actorId: resolved.account.id,

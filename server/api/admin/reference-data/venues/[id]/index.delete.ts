@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await venueById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such venue' })
+  if (!held) throw noSuch('venue')
 
   if (held.inUse) {
     const holding = await venueInUseBy(id)

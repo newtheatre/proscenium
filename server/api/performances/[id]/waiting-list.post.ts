@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   if (input.performanceId !== id) throw createError({ statusCode: 400, statusMessage: 'That waiting list is for a different performance. Open the performance again.' })
 
   const performance = await performanceById(id)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   const account = await currentAccount(event)
   const email = account?.email ?? input.guest?.email

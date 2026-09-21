@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, claimDeclineForm)
 
   const claim = await findClaim(id)
-  if (!claim) throw createError({ statusCode: 404, statusMessage: 'No such claim' })
+  if (!claim) throw noSuch('claim')
   if (claim.status !== 'OPEN') {
     throw createError({ statusCode: 409, statusMessage: 'That claim has already been answered' })
   }

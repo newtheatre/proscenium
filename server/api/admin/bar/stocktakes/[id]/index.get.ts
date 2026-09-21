@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
 
   const held = await stocktakeById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such stocktake' })
+  if (!held) throw noSuch('stocktake')
 
   return { stocktake: held, lines: await stocktakeLines(id) }
 })

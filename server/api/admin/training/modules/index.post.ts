@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   assertStewards(resolved, input.department)
 
   if (!await departmentByCode(input.department)) {
-    throw createError({ statusCode: 404, statusMessage: 'No such department' })
+    throw noSuch('department')
   }
   if (await moduleById(input.id)) {
     throw createError({ statusCode: 409, statusMessage: 'A module already has that id' })

@@ -11,13 +11,13 @@ export default defineEventHandler(async (event) => {
   const { userId } = await readValidatedBodyOrThrow(event, shiftAssignForm)
 
   const held = await openingShiftDetail(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such bar opening slot' })
+  if (!held) throw noSuch('bar opening slot')
   if (held.openingStatus === 'CANCELLED') {
     throw createError({ statusCode: 409, statusMessage: 'This opening has been cancelled' })
   }
 
   const subject = await findById(userId)
-  if (!subject || subject.anonymisedAt !== null) throw createError({ statusCode: 404, statusMessage: 'No such member' })
+  if (!subject || subject.anonymisedAt !== null) throw noSuch('member')
   if (subject.disabled) throw createError({ statusCode: 403, statusMessage: 'That account is disabled and cannot be assigned a shift' })
 
   // The same live gate self-claiming rides: an officer's assignment does not admit somebody a

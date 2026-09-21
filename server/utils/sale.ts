@@ -46,7 +46,7 @@ type PublicDiscount = Pick<Discount, 'id' | 'name' | 'percent'>
 async function resolveDiscount(discountId: string | null): Promise<Discount | null> {
   if (!discountId) return null
   const discount = await discountById(discountId)
-  if (!discount) throw createError({ statusCode: 404, statusMessage: 'No such discount' })
+  if (!discount) throw noSuch('discount')
   if (discount.status !== 'ACTIVE') {
     throw createError({ statusCode: 409, statusMessage: `${discount.name} is retired, so it cannot be applied to a new sale` })
   }
@@ -376,7 +376,7 @@ async function resolveWalkUps(walkUps: WalkUpLineInput[], performanceIds: string
       throw createError({ statusCode: 409, statusMessage: 'The till sells walk-ups for tonight at this venue only; advance sales are on the desk' })
     }
     const performance = await performanceById(performanceId)
-    if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+    if (!performance) throw noSuch('performance')
     const refusal = saleRefusal(performance, at, 'DESK')
     if (refusal) throw createError({ statusCode: 409, statusMessage: refusal.says })
 
@@ -385,7 +385,7 @@ async function resolveWalkUps(walkUps: WalkUpLineInput[], performanceIds: string
       .map(type => [type.id, type]))
     const priced = lines.map((line) => {
       const type = types.get(line.ticketTypeId)
-      if (!type) throw createError({ statusCode: 400, statusMessage: 'No such ticket type for this performance' })
+      if (!type) throw createError({ statusCode: 400, statusMessage: saysNoSuch('ticket type', 'Choose one of the ticket types this performance offers') })
       return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source }
     })
 
@@ -851,7 +851,7 @@ export async function commitCompSale(
 ): Promise<SaleReceipt> {
   const expiryMinutes = await configValue(undefined, 'COMP_REQUEST_EXPIRY_MINUTES')
   const request = await compRequestById(requestId, expiryMinutes)
-  if (!request) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+  if (!request) throw noSuch('comp request')
   if (request.status !== 'APPROVED') {
     throw createError({ statusCode: 409, statusMessage: request.status === 'PENDING' ? 'That request has not been approved yet' : 'That request was declined' })
   }
@@ -866,7 +866,7 @@ export async function commitCompSale(
   if (request.expired) throw createError({ statusCode: 409, statusMessage: 'That request has lapsed; ask again' })
 
   const lines = await compRequestLines(requestId)
-  if (!lines) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+  if (!lines) throw noSuch('comp request')
 
   // The house the ask named, where this session's authority covers it; anything else resolves
   // against the bar's windows now, so nothing is ever keyed outside what the caller holds (F-126).

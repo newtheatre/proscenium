@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, unlistForm)
 
   const booking = await bookingFor(id)
-  if (!booking) throw createError({ statusCode: 404, statusMessage: 'No such request' })
+  if (!booking) throw noSuch('request')
 
   const refusal = refusalToUnlist(booking)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })

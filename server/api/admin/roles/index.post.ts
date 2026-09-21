@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
 
   const subject = await findById(input.userId)
   if (!subject || subject.anonymisedAt !== null) {
-    throw createError({ statusCode: 404, statusMessage: 'No such account' })
+    throw noSuch('account')
   }
 
   const expiresAt = input.expiresAt === undefined ? defaultRoleExpiry(new Date()) : input.expiresAt

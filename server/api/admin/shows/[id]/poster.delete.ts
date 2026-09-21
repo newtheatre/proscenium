@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await showById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such show' })
+  if (!held) throw noSuch('show')
 
   const key = await posterKeyOf(id)
   if (!key) throw createError({ statusCode: 409, statusMessage: `${held.title} has no poster to remove` })

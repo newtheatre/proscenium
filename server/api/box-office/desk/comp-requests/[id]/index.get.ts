@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
 
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
   const request = await ticketCompRequestById(id, expiryMinutes)
-  if (!request) throw createError({ statusCode: 404, statusMessage: 'No such comp request' })
+  if (!request) throw noSuch('comp request')
 
   return { request }
 })

@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await contentWarningById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such content warning' })
+  if (!held) throw noSuch('content warning')
 
   if (held.showCount > 0) {
     throw createError({

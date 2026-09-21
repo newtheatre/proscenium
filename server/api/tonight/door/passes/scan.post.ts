@@ -7,10 +7,10 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireNightAuthority(event, 'DOOR', { performanceId: input.performanceId })
 
   const performance = await performanceById(input.performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   const state = await passRedemptionStateByReference(input.reference, performance.showId)
-  if (!state) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+  if (!state) throw noSuch('pass')
 
   const existing = await admissionForPerformance(state.id, input.performanceId)
   if (existing) {

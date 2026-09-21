@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await venueById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such venue' })
+  if (!held) throw noSuch('venue')
 
   const input = await readValidatedBodyOrThrow(event, venueForm)
   const address = input.address ?? null
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
   if (updated.length === 0) {
     const taken = await venueNamed(input.name, id)
-    if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such venue' })
+    if (!taken) throw noSuch('venue')
     throw createError({ statusCode: 409, statusMessage: `A venue is already called ${taken.name}` })
   }
 

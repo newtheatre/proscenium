@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const userId = getRouterParam(event, 'userId') ?? ''
 
   const profile = await accessProfileForOfficer(userId)
-  if (!profile) throw createError({ statusCode: 404, statusMessage: 'No such access profile' })
+  if (!profile) throw noSuch('access profile')
 
   return { profile }
 })

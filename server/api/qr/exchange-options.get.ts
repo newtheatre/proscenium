@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
 
   const limited = await configValue(event, 'LISTING_LIMITED_THRESHOLD_PERCENT')
   const show = await publicShowBySlug(limited, reservation.showSlug)
-  if (!show) throw createError({ statusCode: 404, statusMessage: 'No such show' })
+  if (!show) throw noSuch('show')
 
   return {
     currentPerformanceId: reservation.performanceId,

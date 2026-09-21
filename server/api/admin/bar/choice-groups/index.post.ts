@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const usable = await db.all<{ id: string, name: string, status: string }>(sql`
     SELECT id, name, status FROM bar_items WHERE id IN (${sql.join(named.map(id => sql`${id}`), sql`, `)})
   `)
-  if (usable.length !== named.length) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+  if (usable.length !== named.length) throw noSuch('stocked item')
 
   const retired = usable.find(item => item.status === 'RETIRED')
   if (retired) {

@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const { label, body, sort } = await readValidatedBodyOrThrow(event, presetForm)
 
   const before = (await presets(true)).find(preset => preset.id === id)
-  if (!before) throw createError({ statusCode: 404, statusMessage: 'No such preset' })
+  if (!before) throw noSuch('preset')
 
   await db.batch([
     db.run(updatePresetStatement(id, label, body, sort, resolved.account.id)),

@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await performanceById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!held) throw noSuch('performance')
   if (held.status === 'CANCELLED') {
     throw createError({ statusCode: 409, statusMessage: 'This performance is already cancelled' })
   }

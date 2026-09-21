@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await stocktakeById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such stocktake' })
+  if (!held) throw noSuch('stocktake')
   if (held.status !== 'OPEN') {
     throw createError({ statusCode: 409, statusMessage: 'This stocktake has already been applied' })
   }

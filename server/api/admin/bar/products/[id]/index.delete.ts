@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await productById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such product' })
+  if (!held) throw noSuch('product')
 
   if (held.everSold) {
     throw createError({

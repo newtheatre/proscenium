@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   await requireNightAuthority(event, 'DOOR', { performanceId: input.performanceId })
 
   const performance = await performanceById(input.performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   const now = Math.floor(Date.now() / 1000)
   const found = await doorPassSearch(input.q, input.performanceId, performance.showId)

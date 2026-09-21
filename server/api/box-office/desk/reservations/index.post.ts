@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, deskSaleForm)
 
   const performance = await performanceById(input.performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   // The desk sells past the customer window; nothing else about the refusal moves (D-112
   // criterion 3, D-115 criterion 3): cancelled, unpublished or external still refuses here too.
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   const resolvedTypes = new Map((await bookableTicketTypes(input.performanceId, performance.showId, false, false)).map(type => [type.id, type]))
   const lines = input.lines.map((line) => {
     const type = resolvedTypes.get(line.ticketTypeId)
-    if (!type) throw createError({ statusCode: 400, statusMessage: 'No such ticket type for this performance' })
+    if (!type) throw createError({ statusCode: 400, statusMessage: saysNoSuch('ticket type', 'Choose one of the ticket types this performance offers') })
     return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source }
   })
 

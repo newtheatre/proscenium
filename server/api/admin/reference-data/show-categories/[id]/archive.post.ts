@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await showCategoryById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such category' })
+  if (!held) throw noSuch('category')
 
   const { archived } = await readValidatedBodyOrThrow(event, archiveShowCategoryForm)
   if (archived === held.archived) {

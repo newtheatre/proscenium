@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await showById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such show' })
+  if (!held) throw noSuch('show')
 
   const previousKey = await posterKeyOf(id)
   const stored = await storePosterImage(event, { showId: id, fieldName: 'poster', previousKey })

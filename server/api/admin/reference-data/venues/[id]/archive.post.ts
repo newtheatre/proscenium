@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await venueById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such venue' })
+  if (!held) throw noSuch('venue')
 
   const { archived } = await readValidatedBodyOrThrow(event, archiveVenueForm)
   if (archived === held.archived) {

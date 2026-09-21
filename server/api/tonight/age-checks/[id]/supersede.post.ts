@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, supersedeForm)
 
   const original = await ageCheckById(id)
-  if (!original) throw createError({ statusCode: 404, statusMessage: 'No such entry' })
+  if (!original) throw noSuch('entry')
 
   const correctionId = newId()
   const write = supersedeAgeCheck(resolved.account.id, id, { ...input, performanceId: original.performanceId }, correctionId)

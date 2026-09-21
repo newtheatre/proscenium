@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await passTypeById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+  if (!held) throw noSuch('pass')
 
   const input = await readValidatedBodyOrThrow(event, passTypeForm)
   const description = input.description ?? null
@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
 
   if (updated.length === 0) {
     const taken = await passTypeBySlug(input.slug, id)
-    if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+    if (!taken) throw noSuch('pass')
     throw createError({ statusCode: 409, statusMessage: `A pass already has the address ${taken.slug}` })
   }
 

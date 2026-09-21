@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   await requirePermission(event, 'ticketing.read')
 
   const show = await showById(id)
-  if (!show) throw createError({ statusCode: 404, statusMessage: 'No such show' })
+  if (!show) throw noSuch('show')
 
   const input = await getValidatedQueryOrThrow(event, query)
   const clause = performancesClause(input)

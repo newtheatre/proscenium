@@ -2,7 +2,7 @@
 export default defineEventHandler(async (event) => {
   const token = getRouterParam(event, 'token') ?? ''
   const entryId = await verifyWaitingListToken(token)
-  if (!entryId) throw createError({ statusCode: 404, statusMessage: 'No such waiting-list entry' })
+  if (!entryId) throw noSuch('waiting-list entry', 'Ask us for a new link if you still want the seats')
 
   await removeWaitingListEntry(entryId, new Date())
   // Idempotent by design: removing an already-removed or already-claimed entry still reads as

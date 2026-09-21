@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.roomNoShows.id, id))
     .limit(1)
 
-  if (!record) throw createError({ statusCode: 404, statusMessage: 'No such record' })
+  if (!record) throw noSuch('record')
 
   // Only the standing entry may be superseded: withdrawing one already withdrawn, or one an
   // earlier correction replaced, would leave two claims about the same night.

@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'rota.write')
 
   const venue = (await listVenues()).find(one => one.id === venueId)
-  if (!venue) throw createError({ statusCode: 404, statusMessage: 'No such venue' })
+  if (!venue) throw noSuch('venue')
 
   const input = await readValidatedBodyOrThrow(event, shiftTemplateForm)
   const refusal = templateRefusal(input.slots)

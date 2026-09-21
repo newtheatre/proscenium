@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
 
   const performance = await performanceById(id)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   const [summary, next] = await Promise.all([
     waitingListSummary(id),

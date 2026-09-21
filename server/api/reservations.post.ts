@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
   })
 
   const performance = await performanceById(input.performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
 
   // Every internal path asks this one question; a refusal here reads the same as the desk's own
   // (criterion 4, D-112). A web reservation never bypasses the window, so this is the only check.
@@ -80,7 +80,7 @@ export default defineEventHandler(async (event) => {
 
   const lines = input.lines.map((line) => {
     const type = resolved.get(line.ticketTypeId)
-    if (!type) throw createError({ statusCode: 400, statusMessage: 'No such ticket type for this performance' })
+    if (!type) throw createError({ statusCode: 400, statusMessage: saysNoSuch('ticket type', 'Choose one of the ticket types this performance offers') })
     return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source, accessKind: type.accessKind }
   })
 

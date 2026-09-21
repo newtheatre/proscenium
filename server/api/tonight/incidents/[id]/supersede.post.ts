@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, supersedeIncidentForm)
 
   const original = await incidentById(id)
-  if (!original) throw createError({ statusCode: 404, statusMessage: 'No such entry' })
+  if (!original) throw noSuch('entry')
 
   const { from, to } = showNightBounds(resolved.night)
   const happenedAt = input.happenedAt ?? original.happenedAt

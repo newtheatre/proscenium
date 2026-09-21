@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.trainingSessions.id, id))
     .limit(1)
 
-  if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session' })
+  if (!session) throw noSuch('session', 'Open the sessions list and choose it again')
 
   const mine = session.trainerId === resolved.account.id
   if (!mine && !resolved.permissions.has('training.write')) {

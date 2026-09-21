@@ -8,7 +8,7 @@ export interface ErasureOutcome { erased: boolean, alreadyErased: boolean }
 // failing (K-109 criterion 4, J-102 criterion 3).
 export async function eraseAccount(userId: string, actorId: string | null): Promise<ErasureOutcome> {
   const account = await findById(userId)
-  if (!account) throw createError({ statusCode: 404, statusMessage: 'No such account' })
+  if (!account) throw noSuch('account')
 
   if (account.anonymisedAt !== null) return { erased: false, alreadyErased: true }
 

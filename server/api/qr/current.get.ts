@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   if (!reservationId) throw createError({ statusCode: 401, statusMessage: 'That link has expired. Open it again from your email' })
 
   const reservation = await reservationCurrentState(reservationId)
-  if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!reservation) throw noSuch('booking', 'Check the reference and try again')
 
   // Rendered again rather than reusing the email's copy: the image carries the same stable
   // token either way (D-108 criteria 1, 3), and nothing here is cached across a request.

@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireNightAuthority(event, 'DOOR', { performanceId: input.performanceId })
 
   const reservation = await reservationForDoor(input.reference)
-  if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!reservation) throw noSuch('booking', 'Check the reference and try again')
 
   const outcome = doorTicketOutcome(
     reservation.status,

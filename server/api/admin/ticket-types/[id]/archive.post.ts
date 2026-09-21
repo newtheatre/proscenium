@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await ticketTypeById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such ticket type' })
+  if (!held) throw noSuch('ticket type')
   const reserved = systemTicketTypeRefusal(held)
   if (reserved) throw createError({ statusCode: 409, statusMessage: reserved })
 

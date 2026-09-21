@@ -8,14 +8,14 @@ export default defineEventHandler(async (event) => {
   const resolved = await requireCatalogueAuthority(event)
 
   const held = await moduleById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such module' })
+  if (!held) throw noSuch('module')
   assertStewards(resolved, held.department)
 
   const input = await readValidatedBodyOrThrow(event, moduleForm)
   if (input.department !== held.department) {
     assertStewards(resolved, input.department)
     if (!await departmentByCode(input.department)) {
-      throw createError({ statusCode: 404, statusMessage: 'No such department' })
+      throw noSuch('department')
     }
   }
 

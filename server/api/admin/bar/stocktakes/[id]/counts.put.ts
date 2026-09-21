@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await stocktakeById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such stocktake' })
+  if (!held) throw noSuch('stocktake')
 
   const { counts } = await readValidatedBodyOrThrow(event, stocktakeCountsForm)
 

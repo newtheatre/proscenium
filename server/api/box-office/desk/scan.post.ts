@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
 
   if (code.kind === 'REFERENCE') {
     const reservation = await deskReservationByReference(code.value)
-    if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+    if (!reservation) throw noSuch('booking', 'Check the reference and try again')
     return reservation
   }
 
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   if (!reservationId) throw createError({ statusCode: 404, statusMessage: 'That code is not recognised' })
 
   const reservation = await deskReservation(reservationId)
-  if (!reservation) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!reservation) throw noSuch('booking', 'Check the reference and try again')
 
   return reservation
 })

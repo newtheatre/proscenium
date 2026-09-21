@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, variantForm)
 
   const product = await productById(input.productId)
-  if (!product) throw createError({ statusCode: 404, statusMessage: 'No such product' })
+  if (!product) throw noSuch('product')
 
   const id = newId()
 

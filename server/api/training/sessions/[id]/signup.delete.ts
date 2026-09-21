@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   if (!sessionId) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean' })
 
   const session = await sessionForSignUp(sessionId)
-  if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session' })
+  if (!session) throw noSuch('session', 'Open the sessions list and choose it again')
 
   // Read before the write, because a promotion is the difference the write made. Nothing is
   // decided from it: the claim is what decides, and it is a write (G-106 criterion 2).

@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await contentWarningById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such content warning' })
+  if (!held) throw noSuch('content warning')
 
   const input = await readValidatedBodyOrThrow(event, contentWarningForm)
   if (input.kind !== held.kind && held.showCount > 0) {
@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
 
   if (updated.length === 0) {
     const taken = await contentWarningNamed(input.slug, input.title, id)
-    if (!taken) throw createError({ statusCode: 404, statusMessage: 'No such content warning' })
+    if (!taken) throw noSuch('content warning')
     throw createError({ statusCode: 409, statusMessage: `The vocabulary already holds ${taken.title}` })
   }
 

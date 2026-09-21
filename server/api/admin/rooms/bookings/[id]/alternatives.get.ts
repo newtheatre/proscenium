@@ -4,7 +4,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
 
   const displaced = await displacedBooking(id)
-  if (!displaced) throw createError({ statusCode: 404, statusMessage: 'No such booking' })
+  if (!displaced) throw noSuch('booking')
 
   const candidates = await alternativesFor(displaced)
   const best = nearestTo(displaced, candidates)

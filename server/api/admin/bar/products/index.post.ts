@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const id = newId()
 
   if (!await categoryById(input.categoryId)) {
-    throw createError({ statusCode: 404, statusMessage: 'No such category' })
+    throw noSuch('category')
   }
 
   // The predicate rides the write, so two managers naming the same thing at once produce one

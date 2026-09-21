@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const item = await itemById(input.itemId)
-  if (!item) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+  if (!item) throw noSuch('stocked item')
   if (item.status === 'RETIRED') {
     throw createError({ statusCode: 409, statusMessage: `${item.name} is retired: put it back before moving stock against it` })
   }
@@ -70,7 +70,7 @@ async function reversalTarget(input: { kind: string, itemId: string, qty: number
   }
 
   const original = await movementById(input.reversesId)
-  if (!original) throw createError({ statusCode: 404, statusMessage: 'No such movement to reverse' })
+  if (!original) throw noSuch('movement')
   // Reversing a reversal would hide the correction behind a correction, so it is refused here as
   // well as at the unique index that stops the same movement being reversed twice.
   if (original.kind === 'REVERSAL') {

@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   // back is never turned away by a window that has since closed (criterion 1, D-112 already live).
   if (delta.additions.length > 0) {
     const performance = await performanceById(reservation.performanceId)
-    if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+    if (!performance) throw noSuch('performance')
 
     const refusal = saleRefusal(performance, new Date(), 'CUSTOMER')
     if (refusal) throw createError({ statusCode: 409, statusMessage: refusal.says })
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
 
     const priced = delta.additions.map((addition) => {
       const type = resolved.get(addition.ticketTypeId)
-      if (!type) throw createError({ statusCode: 400, statusMessage: 'No such ticket type for this performance' })
+      if (!type) throw createError({ statusCode: 400, statusMessage: saysNoSuch('ticket type', 'Choose one of the ticket types this performance offers') })
       return { addition, type }
     })
 

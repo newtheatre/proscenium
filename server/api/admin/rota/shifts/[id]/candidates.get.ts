@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const { search } = await getValidatedQueryOrThrow(event, query)
 
   const held = await shiftDetail(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such shift' })
+  if (!held) throw noSuch('shift')
 
   const term = contains(search.toLowerCase())
   const matched = await db.all<{ id: string, name: string, email: string }>(sql`

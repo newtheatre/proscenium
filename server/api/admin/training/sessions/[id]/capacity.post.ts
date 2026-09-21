@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, sessionCapacityForm)
 
   const session = await sessionForSignUp(sessionId)
-  if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session' })
+  if (!session) throw noSuch('session', 'Open the sessions list and choose it again')
 
   const [owner] = await db.select({ trainerId: schema.trainingSessions.trainerId })
     .from(schema.trainingSessions).where(eq(schema.trainingSessions.id, sessionId)).limit(1)

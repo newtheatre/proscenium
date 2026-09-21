@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
+import { saysNoSuch } from './no-such'
 import { resolvePrice } from '#shared/utils/ticket-types'
 import type { PriceSource } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
@@ -161,7 +162,7 @@ export function overridesToWrite(
   const known = new Set(held.map(price => price.ticketTypeId))
   for (const override of input) {
     if (!known.has(override.ticketTypeId)) {
-      throw createError({ statusCode: 400, statusMessage: 'No such ticket type' })
+      throw createError({ statusCode: 400, statusMessage: saysNoSuch('ticket type') })
     }
   }
   return {

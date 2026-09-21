@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   if (sameNight) throw createError({ statusCode: 400, statusMessage: sameNight })
 
   const target = await performanceById(input.performanceId)
-  if (!target) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!target) throw noSuch('performance')
 
   // Criterion 5: a different show is cancel and rebook, not an exchange.
   const differentShow = differentShowReason(reservation.showId, target.showId)

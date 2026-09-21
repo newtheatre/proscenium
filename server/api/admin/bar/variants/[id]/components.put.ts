@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
 
   const held = await variantById(id, londonDayOf(new Date()))
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such serving size' })
+  if (!held) throw noSuch('serving size')
 
   const { components } = await readValidatedBodyOrThrow(event, componentsForm)
 
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
       SELECT id, name, status FROM bar_items WHERE id IN (${sql.join(named.map(id => sql`${id}`), sql`, `)})
     `)
 
-  if (usable.length !== named.length) throw createError({ statusCode: 404, statusMessage: 'No such stocked item' })
+  if (usable.length !== named.length) throw noSuch('stocked item')
 
   const retired = usable.find(item => item.status === 'RETIRED')
   if (retired) {

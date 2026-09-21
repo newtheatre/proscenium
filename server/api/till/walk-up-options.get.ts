@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   requireOpenSession(await openSessionFor(resolved.venueId, resolved.night))
 
   const performance = await performanceById(input.performanceId)
-  if (!performance) throw createError({ statusCode: 404, statusMessage: 'No such performance' })
+  if (!performance) throw noSuch('performance')
   const refusal = saleRefusal(performance, new Date(), 'DESK')
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal.says })
 

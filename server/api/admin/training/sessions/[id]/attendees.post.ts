@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   // The modules come from the one definition sign-up reads, so a walk-in is judged by the same
   // rule as somebody who signed up in advance.
   const session = await sessionForSignUp(id)
-  if (!session) throw createError({ statusCode: 404, statusMessage: 'No such session' })
+  if (!session) throw noSuch('session', 'Open the sessions list and choose it again')
 
   const [held] = await db.select({
     trainerId: schema.trainingSessions.trainerId,
@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const person = await findById(input.userId)
-  if (!person) throw createError({ statusCode: 404, statusMessage: 'No such person' })
+  if (!person) throw noSuch('person')
   if (person.anonymisedAt !== null) {
     throw createError({
       statusCode: 409,

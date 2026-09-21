@@ -7,14 +7,14 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, issuePassForm)
 
   const passType = await passTypeForSale(input.passTypeId)
-  if (!passType) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+  if (!passType) throw noSuch('pass')
 
   const refusal = passSaleRefusal(passType, Math.floor(Date.now() / 1000))
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const price = await passTypePriceById(input.passTypePriceId)
   if (!price || price.passTypeId !== input.passTypeId) {
-    throw createError({ statusCode: 400, statusMessage: 'No such price point for this pass' })
+    throw createError({ statusCode: 400, statusMessage: saysNoSuch('price point', 'Choose one of the price points this pass offers') })
   }
 
   if (price.price !== input.expectedTotalPence) {

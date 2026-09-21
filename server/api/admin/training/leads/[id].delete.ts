@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
     userId: schema.departmentLeads.userId,
   }).from(schema.departmentLeads).where(eq(schema.departmentLeads.id, id)).limit(1)
 
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such lead assignment' })
+  if (!held) throw noSuch('lead assignment')
 
   await db.batch([
     db.delete(schema.departmentLeads).where(eq(schema.departmentLeads.id, id)),

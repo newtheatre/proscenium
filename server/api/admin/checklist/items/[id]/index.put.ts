@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, checklistItemForm)
 
   const before = (await itemsForVenue(input.venueId, true)).find(item => item.id === id)
-  if (!before) throw createError({ statusCode: 404, statusMessage: 'No such checklist item' })
+  if (!before) throw noSuch('checklist item')
 
   await db.batch([
     db.run(updateItemStatement(id, input, resolved.account.id)),

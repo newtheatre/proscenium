@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
 
   const held = await shiftDetail(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such shift' })
+  if (!held) throw noSuch('shift')
 
   const eligibilities = await shiftEligibilities(event, account.id, londonToday())
   if (!eligibilities[held.role].eligible) {
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
   if (!applied) {
     const now = await shiftDetail(id)
-    if (!now) throw createError({ statusCode: 404, statusMessage: 'No such shift' })
+    if (!now) throw noSuch('shift')
     if (now.status !== 'OPEN') throw createError({ statusCode: 409, statusMessage: 'That shift has already been taken' })
     throw createError({ statusCode: 409, statusMessage: 'You already hold a shift on this performance' })
   }

@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
 
   const held = await openingShiftDetail(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such bar opening slot' })
+  if (!held) throw noSuch('bar opening slot')
   if (held.userId !== account.id) throw createError({ statusCode: 403, statusMessage: 'That slot is not yours to release' })
 
   const entry = auditEntry({

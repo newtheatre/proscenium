@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const { active } = await readValidatedBodyOrThrow(event, body)
 
   const before = (await milestoneTypes(true)).find(type => type.id === id)
-  if (!before) throw createError({ statusCode: 404, statusMessage: 'No such milestone type' })
+  if (!before) throw noSuch('milestone type')
 
   await db.batch([
     db.run(retireMilestoneTypeStatement(id, active, resolved.account.id)),

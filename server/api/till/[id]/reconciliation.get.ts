@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean' })
 
   const session = await sessionById(id)
-  if (!session) throw createError({ statusCode: 404, statusMessage: 'No such till session' })
+  if (!session) throw noSuch('till session')
 
   await closerFor(event, session)
 

@@ -7,11 +7,11 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const show = await showById(showId)
-  if (!show) throw createError({ statusCode: 404, statusMessage: 'No such show' })
+  if (!show) throw noSuch('show')
 
   const input = await readValidatedBodyOrThrow(event, performanceForm)
   const venue = (await listVenues()).find(one => one.id === input.venueId)
-  if (!venue) throw createError({ statusCode: 400, statusMessage: 'No such venue' })
+  if (!venue) throw createError({ statusCode: 400, statusMessage: saysNoSuch('venue') })
   if (venue.archived) throw createError({ statusCode: 409, statusMessage: `${venue.name} is retired and cannot be booked for a new performance` })
 
   const id = newId()

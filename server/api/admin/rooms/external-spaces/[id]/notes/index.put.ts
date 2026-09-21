@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, spaceNoteForm)
 
   const space = await findSpace(id)
-  if (!space) throw createError({ statusCode: 404, statusMessage: 'No such room' })
+  if (!space) throw noSuch('room')
 
   const purpose = await requirePurpose(event, input.purpose)
   const now = Math.floor(Date.now() / 1000)

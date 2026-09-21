@@ -5,6 +5,7 @@ import { auditedWrite } from './audit'
 import { hasCurrentMembership } from './bookings'
 import { heldSeatsQuery } from './capacity'
 import { configValue } from './configuration'
+import { saysNoSuch } from './no-such'
 import { effectiveCapacity, performanceNight } from './performances'
 import { performanceById } from './programme'
 import { bookableTicketTypes, writeReservation } from './reservations'
@@ -341,7 +342,7 @@ export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEn
     const type = resolved.get(line.ticketTypeId)
     if (!type) {
       await db.run(sql`UPDATE waiting_list SET status = 'OFFERED', updated_at = unixepoch() WHERE id = ${entry.id} AND status = 'CLAIMED'`)
-      return { applied: false, refusal: 'No such ticket type for this performance' }
+      return { applied: false, refusal: saysNoSuch('ticket type', 'Choose one of the ticket types this performance offers') }
     }
     lines.push({ ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source })
   }

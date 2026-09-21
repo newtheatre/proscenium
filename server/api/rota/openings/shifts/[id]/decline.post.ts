@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const { reason } = await readValidatedBodyOrThrow(event, shiftDeclineForm)
 
   const held = await openingShiftDetail(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such bar opening slot' })
+  if (!held) throw noSuch('bar opening slot')
 
   const entry = auditEntry({
     actorId: resolved.account.id,

@@ -4,7 +4,7 @@ export default defineEventHandler(async (event) => {
   await requirePermission(event, 'ticketing.read')
 
   const passType = await passTypeById(id)
-  if (!passType) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+  if (!passType) throw noSuch('pass')
 
   return { passType, shows: await listShowOptions() }
 })

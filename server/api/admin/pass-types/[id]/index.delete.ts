@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
 
   const held = await passTypeById(id)
-  if (!held) throw createError({ statusCode: 404, statusMessage: 'No such pass' })
+  if (!held) throw noSuch('pass')
 
   if (held.everIssued) {
     throw createError({
