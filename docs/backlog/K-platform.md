@@ -9,7 +9,7 @@ the cutover rather than after it. Phasing follows the roadmap: the platform stor
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 30. Phases: 24 MVP, 1 V2, 0 Later, 5 resolved.
+Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
 
 ## Open questions
 
@@ -759,6 +759,28 @@ Stories: 30. Phases: 24 MVP, 1 V2, 0 Later, 5 resolved.
   that only the deployed worker exhibited. The first broke every create route in the application
   for a day; the second made revoking a role impossible. Both were found by hand.
 
+## K-133: A refusal or a dead link lands inside the site
+
+- Role: Visitor
+- Phase: MVP
+- Story: As somebody who mistyped a show's address, or whose sign-in ran out mid-page, I want the
+  screen that says so to still be the theatre's so that I can carry on rather than reach for the
+  back button.
+- Depends on: J-111, K-101
+- Acceptance criteria:
+  1. The error screen renders inside the public chrome: the site header and the site footer as
+     the `default` layout draws them, with the page itself on the spotlight ground carrying the
+     wordmark, so a mistyped show URL never costs the visitor the rest of the site.
+  2. No status code is shown. The screen says what happened and what to do, and an error never
+     shows a reader a number (`docs/copy-style.md` section 6).
+  3. Three ways on are offered on every error: what's on, get involved, and the home page. The
+     tone is plain rather than jokey.
+  4. The wording for 401 and 403, and the enrolment path a second-factor refusal carries (A-112),
+     are unchanged by any of the above: the enrolment button stays the first action where the
+     refusal names one.
+- Source: Issue 1152 item 2. The page rendered outside every layout and printed the status code
+  in mono above the title.
+
 ## K-201: The console command palette
 
 - Role: Administrator
@@ -783,3 +805,4 @@ Stories: 30. Phases: 24 MVP, 1 V2, 0 Later, 5 resolved.
   answer once the sidebar passes roughly forty items; it carries fifty-four. Decision 0082 split
   the groups into sections first, because search finds a screen whose name is already known and
   the sections are what make an unfamiliar one findable at all.
+

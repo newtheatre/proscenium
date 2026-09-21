@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { codeForStep, stepFor } from '#shared/utils/totp'
 import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -293,6 +294,95 @@ describe.skipIf(skip !== null)('registering on an address that already booked as
        WHERE u.email = ? AND t.kind = 'SET_PASSWORD'`, email)
     expect(claim?.n).toBe(0)
   })
+})
+
+// The three screens a person reaches from an email, driven in a browser rather than over the
+// wire: what was wrong with each of them was where it sent the reader next (issue 1152 item 1).
+describe.skipIf(skip !== null)('the way in reads as one journey (A-103, A-112)', () => {
+  test('a sign-in link honours the page it was sent from', async () => {
+    const email = await unproven('magic-next')
+    markVerified(app, email)
+    const token = newToken()
+    await plantToken(email, 'MAGIC_LINK', token)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await view.navigate(`${app.baseURL}/magic?token=${token}&next=%2Faccount%2Fprofile`)
+      await waitFor(view, `location.pathname === '/account/profile'`, 30_000)
+      expect(await view.evaluate<string>('location.pathname')).toBe('/account/profile')
+    }
+    finally {
+      view.close()
+    }
+  }, 90_000)
+
+  // An absolute URL in `next` would make the link an open redirect, so only a path on this site
+  // is followed and anything else lands on the home page.
+  test('a sign-in link refuses to leave the site', async () => {
+    const email = await unproven('magic-offsite')
+    markVerified(app, email)
+    const token = newToken()
+    await plantToken(email, 'MAGIC_LINK', token)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await view.navigate(`${app.baseURL}/magic?token=${token}&next=https%3A%2F%2Fexample.invalid%2F`)
+      await waitFor(view, `location.pathname === '/'`, 30_000)
+      expect(await view.evaluate<string>('location.host')).toBe(new URL(app.baseURL).host)
+    }
+    finally {
+      view.close()
+    }
+  }, 90_000)
+
+  test('the recovery-code form offers the way back to the authenticator', async () => {
+    const email = await unproven('recovery-back')
+    markVerified(app, email)
+    const signedIn = await post('/api/auth/sign-in', { email, password })
+    const cookie = (signedIn.headers.get('set-cookie') ?? '').split(';')[0]!
+    const { secret } = await (await post('/api/account/mfa/enrol', {}, cookie)).json() as { secret: string }
+    expect((await post('/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, cookie)).status).toBe(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test=mfa-challenge]')`, 30_000)
+
+      await click(view, '[data-test=use-recovery-code]')
+      await waitFor(view, `document.querySelector('[data-test=recovery-code]')`)
+
+      await click(view, '[data-test=use-authenticator]')
+      await waitFor(view, `!document.querySelector('[data-test=recovery-code]')`)
+      expect(await view.evaluate<number>(`document.querySelectorAll('[data-test=mfa-challenge] input').length`))
+        .toBeGreaterThan(1)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  // "Ask for a new one" used to land on the credentials step, leaving the reader to find the
+  // forgotten-password form again for themselves.
+  test('a spent reset link asks for a new one on the forgotten-password step', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/reset`)
+      await fill(view, 'form input[type="password"]', generatePassword())
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test=token-expired]')`)
+
+      await click(view, '[data-test=ask-again]')
+      await waitFor(view, `location.pathname === '/sign-in'`, 30_000)
+      await waitFor(view, `document.body.innerText.includes('Forgotten password')`)
+      expect(await view.evaluate<string>('location.search')).toContain('method=reset')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
