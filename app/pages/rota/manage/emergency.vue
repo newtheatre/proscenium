@@ -356,7 +356,7 @@ const columns: TableColumn<VenueCard>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </form>

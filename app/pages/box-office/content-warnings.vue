@@ -447,7 +447,7 @@ const columns: TableColumn<ContentWarning>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Cancel
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
             <UButton
               type="submit"
@@ -463,7 +463,7 @@ const columns: TableColumn<ContentWarning>[] = [
 
     <UModal
       :open="removing !== null"
-      title="Delete this warning?"
+      title="Delete this warning"
       description="No show carries it, so nothing on the public site changes. A warning a show carries can only be archived."
       @update:open="value => { if (!value) removing = null }"
     >
@@ -485,7 +485,7 @@ const columns: TableColumn<ContentWarning>[] = [
               variant="ghost"
               @click="removing = null"
             >
-              Keep it
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
             <UButton
               color="error"

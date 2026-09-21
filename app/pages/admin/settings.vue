@@ -479,7 +479,7 @@ onMounted(load)
           variant="outline"
           @click="confirming = null"
         >
-          Cancel
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
         <UButton
           color="warning"

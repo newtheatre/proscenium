@@ -218,6 +218,14 @@ const columns: TableColumn<Space>[] = [
         ])),
   },
 ]
+
+// A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
+// is shown wherever the action was taken.
+const modalOpen = computed(() => open.value || noting.value !== null || forgetting.value !== null)
+
+watch(modalOpen, (nowOpen) => {
+  if (!nowOpen) failure.value = null
+})
 </script>
 
 <template>
@@ -234,7 +242,7 @@ const columns: TableColumn<Space>[] = [
     />
 
     <UAlert
-      v-if="failure"
+      v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -304,6 +312,14 @@ const columns: TableColumn<Space>[] = [
       description="What we know about where it is and who to ask. We are told little, so most of this is optional."
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <UForm
           :schema="spaceForm"
           :state="state"
@@ -392,7 +408,7 @@ const columns: TableColumn<Space>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -406,6 +422,14 @@ const columns: TableColumn<Space>[] = [
       @update:open="noting = null"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <div class="space-y-4">
           <UFormField
             label="For what"
@@ -478,7 +502,7 @@ const columns: TableColumn<Space>[] = [
           variant="ghost"
           @click="noting = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

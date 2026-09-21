@@ -505,7 +505,7 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
             data-test="module-cancel"
             @click="emit('update:open', false)"
           >
-            Back
+            {{ CONFIRM_BACK_LABEL }}
           </UButton>
         </div>
       </UForm>
