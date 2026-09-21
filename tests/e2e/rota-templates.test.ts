@@ -395,6 +395,25 @@ describe.skipIf(skip !== null)('shift eligibility is set from the templates scre
   }, 120_000)
 })
 
+// K-123 criterion 12: the rota is one workflow across four sidebar entries, and a screen names
+// the step after it rather than sending an officer back to the sidebar.
+describe.skipIf(skip !== null)('the rota links itself step to step', () => {
+  test('the templates screen carries the way on to the board', async () => {
+    const view = await visitAsFoh('/rota/manage/templates')
+    try {
+      await waitFor(view, `!!document.querySelector('[data-test="rota-next-step"]')`)
+      expect(await textOf(view, '[data-test="rota-next-step"]')).toContain('Rota board')
+
+      await click(view, '[data-test="rota-next-step"]')
+      await waitFor(view, `!!document.querySelector('[data-test="board-from"]')`)
+      expect(await view.evaluate<string>('location.pathname')).toBe('/rota/manage/shifts')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+})
+
 async function visitAsAdmin(path: string): Promise<Bun.WebView> {
   forgetSpentStep(app, adminBrowser.email)
   const view = await openSignedOutView(app.baseURL)
