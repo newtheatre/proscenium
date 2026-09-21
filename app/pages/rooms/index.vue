@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatLondon, fromLondonWallClock, londonWeekday } from '#shared/utils/london'
 import { closedOn } from '#shared/utils/rooms'
+import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import type { GridColumn, GridRoom } from '~/components/RoomGrid.vue'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/booking-a-room' })
@@ -24,6 +25,10 @@ interface Room extends GridRoom {
 interface Availability { from: string, to: string, rooms: Room[] }
 
 const request = useRequestFetch()
+
+// The only link off a member screen into the console, so it is drawn only for somebody the
+// console would let in (C-102 criterion 8).
+const managesRooms = computed(() => can(useViewer().value, manageRoomsEstate))
 
 // Day below tablet width, week above: a foyer is not a desk (C-102 criterion 5). False while
 // rendering, a server having no viewport, and corrected on the first client tick.
@@ -144,7 +149,7 @@ useSeoMeta({ title: 'Rooms' })
   <UContainer :class="MEMBER_PAGE_WIDE">
     <UPageHeader
       title="Rooms"
-      description="What is free, and when. Click a free slot to book an hour, or drag across several. A slot somebody else holds reads as booked and nothing more."
+      description="What is free, and when. Choose a free slot to book an hour, or drag across several; on a touch screen, tap where it starts and then where it ends. A slot somebody else holds reads as booked and nothing more."
     />
 
     <div class="mt-6 flex flex-wrap items-center gap-2">
@@ -186,6 +191,8 @@ useSeoMeta({ title: 'Rooms' })
         <UButton
           :color="view === 'day' ? 'primary' : 'neutral'"
           variant="outline"
+          :aria-pressed="view === 'day'"
+          :icon="view === 'day' ? 'i-lucide-check' : undefined"
           data-test="calendar-day"
           @click="view = 'day'"
         >
@@ -194,6 +201,8 @@ useSeoMeta({ title: 'Rooms' })
         <UButton
           :color="view === 'week' ? 'primary' : 'neutral'"
           variant="outline"
+          :aria-pressed="view === 'week'"
+          :icon="view === 'week' ? 'i-lucide-check' : undefined"
           data-test="calendar-week"
           @click="view = 'week'"
         >
@@ -233,14 +242,11 @@ useSeoMeta({ title: 'Rooms' })
       {{ labelFor(span.from) }}<span v-if="span.from !== span.to"> to {{ labelFor(span.to) }}</span>
     </p>
 
-    <UAlert
+    <ReadFailure
       v-if="failure"
+      :failure="failure"
       class="mt-6"
-      data-test="calendar-failure"
-      color="error"
-      variant="subtle"
-      :description="failure.message"
-      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
+      @retry="refresh()"
     />
 
     <p
@@ -248,9 +254,14 @@ useSeoMeta({ title: 'Rooms' })
       class="mt-8 text-sm text-muted"
       data-test="calendar-empty"
     >
-      No rooms are bookable yet. An officer adds them under <ULink to="/rooms/manage">
-        Rooms
-      </ULink>.
+      <template v-if="managesRooms">
+        No rooms are bookable yet. Add them under <ULink to="/rooms/manage">
+          Rooms
+        </ULink>.
+      </template>
+      <template v-else>
+        No rooms are bookable yet. They appear here once the committee has added them.
+      </template>
     </p>
 
     <!-- Rooms down, days across, and a count in each: which room is quiet on Thursday. -->
@@ -292,7 +303,7 @@ useSeoMeta({ title: 'Rooms' })
                 v-if="cell.closed"
                 class="block py-1 text-xs text-muted"
                 :data-test="`summary-${row.room.id}-${cell.day}`"
-              >Closed</span>
+              >Not open</span>
               <UButton
                 v-else
                 size="xs"
@@ -332,8 +343,8 @@ useSeoMeta({ title: 'Rooms' })
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-secondary/40" /> Yours</span>
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-primary/30" /> Booked</span>
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-warning/30" /> Awaiting a decision</span>
-      <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-muted" /> Closed</span>
-      <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-error/20" /> Shut</span>
+      <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-muted" /> Not open</span>
+      <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-error/20" /> Closed</span>
     </div>
   </UContainer>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { fromLondonWallClock, londonWeekday } from '#shared/utils/london'
+import { saysClock } from '#shared/utils/when'
 import type { RoomHours } from '#shared/utils/rooms'
 
 // One grid, two shapes. A column is a room on a day, so a week of one room and a day of every
@@ -52,8 +53,14 @@ const emit = defineEmits<{ pick: [column: GridColumn, from: string, until: strin
 // so a selection can never straddle somebody else's booking.
 const dragging = ref<{ key: string, from: number, to: number } | null>(null)
 
-function startAt(column: GridColumn, minutes: number): void {
-  if (stateOf(column, minutes) !== 'free') return
+// A finger cannot drag here: between press and release a touch pointer is captured and sends no
+// enter events, so the span is tapped end to end instead (C-102 criterion 6).
+const byTouch = ref(false)
+const tapping = ref<{ key: string, minutes: number } | null>(null)
+
+function startAt(column: GridColumn, minutes: number, pointerType: string): void {
+  byTouch.value = pointerType === 'touch'
+  if (byTouch.value || stateOf(column, minutes) !== 'free') return
   dragging.value = { key: column.key, from: minutes, to: minutes }
 }
 
@@ -81,7 +88,19 @@ const dragged = ref(false)
 
 function pick(column: GridColumn, minutes: number): void {
   if (dragged.value) return
-  emit('pick', column, clockAt(minutes), clockAt(minutes + props.slotMinutes * 4))
+  if (!byTouch.value) {
+    emit('pick', column, clockAt(minutes), clockAt(minutes + props.slotMinutes * 4))
+    return
+  }
+
+  const held = tapping.value?.key === column.key ? tapping.value.minutes : null
+  const picked = tapToSpan(held, minutes, props.slotMinutes)
+  tapping.value = picked.start === null ? null : { key: column.key, minutes: picked.start }
+  if (picked.span) emit('pick', column, clockAt(picked.span.from), clockAt(Math.min(picked.span.to, 24 * 60 - 1)))
+}
+
+function tapped(column: GridColumn, minutes: number): boolean {
+  return tapping.value?.key === column.key && tapping.value.minutes === minutes
 }
 
 function finish(column: GridColumn): void {
@@ -148,10 +167,25 @@ function stateOf(column: GridColumn, minutes: number): SlotState {
   return taken.status === 'PENDING_APPROVAL' ? 'pending' : 'booked'
 }
 
+// Every closure on a visible day, said in text: a tooltip is unreachable by touch and announced by
+// nothing (C-102 criterion 7). One line per closure, however many columns it appears under.
+const closures = computed(() => {
+  const found = new Map<string, string>()
+  for (const column of props.columns) {
+    const opens = instantOf(column.day, 0)
+    const shuts = instantOf(column.day, 24 * 60)
+    for (const closure of column.room.closed ?? []) {
+      if (closure.endsAt <= opens || closure.startsAt >= shuts) continue
+      found.set(`${column.room.id}-${closure.startsAt}-${closure.endsAt}`, `${column.room.name}, ${column.label}, ${saysClock(closure.startsAt)} to ${saysClock(closure.endsAt)}: ${closure.reason}`)
+    }
+  }
+  return [...found].map(([key, says]) => ({ key, says }))
+})
+
 // Colour is never the only carrier: every slot names its state to a screen reader (K-101).
 const SAYS: Record<SlotState, string> = {
-  'blacked-out': 'shut',
-  'closed': 'closed',
+  'blacked-out': 'closed',
+  'closed': 'not open',
   'mine': 'yours',
   'booked': 'booked',
   'pending': 'awaiting a decision',
@@ -175,7 +209,7 @@ function labelOf(column: GridColumn, minutes: number): string {
   const closure = closureAt(column, minutes)
 
   const what = closure
-    ? `shut, ${closure.reason}`
+    ? `closed, ${closure.reason}`
     : state === 'mine' && taken ? `yours, ${taken.title}` : SAYS[state]
 
   return `${column.room.name}, ${column.label} at ${clockAt(minutes)}: ${what}`
@@ -183,52 +217,74 @@ function labelOf(column: GridColumn, minutes: number): string {
 </script>
 
 <template>
-  <div
-    class="overflow-x-auto"
-    @pointerup="dragging = null"
-    @pointerleave="dragging = null"
-  >
-    <div
-      class="grid gap-px rounded-md bg-accented"
-      :style="{
-        minWidth: `${4 + columns.length * 4.5}rem`,
-        gridTemplateColumns: `4rem repeat(${columns.length}, minmax(4.5rem, 1fr))`,
-      }"
+  <div>
+    <p
+      v-if="byTouch"
+      class="mb-2 text-sm text-muted"
+      data-test="grid-tap-hint"
     >
-      <div class="bg-default p-2 text-xs text-muted">
-        Time
-      </div>
-      <div
-        v-for="column in columns"
-        :key="column.key"
-        class="bg-default p-2 text-center text-xs font-medium"
-      >
-        {{ column.label }}
-      </div>
+      {{ tapping ? 'Now tap where it ends.' : 'Tap where the booking starts, then tap where it ends.' }}
+    </p>
 
-      <template
-        v-for="slot in slots"
-        :key="slot.minutes"
+    <div
+      class="overflow-x-auto"
+      @pointerup="dragging = null"
+      @pointerleave="dragging = null"
+    >
+      <div
+        class="grid gap-px rounded-md bg-accented"
+        :style="{
+          minWidth: `${4 + columns.length * 4.5}rem`,
+          gridTemplateColumns: `4rem repeat(${columns.length}, minmax(4.5rem, 1fr))`,
+        }"
       >
-        <div class="bg-default px-2 py-1 text-right text-xs text-muted">
-          <span v-if="slot.minutes % 60 === 0">{{ slot.label }}</span>
+        <div class="bg-default p-2 text-xs text-muted">
+          Time
         </div>
-        <button
+        <div
           v-for="column in columns"
-          :key="`${column.key}-${slot.minutes}`"
-          type="button"
-          class="h-4 w-full"
-          :class="[FILLS[stateOf(column, slot.minutes)], inDrag(column, slot.minutes) ? 'ring-2 ring-inset ring-primary' : '']"
-          :disabled="stateOf(column, slot.minutes) !== 'free'"
-          :aria-label="labelOf(column, slot.minutes)"
-          :title="closureAt(column, slot.minutes)?.reason"
-          :data-test="`slot-${column.room.id}-${column.day}-${slot.label}`"
-          @pointerdown.prevent="startAt(column, slot.minutes)"
-          @pointerenter="extendTo(column, slot.minutes)"
-          @pointerup="finish(column)"
-          @click="pick(column, slot.minutes)"
-        />
-      </template>
+          :key="column.key"
+          class="bg-default p-2 text-center text-xs font-medium"
+        >
+          {{ column.label }}
+        </div>
+
+        <template
+          v-for="slot in slots"
+          :key="slot.minutes"
+        >
+          <div class="bg-default px-2 py-1 text-right text-xs text-muted">
+            <span v-if="slot.minutes % 60 === 0">{{ slot.label }}</span>
+          </div>
+          <button
+            v-for="column in columns"
+            :key="`${column.key}-${slot.minutes}`"
+            type="button"
+            class="h-4 w-full pointer-coarse:h-11"
+            :class="[FILLS[stateOf(column, slot.minutes)], inDrag(column, slot.minutes) || tapped(column, slot.minutes) ? 'ring-2 ring-inset ring-primary' : '']"
+            :disabled="stateOf(column, slot.minutes) !== 'free'"
+            :aria-label="labelOf(column, slot.minutes)"
+            :data-test="`slot-${column.room.id}-${column.day}-${slot.label}`"
+            @pointerdown.prevent="startAt(column, slot.minutes, $event.pointerType)"
+            @pointerenter="extendTo(column, slot.minutes)"
+            @pointerup="finish(column)"
+            @click="pick(column, slot.minutes)"
+          />
+        </template>
+      </div>
     </div>
+
+    <ul
+      v-if="closures.length"
+      class="mt-3 space-y-1 text-sm text-muted"
+      data-test="grid-closures"
+    >
+      <li
+        v-for="closure in closures"
+        :key="closure.key"
+      >
+        {{ closure.says }}
+      </li>
+    </ul>
   </div>
 </template>
