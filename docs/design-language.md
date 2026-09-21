@@ -212,6 +212,15 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    its footer, `ConfirmModal`'s `failure` prop where it is one and a `UAlert` at the top of the
    body where it is a form, and the page's own alert is hidden while a modal is open. The
    show-night kit is not bound by this: it keeps its own register (rule 3).
+10. **A console screen says what it is for in one sentence, and the documentation says the
+    rest.** The navbar carries the title, so no screen draws a `UPageHeader` of its own; beneath
+    it comes at most one line of plain prose, above the first table or form. An officer who
+    wants more presses the help button, which opens the screen's `content/docs/` page through
+    the `docs` entry in its `definePageMeta` (J-109, 0076). A `UAlert` is for a state the reader
+    has to act on, a refusal, a warning about the data in front of them or an empty result: one
+    that is always there is furniture, and it is read the second time and never again.
+    `tests/unit/admin-conventions.test.ts` holds the rule, against named lists that may shrink
+    and may not grow (K-123 criterion 9, issue 1151 item 2).
 
 ## Photography and show artwork
 
