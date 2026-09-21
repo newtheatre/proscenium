@@ -155,7 +155,8 @@ describe.skipIf(skip !== null)('closing the night (E-114 criterion 4)', () => {
     const blocked = await send('POST', '/api/tonight/checklist/close', undefined, foh.cookie)
     expect(blocked.status).toBe(409)
     const body = await blocked.json() as { statusMessage?: string, message?: string }
-    expect(body.statusMessage ?? body.message ?? '').toContain('Till reconciled')
+    const said = body.statusMessage ?? body.message ?? ''
+    expect(said).toBe('The checklist cannot close while Till reconciled is still open: tick it or record an exception')
   })
 
   test('closing succeeds once every required item is ticked or exempted, a reload still knows it, and a second close refuses', async () => {

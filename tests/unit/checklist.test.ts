@@ -5,6 +5,7 @@ import {
   checklistItemForm,
   checklistScopeForm,
   exemptForm,
+  saysBlockedClose,
   saysPhase,
   saysSystemCheck,
 } from '#shared/utils/checklist'
@@ -60,5 +61,25 @@ describe('the display wording names every value (0009: no member reads a bare co
   test('every phase and system check says something', () => {
     for (const phase of PHASES) expect(saysPhase(phase).length).toBeGreaterThan(2)
     for (const check of SYSTEM_CHECKS) expect(saysSystemCheck(check).length).toBeGreaterThan(2)
+  })
+})
+
+// K-128 criterion 2. The blocked close used to read "Cannot close: <labels> still needs
+// completing or an exception recorded", a developer's colon heading rather than a sentence.
+describe('a blocked close says what is holding it and what to do (criterion 4)', () => {
+  test('one open item is named inside a sentence', () => {
+    expect(saysBlockedClose(['Till reconciled']))
+      .toBe('The checklist cannot close while Till reconciled is still open: tick it or record an exception')
+  })
+
+  test('several open items are listed in the order they were given', () => {
+    expect(saysBlockedClose(['Till reconciled', 'Fire exits checked']))
+      .toContain('while Till reconciled, Fire exits checked is still open')
+  })
+
+  test('one sentence, so it carries no full stop, and no colon heading is left', () => {
+    const said = saysBlockedClose(['Till reconciled'])
+    expect(said).not.toEndWith('.')
+    expect(said).not.toStartWith('Cannot close')
   })
 })
