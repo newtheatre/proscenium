@@ -8,9 +8,8 @@ import { click, openSignedOutView, skipReason, startApp, textOf, visit, waitFor 
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// Issue 1152 item 5 on the real booking screen: the night a booker exchanges to is named by its
-// date, the ways out of a form are told apart from the destructive action, and the edit form caps
-// what it offers at the order cap and prices it (D-110, D-111, K-123 criterion 7).
+// Issue 1152 item 5 on the real booking screen: the exchange list names its nights by date, a
+// form's way out reads differently from cancelling, and the edit form is priced and capped.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type * as z from 'zod'
-import { qrStatusDisplay, reservationResendForm } from '#shared/utils/reservations'
+import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
+import { qrStatusDisplay, reservationResendForm, saysExchangeNight } from '#shared/utils/reservations'
+import { saysPrice } from '#shared/utils/ticket-types'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 
 type Outcome = 'working' | 'found' | 'resend' | 'sent'
@@ -36,6 +38,8 @@ interface ExchangeOption {
   availability: string
   says: string
 }
+
+const SOLD_OUT_OR_CLOSED = ['SOLD_OUT', 'BOOKING_CLOSED']
 
 const route = useRoute()
 const outcome = ref<Outcome>('working')
@@ -81,13 +85,15 @@ const editLoading = ref(false)
 const editFailure = ref<string | null>(null)
 const bookableTypes = ref<BookableType[]>([])
 const quantities = ref<Record<string, number>>({})
+const editCap = ref(1)
 
 async function startEdit(): Promise<void> {
   editFailure.value = null
   editLoading.value = true
   try {
-    const options = await $fetch<{ ticketTypes: BookableType[], lines: NamedLine[] }>('/api/qr/edit-options')
+    const options = await $fetch<{ ticketTypes: BookableType[], lines: NamedLine[], cap: number }>('/api/qr/edit-options')
     bookableTypes.value = options.ticketTypes
+    editCap.value = options.cap
     const seeded: Record<string, number> = {}
     for (const type of options.ticketTypes) seeded[type.id] = 0
     for (const line of options.lines) seeded[line.ticketTypeId] = line.quantity
@@ -323,9 +329,9 @@ useSeoMeta({ title: 'Your booking' })
           <URadioGroup
             v-model="exchangeChoice"
             :items="exchangeOptions.map(option => ({
-              label: `${option.venueName}: ${option.says}`,
+              ...saysExchangeNight(option),
               value: option.id,
-              disabled: option.availability === 'SOLD_OUT' || option.availability === 'BOOKING_CLOSED',
+              disabled: SOLD_OUT_OR_CLOSED.includes(option.availability),
             }))"
             data-test="booking-exchange-options"
           />
@@ -349,7 +355,7 @@ useSeoMeta({ title: 'Your booking' })
               variant="ghost"
               @click="exchanging = false"
             >
-              Cancel
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </div>
@@ -364,11 +370,12 @@ useSeoMeta({ title: 'Your booking' })
             :key="type.id"
             class="flex items-center justify-between gap-3"
           >
-            <span class="text-sm">{{ type.name }}</span>
+            <span class="text-sm">{{ type.name }} <span class="font-mono text-muted">{{ saysPrice(type.price) }}</span></span>
             <UInputNumber
               v-model="quantities[type.id]"
               :min="0"
-              :max="99"
+              :max="editCap"
+              :aria-label="`${type.name} tickets`"
               :data-test="`booking-edit-quantity-${type.id}`"
             />
           </div>
@@ -385,45 +392,21 @@ useSeoMeta({ title: 'Your booking' })
               variant="ghost"
               @click="editing = false"
             >
-              Cancel
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </div>
 
-        <UAlert
-          v-if="cancelFailure"
-          color="error"
-          variant="subtle"
-          :description="cancelFailure"
+        <ConfirmModal
+          v-model:open="cancelConfirming"
+          name="cancel-booking"
+          title="Cancel this booking"
+          verb="Cancel this booking"
+          consequence="Nothing has been charged, so nothing needs refunding. The seats go back on sale straight away."
+          :loading="cancelling"
+          :failure="cancelFailure"
+          @confirm="cancelBooking"
         />
-
-        <div
-          v-if="cancelConfirming"
-          class="space-y-3 border-t border-default pt-4"
-          data-test="booking-cancel-confirm"
-        >
-          <p class="text-sm text-muted">
-            Cancel this booking? Nothing has been charged, so nothing needs refunding, but the
-            seats go back on sale immediately.
-          </p>
-          <div class="flex gap-2">
-            <UButton
-              data-test="booking-cancel-confirm-submit"
-              color="error"
-              :loading="cancelling"
-              @click="cancelBooking"
-            >
-              Yes, cancel it
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="cancelConfirming = false"
-            >
-              Keep it
-            </UButton>
-          </div>
-        </div>
       </div>
 
       <div
@@ -454,7 +437,6 @@ useSeoMeta({ title: 'Your booking' })
         </div>
 
         <UAuthForm
-          title="Resend my confirmation"
           :schema="reservationResendForm"
           :fields="resendFields"
           :submit="{ label: 'Resend it' }"
