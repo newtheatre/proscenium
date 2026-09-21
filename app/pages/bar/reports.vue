@@ -15,7 +15,7 @@ import type {
 } from '#shared/utils/bar-reports'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Bar reports', middleware: 'console', docs: '/docs/bar/reports' })
+definePageMeta({ layout: 'console', title: 'Reports', middleware: 'console', docs: '/docs/bar/reports' })
 
 // Words, not the enum's own shouting-capitals spelling: the same treatment every other bar
 // screen gives a stored value (K-101).

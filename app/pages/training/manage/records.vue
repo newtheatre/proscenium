@@ -5,7 +5,7 @@ import { EVIDENCE_REF_LIMIT, REVOKE_REASON_LIMIT, saysKind, saysSource } from '#
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Training records', middleware: 'console', docs: '/docs/training/records' })
+definePageMeta({ layout: 'console', title: 'Records', middleware: 'console', docs: '/docs/training/records' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

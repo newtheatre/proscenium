@@ -2,7 +2,7 @@
 title: Documentation
 description: How each part of the system is run, kept by the people who run it.
 module: Governance
-updatedOn: 2026-09-15
+updatedOn: 2026-09-21
 updatedBy: Matt Adcock
 ---
 
@@ -32,15 +32,16 @@ and the IT Manager is told. Drift is a defect, not a chore.
 
 ## Running the theatre
 
-The console screens, under **Manage** in the account menu. Each section opens with who holds
-the permission and what the screens are for.
+The console screens, under **Manage** in the account menu. Each group in the sidebar is in two
+parts, Every day and Set-up, and each section below opens with who holds the permission and what
+the screens are for.
 
 ::card-group
   ::card{icon="i-lucide-ticket" title="Box office" to="/docs/box-office"}
-  The desk, passes, shows and performances, venues, seasons, ticket types, content warnings, access profiles.
+  The desk, the pass desk, shows and performances, venues, seasons, ticket types, pass types, content warnings, access profiles.
   ::
   ::card{icon="i-lucide-beer" title="Bar" to="/docs/bar"}
-  Products, categories, stock, movements, stocktakes, the order list and reports.
+  Stock, movements, stocktakes, the order list, tabs and reports, then the products, categories and discounts behind them.
   ::
   ::card{icon="i-lucide-door-open" title="Spaces" to="/docs/spaces"}
   The rooms, room requests, closures, other rooms and utilisation.

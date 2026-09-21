@@ -104,9 +104,7 @@ describe('a group is a job, and the order never varies (0040)', () => {
 })
 
 // The sidebar said "Unfilled shifts" for months after the screen became the rota board (#1041).
-// A label and its page's title are one name, with no exemptions (0082), so renaming one side
-// alone fails here. Where the two disagreed, the shorter noun won: the sidebar truncates at its
-// default width and the navbar does not (issue 921), and the group heading supplies the domain.
+// A label and its page's title are one name, with no exemptions: renaming one side alone fails (0082).
 describe('a sidebar label is the title the page gives itself (0082)', () => {
   function titleOf(source: string): string | null {
     const meta = /definePageMeta\(\{[\s\S]*?\}\)/.exec(source)?.[0] ?? ''
