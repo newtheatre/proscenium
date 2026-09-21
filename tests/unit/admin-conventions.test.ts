@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
+import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
 import { plural } from '#shared/utils/text'
 
 // The admin conventions are a test rather than a review habit (0032), the same way the design
@@ -102,6 +103,63 @@ describe('a console list filters by its declaration (K-129)', () => {
     expect(undeclared.map(screen => screen.path)).toEqual([])
     const handWritten = (await lists()).filter(screen => /ActiveFilter\[\]/.test(screen.source))
     expect(handWritten.map(screen => screen.path)).toEqual([])
+  })
+})
+
+// What a destructive route looks like from the page: a DELETE, or a POST to a path whose last
+// segment names what it undoes. A status flip is both directions; only the off one confirms.
+const DESTRUCTIVE_ROUTE = /method:\s*'DELETE'|\/(?:cancel|revoke|void|decline|retire|unconfirm|stand-down|status|security)['`]/
+
+// A destructive action that already confirms in a modal of its own, with a verb that names what
+// it destroys. Moving each onto ConfirmModal is mechanical and is K-123's second slice.
+const CONFIRMS_IN_ITS_OWN_MODAL = [
+  'app/pages/bar/categories.vue',
+  'app/pages/bar/tabs.vue',
+  'app/pages/box-office/content-warnings.vue',
+  'app/pages/box-office/pass-types.vue',
+  'app/pages/box-office/seasons.vue',
+  'app/pages/box-office/show-categories.vue',
+  'app/pages/box-office/ticket-types.vue',
+  'app/pages/box-office/venues.vue',
+]
+
+// The sweep lands module by module: the box office and the bar first, then rota, rooms, training
+// and people. Both lists go when the second lands and the whole console answers to the rule.
+const SWEPT = ['app/pages/bar/', 'app/pages/box-office/']
+const CONFIRMED_EVERYWHERE = false
+
+describe('a destructive action confirms before it happens (K-123, 0032)', () => {
+  const unconfirmed = async (paths: string[]): Promise<string[]> =>
+    (await screens())
+      .filter(screen => paths.some(prefix => screen.path.startsWith(prefix)))
+      .filter(screen => DESTRUCTIVE_ROUTE.test(screen.source))
+      .filter(screen => !screen.source.includes('<ConfirmModal') && !CONFIRMS_IN_ITS_OWN_MODAL.includes(screen.path))
+      .map(screen => screen.path)
+
+  test('every swept module confirms through the one shared component', async () => {
+    const swept = (await screens()).filter(screen => SWEPT.some(prefix => screen.path.startsWith(prefix)))
+    expect(swept.length).toBeGreaterThan(0)
+    expect(await unconfirmed(SWEPT)).toEqual([])
+  })
+
+  test.skipIf(!CONFIRMED_EVERYWHERE)('every console page that destroys something confirms first', async () => {
+    expect(await unconfirmed([PAGES])).toEqual([])
+  })
+
+  // The cancel word is read from one place, so the modal-conventions job changes one string.
+  test('the shared component reads its cancel label rather than spelling it', async () => {
+    const component = await Bun.file('app/components/ConfirmModal.vue').text()
+    expect(component).toContain('CONFIRM_BACK_LABEL')
+    expect(CONFIRM_BACK_LABEL.trim()).toBe(CONFIRM_BACK_LABEL)
+    expect(CONFIRM_BACK_LABEL.endsWith('.')).toBe(false)
+  })
+
+  // A refusal belongs inside the modal it concerns, never in a page alert behind the overlay
+  // (0032). The component takes it as a prop, so no caller has to remember.
+  test('the shared component renders a refusal of its own', async () => {
+    const component = await Bun.file('app/components/ConfirmModal.vue').text()
+    expect(component).toContain('failure')
+    expect(component).toContain('<UAlert')
   })
 })
 

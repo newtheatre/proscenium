@@ -348,15 +348,23 @@ async function collect(): Promise<void> {
   }
 }
 
+const refunding = ref<TicketLine | null>(null)
 const refundingTicketId = ref<string | null>(null)
 const refundFailure = ref<string | null>(null)
+const cancelConfirming = ref(false)
 const cancelling = ref(false)
 const cancelFailure = ref<string | null>(null)
 
+function askRefund(ticket: TicketLine): void {
+  refundFailure.value = null
+  refunding.value = ticket
+}
+
 // D-116 criterion 5: refunded tickets leave this list the instant the write commits, since the
 // route that reads it already filters to what is still unrefunded.
-async function refundTicket(ticket: TicketLine): Promise<void> {
-  if (!selected.value) return
+async function refundTicket(): Promise<void> {
+  const ticket = refunding.value
+  if (!selected.value || !ticket) return
   refundingTicketId.value = ticket.ticketId
   refundFailure.value = null
   try {
@@ -365,6 +373,7 @@ async function refundTicket(ticket: TicketLine): Promise<void> {
       body: { expectedTotalPence: ticket.pricePaid },
     })
     toast.add({ title: 'Ticket refunded', icon: 'i-lucide-check', color: 'success' })
+    refunding.value = null
     selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${selected.value.id}`)
     await search()
     void loadSummary()
@@ -386,6 +395,7 @@ async function cancelCollected(): Promise<void> {
   try {
     await $fetch(`/api/box-office/desk/reservations/${selected.value.id}/cancel`, { method: 'POST' })
     toast.add({ title: 'Booking cancelled', icon: 'i-lucide-check', color: 'success' })
+    cancelConfirming.value = false
     open.value = false
     await search()
     void loadSummary()
@@ -831,13 +841,6 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
             </UButton>
           </template>
           <template v-else-if="selected.status === 'COLLECTED'">
-            <UAlert
-              v-if="refundFailure"
-              color="error"
-              variant="subtle"
-              :description="refundFailure"
-            />
-
             <ul
               v-if="selected.tickets.length > 0"
               class="space-y-2 text-sm"
@@ -852,9 +855,8 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
                   size="xs"
                   color="error"
                   variant="subtle"
-                  :loading="refundingTicketId === ticket.ticketId"
                   :data-test="`desk-refund-${ticket.ticketId}`"
-                  @click="refundTicket(ticket)"
+                  @click="askRefund(ticket)"
                 >
                   Refund
                 </UButton>
@@ -868,20 +870,12 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
               Every ticket on this booking has been refunded.
             </p>
 
-            <UAlert
-              v-if="cancelFailure"
-              color="error"
-              variant="subtle"
-              :description="cancelFailure"
-            />
-
             <UButton
               v-if="selected.tickets.length === 0"
               color="neutral"
               variant="subtle"
-              :loading="cancelling"
               data-test="desk-cancel-collected"
-              @click="cancelCollected"
+              @click="cancelFailure = null; cancelConfirming = true"
             >
               Cancel booking
             </UButton>
@@ -929,5 +923,28 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
         </div>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="refunding !== null"
+      name="desk-refund"
+      title="Refund this ticket"
+      :verb="`Refund ${saysPrice(refunding?.pricePaid ?? 0)}`"
+      consequence="Hand the money back on the reader first. The seat goes back on sale."
+      :loading="refundingTicketId !== null"
+      :failure="refundFailure"
+      @update:open="value => { if (!value) refunding = null }"
+      @confirm="refundTicket"
+    />
+
+    <ConfirmModal
+      v-model:open="cancelConfirming"
+      name="desk-cancel"
+      title="Cancel the booking"
+      verb="Cancel the booking"
+      consequence="It cannot be brought back. A booker who changes their mind again makes a new booking."
+      :loading="cancelling"
+      :failure="cancelFailure"
+      @confirm="cancelCollected"
+    />
   </div>
 </template>

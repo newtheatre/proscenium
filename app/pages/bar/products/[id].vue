@@ -127,6 +127,30 @@ async function save(): Promise<void> {
   }
 }
 
+// Retiring confirms; putting a size back on the till does not (K-123 criterion 7).
+const retiring = ref<ProductVariant | null>(null)
+const retireFailure = ref<string | null>(null)
+const retireWorking = ref(false)
+
+async function retire(): Promise<void> {
+  const variant = retiring.value
+  if (!variant) return
+  retireWorking.value = true
+  retireFailure.value = null
+  try {
+    await $fetch(`/api/admin/bar/variants/${variant.id}/status`, { method: 'POST', body: { status: 'RETIRED' } })
+    toast.add({ title: `${variant.label} is retired`, icon: 'i-lucide-check', color: 'success' })
+    retiring.value = null
+    await refresh()
+  }
+  catch (refused) {
+    retireFailure.value = refusalText(refused)
+  }
+  finally {
+    retireWorking.value = false
+  }
+}
+
 async function setStatus(variant: ProductVariant, status: 'ACTIVE' | 'RETIRED'): Promise<void> {
   failure.value = null
   try {
@@ -234,15 +258,26 @@ async function saveChoice(): Promise<void> {
   }
 }
 
-async function clearChoice(variant: ProductVariant): Promise<void> {
-  failure.value = null
+const clearing = ref<ProductVariant | null>(null)
+const clearFailure = ref<string | null>(null)
+const clearWorking = ref(false)
+
+async function clearChoice(): Promise<void> {
+  const variant = clearing.value
+  if (!variant) return
+  clearWorking.value = true
+  clearFailure.value = null
   try {
     await $fetch(`/api/admin/bar/variants/${variant.id}/choice`, { method: 'PUT', body: { choiceGroupId: null } })
     toast.add({ title: `${variant.label} no longer offers a choice`, icon: 'i-lucide-check', color: 'success' })
+    clearing.value = null
     await refresh()
   }
   catch (refused) {
-    failure.value = refusalText(refused)
+    clearFailure.value = refusalText(refused)
+  }
+  finally {
+    clearWorking.value = false
   }
 }
 
@@ -469,7 +504,10 @@ const columns: TableColumn<ProductVariant>[] = [
             'color': 'neutral',
             'variant': 'ghost',
             'data-test': `clear-choice-${row.original.id}`,
-            'onClick': () => clearChoice(row.original),
+            'onClick': () => {
+              clearFailure.value = null
+              clearing.value = row.original
+            },
           }, () => 'Clear choice')
         : null,
       h(UButton, {
@@ -491,7 +529,11 @@ const columns: TableColumn<ProductVariant>[] = [
         'color': 'neutral',
         'variant': 'ghost',
         'data-test': `status-${row.original.id}`,
-        'onClick': () => setStatus(row.original, row.original.status === 'RETIRED' ? 'ACTIVE' : 'RETIRED'),
+        'onClick': () => {
+          if (row.original.status === 'RETIRED') return void setStatus(row.original, 'ACTIVE')
+          retireFailure.value = null
+          retiring.value = row.original
+        },
       }, () => (row.original.status === 'RETIRED' ? 'Put back' : 'Retire')),
       row.original.everSold || row.original.everPriced
         ? null
@@ -1139,5 +1181,29 @@ const priceColumns: TableColumn<VariantPrice>[] = [
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      :open="retiring !== null"
+      name="retire-variant"
+      :title="retiring ? `Retire ${retiring.label}` : ''"
+      :verb="retiring ? `Retire ${retiring.label}` : ''"
+      consequence="It comes off the till from now. Its recipe, its prices and what it has sold stay."
+      :loading="retireWorking"
+      :failure="retireFailure"
+      @update:open="value => { if (!value) retiring = null }"
+      @confirm="retire"
+    />
+
+    <ConfirmModal
+      :open="clearing !== null"
+      name="clear-choice"
+      title="Clear this choice"
+      verb="Clear the choice"
+      consequence="The till stops offering a choice when this size goes in the basket. The choice group itself is left alone."
+      :loading="clearWorking"
+      :failure="clearFailure"
+      @update:open="value => { if (!value) clearing = null }"
+      @confirm="clearChoice"
+    />
   </div>
 </template>
