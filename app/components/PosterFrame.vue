@@ -45,6 +45,12 @@ const glyph = computed(() => posterGlyph(seed.value))
   >
     <!-- No artwork yet: the show's own two hues and its title in the poster voice, which is a state
          and not a placeholder graphic. A band on a phone, so three cards are not three screens. -->
+    <!-- The hues come from a hash, so one of them lands light: the scrim is the floor that keeps
+         white text readable whatever the title gives (docs/design-language.md, photography rule 1). -->
+    <div
+      class="nnt-scrim absolute inset-0"
+      aria-hidden="true"
+    />
     <UIcon
       :name="glyph"
       class="absolute end-4 top-4 size-8 text-white/60"
@@ -52,7 +58,7 @@ const glyph = computed(() => posterGlyph(seed.value))
     />
     <span
       v-if="titled"
-      class="nnt-headline text-2xl text-white drop-shadow-md"
+      class="nnt-headline relative text-2xl text-white"
     >{{ title }}</span>
   </div>
 </template>

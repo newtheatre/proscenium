@@ -118,7 +118,7 @@ from Nuxt UI's structural components:
 | Operator documentation | `docs`, through `app/pages/docs/[...slug].vue` | The member shell's header with a search button, then `UPage` with a `UPageAside` of the collection's navigation tree on the left, `UPageHeader`, a prose `UPageBody` with previous and next links, and `UContentToc` in the right slot from three sections up (0076). Calm throughout |
 | A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav of `MY_NAV`, the shared footer. No sidebar. Account settings pages (`/account/profile`, `/account/security`, `/account/notifications`) additionally wrap in `AccountSettings.vue`, a `UPage` with a `UPageAside` of `ACCOUNT_NAV` |
 | Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar` (its header a link to `/admin`, its `UNavigationMenu` vertical and `type="multiple"`, each group two `type: 'label'` sections), `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
-| Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard |
+| Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard. The SumUp return screen (`/pay/return/[token]`) wears it too: it is a till operator's screen, and the signed key in its path is what it answers on, so the shell must not depend on a session (F-124 criterion 3) |
 | The backstage board | `backstage` | The same dark subtree with nothing in it at all: no header, no footer, no link off the board (E-120 criterion 6) |
 | The way in (`/sign-in`, `/register`, `/reset`, `/verify`, `/magic`) | `default` | The site header and footer as usual, with `WayIn.vue` drawing the page: a spotlight ground carrying the wordmark over one `UPageCard`. All five wear it, the last three being the screens a person reaches from an email, so the shape lives in one component rather than in five pages. The `signed-out` middleware sends a visitor who already has a session on to `next` or home |
 | The error page (`app/error.vue`) | `default`, through `NuxtLayout` | The same `WayIn` shape inside the site chrome, so a mistyped URL costs the page and not the rest of the site. No status code is shown (`copy-style.md` section 6), and three ways on are offered: what's on, get involved and home. A second-factor refusal keeps its enrolment button above them (A-112, K-133) |
@@ -180,17 +180,22 @@ so no page draws a heading of its own. The hub at `/tonight` is six
 ## Photography and show artwork
 
 The photographs of the building and of past productions are ours, and they carry the spotlight
-better than any gradient. Two rules:
+better than any gradient. Three rules:
 
 1. **Always scrim.** White text over an unscrimmed photograph is a contrast failure waiting for
    the one image that is bright in the wrong corner. Put `nnt-scrim` between the image and the
-   text, every time.
+   text, every time. The same floor goes under the artless poster frame, whose two hues come from
+   a hash of the title and will eventually land light.
 2. **Show art is sovereign.** A production's poster is designed by that show's team, in its own
    world of colour. The house frames it and never restyles, tints, or overlays it. The frame is
-   ours; what is inside it is theirs.
+   ours; what is inside it is theirs, so a listing's flag goes on the card body and never inside
+   the frame.
+3. **A banner photograph is decorative.** The headline beside it is what the page says, so
+   `PhotoHero` renders an empty `alt` and takes no `alt` prop: a caller that named the picture
+   would have a screen reader read it before the words. `design-language.test.ts` refuses one.
 
 The house photographs live under `public/images/`, the logos under `public/images/logos/`, and
-`PhotoHero` is the one component that draws a banner, so rule 1 is applied in one place. It takes
+`PhotoHero` is the one component that draws a banner, so rules 1 and 3 are applied in one place. It takes
 `compact` where the picture is a band rather than the whole first screen, and its `title` and
 `description` slots take over from the props where the headline carries a word in its own colour,
 as what's on does. `align="start"` caps the words at a reading width inside the site column, never

@@ -142,10 +142,14 @@ describe('the four pages draw their banners through NuxtImg behind a scrim (K-12
     expect(attribute(root, 'class').split(/\s+/)).toEqual(expect.arrayContaining(['isolate', 'relative', 'dark']))
   })
 
-  test('nothing under app/ scrims a photograph except the hero', async () => {
+  // The frame of a show with no artwork is the one other place that needs the floor: its two hues
+  // come from a hash of the title, so one of them lands light under the white title.
+  const SCRIMMED = [HERO, 'app/components/PosterFrame.vue']
+
+  test('nothing under app/ scrims a photograph except the hero and the artless frame', async () => {
     const elsewhere: string[] = []
     for (const path of files('app', '**/*.{vue,ts}')) {
-      if (path !== HERO && (await Bun.file(path).text()).includes('nnt-scrim')) elsewhere.push(path)
+      if (!SCRIMMED.includes(path) && (await Bun.file(path).text()).includes('nnt-scrim')) elsewhere.push(path)
     }
     expect(elsewhere).toEqual([])
   })

@@ -35,7 +35,6 @@ useSchemaOrg([
   <div data-test="get-involved">
     <PhotoHero
       :src="page!.banner!"
-      :alt="page!.bannerAlt"
       align="start"
       :title="page!.headline ?? page!.title"
       :description="page!.description"

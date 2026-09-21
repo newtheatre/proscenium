@@ -114,9 +114,11 @@ J-110's policy pages share: J-110 adds files under `content/`, not a second rout
 A page carrying `placeholder: true` in its frontmatter renders a banner saying so (D-103); it is
 how copy the committee has not yet supplied reaches the site honestly rather than not at all.
 
-A page carrying `banner` (a path under `public/`) and `bannerAlt` draws that photograph behind its
-title through `PhotoHero`, the one component that puts `nnt-scrim` between a picture and the words
-(K-126, `design-language.md`). The home and what's-on pages use the same component directly.
+A page carrying `banner` (a path under `public/`) draws that photograph behind its title through
+`PhotoHero`, the one component that puts `nnt-scrim` between a picture and the words
+(K-126, `design-language.md`). The picture is a backdrop and carries no alternative text of its
+own, the title beside it being what the page says. The home and what's-on pages use the same
+component directly.
 
 ### Search engines and old links (K-125)
 
