@@ -51,8 +51,12 @@ const {
   selectedTabHolderId,
 } = useTillCatalogue(session, venueId)
 
-// Two panes over one basket (F-122). UTabs' own panel markup does not fit the basket sitting
-// under both, so this only renders the trigger list (:content="false") and the panes below it.
+// The device's own answer, not a probe: pricing is a round trip, so what the till can say about
+// a dropped connection is what it can charge on (K-103, issue 1150 item 7).
+const online = useOnline()
+
+// Two panes over one basket (F-122), the tab list below the basket: neither pane is unmounted,
+// so the tickets scanner survives a switch (issue 1150 item 8).
 const pane = ref<'bar' | 'tickets'>('bar')
 const PANE_TABS: { value: 'bar' | 'tickets', label: string }[] = [{ value: 'bar', label: 'Bar' }, { value: 'tickets', label: 'Tickets' }]
 
@@ -103,6 +107,7 @@ const {
   priced,
   pricing,
   priceFailure,
+  offline,
   recomputeTotal,
   grandTotalPence,
   isVariantRestricted,
@@ -130,6 +135,7 @@ const {
   walkUpsPence,
   requestPrice: body => $fetch<PricedBasket>('/api/till/price', { method: 'POST', body }),
   recordAgeCheck: body => $fetch('/api/tonight/age-checks', { method: 'POST', body }),
+  online,
 })
 
 // A collapsed reminder above the pinned actions, so checking the basket does not mean scrolling
@@ -282,7 +288,7 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
   catch (refused) {
     // K-103 protects reads, not writes: a transport failure needs different words from an
     // ordinary refusal, since whether the sale landed is unknown rather than settled (finding 16).
-    chargeFailure.value = writeFailureText(refused, 'Check the last sale before ringing it up again.')
+    chargeFailure.value = writeFailureText(refused, 'Check the reader: ring it up again only if it took nothing.')
     ageCheckStep.value = 'closed'
     // The refusal already names the true figure; catch the total up to it too, so what is shown
     // under the message is the one a retry would now send (F-104 criterion 3, no bypass).
@@ -359,6 +365,15 @@ function nextSale(): void {
   ageCheckStep.value = 'closed'
 }
 
+// What the charge buttons read while the total is unknown, so they can stay on screen and say
+// why rather than disappearing (issue 1150 item 7).
+const readerLabel = computed(() => {
+  if (selectedTabHolderId.value) return grandTotalPence.value === null ? 'Put the basket on the tab' : `Put ${saysMoney(grandTotalPence.value)} on the tab`
+  if (grandTotalPence.value === null) return 'Charge the basket'
+  return sumupAvailable.value ? `Key ${saysMoney(grandTotalPence.value)} into the reader` : `Charge ${saysMoney(grandTotalPence.value)}`
+})
+const sumupLabel = computed(() => grandTotalPence.value === null ? 'Charge the basket on SumUp' : `Charge ${saysMoney(grandTotalPence.value)} on SumUp`)
+
 // A walk-up's door pass, printed from the counter laptop (F-123 criterion 4).
 function printPass(): void {
   window.print()
@@ -380,7 +395,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
     <NightScreen
       title="Till"
       :hint="session
-        ? 'Tap a size to add it. Quantities and lines are editable before payment.'
+        ? (basketEmpty ? 'Tap a size to add it. Quantities and lines are editable before payment.' : undefined)
         : 'Opening the till is one session for the whole night. Everyone at this venue sells against it.'"
       :stale="session ? catalogue.cachedAt.value : syncedAt"
       :busy="busy || catalogue.pending.value"
@@ -507,16 +522,36 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             :class="{ 'opacity-50': compLocked || sumup.pending.value !== null }"
             class="space-y-6"
           >
-            <UTabs
-              v-model="pane"
-              :items="PANE_TABS"
-              :content="false"
-              class="w-full"
+            <!-- The tabs are hand-rolled rather than UTabs, because the panes need ids that name
+                 their own tab and neither pane may be torn down (K-101, issue 1150 item 8). -->
+            <div
+              class="grid grid-cols-2 gap-1 rounded-lg bg-elevated p-1"
+              role="tablist"
+              aria-label="What is being sold"
               data-test="till-panes"
-            />
+              @keydown.left="pane = 'bar'"
+              @keydown.right="pane = 'tickets'"
+            >
+              <button
+                v-for="tab in PANE_TABS"
+                :id="`till-pane-${tab.value}`"
+                :key="tab.value"
+                type="button"
+                role="tab"
+                :aria-selected="pane === tab.value"
+                :aria-controls="`pane-${tab.value}-panel`"
+                :tabindex="pane === tab.value ? 0 : -1"
+                class="min-h-12 rounded-md text-sm font-medium"
+                :class="pane === tab.value ? 'bg-default text-highlighted' : 'text-muted'"
+                :data-test="`till-pane-${tab.value}`"
+                @click="pane = tab.value"
+              >
+                {{ tab.label }}
+              </button>
+            </div>
 
             <TillTicketsPane
-              v-if="pane === 'tickets'"
+              v-show="pane === 'tickets'"
               id="pane-tickets-panel"
               v-model:lookup-term="lookupTerm"
               v-model:camera-open="cameraOpen"
@@ -524,7 +559,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               v-model:walk-up-guest-name="walkUpGuestName"
               v-model:walk-up-guest-email="walkUpGuestEmail"
               role="tabpanel"
-              aria-label="Tickets"
+              aria-labelledby="till-pane-tickets"
               tabindex="0"
               :looking-up="lookingUp"
               :camera-note="cameraNote"
@@ -549,7 +584,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               v-show="pane === 'bar'"
               id="pane-bar-panel"
               role="tabpanel"
-              aria-label="Bar"
+              aria-labelledby="till-pane-bar"
               tabindex="0"
               :categories="categories"
               :products-in="productsIn"
@@ -620,29 +655,35 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             variant="subtle"
             :description="`Collected: ${charged.tickets.map(ticket => ticket.reference).join(', ')}. The door now reads PAID.`"
           />
-          <!-- The door pass (F-123 criterion 4): photographed off the screen, or printed. -->
+          <!-- The door pass (F-123 criterion 4): photographed off the screen, or printed. The
+               print rule in the token source puts these on the paper and nothing else. -->
           <div
-            v-for="pass in charged?.walkUps ?? []"
-            :key="pass.reservationId"
-            class="print-pass rounded-xl border border-default bg-white p-4 text-center text-black"
-            :data-test="`door-pass-${pass.reservationId}`"
+            v-if="charged?.walkUps.length"
+            class="print-sheet space-y-4"
           >
-            <p class="font-mono text-2xl tracking-[0.3em]">
-              {{ pass.reference }}
-            </p>
-            <p class="text-sm">
-              {{ pass.showTitle }} · party of {{ pass.partySize }} · paid
-            </p>
-            <img
-              :src="`data:image/svg+xml;base64,${pass.qrSvg}`"
-              alt="Booking QR code"
-              width="180"
-              height="180"
-              class="mx-auto my-2"
+            <div
+              v-for="pass in charged?.walkUps ?? []"
+              :key="pass.reservationId"
+              class="print-pass rounded-xl border border-default bg-white p-4 text-center text-black"
+              :data-test="`door-pass-${pass.reservationId}`"
             >
-            <p class="text-xs">
-              Show this at the door, or read out the reference.
-            </p>
+              <p class="font-mono text-2xl tracking-[0.3em]">
+                {{ pass.reference }}
+              </p>
+              <p class="text-sm">
+                {{ pass.showTitle }} · party of {{ pass.partySize }} · paid
+              </p>
+              <img
+                :src="`data:image/svg+xml;base64,${pass.qrSvg}`"
+                alt="Booking QR code"
+                width="180"
+                height="180"
+                class="mx-auto my-2"
+              >
+              <p class="text-xs">
+                Show this at the door, or read out the reference.
+              </p>
+            </div>
           </div>
           <UButton
             v-if="charged?.walkUps.length"
@@ -697,53 +738,66 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
       </p>
 
       <template #actions>
+        <!-- One row, not three: the count, the comp chip and the total share it, because every
+             row here costs the thumb zone (K-102 criterion 2, issue 1150 item 8). -->
         <div
-          v-if="session && !charged && !basketEmpty"
-          class="flex items-center justify-between rounded-lg bg-elevated px-3 py-2 text-sm"
+          v-if="session && !charged && (!basketEmpty || compRequestId !== null)"
+          class="flex items-center justify-between gap-2 rounded-lg bg-elevated px-3 py-2 text-sm"
           data-test="basket-summary-bar"
         >
-          <span>{{ basketItemCount }} {{ basketItemCount === 1 ? 'item' : 'items' }}</span>
-          <span data-test="basket-summary-total">{{ grandTotalPence !== null && !pricing ? saysMoney(grandTotalPence) : 'Pricing…' }}</span>
+          <span
+            v-if="offline"
+            data-test="till-offline"
+          >No connection. Charging waits for it.</span>
+          <template v-else>
+            <span v-if="!basketEmpty">{{ basketItemCount }} {{ basketItemCount === 1 ? 'item' : 'items' }}</span>
+            <UButton
+              v-if="compRequestId === null && compEligible"
+              size="sm"
+              color="neutral"
+              variant="subtle"
+              class="min-h-10"
+              icon="i-lucide-gift"
+              data-test="till-comp-chip"
+              @click="openCompModal"
+            >
+              Ask for a comp
+            </UButton>
+            <UButton
+              v-else-if="compRequestId !== null"
+              size="sm"
+              :color="compDeclined ? 'error' : compLapsed ? 'warning' : 'neutral'"
+              variant="subtle"
+              class="min-h-10"
+              icon="i-lucide-gift"
+              data-test="till-comp-pending-chip"
+              @click="openCompModal"
+            >
+              {{ compDeclined ? 'Comp declined' : compLapsed ? 'Comp lapsed' : compCanGive ? 'Comp approved, give it' : compGiven ? 'Comp given' : 'Comp pending…' }}
+            </UButton>
+            <span
+              v-if="!basketEmpty"
+              data-test="basket-summary-total"
+            >{{ grandTotalPence !== null && !pricing ? saysMoney(grandTotalPence) : 'Pricing…' }}</span>
+          </template>
         </div>
-        <UButton
-          v-if="session && !charged && compRequestId === null && compEligible"
-          size="sm"
-          color="neutral"
-          variant="subtle"
-          class="min-h-10 self-start"
-          icon="i-lucide-gift"
-          data-test="till-comp-chip"
-          @click="openCompModal"
-        >
-          Ask for a comp
-        </UButton>
-        <UButton
-          v-else-if="session && !charged && compRequestId !== null"
-          size="sm"
-          :color="compDeclined ? 'error' : compLapsed ? 'warning' : 'neutral'"
-          variant="subtle"
-          class="min-h-10 self-start"
-          icon="i-lucide-gift"
-          data-test="till-comp-pending-chip"
-          @click="openCompModal"
-        >
-          {{ compDeclined ? 'Comp declined' : compLapsed ? 'Comp lapsed' : compCanGive ? 'Comp approved, give it' : compGiven ? 'Comp given' : 'Comp pending…' }}
-        </UButton>
+        <!-- Offline, the buttons stay where the thumb expects them, disabled, with the line
+             above saying why: a control that vanishes reads as a fault (issue 1150 item 7). -->
         <NightAction
-          v-if="session && !charged && !basketEmpty && grandTotalPence !== null && sumupAvailable && !sumup.pending.value && !compLocked"
-          :label="`Charge ${saysMoney(grandTotalPence)} on SumUp`"
+          v-if="session && !charged && !basketEmpty && (grandTotalPence !== null || offline) && sumupAvailable && !sumup.pending.value && !compLocked"
+          :label="sumupLabel"
           icon="i-lucide-smartphone-nfc"
-          :disabled="pricing || walkUpGuestIncomplete"
+          :disabled="pricing || walkUpGuestIncomplete || offline"
           :loading="charging"
           data-test="charge-sumup"
           @press="() => chargeOnSumUp()"
         />
         <NightAction
-          v-if="session && !charged && !basketEmpty && grandTotalPence !== null && !sumup.pending.value && !compLocked"
-          :label="selectedTabHolderId ? `Put ${saysMoney(grandTotalPence)} on the tab` : sumupAvailable ? `Key ${saysMoney(grandTotalPence)} into the reader` : `Charge ${saysMoney(grandTotalPence)}`"
+          v-if="session && !charged && !basketEmpty && (grandTotalPence !== null || offline) && !sumup.pending.value && !compLocked"
+          :label="readerLabel"
           :icon="selectedTabHolderId ? 'i-lucide-book-user' : 'i-lucide-credit-card'"
           :color="sumupAvailable ? 'neutral' : 'primary'"
-          :disabled="pricing || walkUpGuestIncomplete"
+          :disabled="pricing || walkUpGuestIncomplete || offline"
           :loading="charging"
           data-test="charge-reader"
           @press="() => charge()"

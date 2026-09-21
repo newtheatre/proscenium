@@ -23,6 +23,7 @@ setNightEyebrow(() => props.title)
     <p
       v-if="hint"
       class="text-sm text-muted"
+      data-test="night-hint"
     >
       {{ hint }}
     </p>
@@ -36,6 +37,7 @@ setNightEyebrow(() => props.title)
     <div
       v-if="$slots.actions"
       class="sticky bottom-0 flex flex-col gap-3 bg-default pb-4 pt-3"
+      data-test="night-actions"
     >
       <slot name="actions" />
     </div>
