@@ -117,7 +117,7 @@ from Nuxt UI's structural components:
 | Get involved | `default`, through `app/pages/get-involved.vue` | The one landing page: a left-aligned `PhotoHero` with the flash and the marquee, ticket-stub department tiles, a numbered step strip, a spotlight quote band, then the prose column. Its headline, flash, tiles, steps and quote are front matter, so the committee edits words and never the page |
 | Operator documentation | `docs`, through `app/pages/docs/[...slug].vue` | The member shell's header with a search button, then `UPage` with a `UPageAside` of the collection's navigation tree on the left, `UPageHeader`, a prose `UPageBody` with previous and next links, and `UContentToc` in the right slot from three sections up (0076). Calm throughout |
 | A member's own screens | `member` | The site header, a `UNavigationMenu` sub-nav of `MY_NAV`, the shared footer. No sidebar. Account settings pages (`/account/profile`, `/account/security`, `/account/notifications`) additionally wrap in `AccountSettings.vue`, a `UPage` with a `UPageAside` of `ACCOUNT_NAV` |
-| Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar`, `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
+| Console: managing rooms, training, the bar, the box office, people, money | `console` | `UDashboardGroup`, `UDashboardSidebar` (its header a link to `/admin`, its `UNavigationMenu` vertical and `type="multiple"`, each group two `type: 'label'` sections), `UDashboardPanel`, `UDashboardNavbar`, `UDashboardSearch`, `UTable` |
 | Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard |
 | The backstage board | `backstage` | The same dark subtree with nothing in it at all: no header, no footer, no link off the board (E-120 criterion 6) |
 | The way in (`/sign-in`, `/register`) | `default` | The site header and footer as usual, with the page itself a spotlight ground carrying the wordmark over one `UPageCard`. The `signed-out` middleware sends a visitor who already has a session on to `next` or home |
@@ -125,7 +125,10 @@ from Nuxt UI's structural components:
 The shell follows the posture of the work, not the URL, and which shell a screen takes is a
 decision record rather than a habit (`decisions/0040-navigation-is-shaped-by-posture-and-filtered-by-ability.md`).
 `UDashboardSearch` is in the matrix above and is not built yet: it is the answer once the sidebar
-passes roughly forty items.
+passes roughly forty items, and it is now a story of its own (K-201) rather than a line in a
+consequences list. The sidebar carries fifty-four, which is why each group splits into Every day
+and Set-up first (0082): search finds a screen whose name you already know, and the sections are
+what make an unfamiliar one findable at all.
 
 Seven rules follow:
 
@@ -158,7 +161,11 @@ so no page draws a heading of its own. The hub at `/tonight` is six
    public header (`HEADER_NAV`, a derived slice of `PUBLIC_NAV`) and the footer comes from
    `shared/utils/site-nav.ts`, and the console middleware guards a route from the same entry the
    sidebar renders. A screen added to a layout and not to the declaration fails
-   `tests/unit/site-nav.test.ts` (0040).
+   `tests/unit/site-nav.test.ts` (0040). Three things about a console entry are tests there too,
+   and not review's job (0082): a group is ordered as Every day then Set-up, or names no section
+   at all; an icon belongs to one entry across the whole sidebar; and a nav label is character for
+   character the `title` its page sets in `definePageMeta`, with the shorter noun winning, because
+   the sidebar truncates at its default width and the navbar does not (issue 921).
 6. **A `UTable` stays usable below `sm`.** A secondary column carries `app/utils/responsive-table.ts`'s
    `HIDE_BELOW_SM` class on both its header and cell, and its content moves into the primary
    column's own cell as an `sm:hidden` line, so nothing a phone reads is lost, only where it sits;

@@ -70,7 +70,7 @@ export function useTillBasket(deps: TillBasketDeps) {
   const sizing = ref<SaleProduct | null>(null)
 
   // One tile per product, and what its tap does is the product's own shape (F-103 criterion 1,
-  // 0082): add it, ask which size, or ask which mixer.
+  // 0083): add it, ask which size, or ask which mixer.
   function tapProduct(product: SaleProduct): void {
     const only = product.variants.length === 1 ? product.variants[0] : null
     if (only) {

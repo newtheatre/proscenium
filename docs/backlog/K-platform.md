@@ -9,7 +9,7 @@ the cutover rather than after it. Phasing follows the roadmap: the platform stor
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
+Stories: 30. Phases: 24 MVP, 1 V2, 0 Later, 5 resolved.
 
 ## Open questions
 
@@ -758,3 +758,28 @@ Stories: 29. Phases: 24 MVP, 0 V2, 0 Later, 5 resolved.
 - Source: Decisions 0067 and 0068, two defects in two days that every existing suite passed and
   that only the deployed worker exhibited. The first broke every create route in the application
   for a day; the second made revoking a role impossible. Both were found by hand.
+
+## K-201: The console command palette
+
+- Role: Administrator
+- Phase: V2
+- Story: As an officer who knows the name of a screen but not which group holds it, I want to
+  open it by typing its name from anywhere in the console so that finding a screen never costs
+  more than remembering what it is called.
+- Depends on: K-123
+- Acceptance criteria:
+  1. `UDashboardSearch` sits in the console shell, opens on a keyboard shortcut and from a
+     control in the sidebar, and is reachable from every console screen.
+  2. It is built from `CONSOLE_NAV` and `CONSOLE_HOME`, the same declaration the sidebar and the
+     console middleware read (0040, 0082). A screen reaches the palette by being declared, never
+     by being listed a second time.
+  3. Each result carries its group and its section, so two screens with similar names are told
+     apart by where they live, and the palette is grouped in the sidebar's own fixed order.
+  4. Results are filtered by ability, exactly as the sidebar is, and a unit test asserts that a
+     viewer's palette and their sidebar hold the same destinations.
+  5. Opening a result navigates and closes the palette; the palette holds no destination that is
+     not in the declaration and adds no route of its own.
+- Source: Pre-cutover review, issue 1151 item 1. The design language names the palette as the
+  answer once the sidebar passes roughly forty items; it carries fifty-four. Decision 0082 split
+  the groups into sections first, because search finds a screen whose name is already known and
+  the sections are what make an unfamiliar one findable at all.

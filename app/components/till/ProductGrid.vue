@@ -3,7 +3,7 @@ import { saysMoney } from '#shared/utils/bar'
 import { plural } from '#shared/utils/text'
 import type { SaleCategory, SaleChoice, SaleProduct, SaleVariant } from '#shared/utils/sale'
 
-// The drinks grid (F-103 criterion 1, 0082): one tile per product, sizes in a sheet off the tile,
+// The drinks grid (F-103 criterion 1, 0083): one tile per product, sizes in a sheet off the tile,
 // and a size prompts for its choice before the line lands rather than after (criterion 2).
 
 const props = defineProps<{

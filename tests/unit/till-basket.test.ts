@@ -109,7 +109,7 @@ describe('tapping a variant twice merges into one line, up to the cap (F-103 cri
   })
 })
 
-describe('what a tap on a tile does depends on the product\'s sizes (F-103 criterion 1, 0082)', () => {
+describe('what a tap on a tile does depends on the product\'s sizes (F-103 criterion 1, 0083)', () => {
   test('one size with no choice adds to the basket at once', () => {
     const { basket, scope } = setup()
     basket.tapProduct(aProduct())

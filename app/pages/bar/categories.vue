@@ -5,7 +5,7 @@ import { barCategoriesList } from '#shared/utils/bar-categories-list'
 import type { BarCategory, CategoryPrice, ServingKind } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Bar categories', middleware: 'console', docs: '/docs/bar/categories' })
+definePageMeta({ layout: 'console', title: 'Categories', middleware: 'console', docs: '/docs/bar/categories' })
 
 const request = useRequestFetch()
 const toast = useToast()

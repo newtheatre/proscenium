@@ -2,14 +2,14 @@
 title: Rota
 description: Setting a show night up from the console, from the venue's staffing to the wings device.
 module: Show night
-updatedOn: 2026-09-15
+updatedOn: 2026-09-21
 updatedBy: Matt Adcock
 navigation:
   title: Overview
   icon: i-lucide-clipboard-list
 ---
 
-These are the console screens under **Manage, Tonight**. They are planned at a desk, days before
+These are the console screens under **Manage, Rota**. They are planned at a desk, days before
 a performance: how each venue is staffed, who is confirmed on which shift, what the duty manager
 must tick before the house opens and after it closes, what front of house reads in an emergency,
 and which incidents reach the safety officer. The screens used on the night itself, on a phone in

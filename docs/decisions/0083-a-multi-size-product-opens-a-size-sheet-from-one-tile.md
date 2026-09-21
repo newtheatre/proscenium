@@ -1,4 +1,4 @@
-# 0082: A multi-size product opens a size sheet from one tile, rather than showing its sizes inside the tile
+# 0083: A multi-size product opens a size sheet from one tile, rather than showing its sizes inside the tile
 
 - Status: Proposed
 - Date: 2026-09-21

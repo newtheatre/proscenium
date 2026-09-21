@@ -7,7 +7,7 @@ import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { SessionInput } from '#shared/utils/training'
 
-definePageMeta({ layout: 'console', title: 'Training sessions', middleware: 'console', docs: '/docs/training/sessions' })
+definePageMeta({ layout: 'console', title: 'Sessions', middleware: 'console', docs: '/docs/training/sessions' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

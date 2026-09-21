@@ -302,7 +302,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     view.close()
   }, 120_000)
 
-  // 0082: the sizes are a sheet off the tile, so a wine at 360 pixels is two large taps rather
+  // 0083: the sizes are a sheet off the tile, so a wine at 360 pixels is two large taps rather
   // than four pills wrapped inside half a card.
   test('a product with several sizes opens the size sheet, and the size chosen there lands in the basket', async () => {
     const { venueId } = programme('sale-sizes')

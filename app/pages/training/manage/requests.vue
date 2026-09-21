@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { DECLINE_REASON_LIMIT } from '#shared/utils/training'
 
-definePageMeta({ layout: 'console', title: 'Training requests', middleware: 'console', docs: '/docs/training/requests' })
+definePageMeta({ layout: 'console', title: 'Requests', middleware: 'console', docs: '/docs/training/requests' })
 
 interface Demand {
   moduleId: string

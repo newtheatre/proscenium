@@ -80,7 +80,7 @@ Open questions:
   1. The sale screen shows one tile per product; a product with multiple variants expands to size
      buttons (Bottle, 125ml, 175ml, 250ml; Single, Double), and a single-variant product adds to
      the basket in one tap.
-     Amended by decision 0082: the size buttons open in a sheet from the tile, not inside it.
+     Amended by decision 0083: the size buttons open in a sheet from the tile, not inside it.
   2. A variant with a choice group (a spirit's mixer) prompts for the choice before the line lands
      in the basket; the basket line names product, variant and chosen option.
   3. Each line prices from the variant's effective price (F-116) in integer pence; the running
