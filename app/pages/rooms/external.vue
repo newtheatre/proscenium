@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { describePurpose } from '#shared/utils/bookings'
 import { fromLondonWallClock } from '#shared/utils/london'
+import type { FormSubmitEvent } from '@nuxt/ui'
+import { z } from 'zod'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/other-rooms' })
 
@@ -10,14 +12,32 @@ const route = useRoute()
 const toast = useToast()
 const request = useRequestFetch()
 
-const state = reactive({
+// The screen's own shape: a day and two wall clocks, which become the instants the write path
+// validates on the way out (C-120 criterion 7, 0014).
+const form = z.object({
+  title: z.string().trim().min(1, 'Say what the room is for').max(200),
+  purpose: z.string().min(1, 'Say what the room is for'),
+  attendees: z.number().int().positive().optional(),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a day'),
+  from: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a start time'),
+  to: z.string().regex(/^\d{2}:\d{2}$/, 'Choose an end time'),
+  preferredSpaceId: z.string().optional(),
+  notes: z.string().trim().max(1000),
+}).refine(ask => ask.to > ask.from, {
+  path: ['to'],
+  message: 'A booking ends after it starts',
+})
+
+type ExternalForm = z.output<typeof form>
+
+const state = reactive<ExternalForm>({
   title: '',
   purpose: '',
-  attendees: undefined as number | undefined,
+  attendees: undefined,
   day: String(route.query.day ?? ''),
   from: String(route.query.at ?? '18:00'),
   to: addMinutes(String(route.query.at ?? '18:00'), 120),
-  preferredSpaceId: undefined as string | undefined,
+  preferredSpaceId: undefined,
   notes: '',
 })
 
@@ -52,26 +72,24 @@ function instantOf(day: string, clock: string): string {
   return fromLondonWallClock(year!, month!, date!, hour!, minute!).toISOString()
 }
 
-const ready = computed(() => Boolean(state.title.trim() && state.purpose && state.day && state.to > state.from))
-
 // The server refuses NO_MEMBERSHIP outright (0031), so the form's job is to say where to put it
 // right rather than to invent its own wording (A-129).
 const needsMembership = computed(() => failures.value.some(failure => failure.reason === 'NO_MEMBERSHIP'))
 
-async function ask(): Promise<void> {
+async function ask(event: FormSubmitEvent<ExternalForm>): Promise<void> {
   saving.value = true
   failures.value = []
   try {
     const answer = await $fetch<{ warning: string | null }>('/api/rooms/external-requests', {
       method: 'POST',
       body: {
-        title: state.title,
-        purpose: state.purpose,
-        attendees: state.attendees ?? null,
-        startsAt: instantOf(state.day, state.from),
-        endsAt: instantOf(state.day, state.to),
-        preferredSpaceId: state.preferredSpaceId ?? null,
-        notes: state.notes,
+        title: event.data.title,
+        purpose: event.data.purpose,
+        attendees: event.data.attendees ?? null,
+        startsAt: instantOf(event.data.day, event.data.from),
+        endsAt: instantOf(event.data.day, event.data.to),
+        preferredSpaceId: event.data.preferredSpaceId ?? null,
+        notes: event.data.notes,
       },
     })
 
@@ -114,9 +132,16 @@ useSeoMeta({ title: 'Book a room not listed here' })
     />
 
     <UPageCard class="mt-8">
-      <div class="space-y-5">
+      <UForm
+        :schema="form"
+        :state="state"
+        class="space-y-5"
+        data-test="external-form"
+        @submit="ask"
+      >
         <UFormField
           label="What it is for"
+          name="title"
           required
           description="Shown to the Theatre Manager and written on the form."
         >
@@ -129,6 +154,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
 
         <UFormField
           label="What the room is for"
+          name="purpose"
           required
           description="What you need the room to be like. It is what decides whether a room they offer will suit."
         >
@@ -144,6 +170,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
 
         <UFormField
           label="Day"
+          name="day"
           required
         >
           <DateField
@@ -155,22 +182,22 @@ useSeoMeta({ title: 'Book a room not listed here' })
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField
             label="From"
+            name="from"
             required
           >
-            <UInput
+            <TimeField
               v-model="state.from"
-              type="time"
               class="w-full"
               data-test="external-from"
             />
           </UFormField>
           <UFormField
             label="Until"
+            name="to"
             required
           >
-            <UInput
+            <TimeField
               v-model="state.to"
-              type="time"
               class="w-full"
               data-test="external-to"
             />
@@ -179,6 +206,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
 
         <UFormField
           label="How many people"
+          name="attendees"
           hint="Optional"
         >
           <UInputNumber
@@ -190,6 +218,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
 
         <UFormField
           label="A room you would like"
+          name="preferredSpaceId"
           hint="Optional"
           description="A preference, not a promise. If we know a room is no good for what you are doing, you are told here."
         >
@@ -201,6 +230,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
 
         <UFormField
           label="Anything else whoever manages it should know"
+          name="notes"
           hint="Optional"
         >
           <UTextarea
@@ -243,10 +273,9 @@ useSeoMeta({ title: 'Book a room not listed here' })
 
         <div class="flex flex-wrap gap-2">
           <UButton
+            type="submit"
             :loading="saving"
-            :disabled="!ready"
             data-test="external-submit"
-            @click="ask"
           >
             Ask for it
           </UButton>
@@ -258,7 +287,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
             Back to our own rooms
           </UButton>
         </div>
-      </div>
+      </UForm>
     </UPageCard>
   </UContainer>
 </template>

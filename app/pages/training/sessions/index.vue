@@ -33,11 +33,13 @@ const toast = useToast()
 const failure = ref<string | null>(null)
 const working = ref<string | null>(null)
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   'training-sessions',
   () => request<{ items: Session[], total: number }>('/api/training/sessions'),
   { default: (): { items: Session[], total: number } => ({ items: [], total: 0 }) },
 )
+
+const listFailure = useListFailure(error, 'The schedule could not be read.')
 
 const mine = computed(() => data.value.items.filter(session => session.myPosition !== null))
 const open = computed(() => data.value.items.filter(session => session.myPosition === null))
@@ -216,8 +218,15 @@ const sessionDay = (session: Session): string =>
         Coming up
       </h2>
 
+      <ReadFailure
+        v-if="listFailure"
+        :failure="listFailure"
+        class="mt-3"
+        @retry="refresh()"
+      />
+
       <p
-        v-if="open.length === 0"
+        v-else-if="open.length === 0"
         class="mt-3 text-muted"
         data-test="sessions-empty"
       >

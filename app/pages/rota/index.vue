@@ -56,20 +56,24 @@ interface OpenShift {
 
 const toast = useToast()
 
-const { data: mine, refresh: refreshMine } = await useFetch<{ items: MyShift[], openings: MyOpeningShift[] }>('/api/rota/mine', {
+const { data: mine, error: mineError, refresh: refreshMine } = await useFetch<{ items: MyShift[], openings: MyOpeningShift[] }>('/api/rota/mine', {
   default: (): { items: MyShift[], openings: MyOpeningShift[] } => ({ items: [], openings: [] }),
 })
+
+const mineFailure = useListFailure(mineError, 'The shifts you hold could not be read.')
 
 const role = ref<ShiftRole | undefined>(undefined)
 const page = ref(1)
 
 type OpenShifts = Page<OpenShift> & { openings: OpenOpeningShift[] }
 
-const { data, status, refresh } = await useFetch<OpenShifts>('/api/rota/shifts', {
+const { data, status, error, refresh } = await useFetch<OpenShifts>('/api/rota/shifts', {
   query: computed(() => ({ role: role.value, page: page.value })),
   watch: [role, page],
   default: (): OpenShifts => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1, openings: [] }),
 })
+
+const openFailure = useListFailure(error, 'The open shifts could not be read.')
 
 const claiming = ref<string | null>(null)
 const releasing = ref<string | null>(null)
@@ -217,8 +221,15 @@ useSeoMeta({ title: 'My rota' })
       description="Shifts you already hold, and open ones you currently qualify for. What is locked names what would unlock it."
     />
 
+    <ReadFailure
+      v-if="mineFailure"
+      :failure="mineFailure"
+      class="mt-8"
+      @retry="refreshMine()"
+    />
+
     <section
-      v-if="mine.items.length || mine.openings.length"
+      v-else-if="mine.items.length || mine.openings.length"
       class="mt-8"
       data-test="my-shifts"
     >
@@ -332,6 +343,8 @@ useSeoMeta({ title: 'My rota' })
         <UButton
           :color="role === undefined ? 'primary' : 'neutral'"
           variant="outline"
+          :aria-pressed="role === undefined"
+          :icon="role === undefined ? 'i-lucide-check' : undefined"
           data-test="role-filter-all"
           @click="selectRole(undefined)"
         >
@@ -342,6 +355,8 @@ useSeoMeta({ title: 'My rota' })
           :key="one"
           :color="role === one ? 'primary' : 'neutral'"
           variant="outline"
+          :aria-pressed="role === one"
+          :icon="role === one ? 'i-lucide-check' : undefined"
           :data-test="`role-filter-${one}`"
           @click="selectRole(one)"
         >
@@ -359,6 +374,13 @@ useSeoMeta({ title: 'My rota' })
         />
         <span>Reading the open shifts.</span>
       </div>
+
+      <ReadFailure
+        v-else-if="openFailure"
+        :failure="openFailure"
+        class="mt-8"
+        @retry="refresh()"
+      />
 
       <p
         v-else-if="data.items.length === 0 && data.openings.length === 0"
