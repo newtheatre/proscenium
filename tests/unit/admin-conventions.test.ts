@@ -53,6 +53,11 @@ const REPORTS_WITHOUT_A_TOOLBAR = [
   // The desk searches by reference and scans a code: its results are what one lookup returned,
   // and the status pills beside the search are the only narrowing there is (D-114).
   'app/pages/box-office/desk.vue',
+  // Set-up screens holding one short fixed list each, and a board of everything outstanding:
+  // there is nothing to search across and nothing to filter by (E-120, G-108, H-112).
+  'app/pages/rota/manage/backstage.vue',
+  'app/pages/rota/manage/safety.vue',
+  'app/pages/training/manage/requests.vue',
 ]
 
 describe('an input is the component for its value (0032)', () => {
@@ -434,7 +439,7 @@ async function consoleFiles(): Promise<{ path: string, source: string }[]> {
 // read its neighbour's buttons.
 function columnEntries(source: string): string[][] {
   const blocks: string[][] = []
-  const opening = /columns[^=\n]*=\s*\[/g
+  const opening = /[Cc]olumns[^=\n]*=\s*\[/g
   let match: RegExpExecArray | null
   while ((match = opening.exec(source)) !== null) {
     const entries: string[] = []
