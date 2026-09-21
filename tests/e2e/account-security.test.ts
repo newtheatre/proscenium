@@ -89,6 +89,25 @@ describe.skipIf(skip !== null)('managing a second factor on the account (A-109, 
     }
   }, CASE_TIMEOUT_MS)
 
+  // A-112 criterion 6: begun by mistake, or the phone is in another room. The way out is on the
+  // step itself, and the account is left exactly as it was.
+  test('setting up an authenticator app can be stopped part way, leaving nothing behind', async () => {
+    const { email, view } = await registerAndSignIn('abandon')
+    try {
+      await visit(view, `${app.baseURL}/account/security`)
+      await click(view, '[data-test="begin"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="mfa-secret"]\')')
+
+      await click(view, '[data-test="mfa-cancel"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="begin"]\')')
+      expect(await textOf(view, 'body')).not.toContain('Scan this with your authenticator app')
+      expect(codeCount(email)).toBe(0)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('enrolling shows the secret and a scannable code, then the recovery codes once', async () => {
     const { email, view } = await registerAndSignIn('enrol')
     try {
