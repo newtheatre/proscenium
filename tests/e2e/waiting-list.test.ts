@@ -145,3 +145,84 @@ describe.skipIf(skip !== null)('leaving with a link that no longer works says so
     expect(entriesFor(performanceId)[0]?.status).toBe('REMOVED')
   }, CASE_TIMEOUT_MS)
 })
+
+// Issue 1152 item 5: the join screen named no show and validated only blanks, and leaving from a
+// live offer was one click with nothing said about what it costs.
+describe.skipIf(skip !== null)('the join screen names what it is a list for (criterion 1)', () => {
+  test('the show and the night are on the page before anybody fills anything in', async () => {
+    const { performanceId } = await bookableShow()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/waiting-list/${performanceId}`, '[data-test="waiting-list-join-page"]')
+      await waitFor(view, `document.querySelector('[data-test="waiting-list-for"]')`)
+
+      const says = await textOf(view, '[data-test="waiting-list-for"]')
+      expect(says).toContain('The Cherry Orchard')
+      // The long London form the show page uses, so the night is unambiguous.
+      expect(says).toMatch(/\d{1,2}\s\w+\sat\s\d{2}:\d{2}/)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a blank name and a malformed address each answer on their own field', async () => {
+    const { performanceId } = await bookableShow()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/waiting-list/${performanceId}`, '[data-test="waiting-list-join-page"]')
+      await fill(view, '[data-test="waiting-list-guest-email"]', 'not-an-address')
+      await click(view, '[data-test="waiting-list-submit"]')
+      await waitFor(view, `document.body.innerText.includes('does not look like an email address')`)
+
+      const body = await textOf(view)
+      expect(body).toContain('Tell us the name to hold the place under')
+      expect(body).not.toContain('Invalid')
+      expect(body).not.toContain('Required')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('leaving is asked about first (criterion 4)', () => {
+  test('the leave button on the entry page opens a named confirmation, and backing out leaves the entry alone', async () => {
+    const { performanceId } = await bookableShow()
+    const email = `asked-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/waiting-list/${performanceId}`, '[data-test="waiting-list-join-page"]')
+      await fill(view, '[data-test="waiting-list-guest-name"]', 'Ada Asked')
+      await fill(view, '[data-test="waiting-list-guest-email"]', email)
+      await click(view, '[data-test="waiting-list-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="waiting-list-joined"]')`)
+
+      const letter = (await letters(app)).find(text => text.includes(email)) ?? ''
+      const entryUrl = letter.match(/https?:\/\/\S*\/waiting-list\/entry\/\S+/)?.[0]
+      expect(entryUrl).toBeDefined()
+
+      await visit(view, entryUrl!, '[data-test="waiting-list-entry-page"]')
+      await click(view, '[data-test="waiting-list-leave"]')
+      await waitFor(view, `document.querySelector('[data-test="confirm-leave-waiting-list-verb"]')`)
+
+      // The consequence is stated, not implied by a red button.
+      expect(await textOf(view)).toContain('next person')
+
+      await click(view, '[data-test="confirm-leave-waiting-list-back"]')
+      expect(entriesFor(performanceId)[0]?.status).toBe('WAITING')
+
+      await click(view, '[data-test="waiting-list-leave"]')
+      await waitFor(view, `document.querySelector('[data-test="confirm-leave-waiting-list-verb"]')`)
+      await click(view, '[data-test="confirm-leave-waiting-list-verb"]')
+      await waitFor(view, `document.querySelector('[data-test="waiting-list-removed"]')`)
+      expect(entriesFor(performanceId)[0]?.status).toBe('REMOVED')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
