@@ -204,7 +204,7 @@ const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParam
               variant="ghost"
               @click="editing = null"
             >
-              Cancel
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </div>

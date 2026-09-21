@@ -363,7 +363,7 @@ const columns: TableColumn<BarCategory>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -448,7 +448,7 @@ const columns: TableColumn<BarCategory>[] = [
                 variant="ghost"
                 @click="pricing = null"
               >
-                Back
+                {{ CONFIRM_BACK_LABEL }}
               </UButton>
             </div>
           </UForm>
@@ -486,7 +486,7 @@ const columns: TableColumn<BarCategory>[] = [
           v-else
           class="text-sm text-muted"
         >
-          This cannot be undone, and there is nothing behind it to lose.
+          The category goes. No product sits in it, so nothing moves with it.
         </p>
       </template>
 
@@ -504,7 +504,7 @@ const columns: TableColumn<BarCategory>[] = [
           variant="ghost"
           @click="removing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

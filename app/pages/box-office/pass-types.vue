@@ -559,7 +559,7 @@ const columns: TableColumn<PassType>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -602,7 +602,7 @@ const columns: TableColumn<PassType>[] = [
           variant="ghost"
           @click="removing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -645,7 +645,7 @@ const columns: TableColumn<PassType>[] = [
           variant="ghost"
           @click="managingShows = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

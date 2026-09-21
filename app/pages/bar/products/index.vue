@@ -502,7 +502,7 @@ const columns: TableColumn<BarProduct>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -527,7 +527,7 @@ const columns: TableColumn<BarProduct>[] = [
           v-else
           class="text-sm text-muted"
         >
-          This cannot be undone, and there is nothing behind it to lose.
+          The product goes. Its category and the rest of the list stay as they are.
         </p>
       </template>
 
@@ -545,7 +545,7 @@ const columns: TableColumn<BarProduct>[] = [
           variant="ghost"
           @click="removing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

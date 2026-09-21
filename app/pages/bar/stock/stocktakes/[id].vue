@@ -303,7 +303,7 @@ const columns: TableColumn<StocktakeLine>[] = [
 
     <UModal
       :open="confirming"
-      title="Apply this stocktake?"
+      title="Apply this stocktake"
       description="Posts one adjustment movement per item that counted differently, then freezes the stocktake for good."
       @update:open="confirming = false"
     >
@@ -352,7 +352,7 @@ const columns: TableColumn<StocktakeLine>[] = [
           variant="ghost"
           @click="confirming = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

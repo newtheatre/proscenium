@@ -623,7 +623,7 @@ const columns: TableColumn<AdminPerformance>[] = [
               variant="ghost"
               @click="performanceOpen = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -658,7 +658,7 @@ const columns: TableColumn<AdminPerformance>[] = [
           variant="ghost"
           @click="cancelling = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -671,7 +671,8 @@ const columns: TableColumn<AdminPerformance>[] = [
     >
       <template #body>
         <p class="text-sm text-muted">
-          This cannot be undone, and there is nothing behind it to lose.
+          The performance goes and the show keeps the rest. Nothing has been sold for it, so
+          nobody loses a seat.
         </p>
       </template>
 
@@ -682,14 +683,14 @@ const columns: TableColumn<AdminPerformance>[] = [
           data-test="confirm-delete-performance"
           @click="deletePerformance"
         >
-          Delete it
+          Delete the performance
         </UButton>
         <UButton
           color="neutral"
           variant="ghost"
           @click="removing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -707,6 +708,16 @@ const columns: TableColumn<AdminPerformance>[] = [
           level="performance"
           :endpoint="`/api/admin/performances/${pricing.id}/prices`"
         />
+      </template>
+
+      <template #footer>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="pricing = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
   </div>

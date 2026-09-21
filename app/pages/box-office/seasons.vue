@@ -344,7 +344,7 @@ const columns: TableColumn<AdminSeason>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -369,7 +369,7 @@ const columns: TableColumn<AdminSeason>[] = [
           v-else
           class="text-sm text-muted"
         >
-          This cannot be undone, and there is nothing behind it to lose.
+          The season goes. Every show stays where it is.
         </p>
       </template>
 
@@ -387,7 +387,7 @@ const columns: TableColumn<AdminSeason>[] = [
           variant="ghost"
           @click="removing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

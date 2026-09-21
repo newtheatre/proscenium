@@ -141,6 +141,17 @@ const needsVarianceNote = computed(() => hasReading.value && props.variancePrevi
         >
           Confirm close
         </UButton>
+
+        <UButton
+          block
+          color="neutral"
+          variant="ghost"
+          class="min-h-12"
+          data-test="close-till-back"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </div>
     </template>
   </UModal>

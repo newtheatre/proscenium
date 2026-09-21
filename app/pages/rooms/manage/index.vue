@@ -345,6 +345,7 @@ const columns: TableColumn<Room>[] = [
     >
       <template #body>
         <UForm
+          id="room-form"
           :schema="roomForm"
           :state="state"
           class="space-y-4"
@@ -555,15 +556,25 @@ const columns: TableColumn<Room>[] = [
               description="A retired room keeps its history and leaves the calendar."
             />
           </UFormField>
-
-          <UButton
-            type="submit"
-            :loading="saving"
-            data-test="room-save"
-          >
-            {{ editing ? 'Save' : 'Add it' }}
-          </UButton>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="room-form"
+          :loading="saving"
+          data-test="room-save"
+        >
+          {{ editing ? 'Save changes' : 'Add the room' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
