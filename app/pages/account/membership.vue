@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysDayLong } from '#shared/utils/when'
-import { MEMBERSHIP_TERMS, londonDay } from '#shared/utils/membership'
+import { MEMBERSHIP_TERMS, londonDay, saysMembershipState } from '#shared/utils/membership'
+import { saysMembershipSentence } from '#shared/utils/my-summary'
 import type { MembershipState } from '#shared/utils/membership'
 import { membershipClaimForm } from '#shared/utils/membership-claims'
 import type { MembershipClaimInput } from '#shared/utils/membership-claims'
@@ -41,6 +42,22 @@ const { data, refresh, error } = await useAsyncData<Own>(
 const listFailure = useListFailure(error, 'Your membership could not be read.')
 
 const sayDay = (day: string): string => saysDayLong(day, { year: true })
+
+// Colour alone never carries the state: the badge word beside it is what says which (K-101).
+const BADGE_COLOUR: Record<MembershipState['kind'], 'success' | 'warning' | 'neutral'> = {
+  current: 'success',
+  grace: 'warning',
+  lapsed: 'neutral',
+  none: 'neutral',
+}
+
+// Word and sentence both from the shared helpers: this page, the /my tile and every refusal
+// say the state one way (K-128).
+const standing = computed(() => {
+  const state = data.value.state
+  const until = 'until' in state ? state.until : null
+  return { word: saysMembershipState(state.kind), says: saysMembershipSentence({ state: state.kind, until, claim: null }) }
+})
 
 const termLabel = (years: number): string => `${years} year${years === 1 ? '' : 's'}`
 
@@ -137,45 +154,16 @@ useSeoMeta({ title: 'Membership' })
           data-test="membership-state"
           class="space-y-2 text-sm"
         >
-          <template v-if="data.state.kind === 'current'">
-            <UBadge
-              color="success"
-              variant="subtle"
-            >
-              Current
-            </UBadge>
-            <p>Your membership runs until {{ sayDay(data.state.until) }}.</p>
-          </template>
-          <template v-else-if="data.state.kind === 'grace'">
-            <UBadge
-              color="warning"
-              variant="subtle"
-            >
-              In grace
-            </UBadge>
-            <p>
-              Your membership ran out on {{ sayDay(data.state.expiredOn) }}. It still counts until
-              {{ sayDay(data.state.until) }}, which is the {{ data.graceDays }} days we allow for a renewal to reach us.
-            </p>
-          </template>
-          <template v-else-if="data.state.kind === 'lapsed'">
-            <UBadge
-              color="neutral"
-              variant="subtle"
-            >
-              Lapsed
-            </UBadge>
-            <p>Your membership lapsed on {{ sayDay(data.state.expiredOn) }}.</p>
-          </template>
-          <template v-else>
-            <UBadge
-              color="neutral"
-              variant="subtle"
-            >
-              None
-            </UBadge>
-            <p>No membership is recorded on your account.</p>
-          </template>
+          <UBadge
+            :color="BADGE_COLOUR[data.state.kind]"
+            variant="subtle"
+          >
+            {{ standing.word }}
+          </UBadge>
+          <p>{{ standing.says }}</p>
+          <p v-if="data.state.kind === 'grace' || data.state.kind === 'lapsed'">
+            It ran out on {{ sayDay(data.state.expiredOn) }}.
+          </p>
         </div>
       </UPageCard>
 
@@ -185,7 +173,7 @@ useSeoMeta({ title: 'Membership' })
         icon="i-lucide-badge-check"
         title="Membership is bought at the Students' Union"
         :description="feeValue
-          ? `We cannot sell it here. The current fee is ${feeValue.text}${feeValue.enforced ? '' : ' (not enforced yet)'}. Once you have bought it, tell us below and an officer will record it on your account.`
+          ? `We cannot sell it here. The current fee is ${feeValue.text}. Once you have bought it, tell us below and an officer will record it on your account.`
           : 'We cannot sell it here. Once you have bought it, tell us below and an officer will record it on your account.'"
         data-test="membership-fee"
       />
@@ -234,7 +222,7 @@ useSeoMeta({ title: 'Membership' })
             :loading="withdrawing"
             @click="withdraw"
           >
-            Withdraw
+            Withdraw the claim
           </UButton>
         </div>
       </UPageCard>

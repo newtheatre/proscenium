@@ -285,7 +285,7 @@ useSeoMeta({ title: 'Security' })
           data-test="mfa-required"
           color="info"
           variant="subtle"
-          description="A role you hold requires a second factor, so this one cannot be removed while you hold it."
+          description="A role you hold needs an authenticator app. Give the role up first if you want to remove this."
         />
 
         <div class="flex flex-wrap gap-2">
@@ -313,7 +313,7 @@ useSeoMeta({ title: 'Security' })
     <UPageCard
       class="mt-6"
       title="Your data"
-      description="Everything the theatre holds about you, in one file. A fuller account page arrives with A-114."
+      description="Everything we hold about you, in one file."
     >
       <div class="flex flex-wrap gap-2">
         <UButton
@@ -352,7 +352,7 @@ useSeoMeta({ title: 'Security' })
           <UAlert
             color="warning"
             variant="subtle"
-            description="This cannot be undone. Bookings and attendance stay as anonymous rows so the theatre's own records still add up."
+            description="This cannot be undone. Your bookings and attendance stay on our own count of the year, with your name taken off them."
           />
           <UFormField
             label="Type your email address to confirm"

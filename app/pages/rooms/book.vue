@@ -166,7 +166,7 @@ async function bookSeries(): Promise<void> {
         : `${plural(answer.occurrences.length, 'booking')} asked for`,
       description: answer.status === 'CONFIRMED'
         ? `${made()}. Cancelling asks whether you mean one week or the whole run.`
-        : `${made()}. The slots are held while somebody decides.`,
+        : `${made()}. The slots are held while an officer decides.`,
       icon: 'i-lucide-check',
       color: answer.status === 'CONFIRMED' ? 'success' : 'warning',
     })
@@ -328,7 +328,7 @@ async function ask(): Promise<void> {
 
     toast.add({
       title: 'Asked for',
-      description: `${made()}. The slot is held while somebody decides.`,
+      description: `${made()}. The slot is held while an officer decides.`,
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -349,7 +349,7 @@ useSeoMeta({ title: 'Book a room' })
   <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       title="Book a room"
-      description="A booking inside the rules is held straight away. One outside them is a request somebody decides on."
+      description="A booking inside the rules is held straight away. One outside them is a request an officer decides on."
     />
 
     <UPageCard class="mt-8">
@@ -575,7 +575,7 @@ useSeoMeta({ title: 'Book a room' })
                 :key="refusal.day"
               >
                 {{ refusal.day }}:
-                {{ refusal.conflicts.length ? 'somebody already has it' : refusal.failures.map(one => one.says).join(' ') }}
+                {{ refusal.conflicts.length ? 'another member already has it' : refusal.failures.map(one => one.says).join(' ') }}
               </li>
             </ul>
             <UButton
@@ -594,7 +594,7 @@ useSeoMeta({ title: 'Book a room' })
           v-if="failures.length"
           :color="state.asking ? 'warning' : 'error'"
           variant="subtle"
-          :title="state.asking ? 'This one needs somebody to agree to it' : 'That booking cannot be made'"
+          :title="state.asking ? 'This one needs an officer to agree to it' : 'That booking cannot be made'"
           data-test="booking-failures"
         >
           <template #description>
@@ -610,7 +610,7 @@ useSeoMeta({ title: 'Book a room' })
               v-if="state.asking"
               class="mt-2"
             >
-              Ask for it anyway, and somebody will decide. The slot is held while they do.
+              Ask for it anyway, and an officer will decide. The slot is held while they do.
             </p>
             <UButton
               v-if="needsMembership"
@@ -620,7 +620,7 @@ useSeoMeta({ title: 'Book a room' })
               to="/account/membership"
               data-test="booking-membership-link"
             >
-              Sort out your membership
+              Tell us about your membership
             </UButton>
           </template>
         </UAlert>

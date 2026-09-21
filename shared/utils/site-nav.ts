@@ -249,7 +249,7 @@ export const MY_NAV: NavEntry[] = [
   // Module C: spaces
 
   { label: 'Book a room', icon: 'i-lucide-door-open', to: '/rooms', ability: signedIn, exact: true },
-  { label: 'My bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },
+  { label: 'My room bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },
 
   // Module G: training
 
