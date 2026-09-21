@@ -577,40 +577,14 @@ function introProse(source: string): string[] {
 
 const sentences = (prose: string): number => (prose.match(/[.?!](?=\s|$)/g) ?? []).length
 
-// A screen whose explainer has not been swept yet. Box office and bar went first (issue 1151
-// item 2); the list may shrink and may not grow.
+// Developer tools, which never ship (K-124), and whose reader wants the warning in front of them
+// rather than one tap away in a document. The list may shrink and may not grow.
 const EXPLAINS_ITSELF_IN_AN_ALERT = [
-  // Developer tools, which never ship (K-124), and whose reader wants the warning in front of
-  // them rather than in a document.
   'app/pages/dev.vue',
-  'app/pages/people/fellows.vue',
-  'app/pages/people/members.vue',
-  'app/pages/rooms/manage/closures.vue',
-  'app/pages/rooms/manage/index.vue',
-  'app/pages/rooms/manage/other.vue',
-  'app/pages/rooms/manage/requests.vue',
-  'app/pages/rooms/manage/utilisation.vue',
-  'app/pages/rota/manage/age-checks.vue',
-  'app/pages/rota/manage/approvals.vue',
-  'app/pages/rota/manage/backstage.vue',
-  'app/pages/rota/manage/checklists.vue',
-  'app/pages/rota/manage/emergency.vue',
-  'app/pages/rota/manage/openings.vue',
-  'app/pages/rota/manage/safety.vue',
-  'app/pages/rota/manage/templates.vue',
-  'app/pages/training/manage/departments.vue',
-  'app/pages/training/manage/index.vue',
-  'app/pages/training/manage/records.vue',
-  'app/pages/training/manage/requests.vue',
-  'app/pages/training/manage/sessions/index.vue',
 ]
 
-// An introduction still running to more than a sentence, for the same sweep. The list may shrink
-// and may not grow.
-const INTRODUCES_ITSELF_AT_LENGTH = [
-  'app/pages/admin/settings.vue',
-  'app/pages/comms/operations/accounts/[id].vue',
-]
+// An introduction still running to more than a sentence. Empty, and it may not grow.
+const INTRODUCES_ITSELF_AT_LENGTH: string[] = []
 
 describe('a console screen introduces itself in one sentence (K-123 criterion 11, issue 1151 item 2)', () => {
   test('no screen keeps an alert on the page that no state turns off', async () => {
