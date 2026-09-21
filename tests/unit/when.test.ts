@@ -66,6 +66,21 @@ describe('an ISO string and an epoch say the same words', () => {
     expect(saysWhen(iso, { now: NOW })).toBe(saysWhen(seconds(iso), { now: NOW }))
     expect(saysWhenLong(iso, { now: NOW })).toBe(saysWhenLong(seconds(iso), { now: NOW }))
   })
+
+  test('a number in milliseconds says the same words as the same instant in seconds', () => {
+    const at = seconds('2026-10-14T18:30:00Z')
+    expect(saysWhen(at * 1000, { now: NOW })).toBe(saysWhen(at, { now: NOW }))
+  })
+})
+
+describe('the line between seconds and milliseconds (1e11)', () => {
+  test('just under the line is seconds', () => {
+    expect(saysDay(99_999_999_999, { year: true })).toBe('Wed 16 Nov 5138')
+  })
+
+  test('on the line is milliseconds', () => {
+    expect(saysDay(100_000_000_000, { year: true })).toBe('Sat 3 Mar 1973')
+  })
 })
 
 describe('midnight and the show-night boundary read as the right day (0014)', () => {

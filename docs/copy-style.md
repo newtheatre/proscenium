@@ -149,7 +149,7 @@ Dates and times are Europe/London and take two shapes: short in a list, "Wed 14 
 long in prose, "Wednesday 14 October at 19:30". Both come from `shared/utils/when.ts`, which fixes
 the separators the locale would otherwise choose for itself: `saysWhen()` and `saysWhenLong()` for
 an instant, `saysDay()` and `saysDayLong()` where only the day is meant, and `saysClock()` for a
-time on its own. Each takes epoch seconds, an ISO string, or a `YYYY-MM-DD` London day, and each
+time on its own. Each takes an epoch number, an ISO string, or a `YYYY-MM-DD` London day, and each
 pins the zone by construction, so no page builds its own options object. `formatLondon()`
 (`shared/utils/london.ts`) is the mechanism underneath and is not called from a page.
 

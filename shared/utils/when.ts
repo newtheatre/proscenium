@@ -2,7 +2,7 @@
 // is Europe/London by construction (0014), and the separators are literal so no locale moves them.
 import { committeeYearOf, formatLondon, startOfLondonDay } from './london'
 
-// A number is epoch seconds, the wire convention throughout; milliseconds would read as 1970.
+// A number is epoch seconds, the wire convention throughout, or milliseconds above the line below.
 // A bare YYYY-MM-DD is a London day, not the UTC midnight `new Date` would take it for.
 export type When = number | string
 
@@ -13,8 +13,12 @@ export interface WhenOptions {
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 
+// The year 5138 in seconds and 1973 in milliseconds: nothing this system dates falls either side
+// the wrong way, so a caller passing Date.now() reads as now rather than as 1970.
+const MILLISECONDS_FROM = 100_000_000_000
+
 export function whenInstant(value: When): Date {
-  if (typeof value === 'number') return new Date(value * 1000)
+  if (typeof value === 'number') return new Date(value >= MILLISECONDS_FROM ? value : value * 1000)
   return DAY.test(value) ? startOfLondonDay(value) : new Date(value)
 }
 
