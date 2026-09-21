@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { REQUEST_NOTE_LIMIT, saysKind, saysRequestStatus, saysSource, saysState } from '#shared/utils/training'
+import { saysDay } from '#shared/utils/when'
 import type { RecordState } from '#shared/utils/training'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/your-training' })
@@ -291,13 +292,13 @@ const standings = computed(() => [
               </div>
               <p class="mt-1 text-sm text-muted">
                 <!-- How it was come by, because a certificate we recorded is not one we ran (G-121 c4). -->
-                {{ saysKind(record.kind) }} · {{ saysSource(record.source) }} · Awarded {{ record.awardedOn }}
+                {{ saysKind(record.kind) }} · {{ saysSource(record.source) }} · Awarded {{ saysDay(record.awardedOn) }}
                 <!-- A brief never expires, so it shows what it is instead of a date (criterion 5). -->
                 <template v-if="record.kind === 'BRIEF'">
                   · Last attended
                 </template>
                 <template v-else-if="record.expiresOn">
-                  · Runs to {{ record.expiresOn }}
+                  · Runs to {{ saysDay(record.expiresOn) }}
                 </template>
                 <template v-else>
                   · Never expires
@@ -351,7 +352,7 @@ const standings = computed(() => [
               </UBadge>
             </div>
             <p class="mt-1 text-sm text-muted">
-              {{ session.heldOn }} at {{ session.startsAt }}
+              {{ saysDay(session.heldOn) }} at {{ session.startsAt }}
               <template v-if="session.place">
                 · {{ session.place }}
               </template>

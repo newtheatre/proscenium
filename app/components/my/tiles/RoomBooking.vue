@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import type { MySummary } from '#shared/utils/my-summary'
 
 defineProps<{ summary: MySummary }>()
@@ -18,7 +18,7 @@ defineProps<{ summary: MySummary }>()
       {{ summary.room?.roomName }}
     </p>
     <p class="text-sm text-muted">
-      {{ summary.room && formatLondon(new Date(summary.room.startsAt * 1000), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }}
+      {{ summary.room && saysWhen(summary.room.startsAt) }}
     </p>
     <p
       v-if="summary.room?.purpose"

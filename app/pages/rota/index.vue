@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhenLong } from '#shared/utils/when'
 import { saysShiftRole, saysShiftStatus, SHIFT_ROLES } from '#shared/utils/rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { Page } from '#shared/utils/pagination'
@@ -196,7 +196,7 @@ async function claim(shift: OpenShift): Promise<void> {
 }
 
 function spanOf(startsAt: number): string {
-  return formatLondon(new Date(startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
+  return saysWhenLong(startsAt)
 }
 
 function selectRole(one: ShiftRole | undefined): void {

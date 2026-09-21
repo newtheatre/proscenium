@@ -171,6 +171,19 @@ describe('a time is always the shared TimeField (#915)', () => {
   })
 })
 
+// K-102, issue 1150 item 8: a door pass is printed from the counter laptop, and a show-night
+// screen is dark. Printing one without a rule puts the whole dark screen on the paper.
+describe('printing takes the pass alone, light on white (K-102)', () => {
+  test('the token source carries a print rule that hides everything but the pass', async () => {
+    const theme = await Bun.file(TOKEN_SOURCE).text()
+    const print = theme.slice(theme.indexOf('@media print'))
+    expect(theme).toContain('@media print')
+    expect(print).toContain('.print-pass')
+    expect(print).toContain('visibility: visible')
+    expect(print).toContain('color-scheme: light')
+  })
+})
+
 // The member and public shells, the console's half of the same rule being in
 // admin-conventions.test.ts. A locale format takes the runtime's zone, which is UTC (0014).
 const LOCALE_FORMAT = /\.toLocale(?:Date|Time)?String\(/
@@ -274,5 +287,74 @@ describe('the member shell is calm (0084, K-127, issue 1153 item 1)', () => {
       }
     }
     expect(offenders).toEqual([])
+  })
+})
+
+// A screen asks for a shape, it does not build one: formatLondon is the mechanism under
+// shared/utils/when.ts, and a bespoke options object is how the two shapes drifted (copy-style §9).
+const BUILDS_ITS_OWN = /formatLondon\(/
+
+// The console and show-night screens this slice did not reach, and the shared helpers whose
+// shapes are not read by a person. The list may shrink and may not grow.
+const BUILDS_ITS_OWN_ALLOWED = [
+  'app/components/box-office/show/Performances.vue',
+  'app/components/box-office/show/Sales.vue',
+  'app/components/box-office/show/StatusStrip.vue',
+  'app/components/till/TicketsPane.vue',
+  'app/pages/admin/audit.vue',
+  'app/pages/admin/index.vue',
+  'app/pages/admin/settings.vue',
+  'app/pages/bar/stock/movements.vue',
+  'app/pages/bar/stock/stocktakes/[id].vue',
+  'app/pages/bar/stock/stocktakes/index.vue',
+  'app/pages/bar/tabs.vue',
+  'app/pages/box-office/pass-types.vue',
+  'app/pages/comms/operations/accounts/[id].vue',
+  'app/pages/people/accounts/index.vue',
+  'app/pages/people/roles.vue',
+  'app/pages/rooms/index.vue',
+  'app/pages/rooms/manage/requests.vue',
+  'app/pages/rooms/mine.vue',
+  'app/pages/rota/manage/approvals.vue',
+  'app/pages/rota/manage/emergency.vue',
+  'app/pages/rota/manage/openings.vue',
+  'app/pages/rota/manage/safety.vue',
+  'app/pages/rota/manage/shifts.vue',
+  'app/pages/tonight/emergency.vue',
+  'app/pages/tonight/glance.vue',
+  'app/pages/tonight/till/index.vue',
+  'shared/utils/blackouts.ts',
+  'shared/utils/list-filters.ts',
+  'shared/utils/night-hub.ts',
+  'shared/utils/programme.ts',
+]
+
+// london.ts declares formatLondon and when.ts is the one caller the rule exists to route through.
+const THE_MECHANISM = ['shared/utils/london.ts', 'shared/utils/when.ts']
+
+async function sharedFiles(): Promise<string[]> {
+  const glob = new Bun.Glob('**/*.ts')
+  return [...glob.scanSync({ cwd: 'shared', onlyFiles: true })]
+    .map(path => `shared/${path}`)
+    .filter(path => !THE_MECHANISM.includes(path))
+    .sort()
+}
+
+describe('a date shape comes from the shared helpers (K-127, K-128, issue 1153 item 2)', () => {
+  test('no page, component or shared helper builds its own date format', async () => {
+    const found: string[] = []
+    for (const file of [...await appFiles(), ...await sharedFiles()]) {
+      if (BUILDS_ITS_OWN_ALLOWED.includes(file)) continue
+      if (BUILDS_ITS_OWN.test(await Bun.file(file).text())) found.push(file)
+    }
+    expect(found).toEqual([])
+  })
+
+  test('the allow-list names only files that still build one', async () => {
+    const stale: string[] = []
+    for (const file of BUILDS_ITS_OWN_ALLOWED) {
+      if (!BUILDS_ITS_OWN.test(await Bun.file(file).text())) stale.push(file)
+    }
+    expect(stale).toEqual([])
   })
 })

@@ -184,3 +184,38 @@
   line-height: 1.05;
   text-wrap: balance;
 }
+
+/* Printing a door pass from the counter laptop (F-123, K-102). A show-night screen is dark, and
+   without this the printer is asked for the whole of it: the pass alone goes on the paper. */
+@media print {
+  :root { color-scheme: light; }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  body * { visibility: hidden; }
+
+  .print-pass,
+  .print-pass * { visibility: visible; }
+
+  /* Lifted to the top of the sheet so the passes print from the first line, whatever was
+     scrolled above them on screen. */
+  .print-sheet {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  .print-pass {
+    background: white;
+    color: black;
+    border: 1px solid black;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  @page { margin: 12mm; }
+}

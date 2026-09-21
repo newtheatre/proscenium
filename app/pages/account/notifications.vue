@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
+import { saysWhen } from '#shared/utils/when'
 import { TOPIC_DESCRIPTIONS, TOPIC_LABELS } from '#shared/utils/notifications'
 import type { NotificationTopic } from '#shared/utils/senders'
 
@@ -179,7 +179,7 @@ useSeoMeta({ title: 'Notifications' })
               class="font-medium"
             >{{ item.title }}</span>
             <span class="ms-auto text-xs text-muted">
-              {{ formatLondon(new Date(item.createdAt * 1000), { dateStyle: 'medium', timeStyle: 'short' }) }}
+              {{ saysWhen(item.createdAt) }}
             </span>
           </div>
           <p

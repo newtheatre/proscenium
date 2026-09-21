@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { describeExpiry, saysDeliveryMode, saysKind } from '#shared/utils/training'
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import type { DeliveryMode, ExpiryMode, ModuleKind } from '#shared/utils/training'
 
 interface Prerequisite { moduleId: string, name: string, held: boolean | null }
@@ -46,7 +46,7 @@ const unlocks = computed(() => data.value.items
 const nextSessionLine = computed(() => {
   const session = module.value?.nextSession
   if (!session) return 'No session scheduled'
-  const day = formatLondon(startOfLondonDay(session.heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
+  const day = saysDay(session.heldOn)
   return session.place ? `${day}, ${session.startsAt} · ${session.place}` : `${day}, ${session.startsAt}`
 })
 

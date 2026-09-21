@@ -43,13 +43,17 @@ export interface TillBasketDeps {
   // Injected rather than a bare $fetch, so the pure basket logic type-checks and runs under
   // bun:test with no Nuxt runtime beneath it (tests/tsconfig.json).
   requestPrice: (body: { venueId: string, lines: { variantId: string, qty: number, choiceItemId: string | null }[], discountId: string | null }) => Promise<PricedBasket>
+  // Whether the device believes it can reach anything, injected so the offline behaviour is
+  // testable without a browser (K-103).
+  online: Ref<boolean>
+
   // A refusal at the tap may never reach a sale, so it goes on the register on its own
   // (F-106 criterion 6).
   recordAgeCheck: (body: { outcome: 'REFUSED', idType: null, reason: RefusalReason | null, description: string, notes: string | null, product: string | null, performanceId: null }) => Promise<unknown>
 }
 
 export function useTillBasket(deps: TillBasketDeps) {
-  const { venueId, products, selectedDiscountId, selectedTabHolderId, ticketLines, walkUpLines, walkUpGuest, ticketsPence, walkUpsPence, requestPrice, recordAgeCheck } = deps
+  const { venueId, products, selectedDiscountId, selectedTabHolderId, ticketLines, walkUpLines, walkUpGuest, ticketsPence, walkUpsPence, requestPrice, recordAgeCheck, online } = deps
 
   const basket = ref<BasketLine[]>([])
 
@@ -142,12 +146,22 @@ export function useTillBasket(deps: TillBasketDeps) {
   const pricing = ref(false)
   const priceFailure = ref<string | null>(null)
 
+  // Pricing is a round trip, so with nothing to reach the total is unknown, not stale and not a
+  // refusal: the screen says so and the charge waits (K-103, issue 1150 item 7).
+  const offline = computed(() => !online.value)
+
   // Recomputed server-side on every change, never trusted from what the screen last showed (0004,
   // F-103 criterion 3). The caller debounces the calls; this only ever does one at a time.
   async function recomputeTotal(): Promise<void> {
     if (basket.value.length === 0 || !venueId.value) {
       priced.value = null
       priceFailure.value = null
+      return
+    }
+    if (!online.value) {
+      priced.value = null
+      priceFailure.value = null
+      pricing.value = false
       return
     }
     pricing.value = true
@@ -169,6 +183,11 @@ export function useTillBasket(deps: TillBasketDeps) {
       pricing.value = false
     }
   }
+
+  // Nobody should have to touch the basket to get a total back once the connection returns.
+  watch(online, (up) => {
+    if (up) void recomputeTotal()
+  })
 
   let priceTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -218,7 +237,7 @@ export function useTillBasket(deps: TillBasketDeps) {
     const names = [...new Set(removed.map(line => line.productName))].join(', ')
     basket.value = basket.value.filter(line => !isRestricted(line))
     askingAgeCheckFor.value = null
-    refusedLinesNote.value = names ? `Not sold, on the ID refusal: ${names}` : null
+    refusedLinesNote.value = names ? `ID refused. Not sold: ${names}` : null
     refusalRecordFailure.value = null
     try {
       await recordAgeCheck({
@@ -289,6 +308,7 @@ export function useTillBasket(deps: TillBasketDeps) {
     priced,
     pricing,
     priceFailure,
+    offline,
     recomputeTotal,
     grandTotalPence,
     isRestricted,

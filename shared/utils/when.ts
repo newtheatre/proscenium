@@ -4,7 +4,7 @@ import { committeeYearOf, formatLondon, startOfLondonDay } from './london'
 
 // A number is epoch seconds, the wire convention throughout, or milliseconds above the line below.
 // A bare YYYY-MM-DD is a London day, not the UTC midnight `new Date` would take it for.
-export type When = number | string
+export type When = number | string | Date
 
 export interface WhenOptions {
   year?: boolean
@@ -18,6 +18,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/
 const MILLISECONDS_FROM = 100_000_000_000
 
 export function whenInstant(value: When): Date {
+  if (value instanceof Date) return value
   if (typeof value === 'number') return new Date(value >= MILLISECONDS_FROM ? value : value * 1000)
   return DAY.test(value) ? startOfLondonDay(value) : new Date(value)
 }

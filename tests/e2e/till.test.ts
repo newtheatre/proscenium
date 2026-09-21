@@ -644,3 +644,99 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     view.close()
   }, 120_000)
 })
+
+// K-102 and issue 1150 item 8: the show-night layout itself. These wait for the nightly run.
+describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)', () => {
+  // `aSellableProduct` makes a category of its own each time, so a second one is what puts the
+  // category chips on the grid at all.
+  async function atTheTill(secondCategory = false): Promise<{ view: Bun.WebView, productId: string }> {
+    const password = generatePassword()
+    const staff = await registerMember(app, `till-layout-${crypto.randomUUID().slice(0, 6)}`, password)
+    await request(app, 'POST', '/api/admin/roles', { userId: staff.id, role: 'BAR_MANAGER' }, admin.cookie)
+    const where = programme(`till-layout-${crypto.randomUUID().slice(0, 6)}`)
+    await openTill(where.venueId, staff.cookie)
+    const { productId } = await aSellableProduct(300)
+    if (secondCategory) await aSellableProduct(250)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', staff.email)
+    await fill(view, 'form input[type="password"]', password)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${where.venueId}`, `[data-test="product-${productId}"]`)
+    return { view, productId }
+  }
+
+  // A pane torn down and rebuilt takes the camera with it, which is the door's lesson (PR 1157).
+  test('both panes stay mounted, so switching never remounts the scanner', async () => {
+    const { view } = await atTheTill()
+    await waitFor(view, `document.querySelector('#pane-tickets-panel')`)
+
+    await view.evaluate(`document.querySelector('#pane-tickets-panel').dataset.aliveMarker = 'kept'`)
+    await click(view, '[data-test="till-pane-tickets"]')
+    await waitFor(view, `document.querySelector('#pane-tickets-panel').offsetParent !== null`)
+    await click(view, '[data-test="till-pane-bar"]')
+    await waitFor(view, `document.querySelector('#pane-bar-panel').offsetParent !== null`)
+
+    expect(await view.evaluate<string>(`document.querySelector('#pane-tickets-panel').dataset.aliveMarker`)).toBe('kept')
+    view.close()
+  }, 120_000)
+
+  test('each pane is named by the tab that opens it', async () => {
+    const { view } = await atTheTill()
+    const labelled = `(() => {
+      return ['#pane-bar-panel', '#pane-tickets-panel'].map((selector) => {
+        const panel = document.querySelector(selector)
+        const by = panel && panel.getAttribute('aria-labelledby')
+        const tab = by && document.getElementById(by)
+        return { role: panel && panel.getAttribute('role'), label: tab && tab.textContent.trim() }
+      })
+    })()`
+    const panes = await view.evaluate<{ role: string | null, label: string | null }[]>(labelled)
+    expect(panes[0]).toEqual({ role: 'tabpanel', label: 'Bar' })
+    expect(panes[1]).toEqual({ role: 'tabpanel', label: 'Tickets' })
+    view.close()
+  }, 120_000)
+
+  // A hint is for the first sale of the night, not a line above every one of them.
+  test('the hint goes once there is something in the basket', async () => {
+    const { view, productId } = await atTheTill()
+    expect(await textOf(view, '[data-test="night-hint"]')).toContain('Tap a size')
+
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="night-hint"]') === null`)
+    view.close()
+  }, 120_000)
+
+  // The pinned area is the thumb's, and every row in it costs one (K-102 criterion 2).
+  test('the pinned area stacks no more than three rows on a phone', async () => {
+    const { view, productId } = await atTheTill()
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket-summary-bar"]')`)
+
+    const rows = await view.evaluate<number>(`document.querySelector('[data-test="night-actions"]').children.length`)
+    expect(rows).toBeLessThanOrEqual(3)
+    view.close()
+  }, 120_000)
+
+  // Every control on a show-night screen, not only the primary ones (design-language.md rule 4).
+  test('every control a thumb reaches for clears 48 pixels', async () => {
+    const { view, productId } = await atTheTill(true)
+    await waitFor(view, `document.querySelector('[data-test="category-chips"] button')`)
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
+
+    const heights = `[
+      ...document.querySelectorAll('[data-test="category-chips"] button'),
+      document.querySelector('[data-test="allergen-${productId}"]'),
+      document.querySelector('[data-test="till-comp-chip"]'),
+      document.querySelector('[data-test="till-overflow-menu"]'),
+      ...document.querySelectorAll('[role="tab"]'),
+    ].map(control => Math.round(control.getBoundingClientRect().height))`
+    const measured = await view.evaluate<number[]>(heights)
+    expect(measured.length).toBeGreaterThanOrEqual(6)
+    for (const height of measured) expect(height).toBeGreaterThanOrEqual(48)
+    view.close()
+  }, 120_000)
+})

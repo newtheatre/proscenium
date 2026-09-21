@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { saysSessionStatus } from '#shared/utils/training'
 
 definePageMeta({ layout: 'console', title: 'Session', middleware: 'console', docs: '/docs/training/sessions' })
@@ -33,7 +33,7 @@ interface Session {
 
 // The same short London day the member-facing list reads, so a date means one thing either side.
 const sessionDay = (heldOn: string): string =>
-  formatLondon(startOfLondonDay(heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
+  saysDay(heldOn)
 
 const route = useRoute()
 const request = useRequestFetch()

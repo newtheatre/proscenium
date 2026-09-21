@@ -149,6 +149,7 @@ const reason = defineModel<string>('reason', { required: true })
             block
             color="neutral"
             variant="subtle"
+            class="min-h-12"
             data-test="comp-keep-waiting"
             @click="open = false"
           >
@@ -173,6 +174,7 @@ const reason = defineModel<string>('reason', { required: true })
               block
               color="neutral"
               variant="subtle"
+              class="min-h-12"
               data-test="comp-keep-waiting"
               @click="open = false"
             >

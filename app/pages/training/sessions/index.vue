@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysGaps } from '#shared/utils/training'
 import { saysClosure, saysPlace } from '#shared/utils/training-signup'
-import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import type { PrerequisiteGap } from '#shared/utils/training'
 import type { ClosureReason } from '#shared/utils/training-signup'
 
@@ -108,7 +108,7 @@ async function withdraw(session: Session): Promise<void> {
 const placesLeft = (session: Session): number => Math.max(0, session.capacity - session.signedUp)
 
 const sessionDay = (session: Session): string =>
-  formatLondon(startOfLondonDay(session.heldOn), { weekday: 'short', day: 'numeric', month: 'short' })
+  saysDay(session.heldOn)
 </script>
 
 <template>

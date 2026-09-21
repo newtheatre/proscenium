@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { boardFeedRows, boardStateFrom, currentBoardState, otherBoardSide, saysBoardSide } from '#shared/utils/backstage'
-import { formatLondon } from '#shared/utils/london'
+import { saysClock } from '#shared/utils/when'
 import type { BoardMessage, BoardSide } from '#shared/utils/backstage'
 
 // The board as either end reads it (E-121 criterion 7): own last call, the other end's, then
@@ -20,7 +20,7 @@ function seenAt(messageId: string): number | null {
 }
 
 function timeOf(at: number): string {
-  return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
+  return saysClock(at)
 }
 
 function saysMessage(message: BoardMessage): string {

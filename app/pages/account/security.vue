@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { renderSVG } from 'uqr'
-import { formatLondon } from '#shared/utils/london'
+import { saysDayLong } from '#shared/utils/when'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
 
@@ -115,7 +115,7 @@ const closeAccount = (): Promise<void> => attempt(async () => {
 })
 
 const confirmedOn = computed(() =>
-  state.value?.confirmedAt ? formatLondon(new Date(state.value.confirmedAt * 1000), { dateStyle: 'long' }) : null)
+  state.value?.confirmedAt ? saysDayLong(state.value.confirmedAt, { year: true }) : null)
 
 onMounted(load)
 
