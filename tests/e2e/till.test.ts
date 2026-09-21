@@ -647,13 +647,16 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
 
 // K-102 and issue 1150 item 8: the show-night layout itself. These wait for the nightly run.
 describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)', () => {
-  async function atTheTill(): Promise<{ view: Bun.WebView, productId: string }> {
+  // `aSellableProduct` makes a category of its own each time, so a second one is what puts the
+  // category chips on the grid at all.
+  async function atTheTill(secondCategory = false): Promise<{ view: Bun.WebView, productId: string }> {
     const password = generatePassword()
     const staff = await registerMember(app, `till-layout-${crypto.randomUUID().slice(0, 6)}`, password)
     await request(app, 'POST', '/api/admin/roles', { userId: staff.id, role: 'BAR_MANAGER' }, admin.cookie)
     const where = programme(`till-layout-${crypto.randomUUID().slice(0, 6)}`)
     await openTill(where.venueId, staff.cookie)
     const { productId } = await aSellableProduct(300)
+    if (secondCategory) await aSellableProduct(250)
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -719,13 +722,21 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
 
   // Every control on a show-night screen, not only the primary ones (design-language.md rule 4).
   test('every control a thumb reaches for clears 48 pixels', async () => {
-    const { view, productId } = await atTheTill()
+    const { view, productId } = await atTheTill(true)
+    await waitFor(view, `document.querySelector('[data-test="category-chips"] button')`)
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
 
-    const heights = `['[data-test="allergen-${productId}"]', '[data-test="till-comp-chip"]']
-      .map(selector => Math.round(document.querySelector(selector).getBoundingClientRect().height))`
-    for (const height of await view.evaluate<number[]>(heights)) expect(height).toBeGreaterThanOrEqual(48)
+    const heights = `[
+      ...document.querySelectorAll('[data-test="category-chips"] button'),
+      document.querySelector('[data-test="allergen-${productId}"]'),
+      document.querySelector('[data-test="till-comp-chip"]'),
+      document.querySelector('[data-test="till-overflow-menu"]'),
+      ...document.querySelectorAll('[role="tab"]'),
+    ].map(control => Math.round(control.getBoundingClientRect().height))`
+    const measured = await view.evaluate<number[]>(heights)
+    expect(measured.length).toBeGreaterThanOrEqual(6)
+    for (const height of measured) expect(height).toBeGreaterThanOrEqual(48)
     view.close()
   }, 120_000)
 })

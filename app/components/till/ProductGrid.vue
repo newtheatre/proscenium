@@ -50,7 +50,7 @@ function priceLine(product: SaleProduct): string {
         size="sm"
         color="neutral"
         variant="subtle"
-        class="min-h-10 shrink-0"
+        class="min-h-12 shrink-0"
         :data-test="`category-chip-${category.id}`"
         @click="jumpTo(category.id)"
       >

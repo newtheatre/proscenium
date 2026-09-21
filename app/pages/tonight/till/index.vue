@@ -425,7 +425,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           variant="subtle"
           size="xl"
           block
-          class="justify-between"
+          class="min-h-12 justify-between"
           @click="chooseVenue(venue.venueId)"
         >
           <span>{{ venue.venueName }}</span>
@@ -463,6 +463,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               color="neutral"
               variant="ghost"
               size="sm"
+              class="size-12"
               aria-label="More till actions"
               data-test="till-overflow-menu"
             />
