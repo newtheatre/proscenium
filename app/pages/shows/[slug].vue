@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { saysNoSuch } from '#shared/utils/no-such'
 import { groupContentWarnings, saysAssessment } from '#shared/utils/content-warnings'
 import { saysClock, saysDay, saysWhenLong } from '#shared/utils/when'
-import { saysLatecomerPolicy } from '#shared/utils/programme'
+import { SAYS_BOOKING_HOLDS, SAYS_PAYMENT, TO_BE_CONFIRMED, saysLatecomerPolicy } from '#shared/utils/programme'
 import { pounds, saysPrice, saysRestriction } from '#shared/utils/ticket-types'
 import { DEFAULT_OG_IMAGE, SITE_ADDRESS } from '#shared/utils/seo'
 import type { Availability, ListedPerformance, ListedShow } from '#shared/utils/programme'
@@ -15,7 +16,7 @@ const slug = computed(() => String(route.params.slug))
 const { data } = await useFetch<ListedShow>(() => `/api/shows/${slug.value}`)
 
 if (!data.value) {
-  throw createError({ statusCode: 404, statusMessage: 'No such show', fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNoSuch('show', 'Go back to what is on and choose another'), fatal: true })
 }
 
 const show = computed(() => data.value!.show)
@@ -90,7 +91,7 @@ const runs = computed(() => {
   const times = onOffer.value.map(one => one.startsAt).sort((a, b) => a - b)
   const first = times[0]
   const last = times[times.length - 1]
-  if (first === undefined || last === undefined) return 'Dates to be announced'
+  if (first === undefined || last === undefined) return TO_BE_CONFIRMED
   return first === last ? day(first) : `${day(first)} to ${day(last)}`
 })
 
@@ -183,7 +184,7 @@ function saysInterval(performance: ListedPerformance): string {
                 Running time
               </dt>
               <dd data-test="running-time">
-                {{ shape?.durationMinutes ? `${shape.durationMinutes} minutes` : 'Not yet confirmed' }}
+                {{ shape?.durationMinutes ? `${shape.durationMinutes} minutes` : TO_BE_CONFIRMED }}
               </dd>
             </div>
             <div>
@@ -191,7 +192,7 @@ function saysInterval(performance: ListedPerformance): string {
                 Tickets
               </dt>
               <dd data-test="show-tickets">
-                {{ tickets.length ? tickets.join(' · ') : 'Not yet priced' }}
+                {{ tickets.length ? tickets.join(' · ') : TO_BE_CONFIRMED }}
               </dd>
             </div>
             <div>
@@ -199,7 +200,7 @@ function saysInterval(performance: ListedPerformance): string {
                 Guidance
               </dt>
               <dd data-test="age-guidance">
-                {{ show.ageGuidance ?? 'None stated' }}
+                {{ show.ageGuidance ?? TO_BE_CONFIRMED }}
               </dd>
             </div>
           </dl>
@@ -254,7 +255,7 @@ function saysInterval(performance: ListedPerformance): string {
           class="mt-4 text-sm text-muted"
           data-test="show-practical"
         >
-          {{ shape ? saysInterval(shape) : 'Interval not yet confirmed' }}. {{ saysLatecomerPolicy(show.latecomerPolicy) }}
+          {{ shape ? saysInterval(shape) : TO_BE_CONFIRMED }}. {{ saysLatecomerPolicy(show.latecomerPolicy) }}
         </p>
 
         <!-- Three states, not two: nobody having looked is not the same answer as somebody having
@@ -416,7 +417,7 @@ function saysInterval(performance: ListedPerformance): string {
                   :class="TAG_CLASS[performance.availability]"
                   :data-test="`availability-${performance.id}`"
                 >
-                  {{ performance.availability === 'SOLD_OUT' ? 'Full' : performance.says }}
+                  {{ performance.says }}
                 </p>
               </div>
               <div class="ms-auto flex flex-wrap items-center gap-2">
@@ -429,7 +430,7 @@ function saysInterval(performance: ListedPerformance): string {
                   trailing-icon="i-lucide-external-link"
                   :data-test="`external-${performance.id}`"
                 >
-                  Book elsewhere
+                  Book tickets elsewhere
                 </UButton>
                 <UButton
                   v-else-if="performance.availability === 'AVAILABLE' || performance.availability === 'LIMITED'"
@@ -437,7 +438,7 @@ function saysInterval(performance: ListedPerformance): string {
                   size="sm"
                   :data-test="`book-${performance.id}`"
                 >
-                  Pick
+                  Book tickets
                 </UButton>
                 <UButton
                   v-else-if="performance.availability === 'SOLD_OUT'"
@@ -475,11 +476,10 @@ function saysInterval(performance: ListedPerformance): string {
         <template #footer>
           <div class="flex items-center justify-between font-mono">
             <span class="text-sm text-muted">From</span>
-            <span>{{ from ?? 'Not yet priced' }}</span>
+            <span>{{ from ?? TO_BE_CONFIRMED }}</span>
           </div>
           <p class="mt-2 text-sm text-muted">
-            No booking fees. Booking online holds your seats; the box office takes payment at the
-            theatre, in person, on the night.
+            No booking fees. {{ SAYS_BOOKING_HOLDS }} {{ SAYS_PAYMENT }}
           </p>
         </template>
       </UCard>

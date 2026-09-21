@@ -38,12 +38,12 @@ describe('what a listing card says about a run (#918)', () => {
   })
 
   test('house full only when every on-sale night is gone', () => {
-    expect(listingFlag(run(night('SOLD_OUT'), night('SOLD_OUT')))).toBe('House full')
+    expect(listingFlag(run(night('SOLD_OUT'), night('SOLD_OUT')))).toBe('Sold out')
   })
 
   test('a cancelled night and a closed window neither fill a house nor empty one', () => {
-    expect(listingFlag(run(night('SOLD_OUT'), night('AVAILABLE', true)))).toBe('House full')
-    expect(listingFlag(run(night('SOLD_OUT'), night('BOOKING_CLOSED')))).toBe('House full')
+    expect(listingFlag(run(night('SOLD_OUT'), night('AVAILABLE', true)))).toBe('Sold out')
+    expect(listingFlag(run(night('SOLD_OUT'), night('BOOKING_CLOSED')))).toBe('Sold out')
   })
 
   test('selling fast when a night is limited and the run is not full', () => {

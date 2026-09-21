@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { noSuch, saysNoSuch } from '#server/utils/no-such'
+import { noSuch } from '#server/utils/no-such'
+import { saysNoSuch } from '#shared/utils/no-such'
 
 // K-128 criterion 2. Around sixty nouns refused with "No such X", which says what happened and
 // never what to do; the sentence is written once here so every route says the same thing.

@@ -24,8 +24,12 @@ async function load(): Promise<void> {
   loading.value = false
 }
 
-function when(at: number | null): string {
-  return at === null ? 'not recorded' : saysDay(at)
+// A method nobody has signed in with yet says when it was added and stops there, rather than
+// telling the reader what the account holds about them.
+function saysUse(method: SignInMethod): string {
+  const added = method.addedAt === null ? [] : [`Added ${saysDay(method.addedAt)}.`]
+  const used = method.lastUsedAt === null ? [] : [`Last used ${saysDay(method.lastUsedAt)}.`]
+  return [...added, ...used].join(' ')
 }
 
 // A stale session on any of these three opens the modal instead of a toast; the retry is the
@@ -150,7 +154,7 @@ onMounted(load)
 <template>
   <UPageCard
     title="How you sign in"
-    description="The theatre never removes your last way in. Add another before taking one away."
+    description="We never remove your last way in. Add another before taking one away."
   >
     <div
       v-if="loading"
@@ -182,7 +186,7 @@ onMounted(load)
             {{ method.label }}
           </p>
           <p class="text-sm text-muted">
-            Added {{ when(method.addedAt) }}. Last used {{ when(method.lastUsedAt) }}.
+            {{ saysUse(method) }}
           </p>
         </div>
 
@@ -195,7 +199,7 @@ onMounted(load)
           :data-test="`remove-method-${method.id}`"
           @click="remove(method)"
         >
-          Remove
+          Remove this way in
         </UButton>
         <UBadge
           v-else
@@ -235,7 +239,7 @@ onMounted(load)
               data-test="change-email"
               @click="changeEmail"
             >
-              Change it
+              Change the address
             </UButton>
           </div>
         </UFormField>
@@ -262,7 +266,7 @@ onMounted(load)
               data-test="set-password"
               @click="setPassword"
             >
-              Set it
+              Save the password
             </UButton>
           </div>
         </UFormField>

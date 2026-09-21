@@ -107,8 +107,8 @@ function useGoogle(): void {
 <template>
   <UModal
     v-model:open="open"
-    title="Confirm it's you"
-    description="This action is sensitive, so it asks again before it goes ahead."
+    title="Confirm it is you"
+    description="Confirm one of the ways you sign in before this change goes ahead."
   >
     <template #body>
       <div
@@ -221,7 +221,7 @@ function useGoogle(): void {
               data-test="reauth-submit"
               :loading="working"
             >
-              Confirm
+              Confirm it is you
             </UButton>
           </form>
         </template>
