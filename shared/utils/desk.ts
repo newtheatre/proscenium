@@ -4,6 +4,8 @@ import { guestDetailsForm } from './reservations'
 import { pageQuery } from './pagination'
 import { saysPrice } from './ticket-types'
 import { saysReservationStatus } from './capacity'
+import { showNightOf } from './show-night'
+import { saysDay } from './when'
 
 // D-114: finding a booking at the desk and taking payment for it. Collection is the payment
 // boundary (criterion 2); this file is the pure shape of what crosses it.
@@ -148,4 +150,53 @@ export function readDeskScan(raw: string): DeskScan {
   if (code) return { kind: code.kind, value: code.value }
   if (trimmed.length > 0 && !trimmed.includes('/')) return { kind: 'BOOKING_TOKEN', value: trimmed }
   return { kind: 'REFUSED', reason: DESK_SCAN_UNKNOWN_REFUSAL }
+}
+
+// The desk works to the 04:00-to-04:00 night (0014), so a performance at 01:00 is still on the
+// evening it began: the night in progress is named as tonight rather than left as its label.
+export function saysDeskNight(night: string, now: Date = new Date()): string {
+  const day = saysDay(night, { now })
+  return night === showNightOf(now) ? `Tonight, ${day}` : day
+}
+
+export interface WalkUpLine {
+  pricePence: number
+  quantity: number
+}
+
+// The figure the officer reads into the reader and the expected total the screen sends are this
+// one sum (0004, 0005), never two computations that can drift apart.
+export function walkUpTotalPence(lines: WalkUpLine[]): number {
+  return lines.reduce((total, line) => total + line.pricePence * line.quantity, 0)
+}
+
+export function walkUpRefusal(lines: WalkUpLine[], guest: { name: string, email: string }): string | null {
+  if (!lines.some(line => line.quantity > 0)) return 'Choose at least one ticket.'
+  if (guest.name.trim().length === 0) return 'Enter the booker\'s name.'
+  if (guest.email.trim().length === 0) return 'Enter the booker\'s email address.'
+  return null
+}
+
+// The card searches on its own as soon as a performance is chosen, so an empty table is either
+// a search nobody has run or one that matched nothing, and the two read differently.
+export function deskEmptySays(state: { searched: boolean, narrowed: boolean }): string {
+  if (!state.searched) return 'Scan a booking\'s code, or search by reference or name.'
+  if (state.narrowed) return 'No booking matches that. Check the reference, or search by part of the booker\'s name.'
+  return 'No bookings on this performance. A walk-up sold here is the first one.'
+}
+
+export interface DeskCompRequest {
+  status: 'PENDING' | 'APPROVED' | 'DECLINED'
+  expired: boolean
+  declineReason: string | null
+}
+
+// D-117: what holds Collect closed on a comp, in the words that go beside the button. Null is
+// an approved, unexpired request, which is the only thing that opens it.
+export function compBlockedSays(request: DeskCompRequest | null): string | null {
+  if (request === null) return 'Ask tonight\'s duty manager for this comp first.'
+  if (request.expired) return 'That request lapsed. Ask again.'
+  if (request.status === 'PENDING') return 'Waiting on tonight\'s duty manager to approve this.'
+  if (request.status === 'DECLINED') return `Declined: ${request.declineReason ?? 'no reason given'}`
+  return null
 }
