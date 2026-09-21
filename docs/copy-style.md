@@ -40,13 +40,13 @@ Four shells, one posture each (0040):
   account/membership.vue` reads "Your membership runs until {day}." and "We cannot sell it here.
   Once you have bought it, tell us below and an officer will record it on your account."
 - **`console`** (sit-down work): imperative labels, terse, nouns for columns and verbs for
-  buttons. `shared/utils/site-nav.ts`'s console groups are nouns throughout: "Stocked items",
+  buttons. `shared/utils/site-nav.ts`'s console groups are nouns throughout: "Ledger entries",
   "Room requests", "Revenue by show". Buttons match: "Delete", "Revoke".
 - **`tonight`** (standing up, on a phone): two or three words per control, no sentences on a
   button. `app/pages/tonight/index.vue` labels its actions "Door", "Till", "Backstage board",
   "Emergency card".
 
-A string written for one shell reads wrong in another: "Stocked items" is cold on a public page,
+A string written for one shell reads wrong in another: "Ledger entries" is cold on a public page,
 and a full sentence costs a duty manager time they do not have mid-interval on a till screen.
 
 ## 4. Glossary

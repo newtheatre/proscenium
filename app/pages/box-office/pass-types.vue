@@ -12,7 +12,7 @@ import { passTypesList } from '#shared/utils/pass-types-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { PassType, PassTypeStatus } from '#shared/utils/pass-types'
 
-definePageMeta({ layout: 'console', title: 'Passes', middleware: 'console', docs: '/docs/box-office/pass-types' })
+definePageMeta({ layout: 'console', title: 'Pass types', middleware: 'console', docs: '/docs/box-office/pass-types' })
 
 interface ShowOption { id: string, title: string, status: string }
 

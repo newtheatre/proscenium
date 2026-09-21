@@ -6,7 +6,7 @@ import type { FilterOption } from '#shared/utils/list-filters'
 import type { AllergenState, BarCategory, BarProduct, ProductStatus } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Bar products', middleware: 'console', docs: '/docs/bar/products' })
+definePageMeta({ layout: 'console', title: 'Products', middleware: 'console', docs: '/docs/bar/products' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

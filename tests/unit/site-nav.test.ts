@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { ABILITY_PERMISSIONS } from '#shared/utils/abilities'
 import { contentPathOf } from '#shared/utils/docs-paths'
 import { PERMISSIONS } from '#shared/utils/roles'
-import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor } from '#shared/utils/site-nav'
+import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor } from '#shared/utils/site-nav'
 
 // The navigation conventions are a test rather than a review habit (0040), the same way the admin
 // component conventions are (0032). What review still judges is whether a label reads well.
@@ -80,8 +80,15 @@ describe('every console screen is in the navigation (0040)', () => {
 describe('a group is a job, and the order never varies (0040)', () => {
   test('the canonical order is what ships', () => {
     expect(CONSOLE_NAV.map(group => group.key)).toEqual([
-      'tonight', 'box-office', 'bar', 'spaces', 'training', 'people', 'money', 'comms', 'system',
+      'rota', 'box-office', 'bar', 'spaces', 'training', 'people', 'money', 'comms', 'system',
     ])
+  })
+
+  // The group is desk work planned days ahead; Tonight is the phone shell a person works a show
+  // night on, and one word named both until 0082.
+  test('the rota administration group is called Rota', () => {
+    expect(CONSOLE_NAV[0]).toMatchObject({ key: 'rota', label: 'Rota', prefix: '/rota/manage' })
+    expect(CONSOLE_NAV.map(group => group.label)).not.toContain('Tonight')
   })
 
   test('every item sits under its own group prefix', () => {
@@ -97,32 +104,68 @@ describe('a group is a job, and the order never varies (0040)', () => {
 })
 
 // The sidebar said "Unfilled shifts" for months after the screen became the rota board (#1041).
-// A label and its page's title are one name, so renaming one side alone fails here.
-describe('a sidebar label says what the page it opens calls itself', () => {
-  // A title that names its own domain where the sidebar group already supplies it: the screen is
-  // reached from elsewhere too, and "Stock" alone would not say what of.
-  const NAMES_ITS_OWN_DOMAIN = new Set(['/bar/stock', '/bar/stock/movements'])
-
+// A label and its page's title are one name, with no exemptions: renaming one side alone fails (0082).
+describe('a sidebar label is the title the page gives itself (0082)', () => {
   function titleOf(source: string): string | null {
     const meta = /definePageMeta\(\{[\s\S]*?\}\)/.exec(source)?.[0] ?? ''
     return /title:\s*'([^']*)'/.exec(meta)?.[1] ?? null
   }
 
-  test('every console entry reads as its page does', async () => {
+  test('every console entry reads exactly as its page does', async () => {
     const sources = new Map((await pages()).map(page => [routeOf(page.path), page.source]))
     const drifted: string[] = []
-    for (const group of CONSOLE_NAV) {
-      for (const item of group.items) {
-        if (NAMES_ITS_OWN_DOMAIN.has(item.to)) continue
-        const source = sources.get(item.to)
-        if (source === undefined) continue
-        const title = titleOf(source)
-        // A page under a group may lead with the group's own word, which the sidebar supplies.
-        const prefixed = `${group.label} ${item.label.toLowerCase()}`
-        if (title !== item.label && title !== prefixed) drifted.push(`${item.to}: "${item.label}" against "${title}"`)
-      }
+    for (const item of [CONSOLE_HOME, ...CONSOLE_NAV.flatMap(group => group.items)]) {
+      const source = sources.get(item.to)
+      if (source === undefined) continue
+      const title = titleOf(source)
+      if (title !== item.label) drifted.push(`${item.to}: "${item.label}" against "${title}"`)
     }
     expect(drifted).toEqual([])
+  })
+})
+
+// An icon that marks two screens marks neither: the column stops carrying information, and
+// i-lucide-beer stood for the Bar group, its products and a bar opening at once (0082).
+describe('an icon belongs to one entry', () => {
+  test('nothing in the console sidebar wears an icon twice', () => {
+    const icons = [CONSOLE_HOME.icon, ...CONSOLE_NAV.flatMap(group => [group.icon, ...group.items.map(item => item.icon)])]
+    const twice = icons.filter((icon, index) => icons.indexOf(icon) !== index)
+    expect([...new Set(twice)]).toEqual([])
+  })
+
+  test('every icon is a lucide name', () => {
+    const stray = [CONSOLE_HOME, ...CONSOLE_NAV.flatMap(group => group.items)]
+      .filter(entry => !entry.icon.startsWith('i-lucide-'))
+    expect(stray.map(entry => entry.to)).toEqual([])
+  })
+})
+
+// Daily work and once-a-year set-up sat interleaved in every group (0082).
+describe('a group splits into Every day and Set-up, or not at all', () => {
+  test('every section named is one of the two', () => {
+    const unknown = CONSOLE_NAV.flatMap(group => group.items)
+      .filter(item => item.section !== undefined && !(NAV_SECTIONS as readonly string[]).includes(item.section))
+    expect(unknown.map(item => item.to)).toEqual([])
+  })
+
+  test('a group either splits or does not', () => {
+    const half = CONSOLE_NAV.filter(group =>
+      group.items.some(item => item.section) && !group.items.every(item => item.section))
+    expect(half.map(group => group.key)).toEqual([])
+  })
+
+  test('the every-day items come first, so a section is one run and not two', () => {
+    const scrambled = CONSOLE_NAV.filter((group) => {
+      const sections = group.items.map(item => item.section).filter(Boolean)
+      return sections.some((section, index) => index > 0 && section !== sections[index - 1] && sections.slice(0, index).includes(section))
+        || (sections.length > 0 && sections[0] !== 'Every day')
+    })
+    expect(scrambled.map(group => group.key)).toEqual([])
+  })
+
+  test('the groups the review named are the ones that split', () => {
+    const split = CONSOLE_NAV.filter(group => group.items.some(item => item.section)).map(group => group.key)
+    expect(split).toEqual(['rota', 'box-office', 'bar', 'spaces', 'training'])
   })
 })
 

@@ -133,6 +133,16 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
       .toEqual({ marquee: 0, sticker: 0, spotlight: 0 })
   })
 
+  // The one place every console screen agrees on was a bare span, so the sidebar had no way home
+  // (0082). On /dev for the same reason the test above is.
+  test('the console sidebar header is a link to the overview', async () => {
+    const href = await inspect<string | null>('/dev', `(() => {
+      const header = document.querySelector('aside a[href="/admin"], nav a[href="/admin"]')
+      return header ? header.getAttribute('href') : null
+    })()`)
+    expect(href).toBe('/admin')
+  })
+
   test('the show-night shell is a dark subtree, not a dashboard', async () => {
     const seen = await inspect<{ bg: string, dashboard: number }>('/tonight', `(() => ({
       bg: getComputedStyle(document.querySelector('.dark')).backgroundColor,

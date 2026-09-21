@@ -15,7 +15,7 @@ import { barItemsList } from '#shared/utils/bar-items-list'
 import type { MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Stocked items', middleware: 'console', docs: '/docs/bar/stock' })
+definePageMeta({ layout: 'console', title: 'Stock', middleware: 'console', docs: '/docs/bar/stock' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
