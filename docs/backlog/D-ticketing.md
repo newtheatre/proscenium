@@ -385,12 +385,21 @@ Open questions:
      the desk collects bookings. Where there is no camera, or its permission is refused, the
      screen names the failure and falls back to the typed field, which keeps accepting the same
      forms.
+  9. The desk reads back in its own register: the night on screen is a London show night in
+     words ("Tonight, Wed 14 Oct"), never a stored label, and the control that returns to it
+     says tonight; exactly one control on the results card opens a booking; the results card
+     tells a search that has not run yet from one that matched nothing, and each says what to
+     try next; a Collect the screen holds closed names why beside the button and the button
+     points at that reason; opening a booking from the results shows it is working and says so
+     when it cannot; and the camera-failure sentences are the shared ones (criterion 8, E-129),
+     never spelled a second time here.
 - Source: Prompt Book D-2, D-3, D-5, P4; audit PR-5; Get-In constraint 1, part 2 (collection:
   carry); criterion 7 added from the committee's admin-boxoffice mockup, 13 September 2026, and
   restated in Matt's own words on the pull request: no BOX_OFFICE shift role exists
   (`NIGHT_ROLES`), so "on shift" reads as the confirmed duty manager rather than a box office
   roster; criterion 8 added at Matt's direction, 14 September 2026, because the desk's scan
-  field only ever worked with a keyboard-wedge scanner while the door already had a camera.
+  field only ever worked with a keyboard-wedge scanner while the door already had a camera;
+  criterion 9 added from issue 1151 item 9, 21 September 2026, on a read of the screen as built.
 
 ## D-115: Walk-up sales recorded as door source
 
@@ -413,8 +422,16 @@ Open questions:
      gets the confirmation and its QR, and optional. A walk-up sold with neither is a reservation
      with no account behind it, findable by reference alone; the till sells them that way from
      F-123 and the desk's own form is unchanged until it is next touched.
+  7. The desk screen sells a walk-up itself, not the route alone: the performance on screen, a
+     line per ticket type with its quantity, the booker's details, and a total the screen reads
+     out to the reader and then sends as its expected total (criterion 4). The sale lands as a
+     DOOR reservation, and the tiles and the results both move once it does. The form asks for
+     the name and the email while the desk route asks for both; criterion 6's optional pair
+     follows the route, not the screen.
 - Source: Prompt Book D-5; audit PR-5 (defect: walk-ins written as PENDING/WEB); Get-In part 2
-  (walk-ins: rebuild, fixed by construction); Matt's direction, 14 September 2026 (criterion 6)
+  (walk-ins: rebuild, fixed by construction); Matt's direction, 14 September 2026 (criterion 6);
+  criterion 7 from issue 1151 item 9, 21 September 2026: the route and the schema were there and
+  the screen offered no way to reach them.
 
 ## D-116: Refunds, in person, per ticket, race-safe
 

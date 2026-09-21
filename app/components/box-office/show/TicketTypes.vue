@@ -29,7 +29,7 @@ const props = defineProps<{ show: AdminShow }>()
         color="info"
         variant="subtle"
         data-test="reservation-only"
-        description="Reservation only: patrons pay at the box office or the bar, on the Students' Union card reader. No online payment is configured anywhere."
+        description="Reservation only: bookers pay at the box office or the bar, on the Students' Union card reader. There is no online payment."
       />
     </div>
   </UCard>

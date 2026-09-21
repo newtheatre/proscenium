@@ -53,7 +53,7 @@ async function save(): Promise<void> {
 
     toast.add({
       title: editing.value ? 'Discount changed' : 'Discount added',
-      description: 'A sale already given this discount keeps its own snapshot: this only changes what applying it does from now on.',
+      description: 'A sale already given this discount keeps the rate it was given: this only changes what applying it does from now on.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -143,7 +143,7 @@ const columns: TableColumn<Discount>[] = [
           retireFailure.value = null
           retiring.value = row.original
         },
-      }, () => (row.original.status === 'RETIRED' ? 'Put back' : 'Retire')),
+      }, () => (row.original.status === 'RETIRED' ? 'Bring back' : 'Retire')),
     ]),
   },
 ]
@@ -160,7 +160,7 @@ const columns: TableColumn<Discount>[] = [
       :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
-    <!-- Retire and Put back act from the table, with no modal open to show the form's own alert. -->
+    <!-- Retire and Bring back act from the table, with no modal open to show the form's own alert. -->
     <UAlert
       v-if="failure && !open"
       data-test="failure"
@@ -220,7 +220,7 @@ const columns: TableColumn<Discount>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Edit ${editing.name}` : 'Add a discount'"
-      description="A percentage off, applied at the till and snapshotted onto every sale line it touches."
+      description="A percentage off, applied at the till and kept on every sale line it touches."
     >
       <template #body>
         <UForm
@@ -255,7 +255,7 @@ const columns: TableColumn<Discount>[] = [
             label="Percent off"
             name="percent"
             required
-            description="A whole number, 1 to 100. Refused above the configured cap."
+            description="A whole number, 1 to 100. Refused above the house cap."
           >
             <UInputNumber
               v-model="state.percent"
@@ -272,7 +272,7 @@ const columns: TableColumn<Discount>[] = [
               :loading="saving"
               data-test="discount-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the discount' : 'Add a discount' }}
             </UButton>
             <UButton
               color="neutral"

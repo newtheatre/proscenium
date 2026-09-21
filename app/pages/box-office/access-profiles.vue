@@ -124,7 +124,7 @@ const givenFlags = computed(() => ACCESS_FLAGS.filter(flag => detail.value?.flag
 const columns: TableColumn<Summary>[] = [
   {
     id: 'name',
-    header: 'Patron',
+    header: 'Booker',
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.name),
       h('div', { class: 'font-mono text-xs text-muted' }, row.original.email),
@@ -299,7 +299,7 @@ watch(modalOpen, (nowOpen) => {
               v-else
               class="text-sm text-muted"
             >
-              None of the listed categories.
+              None of the listed needs.
             </p>
           </div>
 

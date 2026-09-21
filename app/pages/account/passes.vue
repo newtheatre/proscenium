@@ -119,7 +119,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
           v-else
           class="py-4 text-center text-sm text-muted"
         >
-          You hold no passes yet.
+          You hold no passes. Ask for one below and it appears here once an officer grants it.
         </p>
       </UCard>
 

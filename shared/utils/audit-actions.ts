@@ -265,10 +265,10 @@ const CATALOGUE = {
 
   // Module F: bar
 
-  'bar.category.created': { label: 'Bar category added', module: 'bar' },
-  'bar.category.updated': { label: 'Bar category changed', module: 'bar' },
-  'bar.category.price.set': { label: 'Category default price set from a date', module: 'bar' },
-  'bar.category.deleted': { label: 'Bar category deleted', module: 'bar' },
+  'bar.category.created': { label: 'Product category added', module: 'bar' },
+  'bar.category.updated': { label: 'Product category changed', module: 'bar' },
+  'bar.category.price.set': { label: 'Product category default price set from a date', module: 'bar' },
+  'bar.category.deleted': { label: 'Product category deleted', module: 'bar' },
   'bar.product.created': { label: 'Bar product added', module: 'bar' },
   'bar.product.updated': { label: 'Bar product changed', module: 'bar' },
   'bar.product.status.changed': { label: 'Bar product put on or off the till', module: 'bar' },

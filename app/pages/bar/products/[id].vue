@@ -403,7 +403,7 @@ async function savePrice(): Promise<void> {
     })
     toast.add({
       title: answered.effectiveNow ? 'Price set, and in force now' : 'Price set, and waiting for its date',
-      description: 'Nothing was overwritten: this is a new row, and the ones before it stay.',
+      description: 'The price before this one stays readable, dated as it was.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -477,7 +477,7 @@ const columns: TableColumn<ProductVariant>[] = [
             'variant': 'subtle',
             'size': 'sm',
             'data-test': `price-source-${row.original.id}`,
-          }, () => (row.original.priceSource === 'variant' ? 'Own price' : 'Category default')),
+          }, () => (row.original.priceSource === 'variant' ? 'Own price' : 'Product category default')),
         ])),
   },
   {
@@ -518,7 +518,7 @@ const columns: TableColumn<ProductVariant>[] = [
             }]
           : []),
         {
-          label: row.original.status === 'RETIRED' ? 'Put back' : 'Retire',
+          label: row.original.status === 'RETIRED' ? 'Bring back' : 'Retire',
           onSelect: () => {
             if (row.original.status === 'RETIRED') return void setStatus(row.original, 'ACTIVE')
             retireFailure.value = null
@@ -644,7 +644,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Edit ${editing.label}` : 'Add a serving size'"
-      description="A product sells each serving kind once, because the kind is what a category default price resolves on."
+      description="A product sells each serving kind once."
     >
       <template #body>
         <UForm
@@ -666,7 +666,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
             label="Serving kind"
             name="servingKind"
             required
-            :description="editing?.everSold ? 'Fixed: this size has been sold, so it keeps the kind it sold under.' : 'What a category default price resolves on.'"
+            :description="editing?.everSold ? 'Fixed: this size has been sold, so it keeps the kind it sold under.' : 'What a product category default price applies to.'"
           >
             <USelect
               v-model="state.servingKind"
@@ -709,7 +709,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               :loading="saving"
               data-test="variant-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the serving size' : 'Add a serving size' }}
             </UButton>
             <UButton
               color="neutral"
@@ -823,7 +823,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               :loading="saving"
               data-test="recipe-submit"
             >
-              Save it
+              Save the recipe
             </UButton>
             <UButton
               color="neutral"
@@ -840,7 +840,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
     <UModal
       :open="pricing !== null"
       :title="pricing ? `What ${pricing.label} costs` : ''"
-      description="Prices are dated rows and nothing is ever overwritten. The latest row on or before today wins, so a mistake is corrected with a new row today."
+      description="A price is dated. The latest price on or before today is what the till charges, so a mistake is put right with a new price dated today."
       @update:open="pricing = null; failure = null"
     >
       <template #body>
@@ -1001,7 +1001,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               :disabled="choiceGroupOptions.length === 0"
               data-test="choice-submit"
             >
-              Attach it
+              Attach the choice group
             </UButton>
             <UButton
               color="neutral"
@@ -1112,7 +1112,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               :loading="saving"
               data-test="new-group-submit"
             >
-              Add it
+              Add the choice group
             </UButton>
             <UButton
               color="neutral"
@@ -1155,7 +1155,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
           data-test="confirm-delete"
           @click="remove"
         >
-          Delete it
+          Delete the serving size
         </UButton>
         <UButton
           color="neutral"

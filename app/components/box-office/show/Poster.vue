@@ -133,7 +133,7 @@ async function remove(): Promise<void> {
           data-test="confirm-poster-remove"
           @click="remove"
         >
-          Remove it
+          Remove the poster
         </UButton>
         <UButton
           color="neutral"

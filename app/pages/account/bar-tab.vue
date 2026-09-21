@@ -56,7 +56,7 @@ function describe(charge: ItemisedTab['charges'][number]): string {
   >
     <UPageHeader
       title="Your bar tab"
-      description="A charge to a tab is credit extended, not money taken: settle it in person on the reader."
+      description="A charge to a tab is owed, not taken. Settle it in person on the reader."
     />
 
     <UAlert

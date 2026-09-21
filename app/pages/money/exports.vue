@@ -171,7 +171,7 @@ const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParam
     <UModal
       :open="Boolean(editing)"
       title="Change the nominal code"
-      description="An export line whose pair carries no mapping still exports, marked unmapped rather than dropped."
+      description="An export line with no mapping still exports, marked unmapped."
       @update:open="(open: boolean) => { if (!open) editing = null }"
     >
       <template #body>

@@ -123,7 +123,7 @@ const asideLinks = computed<PageLink[]>(() => data.value.departments.map(one => 
           class="py-12 text-center text-muted"
           data-test="catalogue-empty"
         >
-          Nothing matches that.
+          Nothing here matches that. Clear the search above and the whole catalogue comes back.
         </p>
 
         <div data-test="catalogue">

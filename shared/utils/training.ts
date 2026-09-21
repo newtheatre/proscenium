@@ -455,11 +455,10 @@ export type RequestStatus = typeof REQUEST_STATUSES[number]
 export const REQUEST_NOTE_LIMIT = 500
 export const DECLINE_REASON_LIMIT = 500
 
+// A request nobody has answered is waiting, which is the state the board exists to clear.
 export function saysRequestStatus(status: string): string {
-  // "Answered" rather than "Declined": the lead wrote back, and what they wrote is shown. A
-  // request nobody has answered is waiting, which is the state the board exists to clear.
   if (status === 'SCHEDULED') return 'Scheduled'
-  if (status === 'DECLINED') return 'Answered'
+  if (status === 'DECLINED') return 'Declined'
   if (status === 'WITHDRAWN') return 'Withdrawn'
   return 'Waiting'
 }

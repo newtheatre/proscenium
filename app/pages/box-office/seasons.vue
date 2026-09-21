@@ -341,7 +341,7 @@ const columns: TableColumn<AdminSeason>[] = [
               :loading="saving"
               data-test="season-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the season' : 'Add a season' }}
             </UButton>
             <UButton
               color="neutral"
@@ -384,7 +384,7 @@ const columns: TableColumn<AdminSeason>[] = [
           data-test="confirm-delete"
           @click="remove"
         >
-          Delete it
+          Delete the season
         </UButton>
         <UButton
           color="neutral"
