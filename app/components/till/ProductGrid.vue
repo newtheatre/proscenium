@@ -103,7 +103,7 @@ function priceLine(product: SaleProduct): string {
             variant="ghost"
             icon="i-lucide-info"
             block
-            class="min-h-10 justify-start p-1 text-xs"
+            class="min-h-12 justify-start p-1 text-xs"
             :aria-label="`Allergens for ${product.name}`"
             :data-test="`allergen-${product.id}`"
             @click="emit('openAllergens', { name: product.name, state: product.allergenState, note: product.allergenNote })"

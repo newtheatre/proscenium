@@ -716,4 +716,16 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
     expect(rows).toBeLessThanOrEqual(3)
     view.close()
   }, 120_000)
+
+  // Every control on a show-night screen, not only the primary ones (design-language.md rule 4).
+  test('every control a thumb reaches for clears 48 pixels', async () => {
+    const { view, productId } = await atTheTill()
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
+
+    const heights = `['[data-test="allergen-${productId}"]', '[data-test="till-comp-chip"]']
+      .map(selector => Math.round(document.querySelector(selector).getBoundingClientRect().height))`
+    for (const height of await view.evaluate<number[]>(heights)) expect(height).toBeGreaterThanOrEqual(48)
+    view.close()
+  }, 120_000)
 })

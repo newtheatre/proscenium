@@ -702,7 +702,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             data-test="age-check-refused-note"
             color="warning"
             variant="subtle"
-            :description="`Not sold, on the ID refusal: ${charged.refusedLines.map(line => line.productName).join(', ')}`"
+            :description="`ID refused. Not sold: ${charged.refusedLines.map(line => line.productName).join(', ')}`"
           />
           <UAlert
             v-if="charged && charged.discount"
@@ -756,7 +756,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               size="sm"
               color="neutral"
               variant="subtle"
-              class="min-h-10"
+              class="min-h-12"
               icon="i-lucide-gift"
               data-test="till-comp-chip"
               @click="openCompModal"
@@ -768,7 +768,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               size="sm"
               :color="compDeclined ? 'error' : compLapsed ? 'warning' : 'neutral'"
               variant="subtle"
-              class="min-h-10"
+              class="min-h-12"
               icon="i-lucide-gift"
               data-test="till-comp-pending-chip"
               @click="openCompModal"

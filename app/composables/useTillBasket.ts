@@ -237,7 +237,7 @@ export function useTillBasket(deps: TillBasketDeps) {
     const names = [...new Set(removed.map(line => line.productName))].join(', ')
     basket.value = basket.value.filter(line => !isRestricted(line))
     askingAgeCheckFor.value = null
-    refusedLinesNote.value = names ? `Not sold, on the ID refusal: ${names}` : null
+    refusedLinesNote.value = names ? `ID refused. Not sold: ${names}` : null
     refusalRecordFailure.value = null
     try {
       await recordAgeCheck({

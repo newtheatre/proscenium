@@ -357,7 +357,7 @@ describe('a refusal at the tap takes the line back out and says so (F-106 criter
   test('the screen says what is not being sold, naming the product', async () => {
     const { basket, scope } = mixed()
     await basket.refuseAgeCheck(refused)
-    expect(basket.refusedLinesNote.value).toContain('Gin')
+    expect(basket.refusedLinesNote.value).toBe('ID refused. Not sold: Gin')
     scope.stop()
   })
 

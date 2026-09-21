@@ -159,7 +159,9 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    the expressive kit, and all four are show-night only.
 4. **The show-night screens are phone-first and work offline.** They cache their night on open
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
-   looks right on a desk monitor is wrong for the surface it is on.
+   looks right on a desk monitor is wrong for the surface it is on. Every control on one clears
+   48 by 48 pixels, not only the primary actions K-102 criterion 2 names: a cold hand in a dark
+   foyer does not aim, and a secondary control missed twice costs more than the room it saved.
 5. **Navigation is declared once and filtered by ability.** Every destination in the console
    sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu, the
    public header (`HEADER_NAV`, a derived slice of `PUBLIC_NAV`) and the footer comes from
