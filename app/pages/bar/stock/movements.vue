@@ -119,7 +119,7 @@ const columns: TableColumn<StockMovement>[] = [
   },
   {
     id: 'act',
-    header: '',
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => (row.original.kind === 'REVERSAL' || row.original.reversed
       ? null

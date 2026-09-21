@@ -152,7 +152,7 @@ const columns: TableColumn<Holder>[] = [
   },
   {
     id: 'act',
-    header: '',
+    header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right' } },
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
       h(UButton, {

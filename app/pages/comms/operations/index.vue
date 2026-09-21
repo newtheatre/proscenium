@@ -85,6 +85,13 @@ const columns: TableColumn<SendLogRow>[] = [
   { accessorKey: 'error', header: 'Error', meta: { class: { td: 'text-sm text-muted' } } },
 ]
 
+const dailyColumns: TableColumn<DailyCount>[] = [
+  { id: 'day', header: 'Day', cell: ({ row }) => row.original.day },
+  { accessorKey: 'type', header: 'Type', meta: { class: { td: 'font-mono text-sm' } } },
+  { id: 'status', header: 'Outcome', cell: ({ row }) => saysNotificationStatus(row.original.status) },
+  { id: 'count', header: 'Count', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.count) },
+]
+
 onMounted(() => {
   void load()
   void loadDaily()
@@ -108,37 +115,17 @@ onMounted(() => {
       <h2 class="font-semibold">
         Last 14 days
       </h2>
-      <p
-        v-if="daily.length === 0"
-        class="text-sm text-muted"
+      <UTable
+        :data="daily"
+        :columns="dailyColumns"
+        data-test="daily-counts-table"
       >
-        Nothing sent in this window.
-      </p>
-      <table
-        v-else
-        class="w-full text-sm"
-      >
-        <thead>
-          <tr class="border-b text-left text-muted">
-            <th class="py-2">
-              Day
-            </th><th>Type</th><th>Outcome</th><th>Count</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="row in daily"
-            :key="`${row.day}-${row.type}-${row.status}`"
-            class="border-b last:border-0"
-          >
-            <td class="py-2">
-              {{ row.day }}
-            </td><td class="font-mono">
-              {{ row.type }}
-            </td><td>{{ saysNotificationStatus(row.status) }}</td><td>{{ row.count }}</td>
-          </tr>
-        </tbody>
-      </table>
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            Nothing sent in this window.
+          </p>
+        </template>
+      </UTable>
     </section>
 
     <AdminToolbar

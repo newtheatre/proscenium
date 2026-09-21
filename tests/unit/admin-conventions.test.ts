@@ -50,6 +50,9 @@ const REPORTS_WITHOUT_A_TOOLBAR = [
   // filter by name across other rows, so the shared toolbar would sit empty (0032).
   'app/pages/bar/stock/order-list.vue',
   'app/pages/bar/stock/stocktakes/[id].vue',
+  // The desk searches by reference and scans a code: its results are what one lookup returned,
+  // and the status pills beside the search are the only narrowing there is (D-114).
+  'app/pages/box-office/desk.vue',
 ]
 
 describe('an input is the component for its value (0032)', () => {
