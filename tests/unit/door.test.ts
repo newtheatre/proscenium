@@ -98,9 +98,9 @@ describe('one code in front of the lens admits once (criterion 3)', () => {
 })
 
 describe('door mode answers admit or redirect, and never with a figure (criterion 7)', () => {
-  test('a collected booking is PAID and says so in the words the door reads out', () => {
+  test('a paid booking is PAID and says so in the words the door reads out', () => {
     expect(doorVerdict({ headline: 'Admit', detail: null, admit: true }, false))
-      .toEqual({ state: 'PAID', headline: 'PAID', line: 'All collected, admit', note: null })
+      .toEqual({ state: 'PAID', headline: 'PAID', line: 'Paid, admit', note: null })
   })
 
   test('an unpaid booking points at the bar, and the amount due never reaches the screen', () => {

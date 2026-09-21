@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysWarningLevel } from '#shared/utils/content-warnings'
-import { formatLondon } from '#shared/utils/london'
+import { saysClock } from '#shared/utils/when'
 import { HUB_KPI_LABELS, compApprovalLine, groupedBoardCode, housePercentLine, hubKpis, nightHeaderLine, passPressureAdvice, runningTimeLine, saysSeatsLeft } from '#shared/utils/night-hub'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { saysShiftRole } from '#shared/utils/rota'
@@ -193,7 +193,7 @@ const guidance = computed(() => {
 })
 
 function timeOf(at: number): string {
-  return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
+  return saysClock(at)
 }
 
 const boardCode = ref<string | null>(null)
@@ -556,7 +556,7 @@ onUnmounted(() => {
               data-test="board-code-hide"
               @click="hideCode"
             >
-              Hide
+              Hide the code
             </UButton>
           </p>
           <UButton
@@ -569,7 +569,7 @@ onUnmounted(() => {
             data-test="board-code-reveal"
             @click="revealCode"
           >
-            Show tonight's code
+            Show the code
           </UButton>
         </NightBlock>
       </template>
@@ -617,7 +617,7 @@ onUnmounted(() => {
               class="min-h-12"
               @click="approving = null"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </div>
@@ -627,7 +627,7 @@ onUnmounted(() => {
     <UModal
       :open="declining !== null"
       title="Decline this comp"
-      description="The reason goes on the record and the person who asked sees it."
+      description="The person who asked sees the reason you give."
       @update:open="declining = null"
     >
       <template #body>
@@ -663,7 +663,7 @@ onUnmounted(() => {
               :disabled="!declineReason.trim()"
               data-test="decline-comp-submit"
             >
-              Decline it
+              Decline the comp
             </UButton>
             <UButton
               color="neutral"
@@ -671,7 +671,7 @@ onUnmounted(() => {
               class="min-h-12"
               @click="declining = null"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </form>

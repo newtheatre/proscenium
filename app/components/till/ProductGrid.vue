@@ -117,7 +117,7 @@ function priceLine(product: SaleProduct): string {
     <UModal
       :open="sizing !== null"
       :title="sizing ? sizing.name : ''"
-      description="Pick a size."
+      description="Pick a size"
       @update:open="emit('closeSizing')"
     >
       <template #body>
@@ -144,7 +144,7 @@ function priceLine(product: SaleProduct): string {
             class="min-h-12"
             @click="emit('closeSizing')"
           >
-            Back
+            {{ CONFIRM_BACK_LABEL }}
           </UButton>
         </div>
       </template>
@@ -153,7 +153,7 @@ function priceLine(product: SaleProduct): string {
     <UModal
       :open="choosing !== null"
       :title="choosing ? choosing.choice.name : ''"
-      description="Pick one; it depletes at no extra charge."
+      description="Pick one, at no extra charge"
       @update:open="emit('closeChoosing')"
     >
       <template #body>

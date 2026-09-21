@@ -1,4 +1,5 @@
 import { RESERVATION_REFERENCE_LENGTH } from './reservations'
+import { plural } from './text'
 
 // Door mode's own pure logic (E-129): what a camera hands the door, and what the verdict card is
 // allowed to say. Four code forms reach it, listed on `ScannedKind` below.
@@ -95,7 +96,7 @@ export function doorVerdict(
   outcome: { headline: string, detail: string | null, admit: boolean },
   unpaid: boolean,
 ): DoorVerdict {
-  if (outcome.admit) return { state: 'PAID', headline: 'PAID', line: 'All collected, admit', note: null }
+  if (outcome.admit) return { state: 'PAID', headline: 'PAID', line: 'Paid, admit', note: null }
   if (unpaid) {
     return {
       state: 'UNPAID',
@@ -144,7 +145,7 @@ export const PASS_ADMISSION_PARTY_SIZE = 1
 export function saysPassCoverage(passTypeSlug: string, coveredCount: number): string {
   if (passTypeSlug === 'fellowship') return 'All in-house shows'
   if (coveredCount === 0) return 'No shows yet'
-  return coveredCount === 1 ? '1 show' : `${coveredCount} shows`
+  return plural(coveredCount, 'show')
 }
 
 // Tonight's own line, which is the one the volunteer reads before pressing Admit. `DOOR` is the
@@ -152,7 +153,7 @@ export function saysPassCoverage(passTypeSlug: string, coveredCount: number): st
 export function saysPassTonight(tonightAt: number | null, tonightStatus: string | null): { line: string, admitted: boolean } {
   if (tonightAt === null) return { line: 'Not yet redeemed', admitted: false }
   if (tonightStatus === 'DOOR') return { line: 'Already admitted tonight', admitted: true }
-  if (tonightStatus === 'PENDING' || tonightStatus === 'COLLECTED') return { line: 'Redeemed, not yet through the door', admitted: false }
+  if (tonightStatus === 'PENDING' || tonightStatus === 'COLLECTED') return { line: 'Redeemed, not yet in', admitted: false }
   return { line: 'Tonight\'s admission was cancelled', admitted: true }
 }
 

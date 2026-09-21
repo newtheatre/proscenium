@@ -145,13 +145,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-check-check"
-      title="Claims wait here while auto-confirm is off"
-      description="A confirmed claim becomes tonight's shift. A decline needs a reason, because that is what the claimant is shown."
-    />
+    <p class="text-sm text-muted">
+      Shift claims waiting for a decision.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

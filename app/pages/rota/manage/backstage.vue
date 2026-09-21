@@ -278,13 +278,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-radio"
-      title="Nothing already on the board moves"
-      description="Editing or retiring one of these changes nothing already posted: a message keeps the wording it was sent with."
-    />
+    <p class="text-sm text-muted">
+      The message types and presets the board offers.
+    </p>
 
     <UCard data-test="milestone-types">
       <template #header>

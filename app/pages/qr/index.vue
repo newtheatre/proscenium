@@ -269,7 +269,7 @@ useSeoMeta({ title: 'Your booking' })
           color="neutral"
           variant="subtle"
           title="Already paid"
-          description="This booking has been collected. Refunds are handled in person at the box office; bring your reference."
+          description="You have paid for this booking. Refunds are handled in person at the box office; bring your reference."
         />
 
         <div

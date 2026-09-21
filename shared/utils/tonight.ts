@@ -1,4 +1,4 @@
-import { londonClock } from './london'
+import { saysClock } from './when'
 import type { NightRole } from './night-authority'
 
 // Which of tonight's performances a duty manager covering more than one is looking at right now
@@ -26,7 +26,7 @@ export function activePerformanceId<T extends RunningPerformance>(performances: 
 export interface PerformanceChoice { showTitle: string, startsAt: number }
 
 export function saysPerformanceChoice(performance: PerformanceChoice): string {
-  return `${performance.showTitle}, ${londonClock(new Date(performance.startsAt * 1000))}`
+  return `${performance.showTitle}, ${saysClock(performance.startsAt)}`
 }
 
 // Who is on tonight, for the contacts block (E-112 criterion 2). A shift's own role order, so

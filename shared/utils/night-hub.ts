@@ -1,6 +1,6 @@
-import { formatLondon } from './london'
 import { plural } from './text'
 import { saysPrice } from './ticket-types'
+import { saysClock, saysDay } from './when'
 
 // What the show-night header and the hub's tiles read (E-112). Pure: the numbers and the wording
 // are decided here so one test holds them, and the screens only place them.
@@ -12,11 +12,10 @@ export interface HubHouse {
   remaining: number | null
 }
 
-/** The line under the show title: "Thu 5 Nov · 19:30 · Main Hall". */
+// The line under the show title: "Thu 5 Nov · 19:30 · Main Hall". Never a year: the header is
+// always tonight's house, whichever committee year the clock has reached (0009, copy-style §9).
 export function nightHeaderLine(startsAt: number, venueName: string): string {
-  const at = new Date(startsAt * 1000)
-  const day = formatLondon(at, { weekday: 'short', day: 'numeric', month: 'short' })
-  return `${day} · ${formatLondon(at, { timeStyle: 'short' })} · ${venueName}`
+  return `${saysDay(startsAt, { year: false })} · ${saysClock(startsAt)} · ${venueName}`
 }
 
 /** First name only: the badge is read at arm's length, and a surname never helps it. */
@@ -66,8 +65,8 @@ export function hubKpis(house: HubHouse): HubKpis {
   }
 }
 
-// The bar under the numbers is sold over capacity, so it is the sold share it names: "collected"
-// is the next number along, and reading one for the other overstates the room (issue 1150 item 10).
+// The bar under the numbers is sold over capacity, so it is the sold share it names: admitted is
+// the next number along, and reading one for the other overstates the room (issue 1150 item 10).
 export function housePercentLine(soldPercent: number | null): string {
   if (soldPercent === null) return 'No cap on this house'
   return `${soldPercent}% of the house sold`
@@ -110,16 +109,17 @@ export function passPressureAdvice(covering: number, headroom: number | null): s
   return 'More passes than seats left: admit in order of arrival and send walk-ups to the bar.'
 }
 
-/** "2h 10 · one interval", the answer the door is asked most often after the price. */
+/** "2h 10 · 1 interval", the answer the door is asked most often after the price. */
 export function runningTimeLine(durationMinutes: number | null, intervalCount: number, intervalMinutes: number | null): string {
+  const counted = plural(intervalCount, 'interval')
   const intervals = intervalCount === 0
     ? 'straight through'
-    : intervalCount === 1 ? `one interval${intervalMinutes ? ` of ${intervalMinutes} minutes` : ''}` : `${intervalCount} intervals`
+    : intervalMinutes ? `${counted} of ${intervalMinutes} minutes` : counted
   if (durationMinutes === null) return `Running time not yet stated · ${intervals}`
   return `${Math.floor(durationMinutes / 60)}h ${String(durationMinutes % 60).padStart(2, '0')} · ${intervals}`
 }
 
-/** Two groups of three, so tonight's board code can be read out over a headset. */
+/** Two groups of three, so the backstage code can be read out over a headset. */
 export function groupedBoardCode(code: string): string {
   const digits = code.replace(/\s+/g, '')
   if (digits.length !== 6) return code

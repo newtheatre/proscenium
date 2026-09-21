@@ -63,7 +63,7 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Ticket | Reservation, booking, hold | A `reservations` row with `sold: true` (D-104): paid, or to be paid at the box office. |
 | Reservation | (no reader-facing use) | The table and the API's word (`POST /api/reservations`). A reader never sees it. |
 | Booking | Reservation, facing the reader | The reader's word for a reservation, sold or not: `book/[performanceId].vue` says "View your booking". |
-| Hold | Reservation, booking | The state before release or payment: "Hold these seats" (`book/[performanceId].vue`), `hold_expires_at`. |
+| Hold | Reservation, booking | The state before release or payment, in the booking policy's words: "An unpaid booking is released N minutes before curtain, and the seats go back on sale" (`book/[performanceId].vue`), `hold_expires_at`. |
 | Room | Venue, space, in body copy | A bookable part of the estate, with opening hours, a policy, a blackout calendar. |
 | Venue | Room | Where a performance happens: its own row, an address, an emergency card; may point at a room (0043). |
 | Space | Room, venue, outside navigation | Only the nav group's umbrella word (`site-nav.ts`'s "Spaces"). Body copy says room or venue. |
@@ -82,6 +82,27 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Sign in / sign out | Log in, login, logon | Already the practice: `AuthStatus.vue` uses "Sign out" throughout; nothing in `app/` says "log in". |
 | Email | E-mail | Already the practice: no hyphenated form appears under `app/`, `shared/` or `server/`. |
 | Postcode | Post code, post-code | One word, no hyphen, wherever an address is collected. |
+| Paid | Collected, for a booking | A booking whose money has been taken, whoever took it: the door's PAID card and the till's confirmation both say it (K-128, issue 1150 item 16). |
+| In | Admitted, collected, for a person | Through the door. `HUB_KPI_LABELS` carries the three house words, sold, in and seats left, and every show-night screen reads them from there. |
+| Exception | Closed over, exempted | A checklist item answered with a reason instead of a tick. The control is "Make an exception", the record reads "Exception: …", and the night report prints the reason. |
+| Backstage code | Tonight's code, board code | The six digits a crew device joins the backstage board with. Revealed on request with "Show the code" and put away with "Hide the code". |
+| Ticks itself | System-verified | A checklist item that reads the live data rather than being hand-ticked. |
+
+## 4a. The public shell's settled words
+
+The K-128 sweep of the public shell (issue 1152 item 8) settled four wordings that were said
+several ways each. All four live in `shared/utils/programme.ts`, so a screen asks for them rather
+than spelling its own.
+
+| Thing | The one wording | Where it comes from |
+| --- | --- | --- |
+| A full house | "Sold out" | `saysAvailability()`. Never "Full", never "House full"; `listingFlag()` takes its sticker from the same function. |
+| A fact nobody has settled | "To be confirmed" | `TO_BE_CONFIRMED`. Never "Not yet priced", "Dates to be announced", "None stated" or "Not yet confirmed". |
+| Paying | "You pay at the box office when you arrive." | `SAYS_PAYMENT`, paired with `SAYS_BOOKING_HOLDS` ("Booking online holds your seats.") where the reader needs both. No line item is drawn for the nought paid online: a row for nothing is a row to read. |
+| The act of booking | "Book" | One verb, so a button reads "Book tickets", "Book your seats", "Book 3 tickets" or "Book tickets elsewhere", never "Reserve", "Pick" or a bare "Book". |
+
+A thing that is no longer there says so through `saysNoSuch()` in `shared/utils/no-such.ts`, which
+a page reaches the same way a route does.
 
 ## 5. The shape of a refusal
 

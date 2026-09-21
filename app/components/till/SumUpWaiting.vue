@@ -54,7 +54,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
     </p>
     <UInput
       v-model="smpTxCodeTyped"
-      placeholder="Transaction code from the SumUp app (optional)"
+      placeholder="SumUp code (optional)"
       class="mt-2 w-full"
       data-test="sumup-tx-code"
     />
@@ -73,7 +73,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
         data-test="sumup-went-through"
         @click="emit('resolve', pending.id, 'succeeded', null)"
       >
-        It went through
+        Payment went through
       </UButton>
       <UButton
         color="neutral"
@@ -83,7 +83,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
         data-test="sumup-did-not"
         @click="emit('resolve', pending.id, 'abandoned', abandonNote.trim() || null)"
       >
-        It did not
+        Payment did not
       </UButton>
       <UButton
         color="neutral"
@@ -97,7 +97,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
       </UButton>
     </div>
     <p class="mt-2 text-xs text-muted">
-      Nothing happened? The SumUp app is not on this device: say it did not, and key the figure into the reader.
+      Nothing happened? The SumUp app is not on this device: answer Payment did not, and key the figure into the reader.
     </p>
   </NightBlock>
 
@@ -132,7 +132,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
           :data-test="`sumup-open-succeeded-${attempt.id}`"
           @click="emit('resolve', attempt.id, 'succeeded', null)"
         >
-          It went through
+          Payment went through
         </UButton>
         <UButton
           size="sm"
@@ -143,7 +143,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
           :data-test="`sumup-open-abandoned-${attempt.id}`"
           @click="emit('resolve', attempt.id, 'abandoned', attempt.status === 'MISMATCH' ? (abandonNote.trim() || null) : null)"
         >
-          It did not
+          Payment did not
         </UButton>
       </div>
     </div>

@@ -287,13 +287,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-clipboard-list"
-      title="A template is how a venue is staffed, and every performance is stamped from it"
-      description="Adding a performance stamps one open shift per slot straight away. Editing a template changes nothing already stamped, so use Stamp the diary to reach performances that are already in it. Every venue template carries exactly one duty manager."
-    />
+    <p class="text-sm text-muted">
+      How each venue is staffed for a performance.
+    </p>
 
     <UPageCard
       v-if="seesEligibility"

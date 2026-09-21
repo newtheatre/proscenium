@@ -421,13 +421,9 @@ const columns: TableColumn<Session>[] = [
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-calendar-days"
-      title="Teaching is planned, and running one is earned"
-      description="Scheduling a session needs a current trainer certification, and you may teach only what you hold. A certification is not taught by session: it is signed off on experience gained outside training."
-    />
+    <p class="text-sm text-muted">
+      Sessions planned, and who is coming to each.
+    </p>
 
     <AdminToolbar
       v-model:search="search"

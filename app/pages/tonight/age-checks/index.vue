@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import { ID_TYPES, REFUSAL_REASONS, ageCheckReady, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
-import { londonClock } from '#shared/utils/london'
+import { saysClock } from '#shared/utils/when'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
 
@@ -253,7 +253,7 @@ async function submitCorrect(): Promise<void> {
         >
           <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-sm font-semibold">{{ saysOutcome(entry.outcome) }}</span>
-            <span class="text-xs text-muted">{{ londonClock(new Date(entry.createdAt * 1000)) }}</span>
+            <span class="text-xs text-muted">{{ saysClock(entry.createdAt) }}</span>
           </div>
           <p class="text-sm">
             {{ entry.description }}
@@ -262,7 +262,7 @@ async function submitCorrect(): Promise<void> {
             {{ entry.outcome === 'ACCEPTED' ? saysIdType(entry.idType!) : saysRefusalReason(entry.reason!) }}
             by {{ entry.checkedByName }}
             <span v-if="entry.supersedesId"> · corrects an earlier entry</span>
-            <span v-if="entry.supersededBy"> · superseded</span>
+            <span v-if="entry.supersededBy"> · corrected later</span>
           </p>
           <UButton
             v-if="!entry.supersededBy"
@@ -292,7 +292,7 @@ async function submitCorrect(): Promise<void> {
     <UModal
       v-model:open="logging"
       title="Log a Challenge 25 check"
-      description="Timestamp and the checking person are automatic. Describe who you checked, never by name."
+      description="The time and your name go on it. Describe who you checked, never by name."
     >
       <template #body>
         <form
@@ -388,7 +388,7 @@ async function submitCorrect(): Promise<void> {
               class="min-h-12 justify-between"
               data-test="log-more-open"
             >
-              The house, the product, a note
+              House, product, note
             </UButton>
 
             <template #content>
@@ -444,7 +444,7 @@ async function submitCorrect(): Promise<void> {
               class="min-h-12"
               @click="logging = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </form>
@@ -454,7 +454,7 @@ async function submitCorrect(): Promise<void> {
     <UModal
       :open="correcting !== null"
       :title="correcting ? 'Correct this entry' : ''"
-      description="This files a new entry naming what it supersedes. The original stays visible."
+      description="This files a new entry. The original stays visible."
       @update:open="correcting = null"
     >
       <template #body>
@@ -578,7 +578,7 @@ async function submitCorrect(): Promise<void> {
               class="min-h-12"
               @click="correcting = null"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </form>

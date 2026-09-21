@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
-import { saysNoSuch } from './no-such'
+import { saysNoSuch } from '#shared/utils/no-such'
 import { resolvePrice } from '#shared/utils/ticket-types'
 import type { PriceSource } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'

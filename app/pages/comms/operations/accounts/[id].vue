@@ -112,7 +112,7 @@ onMounted(load)
     </h1>
 
     <p class="text-sm text-muted">
-      Types, dates and outcomes only. Never a message body, which might carry somebody else's data.
+      Types, dates and outcomes only, never a message body.
     </p>
 
     <AdminToolbar

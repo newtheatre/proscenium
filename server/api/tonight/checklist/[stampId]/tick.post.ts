@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   })
 
   const ticked = await auditedWrite(db.all<{ id: string }>(tickStatement(stampId, target, resolved.account.id)), entry)
-  if (!ticked) throw createError({ statusCode: 409, statusMessage: 'That item cannot be ticked: it may already be ticked, exempted, or system-verified' })
+  if (!ticked) throw createError({ statusCode: 409, statusMessage: 'That item cannot be ticked: it may already be ticked, an exception, or one that ticks itself' })
 
   return { ok: true }
 })

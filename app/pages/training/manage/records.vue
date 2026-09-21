@@ -275,13 +275,9 @@ watch(modalOpen, (nowOpen) => {
       :description="failure"
     />
 
-    <UAlert
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-clipboard-check"
-      title="What somebody holds, and how they came to hold it"
-      description="A sign-off records competence proven outside a session, and an external certificate records competence earned elsewhere that we never assessed. Nothing is ever deleted: a correction is a revocation with a reason, and then a fresh award."
-    />
+    <p class="text-sm text-muted">
+      What somebody holds, and how they came to hold it.
+    </p>
 
     <UFormField
       label="Whose records"

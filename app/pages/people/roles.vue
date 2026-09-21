@@ -202,34 +202,33 @@ const columns: TableColumn<Holder>[] = [
       :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
     />
 
-    <UPageCard
-      title="The roles there are"
-      description="A count is live holders only: a grant that has lapsed stops working the moment it expires (0009)."
+    <p class="text-sm text-muted">
+      Pick a role to see who holds it now.
+    </p>
+
+    <div
+      data-test="role-tiles"
+      class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
     >
-      <div
-        data-test="role-tiles"
-        class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+      <UButton
+        v-for="tile in tiles"
+        :key="tile.role"
+        :color="chosen === tile.role ? 'primary' : 'neutral'"
+        :variant="chosen === tile.role ? 'subtle' : 'outline'"
+        class="justify-between"
+        :data-test="`tile-${tile.role}`"
+        @click="choose(tile.role)"
       >
-        <UButton
-          v-for="tile in tiles"
-          :key="tile.role"
-          :color="chosen === tile.role ? 'primary' : 'neutral'"
-          :variant="chosen === tile.role ? 'subtle' : 'outline'"
-          class="justify-between"
-          :data-test="`tile-${tile.role}`"
-          @click="choose(tile.role)"
+        <span>{{ tile.label }}</span>
+        <UBadge
+          color="neutral"
+          variant="subtle"
+          size="sm"
         >
-          <span>{{ tile.label }}</span>
-          <UBadge
-            color="neutral"
-            variant="subtle"
-            size="sm"
-          >
-            {{ plural(tile.holders, 'holder') }}
-          </UBadge>
-        </UButton>
-      </div>
-    </UPageCard>
+          {{ plural(tile.holders, 'holder') }}
+        </UBadge>
+      </UButton>
+    </div>
 
     <UPageCard
       v-if="chosen && sees.grants"

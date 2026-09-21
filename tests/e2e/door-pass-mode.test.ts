@@ -172,7 +172,7 @@ describe.skipIf(skip !== null)('the screen at /tonight/door?mode=pass', () => {
       const card = await textOf(view, `[data-test="pass-card-${reference}"]`)
       expect(card).toContain(holder.name)
       expect(card).toContain(reference)
-      expect(card).toContain('Admit, party of 1')
+      expect(card).toContain('Admit one')
 
       // Admitting hands over to the door's own verdict card, so one admission reads the same
       // whichever way the reference arrived.

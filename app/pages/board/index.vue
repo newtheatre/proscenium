@@ -169,7 +169,7 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
           Join tonight's board
         </h1>
         <p class="text-muted">
-          Ask the duty manager for tonight's code.
+          Ask the duty manager for the backstage code.
         </p>
 
         <UAlert
@@ -230,7 +230,7 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
           data-test="board-offline"
           class="text-sm text-warning"
         >
-          {{ writeQueue.connection.value.queued }} message{{ writeQueue.connection.value.queued === 1 ? '' : 's' }} waiting to send.
+          {{ plural(writeQueue.connection.value.queued, 'message') }} waiting to send.
         </p>
       </div>
 
