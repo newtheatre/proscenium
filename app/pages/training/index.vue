@@ -87,7 +87,7 @@ async function askFor(moduleId: string): Promise<void> {
     })
     toast.add({
       title: 'Asked',
-      description: 'A lead will see it on their board.',
+      description: 'The department lead will see it on their board.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -331,12 +331,11 @@ const standings = computed(() => [
         v-if="signedUpTo.length === 0"
         class="mt-1 text-sm text-muted"
       >
-        Nothing yet.
-        <ULink to="/training/sessions">
+        You are signed up to nothing. <ULink to="/training/sessions">
           The schedule
         </ULink>
-        shows what is being taught, and a full session takes you onto its waiting list rather than
-        turning you away.
+        shows what is being taught, and signing up puts it here; a full session takes you onto its
+        waiting list rather than turning you away.
       </p>
 
       <ul
@@ -476,7 +475,7 @@ const standings = computed(() => [
             :data-test="`withdraw-${ask.moduleId}`"
             @click="withdraw(ask.id)"
           >
-            Withdraw
+            Withdraw the request
           </UButton>
         </li>
       </ul>

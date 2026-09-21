@@ -64,7 +64,7 @@ async function reverse(): Promise<void> {
     })
     toast.add({
       title: 'Movement reversed',
-      description: 'Both rows stay, and on hand is the sum across them.',
+      description: 'Both movements stay, and on hand is the sum across them.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -234,7 +234,7 @@ const columns: TableColumn<StockMovement>[] = [
             label="Reason"
             name="reason"
             required
-            description="From the list, so a correction can be reported on rather than read."
+            description="From the list, so the report can group the correction."
           >
             <USelect
               v-model="reason"

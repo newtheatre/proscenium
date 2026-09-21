@@ -46,7 +46,7 @@ async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<
     await $fetch('/api/account/access-profile', { method: 'PUT', body: event.data })
     toast.add({
       title: 'Access profile saved',
-      description: 'An accessibility officer will verify it before the door sees anything.',
+      description: 'The Accessibility Officer verifies it before it reaches anybody working the door.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -86,7 +86,7 @@ useSeoMeta({ title: 'Access requirements' })
   <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       title="Access requirements"
-      description="Tell us what you need once, and control exactly what the door sees. This is verified in person by an accessibility officer before it reaches any other screen."
+      description="Tell us what you need once, and choose exactly what the people on the door are shown. The Accessibility Officer verifies it in person before it reaches any other screen."
     />
 
     <UPageCard class="mt-8">
@@ -150,7 +150,7 @@ useSeoMeta({ title: 'Access requirements' })
           <UFormField
             label="Anything else, in your own words"
             name="requesterNote"
-            hint="Optional. Never shown to the door: it helps the officer verifying this only."
+            hint="Optional. Shown to nobody but the Accessibility Officer verifying this."
           >
             <UTextarea
               v-model="state.requesterNote"
@@ -174,7 +174,7 @@ useSeoMeta({ title: 'Access requirements' })
           <UFormField name="consent">
             <UCheckbox
               v-model="state.consent"
-              label="Let the door see my agreed wording once verified"
+              label="Show my agreed wording to the people on the door once it is verified"
               data-test="access-consent"
             />
           </UFormField>
@@ -184,7 +184,7 @@ useSeoMeta({ title: 'Access requirements' })
             :loading="saving"
             data-test="access-save"
           >
-            {{ profile ? 'Save changes' : 'Submit' }}
+            {{ profile ? 'Save changes' : 'Save your requirements' }}
           </UButton>
         </UForm>
 
@@ -192,7 +192,7 @@ useSeoMeta({ title: 'Access requirements' })
           <USeparator />
           <div>
             <p class="text-sm text-muted">
-              Withdrawing deletes this after 30 days. Nothing is shown to the door in the meantime.
+              Withdrawing deletes this after 30 days. The people on the door are shown nothing in the meantime.
             </p>
             <UButton
               color="error"
@@ -202,7 +202,7 @@ useSeoMeta({ title: 'Access requirements' })
               data-test="access-withdraw"
               @click="withdraw"
             >
-              Withdraw
+              Withdraw my requirements
             </UButton>
           </div>
         </template>

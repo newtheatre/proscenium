@@ -597,7 +597,7 @@ const columns: TableColumn<AdminPerformance>[] = [
               label="Unpaid holds release"
               name="holdReleaseMinutesBefore"
               hint="Optional"
-              description="Minutes before curtain. Leave it empty to take the configured default."
+              description="Minutes before curtain. Leave it empty to take the house default."
             >
               <UInputNumber
                 v-model="form.holdReleaseMinutesBefore"
@@ -643,7 +643,7 @@ const columns: TableColumn<AdminPerformance>[] = [
               :loading="saving"
               data-test="performance-submit"
             >
-              {{ editingPerformance ? 'Save it' : 'Add it' }}
+              {{ editingPerformance ? 'Save the performance' : 'Add a performance' }}
             </UButton>
             <UButton
               color="neutral"
@@ -678,7 +678,7 @@ const columns: TableColumn<AdminPerformance>[] = [
           data-test="confirm-cancel"
           @click="cancelPerformance"
         >
-          Cancel it
+          Cancel the performance
         </UButton>
         <UButton
           color="neutral"

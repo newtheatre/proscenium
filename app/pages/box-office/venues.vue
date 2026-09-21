@@ -349,7 +349,7 @@ const columns: TableColumn<AdminVenue>[] = [
           </UFormField>
 
           <UFormField
-            label="Address"
+            label="Postal address"
             name="address"
             hint="Optional"
           >
@@ -401,7 +401,7 @@ const columns: TableColumn<AdminVenue>[] = [
           <USwitch
             v-model="state.isExternal"
             label="External venue"
-            description="A union or off-site space, for reporting rather than blackouts."
+            description="A union or off-site space. It appears in reports and takes no blackouts."
             data-test="venue-external"
           />
 
@@ -411,7 +411,7 @@ const columns: TableColumn<AdminVenue>[] = [
               :loading="saving"
               data-test="venue-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the venue' : 'Add a venue' }}
             </UButton>
             <UButton
               color="neutral"
@@ -454,7 +454,7 @@ const columns: TableColumn<AdminVenue>[] = [
           data-test="confirm-delete"
           @click="remove"
         >
-          Delete it
+          Delete the venue
         </UButton>
         <UButton
           color="neutral"

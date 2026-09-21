@@ -12,6 +12,8 @@ const SHOW_NIGHT_GLOBS = [
 ]
 
 const SHOW_NIGHT_FILES = [
+  // Where the SumUp app returns: it wears the tonight layout, so it takes the tonight register.
+  'app/pages/pay/return/[token].vue',
   'app/components/BoardFeed.vue',
   'app/components/DoorPassMode.vue',
   'app/components/DoorVerdictCard.vue',
@@ -232,7 +234,7 @@ describe('one set of camera-failure words (K-128, issue 1150 item 16)', () => {
   })
 
   test('every camera screen reads them from door.ts', async () => {
-    for (const file of ['app/components/QrScanner.vue', 'app/pages/tonight/door/index.vue', 'app/composables/useTillTickets.ts']) {
+    for (const file of ['app/components/QrScanner.vue', 'app/pages/tonight/door/index.vue', 'app/composables/useTillTickets.ts', 'app/pages/box-office/desk.vue']) {
       expect(`${file}: ${(await Bun.file(file).text()).includes('CAMERA_FALLBACK_SAYS')}`).toBe(`${file}: true`)
     }
   })

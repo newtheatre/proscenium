@@ -118,7 +118,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
   <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       title="Book a room not listed here"
-      description="For when nothing of ours suits. Somebody else decides which room we get, so this is a request rather than a booking."
+      description="For when nothing of ours suits. The Theatre Manager decides which room we get, and this is a request rather than a booking."
     />
 
     <UAlert
@@ -266,7 +266,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
               to="/account/membership"
               data-test="external-membership-link"
             >
-              Sort out your membership
+              Tell us about your membership
             </UButton>
           </template>
         </UAlert>

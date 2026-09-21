@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { committeeYearEnd, committeeYearOf } from './london'
+import { plural } from './text'
 
 // Booked rooms nobody turned up to, and what they cost (C-116). The old app promised no-show
 // tracking and never built it, so an empty booked room cost nothing at all (RM-1).
@@ -26,13 +27,13 @@ export function standingFor(count: number, ladder: Ladder): Standing {
 
 export function saysStanding(standing: Standing, count: number, ladder: Ladder): string {
   if (standing === 'PRE_APPROVAL') {
-    return `Every booking you make is checked by a person first, because ${count} were not turned up to.`
+    return `You have missed ${plural(count, 'booking')}. Every booking you make now is checked by a person first.`
   }
   if (standing === 'RECORDED') {
-    return `${count} bookings were not turned up to. At ${ladder.preApprovalAt}, every booking is checked by a person first.`
+    return `You have missed ${plural(count, 'booking')}. At ${ladder.preApprovalAt}, every booking you make is checked by a person first.`
   }
   return count === 1
-    ? 'One booking was not turned up to. Nothing follows from it yet.'
+    ? 'You have missed one booking. Nothing follows from it.'
     : 'Nothing on your record.'
 }
 

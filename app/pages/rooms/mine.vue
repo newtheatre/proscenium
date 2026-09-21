@@ -109,8 +109,8 @@ async function cancelUnlisted(): Promise<void> {
     toast.add({
       title: 'Withdrawn',
       description: answer.alreadyRequested
-        ? 'The Theatre Manager has been told, because our booking for it still stands.'
-        : 'It had not been requested yet.',
+        ? 'The Theatre Manager has been told. Our booking for it still stands.'
+        : 'Nothing had been requested.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -255,7 +255,7 @@ useSeoMeta({ title: 'My bookings' })
         </ULink> and it appears here.
       </template>
       <template v-else>
-        Nothing in the past yet.
+        Nothing has finished. A booking moves here once its slot has passed.
       </template>
     </p>
 
@@ -356,7 +356,7 @@ useSeoMeta({ title: 'My bookings' })
         Rooms we do not manage
       </h2>
       <p class="mt-1 text-sm text-muted">
-        Somebody else decides which room we get, so none of these is held until they answer.
+        The Theatre Manager decides which room we get, and none of these is held until they answer.
       </p>
 
       <ul class="mt-4 divide-y divide-default">
@@ -493,7 +493,7 @@ useSeoMeta({ title: 'My bookings' })
           data-test="cancel-unlisted-confirm"
           @click="cancelUnlisted"
         >
-          Withdraw it
+          Withdraw the request
         </UButton>
         <UButton
           color="neutral"

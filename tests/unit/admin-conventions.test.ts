@@ -596,3 +596,117 @@ describe('a console screen introduces itself in one sentence (K-123 criterion 11
     expect(nameless).toEqual([])
   })
 })
+
+// What a person reads on a console screen: the text between tags, the attributes that carry copy,
+// and the labels a script hands a table, a toast or a modal (K-128, `docs/copy-style.md`).
+const COPY_ATTRIBUTE = /(?:^|\s):?(?:label|title|description|placeholder|help|hint|text|heading|empty|caption|aria-label)="([^"]*)"/g
+const COPY_KEY = /(?:^|\s)'?(?:label|title|description|placeholder|help|hint|header|message|empty)'?:\s*(['"`])((?:(?!\1)[\s\S])*?)\1/g
+// An interpolation is a value the screen fills in, not copy anybody wrote.
+const INTERPOLATION = /\$\{[^}]*\}|\{\{[^}]*\}\}/g
+
+function readerStrings(source: string): string[] {
+  const clean = source.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '').replace(INTERPOLATION, '')
+  const strings = [...templateOf(clean).matchAll(/>([^<>]*[A-Za-z]{3}[^<>]*)</g)].map(match => match[1])
+  strings.push(...[...clean.matchAll(COPY_ATTRIBUTE)].map(match => match[1]))
+  strings.push(...[...clean.matchAll(COPY_KEY)].map(match => match[2]))
+  return strings.map(one => one.replace(/\s+/g, ' ').trim()).filter(one => one.length > 0)
+}
+
+// A button's own words: the text between its tags, and the label a ternary or a script hands it.
+function buttonLabels(source: string): string[] {
+  const clean = source.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
+  return [
+    ...[...templateOf(clean).matchAll(/>\s*([^<>{}]{2,44}?)\s*</g)].map(match => match[1]),
+    ...[...clean.matchAll(/'([^'\n]{2,44})'/g)].map(match => match[1]),
+  ].map(one => one.trim())
+}
+
+const CITES_A_RECORD = /\b[A-K]-1[0-9][0-9]\b|\(0[0-9]{3}\)|\bcriterion\b/
+const EXPLAINS_ITSELF = /\b(?:because|so that|which is why|rather than|on purpose)\b/i
+const NOT_THE_HOUSE_WORD = /\bvariants?\b|\bpatrons?\b|\bcustomers?\b|\btheatregoers?\b/i
+const NARRATES_THE_MACHINE = /\bsnapshot(?:ted|s)?\b|\boverwritten\b|\bstale read\b|\bin the same write\b|\bconfigured\b|\bthe database\b|\bthe server\b|\bthe system\b|\btombstoned?\b/i
+const THE_PASTED_FAILURE = 'This is not the same as nothing being asked for'
+const PRONOUN_LABEL = /^(?:Add|Save|Record|Define|Plan|Note|Close|List|Publish|Delete|Attach|Remove|Take|Set|Show|Send|Turn|Ask|Make|Cancel|Write|Book)\b[^.?!]{0,24}\bit\b[^.?!]{0,10}$/
+
+const saying = async (test: (source: string) => boolean): Promise<string[]> =>
+  (await consoleFiles()).filter(file => test(file.source)).map(file => file.path)
+
+// Each list is what the sweep has still to reach, module by module (issue 1151 item 12). Box
+// office, the bar and money are done; every list may shrink and may not grow.
+const CITES_A_RECORD_ON_SCREEN = [
+  'app/pages/admin/backups.vue',
+  'app/pages/admin/settings.vue',
+  'app/pages/people/accounts/[id].vue',
+  'app/pages/people/roles.vue',
+]
+const STILL_EXPLAINS_ITSELF = [
+  'app/components/training/ModuleEditor.vue',
+  'app/pages/dev.vue',
+  'app/pages/rooms/manage/closures.vue',
+  'app/pages/rooms/manage/other.vue',
+  'app/pages/training/manage/records.vue',
+  'app/pages/training/manage/requests.vue',
+]
+const STILL_NARRATES_THE_MACHINE = [
+  'app/pages/admin/audit.vue',
+  'app/pages/admin/backups.vue',
+  'app/pages/people/accounts/[id].vue',
+  'app/pages/training/manage/sessions/index.vue',
+]
+const STILL_PASTES_THE_FAILURE = [
+  'app/components/training/CatalogueTable.vue',
+  'app/pages/rooms/manage/index.vue',
+  'app/pages/rooms/manage/other.vue',
+  'app/pages/rooms/manage/utilisation.vue',
+  'app/pages/training/manage/departments.vue',
+  'app/pages/training/manage/records.vue',
+  'app/pages/training/manage/requests.vue',
+  'app/pages/training/manage/sessions/index.vue',
+]
+const STILL_BUTTONS_A_PRONOUN = [
+  'app/components/training/ModuleEditor.vue',
+  'app/pages/admin/backups.vue',
+  'app/pages/people/fellows.vue',
+  'app/pages/people/members.vue',
+  'app/pages/rooms/manage/other.vue',
+  'app/pages/rooms/manage/requests.vue',
+  'app/pages/rota/manage/backstage.vue',
+  'app/pages/rota/manage/checklists.vue',
+  'app/pages/rota/manage/emergency.vue',
+  'app/pages/rota/manage/openings.vue',
+  'app/pages/rota/manage/safety.vue',
+  'app/pages/rota/manage/templates.vue',
+  'app/pages/training/manage/departments.vue',
+  'app/pages/training/manage/records.vue',
+]
+
+describe('the console speaks one voice (K-128 criterion 2, issue 1151 item 12)', () => {
+  test('no screen quotes a decision or a story at its reader', async () => {
+    expect((await saying(source => readerStrings(source).some(one => CITES_A_RECORD.test(one))))
+      .filter(path => !CITES_A_RECORD_ON_SCREEN.includes(path))).toEqual([])
+  })
+
+  test('no screen argues for itself: the reasoning stays in the decision record', async () => {
+    expect((await saying(source => readerStrings(source).some(one => EXPLAINS_ITSELF.test(one))))
+      .filter(path => !STILL_EXPLAINS_ITSELF.includes(path))).toEqual([])
+  })
+
+  test('no button names its object with a pronoun', async () => {
+    expect((await saying(source => buttonLabels(source).some(one => PRONOUN_LABEL.test(one))))
+      .filter(path => !STILL_BUTTONS_A_PRONOUN.includes(path))).toEqual([])
+  })
+
+  test('a serving size is never a variant, and nobody is a patron or a customer', async () => {
+    expect(await saying(source => readerStrings(source).some(one => NOT_THE_HOUSE_WORD.test(one)))).toEqual([])
+  })
+
+  test('no screen narrates the machine to its reader', async () => {
+    expect((await saying(source => readerStrings(source).some(one => NARRATES_THE_MACHINE.test(one))))
+      .filter(path => !STILL_NARRATES_THE_MACHINE.includes(path))).toEqual([])
+  })
+
+  test('a failed read says so in the house shape, not in a pasted paragraph', async () => {
+    expect((await saying(source => source.includes(THE_PASTED_FAILURE)))
+      .filter(path => !STILL_PASTES_THE_FAILURE.includes(path))).toEqual([])
+  })
+})

@@ -68,7 +68,7 @@ async function save(): Promise<void> {
     else {
       await $fetch('/api/admin/reference-data/show-categories', { method: 'POST', body })
     }
-    toast.add({ title: editing.value ? 'Category changed' : 'Category added', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: editing.value ? 'Show category changed' : 'Show category added', icon: 'i-lucide-check', color: 'success' })
     open.value = false
     await reload()
   }
@@ -85,7 +85,7 @@ async function setArchived(category: AdminShowCategory, archived: boolean): Prom
   try {
     await $fetch(`/api/admin/reference-data/show-categories/${category.id}/archive`, { method: 'POST', body: { archived } })
     toast.add({
-      title: archived ? 'Category retired' : 'Category back in use',
+      title: archived ? 'Show category retired' : 'Show category back in use',
       description: archived ? 'It stops appearing for a new show and still names every show that already carries it.' : undefined,
       icon: 'i-lucide-check',
       color: 'success',
@@ -105,7 +105,7 @@ async function remove(): Promise<void> {
   failure.value = null
   try {
     await $fetch(`/api/admin/reference-data/show-categories/${category.id}`, { method: 'DELETE' })
-    toast.add({ title: 'Category deleted', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: 'Show category deleted', icon: 'i-lucide-check', color: 'success' })
     removing.value = null
     await reload()
   }
@@ -122,7 +122,7 @@ const listingFailure = computed(() => (error.value ? refusalText(error.value, 'T
 const columns: TableColumn<AdminShowCategory>[] = [
   {
     id: 'name',
-    header: 'Category',
+    header: 'Show category',
     cell: ({ row }) => h('div', { class: 'flex flex-wrap items-center gap-2' }, [
       h('span', {}, row.original.name),
       row.original.archived
@@ -251,7 +251,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
 
     <UModal
       v-model:open="open"
-      :title="editing ? `Edit ${editing.name}` : 'Add a category'"
+      :title="editing ? `Edit ${editing.name}` : 'Add a show category'"
       description="The name is held once."
     >
       <template #body>
@@ -299,7 +299,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
               :loading="saving"
               data-test="category-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the show category' : 'Add a show category' }}
             </UButton>
             <UButton
               color="neutral"
@@ -316,7 +316,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
     <UModal
       :open="removing !== null"
       :title="removing ? `Delete ${removing.name}` : ''"
-      description="No show belongs to this category, so there is no history to keep."
+      description="No show belongs to this show category, so there is no history to keep."
       @update:open="removing = null; failure = null"
     >
       <template #body>
@@ -331,7 +331,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
           v-else
           class="text-sm text-muted"
         >
-          The category goes. Every show stays where it is.
+          The show category goes. Every show stays where it is.
         </p>
       </template>
 
@@ -342,7 +342,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
           data-test="confirm-delete"
           @click="remove"
         >
-          Delete it
+          Delete the show category
         </UButton>
         <UButton
           color="neutral"

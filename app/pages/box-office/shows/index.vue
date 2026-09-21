@@ -316,7 +316,7 @@ const artless = computed(() => data.value.items.filter(one => one.status === 'DR
     <UModal
       v-model:open="open"
       title="Add a show"
-      description="A title and the address its public page will have. Everything else is on the show's own screen, and it stays a draft until you publish it."
+      description="A title and the web address its public page will have. Everything else is on the show's own screen, and it stays a draft until you publish it."
     >
       <template #body>
         <UForm
@@ -347,7 +347,7 @@ const artless = computed(() => data.value.items.filter(one => one.status === 'DR
           </UFormField>
 
           <UFormField
-            label="Address"
+            label="Web address"
             name="slug"
             required
             description="The public page is /shows/ and this. Lowercase words joined by hyphens."
@@ -366,7 +366,7 @@ const artless = computed(() => data.value.items.filter(one => one.status === 'DR
               :loading="saving"
               data-test="show-submit"
             >
-              Add it
+              Add the show
             </UButton>
             <UButton
               color="neutral"

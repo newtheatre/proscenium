@@ -5,7 +5,7 @@ import type { ListSpec } from './list-filters'
 // order is read at request time, so sort is the whole of it.
 export const barCategoriesList = {
   key: 'bar-categories',
-  search: { placeholder: 'A category', maxLength: MAX_BAR_NAME },
+  search: { placeholder: 'A product category', maxLength: MAX_BAR_NAME },
   fields: [],
   sort: {
     fields: [

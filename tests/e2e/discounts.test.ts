@@ -357,7 +357,7 @@ describe.skipIf(skip !== null)('the console screen (#1051)', () => {
 
     // Retire, then put back: never deleted, and the table names the state either way.
     await click(view, `[data-test="status-${id}"]`)
-    await waitFor(view, `document.querySelector('[data-test="status-${id}"]') && document.querySelector('[data-test="status-${id}"]').textContent.trim() === 'Put back'`)
+    await waitFor(view, `document.querySelector('[data-test="status-${id}"]') && document.querySelector('[data-test="status-${id}"]').textContent.trim() === 'Bring back'`)
     expect(await textOf(view, '[data-test="bar-discounts-table"]')).toContain('Retired')
 
     await click(view, `[data-test="status-${id}"]`)
@@ -386,7 +386,7 @@ describe.skipIf(skip !== null)('the console screen (#1051)', () => {
     view.close()
   }, 120_000)
 
-  // Retire and Put back act straight from the table, with no modal open to carry the form's own
+  // Retire and Bring back act straight from the table, with no modal open to carry the form's own
   // alert: a code-review pass on this PR found the refusal had nowhere to show (issue #1051).
   test('a status-change refusal shows on the page, not only inside a modal', async () => {
     const { id, name } = await aDiscount(10)

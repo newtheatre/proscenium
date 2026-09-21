@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { DESK_STATUS_FILTERS, DESK_TENDERS, REINSTATE_REASON_LIMIT, reinstateRefusal, uncollectableReason } from '#shared/utils/desk'
+import { DESK_SALE_LINE_QUANTITY_CAP, DESK_STATUS_FILTERS, DESK_TENDERS, REINSTATE_REASON_LIMIT, compBlockedSays, deskEmptySays, reinstateRefusal, saysDeskNight, uncollectableReason, walkUpRefusal, walkUpTotalPence } from '#shared/utils/desk'
+import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
 import { saysClock } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskStatusFilter, DeskTender } from '#shared/utils/desk'
+import type { WalkUpOption } from '#shared/utils/sale'
 import type { ScannerFailure } from '~/composables/useQrScanner'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -159,18 +161,88 @@ function goTo(target: string): void {
   performanceId.value = undefined
 }
 
+const walkUpOptions = ref<WalkUpOption[]>([])
+const walkUpQuantities = ref<Record<string, number>>({})
+const walkUpGuest = ref({ name: '', email: '' })
+const walkUpOptionsFailure = ref<string | null>(null)
+const walkUpFailure = ref<string | null>(null)
+const selling = ref(false)
+
+async function loadWalkUpOptions(): Promise<void> {
+  walkUpOptions.value = []
+  walkUpQuantities.value = {}
+  walkUpOptionsFailure.value = null
+  if (!performanceId.value) return
+  try {
+    const body = await $fetch<{ options: WalkUpOption[] }>('/api/box-office/desk/ticket-types', { query: { performanceId: performanceId.value } })
+    walkUpOptions.value = body.options
+    walkUpQuantities.value = Object.fromEntries(body.options.map(option => [option.id, 0]))
+  }
+  catch (error) {
+    walkUpOptionsFailure.value = refusalText(error)
+  }
+}
+
+const walkUpLines = computed(() => walkUpOptions.value.map(option => ({
+  ticketTypeId: option.id,
+  pricePence: option.price,
+  quantity: walkUpQuantities.value[option.id] ?? 0,
+})))
+const walkUpTotal = computed(() => walkUpTotalPence(walkUpLines.value))
+const walkUpBlockedSays = computed(() => walkUpRefusal(walkUpLines.value, walkUpGuest.value))
+
+// D-115 criterion 7: the sale and its payment are one write, and the figure on screen is the
+// figure sent, so a reader keyed to something else is refused before anything is created (0005).
+async function takeWalkUp(): Promise<void> {
+  if (!performanceId.value || walkUpBlockedSays.value !== null) return
+  selling.value = true
+  walkUpFailure.value = null
+  try {
+    const sold = await $fetch<{ reference: string }>('/api/box-office/desk/reservations', {
+      method: 'POST',
+      body: {
+        performanceId: performanceId.value,
+        lines: walkUpLines.value.filter(line => line.quantity > 0).map(line => ({ ticketTypeId: line.ticketTypeId, quantity: line.quantity })),
+        guest: { name: walkUpGuest.value.name.trim(), email: walkUpGuest.value.email.trim() },
+        expectedTotalPence: walkUpTotal.value,
+        tender: 'CARD',
+      },
+    })
+    toast.add({ title: 'Walk-up sold', description: `Reference ${sold.reference}.`, icon: 'i-lucide-check', color: 'success' })
+    walkUpQuantities.value = {}
+    walkUpGuest.value = { name: '', email: '' }
+    await search()
+    void loadSummary()
+  }
+  catch (error) {
+    walkUpFailure.value = refusalText(error)
+  }
+  finally {
+    selling.value = false
+  }
+}
+
 const results = ref<SearchRow[]>([])
 const searching = ref(false)
+const searched = ref(false)
+const narrowed = ref(false)
+
+// What the empty card says depends on whether a search has run and whether anything narrowed it:
+// the card searches on its own, so "no results yet" was said about a search that had happened.
+const emptySays = computed(() => deskEmptySays({ searched: searched.value, narrowed: narrowed.value }))
 
 async function search(): Promise<void> {
   if (!performanceId.value) return
   searching.value = true
   searchFailure.value = null
+  const asked = q.value.trim()
   try {
     const page = await $fetch<{ items: SearchRow[] }>('/api/box-office/desk/search', {
-      query: { performanceId: performanceId.value, q: q.value.trim() || undefined, status: statusFilter.value },
+      query: { performanceId: performanceId.value, q: asked || undefined, status: statusFilter.value },
     })
     results.value = page.items
+    narrowed.value = asked.length > 0 || statusFilter.value !== 'ALL'
+    searched.value = true
   }
   catch (error) {
     searchFailure.value = refusalText(error)
@@ -184,16 +256,20 @@ async function search(): Promise<void> {
 // ahead of this one registering, and a shift that opens the desk fresh still wants tonight's list.
 watch(performanceId, () => {
   results.value = []
+  searched.value = false
+  narrowed.value = false
   q.value = ''
   statusFilter.value = 'ALL'
   void search()
   void loadSummary()
+  void loadWalkUpOptions()
 }, { immediate: true })
 
 watch(statusFilter, () => void search())
 
 const selected = ref<ReservationDetail | null>(null)
 const open = ref(false)
+const openingId = ref<string | null>(null)
 const tender = ref<DeskTender>('CARD')
 const compRequestReason = ref('')
 const requestingComp = ref(false)
@@ -237,16 +313,36 @@ const ticketTotalPence = computed(() => selected.value?.tickets.reduce((total, t
 const dueNow = computed(() => (tender.value === 'COMP' ? 0 : ticketTotalPence.value))
 // D-117: only an approved, unexpired, unspent request lets a comp be collected.
 const compApproved = computed(() => selected.value?.compRequest?.status === 'APPROVED' && !selected.value.compRequest.expired)
+// One sentence for why Collect is closed, said once on screen and named by the button itself, so
+// the reason never sits behind a control with nothing beside it (D-114 criterion 9).
+const collectBlockedSays = computed(() => (tender.value === 'COMP' ? compBlockedSays(selected.value?.compRequest ?? null) : null))
 
-async function open2(id: string): Promise<void> {
+function resetBookingForm(): void {
   collectFailure.value = null
   tender.value = 'CARD'
   compRequestReason.value = ''
   compRequestFailure.value = null
   reinstateReason.value = ''
   reinstateFailure.value = null
-  selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${id}`)
-  open.value = true
+}
+
+// A refusal here is the row's own: the results stay put and say so, rather than the press doing
+// nothing at all while the read fails silently.
+async function openReservation(id: string): Promise<void> {
+  if (openingId.value) return
+  openingId.value = id
+  searchFailure.value = null
+  resetBookingForm()
+  try {
+    selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${id}`)
+    open.value = true
+  }
+  catch (error) {
+    searchFailure.value = refusalText(error)
+  }
+  finally {
+    openingId.value = null
+  }
 }
 
 // One path for the camera and the typed field both: the route reads every form a code takes,
@@ -259,12 +355,7 @@ async function resolveScan(raw: string): Promise<void> {
       method: 'POST',
       body: { scanned: raw },
     })
-    tender.value = 'CARD'
-    compRequestReason.value = ''
-    compRequestFailure.value = null
-    collectFailure.value = null
-    reinstateReason.value = ''
-    reinstateFailure.value = null
+    resetBookingForm()
     open.value = true
     scanned.value = ''
   }
@@ -287,15 +378,9 @@ async function scanDecoded(value: string): Promise<void> {
   await resolveScan(value.trim())
 }
 
-const cameraSays: Record<ScannerFailure, string> = {
-  NO_CAMERA: 'No camera on this device, so scan into the field or type the reference.',
-  REFUSED: 'Camera access refused, so scan into the field or type the reference. Allow it in the site settings to use it.',
-  BROKEN: 'The camera would not start, so scan into the field or type the reference.',
-}
-
 function fallBackToTyping(failure: ScannerFailure): void {
   cameraOpen.value = false
-  cameraNote.value = cameraSays[failure]
+  cameraNote.value = CAMERA_FALLBACK_SAYS[failure]
 }
 
 function openCamera(): void {
@@ -449,8 +534,10 @@ const resultColumns: TableColumn<SearchRow>[] = [
     meta: RIGHT_ALIGNED,
     cell: ({ row }) => h(UButton, {
       'size': 'sm',
+      'loading': openingId.value === row.original.id,
+      'disabled': openingId.value !== null && openingId.value !== row.original.id,
       'data-test': `desk-open-${row.original.id}`,
-      'onClick': () => open2(row.original.id),
+      'onClick': () => openReservation(row.original.id),
     }, () => 'Open'),
   },
 ]
@@ -474,7 +561,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
         <span
           class="text-sm font-medium"
           data-test="desk-night"
-        >{{ nightly?.night }}</span>
+        >{{ nightly ? saysDeskNight(nightly.night) : '' }}</span>
         <UButton
           icon="i-lucide-chevron-right"
           color="neutral"
@@ -487,9 +574,10 @@ const resultColumns: TableColumn<SearchRow>[] = [
           size="xs"
           color="neutral"
           variant="ghost"
+          data-test="desk-tonight"
           @click="night = null; refreshNightly()"
         >
-          Today
+          Tonight
         </UButton>
       </div>
 
@@ -569,7 +657,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
               data-test="desk-scan-submit"
               @click="scan"
             >
-              Open
+              Find the booking
             </UButton>
             <UButton
               v-if="cameraOpen"
@@ -579,7 +667,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
               data-test="desk-scan-camera-close"
               @click="cameraOpen = false"
             >
-              Close the camera
+              Stop the camera
             </UButton>
             <UButton
               v-else
@@ -650,8 +738,11 @@ const resultColumns: TableColumn<SearchRow>[] = [
           data-test="desk-results"
         >
           <template #empty>
-            <p class="py-6 text-center text-sm text-muted">
-              No results yet. Search, or scan a booking's code.
+            <p
+              class="py-6 text-center text-sm text-muted"
+              data-test="desk-empty"
+            >
+              {{ emptySays }}
             </p>
           </template>
         </UTable>
@@ -709,6 +800,106 @@ const resultColumns: TableColumn<SearchRow>[] = [
             </dd>
           </div>
         </dl>
+      </UCard>
+
+      <UCard
+        v-if="performanceId"
+        data-test="desk-walk-up"
+      >
+        <template #header>
+          <p class="font-medium">
+            Walk-up
+          </p>
+        </template>
+
+        <UAlert
+          v-if="walkUpOptionsFailure"
+          color="error"
+          variant="subtle"
+          :description="walkUpOptionsFailure"
+          data-test="desk-walk-up-options-failure"
+        />
+        <p
+          v-else-if="walkUpOptions.length === 0"
+          class="text-sm text-muted"
+          data-test="desk-walk-up-empty"
+        >
+          No ticket types on this performance. Add one under Box office, Ticket types.
+        </p>
+        <div
+          v-else
+          class="space-y-3"
+        >
+          <UFormField
+            v-for="option in walkUpOptions"
+            :key="option.id"
+            :label="`${option.name} · ${saysPrice(option.price)}`"
+          >
+            <UInputNumber
+              v-model="walkUpQuantities[option.id]"
+              :min="0"
+              :max="DESK_SALE_LINE_QUANTITY_CAP"
+              class="w-32"
+              :data-test="`desk-walk-up-quantity-${option.id}`"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Booker's name"
+            required
+          >
+            <UInput
+              v-model="walkUpGuest.name"
+              class="w-full"
+              data-test="desk-walk-up-name"
+            />
+          </UFormField>
+          <UFormField
+            label="Booker's email"
+            required
+          >
+            <UInput
+              v-model="walkUpGuest.email"
+              type="email"
+              class="w-full"
+              data-test="desk-walk-up-email"
+            />
+          </UFormField>
+
+          <p
+            class="text-lg font-semibold"
+            data-test="desk-walk-up-total"
+          >
+            Due now: {{ saysPrice(walkUpTotal) }}
+          </p>
+
+          <UAlert
+            v-if="walkUpFailure"
+            color="error"
+            variant="subtle"
+            :description="walkUpFailure"
+            data-test="desk-walk-up-failure"
+          />
+
+          <p
+            v-if="walkUpBlockedSays"
+            id="desk-walk-up-blocked"
+            class="text-sm text-muted"
+            data-test="desk-walk-up-blocked"
+          >
+            {{ walkUpBlockedSays }}
+          </p>
+
+          <UButton
+            :loading="selling"
+            :disabled="walkUpBlockedSays !== null"
+            :aria-describedby="walkUpBlockedSays === null ? undefined : 'desk-walk-up-blocked'"
+            data-test="desk-walk-up-sell"
+            @click="takeWalkUp"
+          >
+            Sell {{ saysPrice(walkUpTotal) }}
+          </UButton>
+        </div>
       </UCard>
     </div>
 
@@ -782,25 +973,38 @@ const resultColumns: TableColumn<SearchRow>[] = [
               />
               <UAlert
                 v-else-if="selected.compRequest?.status === 'PENDING' && !selected.compRequest.expired"
+                id="desk-collect-blocked"
                 color="info"
                 variant="subtle"
                 icon="i-lucide-clock"
-                description="Waiting on tonight's duty manager to approve this."
+                :description="collectBlockedSays ?? ''"
                 data-test="desk-comp-pending"
               />
               <template v-else>
                 <UAlert
                   v-if="selected.compRequest?.status === 'DECLINED'"
+                  id="desk-collect-blocked"
                   color="error"
                   variant="subtle"
-                  :description="`Declined: ${selected.compRequest.declineReason}`"
+                  :description="collectBlockedSays ?? ''"
+                  data-test="desk-comp-declined"
                 />
                 <UAlert
                   v-else-if="selected.compRequest?.expired"
+                  id="desk-collect-blocked"
                   color="warning"
                   variant="subtle"
-                  description="That request lapsed; ask again."
+                  :description="collectBlockedSays ?? ''"
+                  data-test="desk-comp-lapsed"
                 />
+                <p
+                  v-else
+                  id="desk-collect-blocked"
+                  class="text-sm text-muted"
+                  data-test="desk-comp-unasked"
+                >
+                  {{ collectBlockedSays }}
+                </p>
                 <UFormField
                   label="Reason for the comp"
                   required
@@ -837,7 +1041,8 @@ const resultColumns: TableColumn<SearchRow>[] = [
 
             <UButton
               :loading="collecting"
-              :disabled="tender === 'COMP' && !compApproved"
+              :disabled="collectBlockedSays !== null"
+              :aria-describedby="collectBlockedSays === null ? undefined : 'desk-collect-blocked'"
               data-test="desk-collect"
               @click="collect"
             >

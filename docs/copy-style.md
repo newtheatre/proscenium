@@ -87,6 +87,18 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Exception | Closed over, exempted | A checklist item answered with a reason instead of a tick. The control is "Make an exception", the record reads "Exception: …", and the night report prints the reason. |
 | Backstage code | Tonight's code, board code | The six digits a crew device joins the backstage board with. Revealed on request with "Show the code" and put away with "Hide the code". |
 | Ticks itself | System-verified | A checklist item that reads the live data rather than being hand-ticked. |
+| Booker | Patron, customer, theatregoer | Somebody with a booking. Anyone else on the public site is a visitor, and somebody current with the SU is a member (K-128, issue 1151 item 12). |
+| Serving size | Variant, in anything a person reads | A size a product sells at. The catalogue row says "Serving size", a sentence says "size", and the till says "size" (0083). |
+| Show category | Category, on its own in the box office | The grouping a show belongs to. |
+| Product category | Category, on its own in the bar | The grouping a product sits in on the till. |
+| Stock group | Category, for a stocked item | The free text that groups the order list. It is not a product category. |
+| Need | Category, for an access profile | One of the standard access needs an access profile ticks. |
+| Retire | Archive, for a catalogue thing | Off the till or the estate, its history kept. "Bring back" reverses it. |
+| Hide | Retire, for something reversible | Off the till for now. "Put on the till" reverses it. |
+| Close | Retire, for a period or a night | A period or a night stops taking entries. |
+| Remove | Delete, retire, for something with no history | A template, a lead, a note, a poster: nothing to keep. |
+| Revoke | Remove, for a grant | A grant is taken away. |
+| Web address | Address, for a slug | The last part of a public page's address, lowercase words joined by hyphens. A postal address is a "postal address" and an email is an "email address". |
 
 ## 4a. The public shell's settled words
 
@@ -128,6 +140,21 @@ account you mean", and `server/utils/validation.ts` no longer lists field keys e
 failed check has no wording of its own, the sentence comes from the house error map in
 `shared/utils/house-errors.ts`, registered once on each side, so a reader never sees the
 validation library's own English.
+
+## 5a. The member shell's settled words
+
+The K-128 sweep of the member shell (issue 1153 item 8) settled the wordings that were said
+several ways each, and put each of them in one place.
+
+| Thing | The one wording | Where it comes from |
+| --- | --- | --- |
+| The membership state | "Current", "In grace", "Lapsed", "None" | `MEMBERSHIP_WORDING` and `saysMembershipState()` in `shared/utils/membership.ts`; the sentence beside the badge is `saysMembershipSentence()` in `shared/utils/my-summary.ts`, which the My NNT tile reads too. |
+| A membership a member needs | "Tell us about your membership" | The refusal links to `/account/membership`, which is where telling us happens. Never "Sort out your membership". |
+| What we send | "Notification" | The nav, the settings page and the inbox all say it. Never "message". |
+| Room bookings in the nav | "My room bookings" | `site-nav.ts`. "Bookings" on its own is the reader's word for tickets (section 4), and the notification topic keeps it. |
+| The officer who decides | The role in Title Case where one role decides ("the Theatre Manager", "the Accessibility Officer", "the department lead"); "an officer" where the permission decides and no one role holds it | Never "somebody". A room request has no approver role: whoever holds `rooms.write` may decide it, so "an officer" is the true word there. |
+| A declined training request | "Declined" | `saysRequestStatus()` in `shared/utils/training.ts`. "Answered" hid a refusal behind a softer word. |
+| The people working the door | "the people on the door", "anybody working the door" | Never "the door" as a shorthand for them: a member choosing what is shown is choosing who sees it. |
 
 ## 6. The shape of an error
 

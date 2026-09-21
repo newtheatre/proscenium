@@ -6,7 +6,7 @@ import { saysDay } from '#shared/utils/when'
 import type { BarCategory, CategoryPrice, ServingKind } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Categories', middleware: 'console', docs: '/docs/bar/categories' })
+definePageMeta({ layout: 'console', title: 'Product categories', middleware: 'console', docs: '/docs/bar/categories' })
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -56,7 +56,7 @@ async function save(): Promise<void> {
     else await $fetch('/api/admin/bar/categories', { method: 'POST', body })
 
     toast.add({
-      title: editing.value ? 'Category changed' : 'Category added',
+      title: editing.value ? 'Product category changed' : 'Product category added',
       description: 'The till draws its next screen from this.',
       icon: 'i-lucide-check',
       color: 'success',
@@ -80,7 +80,7 @@ async function remove(): Promise<void> {
   failure.value = null
   try {
     await $fetch(`/api/admin/bar/categories/${category.id}`, { method: 'DELETE' })
-    toast.add({ title: 'Category deleted', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: 'Product category deleted', icon: 'i-lucide-check', color: 'success' })
     removing.value = null
     await refresh()
   }
@@ -132,7 +132,7 @@ async function savePrice(): Promise<void> {
     })
     toast.add({
       title: answered.effectiveNow ? 'Default set, and in force now' : 'Default set, and waiting for its date',
-      description: 'Nothing was overwritten: this is a new row, and the ones before it stay.',
+      description: 'The price before this one stays readable, dated as it was.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -170,7 +170,7 @@ const listingFailure = useListFailure(error, 'The categories could not be read.'
 const columns: TableColumn<BarCategory>[] = [
   {
     id: 'name',
-    header: 'Category',
+    header: 'Product category',
     cell: ({ row }) => h('div', { class: 'flex items-center gap-2' }, [
       row.original.colour
         ? h('span', {
@@ -308,8 +308,8 @@ const columns: TableColumn<BarCategory>[] = [
 
     <UModal
       v-model:open="open"
-      :title="editing ? `Edit ${editing.name}` : 'Add a category'"
-      description="A category groups products on the till and decides the order they appear in."
+      :title="editing ? `Edit ${editing.name}` : 'Add a product category'"
+      description="A product category groups products on the till and decides the order they appear in."
     >
       <template #body>
         <UForm
@@ -343,7 +343,7 @@ const columns: TableColumn<BarCategory>[] = [
           <UFormField
             label="Order on the till"
             name="sort"
-            description="Lower comes first. Categories sharing a number fall back to their names."
+            description="Lower comes first. Product categories sharing a number fall back to their names."
           >
             <UInputNumber
               v-model="state.sort"
@@ -368,7 +368,7 @@ const columns: TableColumn<BarCategory>[] = [
               :loading="saving"
               data-test="category-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the product category' : 'Add a product category' }}
             </UButton>
             <UButton
               color="neutral"
@@ -385,7 +385,7 @@ const columns: TableColumn<BarCategory>[] = [
     <UModal
       :open="pricing !== null"
       :title="pricing ? `Default prices for ${pricing.name}` : ''"
-      description="A variant with no price of its own resolves here, by serving kind. An explicit variant price always wins; prices are dated rows and nothing is ever overwritten."
+      description="A serving size with no price of its own falls back here, by serving kind. A size's own price always wins. A new price starts on its date and the one before it stays readable."
       @update:open="pricing = null; failure = null"
     >
       <template #body>
@@ -472,7 +472,7 @@ const columns: TableColumn<BarCategory>[] = [
           >
             <template #empty>
               <p class="py-6 text-center text-sm text-muted">
-                No default set yet. A variant with no price of its own has nothing to fall back on.
+                No default set yet. A serving size with no price of its own has nothing to fall back on.
               </p>
             </template>
           </UTable>
@@ -483,7 +483,7 @@ const columns: TableColumn<BarCategory>[] = [
     <UModal
       :open="removing !== null"
       :title="removing ? `Delete ${removing.name}` : ''"
-      description="Nothing has ever been sold in this category, so there is no history to keep."
+      description="Nothing has ever been sold in this product category, so there is no history to keep."
       @update:open="removing = null; failure = null"
     >
       <template #body>
@@ -498,7 +498,7 @@ const columns: TableColumn<BarCategory>[] = [
           v-else
           class="text-sm text-muted"
         >
-          The category goes. No product sits in it, so nothing moves with it.
+          The product category goes. No product sits in it, so nothing moves with it.
         </p>
       </template>
 
@@ -509,7 +509,7 @@ const columns: TableColumn<BarCategory>[] = [
           data-test="confirm-delete"
           @click="remove"
         >
-          Delete it
+          Delete the product category
         </UButton>
         <UButton
           color="neutral"

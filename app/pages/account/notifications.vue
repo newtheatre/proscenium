@@ -129,8 +129,8 @@ useSeoMeta({ title: 'Notifications' })
 
     <UPageCard
       class="mt-6"
-      title="Recent messages"
-      description="Everything the theatre sent you that a preference could have silenced lands here as well, so switching email off never loses a message."
+      title="Recent notifications"
+      description="Everything we sent you that a setting above could have silenced lands here as well. Switching email off never loses a notification."
       data-test="inbox"
     >
       <p
@@ -138,7 +138,8 @@ useSeoMeta({ title: 'Notifications' })
         class="text-sm text-muted"
         data-test="inbox-empty"
       >
-        Nothing yet.
+        Nothing has come in. Anything we send you lands here, and the settings above choose
+        what that is.
       </p>
 
       <ul

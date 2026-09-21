@@ -475,7 +475,7 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
           </UFormField>
 
           <UFormField
-            label="Category"
+            label="Product category"
             required
           >
             <USelect
@@ -771,7 +771,7 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
               :data-test="`component-remove-${index}`"
               @click="components.splice(index, 1)"
             >
-              Take it out
+              Take the ingredient out
             </UButton>
           </div>
 
@@ -802,7 +802,7 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
           <USwitch
             v-model="choice.offered"
             label="It comes with a choice"
-            description="A mixer or a garnish the customer picks at the till. The chosen one depletes its own stock."
+            description="A mixer or a garnish chosen at the till. The chosen one depletes its own stock."
             data-test="setup-choice"
           />
 
@@ -874,7 +874,7 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
         variant="subtle"
         icon="i-lucide-tag"
         data-test="unpriced"
-        :description="`Nothing prices ${unpriced.join(', ')} yet, so it will be set up hidden. Fill the price in, or set a category default, and put it on the till after.`"
+        :description="`Nothing prices ${unpriced.join(', ')} yet, so it will be set up hidden. Fill the price in, or set a product category default, and put it on the till after.`"
       />
 
       <p
@@ -892,7 +892,7 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
           :disabled="blocked !== null"
           data-test="setup-submit"
         >
-          Set it up
+          Set the product up
         </UButton>
         <UButton
           color="neutral"

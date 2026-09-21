@@ -402,7 +402,7 @@ const columns: TableColumn<PassType>[] = [
           </UFormField>
 
           <UFormField
-            label="Address"
+            label="Web address"
             name="slug"
             required
             description="Lowercase words joined by hyphens."
@@ -577,7 +577,7 @@ const columns: TableColumn<PassType>[] = [
               :loading="saving"
               data-test="pass-type-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the pass type' : 'Add a pass type' }}
             </UButton>
             <UButton
               color="neutral"
@@ -620,7 +620,7 @@ const columns: TableColumn<PassType>[] = [
           data-test="confirm-delete"
           @click="remove"
         >
-          Delete it
+          Delete the pass type
         </UButton>
         <UButton
           color="neutral"
@@ -663,7 +663,7 @@ const columns: TableColumn<PassType>[] = [
           data-test="save-shows"
           @click="saveShows"
         >
-          Save it
+          Save the shows
         </UButton>
         <UButton
           color="neutral"
