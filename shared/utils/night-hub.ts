@@ -1,4 +1,5 @@
 import { formatLondon } from './london'
+import { plural } from './text'
 
 // What the show-night header and the hub's tiles read (E-112). Pure: the numbers and the wording
 // are decided here so one test holds them, and the screens only place them.
@@ -33,26 +34,55 @@ export function onShiftLabel(via: 'SHIFT' | 'OFFICER' | null, name: string | nul
 }
 
 export interface HubKpis {
-  reserved: number
+  sold: number
   capacity: number | null
-  collected: number
-  headroom: number | null
+  admitted: number
+  seatsLeft: number | null
   toCome: number
-  collectedPercent: number | null
+  admittedPercent: number | null
 }
 
-// "Walk-up headroom" is the seats nobody has reserved, which is what the door is really asking.
-// "To come" is the reserved seats still to arrive, never a negative one if admissions overrun.
+// One duty manager reads the hub, the glance, the door and the till in one interval, so the three
+// house numbers carry one word each wherever they are placed (issue 1150 item 11).
+export const HUB_KPI_LABELS = { sold: 'sold', admitted: 'in', seatsLeft: 'seats left' } as const
+
+/** An uncapped house in words a volunteer says out loud, never a symbol at arm's length. */
+export function saysSeatsLeft(seatsLeft: number | null): string {
+  return seatsLeft === null ? 'No cap' : String(seatsLeft)
+}
+
+// "Seats left" is capacity less what is sold, which is what the door is really asking. "To come"
+// is the sold seats still to arrive, never a negative one if admissions overrun.
 export function hubKpis(house: HubHouse): HubKpis {
   const percent = house.capacity && house.capacity > 0 ? Math.round((house.sold / house.capacity) * 100) : null
   return {
-    reserved: house.sold,
+    sold: house.sold,
     capacity: house.capacity,
-    collected: house.admitted,
-    headroom: house.remaining,
+    admitted: house.admitted,
+    seatsLeft: house.remaining,
     toCome: Math.max(0, house.sold - house.admitted),
-    collectedPercent: percent,
+    admittedPercent: percent,
   }
+}
+
+export interface ChecklistPhaseEntry { phase: 'PRE' | 'POST', done: boolean }
+
+// What the hub's checklist tile says instead of repeating the screen's name (issue 1150 item 3).
+// House open chooses which phase is asked about first; a phase already clear is never reported.
+export function checklistHint(entries: readonly ChecklistPhaseEntry[], houseOpen: boolean): string {
+  if (entries.length === 0) return 'Pre-show and post-show'
+  const order: ChecklistPhaseEntry['phase'][] = houseOpen ? ['POST', 'PRE'] : ['PRE', 'POST']
+  for (const phase of order) {
+    const left = entries.filter(entry => entry.phase === phase && !entry.done).length
+    if (left > 0) return `${plural(left, phase === 'PRE' ? 'pre-show item' : 'post-show item')} left`
+  }
+  return 'All ticked'
+}
+
+// The generic fallback is not a reason: reading it after a colon tells a duty manager nothing the
+// first half did not (issue 1150 item 11).
+export function staleBannerLine(reason: string | null): string {
+  return reason ? `Showing what was last loaded: ${reason}` : 'Showing what was last loaded'
 }
 
 // Whether the door can admit pass holders without thinking. Three states, because a volunteer at

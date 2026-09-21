@@ -273,7 +273,7 @@ onUnmounted(() => {
           <div class="grid grid-cols-4 gap-1 text-center">
             <div>
               <p class="font-mono text-xl font-bold tabular-nums">
-                {{ kpis.reserved }}
+                {{ kpis.sold }}
               </p>
               <p class="text-xs text-muted">
                 reserved
@@ -281,7 +281,7 @@ onUnmounted(() => {
             </div>
             <div>
               <p class="font-mono text-xl font-bold tabular-nums text-secondary">
-                {{ kpis.collected }}
+                {{ kpis.admitted }}
               </p>
               <p class="text-xs text-muted">
                 collected
@@ -297,7 +297,7 @@ onUnmounted(() => {
             </div>
             <div>
               <p class="font-mono text-xl font-bold tabular-nums text-success">
-                {{ kpis.headroom === null ? '∞' : kpis.headroom }}
+                {{ kpis.seatsLeft === null ? '∞' : kpis.seatsLeft }}
               </p>
               <p class="text-xs text-muted">
                 walk-ups OK
@@ -305,16 +305,16 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <template v-if="kpis.collectedPercent !== null">
+          <template v-if="kpis.admittedPercent !== null">
             <UProgress
-              :model-value="kpis.collectedPercent"
+              :model-value="kpis.admittedPercent"
               color="secondary"
               size="md"
               class="mt-4"
               data-test="glance-progress"
             />
             <p class="mt-2 text-sm text-muted">
-              {{ kpis.collectedPercent }}% of house collected or expected
+              {{ kpis.admittedPercent }}% of house collected or expected
             </p>
           </template>
           <p
@@ -402,11 +402,11 @@ onUnmounted(() => {
             <p>Passes covering tonight</p>
             <p class="shrink-0 font-mono">
               <span class="text-lg font-bold">{{ selected.passesCovering }}</span>
-              <span class="text-muted"> vs {{ kpis.headroom === null ? 'an uncapped house' : `${kpis.headroom} seats free` }}</span>
+              <span class="text-muted"> vs {{ kpis.seatsLeft === null ? 'an uncapped house' : `${kpis.seatsLeft} seats free` }}</span>
             </p>
           </div>
           <p class="mt-2 text-sm text-muted">
-            {{ passPressureAdvice(selected.passesCovering, kpis.headroom) }}
+            {{ passPressureAdvice(selected.passesCovering, kpis.seatsLeft) }}
           </p>
         </NightBlock>
 
@@ -642,7 +642,7 @@ onUnmounted(() => {
         icon="i-lucide-moon-star"
         color="neutral"
         variant="outline"
-        to="/tonight/checklist"
+        :to="selectedId ? `/tonight/checklist?performanceId=${selectedId}` : '/tonight/checklist'"
       />
       <p class="text-center text-xs text-muted">
         Duty manager only: releases no-shows and sends the report.

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// One of the hub's six actions: a whole card is the tap target, so a thumb in a dark foyer needs
+// One of the hub's destinations: a whole card is the tap target, so a thumb in a dark foyer needs
 // no aim at all (K-102 criterion 2). Never a spinner and never a hover state.
 const props = withDefaults(defineProps<{
   label: string
