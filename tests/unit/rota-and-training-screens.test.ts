@@ -2,8 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { ROTA_FLOW } from '#shared/utils/rota-flow'
 
 // The rota and training console screens, read as source: one workflow that links itself, a board
-// with a date window, module names on the pickers, and the grant beside the decline (issue 1151
-// item 10). What the routes do is proved in `tests/integration`.
+// with a date window, module names on the pickers, and the grant beside the decline (item 10).
 
 const read = (path: string): Promise<string> => Bun.file(path).text()
 
@@ -62,7 +61,7 @@ describe('a module is chosen by name (G-120 criterion 7)', () => {
 
   test('no picker on the records screen is a bare id', async () => {
     const source = await read(RECORDS)
-    expect(source).not.toContain('>\n            {{ module.id }}\n          </UButton>')
+    expect(source).not.toContain('{{ module.id }}')
   })
 
   test('revoking names the module rather than its id', async () => {

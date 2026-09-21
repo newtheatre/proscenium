@@ -15,6 +15,11 @@ describe('the rota flow names its own order (K-123 criterion 12)', () => {
     for (const step of ROTA_FLOW) expect(step.to).toStartWith('/rota/manage/')
   })
 
+  test('the way on to a step is a verb and its object, as a console control is', () => {
+    expect(rotaStepAfter('templates')?.onward).toBe('Fill the rota')
+    expect(rotaStepAfter('openings')?.onward).toBe('Approve the claims')
+  })
+
   test('each step but the last names the one after it', () => {
     expect(rotaStepAfter('templates')?.key).toBe('board')
     expect(rotaStepAfter('board')?.key).toBe('openings')

@@ -402,7 +402,7 @@ describe.skipIf(skip !== null)('the rota links itself step to step', () => {
     const view = await visitAsFoh('/rota/manage/templates')
     try {
       await waitFor(view, `!!document.querySelector('[data-test="rota-next-step"]')`)
-      expect(await textOf(view, '[data-test="rota-next-step"]')).toContain('Rota board')
+      expect(await textOf(view, '[data-test="rota-next-step"]')).toContain('Fill the rota')
 
       await click(view, '[data-test="rota-next-step"]')
       await waitFor(view, `!!document.querySelector('[data-test="board-from"]')`)

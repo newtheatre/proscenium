@@ -287,6 +287,8 @@ watch(modalOpen, (nowOpen) => {
       An evening with no performance, staffed like any other.
     </p>
 
+    <RotaFlow step="openings" />
+
     <AdminToolbar
       v-model:search="search"
       :placeholder="rotaOpeningsList.search?.placeholder"

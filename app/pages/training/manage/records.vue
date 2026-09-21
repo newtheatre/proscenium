@@ -365,7 +365,7 @@ watch(modalOpen, (nowOpen) => {
             :data-test="`sign-${module.id}`"
             @click="chosen = module.id"
           >
-            {{ module.id }}
+            {{ module.name }}
           </UButton>
         </div>
       </template>
@@ -419,7 +419,7 @@ watch(modalOpen, (nowOpen) => {
                 :data-test="`external-${module.id}`"
                 @click="certificate.moduleId = module.id"
               >
-                {{ module.id }}
+                {{ module.name }}
               </UButton>
             </div>
           </UFormField>
@@ -484,7 +484,7 @@ watch(modalOpen, (nowOpen) => {
 
     <UModal
       :open="revoking !== null"
-      :title="revoking ? `Revoke ${revoking.moduleId}` : ''"
+      :title="revoking ? `Revoke ${revoking.moduleName}` : ''"
       description="The record stays and stops counting. A reason is required, and it is scrubbed if the person is ever erased."
       @update:open="revoking = null"
     >
