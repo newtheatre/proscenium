@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  MAX_PARTY_SIZE,
   claimWaitingListOfferForm,
   joinWaitingListForm,
   offerExpiresAt,
   offerWouldBeBornExpired,
   partySizeMismatchReason,
+  waitingListGuestJoinForm,
+  waitingListPartyForm,
 } from '#shared/utils/waiting-list'
 
 // D-113 as pure rules. The database rule (the active-only unique index, the race-safe claim) is
@@ -81,5 +84,35 @@ describe('claimWaitingListOfferForm', () => {
       ],
     })
     expect(result.success).toBe(true)
+  })
+})
+
+// Issue 1152 item 5: the join screen validated only blanks, and the exchange list named nights
+// with no date on them.
+describe('the join screen validates before it asks (criterion 1)', () => {
+  test('a guest needs a name and an address, in the house\'s words', () => {
+    const blank = waitingListGuestJoinForm.safeParse({ partySize: 1, name: '  ', email: '' })
+    expect(blank.success).toBe(false)
+    const said = blank.success ? [] : blank.error.issues.map(issue => issue.message)
+    expect(said).toContain('Tell us the name to hold the place under.')
+    expect(said).toContain('Tell us where to send the offer.')
+    for (const message of said) expect(message).not.toContain('Invalid')
+  })
+
+  test('an address that is not one is refused on its own field', () => {
+    const wrong = waitingListGuestJoinForm.safeParse({ partySize: 2, name: 'Masha', email: 'not-an-address' })
+    expect(wrong.success).toBe(false)
+    const paths = wrong.success ? [] : wrong.error.issues.map(issue => issue.path.join('.'))
+    expect(paths).toEqual(['email'])
+  })
+
+  test('a party of none and a party over the ceiling are both refused', () => {
+    expect(waitingListPartyForm.safeParse({ partySize: 0 }).success).toBe(false)
+    expect(waitingListPartyForm.safeParse({ partySize: MAX_PARTY_SIZE + 1 }).success).toBe(false)
+    expect(waitingListPartyForm.safeParse({ partySize: MAX_PARTY_SIZE }).success).toBe(true)
+  })
+
+  test('a signed-in booker gives a party size and nothing else', () => {
+    expect(waitingListPartyForm.safeParse({ partySize: 3 }).success).toBe(true)
   })
 })

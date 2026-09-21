@@ -1,35 +1,50 @@
 <script setup lang="ts">
-// Join the waiting list for a performance (D-113 criterion 1). No availability check here: a
+import { formatLondon } from '#shared/utils/london'
+import { MAX_PARTY_SIZE, waitingListGuestJoinForm, waitingListPartyForm } from '#shared/utils/waiting-list'
+import type { FormSubmitEvent } from '@nuxt/ui'
+
+// Join the waiting list for a performance (D-113 criteria 1 and 6). No availability check here: a
 // join is refused server-side only by a duplicate, never by whether the house happens to be full.
+
+interface BookingInfo {
+  show: { slug: string, title: string }
+  performance: { startsAt: number, venueName: string }
+}
 
 const route = useRoute()
 const performanceId = computed(() => String(route.params.performanceId))
 const { account } = useAccount()
 
-const partySize = ref(1)
-const guestName = ref('')
-const guestEmail = ref('')
+// The same public read the booking screen makes, for the one thing this screen was missing: which
+// show and which night the list is for.
+const { data } = await useFetch<BookingInfo>(() => `/api/performances/${performanceId.value}/booking`)
+
+if (!data.value) {
+  throw createError({ statusCode: 404, statusMessage: 'No such performance', fatal: true })
+}
+
+const when = computed(() => formatLondon(new Date(data.value!.performance.startsAt * 1000), {
+  weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+}))
+
+const schema = computed(() => (account.value.signedIn ? waitingListPartyForm : waitingListGuestJoinForm))
+
+const state = reactive({ partySize: 1, name: '', email: '' })
 
 const submitting = ref(false)
 const notice = ref<string | null>(null)
 const joined = ref(false)
 const emailed = ref(true)
 
-async function join(): Promise<void> {
+async function join(event: FormSubmitEvent<{ partySize: number, name?: string, email?: string }>): Promise<void> {
   notice.value = null
-
-  if (!account.value.signedIn && (!guestName.value.trim() || !guestEmail.value.trim())) {
-    notice.value = 'A name and an email address are required to join as a guest'
-    return
-  }
-
   submitting.value = true
   try {
     const body: { performanceId: string, partySize: number, guest?: { name: string, email: string } } = {
       performanceId: performanceId.value,
-      partySize: partySize.value,
+      partySize: event.data.partySize,
     }
-    if (!account.value.signedIn) body.guest = { name: guestName.value.trim(), email: guestEmail.value.trim() }
+    if (!account.value.signedIn) body.guest = { name: event.data.name!.trim(), email: event.data.email!.trim() }
 
     const result = await $fetch<{ emailed: boolean }>(`/api/performances/${performanceId.value}/waiting-list`, { method: 'POST', body })
     emailed.value = result.emailed
@@ -43,7 +58,10 @@ async function join(): Promise<void> {
   }
 }
 
-useSeoMeta({ title: 'Join the waiting list' })
+useSeoMeta({
+  title: 'Join the waiting list',
+  description: () => `Join the waiting list for ${data.value?.show.title ?? 'a performance'} at the Nottingham New Theatre.`,
+})
 </script>
 
 <template>
@@ -51,9 +69,23 @@ useSeoMeta({ title: 'Join the waiting list' })
     class="max-w-2xl py-16"
     data-test="waiting-list-join-page"
   >
+    <UBreadcrumb
+      class="mb-6"
+      :items="[
+        { label: data!.show.title, to: `/shows/${data!.show.slug}` },
+        { label: 'Waiting list' },
+      ]"
+    />
+
     <h1 class="nnt-headline text-3xl">
       Join the waiting list
     </h1>
+    <p
+      class="mt-2 text-muted"
+      data-test="waiting-list-for"
+    >
+      {{ data!.show.title }} · {{ when }} · {{ data!.performance.venueName }}
+    </p>
 
     <div
       v-if="joined"
@@ -85,9 +117,12 @@ useSeoMeta({ title: 'Join the waiting list' })
       </UButton>
     </div>
 
-    <div
+    <UForm
       v-else
+      :schema="schema"
+      :state="state"
       class="mt-8 space-y-6"
+      @submit="join"
     >
       <UAlert
         v-if="notice"
@@ -99,12 +134,13 @@ useSeoMeta({ title: 'Join the waiting list' })
 
       <UFormField
         label="Party size"
-        description="Up to 10, including yourself."
+        name="partySize"
+        :description="`Up to ${MAX_PARTY_SIZE}, including yourself. An offer covers the whole party.`"
       >
         <UInputNumber
-          v-model="partySize"
+          v-model="state.partySize"
           :min="1"
-          :max="10"
+          :max="MAX_PARTY_SIZE"
           class="w-28"
           data-test="waiting-list-party-size"
         />
@@ -119,10 +155,11 @@ useSeoMeta({ title: 'Join the waiting list' })
         <div class="space-y-4">
           <UFormField
             label="Name"
+            name="name"
             required
           >
             <UInput
-              v-model="guestName"
+              v-model="state.name"
               class="w-full"
               autocomplete="name"
               data-test="waiting-list-guest-name"
@@ -130,11 +167,12 @@ useSeoMeta({ title: 'Join the waiting list' })
           </UFormField>
           <UFormField
             label="Email address"
+            name="email"
             required
             description="We'll email you here the moment a seat is offered."
           >
             <UInput
-              v-model="guestEmail"
+              v-model="state.email"
               type="email"
               class="w-full"
               autocomplete="email"
@@ -145,12 +183,12 @@ useSeoMeta({ title: 'Join the waiting list' })
       </UCard>
 
       <UButton
+        type="submit"
         :loading="submitting"
         data-test="waiting-list-submit"
-        @click="join"
       >
         Join the waiting list
       </UButton>
-    </div>
+    </UForm>
   </UContainer>
 </template>

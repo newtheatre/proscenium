@@ -15,5 +15,7 @@ export default defineEventHandler(async (event) => {
     namedTicketLines(reservationId),
   ])
 
-  return { ticketTypes, lines }
+  // The same cap the write path applies, so the form never offers a quantity it would refuse
+  // (D-104 criterion 2, D-110 criterion 6).
+  return { ticketTypes, lines, cap: await configValue(event, 'PUBLIC_ORDER_SEAT_CAP') }
 })

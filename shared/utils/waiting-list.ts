@@ -8,8 +8,22 @@ export const WAITING_LIST_STATUSES = ['WAITING', 'OFFERED', 'CLAIMED', 'LAPSED',
 export type WaitingListStatus = (typeof WAITING_LIST_STATUSES)[number]
 
 // A structural ceiling: `PUBLIC_ORDER_SEAT_CAP` still governs what the claim itself may book.
-const MAX_PARTY_SIZE = 10
+export const MAX_PARTY_SIZE = 10
 const MAX_CLAIM_LINES = 20
+
+// What the join screen checks before it asks the server, in the house's words: neither a Zod
+// default nor the server's own field path reaches a reader (D-113 criterion 6, K-128).
+export const waitingListPartyForm = z.object({
+  partySize: z.number().int()
+    .min(1, 'A place is held for at least one person.')
+    .max(MAX_PARTY_SIZE, `A waiting-list place holds up to ${MAX_PARTY_SIZE} people. For a larger party, contact the box office.`),
+})
+
+export const waitingListGuestJoinForm = waitingListPartyForm.extend({
+  name: z.string().trim().min(1, 'Tell us the name to hold the place under.').max(200),
+  email: z.string().trim().min(1, 'Tell us where to send the offer.').max(320)
+    .refine(value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), 'That does not look like an email address. Check it and try again.'),
+})
 
 export const joinWaitingListForm = z.strictObject({
   performanceId: z.string().trim().min(1, 'Say which performance you mean'),
