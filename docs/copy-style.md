@@ -87,6 +87,18 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Exception | Closed over, exempted | A checklist item answered with a reason instead of a tick. The control is "Make an exception", the record reads "Exception: …", and the night report prints the reason. |
 | Backstage code | Tonight's code, board code | The six digits a crew device joins the backstage board with. Revealed on request with "Show the code" and put away with "Hide the code". |
 | Ticks itself | System-verified | A checklist item that reads the live data rather than being hand-ticked. |
+| Booker | Patron, customer, theatregoer | Somebody with a booking. Anyone else on the public site is a visitor, and somebody current with the SU is a member (K-128, issue 1151 item 12). |
+| Serving size | Variant, in anything a person reads | A size a product sells at. The catalogue row says "Serving size", a sentence says "size", and the till says "size" (0083). |
+| Show category | Category, on its own in the box office | The grouping a show belongs to. |
+| Product category | Category, on its own in the bar | The grouping a product sits in on the till. |
+| Stock group | Category, for a stocked item | The free text that groups the order list. It is not a product category. |
+| Need | Category, for an access profile | One of the standard access needs an access profile ticks. |
+| Retire | Archive, for a catalogue thing | Off the till or the estate, its history kept. "Bring back" reverses it. |
+| Hide | Retire, for something reversible | Off the till for now. "Put on the till" reverses it. |
+| Close | Retire, for a period or a night | A period or a night stops taking entries. |
+| Remove | Delete, retire, for something with no history | A template, a lead, a note, a poster: nothing to keep. |
+| Revoke | Remove, for a grant | A grant is taken away. |
+| Web address | Address, for a slug | The last part of a public page's address, lowercase words joined by hyphens. A postal address is a "postal address" and an email is an "email address". |
 
 ## 5. The shape of a refusal
 
