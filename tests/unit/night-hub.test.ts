@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { firstNameOf, groupedBoardCode, hubKpis, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, checklistHint, firstNameOf, groupedBoardCode, hubKpis, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
 
 // The show-night hub's wording and numbers (E-112, E-127, issue 905). The screens place these; what
 // they say is decided here, so one test holds it.
@@ -42,27 +42,92 @@ describe('the on-shift badge (0044)', () => {
 })
 
 describe('the three tiles the door actually asks about (E-112 criterion 1)', () => {
-  test('a capped house splits into reserved, collected and walk-up headroom', () => {
+  test('a capped house splits into sold, in and seats left', () => {
     expect(hubKpis({ sold: 61, admitted: 37, capacity: 86, remaining: 25 })).toEqual({
-      reserved: 61,
+      sold: 61,
       capacity: 86,
-      collected: 37,
-      headroom: 25,
+      admitted: 37,
+      seatsLeft: 25,
       toCome: 24,
-      collectedPercent: 71,
+      admittedPercent: 71,
     })
   })
 
-  test('an uncapped house says so rather than guessing a headroom', () => {
+  test('an uncapped house says so rather than guessing the seats left', () => {
     expect(hubKpis({ sold: 12, admitted: 3, capacity: null, remaining: null })).toMatchObject({
       capacity: null,
-      headroom: null,
-      collectedPercent: null,
+      seatsLeft: null,
+      admittedPercent: null,
     })
   })
 
-  test('more admitted than reserved never shows a negative number to come', () => {
+  test('more admitted than sold never shows a negative number to come', () => {
     expect(hubKpis({ sold: 4, admitted: 6, capacity: 10, remaining: 6 }).toCome).toBe(0)
+  })
+})
+
+// One duty manager reads the hub, the glance, the door and the till in one interval, so the three
+// house numbers carry one word each wherever they appear (issue 1150 item 11).
+describe('one vocabulary for the house numbers (issue 1150 item 11)', () => {
+  test('the labels are sold, in and seats left', () => {
+    expect(HUB_KPI_LABELS).toEqual({ sold: 'sold', admitted: 'in', seatsLeft: 'seats left' })
+  })
+
+  test('an uncapped house reads as words a volunteer says out loud, never a symbol', () => {
+    expect(saysSeatsLeft(null)).toBe('No cap')
+  })
+
+  test('a capped house reads as the count itself', () => {
+    expect(saysSeatsLeft(25)).toBe('25')
+    expect(saysSeatsLeft(0)).toBe('0')
+  })
+})
+
+// The hub's checklist tile says what is left rather than repeating the screen's name (issue 1150
+// item 3). Which phase is counted follows house open, the same boundary the warning banner uses.
+describe('the checklist tile\'s hint (E-114, issue 1150 item 3)', () => {
+  const pre = (done: boolean): { phase: 'PRE', done: boolean } => ({ phase: 'PRE', done })
+  const post = (done: boolean): { phase: 'POST', done: boolean } => ({ phase: 'POST', done })
+
+  test('before house open it counts the pre-show items left', () => {
+    expect(checklistHint([pre(false), pre(false), pre(false), pre(true), post(false)], false)).toBe('3 pre-show items left')
+  })
+
+  test('one item left is singular', () => {
+    expect(checklistHint([pre(false), pre(true)], false)).toBe('1 pre-show item left')
+  })
+
+  test('after house open it counts the post-show items left', () => {
+    expect(checklistHint([pre(true), post(false), post(false)], true)).toBe('2 post-show items left')
+  })
+
+  test('nothing outstanding in either phase reads as done', () => {
+    expect(checklistHint([pre(true), post(true)], false)).toBe('All ticked')
+    expect(checklistHint([pre(true), post(true)], true)).toBe('All ticked')
+  })
+
+  // A phase settled while the other is not says what is actually left, never "All ticked".
+  test('the other phase is named once this one is clear', () => {
+    expect(checklistHint([pre(true), post(false)], false)).toBe('1 post-show item left')
+    expect(checklistHint([pre(false), post(true)], true)).toBe('1 pre-show item left')
+  })
+
+  // A checklist the hub could not read is not a checklist with nothing left on it.
+  test('nothing read at all names the destination rather than claiming it is clear', () => {
+    expect(checklistHint([], false)).toBe('Pre-show and post-show')
+  })
+})
+
+// The generic fallback is not a reason, and reading "That did not work. Try again." after a colon
+// tells a duty manager nothing the first half did not (issue 1150 item 11).
+describe('the stale banner (E-112 criterion 3)', () => {
+  test('a reason worth reading follows the colon', () => {
+    expect(staleBannerLine('The connection dropped.')).toBe('Showing what was last loaded: The connection dropped.')
+  })
+
+  test('no reason leaves the sentence alone', () => {
+    expect(staleBannerLine(null)).toBe('Showing what was last loaded')
+    expect(staleBannerLine('')).toBe('Showing what was last loaded')
   })
 })
 

@@ -87,13 +87,13 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
     }
   }, CASE_TIMEOUT_MS)
 
-  // The hub spends its whole screen on the six actions rather than a sticky slot, so the target
-  // floor is what governs there: every tile is a tap target in its own right (E-112 criterion 1).
+  // The hub spends its whole screen on the night's destinations rather than a sticky slot, so the
+  // target floor governs there: every tile is a tap target in its own right (E-112 criterion 1).
   test('every tile on the hub is a thumb-sized target', async () => {
     const view = await openView(PHONE)
     try {
       await visit(view, `${app.baseURL}/tonight`)
-      for (const selector of ['[data-test="tile-scan"]', '[data-test="tile-glance"]', '[data-test="tile-passes"]', '[data-test="tile-backstage"]', '[data-test="tile-emergency"]', '[data-test="tile-contacts"]']) {
+      for (const selector of ['[data-test="tile-scan"]', '[data-test="tile-glance"]', '[data-test="tile-passes"]', '[data-test="tile-backstage"]', '[data-test="tile-emergency"]', '[data-test="tile-contacts"]', '[data-test="tile-checklist"]', '[data-test="tile-age-checks"]']) {
         const tile = await boxOf(view, selector)
         expect(`${selector}: ${tile.height >= NIGHT_TAP_TARGET_PX && tile.width >= NIGHT_TAP_TARGET_PX}`).toBe(`${selector}: true`)
       }
