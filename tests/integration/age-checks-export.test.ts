@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { recordAgeCheck, supersedeAgeCheck } from '#server/utils/age-checks'
-import { exportQuery } from '#server/utils/age-checks-export'
+import { exportQuery, numberedPdfRows } from '#server/utils/age-checks-export'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
+import type { AgeCheckExportRow } from '#server/utils/age-checks-export'
 import type { AgeCheckInput } from '#shared/utils/age-checks'
 import type { SQL } from 'drizzle-orm'
 
@@ -76,6 +77,41 @@ describe('nothing is omitted (criterion 2)', () => {
       expect(found.map(row => row.id).sort()).toEqual(['ac-1', 'ac-2'])
       expect(found.find(row => row.id === 'ac-1')?.supersededBy).toBe('ac-2')
       expect(found.find(row => row.id === 'ac-2')?.supersedesId).toBe('ac-1')
+    })
+  })
+})
+
+describe('the PDF numbers its own rows (K-128 item 8)', () => {
+  test('the supersedes columns point at a row number, never an id', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      run(database, recordAgeCheck(officer, accepted, 'ac-1', new Date(WITHIN_RANGE * 1000)).statement)
+      run(database, supersedeAgeCheck(officer, 'ac-1', accepted, 'ac-2', new Date((WITHIN_RANGE + 60) * 1000)).statement)
+
+      const found = run(database, exportQuery(WITHIN_RANGE - 3600, WITHIN_RANGE + 3600)) as unknown as AgeCheckExportRow[]
+      const printed = numberedPdfRows(found)
+
+      expect(printed.map(row => row.row)).toEqual(['1', '2'])
+      expect(printed[0]!.supersededBy).toBe('row 2')
+      expect(printed[1]!.supersedes).toBe('row 1')
+      for (const row of printed) {
+        expect(row.supersedes).not.toContain('ac-')
+        expect(row.supersededBy).not.toContain('ac-')
+      }
+    })
+  })
+
+  test('a link to an entry outside the period says so rather than printing an id', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      run(database, recordAgeCheck(officer, accepted, 'ac-old', new Date(OUT_OF_RANGE * 1000)).statement)
+      run(database, supersedeAgeCheck(officer, 'ac-old', accepted, 'ac-new', new Date(WITHIN_RANGE * 1000)).statement)
+
+      const found = run(database, exportQuery(WITHIN_RANGE - 3600, WITHIN_RANGE + 3600)) as unknown as AgeCheckExportRow[]
+      const printed = numberedPdfRows(found)
+
+      expect(printed).toHaveLength(1)
+      expect(printed[0]!.supersedes).toBe('Outside this period')
     })
   })
 })
