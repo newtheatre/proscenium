@@ -108,7 +108,10 @@ Open questions:
   4. Tender is card or comp only; the theatre takes no cash and the till offers no cash tender.
   5. The typed cross-check is the permanent flow: SP-1 was refused SumUp developer access, so no
      reader integration exists to fall back from (F-201 resolved as won't-build).
-- Source: Prompt Book F-1, D-3, Get-In constraint 1; audit PR-5, PR-12.
+  6. The figure to key into the reader is the one number the confirmation is read for: it is shown
+     at display size in the mono face, with tabular figures, and the words around it stay short
+     enough to read across a bar. Nothing else on the confirmation competes with it.
+- Source: Prompt Book F-1, D-3, Get-In constraint 1; audit PR-5, PR-12; issue 1150 item 6.
 
 ## F-105: Atomic sale write
 
@@ -152,7 +155,13 @@ Open questions:
      inspection through module E.
   5. Every sale path (card, comp, tab) runs the same prompt: no route sells a restricted item
      without the flow.
-- Source: Prompt Book F-1, E-3; audit PR-9, PR-12.
+  6. The prompt comes before the drink is poured, not at the charge: a restricted product carries a
+     visible mark on its tile, carried by text and not by colour alone, and the first restricted
+     line to enter a basket opens the prompt naming that product. A basket whose check has already
+     been accepted does not ask again in the same sale. A refusal at the tap takes the restricted
+     lines back out of the basket, says on screen what is not being sold, and is written to the
+     register there and then, since the sale that would otherwise carry it may never happen.
+- Source: Prompt Book F-1, E-3; audit PR-9, PR-12; issue 1150 item 5.
 
 ## F-107: Allergen notes one tap from every product
 

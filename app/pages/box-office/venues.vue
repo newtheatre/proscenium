@@ -417,7 +417,7 @@ const columns: TableColumn<AdminVenue>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -442,7 +442,7 @@ const columns: TableColumn<AdminVenue>[] = [
           v-else
           class="text-sm text-muted"
         >
-          This cannot be undone, and there is nothing behind it to lose.
+          The venue goes. No performance and no shift is attached to it.
         </p>
       </template>
 
@@ -460,7 +460,7 @@ const columns: TableColumn<AdminVenue>[] = [
           variant="ghost"
           @click="removing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

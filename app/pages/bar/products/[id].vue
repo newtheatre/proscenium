@@ -731,7 +731,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -845,7 +845,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               variant="ghost"
               @click="pouring = null"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -916,7 +916,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
                 variant="ghost"
                 @click="pricing = null"
               >
-                Back
+                {{ CONFIRM_BACK_LABEL }}
               </UButton>
             </div>
           </UForm>
@@ -1023,7 +1023,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               variant="ghost"
               @click="choosing = null"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -1134,7 +1134,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               variant="ghost"
               @click="creatingGroup = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -1159,7 +1159,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
           v-else
           class="text-sm text-muted"
         >
-          This cannot be undone, and there is nothing behind it to lose.
+          The size goes. The product and its other sizes stay as they are.
         </p>
       </template>
 
@@ -1177,7 +1177,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
           variant="ghost"
           @click="removing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

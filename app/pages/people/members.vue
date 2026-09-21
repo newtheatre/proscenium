@@ -340,12 +340,16 @@ onMounted(() => {
   void load()
   void countWaiting()
 })
+
+// A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
+// is shown wherever the action was taken.
+const modalOpen = computed(() => declining.value !== null || granting.value)
 </script>
 
 <template>
   <div class="space-y-6">
     <UAlert
-      v-if="failure"
+      v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -457,6 +461,14 @@ onMounted(() => {
       @update:open="value => { if (!value) declining = null }"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure.message"
+        />
         <UForm
           :schema="claimDeclineForm"
           :state="decline"
@@ -500,6 +512,14 @@ onMounted(() => {
       description="What they bought at the SU, and when."
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure.message"
+        />
         <UForm
           ref="grantForm"
           :schema="recordMembership"

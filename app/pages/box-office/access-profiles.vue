@@ -148,6 +148,14 @@ const columns: TableColumn<Summary>[] = [
     }, () => 'Review'),
   },
 ]
+
+// A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
+// is shown wherever the action was taken.
+const modalOpen = computed(() => reviewing.value !== null || declining.value)
+
+watch(modalOpen, (nowOpen) => {
+  if (!nowOpen) failure.value = null
+})
 </script>
 
 <template>
@@ -161,7 +169,7 @@ const columns: TableColumn<Summary>[] = [
     />
 
     <UAlert
-      v-if="failure"
+      v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -229,6 +237,14 @@ const columns: TableColumn<Summary>[] = [
       @update:open="value => { if (!value) reviewing = null }"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <div
           v-if="detailLoading || !detail"
           class="flex items-center gap-3 text-muted"

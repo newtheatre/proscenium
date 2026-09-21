@@ -177,12 +177,20 @@ async function submitAdd(): Promise<void> {
 }
 
 const roleOptions = SHIFT_ROLES.map(role => ({ label: saysShiftRole(role), value: role }))
+
+// A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
+// is shown wherever the action was taken.
+const modalOpen = computed(() => assigning.value !== null || adding.value !== null || unconfirming.value !== null)
+
+watch(modalOpen, (nowOpen) => {
+  if (!nowOpen) failure.value = null
+})
 </script>
 
 <template>
   <div class="space-y-6">
     <UAlert
-      v-if="failure"
+      v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -334,6 +342,14 @@ const roleOptions = SHIFT_ROLES.map(role => ({ label: saysShiftRole(role), value
       @update:open="assigning = null"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <div class="space-y-4">
           <UInputMenu
             class="w-full"
@@ -387,6 +403,14 @@ const roleOptions = SHIFT_ROLES.map(role => ({ label: saysShiftRole(role), value
       @update:open="value => { if (!value) adding = null }"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <div
           v-if="adding"
           class="space-y-4"

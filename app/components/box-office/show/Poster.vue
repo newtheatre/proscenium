@@ -140,7 +140,7 @@ async function remove(): Promise<void> {
           variant="ghost"
           @click="removing = false"
         >
-          Keep it
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

@@ -225,6 +225,14 @@ const columns: TableColumn<Department>[] = [
     ]),
   },
 ]
+
+// A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
+// is shown wherever the action was taken.
+const modalOpen = computed(() => open.value || appointing.value !== null || standingDown.value !== null)
+
+watch(modalOpen, (nowOpen) => {
+  if (!nowOpen) failure.value = null
+})
 </script>
 
 <template>
@@ -241,7 +249,7 @@ const columns: TableColumn<Department>[] = [
     />
 
     <UAlert
-      v-if="failure"
+      v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -310,6 +318,14 @@ const columns: TableColumn<Department>[] = [
       description="The code is what modules reference, so it is fixed once the department exists."
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <UForm
           :schema="editing ? departmentForm : newDepartmentForm"
           :state="state"
@@ -375,7 +391,7 @@ const columns: TableColumn<Department>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -389,6 +405,14 @@ const columns: TableColumn<Department>[] = [
       @update:open="appointing = null"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <UFormField
           label="Who leads it"
           description="They need an account. A person may lead more than one department."
@@ -415,7 +439,7 @@ const columns: TableColumn<Department>[] = [
           variant="ghost"
           @click="appointing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

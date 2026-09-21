@@ -226,3 +226,91 @@ describe('a screen that offers the module catalogue to choose from reads all of 
     expect(partial).toEqual([])
   })
 })
+
+// The show-night kit keeps its own register (design language rule 3), so the till's modals are
+// not console chrome and the modal frame does not reach them.
+const SHOW_NIGHT_COMPONENTS = 'app/components/till/'
+
+// Each modal on its own, so a rule about one does not read its neighbour's markup.
+function modalsIn(source: string): string[] {
+  const blocks: string[] = []
+  const tag = /<UModal\b|<\/UModal>/g
+  let depth = 0
+  let start = 0
+  let match: RegExpExecArray | null
+  while ((match = tag.exec(source)) !== null) {
+    if (match[0] === '</UModal>') {
+      depth--
+      if (depth === 0) blocks.push(source.slice(start, match.index))
+    }
+    else {
+      if (depth === 0) start = match.index
+      depth++
+    }
+  }
+  return blocks
+}
+
+async function modals(): Promise<{ path: string, modals: string[] }[]> {
+  const files = [...await screens()]
+  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: COMPONENTS, onlyFiles: true })) {
+    // One spelling whatever the platform separates directories with, so an allow-list matches.
+    const path = join(COMPONENTS, entry).replaceAll('\\', '/')
+    if (!path.startsWith(SHOW_NIGHT_COMPONENTS)) files.push({ path, source: await Bun.file(path).text() })
+  }
+  return files
+    .map(file => ({ path: file.path, modals: modalsIn(file.source) }))
+    .filter(file => file.modals.length > 0)
+    .sort((a, b) => a.path.localeCompare(b.path))
+}
+
+const hasModal = async (test: (modal: string) => boolean): Promise<string[]> =>
+  (await modals()).filter(file => file.modals.some(test)).map(file => file.path)
+
+// The words the console spelled its way out with, so a sixth is caught as well as a relapse.
+const SPELLED_CANCEL = /<UButton\b[^>]*>\s*(?:Cancel|Back|Keep it|Close|OK|Never mind)\s*<\/UButton>/
+
+// A form modal whose Save still sits in the body. Moving each into the footer is mechanical and
+// changes no flow; the list may shrink and may not grow.
+const FORM_MODAL_ACTIONS_IN_THE_BODY = [
+  'app/components/box-office/show/Performances.vue',
+  'app/components/training/ModuleEditor.vue',
+  'app/pages/admin/audit.vue',
+  'app/pages/admin/backups.vue',
+  'app/pages/bar/categories.vue',
+  'app/pages/bar/discounts.vue',
+  'app/pages/bar/products/[id].vue',
+  'app/pages/bar/products/index.vue',
+  'app/pages/bar/stock/index.vue',
+  'app/pages/box-office/access-profiles.vue',
+  'app/pages/box-office/content-warnings.vue',
+  'app/pages/box-office/pass-types.vue',
+  'app/pages/box-office/seasons.vue',
+  'app/pages/box-office/show-categories.vue',
+  'app/pages/box-office/shows/index.vue',
+  'app/pages/box-office/ticket-types.vue',
+  'app/pages/box-office/venues.vue',
+  'app/pages/people/fellows.vue',
+  'app/pages/people/members.vue',
+  'app/pages/rooms/manage/other.vue',
+  'app/pages/rota/manage/approvals.vue',
+  'app/pages/training/manage/departments.vue',
+  'app/pages/training/manage/sessions/index.vue',
+]
+
+describe('every console modal wears one frame (K-123 criterion 8, 0032)', () => {
+  test('no modal spells its own way out', async () => {
+    expect((await modals()).length).toBeGreaterThan(0)
+    expect(await hasModal(modal => SPELLED_CANCEL.test(modal))).toEqual([])
+  })
+
+  test('a title states what the modal does rather than asking', async () => {
+    expect(await hasModal(modal => /\stitle="[^"]*\?"/.test(modal))).toEqual([])
+  })
+
+  test('a form modal keeps its actions in the footer', async () => {
+    const inTheBody = (await hasModal(modal => /<UForm\b/.test(modal) && !modal.includes('#footer')))
+      .filter(path => !FORM_MODAL_ACTIONS_IN_THE_BODY.includes(path))
+    expect(inTheBody).toEqual([])
+  })
+})

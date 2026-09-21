@@ -107,6 +107,12 @@ const {
   grandTotalPence,
   isVariantRestricted,
   needsAgeCheck,
+  passedAgeCheck,
+  askingAgeCheckFor,
+  refusedLinesNote,
+  refusalRecordFailure,
+  acceptAgeCheck,
+  refuseAgeCheck,
   lineAmount,
   saleBody,
   expectedAfter,
@@ -123,6 +129,7 @@ const {
   ticketsPence,
   walkUpsPence,
   requestPrice: body => $fetch<PricedBasket>('/api/till/price', { method: 'POST', body }),
+  recordAgeCheck: body => $fetch('/api/tonight/age-checks', { method: 'POST', body }),
 })
 
 // A collapsed reminder above the pinned actions, so checking the basket does not mean scrolling
@@ -169,8 +176,21 @@ const {
   resetSelections,
 })
 
-// Which path the Challenge 25 prompt was opened for, so its answer goes the same way.
-const chargeVia = ref<'reader' | 'sumup' | 'comp'>('reader')
+// Which path the Challenge 25 prompt was opened for, so its answer goes the same way. A tap
+// answers nothing but the check itself: the sale is still being built (F-106 criterion 6).
+const chargeVia = ref<'tap' | 'reader' | 'sumup' | 'comp'>('reader')
+
+watch(askingAgeCheckFor, (product) => {
+  if (!product) return
+  chargeVia.value = 'tap'
+  ageCheckStep.value = 'choose'
+})
+
+// Dismissed rather than answered: the restricted line is still in the basket with no outcome,
+// and the charge button asks again.
+watch(ageCheckStep, (step) => {
+  if (step === 'closed') askingAgeCheckFor.value = null
+})
 
 // A comp is bar lines only, at whatever it is, never on a tab, and never asked twice over a
 // SumUp hand-off already in flight for the same basket (F-110 criteria 1, 4).
@@ -213,7 +233,7 @@ function sendComp(): void {
   void sendCompRequest(basket.value.map(line => ({ variantId: line.variantId, qty: line.qty, choiceItemId: line.choiceItemId })))
 }
 
-function giveComp(ageCheck: InlineAgeCheckInput | null = null): void {
+function giveComp(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.value): void {
   if (!ageCheck && compNeedsAgeCheck.value) {
     chargeVia.value = 'comp'
     ageCheckStep.value = 'choose'
@@ -236,7 +256,7 @@ function dismissComp(): void {
 
 // The submission step (F-104, F-105, 0004). A restricted line with no outcome yet opens the
 // Challenge 25 prompt (F-106); a tab holder chosen below charges credit, not the reader (F-108).
-async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void> {
+async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.value): Promise<void> {
   if (!readyToCharge()) return
   if (!ageCheck && needsAgeCheck.value) {
     chargeVia.value = 'reader'
@@ -275,7 +295,7 @@ async function charge(ageCheck: InlineAgeCheckInput | null = null): Promise<void
 
 // The hand-off (F-124 criterion 1): the basket is held on an attempt and the SumUp app opens;
 // what this screen remembers is enough to bring the basket back if the app says no.
-async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = null): Promise<void> {
+async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.value): Promise<void> {
   if (!readyToCharge()) return
   if (!ageCheck && needsAgeCheck.value) {
     chargeVia.value = 'sumup'
@@ -316,8 +336,15 @@ function timeOf(at: number): string {
   return formatLondon(new Date(at * 1000), { timeStyle: 'short' })
 }
 
-// Whichever the modal answers with, the same submission the reader, SumUp or comp path already had.
+// Whichever the modal answers with, the same submission the reader, SumUp or comp path already
+// had. An answer to a tap settles the check for this sale and nothing else.
 function submitAgeCheck(outcome: InlineAgeCheckInput): void {
+  if (outcome.outcome === 'ACCEPTED') acceptAgeCheck(outcome)
+  if (chargeVia.value === 'tap') {
+    if (outcome.outcome === 'REFUSED') void refuseAgeCheck(outcome)
+    ageCheckStep.value = 'closed'
+    return
+  }
   if (chargeVia.value === 'comp') giveComp(outcome)
   else void (chargeVia.value === 'sumup' ? chargeOnSumUp(outcome) : charge(outcome))
 }
@@ -443,6 +470,23 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           Nothing is on the till yet. Price a size in the catalogue, and it appears here.
         </p>
 
+        <UAlert
+          v-if="refusedLinesNote"
+          data-test="age-check-not-sold"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-id-card"
+          :description="refusedLinesNote"
+        />
+
+        <UAlert
+          v-if="refusalRecordFailure"
+          data-test="age-check-record-failure"
+          color="error"
+          variant="subtle"
+          :description="refusalRecordFailure"
+        />
+
         <TillSumUpWaiting
           v-if="!charged"
           v-model:smp-tx-code-typed="smpTxCodeTyped"
@@ -553,13 +597,22 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           class="space-y-4"
           data-test="charge-confirmation"
         >
-          <UAlert
-            color="success"
-            variant="subtle"
-            icon="i-lucide-check"
-            :title="charged?.tab ? `On ${charged.tab.holderName}'s tab` : charged?.viaSumup ? 'Taken on SumUp' : 'Key this into the reader'"
-            :description="charged ? saysMoney(charged.totalPence) : ''"
-          />
+          <!-- The one number read across a bar, so it carries the block and the words stay
+               short (F-104 criterion 6). -->
+          <div
+            class="rounded-xl bg-elevated px-4 py-5 text-center"
+            data-test="charge-amount"
+          >
+            <p class="text-sm text-muted">
+              {{ charged?.tab ? `On ${charged.tab.holderName}'s tab` : charged?.viaSumup ? 'Taken on SumUp' : 'Key this into the reader' }}
+            </p>
+            <p
+              class="mt-1 font-mono text-5xl font-bold tabular-nums"
+              data-test="charge-amount-figure"
+            >
+              {{ charged ? saysMoney(charged.totalPence) : '' }}
+            </p>
+          </div>
           <UAlert
             v-if="charged && charged.tickets.length"
             data-test="tickets-collected-note"
@@ -712,6 +765,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
 
     <TillChallenge25Modal
       v-model:step="ageCheckStep"
+      :product="askingAgeCheckFor"
       :charging="chargeVia === 'comp' ? compGivingBusy : charging"
       @accept="submitAgeCheck"
       @refuse="submitAgeCheck"

@@ -459,7 +459,7 @@ const columns: TableColumn<TicketType>[] = [
               variant="ghost"
               @click="open = false"
             >
-              Back
+              {{ CONFIRM_BACK_LABEL }}
             </UButton>
           </div>
         </UForm>
@@ -484,7 +484,7 @@ const columns: TableColumn<TicketType>[] = [
           v-else
           class="text-sm text-muted"
         >
-          This cannot be undone, and there is nothing behind it to lose.
+          The type goes, and those prices with it. Every other ticket type stays.
         </p>
       </template>
 
@@ -502,7 +502,7 @@ const columns: TableColumn<TicketType>[] = [
           variant="ghost"
           @click="removing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

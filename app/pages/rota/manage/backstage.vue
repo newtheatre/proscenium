@@ -189,12 +189,20 @@ async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
     failure.value = refusalText(error)
   }
 }
+
+// A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
+// is shown wherever the action was taken.
+const modalOpen = computed(() => typeOpen.value || presetOpen.value || retiringType.value !== null || retiringPreset.value !== null)
+
+watch(modalOpen, (nowOpen) => {
+  if (!nowOpen) failure.value = null
+})
 </script>
 
 <template>
   <div class="space-y-6">
     <UAlert
-      v-if="failure"
+      v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -343,6 +351,14 @@ async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
       :title="editingType ? 'Edit milestone type' : 'Add a milestone type'"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <div class="space-y-4">
           <UFormField label="Label">
             <UInput
@@ -378,7 +394,7 @@ async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
           variant="ghost"
           @click="typeOpen = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
@@ -388,6 +404,14 @@ async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
       :title="editingPreset ? 'Edit preset' : 'Add a preset'"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure"
+        />
         <div class="space-y-4">
           <UFormField
             label="Button label"
@@ -436,7 +460,7 @@ async function setPresetActive(preset: Preset, active: boolean): Promise<void> {
           variant="ghost"
           @click="presetOpen = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

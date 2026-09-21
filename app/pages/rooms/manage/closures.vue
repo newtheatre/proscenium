@@ -170,12 +170,16 @@ const columns: TableColumn<Closure>[] = [
 ]
 
 onMounted(loadRooms)
+
+// A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
+// is shown wherever the action was taken.
+const modalOpen = computed(() => closing.value || removing.value !== null)
 </script>
 
 <template>
   <div class="space-y-6">
     <UAlert
-      v-if="failure"
+      v-if="failure && !modalOpen"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -246,6 +250,14 @@ onMounted(loadRooms)
       description="Anything booked in the span is cancelled and its member told."
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure.message"
+        />
         <div class="space-y-4">
           <UFormField
             label="Which room"
@@ -339,18 +351,26 @@ onMounted(loadRooms)
           variant="ghost"
           @click="closing = false"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
 
     <UModal
       :open="removing !== null"
-      title="Reopen this room?"
+      title="Reopen this room"
       :description="removing ? `${removing.room ?? 'Every room'}, ${saysSpan(new Date(removing.startsAt * 1000), new Date(removing.endsAt * 1000))}` : ''"
       @update:open="removing = null"
     >
       <template #body>
+        <UAlert
+          v-if="failure"
+          data-test="failure"
+          class="mb-4"
+          color="error"
+          variant="subtle"
+          :description="failure.message"
+        />
         <p class="text-sm">
           The room becomes bookable again. Bookings this closure cancelled stay cancelled and are
           not restored, because their slots may be somebody else's by now.
@@ -369,7 +389,7 @@ onMounted(loadRooms)
           variant="ghost"
           @click="removing = null"
         >
-          Leave it closed
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

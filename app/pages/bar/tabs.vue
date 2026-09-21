@@ -248,14 +248,14 @@ const columns: TableColumn<HolderRow>[] = [
           variant="ghost"
           @click="closeView"
         >
-          Close
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
 
     <UModal
       :open="voiding !== null"
-      title="Void this charge?"
+      title="Void this charge"
       description="Written once and never edited: a void is a reversing credit, on the record with why."
       @update:open="closeVoid"
     >
@@ -301,7 +301,7 @@ const columns: TableColumn<HolderRow>[] = [
           variant="ghost"
           @click="closeVoid"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>

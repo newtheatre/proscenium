@@ -260,7 +260,7 @@ const columns: TableColumn<StockMovement>[] = [
           variant="ghost"
           @click="reversing = null"
         >
-          Back
+          {{ CONFIRM_BACK_LABEL }}
         </UButton>
       </template>
     </UModal>
