@@ -201,3 +201,78 @@ describe('a date off the console is read in London (K-127, K-128, issue 1153 ite
     expect(found).toEqual([])
   })
 })
+
+// 0084: the member shell is calm, its headings are two sizes and its pages take a named width.
+// The layout and the settings wrapper are held to it too, being what draws the shell.
+const MEMBER_LAYOUT = /layout:\s*['"`]member['"`]/
+const MEMBER_SHELL = ['app/layouts/member.vue', 'app/components/AccountSettings.vue']
+const MEMBER_WIDTHS = ['MEMBER_PAGE_READING', 'MEMBER_PAGE_WORKING', 'MEMBER_PAGE_WIDE']
+const HEADING = /<h([1-6])\b([\s\S]*?)>/g
+const CONTAINER = /<UContainer\b([\s\S]*?)>/g
+
+async function memberPages(): Promise<string[]> {
+  const pages: string[] = []
+  for (const file of (await appFiles()).filter(path => path.startsWith('app/pages/') && path.endsWith('.vue'))) {
+    if (MEMBER_LAYOUT.test(await Bun.file(file).text())) pages.push(file)
+  }
+  return pages
+}
+
+function templateOf(source: string): string {
+  const start = source.search(/^<template>$/m)
+  return start === -1 ? '' : source.slice(start)
+}
+
+describe('the member shell is calm (0084, K-127, issue 1153 item 1)', () => {
+  test('the shell is fifteen pages and the two files that draw it', async () => {
+    expect((await memberPages()).length).toBeGreaterThanOrEqual(15)
+  })
+
+  test('no member screen reaches for the expressive kit', async () => {
+    const offenders: string[] = []
+    for (const file of [...await memberPages(), ...MEMBER_SHELL]) {
+      const source = await Bun.file(file).text()
+      source.split('\n').forEach((line, index) => {
+        for (const match of line.matchAll(/\bnnt-[a-z-]+/g)) offenders.push(`${file}:${index + 1}  ${match[0]}`)
+      })
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('a heading is the page title, a section or a heading inside one', async () => {
+    const sizes: Record<string, string> = {
+      1: 'text-2xl font-semibold text-highlighted',
+      2: 'text-lg font-semibold',
+      3: 'text-base font-semibold',
+    }
+    const offenders: string[] = []
+    for (const file of [...await memberPages(), ...MEMBER_SHELL]) {
+      const template = templateOf(await Bun.file(file).text())
+      for (const heading of template.matchAll(HEADING)) {
+        const level = heading[1] ?? ''
+        const classes = /class="([^"]*)"/.exec(heading[2] ?? '')?.[1] ?? ''
+        const wanted = sizes[level]
+        if (wanted === undefined) offenders.push(`${file}  an h${level} below the third level`)
+        else if (!classes.includes(wanted)) offenders.push(`${file}  an h${level} that is not "${wanted}": "${classes}"`)
+        if (classes.includes('uppercase')) offenders.push(`${file}  an uppercase eyebrow, which is the show-night register`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('every page takes a named width and none spells its own', async () => {
+    const offenders: string[] = []
+    for (const file of await memberPages()) {
+      const source = await Bun.file(file).text()
+      const named = MEMBER_WIDTHS.some(width => source.includes(width))
+      const delegates = source.includes('<AccountSettings')
+      const drawsNothing = !templateOf(source).includes('<UContainer')
+      if (!named && !delegates && !drawsNothing) offenders.push(`${file}  names no width`)
+      for (const container of templateOf(source).matchAll(CONTAINER)) {
+        const classes = /class="([^"]*)"/.exec(container[1] ?? '')?.[1] ?? ''
+        if (/\bmax-w-|\bpy-/.test(classes)) offenders.push(`${file}  a container spelling its own width: "${classes}"`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
