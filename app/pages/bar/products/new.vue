@@ -385,6 +385,18 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
     test: 'shape-recipe',
   },
 ]
+
+// The three cards are one radio group: arrows move between them and only the focused card is in
+// the tab order, which is what a group of radios does (K-101 criterion 5).
+const shapeCards = useTemplateRef<HTMLElement>('shapeCards')
+const focused = ref(0)
+
+function moveFocus(step: number): void {
+  focused.value = (focused.value + step + SHAPES.length) % SHAPES.length
+  nextTick(() => {
+    shapeCards.value?.querySelectorAll<HTMLElement>('[role="radio"]')[focused.value]?.focus()
+  })
+}
 </script>
 
 <template>
@@ -408,13 +420,29 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
         on the product's own screen.
       </p>
 
-      <div class="grid gap-4 sm:grid-cols-3">
+      <div
+        ref="shapeCards"
+        class="grid gap-4 sm:grid-cols-3"
+        role="radiogroup"
+        aria-label="What shape it is"
+      >
         <UCard
-          v-for="card in SHAPES"
+          v-for="(card, index) in SHAPES"
           :key="card.shape"
           class="cursor-pointer"
           :data-test="card.test"
+          role="radio"
+          :aria-checked="shape === card.shape"
+          :aria-label="card.title"
+          :aria-describedby="`${card.test}-description`"
+          :tabindex="index === focused ? 0 : -1"
           @click="start(card.shape)"
+          @keydown.enter.prevent="start(card.shape)"
+          @keydown.space.prevent="start(card.shape)"
+          @keydown.left.prevent="moveFocus(-1)"
+          @keydown.up.prevent="moveFocus(-1)"
+          @keydown.right.prevent="moveFocus(1)"
+          @keydown.down.prevent="moveFocus(1)"
         >
           <div class="space-y-2">
             <UIcon
@@ -424,7 +452,10 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
             <h2 class="font-medium">
               {{ card.title }}
             </h2>
-            <p class="text-sm text-muted">
+            <p
+              :id="`${card.test}-description`"
+              class="text-sm text-muted"
+            >
               {{ card.description }}
             </p>
           </div>

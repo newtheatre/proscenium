@@ -176,6 +176,8 @@ const columns: TableColumn<BarCategory>[] = [
         ? h('span', {
             'class': 'size-3 rounded-full border border-default',
             'style': { backgroundColor: row.original.colour },
+            'role': 'img',
+            'aria-label': `Colour ${row.original.colour}`,
             'data-test': `category-swatch-${row.original.id}`,
           })
         : null,

@@ -426,12 +426,14 @@ const columns: TableColumn<Room>[] = [
                     <UInput
                       v-model="hours[day.index]!.opens"
                       type="time"
+                      :aria-label="`${day.name} opens`"
                       :data-test="`room-opens-${day.index}`"
                     />
                     <span class="text-sm text-muted">to</span>
                     <UInput
                       v-model="hours[day.index]!.closes"
                       type="time"
+                      :aria-label="`${day.name} closes`"
                       :data-test="`room-closes-${day.index}`"
                     />
                   </template>

@@ -652,6 +652,7 @@ const columns: TableColumn<PassType>[] = [
           value-key="value"
           multiple
           placeholder="Search the programme"
+          aria-label="Shows"
           class="w-full"
           data-test="pass-type-shows-editor"
         />
