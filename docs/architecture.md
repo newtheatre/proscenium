@@ -640,7 +640,8 @@ per section (`04.box-office/`), each with a `.navigation.yml` naming it and an `
 and pages `<n>.<slug>.md` inside; Nuxt Content's own rules give the URL, dropping the ordering
 prefix and the index file (`/docs/box-office/desk`). `shared/utils/docs-paths.ts` holds that
 rule once, for the tests and the check. Every page carries `title`, `description`, `module`,
-`updatedOn` and `updatedBy`.
+`updatedOn` and `updatedBy`. `docs/operator-documentation.md` is the runbook for whoever edits
+a page: the tree's naming rules, the shape of a page, the words, the pictures and the checks.
 
 `app/layouts/docs.vue` is the reading surface: the member shell's header with a search button,
 `UPage` with the collection's navigation tree in a `UPageAside`, and `UContentSearch` loaded in

@@ -13,6 +13,13 @@ These screens are where the theatre's rules are set, where every privileged acti
 recorded, and where the IT Manager proves the backups restore. They sit under **Manage,
 System** in the console, and the console itself opens on an overview at **Manage, Overview**.
 
+## If something goes wrong
+
+- **"Your sign-in has ended"**: the overview was opened without signing in. Sign in and it loads.
+- **"You do not have permission to do that"**: you hold no administrative permission, or not
+  the one this screen needs. Ask the IT Manager to check your role; a shift alone never opens
+  the console.
+
 ## Who reaches the console
 
 The console is reached by anybody holding a standing permission that is administrative rather
@@ -68,17 +75,7 @@ The rest of the overview arrives with the stories that need it, and the screen s
   ::card{icon="i-lucide-database-backup" title="Backups" to="/docs/system/backups"}
   What is backed up, how a restore works, and the drill that proves it.
   ::
-  ::card{icon="i-lucide-book-open" title="This documentation" to="/docs/system/this-documentation"}
-  How these pages are written, pictured, checked and kept current.
-  ::
 ::
-
-## If something goes wrong
-
-- **"Your sign-in has ended"**: the overview was opened without signing in. Sign in and it loads.
-- **"You do not have permission to do that"**: you hold no administrative permission, or not
-  the one this screen needs. Ask the IT Manager to check your role; a shift alone never opens
-  the console.
 
 ## Related pages
 

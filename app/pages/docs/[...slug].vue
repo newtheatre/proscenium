@@ -2,6 +2,7 @@
 import { findPageHeadline } from '@nuxt/content/utils'
 import type { ContentNavigationItem } from '@nuxt/content'
 import { resolvePolicyTree, tokensInTree } from '#shared/utils/policy-tokens'
+import { saysDay } from '#shared/utils/when'
 import type { PolicyValues } from '#shared/utils/policy-tokens'
 
 // One page per screen, signed in only: it names permissions, thresholds and internal screens
@@ -99,7 +100,7 @@ useSeoMeta({
         >
           {{ page!.module }}
         </UBadge>
-        <span data-test="docs-updated">Last updated {{ page!.updatedOn }} by {{ page!.updatedBy }}</span>
+        <span data-test="docs-updated">Last updated {{ saysDay(page!.updatedOn) }} by {{ page!.updatedBy }}</span>
       </div>
 
       <ContentRenderer :value="{ ...page!, body }" />

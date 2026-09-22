@@ -904,12 +904,63 @@ Opening one person's history from a row (`/comms/operations/accounts/[id]`) answ
 query with types, dates and outcomes only, never a message body; every such view writes a
 `notifications.history.viewed` audit entry regardless of what it finds.
 
+## The restore drill (J-107 criterion 5)
+
+Run by the IT Manager at the command line, on the cadence `BACKUP_DRILL_INTERVAL_DAYS` sets, and
+recorded afterwards on `/admin/backups`, which is where the overdue flag and the drill log live.
+The operator page for that screen is `/docs/system/backups`; it points here for the commands.
+
+You need the Cloudflare credentials from the committee password manager (the account id and an
+API token that can read the production database and create, write and delete a D1 database of
+its own, exported as `NUXT_HUB_CLOUDFLARE_ACCOUNT_ID` and `NUXT_HUB_CLOUDFLARE_API_TOKEN`), a
+checkout of this repository with its dependencies installed (`wrangler` is one of them), and
+access to the Cloudflare dashboard for the bucket. Nothing in the drill writes to production;
+write down the time you start.
+
+**Time Travel restores a database in place.** `wrangler d1 time-travel restore <database>
+--bookmark=<bookmark>` takes a database back to one of its own bookmarks; there is no source
+database to name, and `d1 export` has no bookmark option, so production's history cannot be
+poured into a second database. The drill therefore copies production with an export, loads the
+copy into a scratch database, and exercises Time Travel on that scratch database.
+
+1. **Export production, read only.** `bunx wrangler d1 export unified --remote --output
+   drill.sql`. Nothing is written to production by this, and the file it leaves is a copy of
+   personal data: step 7 deletes it.
+2. **Create the scratch database.** `bunx wrangler d1 create unified-drill`. Give it that name
+   every time, so a stray database is recognisable as a drill leftover.
+3. **Load the copy.** `bunx wrangler d1 execute unified-drill --remote --file=drill.sql`. Note
+   the minute you started at step 1 and the minute this finishes: the difference is the
+   **Minutes to restore** the form asks for.
+4. **Reconcile.** The Monday manifest is in the `unified-blob` bucket, in the Cloudflare
+   dashboard under R2, at `backups/<date>.json`; open the most recent one. It lists every table
+   with its row count and `ledgerTotalPence`. Against `unified-drill`, run
+   `bunx wrangler d1 execute unified-drill --remote --command="SELECT sum(total_pence) FROM
+   ledger_entries"` and a row count per table, and compare both with the manifest. A difference
+   of a few rows in tables that change daily is expected between Monday and the export; a table
+   missing, a count out by hundreds, or a ledger total that disagrees is a finding.
+5. **Exercise Time Travel, on the scratch database.** `bunx wrangler d1 time-travel info
+   unified-drill` prints its own current bookmark; delete a row from it, then
+   `bunx wrangler d1 time-travel restore unified-drill --bookmark=<bookmark>` and check the row
+   is back. That is the mechanism itself proved, on a database nobody depends on. Never name
+   `unified` in a restore command: restoring production is the disaster procedure, not the drill.
+6. **Record the drill** on `/admin/backups`, whether it passed or failed. A failure is the
+   finding, not a reason to leave it out; the operator page describes the form.
+7. **Delete the scratch database and the export file.** `bunx wrangler d1 delete unified-drill`
+   and remove `drill.sql` from the machine you ran it on. Both are full copies of personal data
+   sitting outside the erasure path, so neither may be kept once the drill is recorded.
+
+**If a migration has gone wrong on production**, that is not a drill. The migration job's run
+summary carries the exact restore command with its own bookmark; restore first, then fix the
+migration and let the job run again. Applying migrations, above, is the procedure.
+
+The weekly export itself is a scheduled task: it writes the manifest every Monday at 05:00 and,
+on failure, a `backup.export-failed` audit entry attributed to the system. It can be run by hand
+against the deployed worker by posting to the `backup` scheduled task.
+
 ## Not built yet
 
-The restore drill procedure now lives in the in-app operator documentation at
-`/docs/system/backups` (J-109, J-107 criterion 5, 0076), command by command, and
-matches the paragraph above. The retention sweep is built and documented above; what it still
-waits on is a warning cadence and, in December, an arming (A-126, K-111).
+The retention sweep is built and documented above; what it still waits on is a warning cadence
+and, in December, an arming (A-126, K-111).
 
 H-106's own criterion 2, the manual re-send action, still waits: `retry_payload` is cleared by
 the time a row reaches `FAILED_FINAL`, so resending has to rebuild the message from source, per

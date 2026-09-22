@@ -7,9 +7,9 @@ import { PERMISSIONS } from '#shared/utils/roles'
 // The wiki is read by whoever is on shift, so it reads in their words (J-109, issue 1154 items 3
 // and 4). The machine's own vocabulary is held here as public-copy.test.ts holds the public shell's.
 
-// The notification catalogue's subject is the type name itself, and item 5 of the same issue
-// turns that page into something a Communications Officer reads. Its codes are counted there.
-const CATALOGUE_PAGE = `${DOCS_ROOT}/11.communications/3.notification-types.md`
+// The send log shows a message's type against every line, so the page that decodes one names
+// them, as Settings names a key. It is the only page that may, and it names nothing else.
+const CATALOGUE_PAGE = `${DOCS_ROOT}/11.communications/3.what-the-theatre-sends.md`
 
 // Settings is the one screen that shows a key, in the font it stores it in, so the page for it
 // names the row the reader is looking at (copy-style section 10, 0012).
