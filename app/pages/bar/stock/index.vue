@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import {
   HAND_ENTERED_KINDS,
   REASONS_BY_KIND,
+  STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   STOCK_UNITS,
   movementEntryForm,
   says,
@@ -57,7 +58,7 @@ interface ItemState {
   allergenNotes?: string
 }
 
-const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: true })
+const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT })
 
 type HandEnteredKind = Exclude<StockMovementKind, 'SALE' | 'COMP' | 'STOCKTAKE' | 'TRANSFER' | 'REVERSAL'>
 
@@ -122,7 +123,7 @@ function edit(item: StockItem | null): void {
     containerMl: item?.containerMl ?? undefined,
     parQty: item?.parQty ?? undefined,
     category: item?.category ?? undefined,
-    ageRestricted: item?.ageRestricted ?? true,
+    ageRestricted: item?.ageRestricted ?? STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
     allergenNotes: item?.allergenNotes ?? undefined,
   })
   open.value = true
@@ -756,9 +757,8 @@ const columns: TableColumn<StockItem>[] = [
         <p class="text-sm">
           {{ hiding?.item.name }} is poured by
           {{ hiding?.products.map(product => product.name).join(', ') }}.
-          Retiring it hides those products at the same time, so nothing is left on the till
-          pouring something the bar no longer stocks. Their recipes, prices and history are
-          untouched, and putting the item back is a separate decision.
+          Retiring it hides those products too. Their recipes, prices and history are
+          untouched, and bringing the item back is a separate decision.
         </p>
       </template>
 

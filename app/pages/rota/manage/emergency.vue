@@ -156,7 +156,7 @@ const columns: TableColumn<VenueCard>[] = [
           'size': 'sm', 'color': 'neutral', 'variant': 'ghost',
           'data-test': `edit-emergency-${row.original.venueId}`,
           'onClick': () => edit(row.original),
-        }, () => (row.original.id ? 'Edit' : 'Set it up'))),
+        }, () => (row.original.id ? 'Edit' : 'Set up the card'))),
   },
 ]
 </script>
@@ -241,7 +241,7 @@ const columns: TableColumn<VenueCard>[] = [
           />
 
           <UFormField
-            label="Address"
+            label="Postal address"
             description="Written to be read aloud to a 999 call handler, including the postcode."
           >
             <UTextarea

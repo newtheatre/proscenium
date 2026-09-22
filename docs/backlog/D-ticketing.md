@@ -516,7 +516,11 @@ Open questions:
   4. Access and companion ticket types are flagged as such and never appear in any public payload
      (D-128).
   5. Creation, archive and price changes are audited with actor and old and new values.
-- Source: Prompt Book D-1, D-8; audit PR-7
+  6. A field that is only settable at creation, the access kind and who may book a type online,
+     is shown read-only on the edit form rather than hidden from it: a type edited without them
+     on screen reads as a type that has neither.
+- Source: Prompt Book D-1, D-8; audit PR-7; criterion 6 from issue 1151 item 10, 21 September
+  2026.
 
 ## D-120: Price overrides with NULL-means-inherit, snapshots on tickets
 
@@ -597,6 +601,9 @@ Open questions:
      assembled on a screen.
   7. A pass a member may ask for is shown with what it costs and what it is, beside its name. A
      list of names alone asks somebody to request a thing they cannot price.
+  8. The covered shows are chosen at creation and changed afterwards by criterion 4's own action,
+     so the edit form names them read-only and says where they are changed, rather than leaving
+     the row looking as though it covers nothing.
 - Source: Prompt Book D-7; audit PR-8; Get-In constraint 7, part 2 (passes: carry, now MVP)
 
 ## D-124: Pass issue at the desk and online request-and-collect
@@ -785,6 +792,8 @@ Open questions:
      (0040), and their API routes stay under `/api/admin/**`. The venue emergency card is show
      night's screen at `/rota/manage/venues/[id]/emergency` (E-113): this story administers the
      venue row and links to that card rather than building it.
+  8. That link is made once, above the table, not once a row: a link repeated on every row that
+     goes to the same place reads as a link to each venue's own card and is not one.
 - Source: Committee direction, 4 September 2026. The programme schema shipped these tables as
   Wave 0 contract (d) with no screen over them, and the build order recorded the gap.
 
@@ -827,9 +836,13 @@ Open questions:
      carrying the reservation-only note (0005), and a danger zone holding the actions that take a
      show away from the public. The poster, the checklist and the danger zone sit in a rail beside
      the sections, in view whichever section is open.
+  9. A section unmounts when another is opened, so unsaved detail edits are never thrown away
+     silently: leaving details with a change on it asks first, and going back leaves the change
+     where it was. Where a section cannot offer its own action, the reason is on screen beside
+     the control and named by it, not left to a control that does nothing when pressed.
 - Source: Pre-cutover review, 10 September 2026. The detail page is the largest in the app at
   over a thousand lines. Criteria 6 to 8 added 13 September 2026 from the committee's
-  `admin-show-editor` mockup.
+  `admin-show-editor` mockup; criterion 9 from issue 1151 item 10, 21 September 2026.
 
 ## D-201: Named allocations reserve capacity without tickets
 

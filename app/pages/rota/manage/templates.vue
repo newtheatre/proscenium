@@ -251,7 +251,7 @@ const columns: TableColumn<VenueTemplate>[] = [
             'variant': 'ghost',
             'data-test': `edit-template-${row.original.venueId}`,
             'onClick': () => edit(row.original),
-          }, () => (row.original.slots.length === 0 ? 'Set it up' : 'Edit')),
+          }, () => (row.original.slots.length === 0 ? 'Set up the template' : 'Edit')),
           row.original.slots.length === 0
             ? null
             : h(UButton, {
@@ -451,7 +451,7 @@ watch(modalOpen, (nowOpen) => {
           data-test="template-submit"
           @click="save"
         >
-          Save it
+          Save the template
         </UButton>
         <UButton
           color="neutral"

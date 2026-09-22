@@ -403,11 +403,11 @@ async function submit(): Promise<void> {
           </UFormField>
 
           <p class="text-sm text-muted">
-            Or add them by their address. Somebody who has never signed in gets an account they can
+            Or add them by their email address. Somebody who has never signed in gets an account they can
             claim later, and their training is waiting on it.
           </p>
 
-          <UFormField label="Address">
+          <UFormField label="Email address">
             <UInput
               v-model="address"
               type="email"

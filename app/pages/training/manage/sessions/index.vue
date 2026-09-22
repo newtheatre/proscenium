@@ -419,7 +419,7 @@ const columns: TableColumn<Session>[] = [
       variant="subtle"
       icon="i-lucide-unplug"
       :title="listFailure.message"
-      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :description="READ_AGAIN"
       :actions="listFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listFailure.enrolPath, color: 'error' }] : []"
     />
 
@@ -685,7 +685,7 @@ const columns: TableColumn<Session>[] = [
     <UModal
       v-model:open="logging"
       title="Log a session"
-      description="Teaching that already happened, away from the system. Nothing is written until you have seen exactly what it would create, one record per person per module, dated to the day it was taught."
+      description="Teaching that already happened, recorded after the fact. You see exactly what it creates before anything is kept: one record per person per module, dated to the day it was taught."
     >
       <template #body>
         <div class="space-y-6">
@@ -775,7 +775,7 @@ const columns: TableColumn<Session>[] = [
                 this training is waiting on it.
               </p>
               <div class="grid gap-3 sm:grid-cols-2">
-                <UFormField label="Address">
+                <UFormField label="Email address">
                   <UInput
                     v-model="address"
                     type="email"
@@ -832,7 +832,7 @@ const columns: TableColumn<Session>[] = [
                 data-test="delivery-preview"
                 @click="preview"
               >
-                Show me what this creates
+                Preview the records
               </UButton>
             </div>
           </div>

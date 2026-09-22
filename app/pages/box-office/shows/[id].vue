@@ -38,11 +38,16 @@ const seasons = computed(() => data.value?.seasons ?? [])
 const warnings = computed(() => data.value?.warnings ?? [])
 const vocabulary = computed(() => data.value?.vocabulary ?? [])
 
+// Details holds typed copy and unmounts when another section opens (D-132 criterion 9).
+const details = useDiscardGuard()
+
 // One section at a time, named in the URL so a link opens where it says (D-132 criterion 1).
 const active = computed({
   get: () => showTab(route.query.tab),
   set: (tab: string) => {
-    void router.push({ query: { ...route.query, tab } })
+    if (tab === showTab(route.query.tab)) return
+    const move = (): void => void router.push({ query: { ...route.query, tab } })
+    if (showTab(route.query.tab) !== 'details' || !details.hold(move)) move()
   },
 })
 
@@ -188,6 +193,7 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
             :categories="categories"
             :seasons="seasons"
             @saved="refresh()"
+            @changed="value => details.changed.value = value"
           />
 
           <BoxOfficeShowPerformances
@@ -311,6 +317,15 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
       :loading="saving"
       :failure="unpublishFailure"
       @confirm="takeOffSale"
+    />
+
+    <ConfirmModal
+      v-model:open="details.asking.value"
+      name="discard-details"
+      title="Leave the details unsaved"
+      verb="Discard the changes"
+      consequence="The details you have typed are not saved yet. Going back leaves them where they are."
+      @confirm="details.discard()"
     />
   </div>
 </template>

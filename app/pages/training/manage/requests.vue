@@ -63,7 +63,7 @@ function requesterColumns(moduleId: string, moduleName: string): TableColumn<Req
   return [
     {
       id: 'person',
-      header: 'Who is asking',
+      header: 'Member',
       cell: ({ row }) => h('div', {}, [
         h('span', { class: 'font-medium' }, row.original.name),
         row.original.note ? h('p', { class: 'text-muted' }, row.original.note) : null,
@@ -118,7 +118,7 @@ watch(modalOpen, (nowOpen) => {
       icon="i-lucide-unplug"
       data-test="load-failed"
       title="The board could not be read"
-      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :description="READ_AGAIN"
     />
 
     <div
@@ -220,7 +220,7 @@ watch(modalOpen, (nowOpen) => {
           class="text-sm text-muted"
         >
           {{ answering.name }} asked for {{ answering.moduleName }}. They are shown what you write, so
-          tell them where it stands rather than only that it is declined.
+          tell them where it stands, not only that it is declined.
         </p>
 
         <UFormField

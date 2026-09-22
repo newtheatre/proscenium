@@ -387,7 +387,7 @@ watch(modalOpen, (nowOpen) => {
           data-test="type-submit"
           @click="saveType"
         >
-          Save it
+          Save the call type
         </UButton>
         <UButton
           color="neutral"
@@ -453,7 +453,7 @@ watch(modalOpen, (nowOpen) => {
           data-test="preset-submit"
           @click="savePreset"
         >
-          Save it
+          Save the preset
         </UButton>
         <UButton
           color="neutral"
