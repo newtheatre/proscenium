@@ -87,3 +87,17 @@ describe('what a screen says', () => {
     expect(saysPassTypeStatus('CLOSED')).toBe('Closed')
   })
 })
+
+// D-123 criterion 8, issue 1151 item 10: covered shows are changed by their own action, and the
+// edit form hid them, so a pass being edited read as one covering nothing.
+describe('the covered shows are named on the edit form, read-only', () => {
+  const SCREEN = 'app/pages/box-office/pass-types.vue'
+
+  test('the edit form carries a read-only line for what the pass covers', async () => {
+    expect(await Bun.file(SCREEN).text()).toContain('pass-type-shows-fixed')
+  })
+
+  test('that line says where the covered shows are changed instead', async () => {
+    expect(await Bun.file(SCREEN).text()).toContain('Covered shows')
+  })
+})

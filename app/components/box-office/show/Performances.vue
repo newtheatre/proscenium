@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
 import { saysWhen } from '#shared/utils/when'
 import {
+  addPerformanceRefusal,
   bookingWindowSource,
   performanceScreenForm,
   resolveBookingClosesHours,
@@ -235,6 +236,7 @@ const venueOptions = computed(() => props.venues
   .filter(one => !one.archived || one.id === editingPerformance.value?.venueId)
   .map(one => ({ label: one.name, value: one.id })))
 const bookableVenues = computed(() => props.venues.filter(one => !one.archived))
+const addRefusal = computed(() => addPerformanceRefusal(bookableVenues.value.length))
 
 function windowOf(one: AdminPerformance): string {
   const inherited = { bookingClosesHoursBefore: props.show.bookingClosesHoursBefore }
@@ -394,13 +396,33 @@ const columns: TableColumn<AdminPerformance>[] = [
         <UButton
           data-test="add-performance"
           icon="i-lucide-plus"
-          :disabled="bookableVenues.length === 0"
+          :disabled="addRefusal !== null"
+          :aria-describedby="addRefusal === null ? undefined : 'add-performance-blocked'"
           @click="editPerformance(null)"
         >
           Add a performance
         </UButton>
       </template>
     </AdminToolbar>
+
+    <UAlert
+      v-if="addRefusal"
+      id="add-performance-blocked"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-map-pin"
+      data-test="add-performance-blocked"
+    >
+      <template #description>
+        {{ addRefusal }}
+        <NuxtLink
+          to="/box-office/venues"
+          class="underline"
+        >
+          Go to venues
+        </NuxtLink>
+      </template>
+    </UAlert>
 
     <UTable
       :data="rows"

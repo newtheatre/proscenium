@@ -165,3 +165,24 @@ describe('what a screen says', () => {
     expect(saysPrice(1250)).toBe('£12.50')
   })
 })
+
+// D-119 criterion 6, issue 1151 item 10: the access kind and the online restriction are set at
+// creation, and the edit form hid both, so an edit read as a type that had neither.
+describe('a field settable only at creation is read-only on the edit form, never absent', () => {
+  const SCREEN = 'app/pages/box-office/ticket-types.vue'
+  const screen = (): Promise<string> => Bun.file(SCREEN).text()
+
+  test('the edit form names the access kind the type was created with', async () => {
+    expect(await screen()).toContain('ticket-type-access-fixed')
+  })
+
+  test('the edit form names who may book it online', async () => {
+    expect(await screen()).toContain('ticket-type-restriction-fixed')
+  })
+
+  test('both read through the wording helpers rather than as the stored value', async () => {
+    const source = await screen()
+    expect(source).toContain('saysAccessKind')
+    expect(source).toContain('saysRestriction')
+  })
+})
