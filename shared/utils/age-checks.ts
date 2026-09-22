@@ -4,7 +4,9 @@ import { constraintRefusal } from './constraint-refusal'
 // The Challenge 25 register's vocabulary (E-118). Nothing here reads a request or the database;
 // `server/utils/age-checks.ts` is where an entry is actually written and read.
 
-export const AGE_CHECK_OUTCOMES = ['ACCEPTED', 'REFUSED'] as const
+// NOT_REQUIRED is visibly over 25: no ID was asked for, so the entry names neither an ID nor a
+// reason, and its description is optional (E-118 criterion 1, 0085).
+export const AGE_CHECK_OUTCOMES = ['ACCEPTED', 'REFUSED', 'NOT_REQUIRED'] as const
 export type AgeCheckOutcome = (typeof AGE_CHECK_OUTCOMES)[number]
 
 export const ID_TYPES = ['PASSPORT', 'DRIVING_LICENCE', 'PASS_CARD', 'OTHER'] as const
@@ -14,16 +16,9 @@ export const REFUSAL_REASONS = ['NO_ID_SHOWN', 'ID_LOOKED_FALSE', 'APPEARED_UNDE
 export type RefusalReason = (typeof REFUSAL_REASONS)[number]
 
 export function saysOutcome(outcome: AgeCheckOutcome): string {
-  return outcome === 'ACCEPTED' ? 'ID accepted' : 'Refused'
-}
-
-// The till's third answer (F-106 criterion 7, 0085): no ID was asked for, so nothing reaches the
-// register. Only a sale ever carries it; the register's own forms below refuse it.
-export const INLINE_AGE_CHECK_OUTCOMES = [...AGE_CHECK_OUTCOMES, 'NOT_REQUIRED'] as const
-export type InlineAgeCheckOutcome = (typeof INLINE_AGE_CHECK_OUTCOMES)[number]
-
-export function saysInlineOutcome(outcome: InlineAgeCheckOutcome): string {
-  return outcome === 'NOT_REQUIRED' ? 'Visibly over 25' : saysOutcome(outcome)
+  if (outcome === 'ACCEPTED') return 'ID accepted'
+  if (outcome === 'REFUSED') return 'Refused'
+  return 'Visibly over 25'
 }
 
 export function saysIdType(idType: IdType): string {
@@ -44,74 +39,62 @@ const DESCRIPTION_LIMIT = 200
 const NOTES_LIMIT = 1000
 
 // The description is guidance, not enforcement: nothing here can tell a name from a description,
-// so the form's own copy is what keeps one out (E-118 criterion 2).
+// so the form's own copy is what keeps one out (E-118 criterion 2). Empty only on NOT_REQUIRED.
 const outcomeFields = {
   outcome: z.enum(AGE_CHECK_OUTCOMES),
   idType: z.enum(ID_TYPES).nullish().transform(value => value ?? null),
   reason: z.enum(REFUSAL_REASONS).nullish().transform(value => value ?? null),
-  description: z.string().trim().min(1, 'Describe who you checked, never by name').max(DESCRIPTION_LIMIT),
+  description: z.string().trim().max(DESCRIPTION_LIMIT).nullish().transform(value => (value ?? '').trim()),
   notes: z.string().trim().max(NOTES_LIMIT).nullish().transform(value => (value ?? '').trim() || null),
 }
 
-// Shared between a standalone check and one folded into a sale (F-106): what an outcome requires
-// is the same wherever it is asked, so the predicate is written once and wired to both shapes.
-interface OutcomeShape { outcome: InlineAgeCheckOutcome, idType: IdType | null, reason: RefusalReason | null }
+// Shared between a standalone check, a correction and one folded into a sale (F-106): what an
+// outcome requires is the same wherever it is asked, so each rule is written once.
+interface OutcomeShape { outcome: AgeCheckOutcome, idType: IdType | null, reason: RefusalReason | null, description: string }
 const acceptedNeedsIdType = (input: OutcomeShape): boolean => input.outcome !== 'ACCEPTED' || input.idType !== null
 const refusedNeedsReason = (input: OutcomeShape): boolean => input.outcome !== 'REFUSED' || input.reason !== null
 const acceptedHasNoReason = (input: OutcomeShape): boolean => input.outcome !== 'ACCEPTED' || input.reason === null
 const refusedHasNoIdType = (input: OutcomeShape): boolean => input.outcome !== 'REFUSED' || input.idType === null
+const notRequiredNamesNeither = (input: OutcomeShape): boolean => input.outcome !== 'NOT_REQUIRED' || (input.idType === null && input.reason === null)
+const checkedNeedsDescription = (input: OutcomeShape): boolean => input.outcome === 'NOT_REQUIRED' || input.description.length > 0
 
-// Whether the standalone register has what an entry needs, which is what the submit reads: the
-// same pair of shape rules the schema refines, so the screen never offers a write it would refuse.
-export function ageCheckReady(form: { outcome: AgeCheckOutcome, idType: IdType | null, reason: RefusalReason | null, description: string }): boolean {
-  if (form.description.trim().length === 0) return false
-  return form.outcome === 'ACCEPTED' ? form.idType !== null : form.reason !== null
+const SHAPE_RULES = [
+  [checkedNeedsDescription, 'description', 'Describe who you checked, never by name'],
+  [notRequiredNamesNeither, 'idType', 'Visibly over 25 names no ID and no reason: nothing was checked'],
+  [acceptedNeedsIdType, 'idType', 'Say what ID was shown'],
+  [refusedNeedsReason, 'reason', 'Say why you refused'],
+  [acceptedHasNoReason, 'reason', 'An accepted check has no refusal reason'],
+  [refusedHasNoIdType, 'idType', 'A refusal names no ID: nothing was accepted'],
+] as const
+
+function shaped<T extends z.ZodType<OutcomeShape>>(schema: T): T {
+  return SHAPE_RULES.reduce((refined, [rule, path, message]) => refined.refine(rule, { path: [path], message }) as T, schema)
 }
 
-export const ageCheckForm = z.object({
+// Whether the register has what an entry needs, which is what the submit reads: the same shape
+// rules the schema refines, so the screen never offers a write it would refuse.
+export function ageCheckReady(form: OutcomeShape): boolean {
+  return SHAPE_RULES.every(([rule]) => rule({ ...form, description: form.description.trim() }))
+}
+
+export const ageCheckForm = shaped(z.object({
   performanceId: z.string().min(1, 'Say which performance you mean').nullish().transform(value => value ?? null),
   ...outcomeFields,
   product: z.string().trim().max(200).nullish().transform(value => (value ?? '').trim() || null),
-}).refine(acceptedNeedsIdType, { path: ['idType'], message: 'Say what ID was shown' })
-  .refine(refusedNeedsReason, { path: ['reason'], message: 'Say why you refused' })
-  .refine(acceptedHasNoReason, { path: ['reason'], message: 'An accepted check has no refusal reason' })
-  .refine(refusedHasNoIdType, { path: ['idType'], message: 'A refusal names no ID: nothing was accepted' })
+}))
 
 export type AgeCheckInput = z.output<typeof ageCheckForm>
 
 // Folded into a till sale (F-106): the performance is the till's own to resolve, and the product
 // is the basket's restricted lines, not a second thing for staff to type.
-interface InlineShape extends OutcomeShape { description: string }
-const notRequiredCarriesNothing = (input: InlineShape): boolean => input.outcome !== 'NOT_REQUIRED' || (input.idType === null && input.reason === null)
-const registerEntryNeedsDescription = (input: InlineShape): boolean => input.outcome === 'NOT_REQUIRED' || input.description.length > 0
-export const inlineAgeCheckForm = z.object({
-  ...outcomeFields,
-  outcome: z.enum(INLINE_AGE_CHECK_OUTCOMES),
-  description: z.string().trim().max(DESCRIPTION_LIMIT).nullish().transform(value => (value ?? '').trim()),
-})
-  .refine(registerEntryNeedsDescription, { path: ['description'], message: 'Describe who you checked, never by name' })
-  .refine(notRequiredCarriesNothing, { path: ['idType'], message: 'Visibly over 25 names no ID and no reason: nothing was checked' })
-  .refine(acceptedNeedsIdType, { path: ['idType'], message: 'Say what ID was shown' })
-  .refine(refusedNeedsReason, { path: ['reason'], message: 'Say why you refused' })
-  .refine(acceptedHasNoReason, { path: ['reason'], message: 'An accepted check has no refusal reason' })
-  .refine(refusedHasNoIdType, { path: ['idType'], message: 'A refusal names no ID: nothing was accepted' })
+export const inlineAgeCheckForm = shaped(z.object(outcomeFields))
 
 export type InlineAgeCheckInput = z.output<typeof inlineAgeCheckForm>
 
-export const supersedeForm = z.object({
-  outcome: z.enum(AGE_CHECK_OUTCOMES),
-  idType: z.enum(ID_TYPES).nullish().transform(value => value ?? null),
-  reason: z.enum(REFUSAL_REASONS).nullish().transform(value => value ?? null),
-  description: z.string().trim().min(1, 'Describe who you checked, never by name').max(DESCRIPTION_LIMIT),
+export const supersedeForm = shaped(z.object({
+  ...outcomeFields,
   product: z.string().trim().max(200).nullish().transform(value => (value ?? '').trim() || null),
-  notes: z.string().trim().max(NOTES_LIMIT).nullish().transform(value => (value ?? '').trim() || null),
-}).refine(
-  input => input.outcome !== 'ACCEPTED' || input.idType !== null,
-  { path: ['idType'], message: 'Say what ID was shown' },
-).refine(
-  input => input.outcome !== 'REFUSED' || input.reason !== null,
-  { path: ['reason'], message: 'Say why you refused' },
-)
+}))
 
 // What a refused write reads as. SQLite names the columns for a unique index and the constraint
 // name for a CHECK, so both spellings appear here (0047).
@@ -122,7 +105,7 @@ export const AGE_CHECK_CONSTRAINT_REFUSALS: { violated: string, says: string }[]
   },
   {
     violated: 'age_checks_outcome_shape',
-    says: 'An accepted check names the ID and nothing else; a refusal names why and nothing else',
+    says: 'An accepted check names the ID and nothing else; a refusal names why and nothing else; visibly over 25 names neither',
   },
   {
     violated: 'age_checks_no_self_supersede',

@@ -47,6 +47,9 @@ const HAND_REVIEWED_REBUILDS = new Set<string>([
   // bar_categories has five dependents and holds none of them: this one is safe by running
   // before the bar catalogue carries a row, which is 0081's decision, not 0063's ordering.
   '0111_a_colour_check_d1_can_evaluate',
+  // age_checks' only dependent is itself (a RESTRICT self-reference on supersedes_id): the links
+  // are held, cut, and restored after the rename, verified against a seeded chain fixture (0085).
+  '0112_visibly_over_25_is_a_register_outcome',
 ])
 
 function scan(dir: string, pattern: string): string[] {

@@ -6,7 +6,6 @@ import {
   ageCheckReady,
   inlineAgeCheckForm,
   saysIdType,
-  saysInlineOutcome,
   saysOutcome,
   saysRefusalReason,
   supersedeForm,
@@ -68,31 +67,38 @@ describe('an outcome folded into a sale needs the same shape, minus what the til
   })
 })
 
-describe('visibly over 25 is a till answer, never a register entry (F-106 criterion 7, 0085)', () => {
+describe('visibly over 25 names neither an ID nor a reason (E-118 criterion 1, F-106 criterion 7, 0085)', () => {
   test('the till accepts it carrying no ID, no reason and no description', () => {
     const parsed = inlineAgeCheckForm.safeParse({ outcome: 'NOT_REQUIRED' })
     expect(parsed.success).toBe(true)
     expect(parsed.success && parsed.data).toMatchObject({ outcome: 'NOT_REQUIRED', idType: null, reason: null, description: '', notes: null })
   })
 
+  test('the register accepts it the same way, standalone and as a correction', () => {
+    const logged = ageCheckForm.safeParse({ outcome: 'NOT_REQUIRED', product: 'Lager' })
+    expect(logged.success).toBe(true)
+    expect(logged.success && logged.data).toMatchObject({ outcome: 'NOT_REQUIRED', idType: null, reason: null, description: '' })
+    expect(supersedeForm.safeParse({ outcome: 'NOT_REQUIRED' }).success).toBe(true)
+  })
+
   test('it carries no ID and no reason: nothing was checked', () => {
     expect(inlineAgeCheckForm.safeParse({ outcome: 'NOT_REQUIRED', idType: 'PASSPORT' }).success).toBe(false)
     expect(inlineAgeCheckForm.safeParse({ outcome: 'NOT_REQUIRED', reason: 'OTHER' }).success).toBe(false)
+    expect(ageCheckForm.safeParse({ ...base, outcome: 'NOT_REQUIRED', idType: 'PASSPORT' }).success).toBe(false)
+    expect(supersedeForm.safeParse({ ...base, outcome: 'NOT_REQUIRED', reason: 'OTHER' }).success).toBe(false)
   })
 
-  test('a register outcome folded into a sale still needs its description', () => {
+  test('a check or a refusal still needs its description', () => {
     expect(inlineAgeCheckForm.safeParse({ outcome: 'ACCEPTED', idType: 'PASSPORT', description: '' }).success).toBe(false)
+    expect(ageCheckForm.safeParse({ ...base, outcome: 'REFUSED', reason: 'NO_ID_SHOWN', description: '' }).success).toBe(false)
   })
 
-  test('the register itself refuses it, standalone and as a correction', () => {
-    expect(ageCheckForm.safeParse({ ...base, outcome: 'NOT_REQUIRED' }).success).toBe(false)
-    expect(supersedeForm.safeParse({ ...base, outcome: 'NOT_REQUIRED' }).success).toBe(false)
+  test('it reads as the customer, everywhere the register is shown', () => {
+    expect(saysOutcome('NOT_REQUIRED')).toBe('Visibly over 25')
   })
 
-  test('it reads as the customer, and a register outcome reads as the register says it', () => {
-    expect(saysInlineOutcome('NOT_REQUIRED')).toBe('Visibly over 25')
-    expect(saysInlineOutcome('ACCEPTED')).toBe(saysOutcome('ACCEPTED'))
-    expect(saysInlineOutcome('REFUSED')).toBe(saysOutcome('REFUSED'))
+  test('the register is ready for it with nothing else filled in', () => {
+    expect(ageCheckReady({ outcome: 'NOT_REQUIRED', idType: null, reason: null, description: '' })).toBe(true)
   })
 })
 

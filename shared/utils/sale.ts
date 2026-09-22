@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { inlineAgeCheckForm } from './age-checks'
-import type { InlineAgeCheckOutcome } from './age-checks'
+import type { AgeCheckOutcome } from './age-checks'
 import type { AllergenState, BarPriceSource, ServingKind } from './bar'
 
 // The till's basket: what is on offer and what pricing one up costs, in integer pence (F-103).
@@ -187,8 +187,7 @@ export interface SaleReceipt {
   entryId: string | null
   totalPence: number
   lines: PricedLine[]
-  // `id` is null for Visibly over 25: the basis is on the sale's audit line, not the register (0085).
-  ageCheck: { id: string | null, outcome: InlineAgeCheckOutcome } | null
+  ageCheck: { id: string, outcome: AgeCheckOutcome } | null
   refusedLines: PricedLine[]
   discount: { id: string, name: string, percent: number } | null
   tab: { holderName: string, outstandingPence: number, capOverridden: boolean } | null

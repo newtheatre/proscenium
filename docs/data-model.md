@@ -1251,11 +1251,13 @@ is open exactly until this row exists) · `resolution_note` · `closed_by` restr
 
 ### age_checks  APPEND-ONLY
 `id` PK · `performance_id` restrict NULL (bar can check outside a show) · `checked_by`
-restrict · `outcome` CHECK `ACCEPTED|REFUSED` · `id_type` CHECK enum, NULL (the ID accepted,
-mandatory on ACCEPTED) · `reason` CHECK enum, NULL (mandatory on REFUSED) · `description`
-(appearance, never a name) · `product` · `notes` · `supersedes_id` NULL self-FK, UNIQUE (one
-correction per entry) · `created_at`. CHECK `age_checks_outcome_shape` ties `id_type` and
-`reason` to `outcome` so exactly one is ever set, never both, never neither. Split from a
+restrict · `outcome` CHECK `ACCEPTED|REFUSED|NOT_REQUIRED` · `id_type` CHECK enum, NULL (the ID
+accepted, mandatory on ACCEPTED) · `reason` CHECK enum, NULL (mandatory on REFUSED) ·
+`description` (appearance, never a name; empty string on NOT_REQUIRED) · `product` · `notes` ·
+`supersedes_id` NULL self-FK, UNIQUE (one correction per entry) · `created_at`. CHECK
+`age_checks_outcome_shape` ties `id_type` and `reason` to `outcome`: accepted sets the ID, refused
+sets the reason, and NOT_REQUIRED (visibly over 25, 0085) sets neither. Rebuilt once, empty, by
+0112 to take the third value (0085, 0063). Split from a
 single `reason` column the original outline carried: criterion 1 asks for the ID type and the
 refusal reason as two distinct pieces of information, not one column doing both jobs
 (E-118). The licensing register; exported as CSV or PDF for any date range, not filtered by

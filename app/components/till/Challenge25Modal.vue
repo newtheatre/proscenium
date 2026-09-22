@@ -32,7 +32,7 @@ function accept(idType: IdType): void {
   emit('accept', { outcome: 'ACCEPTED', idType, reason: null, description: description.value.trim() || 'Checked at the till', notes: null })
 }
 
-// No ID asked for, so nothing for the register (F-106 criterion 7, 0085).
+// No ID asked for: the register entry names neither an ID nor a reason (F-106 criterion 7, 0085).
 function visiblyOver(): void {
   emit('accept', { outcome: 'NOT_REQUIRED', idType: null, reason: null, description: '', notes: null })
 }
