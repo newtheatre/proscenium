@@ -270,6 +270,7 @@ onMounted(load)
     >
       <template #body>
         <UForm
+          id="drill-form"
           ref="drillForm"
           :schema="restoreDrillForm"
           :state="drill"
@@ -340,13 +341,24 @@ onMounted(load)
               class="w-full"
             />
           </UFormField>
-          <UButton
-            type="submit"
-            data-test="drill-submit"
-          >
-            Record the drill
-          </UButton>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="drill-form"
+          data-test="drill-submit"
+        >
+          Record the drill
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="recording = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
   </div>

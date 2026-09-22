@@ -437,6 +437,7 @@ const columns: TableColumn<AdminPerformance>[] = [
     >
       <template #body>
         <UForm
+          id="performance-form"
           :schema="performanceScreenForm"
           :state="form"
           class="space-y-4"
@@ -614,24 +615,25 @@ const columns: TableColumn<AdminPerformance>[] = [
               class="w-full"
             />
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="performance-submit"
-            >
-              {{ editingPerformance ? 'Save the performance' : 'Add a performance' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="performanceOpen = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="performance-form"
+          :loading="saving"
+          data-test="performance-submit"
+        >
+          {{ editingPerformance ? 'Save the performance' : 'Add a performance' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="performanceOpen = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

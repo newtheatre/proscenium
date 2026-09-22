@@ -209,6 +209,7 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
       />
 
       <UForm
+        id="module-form"
         :schema="module ? moduleForm : newModuleForm"
         :state="state"
         class="space-y-4"
@@ -490,25 +491,26 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
             </UButton>
           </div>
         </UFormField>
-
-        <div class="flex flex-wrap gap-2">
-          <UButton
-            type="submit"
-            :loading="saving"
-            data-test="module-submit"
-          >
-            {{ module ? 'Save the module' : 'Add the module' }}
-          </UButton>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            data-test="module-cancel"
-            @click="emit('update:open', false)"
-          >
-            {{ CONFIRM_BACK_LABEL }}
-          </UButton>
-        </div>
       </UForm>
+    </template>
+
+    <template #footer>
+      <UButton
+        type="submit"
+        form="module-form"
+        :loading="saving"
+        data-test="module-submit"
+      >
+        {{ module ? 'Save the module' : 'Add the module' }}
+      </UButton>
+      <UButton
+        color="neutral"
+        variant="ghost"
+        data-test="module-cancel"
+        @click="emit('update:open', false)"
+      >
+        {{ CONFIRM_BACK_LABEL }}
+      </UButton>
     </template>
   </UModal>
 </template>

@@ -500,6 +500,7 @@ const columns: TableColumn<Session>[] = [
         />
 
         <UForm
+          id="session-form"
           :schema="sessionForm"
           :state="state"
           class="space-y-4"
@@ -650,25 +651,26 @@ const columns: TableColumn<Session>[] = [
               />
             </UFormField>
           </div>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              :disabled="!opensAtReady"
-              data-test="session-submit"
-            >
-              Schedule it
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="session-form"
+          :loading="saving"
+          :disabled="!opensAtReady"
+          data-test="session-submit"
+        >
+          Schedule the session
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

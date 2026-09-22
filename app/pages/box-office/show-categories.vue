@@ -256,6 +256,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
     >
       <template #body>
         <UForm
+          id="category-form"
           :schema="showCategoryForm"
           :state="state"
           class="space-y-4"
@@ -292,24 +293,25 @@ const columns: TableColumn<AdminShowCategory>[] = [
               data-test="category-sort"
             />
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="category-submit"
-            >
-              {{ editing ? 'Save the show category' : 'Add a show category' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="category-form"
+          :loading="saving"
+          data-test="category-submit"
+        >
+          {{ editing ? 'Save the show category' : 'Add a show category' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
