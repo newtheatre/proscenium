@@ -95,4 +95,37 @@ describe.skipIf(skip !== null)('the session picker on /comms/announce', () => {
   }, 120_000)
 })
 
+// H-108 criterion 7: the count arrives before anything is written, and the draft survives its
+// own send so an officer can see what went.
+describe.skipIf(skip !== null)('the count and the draft on /comms/announce', () => {
+  test('choosing an audience counts it before a subject is typed', async () => {
+    const view = await signedInView()
+    await visit(view, `${app.baseURL}/comms/announce`, '[data-test="audience-kind"]')
+    await waitFor(view, `!!document.querySelector('[data-test="audience-count"]')`)
+    expect(await textOf(view, '[data-test="audience-count"]')).toMatch(/will get this|Nobody is in this audience/)
+    view.close()
+  }, 120_000)
+
+  test('a sent announcement stays on screen and says it went', async () => {
+    const view = await signedInView()
+    await visit(view, `${app.baseURL}/comms/announce`, '[data-test="audience-kind"]')
+    await fill(view, '[data-test="announce-subject"] input', 'Get-in on Saturday')
+    await fill(view, '[data-test="announce-body"]', 'Doors at ten, bring gloves.')
+
+    await click(view, '[data-test="announce-preview"]')
+    await waitFor(view, `!!document.querySelector('[data-test="announce-send"]')`)
+    await click(view, '[data-test="announce-send"]')
+
+    await waitFor(view, `!!document.querySelector('[data-test="announce-sent"]')`)
+    expect(await textOf(view, '[data-test="announce-sent"]')).toMatch(/Sent to|Queued for/)
+    expect(await view.evaluate<string>('document.querySelector(\'[data-test="announce-subject"] input\').value'))
+      .toBe('Get-in on Saturday')
+
+    await click(view, '[data-test="announce-again"]')
+    await waitFor(view, 'document.querySelector(\'[data-test="announce-sent"]\') === null')
+    expect(await view.evaluate<string>('document.querySelector(\'[data-test="announce-subject"] input\').value')).toBe('')
+    view.close()
+  }, 120_000)
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

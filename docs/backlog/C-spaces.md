@@ -137,7 +137,10 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   4. Each setting displays its default, its current value, and who last changed it when; every change is audited and reversible to the prior value in one action.
   5. A policy change applies to new bookings only; it never cancels or invalidates an existing confirmed booking.
   6. Out-of-hours, over-length, short-notice, beyond-horizon and over-cap requests each produce a distinct, named refusal-or-divert reason the member sees.
-- Source: Prompt Book C-1, J-3, P5; audit RM-1 (policy not enforced); Get-In part 2 (policy engine is new).
+  7. One truth about what a rule accepts. Each override field offers exactly the range the write
+     path takes, and the words beside it say the same thing the field does: where nought is a
+     real answer it is offered, and where it is not, nothing says it is.
+- Source: Prompt Book C-1, J-3, P5; audit RM-1 (policy not enforced); Get-In part 2 (policy engine is new). Criterion 7 comes from the console review of 21 September 2026 (issue 1151 item 10).
 
 ## C-107: Race-safe slot claims
 
@@ -294,7 +297,10 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   3. Report queries page in SQL and export to CSV; no report endpoint returns a bare unpaginated array.
   4. Figures survive user erasure as anonymous rows, so a year's statistics are never dented by a member leaving.
   5. Imported legacy bookings (C-118) appear in reports for their original dates, flagged as pre-migration data.
-- Source: Prompt Book C-2; audit RM-3 (dashboard stats), EW-2; Get-In part 2 (history feeds reporting from day one).
+  6. The span a review is written about is the committee year to date, derived from
+     `committeeYearOf` in Europe/London (0009, 0014), not from the runtime's own clock. The
+     boundary at 31 July is a named test case on either side of it.
+- Source: Prompt Book C-2; audit RM-3 (dashboard stats), EW-2; Get-In part 2 (history feeds reporting from day one). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10), which found the span computed in UTC.
 
 ## C-118: Legacy booking history import
 
