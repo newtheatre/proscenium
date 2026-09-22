@@ -2,7 +2,7 @@
 title: Training
 description: The catalogue of modules, the departments that own them, what people hold, what they are asking for, and the sessions that teach it.
 module: Training
-updatedOn: 2026-09-15
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -16,7 +16,7 @@ record is current is worked out from its dates every time the question is asked.
 
 The console screens are under **Manage, Training**. The member's own side, their dashboard,
 the sessions they can sign up for and the public catalogue, is described in
-[Your training](/docs/members/your-training).
+[My training](/docs/my-nnt/my-training).
 
 ::card-group
   ::card{icon="i-lucide-graduation-cap" title="Catalogue" to="/docs/training/catalogue"}

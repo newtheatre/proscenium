@@ -2,7 +2,7 @@
 title: Communications
 description: Sending an announcement to an audience, and reading what the system sent and what it could not.
 module: Communications
-updatedOn: 2026-09-15
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -17,11 +17,11 @@ composer for an announcement and the log of what went out. They are under **Mana
 Communications**.
 
 ::card-group
-  ::card{icon="i-lucide-megaphone" title="Announcements" to="/docs/communications/announcements"}
+  ::card{icon="i-lucide-megaphone" title="Announce" to="/docs/communications/announce"}
   Composing a message to all current members, the holders of a role, tonight's rota or a
   session's sign-ups, previewing it, and sending it.
   ::
-  ::card{icon="i-lucide-list" title="The send log" to="/docs/communications/send-log"}
+  ::card{icon="i-lucide-list" title="Send log" to="/docs/communications/send-log"}
   Every send with its outcome, the daily counts, one person's history, and what happens to a
   message the provider refused.
   ::

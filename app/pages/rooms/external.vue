@@ -4,7 +4,7 @@ import { fromLondonWallClock } from '#shared/utils/london'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { z } from 'zod'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/other-rooms' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/book-a-room-not-listed-here' })
 
 interface Failure { reason: string, says: string }
 

@@ -6,7 +6,7 @@ import { saysDay } from '#shared/utils/when'
 import type { BarCategory, CategoryPrice, ServingKind } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Product categories', middleware: 'console', docs: '/docs/bar/categories' })
+definePageMeta({ layout: 'console', title: 'Product categories', middleware: 'console', docs: '/docs/bar/product-categories' })
 
 const request = useRequestFetch()
 const toast = useToast()

@@ -3,7 +3,7 @@ import { REQUEST_NOTE_LIMIT, saysKind, saysRequestStatus, saysSource, saysState 
 import { saysDay } from '#shared/utils/when'
 import type { RecordState } from '#shared/utils/training'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/your-training' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/my-training' })
 
 interface Record {
   id: string

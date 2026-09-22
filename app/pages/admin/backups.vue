@@ -6,7 +6,7 @@ import { saysDay } from '#shared/utils/when'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { RestoreDrillForm } from '#shared/utils/backup'
 
-definePageMeta({ layout: 'console', title: 'Backups', middleware: 'console', docs: '/docs/system/backups-and-restore' })
+definePageMeta({ layout: 'console', title: 'Backups', middleware: 'console', docs: '/docs/system/backups' })
 
 interface Status {
   lastDrillAt: string | null
@@ -147,7 +147,7 @@ onMounted(load)
       >
         Restoring is not done on this screen. The IT Manager runs a drill at the command line,
         step by step, from
-        <ULink to="/docs/system/backups-and-restore">
+        <ULink to="/docs/system/backups">
           Backups and restore
         </ULink>, and records the outcome here afterwards.
       </p>

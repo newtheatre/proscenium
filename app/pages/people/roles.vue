@@ -7,7 +7,7 @@ import { rolesList } from '#shared/utils/roles-list'
 import type { Role } from '#shared/utils/roles'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Roles', middleware: 'console', docs: '/docs/people/roles-and-the-committee-year' })
+definePageMeta({ layout: 'console', title: 'Roles', middleware: 'console', docs: '/docs/people/roles' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

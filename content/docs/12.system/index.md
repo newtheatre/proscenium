@@ -2,7 +2,7 @@
 title: System
 description: The console overview, the settings, the audit trail, backups and restore, and how this documentation is kept.
 module: Platform
-updatedOn: 2026-09-21
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -21,11 +21,11 @@ console; an officer whose only permissions are those three is shown no **Manage*
 Within the console each screen checks its own permission, so a person who can reach the
 overview may still be refused a screen the sidebar does not show them.
 
-- **Settings** (`config.read`) are read by Administrators, Managers and the Theatre Manager, and
-  changed (`config.write`) by Administrators only.
-- **The audit trail** (`audit.read`, `audit.write`) is read and written by Administrators,
+- **Settings** (`config.read`) are read by the IT Manager, Managers and the Theatre Manager, and
+  changed (`config.write`) by the IT Manager only.
+- **The audit trail** (`audit.read`, `audit.write`) is read and written by the IT Manager,
   Managers and the Theatre Manager.
-- **Backups** (`backups.read`, `backups.write`) are Administrators only.
+- **Backups** (`backups.read`, `backups.write`) are the IT Manager's alone.
 
 Every standing role expires at the end of the committee year, 31 July, so a permission held in
 June is gone in August unless the incoming committee grants it again.
@@ -64,7 +64,7 @@ The rest of the overview arrives with the stories that need it, and the screen s
   ::card{icon="i-lucide-scroll-text" title="Audit trail" to="/docs/system/audit-trail"}
   Every privileged action, searchable and exportable, with signed entries for what happened outside the system.
   ::
-  ::card{icon="i-lucide-database-backup" title="Backups and restore" to="/docs/system/backups-and-restore"}
+  ::card{icon="i-lucide-database-backup" title="Backups" to="/docs/system/backups"}
   What is backed up, how a restore works, and the drill that proves it.
   ::
   ::card{icon="i-lucide-book-open" title="This documentation" to="/docs/system/this-documentation"}
@@ -76,7 +76,7 @@ The rest of the overview arrives with the stories that need it, and the screen s
 
 - **"Your sign-in has ended"**: the overview was opened without signing in. Sign in and it loads.
 - **"You do not have permission to do that"**: you hold no administrative permission, or not
-  the one this screen needs. Ask an Administrator to check your role; a shift alone never opens
+  the one this screen needs. Ask the IT Manager to check your role; a shift alone never opens
   the console.
 
 ## Related pages

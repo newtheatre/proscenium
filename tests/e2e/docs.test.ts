@@ -54,7 +54,7 @@ describe.skipIf(skip !== null)('operator documentation is reachable with no stan
   })
 
   test('a page inside a section answers, and a threshold on it quotes the live value', async () => {
-    const answered = await send('GET', '/docs/box-office/the-desk', undefined, member.cookie)
+    const answered = await send('GET', '/docs/box-office/desk', undefined, member.cookie)
     expect(answered.status).toBe(200)
     expect(await answered.text()).toContain('data-test="policy-value"')
   })

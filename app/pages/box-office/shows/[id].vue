@@ -4,7 +4,7 @@ import { saysShowStatus } from '#shared/utils/programme'
 import type { AdminPerformance, AdminShow, ShowReference, ShowVenue } from '#shared/utils/programme'
 import type { ContentWarning, ShowContentWarning } from '#shared/utils/content-warnings'
 
-definePageMeta({ layout: 'console', title: 'Show', middleware: 'console', docs: '/docs/box-office/shows-and-performances' })
+definePageMeta({ layout: 'console', title: 'Show', middleware: 'console', docs: '/docs/box-office/shows' })
 
 const route = useRoute()
 const router = useRouter()

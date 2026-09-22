@@ -907,7 +907,7 @@ query with types, dates and outcomes only, never a message body; every such view
 ## Not built yet
 
 The restore drill procedure now lives in the in-app operator documentation at
-`/docs/system/backups-and-restore` (J-109, J-107 criterion 5, 0076), command by command, and
+`/docs/system/backups` (J-109, J-107 criterion 5, 0076), command by command, and
 matches the paragraph above. The retention sweep is built and documented above; what it still
 waits on is a warning cadence and, in December, an arming (A-126, K-111).
 

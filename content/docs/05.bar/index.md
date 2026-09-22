@@ -2,7 +2,7 @@
 title: Bar
 description: The catalogue the till sells from, the stock register behind it, and the reports read from the ledger.
 module: Bar
-updatedOn: 2026-09-15
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -12,12 +12,12 @@ navigation:
 The bar screens are the standing configuration behind the till and the record of what the bar
 holds. Nothing here is operational: the till itself, where money is taken on the Students'
 Union's SumUp reader, is a show-night screen and has its own page at
-[The till](/docs/show-night/the-till). What is set up here is what the till draws its buttons
-from, what a sale depletes, and what the treasurer reads at the end of a period.
+[Till](/docs/tonight/till). What is set up here is what the till draws its buttons
+from, what a sale depletes, and what the Treasurer reads at the end of a period.
 
 The screens are under **Manage, Bar** in the account menu. Reading them needs the `bar.read`
 permission and changing anything needs `bar.write`; the Bar manager role holds both, and
-administrators hold everything. Reports are the one exception: they open for `finance.read` too,
+the IT Manager hold everything. Reports are the one exception: they open for `finance.read` too,
 so the Treasurer reads them without seeing the catalogue or the stock. Nobody reaches any of this
 from a shift: a bar shift opens the till, not these screens.
 
@@ -25,7 +25,7 @@ from a shift: a bar shift opens the till, not these screens.
   ::card{icon="i-lucide-beer" title="Products" to="/docs/bar/products"}
   What the till sells, its serving sizes, what each size depletes and what it costs.
   ::
-  ::card{icon="i-lucide-layout-grid" title="Categories" to="/docs/bar/categories"}
+  ::card{icon="i-lucide-layout-grid" title="Product categories" to="/docs/bar/product-categories"}
   The groups the till shows, in the order it shows them, with default prices by serving kind.
   ::
   ::card{icon="i-lucide-percent" title="Discounts" to="/docs/bar/discounts"}
@@ -62,6 +62,6 @@ always the sum of the movements and never a figure anybody typed in.
 
 ## Related pages
 
-- [The till](/docs/show-night/the-till)
-- [Age checks](/docs/show-night/age-checks)
+- [Till](/docs/tonight/till)
+- [Challenge 25](/docs/tonight/challenge-25)
 - [Comps and discounts](/docs/money/comps-and-discounts)

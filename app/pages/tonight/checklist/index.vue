@@ -2,7 +2,7 @@
 import { saysPhase } from '#shared/utils/checklist'
 import type { Phase, SystemCheck } from '#shared/utils/checklist'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/show-night/checklists' })
+definePageMeta({ layout: 'tonight', docs: '/docs/tonight/checklist' })
 useSeoMeta({ title: 'Checklist' })
 
 interface Entry {

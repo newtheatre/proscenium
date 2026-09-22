@@ -11,7 +11,7 @@ navigation:
 
 Every pound the theatre takes is written to one ledger at the moment it moves: a ticket
 collected at the desk, a drink sold at the till, a pass issued, a refund handed back. Nothing on
-these screens is typed in twice. The Money group at **Manage, Money** is the treasurer's view over
+these screens is typed in twice. The Money group at **Manage, Money** is the Treasurer's view over
 that ledger: what came in, what was given away, whether the card reader agrees, and what goes to
 the Students' Union at the end of a period.
 
@@ -24,7 +24,7 @@ the Students' Union at the end of a period.
 - **`finance.export`**, the Treasurer's third permission, downloads the SU export.
 - **`finance.summary`**, held by the Committee role, opens the season dashboard only, with its
   totals but without the **Entries** buttons that drill into who rang what in.
-- **`finance.reopen`** reopens a closed period. No role holds it except an administrator, who
+- **`finance.reopen`** reopens a closed period. No role holds it except the IT Manager, who
   holds every permission.
 
 ::callout{icon="i-lucide-info" color="info"}
@@ -69,7 +69,7 @@ The range the figures cover is printed above them, from and to, as London dates.
   ::card{icon="i-lucide-gift" title="Comps and discounts" to="/docs/money/comps-and-discounts"}
   Foregone value by show or by period, and access and companion admissions as counts only.
   ::
-  ::card{icon="i-lucide-scale" title="Daily reconciliation" to="/docs/money/reconciliation"}
+  ::card{icon="i-lucide-scale" title="Daily reconciliation" to="/docs/money/daily-reconciliation"}
   The figure the reader's Z should read for a night, recording what it did read, and resolving
   the difference.
   ::
@@ -77,7 +77,7 @@ The range the figures cover is printed above them, from and to, as London dates.
   What an entry and a line are, why nothing is ever edited, and how to find one.
   ::
   ::card{icon="i-lucide-lock" title="Periods" to="/docs/money/periods"}
-  Closing a range so its figures stop moving, and reopening it when an administrator must.
+  Closing a range so its figures stop moving, and reopening it when the IT Manager must.
   ::
   ::card{icon="i-lucide-file-down" title="Exports" to="/docs/money/exports"}
   The CSV shaped for the SU's accounting, and the nominal codes each ledger line maps to.
@@ -88,13 +88,13 @@ The range the figures cover is printed above them, from and to, as London dates.
 
 - **"The dashboard could not be read."**: the ledger query failed or you no longer hold a
   finance permission. Change the period and back to read it again; if it persists, check your
-  role under [roles and the committee year](/docs/people/roles-and-the-committee-year).
+  role under [roles and the committee year](/docs/people/roles).
 - **The Entries buttons are missing**: you hold `finance.summary` and not `finance.read`. The
   committee sees the season's totals, not the individual entries behind them.
 
 ## Related pages
 
 - [Roles and permissions](/docs/getting-started/roles-and-permissions)
-- [The desk](/docs/box-office/the-desk)
-- [The till](/docs/show-night/the-till)
+- [Desk](/docs/box-office/desk)
+- [Till](/docs/tonight/till)
 - [Bar reports](/docs/bar/reports)

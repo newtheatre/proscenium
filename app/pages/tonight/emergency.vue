@@ -4,7 +4,7 @@ import { nightCacheKey } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/show-night/emergency-card' })
+definePageMeta({ layout: 'tonight', docs: '/docs/tonight/emergency' })
 useSeoMeta({ title: 'Emergency card' })
 
 interface Card {

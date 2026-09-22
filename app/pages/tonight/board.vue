@@ -3,7 +3,7 @@ import { saysQueuedSend } from '#shared/utils/backstage'
 import { groupedBoardCode } from '#shared/utils/night-hub'
 import type { BoardSide } from '#shared/utils/backstage'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/show-night/backstage-board' })
+definePageMeta({ layout: 'tonight', docs: '/docs/tonight/backstage' })
 useSeoMeta({ title: 'Backstage' })
 
 interface Message {
