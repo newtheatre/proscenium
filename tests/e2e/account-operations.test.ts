@@ -342,6 +342,31 @@ describe.skipIf(skip !== null)('the account screen', () => {
     }
   }, 120_000)
 
+  // A-121 criterion 6 and A-123 criterion 7: the way back to the directory, and a winner chosen
+  // from it rather than typed as an address that has to match exactly.
+  test('an administrator picks the winning account and walks back to the directory', async () => {
+    const loser = await subject('mergeable')
+    const winner = await subject('mergewinner')
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${loser.id}`, '[data-test="merge-winner"]')
+
+      await fill(view, '[data-test="merge-winner"] input', winner.email.slice(0, 6))
+      await waitFor(view, `document.body.innerText.includes('${winner.email}')`)
+      await click(view, `[data-test="merge-winner"] [role="option"]`)
+      await click(view, '[data-test="merge-preview"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="merge-preview-result"]\')')
+      expect(await textOf(view, '[data-test="merge-preview-result"]')).toContain(winner.email)
+
+      await click(view, '[data-test="back-to-accounts"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="toolbar-search"]\')')
+      expect(await view.evaluate<string>('location.pathname')).toBe('/people/accounts')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
   test('an administrator erases an account from the screen, after typing the email back', async () => {
     const person = await subject('erasable')
     const view = await officerView()

@@ -44,6 +44,12 @@ export function saysClock(value: When): string {
   return formatLondon(whenInstant(value), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 }
 
+// A month's name alone, for a control that picks one. Not a date shape: no day and no year, and
+// the day below is any day the month is sure to have.
+export function saysMonth(month: number): string {
+  return formatLondon(new Date(Date.UTC(2001, month - 1, 15)), { month: 'long' })
+}
+
 export function saysDay(value: When, options: WhenOptions = {}): string {
   const at = whenInstant(value)
   return saysDate(at, false, showsYear(at, options))
