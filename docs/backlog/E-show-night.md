@@ -273,7 +273,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As bar or door staff, I want an age-check register that cannot be quietly edited so that the licence is defensible on paper at any moment.
 - Depends on: E-111; Prompt Book F-1
 - Acceptance criteria:
-  1. An entry records timestamp, the checking person (automatic), the outcome (ID accepted or refused), the ID type where accepted, and for every refusal a mandatory reason.
+  1. An entry records timestamp, the checking person (automatic), the outcome (ID accepted, refused, or visibly over 25 with no ID asked for), the ID type where accepted, and for every refusal a mandatory reason. Amended by decision 0085: the third outcome names neither, and its description is optional.
   2. The subject is recorded as a physical description only ("tall man, grey coat"); the form has no name field and its guidance states that a name must never be entered.
   3. The register is append-only with supersede-style corrections, enforced exactly as E-115.
   4. The flow is reachable inline from the till when an age-restricted item is sold, and standalone from the tonight and door screens.

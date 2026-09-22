@@ -87,6 +87,29 @@ describe('logging a fresh entry (E-118 criterion 1)', () => {
     })
   })
 
+  test('visibly over 25 writes neither an ID type nor a reason, and needs no description (0085)', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const write = recordAgeCheck(officer, { ...accepted, outcome: 'NOT_REQUIRED', idType: null, description: '' }, 'ac-1')
+
+      expect(run(database, write.statement)).toHaveLength(1)
+      const [row] = rows<{ outcome: string, id_type: string | null, reason: string | null, description: string }>(
+        database, 'SELECT outcome, id_type, reason, description FROM age_checks WHERE id = ?', 'ac-1')
+      expect(row).toEqual({ outcome: 'NOT_REQUIRED', id_type: null, reason: null, description: '' })
+    })
+  })
+
+  test('visibly over 25 carrying an ID type is refused at the database', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      const refusal = refusalFor(() => database.batch([[
+        `INSERT INTO age_checks (id, checked_by, outcome, id_type, description) VALUES (?, ?, 'NOT_REQUIRED', 'PASSPORT', '')`,
+        'ac-bad', officer,
+      ]]))
+      expect(refusal?.statusCode).toBe(409)
+    })
+  })
+
   test('a check may name tonight\'s performance, or none at all (bar checks outside a show)', async () => {
     await withDatabase(async (database) => {
       const officer = person(database, 'officer')

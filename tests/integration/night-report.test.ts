@@ -216,7 +216,7 @@ describe('incidents and follow-up (E-115, E-116 criterion 4)', () => {
 })
 
 describe('age checks (E-118)', () => {
-  test('accepted and refused count separately, and a superseded outcome does not double-count', async () => {
+  test('the three outcomes count separately, and a superseded outcome does not double-count', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       const checker = person(database, 'checker')
@@ -233,8 +233,13 @@ describe('age checks (E-118)', () => {
         'a-3', tonight.performanceId, checker, 'a-2',
       ]])
 
-      const [row] = read<{ accepted: number, refused: number }>(database, reportAgeChecksQuery(tonight.performanceId))
-      expect(row).toMatchObject({ accepted: 1, refused: 1 })
+      database.batch([[
+        `INSERT INTO age_checks (id, performance_id, checked_by, outcome, description) VALUES (?, ?, ?, 'NOT_REQUIRED', '')`,
+        'a-4', tonight.performanceId, checker,
+      ]])
+
+      const [row] = read<{ accepted: number, refused: number, notRequired: number }>(database, reportAgeChecksQuery(tonight.performanceId))
+      expect(row).toMatchObject({ accepted: 1, refused: 1, notRequired: 1 })
     })
   })
 })

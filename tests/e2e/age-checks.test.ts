@@ -82,6 +82,16 @@ describe.skipIf(skip !== null)('logging a Challenge 25 check (E-118 criteria 1, 
     expect(row).toMatchObject({ outcome: 'REFUSED', reason: 'NO_ID_SHOWN', id_type: null })
   })
 
+  test('visibly over 25 logs with no ID, no reason and no description (0085)', async () => {
+    const answered = await send('POST', '/api/tonight/age-checks', { performanceId: null, outcome: 'NOT_REQUIRED', product: 'Strongbow' }, bar.cookie)
+    expect(answered.status).toBe(200)
+    const { id } = await answered.json() as { id: string }
+
+    const row = read<{ outcome: string, id_type: string | null, reason: string | null, description: string }>(
+      'SELECT outcome, id_type, reason, description FROM age_checks WHERE id = ?', id)
+    expect(row).toEqual({ outcome: 'NOT_REQUIRED', id_type: null, reason: null, description: '' })
+  })
+
   test('an ordinary member cannot log a check', async () => {
     const member = await registerMember(app, 'age-nobody', generatePassword())
     expect((await send('POST', '/api/tonight/age-checks', accepted, member.cookie)).status).toBe(403)

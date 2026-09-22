@@ -140,17 +140,6 @@ function latestAgeCheck(): AgeCheckRow | undefined {
   }
 }
 
-function latestSaleAudit(): Record<string, unknown> | undefined {
-  const database = new Database(app.databaseFile, { readonly: true })
-  try {
-    const row = database.query(`SELECT detail FROM audit_log WHERE action = 'bar.till.sale' ORDER BY rowid DESC LIMIT 1`).get() as { detail: string } | undefined
-    return row ? JSON.parse(row.detail) as Record<string, unknown> : undefined
-  }
-  finally {
-    database.close()
-  }
-}
-
 describe.skipIf(skip !== null)('a restricted basket is refused with no outcome on record (F-106 criteria 1, 5)', () => {
   test('the refusal names what needs a Challenge 25 check, and nothing is written', async () => {
     const { venueId, restrictedVariantId, restrictedProductName } = await aMixedBasketSetup()
@@ -203,8 +192,8 @@ describe.skipIf(skip !== null)('accepted sells the whole basket and logs the che
   })
 })
 
-describe.skipIf(skip !== null)('visibly over 25 sells the line and writes nothing to the register (F-106 criterion 7, 0085)', () => {
-  test('the sale goes through, the register is untouched, and the sale audit says on what basis', async () => {
+describe.skipIf(skip !== null)('visibly over 25 sells the line and writes its own register entry (F-106 criterion 7, 0085)', () => {
+  test('the sale goes through, and the register entry names neither an ID nor a reason', async () => {
     const { venueId, restrictedVariantId, ordinaryVariantId } = await aMixedBasketSetup()
 
     const before = counts()
@@ -215,23 +204,22 @@ describe.skipIf(skip !== null)('visibly over 25 sells the line and writes nothin
       { outcome: 'NOT_REQUIRED' },
     )
     expect(answered.status).toBe(200)
-    const body = await answered.json() as { entryId: string, totalPence: number, lines: unknown[], ageCheck: { id: string | null, outcome: string }, refusedLines: unknown[] }
+    const body = await answered.json() as { entryId: string, totalPence: number, lines: unknown[], ageCheck: { id: string, outcome: string }, refusedLines: unknown[] }
     expect(body.totalPence).toBe(550)
     expect(body.lines).toHaveLength(2)
     expect(body.refusedLines).toHaveLength(0)
-    expect(body.ageCheck).toEqual({ id: null, outcome: 'NOT_REQUIRED' })
+    expect(body.ageCheck).toMatchObject({ outcome: 'NOT_REQUIRED' })
+    expect(body.ageCheck.id).toBeTruthy()
 
     const after = counts()
     expect(after.entries).toBe(before.entries + 1)
-    expect(after.ageChecks).toBe(before.ageChecks)
-    expect(after.ageCheckAudits).toBe(before.ageCheckAudits)
+    expect(after.ageChecks).toBe(before.ageChecks + 1)
+    expect(after.ageCheckAudits).toBe(before.ageCheckAudits + 1)
     expect(after.saleAudits).toBe(before.saleAudits + 1)
-    expect(latestSaleAudit()).toMatchObject({ challenge25: 'NOT_REQUIRED' })
-  })
 
-  test('the register refuses it as a standalone entry: there is nothing to record', async () => {
-    const answered = await send('POST', '/api/tonight/age-checks', { outcome: 'NOT_REQUIRED', description: 'Grey beard' })
-    expect(answered.status).toBe(400)
+    const row = latestAgeCheck()
+    expect(row).toMatchObject({ outcome: 'NOT_REQUIRED', id_type: null, reason: null, description: '' })
+    expect(row?.product).toBeTruthy()
   })
 })
 
@@ -367,7 +355,7 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     view.close()
   }, 120_000)
 
-  test('Visibly over 25 is one press, asks nothing else, and the register stays as it was', async () => {
+  test('Visibly over 25 is one press, asks nothing else, and lands on the register with the sale', async () => {
     const { venueId, restrictedProductId } = await aMixedBasketSetup()
     const before = counts()
     const view = await atTheTill(venueId, `[data-test="product-${restrictedProductId}"]`)
@@ -384,7 +372,8 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
 
     await click(view, `[aria-label="Charge £5.00"]`)
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
-    expect(counts().ageChecks).toBe(before.ageChecks)
+    expect(counts().ageChecks).toBe(before.ageChecks + 1)
+    expect(latestAgeCheck()).toMatchObject({ outcome: 'NOT_REQUIRED', id_type: null, reason: null })
     view.close()
   }, 120_000)
 
