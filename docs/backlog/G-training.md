@@ -79,7 +79,11 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   4. Requests for a module resolve automatically when a matching session becomes visible to members (opened for sign-up, not merely created), and each requester is emailed once.
   5. A request is a demand signal only: it confers no queue position, priority or place in any session.
   6. Requests for draft or retired modules are refused.
-- Source: Prompt Book G-1; audit TR-2
+  7. The demand board carries the grant beside the decline: every module on it links straight to
+     scheduling a session for that module, with the module already chosen, so the answer that
+     resolves the requests is as near to hand as the answer that closes one.
+- Source: Prompt Book G-1; audit TR-2; issue 1151 item 10 (criterion 7, the board offered a
+  decline and nothing else)
 
 ## G-105: Session sign-up with derived places
 
@@ -310,7 +314,10 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   4. An explicit expiry must fall after the award date and within the module's policy cap, itself bounded by the catalogue-wide 120-month cap.
   5. "Never expires" on a sign-off is a break-glass administrator permission, deliberately absent from the UI, and every use is audited.
   6. A sign-off is an append-only record like any other: renewal is a newer record superseding the old, and correction is revoke plus re-grant.
-- Source: Prompt Book G-3; audit TR-6
+  7. Every control that picks a module names it. A published module id may sit beside the name as
+     a reference, never in place of it, on the records screen as anywhere else (K-123 criterion 1).
+- Source: Prompt Book G-3; audit TR-6; issue 1151 item 10 (criterion 7, the sign-off and
+  certificate pickers offered rows of bare ids)
 
 ## G-121: External certificates
 

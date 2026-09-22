@@ -12,6 +12,7 @@ import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
+import type { BoardBounds } from '#shared/utils/rota-board'
 import type { AddShiftInput, ShiftRole, ShiftStatus, TemplateSlot } from '#shared/utils/rota'
 import type { ShiftOffsets, WindowedPerformance } from '#shared/utils/rota-times'
 import type { SQL } from 'drizzle-orm'
@@ -548,34 +549,34 @@ export interface RosterShiftRow {
   holderName: string | null
 }
 
-// The board's scope, read twice rather than passed as an id list from a result set (0006): the
-// same predicate names the performances and, through it, the shifts that belong to them.
-const rosterScope = (now: number, limit: number): SQL => sql`
+// Read twice rather than passed as an id list from a result set (0006). `from` is inclusive and
+// `to` exclusive, both 04:00 London on their own night (0014).
+const rosterScope = (bounds: BoardBounds): SQL => sql`
   SELECT p.id FROM performances p
-  WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${now}
-  ORDER BY p.starts_at LIMIT ${limit}
+  WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${bounds.from} AND p.starts_at < ${bounds.to}
+  ORDER BY p.starts_at
 `
 
-// Bounded by count, not paged: the board reads a fixed window of performances whole, the way
-// `myShiftsQuery` bounds a member's own list (E-107, 0003).
-export function rosterPerformancesQuery(now: number, limit: number): SQL {
+// Bounded by a window of nights, not paged: the board reads every performance in the span whole,
+// the way `myShiftsQuery` bounds a member's own list (E-107 criterion 7, 0003).
+export function rosterPerformancesQuery(bounds: BoardBounds): SQL {
   return sql`
     SELECT p.id AS performanceId, sh.title AS showTitle, v.name AS venueName, p.starts_at AS startsAt
     FROM performances p
     JOIN shows sh ON sh.id = p.show_id
     JOIN venues v ON v.id = p.venue_id
-    WHERE p.id IN (${rosterScope(now, limit)})
+    WHERE p.id IN (${rosterScope(bounds)})
     ORDER BY p.starts_at
   `
 }
 
-export function rosterShiftsQuery(now: number, limit: number): SQL {
+export function rosterShiftsQuery(bounds: BoardBounds): SQL {
   return sql`
     SELECT s.performance_id AS performanceId, s.id AS shiftId, s.role AS role, s.slot AS slot,
            s.status AS status, u.name AS holderName
     FROM shifts s
     LEFT JOIN users u ON u.id = s.user_id
-    WHERE s.performance_id IN (${rosterScope(now, limit)}) AND s.status <> 'CANCELLED'
+    WHERE s.performance_id IN (${rosterScope(bounds)}) AND s.status <> 'CANCELLED'
     ORDER BY s.role, s.slot
   `
 }
