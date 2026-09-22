@@ -565,7 +565,7 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
   empty header, and rows of up to seven ghost buttons with no overflow. Criterion 11 comes from
   the same review (issue 1151 item 2), which counted thirty-six permanent explainer alerts
   across the console, a page header duplicating the navbar title, and bare paragraphs of
-  explanation on the admin screens. Criterion 12 comes from the console review of 19 September
+  explanation on the admin screens. Criterion 12 comes from the console review of 21 September
   2026 (issue 1151 item 10), which found the rota spread across four sidebar entries in a fixed
   order with no screen naming the next one.
 
