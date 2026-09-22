@@ -89,6 +89,10 @@ Open questions:
      submitted.
   5. The screen is phone-first and one-handed per K-1: adding any variant never requires a text
      field, and touch targets meet the show-night size standard.
+  6. The category row above the grid filters it rather than scrolling to a heading: **All** and
+     one chip per category with something to sell; the chosen chip reads as pressed, a chosen
+     category shows its tiles alone, and the choice stays from one sale to the next until another
+     chip is pressed. A chosen category that empties falls back to All rather than to a blank grid.
 - Source: Prompt Book F-2, Get-In constraint 5; audit PR-12.
 
 ## F-104: Expected-total cross-check on every sale
@@ -161,6 +165,11 @@ Open questions:
      been accepted does not ask again in the same sale. A refusal at the tap takes the restricted
      lines back out of the basket, says on screen what is not being sold, and is written to the
      register there and then, since the sale that would otherwise carry it may never happen.
+  7. The prompt's first answer is **Visibly over 25**, the ordinary case under the policy: no ID
+     was asked for, so it settles the sale the way an accepted check does and writes nothing to
+     the register, which records checks made and refusals given (E-118 criterion 1, decision 0085).
+     The sale's own audit line says the drink went out on that basis. The standalone register
+     never offers it: there is no entry to make.
 - Source: Prompt Book F-1, E-3; audit PR-9, PR-12; issue 1150 item 5.
 
 ## F-107: Allergen notes one tap from every product

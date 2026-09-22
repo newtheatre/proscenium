@@ -720,6 +720,28 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
     view.close()
   }, 120_000)
 
+  // F-103 criterion 6: a chip narrows the grid to its category; All brings the rest back.
+  test('a category chip filters the grid, and All brings every tile back', async () => {
+    const { view, productId } = await atTheTill(true)
+    await waitFor(view, `document.querySelectorAll('[data-test="category-chips"] button').length === 3`)
+    const tiles = `document.querySelectorAll('[data-test^="product-"]').length`
+    expect(await view.evaluate<number>(tiles)).toBe(2)
+
+    const otherChip = `(() => {
+      const mine = document.querySelector('[data-test="product-${productId}"]').closest('[id^="till-category-"]').id.replace('till-category-', '')
+      return [...document.querySelectorAll('[data-test^="category-chip-"]')].map(chip => chip.dataset.test).find(name => name !== 'category-chip-all' && name !== 'category-chip-' + mine)
+    })()`
+    const other = await view.evaluate<string>(otherChip)
+    await click(view, `[data-test="${other}"]`)
+    await waitFor(view, `${tiles} === 1`)
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="product-${productId}"]') === null`)).toBe(true)
+    expect(await view.evaluate<string>(`document.querySelector('[data-test="${other}"]').getAttribute('aria-pressed')`)).toBe('true')
+
+    await click(view, '[data-test="category-chip-all"]')
+    await waitFor(view, `${tiles} === 2`)
+    view.close()
+  }, 120_000)
+
   // Every control on a show-night screen, not only the primary ones (design-language.md rule 4).
   test('every control a thumb reaches for clears 48 pixels', async () => {
     const { view, productId } = await atTheTill(true)
