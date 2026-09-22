@@ -19,7 +19,6 @@ interface View {
 
 interface MergeCounts { bookings: number, records: number, shifts: number, memberships: number, grants: number }
 interface MergePreview { winner: { id: string, name: string, email: string }, loser: { id: string, name: string, email: string }, counts: MergeCounts }
-interface DirectoryItem { id: string, name: string, email: string }
 
 const route = useRoute()
 const view = ref<View | null>(null)
@@ -28,7 +27,7 @@ const working = ref('')
 
 // The account this page shows is always the losing side: merging it away is one of its own
 // security-adjacent actions, the same way disabling or erasing it is (A-123).
-const mergeSearch = ref('')
+const mergeWinnerId = ref<string | undefined>(undefined)
 const mergeFailure = ref<string | null>(null)
 const mergePreview = ref<MergePreview | null>(null)
 const mergeConfirmEmail = ref('')
@@ -112,19 +111,15 @@ async function eraseAccount(): Promise<void> {
 }
 
 async function previewMerge(): Promise<void> {
+  const winnerId = mergeWinnerId.value
+  if (!winnerId) return
   mergeFailure.value = null
   mergePreview.value = null
   mergeWorking.value = true
   try {
-    const found = await $fetch<{ items: DirectoryItem[] }>('/api/admin/accounts', { query: { search: mergeSearch.value, pageSize: 5 } })
-    const winner = found.items.find(item => item.email.toLowerCase() === mergeSearch.value.trim().toLowerCase())
-    if (!winner) {
-      mergeFailure.value = 'No account matches that email exactly.'
-      return
-    }
     mergePreview.value = await $fetch<MergePreview>(`/api/admin/accounts/${route.params.id}/merge-preview`, {
       method: 'POST',
-      body: { winnerId: winner.id },
+      body: { winnerId },
     })
   }
   catch (error) {
@@ -145,7 +140,7 @@ async function confirmMerge(): Promise<void> {
       body: { winnerId: mergePreview.value.winner.id, confirmEmail: mergeConfirmEmail.value },
     })
     mergePreview.value = null
-    mergeSearch.value = ''
+    mergeWinnerId.value = undefined
     mergeConfirmEmail.value = ''
     await load()
   }
@@ -198,6 +193,18 @@ onMounted(load)
 
 <template>
   <div class="space-y-6">
+    <UButton
+      to="/people/accounts"
+      data-test="back-to-accounts"
+      variant="link"
+      color="neutral"
+      size="sm"
+      icon="i-lucide-arrow-left"
+      class="px-0"
+    >
+      Accounts
+    </UButton>
+
     <UAlert
       v-if="failure"
       data-test="failure"
@@ -205,6 +212,22 @@ onMounted(load)
       variant="subtle"
       :description="failure"
     />
+
+    <div
+      v-else-if="!view"
+      data-test="account-skeleton"
+      class="space-y-6"
+    >
+      <div class="space-y-2">
+        <USkeleton class="h-7 w-56" />
+        <USkeleton class="h-4 w-72" />
+      </div>
+      <USkeleton
+        v-for="card in 3"
+        :key="card"
+        class="h-32 w-full"
+      />
+    </div>
 
     <div
       v-if="view"
@@ -489,19 +512,21 @@ onMounted(load)
           v-if="!mergePreview"
           class="flex flex-wrap items-end gap-2"
         >
-          <UFormField label="Winning account's email">
-            <UInput
-              v-model="mergeSearch"
-              data-test="merge-search"
-              type="email"
-              placeholder="winner@example.com"
+          <UFormField
+            label="Winning account"
+            class="w-full sm:w-96"
+          >
+            <PersonPicker
+              v-model="mergeWinnerId"
+              data-test="merge-winner"
+              placeholder="Search by name, address or student number"
             />
           </UFormField>
           <UButton
             data-test="merge-preview"
             variant="subtle"
             :loading="mergeWorking"
-            :disabled="!mergeSearch.trim()"
+            :disabled="!mergeWinnerId"
             @click="previewMerge"
           >
             Preview the merge

@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
-// The people and money console screens, read as source: a way back and a skeleton on an
-// account's page, a picker for a merge, the claims count in reach, and period controls that ask
-// the question themselves (issue 1151 item 10).
+// The people and money console screens, read as source: a way back, a skeleton, a picker for a
+// merge, the claims count in reach, and period controls that ask the question (item 10).
 
 const read = (path: string): Promise<string> => Bun.file(path).text()
 

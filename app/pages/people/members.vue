@@ -398,6 +398,17 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
 
       <template #actions>
         <UButton
+          v-if="!onQueue && waiting"
+          data-test="claims-waiting"
+          icon="i-lucide-inbox"
+          color="warning"
+          variant="subtle"
+          @click="set('filter', { key: 'filter', operator: 'is', values: [AWAITING_RECORD] })"
+        >
+          Record {{ plural(waiting, 'claim') }}
+        </UButton>
+
+        <UButton
           v-if="writes"
           data-test="record-membership"
           icon="i-lucide-user-plus"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
-import { currentSeasonYear } from '#shared/utils/season'
+import { currentSeasonYear, seasonChoices } from '#shared/utils/season'
 import type { PassUtilisationRow, RevenueByShowReport, ShowRevenueRow } from '#shared/utils/revenue-by-show'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -10,11 +10,12 @@ definePageMeta({ layout: 'console', title: 'Revenue by show', middleware: 'conso
 const request = useRequestFetch()
 
 const year = ref(currentSeasonYear())
+const seasons = seasonChoices(year.value)
 
 // The season, always: a treasurer comparing shows reads them within one season at a time.
 const query = computed(() => ({ kind: 'SEASON', year: String(year.value) }))
 
-const { data, status, error, refresh } = await useAsyncData(
+const { data, status, error } = await useAsyncData(
   'revenue-by-show',
   () => request<{ report: RevenueByShowReport }>('/api/admin/finance/revenue-by-show', { query: query.value }).then(response => response.report),
   { watch: [query] },
@@ -100,18 +101,13 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
       :searchable="false"
     >
       <template #actions>
-        <UInputNumber
+        <USelect
           v-model="year"
-          aria-label="Season year"
+          aria-label="Season"
           data-test="season-year"
+          :items="seasons"
+          value-key="value"
         />
-        <UButton
-          data-test="refresh-revenue"
-          variant="subtle"
-          @click="refresh()"
-        >
-          Refresh
-        </UButton>
       </template>
     </AdminToolbar>
 

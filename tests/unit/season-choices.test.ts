@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { monthChoices, saysSeasonYear, seasonChoices, SEASONS_OFFERED } from '#shared/utils/season'
+import { monthChoices, saysSeasonYear, seasonChoices, SEASONS_OFFERED, yearChoices } from '#shared/utils/season'
 
 // What the money screens offer instead of a number spinner (I-105 criterion 6, K-123 criterion 2).
 
@@ -19,6 +19,17 @@ describe('a season is chosen from a list (I-105 criterion 6)', () => {
 
   test('the turn of the century still reads as two years', () => {
     expect(saysSeasonYear(2100)).toBe('2099/2100')
+  })
+})
+
+describe('a month carries a calendar year, not a season (I-105 criterion 6)', () => {
+  test('a year reads as one year', () => {
+    expect(yearChoices(2026)[0]).toEqual({ label: '2026', value: 2026 })
+  })
+
+  test('the list runs back the same depth as the seasons', () => {
+    expect(yearChoices(2026)).toHaveLength(SEASONS_OFFERED)
+    expect(yearChoices(2026).at(-1)!.value).toBe(2021)
   })
 })
 

@@ -129,13 +129,6 @@ async function record(): Promise<void> {
           v-model="night"
           data-test="reconciliation-night"
         />
-        <UButton
-          data-test="refresh-reconciliation"
-          variant="subtle"
-          @click="refresh()"
-        >
-          Refresh
-        </UButton>
       </template>
     </AdminToolbar>
 
