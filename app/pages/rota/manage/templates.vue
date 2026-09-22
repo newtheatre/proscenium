@@ -291,6 +291,8 @@ watch(modalOpen, (nowOpen) => {
       How each venue is staffed for a performance.
     </p>
 
+    <RotaFlow step="templates" />
+
     <UPageCard
       v-if="seesEligibility"
       title="Shift eligibility"

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { saysDay, saysClock } from '#shared/utils/when'
+import { saysDay, saysClock, saysDayLong } from '#shared/utils/when'
+import { defaultBoardWindow } from '#shared/utils/rota-board'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
+import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
 definePageMeta({ layout: 'console', title: 'Rota board', middleware: 'console', docs: '/docs/rota/rota-board' })
@@ -27,11 +29,29 @@ const request = useRequestFetch()
 const toast = useToast()
 const failure = ref<string | null>(null)
 
+// A span the officer is working on rather than a filter over a fixed set of rows, so it is a
+// pair of date fields and not a K-129 condition, as the utilisation report's span is.
+const window = reactive(defaultBoardWindow(new Date()))
+
 const { data, status, refresh } = await useAsyncData(
   'rota-shifts-board',
-  () => request<{ items: RosterPerformance[] }>('/api/admin/rota/shifts/board'),
-  { default: (): { items: RosterPerformance[] } => ({ items: [] }) },
+  () => request<{ items: RosterPerformance[] }>('/api/admin/rota/shifts/board', {
+    query: { from: window.from, to: window.to },
+  }),
+  { watch: [() => window.from, () => window.to], default: (): { items: RosterPerformance[] } => ({ items: [] }) },
 )
+
+const opened = defaultBoardWindow(new Date())
+
+const activeFilters = computed<ActiveFilter[]>(() => {
+  if (window.from === opened.from && window.to === opened.to) return []
+  return [{
+    key: 'window',
+    label: `${saysDay(window.from)} to ${saysDay(window.to)}`,
+    icon: 'i-lucide-calendar-range',
+    clear: () => Object.assign(window, defaultBoardWindow(new Date())),
+  }]
+})
 
 function spanOf(startsAt: number): string {
   return `${saysDay(startsAt)} · ${saysClock(startsAt)}`
@@ -200,6 +220,30 @@ watch(modalOpen, (nowOpen) => {
       A confirmed shift is what lights up the show-night screen.
     </p>
 
+    <RotaFlow step="board" />
+
+    <AdminToolbar
+      :active="activeFilters"
+      :loading="status === 'pending'"
+      :searchable="false"
+      @clear="Object.assign(window, defaultBoardWindow(new Date()))"
+    >
+      <template #filters>
+        <UFormField label="From">
+          <DateField
+            v-model="window.from"
+            data-test="board-from"
+          />
+        </UFormField>
+        <UFormField label="Until">
+          <DateField
+            v-model="window.to"
+            data-test="board-until"
+          />
+        </UFormField>
+      </template>
+    </AdminToolbar>
+
     <div
       v-if="status === 'pending'"
       class="flex items-center gap-3 text-muted"
@@ -216,7 +260,8 @@ watch(modalOpen, (nowOpen) => {
       class="text-sm text-muted"
       data-test="board-empty"
     >
-      Nothing is stamped for a performance yet.
+      No performance between {{ saysDayLong(window.from) }} and {{ saysDayLong(window.to) }} carries
+      a shift. Widen the dates, or stamp a venue's template onto the diary.
     </p>
 
     <div
