@@ -17,19 +17,16 @@ the Students' Union at the end of a period.
 
 ## Who reaches what
 
-- **`finance.read`**, held by the Treasurer role, opens every screen in the group and every
-  figure down to the individual ledger entry.
-- **`finance.write`**, also the Treasurer's, records a reader reading, closes a period and
-  changes an SU nominal code.
-- **`finance.export`**, the Treasurer's third permission, downloads the SU export.
-- **`finance.summary`**, held by the Committee role, opens the season dashboard only, with its
-  totals but without the **Entries** buttons that drill into who rang what in.
-- **`finance.reopen`** reopens a closed period. No role holds it except the IT Manager, who
-  holds every permission.
+- **The Treasurer** opens every screen in the group and every figure down to one ledger entry,
+  records a reader reading, closes a period, changes an SU nominal code and takes the SU export.
+- **The Committee** opens the season dashboard only, with its totals but without the **Entries**
+  buttons that drill into who rang what in.
+- **The IT Manager** reopens a closed period, which nobody else does, and holds everything the
+  Treasurer holds.
 
 ::callout{icon="i-lucide-info" color="info"}
 **Nothing here moves money.** All payment is taken in person on the SU's physical SumUp reader,
-and the system records what the reader took. There is no online charge, no card data and no
+and what the reader took is recorded here. There is no online charge, no card data and no
 settlement feed to match against, so reconciliation is a person reading the reader's Z total
 and typing it in.
 ::
@@ -51,8 +48,9 @@ period: a day, a week, a month, a term or a season. The season runs from {{ SEAS
    Changing any of these reads the ledger again at once; there is nothing else to press. Every
    figure is a query, so a sale made a moment ago is already in the next read.
 3. **Revenue by source**: what each surface took on a card, Desk, Till and so on. With
-   `finance.read` each row has an **Entries** button that opens the [ledger entries](/docs/money/ledger-entries)
-   list filtered to that source and the dashboard's range.
+   the Treasurer, each row has an **Entries** button that opens the
+   [ledger entries](/docs/money/ledger-entries) list filtered to that source and the
+   dashboard's range.
 4. **Refunds**, **Foregone comps**, **Foregone discounts** and **Open variance**: the money
    handed back, the value given away rather than taken, and the sum of every night's reader
    reading that still disagrees with the ledger and has not been written off.
@@ -89,8 +87,8 @@ The range the figures cover is printed above them, from and to, as London dates.
 - **"The dashboard could not be read."**: the ledger query failed or you no longer hold a
   finance permission. Change the period and back to read it again; if it persists, check your
   role under [roles and the committee year](/docs/people/roles).
-- **The Entries buttons are missing**: you hold `finance.summary` and not `finance.read`. The
-  committee sees the season's totals, not the individual entries behind them.
+- **The Entries buttons are missing**: you are on the Committee rather than the Treasurer. The
+  committee sees the season's totals, not the entries behind them.
 
 ## Related pages
 

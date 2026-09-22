@@ -1,6 +1,6 @@
 ---
 title: Communications
-description: Sending an announcement to an audience, and reading what the system sent and what it could not.
+description: Sending an announcement to an audience, and reading what went out and what could not.
 module: Communications
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
@@ -9,11 +9,11 @@ navigation:
   icon: i-lucide-send
 ---
 
-Every message the theatre sends, whether an officer wrote it or the system did, leaves through
-one notification centre. It resolves the address at the moment of sending, honours the member's
-preferences, coalesces rapid changes into one email, logs every outcome and never hands an
-anonymised or placeholder address to the mail provider (0013). The two screens here are the
-composer for an announcement and the log of what went out. They are under **Manage,
+Every message the theatre sends, whether an officer wrote it or it went out on its own, leaves
+the same way. The address is read at the moment of sending, the member's preferences are
+honoured, a run of quick changes becomes one email, every outcome is logged, and the address of
+a closed account is never handed to the mail provider. The two screens here are where an
+announcement is written and the log of what went out. They are under **Manage,
 Communications**.
 
 ::card-group
@@ -26,24 +26,22 @@ Communications**.
   message the provider refused.
   ::
   ::card{icon="i-lucide-bell" title="Notification types" to="/docs/communications/notification-types"}
-  Every message the system sends on its own, by module, with its channel, whether a member can
+  Every message that goes out on its own, by area, with how it arrives, whether a member can
   switch it off, and which digest it can join.
   ::
 ::
 
-## Who holds the permissions
+## Who reaches them
 
-Announcing needs `comms.announce` and the send log needs `comms.operations`. Neither is granted
-to any committee role at present: only the IT Manager (the `ADMIN` role, which holds every
-permission) reaches these screens. Which officers should hold them, and whether a
-whole-membership send should need a second officer, is an open question the committee has not
-yet answered, so the grant stays narrow until it does. Roles lapse at the committee year end,
-31 July, like every standing grant.
+At present the IT Manager alone: announcing and the send log are granted to no committee role.
+Which officers should hold them, and whether a send to the whole membership should need a second
+officer, is a question the committee has not answered, and until it does the answer stays
+narrow. Roles lapse at the committee year end, 31 July, as every standing grant does.
 
 ## Where mail comes from
 
-Every email carries one of five sender identities, each a real, replyable mailbox on
-`newtheatre.org.uk` (0020): NNT Box Office (`boxoffice@`), NNT Room Bookings (`rooms@`),
+Every email comes from one of five addresses, each a real mailbox on `newtheatre.org.uk` that
+a reply reaches: NNT Box Office (`boxoffice@`), NNT Room Bookings (`rooms@`),
 NNT Training (`training@`), NNT Accounts (`accounts@`) and The New Theatre (`hello@`) for
 announcements and shift news. Nothing is sent from a no-reply address, and the worker's mail
 binding refuses any other sender.

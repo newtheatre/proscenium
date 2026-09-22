@@ -19,9 +19,9 @@ address also works typed into any phone.
 **A shift tonight is what opens these screens, not a standing role.** A confirmed door, bar or
 duty manager shift on one of tonight's performances is the ordinary way in, and it stops working
 at 04:00 with nothing to revoke. Two roles open the screens anyway when the rota is wrong at
-19:20: the Front of house manager opens the door and the duty manager's screens, and the Bar
-manager opens the till. Every such opening is recorded and flagged on the night report, so the
-committee can see when the rota is not being kept (0044).
+19:20: the Front of House Manager opens the door and the duty manager's screens, and the Bar
+Manager opens the till. Every opening of that kind is recorded and flagged on the night report,
+which is how the committee sees a rota that is not being kept.
 ::
 
 ## Who opens what
@@ -114,7 +114,7 @@ required pre-show checklist item that is still not done.
 - **"This needs a confirmed door shift on one of tonight's performances, or the front of house
   manager's role"** (or the same for a bar shift and the Bar Manager, or for a duty manager
   shift): nothing tonight gives you this screen. Find the person named, or ask the officer to assign you the shift on
-  the rota. The IT Manager is never the answer offered, on purpose.
+  the rota. The IT Manager is never offered as the answer to a rota that is wrong.
 - **"Nothing is running tonight, so there is nothing to take charge of"**: no performance at
   any venue tonight, or the only one is cancelled. Check the programme.
 - **"Show-night tools open for tonight only, and that night has ended"**: the screen was open

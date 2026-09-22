@@ -28,7 +28,8 @@ are in the other sections, and each one opens by saying which.
   31 July.
   ::
   ::card{icon="i-lucide-map" title="Finding your way" to="/docs/getting-started/finding-your-way"}
-  The four shells, the account menu, the help button, and how this documentation is kept.
+  The four faces of the theatre's screens, the account menu, the help button, and how this
+  documentation is kept.
   ::
   ::card{icon="i-lucide-book-a" title="Glossary" to="/docs/getting-started/glossary"}
   One word for each thing, so a page and a screen mean the same by it.
@@ -42,5 +43,5 @@ are in the other sections, and each one opens by saying which.
 
 Anybody with an account. Signing in is the only thing this documentation asks of you: a member
 with no role, a volunteer on tonight's door and the IT Manager all read the same pages. Where a
-page in another section says "needs the `rota.write` permission", the
-[roles page](/docs/getting-started/roles-and-permissions) says which role holds it.
+page in another section names the officer who works a screen,
+[Roles and permissions](/docs/getting-started/roles-and-permissions) says what each role opens.
