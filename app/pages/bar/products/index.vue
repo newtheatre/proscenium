@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ALLERGEN_STATES, productForm, says } from '#shared/utils/bar'
+import { ALLERGEN_STATES, PRODUCT_AGE_RESTRICTED_DEFAULT, productForm, says } from '#shared/utils/bar'
 import { barProductsList } from '#shared/utils/bar-products-list'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { AllergenState, BarCategory, BarProduct, ProductStatus } from '#shared/utils/bar'
@@ -64,7 +64,7 @@ const state = reactive<FormState>({
   categoryId: '',
   sort: 0,
   staffedOnly: false,
-  ageRestricted: false,
+  ageRestricted: PRODUCT_AGE_RESTRICTED_DEFAULT,
   allergenState: 'UNKNOWN',
 })
 
@@ -89,7 +89,7 @@ function edit(product: BarProduct | null): void {
     categoryId: product?.categoryId ?? categoryOptions.value[0]?.value ?? '',
     sort: product?.sort ?? 0,
     staffedOnly: product?.staffedOnly ?? false,
-    ageRestricted: product?.ageRestricted ?? false,
+    ageRestricted: product?.ageRestricted ?? PRODUCT_AGE_RESTRICTED_DEFAULT,
     allergenState: product?.allergenState ?? 'UNKNOWN',
     allergenNote: product?.allergenNote ?? undefined,
   })
@@ -330,16 +330,6 @@ const columns: TableColumn<BarProduct>[] = [
           to="/bar/products/new"
         >
           Set up a product
-        </UButton>
-        <UButton
-          :disabled="categoryOptions.length === 0"
-          color="neutral"
-          variant="subtle"
-          data-test="add-product"
-          icon="i-lucide-plus"
-          @click="edit(null)"
-        >
-          Add a product
         </UButton>
       </template>
     </AdminToolbar>

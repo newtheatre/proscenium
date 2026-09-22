@@ -11,7 +11,8 @@ definePageMeta({ layout: 'console', title: 'Venues', middleware: 'console', docs
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
 
-// The card itself is show night's own screen (E-113); this row only links to it.
+// The cards are show night's own screen (E-113), one list for every venue: this screen links
+// to that list once rather than once a row, where every row's link went to the same place.
 const seeEmergencyCards = computed(() => can(useViewer().value, viewEmergencyCard))
 
 const request = useRequestFetch()
@@ -197,15 +198,6 @@ const columns: TableColumn<AdminVenue>[] = [
     header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
-      seeEmergencyCards.value
-        ? h(UButton, {
-            'size': 'sm',
-            'color': 'neutral',
-            'variant': 'ghost',
-            'to': '/rota/manage/emergency',
-            'data-test': `emergency-${row.original.id}`,
-          }, () => 'Emergency card')
-        : null,
       h(UButton, {
         'size': 'sm',
         'color': 'neutral',
@@ -275,6 +267,16 @@ const columns: TableColumn<AdminVenue>[] = [
       </template>
 
       <template #actions>
+        <UButton
+          v-if="seeEmergencyCards"
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-siren"
+          to="/rota/manage/emergency"
+          data-test="emergency-cards"
+        >
+          Emergency cards
+        </UButton>
         <UButton
           data-test="add-venue"
           icon="i-lucide-plus"

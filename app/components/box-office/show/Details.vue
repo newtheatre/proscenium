@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LATECOMER_POLICIES, saysLatecomerPolicy, showForm } from '#shared/utils/programme'
+import { LATECOMER_POLICIES, saysLatecomerPolicy, showCopyChanged, showForm } from '#shared/utils/programme'
 import type { AdminShow, LatecomerPolicy, ShowReference } from '#shared/utils/programme'
 
 // The show's own copy: what the public page says and the rules every performance inherits (D-121).
@@ -10,7 +10,7 @@ const props = defineProps<{
   seasons: ShowReference[]
 }>()
 
-const emit = defineEmits<{ saved: [] }>()
+const emit = defineEmits<{ saved: [], changed: [boolean] }>()
 
 const toast = useToast()
 const saving = ref(false)
@@ -44,6 +44,12 @@ watchEffect(() => {
     seasonId: one.seasonId,
   })
 })
+
+// The page guards the tab change with this, since this section unmounts when another opens and
+// takes whatever is typed with it (D-132 criterion 9).
+const changed = computed(() => showCopyChanged(copy, props.show))
+watch(changed, value => emit('changed', value), { immediate: true })
+onUnmounted(() => emit('changed', false))
 
 const blank = (value: string): string | null => (value.trim() ? value.trim() : null)
 
