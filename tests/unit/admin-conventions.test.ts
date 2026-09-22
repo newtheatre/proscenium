@@ -754,6 +754,15 @@ describe('every console control says what it is (K-101 criterion 5, issue 1151 i
     expect(requests).toContain('\'aria-label\': `Answer ${row.original.name}\'s request`')
   })
 
+  // The settings screen repeats the same two words down every row, so each pair says which
+  // setting it acts on rather than leaving a list of buttons all called Save.
+  test('an action that repeats down a list of settings names the setting', async () => {
+    const settings = await Bun.file('app/pages/admin/settings.vue').text()
+    const repeated = openingTags(settings, 'UButton').filter(tag => /:data-test="`(?:save|revert)-/.test(tag))
+    expect(repeated.length).toBeGreaterThan(0)
+    expect(repeated.filter(tag => !/:aria-label=/.test(tag))).toEqual([])
+  })
+
   test('safety-critical training says so in words wherever a colour says it', async () => {
     const coloured = (await consoleFiles()).filter(file => file.source.includes('safetyCritical ?'))
     expect(coloured.length).toBeGreaterThan(0)
