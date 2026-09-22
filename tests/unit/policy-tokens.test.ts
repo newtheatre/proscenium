@@ -180,7 +180,9 @@ describe('what a page renders (criteria 2, 4, 5)', () => {
     const resolved = resolvePolicyTree(tree(['p', {}, 'free: {{REFUND_UNPAID_CANCELLATION_FREE}}']), values)
     const rendered = JSON.stringify(resolved)
     expect(rendered).toContain('policy-unenforced')
-    expect(rendered).toContain('not enforced yet')
+    expect(rendered).toContain('applied by hand')
+    // Nothing on a public page is promised for later (copy-style section 3).
+    expect(rendered).not.toMatch(/not yet|not enforced yet/)
   })
 
   test('a binding node becomes the live value, not a blank', () => {

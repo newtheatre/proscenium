@@ -175,7 +175,7 @@ forbids, and it is why the resolver handles the binding node rather than trustin
 Three things a token can be, and all three are visible on the page rather than silent:
 
 - **Resolved**: the live value, formatted for its unit.
-- **Stated but unenforced**: the value, marked "not enforced yet". A key is enforced when the
+- **Stated but unenforced**: the value, marked "applied by hand". A key is enforced when the
   server actually reads it, which `ENFORCED_KEYS` records and a test greps the server to verify,
   so the mark cannot drift from the truth (criterion 5).
 - **Unresolvable**: a visible error naming the key, never a blank and never stale text. The build

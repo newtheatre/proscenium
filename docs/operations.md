@@ -550,7 +550,7 @@ release, no deploy. The page shows the new value on its next load.
 Three things worth knowing before doing it:
 
 - **A rule the system does not enforce says so on the page.** A setting nothing in the server reads
-  is marked "not enforced yet" beside its value, so publishing a rule the code does not apply is
+  is marked "applied by hand" beside its value, so publishing a rule the code does not apply is
   visible to the reader rather than a quiet lie.
 - **A setting that holds personal data can never be quoted.** CI refuses a token naming one, and
   the endpoint that answers the page refuses the key, so neither a preview nor a deploy publishes

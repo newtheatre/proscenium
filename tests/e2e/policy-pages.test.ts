@@ -96,7 +96,7 @@ describe.skipIf(skip !== null)('a rule nothing enforces says so (criterion 5)', 
   test('the unpaid cancellation rule is quoted and marked as not enforced', async () => {
     const html = await pageHtml('/policies/booking')
     expect(html).toContain('policy-unenforced')
-    expect(html).toContain('not enforced yet')
+    expect(html).toContain('applied by hand')
   })
 
   test('an enforced rule on the same page carries no such mark', async () => {
