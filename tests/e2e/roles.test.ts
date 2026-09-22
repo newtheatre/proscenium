@@ -151,7 +151,7 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     const session = await (await fetch(`${app.baseURL}/api/auth/session`, { headers: { cookie } })).json()
     const response = await send('DELETE', '/api/admin/roles', { userId: session.user.id, role: 'ADMIN' }, cookie)
     expect(response.status).toBe(409)
-    expect((await response.json()).statusMessage ?? '').toMatch(/last administrator/i)
+    expect((await response.json()).statusMessage ?? '').toMatch(/last IT Manager/i)
   })
 
   // "Usable" excludes disabled accounts, so a disabled second administrator must not satisfy
