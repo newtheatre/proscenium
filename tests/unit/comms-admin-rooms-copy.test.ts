@@ -73,7 +73,7 @@ describe('one truth about what a room override takes (C-106 criterion 7)', () =>
   })
 
   test('the words beside a field say what the field accepts', () => {
-    expect(saysOverrideFloor('noticeHours')).toBe('Nought is a real answer, meaning none needed')
+    expect(saysOverrideFloor('noticeHours')).toBe('0 means none needed')
     expect(saysOverrideFloor('minBookingMinutes')).toBe('One or more')
   })
 })
