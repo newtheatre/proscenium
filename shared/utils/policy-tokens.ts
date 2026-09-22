@@ -147,8 +147,8 @@ function nodesFor(key: string, values: PolicyValues): unknown[] {
       test: 'policy-unenforced',
       key,
       css: UNENFORCED_CLASS,
-      text: `${value.text} (not enforced yet)`,
-      title: 'The committee has stated this rule; the system does not enforce it yet',
+      text: `${value.text} (applied by hand)`,
+      title: 'The committee has stated this rule and we apply it by hand, not automatically',
     })
   }
   return span({ test: 'policy-value', key, css: VALUE_CLASS, text: value.text })

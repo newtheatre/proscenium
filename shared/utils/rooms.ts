@@ -57,7 +57,7 @@ export const ROOM_OVERRIDE_FLOORS = {
 export type RoomOverrideKey = keyof typeof ROOM_OVERRIDE_FLOORS
 
 export function saysOverrideFloor(key: RoomOverrideKey): string {
-  return ROOM_OVERRIDE_FLOORS[key] === 0 ? 'Nought is a real answer, meaning none needed' : 'One or more'
+  return ROOM_OVERRIDE_FLOORS[key] === 0 ? '0 means none needed' : 'One or more'
 }
 
 export const roomHoursForm = z.object({
