@@ -40,7 +40,7 @@ async function guardMergeable(winnerId: string, loserId: string): Promise<{ winn
   if (await wouldStrandTheSystem('ADMIN', loserId)) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'That is the last administrator: grant another before merging this one away',
+      statusMessage: 'That is the last IT Manager: grant another before merging this one away',
     })
   }
 

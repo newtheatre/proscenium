@@ -719,7 +719,7 @@ was awarded before is revoked with a reason and the corrected set is issued in i
 write. Anybody dropped keeps their absence on the register as evidence and is emailed the same
 "sorry we missed you" note they would have had on the night.
 
-Past that window the screen says so, and the only correction left is an administrator revoking the
+Past that window the screen says so, and the only correction left is the IT Manager revoking the
 record and granting it again.
 
 ## Logging training that was delivered off-system

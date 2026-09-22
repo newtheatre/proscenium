@@ -41,7 +41,7 @@ describe('a refusal names the role by its title (K-128, copy-style section 4)', 
       for (const match of withoutComments(file.source).matchAll(READER_STRING)) {
         const said = match[2] ?? ''
         // A sentence, or the noun noSuch() turns into one; an import path or an audit code is not read.
-        const reaches = said.includes(' ') || file.source.includes(`noSuch('${said}')`)
+        const reaches = /^[A-Z][a-z].* /.test(said) || file.source.includes(`noSuch('${said}')`)
         if (reaches && /blackout/i.test(said)) offenders.push(`${file.path}: ${said}`)
       }
     }

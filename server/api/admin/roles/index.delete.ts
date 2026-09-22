@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   if (await wouldStrandTheSystem(input.role, input.userId)) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'That is the last administrator: grant another before revoking this one',
+      statusMessage: 'That is the last IT Manager: grant another before revoking this one',
     })
   }
 

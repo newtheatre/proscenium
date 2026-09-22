@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   if (unbounded && !resolved.permissions.has('training.override')) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Signing something off as never expiring is an administrator\'s to do',
+      statusMessage: 'Signing something off as never expiring is the IT Manager\'s to do',
     })
   }
 

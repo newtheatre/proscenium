@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
   if (expiresAt !== null && await wouldStrandTheSystem(input.role, subject.id)) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'That is the last administrator: grant another before dating this one',
+      statusMessage: 'That is the last IT Manager: grant another before dating this one',
     })
   }
 
