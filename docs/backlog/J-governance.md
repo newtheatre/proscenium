@@ -7,7 +7,7 @@ with a tested restore drill, and operator documentation that lives in the app. T
 audit history is not imported in any shape (0030), which is what withdrew J-108. Handover mode itself is V2, shipping before July 2027 so the
 2027/28 committee is the first to be handed the system by the system.
 
-Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
+Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
 
 ## Open questions
 
@@ -287,3 +287,45 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
   3. The orientation states the role's expiry date (the next committee-year boundary) up front.
   4. The orientation is dismissible and permanently re-reachable, and completion is recorded per person per role.
 - Source: Prompt Book J-2, P7; audit SD-8 (handover starting from an accurate register)
+
+## J-204: A task-first page per shift
+
+- Role: Committee
+- Phase: V2
+- Story: As a volunteer picking up a door shift, I want a page written around the shift I am about to work so that I read the three things I need rather than the screen's whole reference.
+- Depends on: J-109
+- Acceptance criteria:
+  1. Each shift role in a venue template (door, bar, duty manager, backstage) has a task-first page: what to do before the house opens, during, and after, in that order, with each step linking to the reference page for the screen it uses.
+  2. The page for tonight's own shift is offered from the show-night hub and from the shift on My rota, so it is reached without searching.
+  3. A task-first page names no permission and no setting: it says what the reader presses and what they will see.
+  4. The reference pages stay as they are, one per screen; a task-first page quotes them rather than repeating them, and a step whose reference page has moved fails the documentation check.
+  5. Each page carries the same provenance line and report-drift action as every other page (J-109 criteria 3 and 4).
+- Source: Issue 1154 item 9, raised by the operator documentation sweep of 22 September 2026; J-109
+
+## J-205: A printable pack per venue
+
+- Role: Front of House Manager
+- Phase: V2
+- Story: As the Front of House Manager, I want one printable pack per venue so that a night with no signal or no charged phone still has the emergency card, the checklist and the contacts on paper.
+- Depends on: J-109
+- Acceptance criteria:
+  1. A venue's pack is one document: its emergency card, its pre-show and post-show checklist, the contacts for the night, and the Challenge 25 refusal wording.
+  2. The pack is generated from the live configuration rather than typed, so a changed assembly point or a changed checklist item reaches the next print.
+  3. The pack carries the date it was generated, and states that a pack older than a configured age is to be reprinted.
+  4. It prints legibly in black and white on A4 without a browser's headers and footers, and is reachable by anybody who can open the venue's emergency card.
+  5. Nothing personal is printed beyond the names and numbers the emergency card already carries.
+- Source: Issue 1154 item 9, raised by the operator documentation sweep of 22 September 2026; E-113 (the emergency card), J-109
+
+## J-206: A page declares the screen it documents
+
+- Role: IT Manager
+- Phase: V2
+- Story: As the IT Manager, I want each documentation page to declare the screen it documents so that the link between a page and a screen is data rather than a pair of hand-kept lists.
+- Depends on: J-109
+- Acceptance criteria:
+  1. Each page carries a `screen` front-matter field naming the route it documents, and a page that documents no screen (a glossary, an overview) says so explicitly rather than leaving the field out.
+  2. The `docs` entry in a screen's page meta is derived from those declarations, so a rename cannot leave the two disagreeing.
+  3. The documentation check fails a `screen` naming a route that does not exist, a route claimed by two pages, and a screen that no page claims.
+  4. The page shows a link to the screen it documents, and the screen's help button continues to open the page.
+  5. The pictures for a page are taken against the route it declares, so the shot manifest names the page rather than repeating the route.
+- Source: Issue 1154 item 9, raised by the operator documentation sweep of 22 September 2026; J-109, 0076
