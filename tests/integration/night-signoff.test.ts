@@ -50,7 +50,7 @@ const REPORT: NightReport = {
     bar: { tenders: [], compsPence: 0, discountsPence: 0 },
   },
   incidents: [],
-  ageChecks: { accepted: 0, refused: 0 },
+  ageChecks: { accepted: 0, refused: 0, notRequired: 0 },
   milestones: [],
   staffing: [],
   bar: { revenuePence: 0, itemsSold: 0 },

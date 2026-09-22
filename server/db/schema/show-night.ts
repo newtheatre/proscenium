@@ -167,6 +167,7 @@ export const ageChecks = sqliteTable('age_checks', {
   checkedBy: text('checked_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
   outcome: text('outcome').notNull(),
   // Which side of the outcome is populated, never both: what ID was accepted, or why refused.
+  // Visibly over 25 (NOT_REQUIRED) populates neither (0085).
   idType: text('id_type'),
   reason: text('reason'),
   // Appearance, never a name; the form's own guidance is what actually keeps a name out.
@@ -182,14 +183,15 @@ export const ageChecks = sqliteTable('age_checks', {
   // One correction per entry: a second one would leave the chain ambiguous about which
   // correction is current (E-118 criterion 3).
   uniqueIndex('age_checks_one_correction').on(table.supersedesId),
-  check('age_checks_outcome_values', sql`${table.outcome} IN ('ACCEPTED', 'REFUSED')`),
+  check('age_checks_outcome_values', sql`${table.outcome} IN ('ACCEPTED', 'REFUSED', 'NOT_REQUIRED')`),
   check('age_checks_id_type_values', sql`${table.idType} IS NULL OR ${table.idType} IN ('PASSPORT', 'DRIVING_LICENCE', 'PASS_CARD', 'OTHER')`),
   check('age_checks_reason_values', sql`${table.reason} IS NULL OR ${table.reason} IN ('NO_ID_SHOWN', 'ID_LOOKED_FALSE', 'APPEARED_UNDERAGE', 'OTHER')`),
-  // Exactly one side of the outcome carries data: accepted names the ID, refused names why,
-  // and neither ever carries both (E-118 criterion 1).
+  // Accepted names the ID, refused names why, and visibly over 25 names neither: no outcome
+  // ever carries both (E-118 criterion 1, 0085).
   check('age_checks_outcome_shape', sql`
     (${table.outcome} = 'ACCEPTED' AND ${table.idType} IS NOT NULL AND ${table.reason} IS NULL)
     OR (${table.outcome} = 'REFUSED' AND ${table.reason} IS NOT NULL AND ${table.idType} IS NULL)
+    OR (${table.outcome} = 'NOT_REQUIRED' AND ${table.idType} IS NULL AND ${table.reason} IS NULL)
   `),
   check('age_checks_no_self_supersede', sql`${table.supersedesId} IS NULL OR ${table.supersedesId} <> ${table.id}`),
 ])

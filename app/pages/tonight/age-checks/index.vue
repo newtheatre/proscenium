@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
-import { ID_TYPES, REFUSAL_REASONS, ageCheckReady, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
+import { AGE_CHECK_OUTCOMES, ID_TYPES, REFUSAL_REASONS, ageCheckReady, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { saysClock } from '#shared/utils/when'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
@@ -100,7 +100,7 @@ const blankForm = (): FormState => ({
   notes: '',
 })
 
-const outcomeOptions = (['ACCEPTED', 'REFUSED'] as const).map(value => ({ label: saysOutcome(value), value }))
+const outcomeOptions = AGE_CHECK_OUTCOMES.map(value => ({ label: saysOutcome(value), value }))
 const idTypeOptions = ID_TYPES.map(value => ({ label: saysIdType(value), value }))
 const reasonOptions = REFUSAL_REASONS.map(value => ({ label: saysRefusalReason(value), value }))
 
@@ -110,11 +110,18 @@ const logFailure = ref<string | null>(null)
 const saving = ref(false)
 
 // Picking a side clears the other one, so a value the form has stopped asking about is never
-// still sitting in it when the write goes (E-118 criterion 1).
+// still sitting in it when the write goes (E-118 criterion 1). Visibly over 25 asks for neither.
 function chooseOutcome(form: { outcome: AgeCheckOutcome, idType: IdType | undefined, reason: RefusalReason | undefined }, outcome: AgeCheckOutcome): void {
   form.outcome = outcome
-  if (outcome === 'ACCEPTED') form.reason = undefined
-  else form.idType = undefined
+  if (outcome !== 'ACCEPTED') form.idType = undefined
+  if (outcome !== 'REFUSED') form.reason = undefined
+}
+
+// What the entry says under its description: the ID, the reason, or that no ID was asked for.
+function saysBasis(entry: { outcome: AgeCheckOutcome, idType: IdType | null, reason: RefusalReason | null }): string {
+  if (entry.outcome === 'ACCEPTED') return saysIdType(entry.idType!)
+  if (entry.outcome === 'REFUSED') return saysRefusalReason(entry.reason!)
+  return 'No ID asked for'
 }
 
 const logReady = computed(() => ageCheckReady({
@@ -255,11 +262,14 @@ async function submitCorrect(): Promise<void> {
             <span class="text-sm font-semibold">{{ saysOutcome(entry.outcome) }}</span>
             <span class="text-xs text-muted">{{ saysClock(entry.createdAt) }}</span>
           </div>
-          <p class="text-sm">
+          <p
+            v-if="entry.description"
+            class="text-sm"
+          >
             {{ entry.description }}
           </p>
           <p class="text-xs text-muted">
-            {{ entry.outcome === 'ACCEPTED' ? saysIdType(entry.idType!) : saysRefusalReason(entry.reason!) }}
+            {{ saysBasis(entry) }}
             by {{ entry.checkedByName }}
             <span v-if="entry.supersedesId"> · corrects an earlier entry</span>
             <span v-if="entry.supersededBy"> · corrected later</span>
@@ -312,7 +322,7 @@ async function submitCorrect(): Promise<void> {
                Everything the register does not need every time folds away (E-118 criterion 1). -->
           <UFormField label="Outcome">
             <div
-              class="grid grid-cols-2 gap-2"
+              class="grid grid-cols-3 gap-2"
               data-test="log-outcome"
             >
               <UButton
@@ -330,7 +340,10 @@ async function submitCorrect(): Promise<void> {
             </div>
           </UFormField>
 
-          <UFormField :label="logForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'">
+          <UFormField
+            v-if="logForm.outcome !== 'NOT_REQUIRED'"
+            :label="logForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'"
+          >
             <div
               v-if="logForm.outcome === 'ACCEPTED'"
               class="grid grid-cols-2 gap-2"
@@ -370,6 +383,7 @@ async function submitCorrect(): Promise<void> {
           <UFormField
             label="Who you checked"
             description="Appearance, never a name: tall man, grey coat."
+            :hint="logForm.outcome === 'NOT_REQUIRED' ? 'Optional' : undefined"
           >
             <UInput
               v-model="logForm.description"
@@ -473,7 +487,7 @@ async function submitCorrect(): Promise<void> {
 
           <UFormField label="Outcome">
             <div
-              class="grid grid-cols-2 gap-2"
+              class="grid grid-cols-3 gap-2"
               data-test="correct-outcome"
             >
               <UButton
@@ -491,7 +505,10 @@ async function submitCorrect(): Promise<void> {
             </div>
           </UFormField>
 
-          <UFormField :label="correctForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'">
+          <UFormField
+            v-if="correctForm.outcome !== 'NOT_REQUIRED'"
+            :label="correctForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'"
+          >
             <div
               v-if="correctForm.outcome === 'ACCEPTED'"
               class="grid grid-cols-2 gap-2"
@@ -531,6 +548,7 @@ async function submitCorrect(): Promise<void> {
           <UFormField
             label="Who you checked"
             description="Appearance, never a name."
+            :hint="correctForm.outcome === 'NOT_REQUIRED' ? 'Optional' : undefined"
           >
             <UInput
               v-model="correctForm.description"

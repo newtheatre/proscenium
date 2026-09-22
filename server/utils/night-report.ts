@@ -144,7 +144,7 @@ export async function reportIncidents(performanceId: string): Promise<ReportInci
   return rows.map(row => ({ ...row, followUpRequired: Boolean(row.followUpRequired), followUpClosed: Boolean(row.followUpClosed) }))
 }
 
-export interface ReportAgeChecks { accepted: number, refused: number }
+export interface ReportAgeChecks { accepted: number, refused: number, notRequired: number }
 
 // Current entries only: a superseded outcome is not what actually happened, only the corrected
 // row is (E-118 criterion 3). Licensing evidence stays in the register itself; this is a count.
@@ -152,7 +152,8 @@ export function reportAgeChecksQuery(performanceId: string): SQL {
   return sql`
     SELECT
       coalesce(sum(CASE WHEN outcome = 'ACCEPTED' THEN 1 ELSE 0 END), 0) AS accepted,
-      coalesce(sum(CASE WHEN outcome = 'REFUSED' THEN 1 ELSE 0 END), 0) AS refused
+      coalesce(sum(CASE WHEN outcome = 'REFUSED' THEN 1 ELSE 0 END), 0) AS refused,
+      coalesce(sum(CASE WHEN outcome = 'NOT_REQUIRED' THEN 1 ELSE 0 END), 0) AS notRequired
     FROM age_checks
     WHERE performance_id = ${performanceId}
       AND id NOT IN (SELECT supersedes_id FROM age_checks WHERE supersedes_id IS NOT NULL)
@@ -161,7 +162,7 @@ export function reportAgeChecksQuery(performanceId: string): SQL {
 
 export async function reportAgeChecks(performanceId: string): Promise<ReportAgeChecks> {
   const [row] = await db.all<ReportAgeChecks>(reportAgeChecksQuery(performanceId))
-  return row ?? { accepted: 0, refused: 0 }
+  return row ?? { accepted: 0, refused: 0, notRequired: 0 }
 }
 
 export interface ReportMilestone { id: string, label: string, composedAt: number, supersededBy: string | null }

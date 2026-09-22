@@ -302,7 +302,7 @@ interface SeedAgeCheck {
   slug: string
   performance: string | null
   checker: string
-  outcome: 'ACCEPTED' | 'REFUSED'
+  outcome: 'ACCEPTED' | 'REFUSED' | 'NOT_REQUIRED'
   idType?: 'PASSPORT' | 'DRIVING_LICENCE' | 'PASS_CARD' | 'OTHER'
   reason?: 'NO_ID_SHOWN' | 'ID_LOOKED_FALSE' | 'APPEARED_UNDERAGE' | 'OTHER'
   description: string
@@ -312,8 +312,9 @@ interface SeedAgeCheck {
   supersedes?: string
 }
 
-// Both outcomes, both shapes the CHECK allows, and one recorded away from any performance.
+// All three outcomes, every shape the CHECK allows, and one recorded away from any performance.
 const AGE_CHECKS: SeedAgeCheck[] = [
+  { slug: 'not-required', performance: 'the-seagull/tonight', checker: 'devon', outcome: 'NOT_REQUIRED', description: '', product: 'Lager, pint', hoursAgo: 2 },
   { slug: 'accepted-passport', performance: 'the-seagull/tonight', checker: 'devon', outcome: 'ACCEPTED', idType: 'PASSPORT', description: 'Fair hair, denim jacket, ordered at the interval', product: 'Lager, can', hoursAgo: 2 },
   { slug: 'accepted-licence', performance: 'the-seagull/tonight', checker: 'devon', outcome: 'ACCEPTED', idType: 'DRIVING_LICENCE', description: 'Tall, in a red scarf', product: 'House red, 175ml glass', hoursAgo: 2 },
   { slug: 'refused-no-id', performance: 'the-seagull/tonight', checker: 'devon', outcome: 'REFUSED', reason: 'NO_ID_SHOWN', description: 'Group of three at the bar, one with no identification', product: 'Gin, double', notes: 'Offered a soft drink instead, which was taken.', hoursAgo: 1 },
