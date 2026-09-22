@@ -7,6 +7,7 @@ import {
   sessionSignupsQuery,
   tonightsRotaQuery,
 } from '#server/utils/announcements'
+import { saysAudienceCount } from '#shared/utils/announcements'
 import { joinsDigest, messageType } from '#shared/utils/notifications'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -186,6 +187,37 @@ describe('the announce composer\'s session picker (H-924)', () => {
       expect(byDate.map(row => row.id)).toEqual(['ts-2'])
 
       expect(read(database, announceSessionsQuery('rigging'))).toEqual([])
+    })
+  })
+})
+
+// Criterion 7: the count a composer is shown before writing anything is the same resolution a
+// send uses, so it can never quote a number the send would not reach.
+describe('the audience count is the audience (criterion 7)', () => {
+  test('the count matches the rows the same query resolves', async () => {
+    await withDatabase((database) => {
+      const current = person(database)
+      const gone = person(database, { anonymisedAt: 1_700_000_000 })
+
+      database.batch([
+        ['INSERT INTO memberships (id, user_id, starts_on, expires_on, source) VALUES (?, ?, ?, ?, ?)',
+          'm-count-1', current, '2020-01-01', '2099-01-01', 'MANUAL'],
+        ['INSERT INTO memberships (id, user_id, starts_on, expires_on, source) VALUES (?, ?, ?, ?, ?)',
+          'm-count-2', gone, '2020-01-01', '2099-01-01', 'MANUAL'],
+      ])
+
+      const ids = read<{ id: string }>(database, allCurrentMembersQuery('2026-01-01', 14)).map(row => row.id)
+      expect(ids).toEqual([current])
+      expect(saysAudienceCount(ids.length)).toBe('1 person will get this')
+    })
+  })
+
+  test('an audience nobody is in says so rather than reading as nought people', async () => {
+    await withDatabase((database) => {
+      person(database)
+      const ids = read<{ id: string }>(database, allCurrentMembersQuery('2026-01-01', 14))
+      expect(ids).toHaveLength(0)
+      expect(saysAudienceCount(ids.length)).toBe('Nobody is in this audience')
     })
   })
 })

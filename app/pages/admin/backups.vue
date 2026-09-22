@@ -141,6 +141,17 @@ onMounted(load)
       title="Restore drill"
       description="Proves the backup by restoring it: the counts and the money totals are checked against the live ones."
     >
+      <p
+        class="mb-3 text-sm text-muted"
+        data-test="where-restoring-happens"
+      >
+        Restoring is not done on this screen. The IT Manager runs a drill at the command line,
+        step by step, from
+        <ULink to="/docs/system/backups-and-restore">
+          Backups and restore
+        </ULink>, and records the outcome here afterwards.
+      </p>
+
       <template v-if="status">
         <UAlert
           v-if="status.overdue"

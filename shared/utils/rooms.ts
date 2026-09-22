@@ -44,6 +44,22 @@ export const roomForm = z.object({
 
 export type RoomInput = z.output<typeof roomForm>
 
+// The smallest number each override takes, declared once so a field, its hint and the write path
+// cannot disagree (C-106 criterion 7). Only notice takes nought, meaning none needed.
+export const ROOM_OVERRIDE_FLOORS = {
+  minBookingMinutes: 1,
+  maxBookingHours: 1,
+  noticeHours: 0,
+  horizonWeeks: 1,
+  activeBookingsCap: 1,
+} as const
+
+export type RoomOverrideKey = keyof typeof ROOM_OVERRIDE_FLOORS
+
+export function saysOverrideFloor(key: RoomOverrideKey): string {
+  return ROOM_OVERRIDE_FLOORS[key] === 0 ? 'Nought is a real answer, meaning none needed' : 'One or more'
+}
+
 export const roomHoursForm = z.object({
   weekday: z.number().int().min(0).max(6),
   opens: z.string().regex(TIME, 'A time reads as HH:MM'),

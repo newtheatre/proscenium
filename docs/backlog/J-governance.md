@@ -77,7 +77,9 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
   3. Values are validated per key (type, range, cross-field rules); an invalid value is refused and never stored, and an impossible date such as a 29 February year boundary is a named refusal case.
   4. Enforcement reads the setting at the write path, so the published policy and the enforced policy are the same document; a changed value takes effect without a deploy.
   5. Every change writes an audit entry with the from and to values.
-- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents)
+  6. A setting nothing reads says what is true of it, that nothing enforces it, rather than
+     apologising or pointing at a future. Nothing on the surface says "yet".
+- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10).
 
 ## J-105: Blast-radius preview, typed confirmation and one-action revert
 
@@ -119,7 +121,10 @@ Stories: 14 (10 MVP, 3 V2, 1 resolved: J-108 superseded by 0030).
   3. A restore drill runs on a configured interval (a number of days, not a term: no term dates exist anywhere in the system, 0034): restore into an isolated environment and reconcile row counts and money totals against production; the outcome (date, operator, result) is recorded in the audit trail.
   4. The operations dashboard shows the date of the last successful drill and flags it when the configured interval has passed without one.
   5. The drill procedure lives in the in-app operator documentation (J-109), current enough that a successor can run it cold.
-- Source: Prompt Book K-1 (tested restore each term), P7; audit EW-3 (Time Travel restore points, weekly exports); Get-In part 6 (one blast radius)
+  6. The screen says where a restore happens and who does one. Restoring is not a screen, so the
+     screen that records drills says so and links to the procedure rather than leaving a reader
+     to look for a button that does not exist.
+- Source: Prompt Book K-1 (tested restore each term), P7; audit EW-3 (Time Travel restore points, weekly exports); Get-In part 6 (one blast radius). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10).
 
 ## J-108: The audit archive import (superseded)
 

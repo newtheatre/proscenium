@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
-import { WEEKDAYS, minutesOpen, roomForm } from '#shared/utils/rooms'
+import { ROOM_OVERRIDE_FLOORS, WEEKDAYS, minutesOpen, roomForm, saysOverrideFloor } from '#shared/utils/rooms'
 import { roomsList } from '#shared/utils/rooms-list'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
@@ -470,19 +470,19 @@ const columns: TableColumn<Room>[] = [
               <div class="space-y-4 pt-4">
                 <p class="text-sm text-muted">
                   Left blank, a room follows the estate settings shown under each box. A number
-                  here applies to this room only, and nought is a real answer meaning none needed.
+                  here applies to this room only. Each box says the smallest it accepts.
                 </p>
 
                 <div class="grid gap-4 sm:grid-cols-2">
                   <UFormField
                     label="Shortest booking"
                     name="minBookingMinutes"
-                    :description="fallsBackTo(estate.minBookingMinutes)"
+                    :description="`${fallsBackTo(estate.minBookingMinutes)} ${saysOverrideFloor('minBookingMinutes')}.`"
                     hint="Minutes"
                   >
                     <UInputNumber
                       v-model="state.minBookingMinutes"
-                      :min="1"
+                      :min="ROOM_OVERRIDE_FLOORS.minBookingMinutes"
                       class="w-full"
                       data-test="room-min-minutes"
                     />
@@ -491,12 +491,12 @@ const columns: TableColumn<Room>[] = [
                   <UFormField
                     label="Longest booking"
                     name="maxBookingHours"
-                    :description="fallsBackTo(estate.maxBookingHours)"
+                    :description="`${fallsBackTo(estate.maxBookingHours)} ${saysOverrideFloor('maxBookingHours')}.`"
                     hint="Hours"
                   >
                     <UInputNumber
                       v-model="state.maxBookingHours"
-                      :min="1"
+                      :min="ROOM_OVERRIDE_FLOORS.maxBookingHours"
                       class="w-full"
                       data-test="room-max-hours"
                     />
@@ -505,12 +505,12 @@ const columns: TableColumn<Room>[] = [
                   <UFormField
                     label="Notice needed"
                     name="noticeHours"
-                    :description="fallsBackTo(estate.noticeHours)"
+                    :description="`${fallsBackTo(estate.noticeHours)} ${saysOverrideFloor('noticeHours')}.`"
                     hint="Hours"
                   >
                     <UInputNumber
                       v-model="state.noticeHours"
-                      :min="0"
+                      :min="ROOM_OVERRIDE_FLOORS.noticeHours"
                       class="w-full"
                       data-test="room-notice-hours"
                     />
@@ -519,12 +519,12 @@ const columns: TableColumn<Room>[] = [
                   <UFormField
                     label="Booking opens"
                     name="horizonWeeks"
-                    :description="fallsBackTo(estate.horizonWeeks)"
+                    :description="`${fallsBackTo(estate.horizonWeeks)} ${saysOverrideFloor('horizonWeeks')}.`"
                     hint="Weeks ahead"
                   >
                     <UInputNumber
                       v-model="state.horizonWeeks"
-                      :min="1"
+                      :min="ROOM_OVERRIDE_FLOORS.horizonWeeks"
                       class="w-full"
                       data-test="room-horizon-weeks"
                     />
@@ -533,11 +533,11 @@ const columns: TableColumn<Room>[] = [
                   <UFormField
                     label="Bookings one member may hold"
                     name="activeBookingsCap"
-                    :description="fallsBackTo(estate.activeBookingsCap)"
+                    :description="`${fallsBackTo(estate.activeBookingsCap)} ${saysOverrideFloor('activeBookingsCap')}.`"
                   >
                     <UInputNumber
                       v-model="state.activeBookingsCap"
-                      :min="1"
+                      :min="ROOM_OVERRIDE_FLOORS.activeBookingsCap"
                       class="w-full"
                       data-test="room-cap"
                     />

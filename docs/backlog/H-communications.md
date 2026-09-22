@@ -144,7 +144,10 @@ Stories: 14 total (9 MVP, 4 V2, 1 Later).
   4. The composer shows a resolved recipient count and a preview before sending; sending records an audit entry with sender, audience definition and count, and per-recipient outcomes land in the send log.
   5. Recipient resolution passes through the undeliverable-address protection (H-107).
   6. Members with email off for announcements still receive the in-app inbox entry.
-- Source: Prompt Book H-1; audit RM-1 (all admins emailed each request, subject to preferences), PR-10 (night reports emailed to configured recipients).
+  7. The count comes before the draft: choosing an audience says how many people it resolves to,
+     without a subject or a message being written first. After a send the composer keeps what was
+     sent on screen and says plainly that it went, rather than emptying itself.
+- Source: Prompt Book H-1; audit RM-1 (all admins emailed each request, subject to preferences), PR-10 (night reports emailed to configured recipients). Criterion 7 comes from the console review of 21 September 2026 (issue 1151 item 10).
 
 ## H-109: Templates and Europe/London formatting
 
