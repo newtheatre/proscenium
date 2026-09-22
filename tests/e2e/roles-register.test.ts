@@ -252,7 +252,7 @@ describe.skipIf(skip !== null)('a grant carries its expiry, its note and its his
     }, cookie)
 
     expect(response.status).toBe(409)
-    expect((await response.json()).statusMessage ?? '').toMatch(/last administrator/i)
+    expect((await response.json()).statusMessage ?? '').toMatch(/last IT Manager/i)
     expect(read<{ expires_at: number | null }>('SELECT expires_at FROM role_grants WHERE user_id = ? AND role = ?', self, 'ADMIN')!.expires_at).toBeNull()
   })
 })
@@ -312,7 +312,7 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
       await waitFor(view, `document.querySelector('[data-test="confirm-revoke-role-verb"]')`)
       await click(view, '[data-test="confirm-revoke-role-verb"]')
       await waitFor(view, `document.querySelector('[data-test="confirm-revoke-role-failure"]')`)
-      expect(await textOf(view, '[data-test="confirm-revoke-role-failure"]')).toMatch(/last administrator/i)
+      expect(await textOf(view, '[data-test="confirm-revoke-role-failure"]')).toMatch(/last IT Manager/i)
     }
     finally {
       view.close()

@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 409,
       statusMessage: `That session was held more than ${windowDays} days ago. `
-        + 'Correcting it now is an administrator revoking the record and granting it again',
+        + 'Correcting it now is the IT Manager revoking the record and granting it again',
     })
   }
 

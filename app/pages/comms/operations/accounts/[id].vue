@@ -60,7 +60,7 @@ const columns: TableColumn<PersonHistoryRow>[] = [
       h('div', { class: 'font-mono text-sm' }, row.original.type),
       // Below sm the channel and the enqueued time are hidden: shown here instead, so a phone
       // keeps the outcome and the sent time in view without losing what they said (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.channel}, enqueued ${saysWhen(row.original.createdAt)}`),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.channel}, queued ${saysWhen(row.original.createdAt)}`),
     ]),
   },
   { accessorKey: 'channel', header: 'Channel', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
@@ -71,7 +71,7 @@ const columns: TableColumn<PersonHistoryRow>[] = [
   },
   {
     id: 'createdAt',
-    header: 'Enqueued',
+    header: 'Queued',
     meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => saysWhen(row.original.createdAt),
   },

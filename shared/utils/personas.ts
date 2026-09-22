@@ -44,5 +44,5 @@ export const PERSONAS: Persona[] = [
 
   // Module I: finance
 
-  { email: 'dev-treasurer@e2e.newtheatre.org.uk', name: 'Theo Treasurer (dev)', role: 'TREASURER', shape: 'full', describes: 'Reads the ledger: foregone comp and discount value, and every finance report built after it.' },
+  { email: 'dev-treasurer@e2e.newtheatre.org.uk', name: 'Theo Treasurer (dev)', role: 'TREASURER', shape: 'full', describes: 'Reads the ledger: forgone comp and discount value, and every finance report built after it.' },
 ]

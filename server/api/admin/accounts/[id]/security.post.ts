@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
   if (input.operation === 'disable' && await wouldStrandTheSystem('ADMIN', id)) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'That is the last administrator: grant another before disabling this one',
+      statusMessage: 'That is the last IT Manager: grant another before disabling this one',
     })
   }
 

@@ -551,7 +551,7 @@ export const CONFIG_KEYS = {
     schema: z.number().int().positive(),
     default: 10,
     workshop: 'people-and-communications',
-    describes: 'Minutes before the first retry, doubling each attempt after it. At the shipped values a message is given up on about two and a half hours after it was enqueued.',
+    describes: 'Minutes before the first retry, doubling each attempt after it. At the shipped values a message is given up on about two and a half hours after it was queued.',
   },
   NOTIFICATION_LOG_RETENTION_MONTHS: {
     schema: z.number().int().positive(),

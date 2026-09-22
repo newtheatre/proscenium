@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   // Belt and braces over the schema: the namespace is the rule, and a manual entry claiming a
   // system action would be indistinguishable from one in every report that reads this table.
   if (!isManualAction(input.action)) {
-    throw createError({ statusCode: 400, statusMessage: 'A manual entry can only record something done outside the system: choose one of the manual actions' })
+    throw createError({ statusCode: 400, statusMessage: 'A manual entry can only record something done away from these screens: choose one of the manual actions' })
   }
 
   // Signed from a session that answered a second factor. Every sign-in path challenges an account

@@ -333,7 +333,7 @@ describe.skipIf(skip !== null)('the account screen', () => {
       await waitFor(view, 'document.querySelector(\'[data-test="confirm-revoke-role-verb"]\')')
       await click(view, '[data-test="confirm-revoke-role-verb"]')
       await waitFor(view, 'document.querySelector(\'[data-test="confirm-revoke-role-failure"]\')')
-      expect(await textOf(view, '[data-test="confirm-revoke-role-failure"]')).toContain('last administrator')
+      expect(await textOf(view, '[data-test="confirm-revoke-role-failure"]')).toContain('last IT Manager')
 
       expect(read('SELECT user_id FROM role_grants WHERE user_id = ? AND role = ?', me, 'ADMIN')).toBeDefined()
     }

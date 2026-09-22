@@ -107,7 +107,7 @@ const varianceColumns: TableColumn<VarianceRow>[] = [
 const compsColumns: TableColumn<CompRow>[] = [
   { id: 'reason', header: 'Reason', cell: ({ row }) => row.original.reason },
   { id: 'approvedBy', header: 'Approved by', cell: ({ row }) => row.original.approvedByName },
-  { id: 'foregone', header: 'Foregone', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.foregonePence) },
+  { id: 'foregone', header: 'Forgone', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.foregonePence) },
 ]
 
 const wastageColumns: TableColumn<WastageRow>[] = [
