@@ -638,7 +638,7 @@ A wiki under `content/docs/`, one page per screen or task, a second Nuxt Content
 documentation is never reachable through the public catch-all. The tree is numbered folders, one
 per section (`04.box-office/`), each with a `.navigation.yml` naming it and an `index.md` overview,
 and pages `<n>.<slug>.md` inside; Nuxt Content's own rules give the URL, dropping the ordering
-prefix and the index file (`/docs/box-office/the-desk`). `shared/utils/docs-paths.ts` holds that
+prefix and the index file (`/docs/box-office/desk`). `shared/utils/docs-paths.ts` holds that
 rule once, for the tests and the check. Every page carries `title`, `description`, `module`,
 `updatedOn` and `updatedBy`.
 
@@ -652,7 +652,7 @@ and next links, and a table of contents from three headings up. Both routes are 
 but a session (`signed-in` middleware), so an operational-only shift with no standing permission can
 still read the page for the screen in front of them (criterion 1).
 
-**A screen names its page.** `definePageMeta({ docs: '/docs/box-office/the-desk' })`, typed by
+**A screen names its page.** `definePageMeta({ docs: '/docs/box-office/desk' })`, typed by
 `shared/types/page-meta.d.ts`, and `DocsLink.vue` renders the help link in the console navbar, the
 member header and the show-night top bar. `tests/unit/docs-links.test.ts` fails a console, member
 or show-night screen that names no page, and a page named that does not exist.

@@ -2,7 +2,7 @@
 title: People
 description: Every account the theatre holds, the membership register, the roll of Fellows and the roles that run out each committee year.
 module: Identity
-updatedOn: 2026-09-15
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -32,7 +32,7 @@ app enrolled before it works.
   ::card{icon="i-lucide-award" title="Fellows" to="/docs/people/fellows"}
   The roll of Fellows: recording an award, the lifetime pass it issues, and revoking one.
   ::
-  ::card{icon="i-lucide-calendar-clock" title="Roles and the committee year" to="/docs/people/roles-and-the-committee-year"}
+  ::card{icon="i-lucide-calendar-clock" title="Roles" to="/docs/people/roles"}
   What each role holds, why every grant runs out on 31 July, and why a shift beats a grant.
   ::
 ::

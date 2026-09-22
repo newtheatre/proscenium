@@ -52,7 +52,7 @@ describe('the backups screen says where a restore happens (J-107 criterion 6)', 
   test('it names who does one and where the steps are', async () => {
     const source = await read(BACKUPS)
     expect(source).toContain('data-test="where-restoring-happens"')
-    expect(source).toContain('/docs/system/backups-and-restore')
+    expect(source).toContain('/docs/system/backups')
   })
 })
 

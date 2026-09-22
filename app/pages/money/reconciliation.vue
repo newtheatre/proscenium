@@ -8,7 +8,7 @@ import { currentShowNight } from '#shared/utils/show-night'
 import type { NightExpected, OutstandingNight, ZReading } from '#shared/utils/night-reconciliation'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Daily reconciliation', middleware: 'console', docs: '/docs/money/reconciliation' })
+definePageMeta({ layout: 'console', title: 'Daily reconciliation', middleware: 'console', docs: '/docs/money/daily-reconciliation' })
 
 const request = useRequestFetch()
 const toast = useToast()

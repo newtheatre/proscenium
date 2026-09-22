@@ -3,7 +3,7 @@ import { HUB_KPI_LABELS, checklistHint, hubKpis, nightHeaderLine, saysSeatsLeft,
 import { activePerformanceId } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/show-night' })
+definePageMeta({ layout: 'tonight', docs: '/docs/tonight' })
 useSeoMeta({ title: 'Tonight' })
 
 interface Performance {

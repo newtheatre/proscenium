@@ -5,7 +5,7 @@ import { saysDay } from '#shared/utils/when'
 import type { PrerequisiteGap } from '#shared/utils/training'
 import type { ClosureReason } from '#shared/utils/training-signup'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/your-training' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/my-training' })
 
 interface Session {
   id: string

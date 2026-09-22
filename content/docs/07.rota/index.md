@@ -2,7 +2,7 @@
 title: Rota
 description: Setting a show night up from the console, from the venue's staffing to the wings device.
 module: Show night
-updatedOn: 2026-09-21
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -12,12 +12,12 @@ navigation:
 These are the console screens under **Manage, Rota**. They are planned at a desk, days before
 a performance: how each venue is staffed, who is confirmed on which shift, what the duty manager
 must tick before the house opens and after it closes, what front of house reads in an emergency,
-and which incidents reach the safety officer. The screens used on the night itself, on a phone in
-the foyer, are documented under [Show night](/docs/show-night/the-door).
+and which incidents reach the Safety Officer. The screens used on the night itself, on a phone in
+the foyer, are documented under [Show night](/docs/tonight/door).
 
 The **Front of house manager** role holds everything here except Safety: the rota, the checklists,
 the emergency cards, the age-check register export and the backstage board's configuration. The
-**Safety officer** role holds Safety and nothing else. Administrators hold all of it. A shift never
+**Safety Officer** role holds Safety and nothing else. The IT Manager holds all of it. A shift never
 reaches these screens: a confirmed shift opens the night's tools, and a role opens the planning.
 
 ::card-group
@@ -40,13 +40,13 @@ reaches these screens: a confirmed shift opens the night's tools, and a role ope
   The card front of house reads in the dark: address, exits, assembly point, first aid.
   ::
   ::card{icon="i-lucide-shield-alert" title="Safety" to="/docs/rota/safety"}
-  Which incident severities reach the safety officer, and closing the follow-ups they open.
+  Which incident severities reach the Safety Officer, and closing the follow-ups they open.
   ::
   ::card{icon="i-lucide-file-down" title="Age-check register" to="/docs/rota/age-check-register"}
   Exporting the Challenge 25 register for a licensing inspection.
   ::
-  ::card{icon="i-lucide-radio" title="Backstage board setup" to="/docs/rota/backstage-board-setup"}
-  The milestone types and one-tap presets the wings device and the foyer send each other.
+  ::card{icon="i-lucide-radio" title="Backstage board" to="/docs/rota/backstage-board"}
+  The milestone types and one-press presets the wings device and the foyer send each other.
   ::
 ::
 

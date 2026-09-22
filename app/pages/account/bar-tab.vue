@@ -4,7 +4,7 @@ import { saysMoney } from '#shared/utils/bar'
 import { saysClock, saysWhen } from '#shared/utils/when'
 import type { ItemisedTab } from '#shared/utils/tab-settlement'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/tab' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/my-tab' })
 
 const request = useRequestFetch()
 

@@ -4,7 +4,7 @@ import { closedOn } from '#shared/utils/rooms'
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import type { GridColumn, GridRoom } from '~/components/RoomGrid.vue'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/booking-a-room' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/book-a-room' })
 
 interface Taken {
   startsAt: number

@@ -3,7 +3,7 @@ import { saysPrice } from '#shared/utils/ticket-types'
 import { saysPassPrices, saysPassStatus } from '#shared/utils/passes'
 import type { PassRequestStatus, PassStatus } from '#shared/utils/passes'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/passes' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/passes' })
 
 interface SellablePassType {
   id: string

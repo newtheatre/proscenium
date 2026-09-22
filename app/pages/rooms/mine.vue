@@ -3,7 +3,7 @@ import { formatLondon } from '#shared/utils/london'
 import { saysBookingState } from '#shared/utils/bookings'
 import { saysExternalState } from '#shared/utils/external-requests'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/members/your-room-bookings' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/my-room-bookings' })
 
 interface Booking {
   id: string

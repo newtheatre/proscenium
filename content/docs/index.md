@@ -2,7 +2,7 @@
 title: Documentation
 description: How each part of the system is run, kept by the people who run it.
 module: Governance
-updatedOn: 2026-09-21
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 ---
 
@@ -19,10 +19,10 @@ and the IT Manager is told. Drift is a defect, not a chore.
   ::card{icon="i-lucide-compass" title="Getting started" to="/docs/getting-started"}
   Signing in, your account, roles and the committee year, where things live, the glossary.
   ::
-  ::card{icon="i-lucide-user-round" title="For members" to="/docs/members"}
+  ::card{icon="i-lucide-user-round" title="My NNT" to="/docs/my-nnt"}
   Tickets, passes, the waiting list, rooms, your rota and your training.
   ::
-  ::card{icon="i-lucide-moon-star" title="On the night" to="/docs/show-night"}
+  ::card{icon="i-lucide-moon-star" title="Tonight" to="/docs/tonight"}
   The door, the till, age checks, checklists, incidents, the emergency card and the board.
   ::
   ::card{icon="i-lucide-settings" title="System" to="/docs/system"}

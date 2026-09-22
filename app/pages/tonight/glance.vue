@@ -9,7 +9,7 @@ import { activePerformanceId } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 import type { ShiftRole } from '#shared/utils/rota'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/show-night/at-a-glance' })
+definePageMeta({ layout: 'tonight', docs: '/docs/tonight/tonight-at-a-glance' })
 useSeoMeta({ title: 'Tonight at a glance' })
 
 interface AccessTonight { firstName: string, party: number, wording: string }

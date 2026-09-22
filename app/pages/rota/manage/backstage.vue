@@ -4,7 +4,7 @@ import { can, manageBoardConfig } from '#shared/utils/abilities'
 import type { VNode } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Backstage board', middleware: 'console', docs: '/docs/rota/backstage-board-setup' })
+definePageMeta({ layout: 'console', title: 'Backstage board', middleware: 'console', docs: '/docs/rota/backstage-board' })
 
 interface MilestoneType { id: string, label: string, sort: number, active: boolean }
 interface Preset { id: string, label: string, body: string, sort: number, active: boolean }

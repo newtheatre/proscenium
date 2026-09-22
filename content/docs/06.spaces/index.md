@@ -2,7 +2,7 @@
 title: Spaces
 description: The rooms we control, the request queue, closures, the rooms we do not manage and the utilisation report.
 module: Spaces
-updatedOn: 2026-09-15
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -48,7 +48,7 @@ decides which room we get.
 
 ## Related pages
 
-- [Booking a room](/docs/members/booking-a-room)
-- [Your room bookings](/docs/members/your-room-bookings)
-- [Other rooms](/docs/members/other-rooms), the member's side of the catalogue
+- [Book a room](/docs/my-nnt/book-a-room)
+- [My room bookings](/docs/my-nnt/my-room-bookings)
+- [Book a room not listed here](/docs/my-nnt/book-a-room-not-listed-here), the member's side of the catalogue
 - [Roles and permissions](/docs/getting-started/roles-and-permissions)

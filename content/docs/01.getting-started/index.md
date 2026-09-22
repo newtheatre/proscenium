@@ -2,7 +2,7 @@
 title: Getting started
 description: Signing in, your own account, what a role lets you do, and where everything lives.
 module: Governance
-updatedOn: 2026-09-15
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -33,8 +33,8 @@ are in the other sections, and each one opens by saying which.
   ::card{icon="i-lucide-book-a" title="Glossary" to="/docs/getting-started/glossary"}
   One word for each thing, so a page and a screen mean the same by it.
   ::
-  ::card{icon="i-lucide-circle-help" title="Questions people ask" to="/docs/getting-started/faq"}
-  Sign-in trouble, expired links, a membership that reads lapsed, and where a screen went.
+  ::card{icon="i-lucide-circle-help" title="First fortnight on the committee" to="/docs/getting-started/first-fortnight-on-the-committee"}
+  The handful of things to do in your first two weeks, and where to read the rest.
   ::
 ::
 

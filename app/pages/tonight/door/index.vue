@@ -3,7 +3,7 @@ import { CAMERA_FALLBACK_SAYS, doorFailureVerdict, saysDoorParty, verdictBuzz, v
 import { saysPerformanceChoice } from '#shared/utils/tonight'
 import type { DoorVerdict, ScannerFailure } from '#shared/utils/door'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/show-night/the-door' })
+definePageMeta({ layout: 'tonight', docs: '/docs/tonight/door' })
 useSeoMeta({ title: 'Door' })
 
 interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }

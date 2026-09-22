@@ -2,7 +2,7 @@
 title: Box office
 description: The desk, passes, the programme and its reference data, and access profile verification.
 module: Ticketing
-updatedOn: 2026-09-15
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -31,10 +31,10 @@ it derives from tonight's confirmed duty manager shift, or from the Manager role
 ## On a show night
 
 ::card-group
-  ::card{icon="i-lucide-search" title="The desk" to="/docs/box-office/the-desk"}
+  ::card{icon="i-lucide-search" title="Desk" to="/docs/box-office/desk"}
   Find a booking by scan, reference or name; take its payment on the reader; comps; refunds.
   ::
-  ::card{icon="i-lucide-ticket-check" title="Issuing passes" to="/docs/box-office/issuing-passes"}
+  ::card{icon="i-lucide-ticket-check" title="Pass desk" to="/docs/box-office/pass-desk"}
   Sell a pass to a named buyer, or fulfil one they requested online.
   ::
 ::
@@ -42,11 +42,11 @@ it derives from tonight's confirmed duty manager shift, or from the Manager role
 ## The programme
 
 ::card-group
-  ::card{icon="i-lucide-drama" title="Shows and performances" to="/docs/box-office/shows-and-performances"}
+  ::card{icon="i-lucide-drama" title="Shows" to="/docs/box-office/shows"}
   Add a show, schedule its performances, price it, assess its warnings, publish it and watch it sell.
   ::
   ::card{icon="i-lucide-map-pin" title="Venues" to="/docs/box-office/venues"}
-  Where a performance happens: capacity, an optional room for blackouts, external venues.
+  Where a performance happens: capacity, an optional room it closes, external venues.
   ::
   ::card{icon="i-lucide-calendar-range" title="Seasons" to="/docs/box-office/seasons"}
   The committee years a show belongs to.
@@ -76,5 +76,5 @@ it derives from tonight's confirmed duty manager shift, or from the Manager role
 ## Related pages
 
 - [Roles and permissions](/docs/getting-started/roles-and-permissions)
-- [The door](/docs/show-night/the-door)
+- [Door](/docs/tonight/door)
 - [Revenue by show](/docs/money/revenue-by-show)

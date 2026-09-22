@@ -7,7 +7,7 @@ import { saysShiftRole } from '#shared/utils/rota'
 import { contactRoster, saysPerformanceChoice, telHref } from '#shared/utils/tonight'
 import type { Category, Severity } from '#shared/utils/incidents'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/show-night/incidents' })
+definePageMeta({ layout: 'tonight', docs: '/docs/tonight/contacts-and-incidents' })
 useSeoMeta({ title: 'Contacts and incidents' })
 
 interface Entry {

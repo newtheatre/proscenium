@@ -3,7 +3,7 @@ import { AUDIENCE_KINDS, AUDIENCE_LABELS, saysAnnouncementSent, saysAudienceCoun
 import { ROLES, saysRole } from '#shared/utils/roles'
 import type { AudienceKind } from '#shared/utils/announcements'
 
-definePageMeta({ layout: 'console', title: 'Announce', middleware: 'console', docs: '/docs/communications/announcements' })
+definePageMeta({ layout: 'console', title: 'Announce', middleware: 'console', docs: '/docs/communications/announce' })
 
 const toast = useToast()
 
