@@ -15,10 +15,9 @@ Union's SumUp reader, is a show-night screen and has its own page at
 [Till](/docs/tonight/till). What is set up here is what the till draws its buttons
 from, what a sale depletes, and what the Treasurer reads at the end of a period.
 
-The screens are under **Manage, Bar** in the account menu. Reading them needs the `bar.read`
-permission and changing anything needs `bar.write`; the Bar manager role holds both, and
-the IT Manager hold everything. Reports are the one exception: they open for `finance.read` too,
-so the Treasurer reads them without seeing the catalogue or the stock. Nobody reaches any of this
+The screens are under **Manage, Bar** in the account menu. The Bar Manager reads them and
+changes them, and the IT Manager holds everything. Reports are the one exception: the Treasurer
+reads them too, without seeing the catalogue or the stock. Nobody reaches any of this
 from a shift: a bar shift opens the till, not these screens.
 
 ::card-group
@@ -29,13 +28,13 @@ from a shift: a bar shift opens the till, not these screens.
   The groups the till shows, in the order it shows them, with default prices by serving kind.
   ::
   ::card{icon="i-lucide-percent" title="Discounts" to="/docs/bar/discounts"}
-  Percentage discounts the till can offer, capped by configuration and snapshotted onto each sale.
+  Percentage discounts the till can offer, capped by a setting and kept on each sale as they stood.
   ::
   ::card{icon="i-lucide-package" title="Stock" to="/docs/bar/stock"}
   The register of stocked items, what is on hand, and recording a delivery or wastage.
   ::
   ::card{icon="i-lucide-arrow-left-right" title="Movements" to="/docs/bar/movements"}
-  The append-only history every on-hand figure is added up from, and how a mistake is reversed.
+  The history every on-hand figure is added up from, which nothing edits, and how a mistake is reversed.
   ::
   ::card{icon="i-lucide-clipboard-list" title="Stocktakes" to="/docs/bar/stocktakes"}
   Counting the bar against what the register expects, and applying the variance.
