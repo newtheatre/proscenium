@@ -244,7 +244,7 @@ watch(modalOpen, (nowOpen) => {
       variant="subtle"
       icon="i-lucide-unplug"
       :title="listFailure.message"
-      description="This is not the same as nothing being asked for. Reload, and if it keeps happening say so."
+      :description="READ_AGAIN"
       :actions="listFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listFailure.enrolPath, color: 'error' }] : []"
     />
 
@@ -380,7 +380,7 @@ watch(modalOpen, (nowOpen) => {
               :loading="saving"
               data-test="department-submit"
             >
-              {{ editing ? 'Save it' : 'Add it' }}
+              {{ editing ? 'Save the department' : 'Add a department' }}
             </UButton>
             <UButton
               color="neutral"

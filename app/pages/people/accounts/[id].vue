@@ -348,14 +348,14 @@ onMounted(load)
           variant="link"
           size="sm"
           icon="i-lucide-shield"
-          label="Work the whole register, role by role"
+          label="Open the register"
           data-test="open-register"
         />
       </UPageCard>
 
       <UPageCard
         title="Membership"
-        description="A term bought at the SU, not a committee year (0031)."
+        description="A term bought at the SU, not a committee year."
       >
         <p
           v-if="!view.memberships.length"
@@ -381,7 +381,7 @@ onMounted(load)
         v-if="view.fellowship"
         data-test="fellowship"
         title="Fellowship"
-        description="A permanent honour, and the theatre's own record (0023)."
+        description="A permanent honour, and the theatre's own record."
       >
         <p class="text-sm">
           Awarded {{ saysDay(view.fellowship.awardedOn) }} by {{ view.fellowship.awardedBy }}.
@@ -540,7 +540,7 @@ onMounted(load)
         >
           <p class="text-sm">
             <span class="font-medium">{{ view.account.email }}</span> moves into
-            <span class="font-medium">{{ mergePreview.winner.email }}</span> and becomes a tombstone.
+            <span class="font-medium">{{ mergePreview.winner.email }}</span> and is emptied.
             Nothing here is undone once confirmed.
           </p>
           <ul class="list-inside list-disc text-sm">
@@ -579,7 +579,7 @@ onMounted(load)
 
       <UPageCard
         title="Recent activity"
-        description="The last 25 entries naming this account. Searching the whole trail is J-103."
+        description="The last 25 entries naming this account."
       >
         <p
           v-if="!view.history.length"

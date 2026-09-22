@@ -424,7 +424,7 @@ watch(modalOpen, (nowOpen) => {
             data-test="opening-submit"
             @click="submitPlan"
           >
-            Plan it
+            Plan the opening
           </UButton>
         </div>
       </template>

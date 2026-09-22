@@ -334,7 +334,7 @@ watch(modalOpen, (nowOpen) => {
           data-test="item-submit"
           @click="save"
         >
-          Save it
+          Save the item
         </UButton>
         <UButton
           color="neutral"

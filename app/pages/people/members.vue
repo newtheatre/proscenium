@@ -616,7 +616,7 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
             type="submit"
             data-test="grant-submit"
           >
-            Record it
+            Record the membership
           </UButton>
         </UForm>
       </template>

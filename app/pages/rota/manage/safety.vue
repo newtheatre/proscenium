@@ -108,7 +108,7 @@ const severityColumns: TableColumn<SeverityRow>[] = [
 const openColumns = computed<TableColumn<OpenItem>[]>(() => [
   {
     id: 'incident',
-    header: 'What happened',
+    header: 'Incident',
     cell: ({ row }) => h('div', { class: 'space-y-1' }, [
       h('div', { class: 'flex items-center gap-2' }, [
         h(UBadge, { color: 'error', variant: 'subtle', size: 'sm' }, () => saysSeverity(row.original.severity)),
@@ -246,7 +246,7 @@ watch(modalOpen, (nowOpen) => {
           data-test="close-submit"
           @click="close"
         >
-          Close it
+          Close the follow-up
         </UButton>
         <UButton
           color="neutral"
