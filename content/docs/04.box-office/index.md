@@ -21,11 +21,9 @@ initiates a charge.
 
 ## Who holds what
 
-The Box office role holds `ticketing.read`, `ticketing.write` and `ticketing.export`, which is
-every screen below except one. Narrowing what a pass covers once passes are live needs
-`ticketing.manage`, which the Manager role holds. Verifying an access profile needs
-`access.verify`, which only the Accessibility officer holds: general box office cannot open that
-screen or see what it holds. Approving a comp or a refund is not a box office permission at all;
+The Box Office Manager reads, changes and exports every screen below except one. Narrowing
+what a pass covers once passes are live is the Manager's. Verifying an access profile is the
+Accessibility Officer's alone: general box office cannot open that screen or see what it holds. Approving a comp or a refund is not a box office permission at all;
 it derives from tonight's confirmed duty manager shift, or from the Manager role.
 
 ## On a show night

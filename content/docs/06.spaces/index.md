@@ -10,14 +10,13 @@ navigation:
 ---
 
 Spaces is the console side of room booking. Members book from **Book a room** in the My NNT
-strip; these screens are where the estate is kept true, requests are answered, a room is shut
+strip; these screens are where the list of rooms is kept true, requests are answered, a room is shut
 for a get-in, and the year's use is counted. They sit under **Manage, Spaces**.
 
-Every screen here opens with the `rooms.read` permission, and changing anything (adding or
-editing a room, deciding a request, closing a room, listing a room we do not manage) needs
-`rooms.write`. The Manager and the Theatre Manager hold both. The Training Manager holds
-`rooms.read` only, so they see the estate, the closures, the catalogue and the report without
-the buttons, and the request queue is not in their navigation at all.
+The Manager and the Theatre Manager read every screen here and change anything on it: adding
+or editing a room, answering a request, closing a room, listing a room we do not manage. The
+Training Manager reads only, so they see the rooms, the closures, the catalogue and the report
+without the buttons, and the request queue is not in their navigation at all.
 
 ::card-group
   ::card{icon="i-lucide-door-open" title="Rooms" to="/docs/spaces/rooms"}

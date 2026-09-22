@@ -1,15 +1,16 @@
 ---
 title: Documentation
-description: How each part of the system is run, kept by the people who run it.
+description: How each part of the theatre is run, kept by the people who run it.
 module: Governance
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 ---
 
-This is the operator documentation for the theatre's system: one page for every screen, written
-so that somebody who joined the committee last week can run their area without a predecessor's
-folder. It is signed in only. Nothing here needs a standing permission to read, because the
-person on a shift tonight needs the page for the screen in front of them more than anybody.
+This is the operator documentation for the theatre's screens: one page for every screen,
+written for somebody who joined the committee last week and has to run their area without a
+predecessor's folder. It is signed in only, and nothing here needs a standing permission to
+read. The person on a shift tonight needs the page for the screen in front of them more than
+anybody does.
 
 Every page says when it was last updated and by whom. If a page and a screen disagree, the
 screen has changed and the page has not: use **Report as out of date** at the top of the page
@@ -59,7 +60,7 @@ the screens are for.
   The season dashboard, revenue by show, comps and discounts, reconciliation, the ledger, periods and exports.
   ::
   ::card{icon="i-lucide-send" title="Communications" to="/docs/communications"}
-  Announcements, the send log and what the system sends on its own.
+  Announcements, the send log and what goes out on its own.
   ::
 ::
 
@@ -70,4 +71,4 @@ the screens are for.
   numbered badges, and the text beneath each picture says what each number is.
 - **If something goes wrong** quotes the refusals in the wording the screen uses, and says what
   to do about each.
-- **What happens next** says what the system does after you act: who is told, what is recorded.
+- **What happens next** says what follows once you have acted: who is told, and what is kept.

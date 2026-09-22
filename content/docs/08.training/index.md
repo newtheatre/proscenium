@@ -40,11 +40,9 @@ the sessions they can sign up for and the public catalogue, is described in
 
 Three kinds of standing open these screens, and only the first is a role.
 
-- **The Training Manager** role holds `training.read`, `training.write`, `training.leads` and
-  `training.revoke`: the whole catalogue, every department, every record, appointing leads and
-  revoking. The Manager role also reads and writes the catalogue. The IT Manager holds
-  `training.override` as well, which no screen offers; it is the break-glass for signing a
-  module off as never expiring.
+- **The Training Manager** role holds the whole of it: the catalogue, every department, every
+  record, appointing leads and revoking. The Manager reads and writes the catalogue too. Signing
+  a module off as never expiring is the IT Manager's alone, and no screen offers it.
 - **A department lead** is a person named against a department on the
   [Departments](/docs/training/departments) screen. They reach Catalogue, Departments, Records
   and Requests for their own departments without holding any role. The assignment lapses at the

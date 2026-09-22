@@ -15,9 +15,8 @@ entered on the roll of Fellows. Everything here is about who somebody is to the 
 what they are doing tonight: the door, the till and the rota derive their authority from a
 shift or a training record, never from anything on these screens.
 
-Reading the screens needs the `accounts.read`, `members.read` or `fellowships.read` permission,
-which the IT Manager, Manager and Theatre Manager roles hold (the Training Manager reads
-accounts and members too). Changing anything is narrower: granting roles, disabling, merging and
+The IT Manager, the Manager and the Theatre Manager read these screens, and the Training
+Manager reads the accounts and the register too. Changing anything is narrower: granting roles, disabling, merging and
 erasing accounts belong to the IT Manager alone; recording memberships and fellowships is the
 IT Manager's and the Manager's. Every role that reaches these screens needs an authenticator
 app enrolled before it works.

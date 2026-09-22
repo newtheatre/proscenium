@@ -9,7 +9,7 @@ navigation:
   icon: i-lucide-settings
 ---
 
-The system screens are where the theatre's rules are set, where every privileged action is
+These screens are where the theatre's rules are set, where every privileged action is
 recorded, and where the IT Manager proves the backups restore. They sit under **Manage,
 System** in the console, and the console itself opens on an overview at **Manage, Overview**.
 
@@ -21,11 +21,11 @@ console; an officer whose only permissions are those three is shown no **Manage*
 Within the console each screen checks its own permission, so a person who can reach the
 overview may still be refused a screen the sidebar does not show them.
 
-- **Settings** (`config.read`) are read by the IT Manager, Managers and the Theatre Manager, and
-  changed (`config.write`) by the IT Manager only.
-- **The audit trail** (`audit.read`, `audit.write`) is read and written by the IT Manager,
-  Managers and the Theatre Manager.
-- **Backups** (`backups.read`, `backups.write`) are the IT Manager's alone.
+- **Settings** are read by the IT Manager, the Manager and the Theatre Manager, and changed by
+  the IT Manager alone.
+- **The audit trail** is read by the IT Manager, the Manager and the Theatre Manager, and the
+  same three record an entry on it.
+- **Backups** are the IT Manager's alone.
 
 Every standing role expires at the end of the committee year, 31 July, so a permission held in
 June is gone in August unless the incoming committee grants it again.
@@ -37,10 +37,11 @@ June is gone in August unless the incoming committee grants it again.
 1. **Help for this screen** opens the documentation page for the screen you are on. Every
    console, member and show-night screen carries one.
 2. **Messages that did not arrive** lists every send that never reached a person, newest first,
-   with why. It needs `audit.read`, and reads as empty ("Nothing has failed or been suppressed")
+   with why. It is for whoever reads the audit trail, and reads as empty ("Nothing has failed
+   or been suppressed")
    rather than as a refusal when you hold something else.
 
-Each line carries a badge saying what the system did: **The provider refused it** (the email or
+Each line carries a badge saying what happened: **The provider refused it** (the email or
 push provider returned a failure), **Not sent** (the message was suppressed before it went), or
 **Spoken for** (it is still in the queue). Beside the person's name and the message type is the
 reason: **muted this topic**, **has not proved their address**, **the account is gone**, **the
@@ -59,10 +60,10 @@ The rest of the overview arrives with the stories that need it, and the screen s
 
 ::card-group
   ::card{icon="i-lucide-sliders-horizontal" title="Settings" to="/docs/system/settings"}
-  Every operational number the system enforces, changed by decision rather than by release.
+  Every operational number the theatre works to, changed by a decision rather than by a release.
   ::
   ::card{icon="i-lucide-scroll-text" title="Audit trail" to="/docs/system/audit-trail"}
-  Every privileged action, searchable and exportable, with signed entries for what happened outside the system.
+  Every privileged action, searchable and exportable, with signed entries for what happened away from a screen.
   ::
   ::card{icon="i-lucide-database-backup" title="Backups" to="/docs/system/backups"}
   What is backed up, how a restore works, and the drill that proves it.
