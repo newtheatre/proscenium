@@ -24,6 +24,23 @@ Manager opens the till. Every opening of that kind is recorded and flagged on th
 which is how the committee sees a rota that is not being kept.
 ::
 
+## If something goes wrong
+
+- **"This needs a confirmed door shift on one of tonight's performances, or the front of house
+  manager's role"** (or the same for a bar shift and the Bar Manager, or for a duty manager
+  shift): nothing tonight gives you this screen. Find the person named, or ask the officer to assign you the shift on
+  the rota. The IT Manager is never offered as the answer to a rota that is wrong.
+- **"Nothing is running tonight, so there is nothing to take charge of"**: no performance at
+  any venue tonight, or the only one is cancelled. Check the programme.
+- **"Show-night tools open for tonight only, and that night has ended"**: the screen was open
+  past 04:00. Go back to the hub and open it again.
+- **"More than one venue is running tonight: name the venue or the performance"**: two venues
+  are running and nothing narrowed the request. The hub passes the chosen performance to the
+  screens that take one; the till does not yet carry a picker and cannot be opened on such a
+  night from the phone.
+- **"Showing what was last loaded: …"**: the connection dropped. The figures on screen are the
+  last ones fetched, and the Last synced line says when.
+
 ## Who opens what
 
 | Screen | A shift of | Or the role |
@@ -108,23 +125,6 @@ required pre-show checklist item that is still not done.
   Unanswered SumUp hand-offs, closing the till, the post-show checklist and the night report.
   ::
 ::
-
-## If something goes wrong
-
-- **"This needs a confirmed door shift on one of tonight's performances, or the front of house
-  manager's role"** (or the same for a bar shift and the Bar Manager, or for a duty manager
-  shift): nothing tonight gives you this screen. Find the person named, or ask the officer to assign you the shift on
-  the rota. The IT Manager is never offered as the answer to a rota that is wrong.
-- **"Nothing is running tonight, so there is nothing to take charge of"**: no performance at
-  any venue tonight, or the only one is cancelled. Check the programme.
-- **"Show-night tools open for tonight only, and that night has ended"**: the screen was open
-  past 04:00. Go back to the hub and open it again.
-- **"More than one venue is running tonight: name the venue or the performance"**: two venues
-  are running and nothing narrowed the request. The hub passes the chosen performance to the
-  screens that take one; the till does not yet carry a picker and cannot be opened on such a
-  night from the phone.
-- **"Showing what was last loaded: …"**: the connection dropped. The figures on screen are the
-  last ones fetched, and the Last synced line says when.
 
 ## What happens next
 

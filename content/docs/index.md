@@ -66,9 +66,11 @@ the screens are for.
 
 ## How to read a page
 
-- **Who this is for** opens every page: the role or the shift that reaches the screen.
+- **An opening paragraph** names the officer or the shift that works the screen, and where the
+  screen is in the navigation.
+- **If something goes wrong** comes next, before anything else, and quotes each refusal in the
+  wording the screen uses with what to do about it. Somebody a refusal has just stopped should
+  not have to scroll past a set-up task to find it.
 - **Numbered steps** walk through a task in the order the screen asks for it. The pictures carry
   numbered badges, and the text beneath each picture says what each number is.
-- **If something goes wrong** quotes the refusals in the wording the screen uses, and says what
-  to do about each.
 - **What happens next** says what follows once you have acted: who is told, and what is kept.

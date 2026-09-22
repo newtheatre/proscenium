@@ -25,7 +25,7 @@ Communications**.
   Every send with its outcome, the daily counts, one person's history, and what happens to a
   message the provider refused.
   ::
-  ::card{icon="i-lucide-bell" title="Notification types" to="/docs/communications/notification-types"}
+  ::card{icon="i-lucide-bell" title="What the theatre sends" to="/docs/communications/what-the-theatre-sends"}
   Every message that goes out on its own, by area, with how it arrives, whether a member can
   switch it off, and which digest it can join.
   ::

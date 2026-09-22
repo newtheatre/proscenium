@@ -15,6 +15,14 @@ these screens is typed in twice. The Money group at **Manage, Money** is the Tre
 that ledger: what came in, what was given away, whether the card reader agrees, and what goes to
 the Students' Union at the end of a period.
 
+## If something goes wrong
+
+- **"The dashboard could not be read."**: the ledger query failed or you no longer hold a
+  finance permission. Change the period and back to read it again; if it persists, check your
+  role under [roles and the committee year](/docs/people/roles).
+- **The Entries buttons are missing**: you are on the Committee rather than the Treasurer. The
+  committee sees the season's totals, not the entries behind them.
+
 ## Who reaches what
 
 - **The Treasurer** opens every screen in the group and every figure down to one ledger entry,
@@ -81,14 +89,6 @@ The range the figures cover is printed above them, from and to, as London dates.
   The CSV shaped for the SU's accounting, and the nominal codes each ledger line maps to.
   ::
 ::
-
-## If something goes wrong
-
-- **"The dashboard could not be read."**: the ledger query failed or you no longer hold a
-  finance permission. Change the period and back to read it again; if it persists, check your
-  role under [roles and the committee year](/docs/people/roles).
-- **The Entries buttons are missing**: you are on the Committee rather than the Treasurer. The
-  committee sees the season's totals, not the entries behind them.
 
 ## Related pages
 

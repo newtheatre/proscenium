@@ -15,8 +15,9 @@ application that replaces stage-door, proscenium, rooms and rehearsal. The gate 
 | `workshops.md` | The configuration defaults register: every number that is currently folklore, with a proposed value for the committee to confirm, plus the workshop agenda. The proposed values are what the system ships until a workshop amends them (0019). |
 | `architecture.md` | How the running system is put together: runtime, code layout, identity, concurrency, scheduled tasks, deployment and testing. |
 | `data-model.md` | Every table, its columns and the rules the schema enforces. |
-| `operations.md` | What an operator does: deploys, migrations and their restore point, the health check, the first administrator, secrets. |
+| `operations.md` | What an operator does: deploys, migrations and their restore point, the health check, the restore drill, the first administrator, secrets. |
 | `design-language.md` | The reasoning behind the tokens, the two intensities, and the rules for using them. |
+| `operator-documentation.md` | How the in-app operator documentation under `content/docs/` is written, pictured, checked and kept current, for whoever edits a page. |
 | `copy-style.md` | The house style for every string a person reads on a screen, in an email or in a notification. |
 | `spikes.md` | Time-boxed investigations that must land before their dependent build work. |
 | `known-issues.md` | Defects and gaps found and not fixed, with where the fix belongs. A pull request that leaves a problem behind records it here. |
