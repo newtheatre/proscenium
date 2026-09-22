@@ -9,7 +9,7 @@ the cutover rather than after it. Phasing follows the roadmap: the platform stor
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
+Stories: 32. Phases: 26 MVP, 1 V2, 0 Later, 5 resolved.
 
 ## Open questions
 
@@ -838,6 +838,34 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
      refusal names one.
 - Source: Issue 1152 item 2. The page rendered outside every layout and printed the status code
   in mono above the title.
+
+## K-134: Report a problem or an idea from any signed-in screen
+
+- Role: Any signed-in officer or shift holder
+- Phase: MVP
+- Story: As somebody working a screen that misbehaves, or who can see what would make it
+  better, I want to say so in two taps from the screen itself so that the IT Manager hears
+  about it without an email, and the report carries enough for whoever fixes it to start.
+- Depends on: J-102, K-109, K-123
+- Acceptance criteria:
+  1. Every `console` and `tonight` screen shows one report button beside the help link. Nothing
+     renders for a signed-out visitor, and nothing appears in the public, docs or member shells.
+  2. The form asks two things only: whether something is wrong or this is an idea, and one text
+     box of 10 to 2000 characters. The page path, the shell, the browser's user agent and the
+     browser's recent failures are attached without asking.
+  3. Submitting writes one `feedback_reports` row and one `feedback.submitted` audit entry in one
+     batch. The report's words live on the row and never in audit detail (0011).
+  4. A reporter may send ten reports an hour; the eleventh is refused with the house wording and
+     a `Retry-After`, the same limit shape every other rate limit uses.
+  5. Erasure scrubs the report's words and browser details and leaves the row, so how many
+     reports arrived survives the person who sent them (K-109, 0011).
+  6. A daily triage run reads every `NEW` row, opens one tracker issue per report (a bug with the
+     worker's logs around the report, an idea with the original words and a first plan), and
+     marks the row `TRIAGED` with the issue link by a conditional write on `status = 'NEW'`
+     (0086). The documentation drift report (J-109) stays its own path.
+- Source: IT Manager request, September 2026. The drift report had no queue
+  (`docs/known-issues.md`), and a defect found on a show night reached nobody unless somebody
+  remembered to write an email afterwards.
 
 ## K-201: The console command palette
 
