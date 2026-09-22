@@ -357,45 +357,16 @@ const columns: TableColumn<AdminSeason>[] = [
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="removing !== null"
+      name="delete-season"
       :title="removing ? `Delete ${removing.name}` : ''"
-      description="No show belongs to this season, so there is no history to keep."
+      verb="Delete the season"
+      consequence="The season goes and every show stays where it is. No show belongs to it, so there is no history to keep."
+      :loading="saving"
+      :failure="failure"
       @update:open="removing = null; failure = null"
-    >
-      <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="delete-failure"
-          color="error"
-          variant="subtle"
-          :description="failure"
-        />
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          The season goes. Every show stays where it is.
-        </p>
-      </template>
-
-      <template #footer>
-        <UButton
-          color="error"
-          :loading="saving"
-          data-test="confirm-delete"
-          @click="remove"
-        >
-          Delete the season
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="removing = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+      @confirm="remove"
+    />
   </div>
 </template>

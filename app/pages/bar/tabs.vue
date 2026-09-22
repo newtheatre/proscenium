@@ -249,23 +249,21 @@ const columns: TableColumn<HolderRow>[] = [
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="voiding !== null"
+      name="void-charge"
       title="Void this charge"
-      description="Written once and never edited: a void is a reversing credit, on the record with why."
+      verb="Void the charge"
+      consequence="Written once and never edited: a void is a reversing credit, on the record with why."
+      :loading="saving"
+      :failure="voidFailure"
       @update:open="closeVoid"
+      @confirm="confirmVoid"
     >
       <template #body>
-        <UAlert
-          v-if="voidFailure"
-          data-test="void-failure"
-          color="error"
-          variant="subtle"
-          :description="voidFailure"
-        />
         <p
           v-if="voiding"
-          class="mb-4 text-sm text-muted"
+          class="text-sm text-muted"
         >
           {{ describe(voiding) }}, {{ saysMoney(voiding.totalPence) }}.
         </p>
@@ -282,24 +280,6 @@ const columns: TableColumn<HolderRow>[] = [
           />
         </UFormField>
       </template>
-
-      <template #footer>
-        <UButton
-          color="error"
-          :loading="saving"
-          data-test="confirm-void"
-          @click="confirmVoid"
-        >
-          Void it
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="closeVoid"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+    </ConfirmModal>
   </div>
 </template>

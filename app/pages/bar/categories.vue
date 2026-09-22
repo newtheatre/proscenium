@@ -484,45 +484,16 @@ const columns: TableColumn<BarCategory>[] = [
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="removing !== null"
+      name="delete-category"
       :title="removing ? `Delete ${removing.name}` : ''"
-      description="Nothing has ever been sold in this product category, so there is no history to keep."
+      verb="Delete the product category"
+      consequence="The product category goes. No product sits in it, nothing has ever been sold in it, and nothing moves with it."
+      :loading="saving"
+      :failure="failure"
       @update:open="removing = null; failure = null"
-    >
-      <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="delete-failure"
-          color="error"
-          variant="subtle"
-          :description="failure"
-        />
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          The product category goes. No product sits in it, and nothing moves with it.
-        </p>
-      </template>
-
-      <template #footer>
-        <UButton
-          color="error"
-          :loading="saving"
-          data-test="confirm-delete"
-          @click="remove"
-        >
-          Delete the product category
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="removing = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+      @confirm="remove"
+    />
   </div>
 </template>

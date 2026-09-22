@@ -492,45 +492,16 @@ const columns: TableColumn<TicketType>[] = [
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="removing !== null"
+      name="delete-ticket-type"
       :title="removing ? `Delete ${removing.name}` : ''"
-      description="Nothing has ever been sold under this type, so there is no history to keep. Deleting it also removes the show and performance prices set for it."
+      verb="Delete the ticket type"
+      consequence="The ticket type goes, and the show and performance prices set for it go with it. Every other ticket type stays, and nothing has ever been sold under this one."
+      :loading="saving"
+      :failure="failure"
       @update:open="removing = null; failure = null"
-    >
-      <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="delete-failure"
-          color="error"
-          variant="subtle"
-          :description="failure"
-        />
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          The type goes, and those prices with it. Every other ticket type stays.
-        </p>
-      </template>
-
-      <template #footer>
-        <UButton
-          color="error"
-          :loading="saving"
-          data-test="confirm-delete"
-          @click="remove"
-        >
-          Delete the ticket type
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="removing = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+      @confirm="remove"
+    />
   </div>
 </template>

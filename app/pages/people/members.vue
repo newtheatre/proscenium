@@ -467,21 +467,19 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
       />
     </div>
 
-    <UModal
+    <ConfirmModal
       :open="declining !== null"
+      name="decline-claim"
       title="Decline this claim"
-      description="The member reads what you write here, so say what to put right."
-      @update:open="value => { if (!value) declining = null }"
+      verb="Decline the claim and tell them"
+      color="primary"
+      consequence="The member reads what you write here, so say what to put right."
+      form="claim-decline-form"
+      :loading="deciding !== null"
+      :failure="failure?.message ?? null"
+      @update:open="value => { if (!value) { declining = null; failure = null } }"
     >
       <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="failure"
-          class="mb-4"
-          color="error"
-          variant="subtle"
-          :description="failure.message"
-        />
         <UForm
           id="claim-decline-form"
           :schema="claimDeclineForm"
@@ -510,26 +508,7 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
           </UFormField>
         </UForm>
       </template>
-
-      <template #footer>
-        <UButton
-          type="submit"
-          form="claim-decline-form"
-          data-test="claim-decline-submit"
-          color="neutral"
-          :loading="deciding !== null"
-        >
-          Decline and tell them
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="declining = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+    </ConfirmModal>
 
     <UModal
       v-model:open="granting"

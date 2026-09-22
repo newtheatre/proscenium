@@ -13,6 +13,9 @@ defineProps<{
   color?: 'error' | 'primary'
   loading?: boolean
   failure?: string | null
+  // Where the dialogue asks for a field, the verb submits that form instead of emitting confirm.
+  form?: string
+  disabled?: boolean
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
@@ -50,8 +53,11 @@ const slots = useSlots()
       <UButton
         :color="color ?? 'error'"
         :loading="loading"
+        :disabled="disabled"
+        :type="form ? 'submit' : 'button'"
+        :form="form"
         :data-test="`confirm-${name}-verb`"
-        @click="emit('confirm')"
+        @click="() => { if (!form) emit('confirm') }"
       >
         {{ verb }}
       </UButton>

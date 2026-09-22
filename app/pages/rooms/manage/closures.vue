@@ -357,42 +357,23 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="removing !== null"
+      name="reopen-room"
       title="Reopen this room"
-      :description="removing ? `${removing.room ?? 'Every room'}, ${saysSpan(new Date(removing.startsAt * 1000), new Date(removing.endsAt * 1000))}` : ''"
-      @update:open="removing = null"
+      verb="Reopen the room"
+      color="primary"
+      consequence="The room becomes bookable again. Bookings this closure cancelled stay cancelled and are not restored. Their slots may be somebody else's by now."
+      :loading="working"
+      :failure="failure?.message ?? null"
+      @update:open="removing = null; failure = null"
+      @confirm="remove"
     >
       <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="failure"
-          class="mb-4"
-          color="error"
-          variant="subtle"
-          :description="failure.message"
-        />
-        <p class="text-sm">
-          The room becomes bookable again. Bookings this closure cancelled stay cancelled and are
-          not restored. Their slots may be somebody else's by now.
+        <p class="text-sm text-muted">
+          {{ removing ? `${removing.room ?? 'Every room'}, ${saysSpan(new Date(removing.startsAt * 1000), new Date(removing.endsAt * 1000))}` : '' }}
         </p>
       </template>
-      <template #footer>
-        <UButton
-          :loading="working"
-          data-test="reopen-confirm"
-          @click="remove"
-        >
-          Reopen it
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="removing = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+    </ConfirmModal>
   </div>
 </template>

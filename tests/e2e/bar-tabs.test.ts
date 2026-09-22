@@ -129,14 +129,14 @@ describe.skipIf(skip !== null)('the tab register lists every holder still carryi
       `document.querySelector('[data-test="tab-charges"] [data-test^="charge-"]').getAttribute('data-test')`,
     )
     await click(view, `[data-test^="void-"]`)
-    await waitFor(view, `document.querySelector('[data-test="confirm-void"]')`)
+    await waitFor(view, `document.querySelector('[data-test="confirm-void-charge-verb"]')`)
 
     // A void needs a reason on the record: submitting blank is refused, not silently accepted.
-    await click(view, '[data-test="confirm-void"]')
-    await waitFor(view, `document.querySelector('[data-test="void-failure"]')`)
+    await click(view, '[data-test="confirm-void-charge-verb"]')
+    await waitFor(view, `document.querySelector('[data-test="confirm-void-charge-failure"]')`)
 
     await fill(view, '[data-test="void-reason"]', 'Rung up against the wrong holder')
-    await click(view, '[data-test="confirm-void"]')
+    await click(view, '[data-test="confirm-void-charge-verb"]')
     await waitFor(view, `document.querySelector('[data-test="${entryTest}"]').textContent.includes('Voided')`)
 
     view.close()

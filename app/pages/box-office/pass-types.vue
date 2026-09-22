@@ -594,46 +594,17 @@ const columns: TableColumn<PassType>[] = [
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="removing !== null"
+      name="delete-pass-type"
       :title="removing ? `Delete ${removing.name}` : ''"
-      description="Nothing has ever been issued under this pass, so there is no history to keep."
+      verb="Delete the pass type"
+      consequence="The pass type goes and this cannot be undone. Nothing has ever been issued under it, so there is no history to keep."
+      :loading="saving"
+      :failure="failure"
       @update:open="removing = null; failure = null"
-    >
-      <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="delete-failure"
-          color="error"
-          variant="subtle"
-          :description="failure"
-        />
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          This cannot be undone.
-        </p>
-      </template>
-
-      <template #footer>
-        <UButton
-          color="error"
-          :loading="saving"
-          data-test="confirm-delete"
-          @click="remove"
-        >
-          Delete the pass type
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="removing = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+      @confirm="remove"
+    />
 
     <UModal
       :open="managingShows !== null"

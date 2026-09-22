@@ -191,20 +191,19 @@ watch(modalOpen, (nowOpen) => {
       </p>
     </div>
 
-    <UModal
+    <ConfirmModal
       :open="answering !== null"
+      name="answer-request"
       title="Answer this request"
-      @update:open="value => { if (!value) answering = null }"
+      verb="Send the reply"
+      color="primary"
+      :loading="saving"
+      :disabled="reason.trim().length < 3"
+      :failure="failure"
+      @update:open="value => { if (!value) { answering = null; failure = null } }"
+      @confirm="answer"
     >
       <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="failure"
-          class="mb-4"
-          color="error"
-          variant="subtle"
-          :description="failure"
-        />
         <p
           v-if="answering"
           class="text-sm text-muted"
@@ -214,7 +213,6 @@ watch(modalOpen, (nowOpen) => {
         </p>
 
         <UFormField
-          class="mt-4"
           label="What to tell them"
           hint="Say why: nothing sends until you do"
           required
@@ -228,25 +226,7 @@ watch(modalOpen, (nowOpen) => {
             data-test="answer-reason"
           />
         </UFormField>
-
-        <div class="mt-4 flex flex-wrap gap-2">
-          <UButton
-            :loading="saving"
-            :disabled="reason.trim().length < 3"
-            data-test="answer-submit"
-            @click="answer"
-          >
-            Send reply
-          </UButton>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            @click="answering = null"
-          >
-            {{ CONFIRM_BACK_LABEL }}
-          </UButton>
-        </div>
       </template>
-    </UModal>
+    </ConfirmModal>
   </div>
 </template>

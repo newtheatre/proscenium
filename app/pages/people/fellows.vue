@@ -170,7 +170,7 @@ onMounted(load)
 <template>
   <div class="space-y-6">
     <UAlert
-      v-if="failure"
+      v-if="failure && revoking === null"
       data-test="failure"
       color="error"
       variant="subtle"
@@ -328,11 +328,15 @@ onMounted(load)
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="revoking !== null"
+      name="revoke-fellowship"
       title="Revoke this fellowship"
-      description="The award, the date and the citation all stand. This adds a second fact, it does not correct the first."
-      @update:open="revoking = null"
+      verb="Revoke the fellowship"
+      consequence="The award, the date and the citation all stand. This adds a second fact, it does not correct the first."
+      form="revoke-form"
+      :failure="revoking ? failure?.message ?? null : null"
+      @update:open="revoking = null; failure = null"
     >
       <template #body>
         <UForm
@@ -360,24 +364,6 @@ onMounted(load)
           </UFormField>
         </UForm>
       </template>
-
-      <template #footer>
-        <UButton
-          type="submit"
-          form="revoke-form"
-          color="error"
-          data-test="revoke-submit"
-        >
-          Revoke
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="revoking = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+    </ConfirmModal>
   </div>
 </template>

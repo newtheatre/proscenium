@@ -157,7 +157,7 @@ const registerLabel = computed(() => {
       </div>
 
       <UAlert
-        v-if="failure"
+        v-if="failure && !calling"
         data-test="failure"
         color="error"
         variant="subtle"
@@ -191,44 +191,6 @@ const registerLabel = computed(() => {
         >
           Cancel this session
         </UButton>
-      </div>
-
-      <div
-        v-else-if="!registerOpen && calling"
-        class="space-y-3 rounded-lg border border-default p-4"
-        data-test="cancel-panel"
-      >
-        <UFormField
-          label="Why it is off"
-          required
-          description="Everybody signed up is emailed this, so write it for them."
-        >
-          <UTextarea
-            v-model="reason"
-            :rows="2"
-            class="w-full"
-            placeholder="The trainer is unwell and we would rather run it properly."
-            data-test="cancel-reason"
-          />
-        </UFormField>
-        <div class="flex flex-wrap gap-2">
-          <UButton
-            color="error"
-            :loading="working"
-            :disabled="!reason.trim()"
-            data-test="cancel-submit"
-            @click="callOff"
-          >
-            Cancel it and tell everybody
-          </UButton>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            @click="calling = false"
-          >
-            Back
-          </UButton>
-        </div>
       </div>
 
       <UAlert
@@ -336,6 +298,34 @@ const registerLabel = computed(() => {
           </template>
         </section>
       </div>
+
+      <ConfirmModal
+        v-model:open="calling"
+        name="cancel-session"
+        title="Cancel this session"
+        verb="Cancel the session and tell everybody"
+        consequence="It awards nothing, its register can never be opened, and everybody signed up is emailed what you write."
+        :loading="working"
+        :disabled="!reason.trim()"
+        :failure="failure"
+        @confirm="callOff"
+      >
+        <template #body>
+          <UFormField
+            label="Why it is off"
+            required
+            description="Everybody signed up is emailed this, so write it for them."
+          >
+            <UTextarea
+              v-model="reason"
+              :rows="2"
+              class="w-full"
+              placeholder="The trainer is unwell and we would rather run it properly."
+              data-test="cancel-reason"
+            />
+          </UFormField>
+        </template>
+      </ConfirmModal>
     </template>
   </div>
 </template>
