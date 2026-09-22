@@ -197,21 +197,17 @@ watch(modalOpen, (nowOpen) => {
       />
     </div>
 
-    <UModal
+    <ConfirmModal
       :open="declining !== null"
+      name="decline-claim"
       title="Decline this claim"
-      description="Say why: the claimant sees this word for word, and the shift stays off the open list until an officer reassigns it."
-      @update:open="declining = null"
+      verb="Decline the claim"
+      consequence="Say why: the claimant sees this word for word, and the shift stays off the open list until an officer reassigns it."
+      form="decline-form"
+      :failure="failure"
+      @update:open="declining = null; failure = null"
     >
       <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="failure"
-          class="mb-4"
-          color="error"
-          variant="subtle"
-          :description="failure"
-        />
         <UForm
           id="decline-form"
           ref="declineForm"
@@ -236,24 +232,6 @@ watch(modalOpen, (nowOpen) => {
           </UFormField>
         </UForm>
       </template>
-
-      <template #footer>
-        <UButton
-          type="submit"
-          form="decline-form"
-          color="error"
-          data-test="decline-submit"
-        >
-          Decline
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="declining = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+    </ConfirmModal>
   </div>
 </template>

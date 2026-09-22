@@ -463,43 +463,16 @@ const columns: TableColumn<ContentWarning>[] = [
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="removing !== null"
-      title="Delete this warning"
-      description="No show carries it, and nothing on the public site changes. A warning a show carries can only be retired."
-      @update:open="value => { if (!value) removing = null }"
-    >
-      <template #body>
-        <div class="space-y-4">
-          <UAlert
-            v-if="failure"
-            data-test="delete-failure"
-            color="error"
-            variant="subtle"
-            :description="failure"
-          />
-          <p class="text-sm">
-            {{ removing?.title }}
-          </p>
-          <div class="flex justify-end gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="removing = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-            <UButton
-              color="error"
-              :loading="saving"
-              data-test="confirm-delete-warning"
-              @click="remove"
-            >
-              Delete
-            </UButton>
-          </div>
-        </div>
-      </template>
-    </UModal>
+      name="delete-warning"
+      :title="removing ? `Delete ${removing.title}` : ''"
+      verb="Delete the content warning"
+      consequence="No show carries it, and nothing on the public site changes. A warning a show carries can only be retired."
+      :loading="saving"
+      :failure="failure"
+      @update:open="value => { if (!value) { removing = null; failure = null } }"
+      @confirm="remove"
+    />
   </div>
 </template>

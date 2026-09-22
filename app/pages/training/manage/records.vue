@@ -482,21 +482,19 @@ watch(modalOpen, (nowOpen) => {
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="revoking !== null"
+      name="revoke-record"
       :title="revoking ? `Revoke ${revoking.moduleName}` : ''"
-      description="The record stays and stops counting. A reason is required, and it is scrubbed if the person is ever erased."
-      @update:open="revoking = null"
+      verb="Revoke the record"
+      consequence="The record stays and stops counting. A reason is required, and it is scrubbed if the person is ever erased."
+      :loading="saving"
+      :disabled="!reason.trim()"
+      :failure="failure"
+      @update:open="revoking = null; failure = null"
+      @confirm="revoke"
     >
       <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="failure"
-          class="mb-4"
-          color="error"
-          variant="subtle"
-          :description="failure"
-        />
         <UFormField
           label="Why"
           required
@@ -511,25 +509,6 @@ watch(modalOpen, (nowOpen) => {
           />
         </UFormField>
       </template>
-
-      <template #footer>
-        <UButton
-          color="error"
-          :loading="saving"
-          :disabled="!reason.trim()"
-          data-test="revoke-submit"
-          @click="revoke"
-        >
-          Revoke it
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="revoking = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+    </ConfirmModal>
   </div>
 </template>

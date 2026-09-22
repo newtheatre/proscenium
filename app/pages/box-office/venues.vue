@@ -427,45 +427,16 @@ const columns: TableColumn<AdminVenue>[] = [
       </template>
     </UModal>
 
-    <UModal
+    <ConfirmModal
       :open="removing !== null"
+      name="delete-venue"
       :title="removing ? `Delete ${removing.name}` : ''"
-      description="Nothing has ever used this venue, so there is no history to keep."
+      verb="Delete the venue"
+      consequence="The venue goes. No performance and no shift is attached to it, and nothing has ever used it."
+      :loading="saving"
+      :failure="failure"
       @update:open="removing = null; failure = null"
-    >
-      <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="delete-failure"
-          color="error"
-          variant="subtle"
-          :description="failure"
-        />
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          The venue goes. No performance and no shift is attached to it.
-        </p>
-      </template>
-
-      <template #footer>
-        <UButton
-          color="error"
-          :loading="saving"
-          data-test="confirm-delete"
-          @click="remove"
-        >
-          Delete the venue
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="removing = null"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+      @confirm="remove"
+    />
   </div>
 </template>
