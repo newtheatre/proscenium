@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AUDIENCE_KINDS, AUDIENCE_LABELS } from '#shared/utils/announcements'
+import { AUDIENCE_KINDS, AUDIENCE_LABELS, saysAnnouncementSent, saysAudienceCount } from '#shared/utils/announcements'
 import { ROLES, saysRole } from '#shared/utils/roles'
 import type { AudienceKind } from '#shared/utils/announcements'
 
@@ -18,12 +18,29 @@ const failure = ref<string | null>(null)
 const previewing = ref(false)
 const sending = ref(false)
 const preview = ref<{ count: number, rendered: { subject: string, text: string } } | null>(null)
+const sent = ref<{ count: number, held: number } | null>(null)
 
 const audience = computed(() => {
   if (kind.value === 'ROLE_HOLDERS') return { kind: kind.value, role: role.value }
   if (kind.value === 'SESSION_SIGNUPS') return { kind: kind.value, sessionId: sessionId.value ?? '' }
   return { kind: kind.value }
 })
+
+const audienceReady = computed(() =>
+  (kind.value !== 'ROLE_HOLDERS' || Boolean(role.value))
+  && (kind.value !== 'SESSION_SIGNUPS' || Boolean(sessionId.value)))
+
+const request = useRequestFetch()
+
+// Answered from the audience alone, so the count is on screen before a word is written
+// (criterion 7). Never cached: an audience is resolved from live data every time it is asked.
+const { data: counted, status: countStatus } = await useAsyncData(
+  () => `announce-audience-${JSON.stringify(audience.value)}`,
+  () => (audienceReady.value
+    ? request<{ count: number }>('/api/admin/comms/announcements/audience', { query: audience.value })
+    : Promise.resolve(null)),
+  { watch: [audience], default: (): { count: number } | null => null, getCachedData: () => undefined },
+)
 
 const ready = computed(() =>
   subject.value.trim().length > 0
@@ -35,6 +52,7 @@ const ready = computed(() =>
 // naming yesterday's audience is worse than none (criterion 4).
 watch([kind, role, sessionId, subject, body, safetyNotice], () => {
   preview.value = null
+  sent.value = null
 })
 
 async function runPreview(): Promise<void> {
@@ -55,6 +73,14 @@ async function runPreview(): Promise<void> {
   }
 }
 
+function startAnother(): void {
+  subject.value = ''
+  body.value = ''
+  safetyNotice.value = false
+  sent.value = null
+  preview.value = null
+}
+
 async function send(): Promise<void> {
   if (!preview.value) return
   sending.value = true
@@ -64,21 +90,14 @@ async function send(): Promise<void> {
       method: 'POST',
       body: { audience: audience.value, subject: subject.value, body: body.value, safetyNotice: safetyNotice.value },
     })
-    // Held means the send log has nothing to show yet, so saying sent would send an officer
-    // looking for rows that only appear with the next digest (0061).
-    const queued = result.held > 0
     toast.add({
-      title: queued
-        ? `Queued for ${plural(result.count, 'recipient')}`
-        : `Sent to ${plural(result.count, 'recipient')}`,
-      description: queued
-        ? 'Each one has an in-app entry now; the email goes out with the next announcements digest.'
-        : undefined,
-      icon: queued ? 'i-lucide-clock' : 'i-lucide-send',
+      title: saysAnnouncementSent(result.count, result.held),
+      icon: result.held > 0 ? 'i-lucide-clock' : 'i-lucide-send',
       color: 'success',
     })
-    subject.value = ''
-    body.value = ''
+    // The draft stays on screen: an officer reads back what went out, and starts the next one
+    // deliberately rather than finding the form emptied under them (criterion 7).
+    sent.value = { count: result.count, held: result.held }
     preview.value = null
   }
   catch (error) {
@@ -128,6 +147,44 @@ async function send(): Promise<void> {
     >
       <SessionPicker v-model="sessionId" />
     </UFormField>
+
+    <p
+      class="text-sm text-muted"
+      data-test="audience-count"
+    >
+      <template v-if="countStatus === 'pending'">
+        Counting the audience
+      </template>
+      <template v-else-if="counted">
+        {{ saysAudienceCount(counted.count) }}
+      </template>
+      <template v-else>
+        Choose who it is for to see how many that is.
+      </template>
+    </p>
+
+    <UAlert
+      v-if="sent"
+      data-test="announce-sent"
+      color="success"
+      variant="subtle"
+      :icon="sent.held > 0 ? 'i-lucide-clock' : 'i-lucide-send'"
+      :title="saysAnnouncementSent(sent.count, sent.held)"
+      :description="sent.held > 0
+        ? 'Each one has an inbox entry now; the email goes out with the next announcements digest.'
+        : 'What went out is below, exactly as it was sent.'"
+    >
+      <template #actions>
+        <UButton
+          data-test="announce-again"
+          color="neutral"
+          variant="outline"
+          @click="startAnother"
+        >
+          Write another announcement
+        </UButton>
+      </template>
+    </UAlert>
 
     <UFormField label="Subject">
       <UInput

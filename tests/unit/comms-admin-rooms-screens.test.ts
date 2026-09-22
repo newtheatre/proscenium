@@ -19,10 +19,12 @@ describe('the composer counts before the draft and keeps it after (H-108 criteri
     expect(source).toContain('saysAudienceCount')
   })
 
-  test('nothing empties the subject or the message on a send', async () => {
+  test('the send path empties neither the subject nor the message', async () => {
     const source = await read(ANNOUNCE)
-    expect(source).not.toContain('subject.value = \'\'')
-    expect(source).not.toContain('body.value = \'\'')
+    const sending = source.split('async function send(')[1]?.split('</script>')[0] ?? ''
+    expect(sending).not.toContain('subject.value = \'\'')
+    expect(sending).not.toContain('body.value = \'\'')
+    expect(sending).toContain('sent.value =')
   })
 
   test('the screen says it went, and offers a way to start another', async () => {

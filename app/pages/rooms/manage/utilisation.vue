@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { saysShare, usedShare } from '#shared/utils/utilisation'
+import { committeeYearToDate, saysShare, usedShare } from '#shared/utils/utilisation'
 import { utilisationList } from '#shared/utils/utilisation-list'
 import type { UtilisationRow } from '#shared/utils/utilisation'
 import type { TableColumn } from '@nuxt/ui'
@@ -21,15 +21,9 @@ interface Report {
   totals: Omit<UtilisationRow, 'key' | 'label'>
 }
 
-// The committee year to date, which is the span a review is actually written about (0009).
-function yearToDate(): { from: string, to: string } {
-  const now = new Date()
-  const august = new Date(Date.UTC(now.getUTCFullYear(), 7, 1))
-  const start = now >= august ? august : new Date(Date.UTC(now.getUTCFullYear() - 1, 7, 1))
-  return { from: start.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
-}
-
-const span = reactive(yearToDate())
+// The committee year to date, London throughout (0009, 0014): a span read off the runtime's own
+// clock names the wrong day for half the year and the wrong year on 31 July.
+const span = reactive(committeeYearToDate(new Date()))
 
 // The breakdown, search, sort and page live in the URL (K-129); the span does not, because it is
 // a report parameter rather than a filter over a fixed set of rows.

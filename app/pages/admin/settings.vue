@@ -303,8 +303,10 @@ onMounted(load)
                   color="neutral"
                   variant="subtle"
                   size="sm"
+                  :data-test="`unenforced-${setting.key}`"
+                  title="The committee states this number here and it is quoted where it is published. Changing it changes no refusal."
                 >
-                  Not enforced yet
+                  Nothing enforces this
                 </UBadge>
                 <UBadge
                   v-if="!setting.hasDefault && !setting.set"

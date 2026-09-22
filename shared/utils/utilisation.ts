@@ -1,8 +1,17 @@
 import { z } from 'zod'
+import { committeeYearEnd, committeeYearOf } from './london'
+import { londonDay } from './membership'
 import { DAY } from './series'
 
 // Booked hours against open hours (C-117). The end-of-year review runs on numbers rather than
 // impressions, which is what the old dashboard's counts never gave anybody (RM-3).
+
+// The committee year to date, which is the span a review is actually written about (C-117
+// criterion 6). London throughout, so 31 July belongs to the year ending (0009, 0014).
+export function committeeYearToDate(at: Date): { from: string, to: string } {
+  const began = committeeYearEnd(committeeYearOf(at) - 1)
+  return { from: londonDay(new Date(began.getTime() + 1)), to: londonDay(at) }
+}
 
 // A technical bound rather than a policy one, so it is a constant and not a setting (0012).
 export const REPORT_PAGE_SIZE = 50
