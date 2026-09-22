@@ -18,6 +18,11 @@ export type ProductStatus = (typeof PRODUCT_STATUSES)[number]
 export const ALLERGEN_STATES = ['UNKNOWN', 'NONE', 'RECORDED'] as const
 export type AllergenState = (typeof ALLERGEN_STATES)[number]
 
+// F-111 criterion 6: every screen that creates either reads its default from here. A product is
+// mostly not alcohol; a stocked item mostly is, and Challenge 25 is a refusal to get wrong.
+export const PRODUCT_AGE_RESTRICTED_DEFAULT = false
+export const STOCK_ITEM_AGE_RESTRICTED_DEFAULT = true
+
 // Complete at birth: widening a CHECK is a table rebuild, and a rebuild of an append-only table
 // is refused outright (0010). The kinds no screen writes yet are listed with the path that will.
 export const STOCK_MOVEMENT_KINDS = [
@@ -204,7 +209,7 @@ export const productForm = z.object({
   categoryId: z.string().trim().min(1, 'A product belongs to a category'),
   sort: z.number().int().min(0).max(999).default(0),
   staffedOnly: z.boolean().default(false),
-  ageRestricted: z.boolean().default(false),
+  ageRestricted: z.boolean().default(PRODUCT_AGE_RESTRICTED_DEFAULT),
   allergenState: z.enum(ALLERGEN_STATES).default('UNKNOWN'),
   allergenNote: z.string().trim().max(MAX_ALLERGEN_NOTE).nullish(),
 }).refine(
@@ -223,7 +228,7 @@ export const stockItemForm = z.object({
   containerMl: z.number().int().positive().max(100_000).nullish(),
   parQty: z.number().int().nonnegative().max(MAX_MOVEMENT_QTY).nullish(),
   category: z.string().trim().max(MAX_BAR_NAME).nullish(),
-  ageRestricted: z.boolean().default(true),
+  ageRestricted: z.boolean().default(STOCK_ITEM_AGE_RESTRICTED_DEFAULT),
   allergenNotes: z.string().trim().max(MAX_ALLERGEN_NOTE).nullish(),
 }).refine(
   value => value.unit === 'ML' || !value.containerMl,

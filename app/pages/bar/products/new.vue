@@ -2,6 +2,7 @@
 import {
   ALLERGEN_STATES,
   MEASURE_PRESETS,
+  PRODUCT_AGE_RESTRICTED_DEFAULT,
   STOCK_UNITS,
   measurePreset,
   presetForCategory,
@@ -44,7 +45,30 @@ const { data: stock } = await useAsyncData(
 )
 
 const categoryOptions = computed(() => categories.value.items.map(item => ({ label: item.name, value: item.id })))
-const activeItems = computed(() => stock.value.items.filter(item => item.status === 'ACTIVE'))
+
+// The register is read a page at a time, so a picker over it searches the register itself rather
+// than offering only the page already in hand (F-111 criterion 6, K-123).
+const itemSearch = ref('')
+const settledItemSearch = useDebounced(itemSearch, 250)
+
+const { data: searchedStock } = await useAsyncData(
+  () => `setup-items-search-${settledItemSearch.value}`,
+  () => settledItemSearch.value.trim().length < 2
+    ? Promise.resolve(noItems())
+    : request<Listing<StockItem>>('/api/admin/bar/items', {
+        query: { search: settledItemSearch.value.trim(), pageSize: MAX_PAGE_SIZE },
+      }),
+  { watch: [settledItemSearch], default: noItems, getCachedData: () => undefined },
+)
+
+// A chosen item has to stay in the list its picker reads, so what was found is added to the
+// page already in hand rather than replacing it.
+const knownItems = computed(() => {
+  const byId = new Map(stock.value.items.map(item => [item.id, item]))
+  for (const item of searchedStock.value.items) byId.set(item.id, item)
+  return [...byId.values()]
+})
+const activeItems = computed(() => knownItems.value.filter(item => item.status === 'ACTIVE'))
 
 const itemOptions = computed(() => activeItems.value
   .map(item => ({ label: `${item.name} (${says(item.unit).toLowerCase()})`, value: item.id })))
@@ -55,9 +79,6 @@ const sellableItemOptions = computed(() => (shape.value === 'SIMPLE'
   ? activeItems.value.filter(item => item.unit === 'ITEM')
   : activeItems.value).map(item => ({ label: `${item.name} (${says(item.unit).toLowerCase()})`, value: item.id })))
 
-// The register is read a page at a time, so a bar past the cap would silently miss items.
-const moreStockThanListed = computed(() => stock.value.total > stock.value.items.length)
-
 const shape = ref<ProductShape>('UNSET')
 
 const product = reactive({
@@ -65,7 +86,7 @@ const product = reactive({
   categoryId: '',
   sort: 0,
   staffedOnly: false,
-  ageRestricted: true,
+  ageRestricted: PRODUCT_AGE_RESTRICTED_DEFAULT,
   allergenState: 'UNKNOWN' as AllergenState,
   allergenNote: '',
 })
@@ -560,21 +581,16 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
             label="Stocked item"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="existingItemId"
               :items="sellableItemOptions"
+              value-key="value"
+              placeholder="Search the register"
               class="w-full"
               data-test="setup-existing-item"
+              @update:search-term="value => itemSearch = value"
             />
           </UFormField>
-
-          <p
-            v-if="moreStockThanListed"
-            class="text-xs text-muted"
-          >
-            The first {{ stock.items.length }} stocked items of {{ stock.total }} are listed here.
-            Anything further down the register is reached from the stock screen.
-          </p>
 
           <USwitch
             v-model="opening.offered"
@@ -730,11 +746,14 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
             :data-test="`component-${index}`"
           >
             <UFormField label="Stocked item">
-              <USelect
+              <USelectMenu
                 v-model="component.itemId"
                 :items="itemOptions"
+                value-key="value"
+                placeholder="Search the register"
                 class="w-full"
                 :data-test="`component-item-${index}`"
+                @update:search-term="value => itemSearch = value"
               />
             </UFormField>
             <UFormField label="Quantity">
@@ -809,11 +828,14 @@ const SHAPES: { shape: ProductShape, title: string, description: string, icon: s
               :data-test="`choice-option-${index}`"
             >
               <UFormField label="Stocked item">
-                <USelect
+                <USelectMenu
                   v-model="option.itemId"
                   :items="itemOptions"
+                  value-key="value"
+                  placeholder="Search the register"
                   class="w-full"
                   :data-test="`choice-item-${index}`"
+                  @update:search-term="value => itemSearch = value"
                 />
               </UFormField>
               <UFormField label="Quantity">

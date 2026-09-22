@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import {
   HAND_ENTERED_KINDS,
   REASONS_BY_KIND,
+  STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   STOCK_UNITS,
   movementEntryForm,
   says,
@@ -57,7 +58,7 @@ interface ItemState {
   allergenNotes?: string
 }
 
-const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: true })
+const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT })
 
 type HandEnteredKind = Exclude<StockMovementKind, 'SALE' | 'COMP' | 'STOCKTAKE' | 'TRANSFER' | 'REVERSAL'>
 
@@ -122,7 +123,7 @@ function edit(item: StockItem | null): void {
     containerMl: item?.containerMl ?? undefined,
     parQty: item?.parQty ?? undefined,
     category: item?.category ?? undefined,
-    ageRestricted: item?.ageRestricted ?? true,
+    ageRestricted: item?.ageRestricted ?? STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
     allergenNotes: item?.allergenNotes ?? undefined,
   })
   open.value = true
