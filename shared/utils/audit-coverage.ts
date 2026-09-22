@@ -775,6 +775,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/config/[key]/blast-radius.get.ts', exempt: 'reads a live count; nothing is written' },
   { route: 'server/api/admin/config/[key]/revert.post.ts', actions: ['config.changed'], via: ['server/utils/config-write.ts'] },
   { route: 'server/api/docs/report-drift.post.ts', actions: ['docs.drift-reported'] },
+  { route: 'server/api/feedback/index.post.ts', actions: ['feedback.submitted'] },
 
   // Module K: platform
 

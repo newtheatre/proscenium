@@ -559,6 +559,38 @@ Three things worth knowing before doing it:
   `content/policies/*.md` in the repository, so changing the wording is a pull request, while
   changing the number is not. That split is deliberate (0012).
 
+## Feedback reports (K-134, 0086)
+
+Anybody signed in to a console or show-night screen can report a problem or an idea from the
+megaphone button beside the help link. Each report is one `feedback_reports` row: the kind, the
+words, the screen, the shell, the browser and the last few requests that browser saw fail, ray
+ids included. The application does nothing further with it. There is no notification and no
+admin screen; a defect that takes the theatre down is `health:watch`'s job, and everything else
+waits for the daily run.
+
+**The daily triage run** is a scheduled assistant session started from the IT Manager's own
+account, not a workflow in this repository and not a task in the worker. Its instructions are
+versioned at `.claude/skills/triage-feedback/SKILL.md`, which is the only place to change what it
+does. On each run it reads every `NEW` row through the account's D1 connector, gathers the
+worker's logs from the quarter hour around a bug through the Workers Logs connector where one is
+attached, opens one issue per report in `newtheatre/proscenium` (labels `from-feedback` and
+`bug` or `idea`), and marks the row `TRIAGED` with the issue link by
+`UPDATE ... WHERE id = ? AND status = 'NEW'`. Zero rows changed means another run got there
+first, and it closes its own issue as a duplicate. It never edits code, never opens a pull
+request and never touches another table.
+
+**If reports stop turning into issues**, the queue is still there. `SELECT COUNT(*) FROM
+feedback_reports WHERE status = 'NEW'` says how much is waiting; the run's own schedule lives in
+the account's routines, and re-creating it is: a daily routine that starts a fresh session in the
+environment holding this repository, with the D1, GitHub and Workers Logs connectors attached,
+whose prompt is "Follow `.claude/skills/triage-feedback/SKILL.md` on `unified/main`". Nothing in
+the worker changes when the run is absent or replaced.
+
+**What the run's writes are not**: audit entries. The run holds no session and is not an actor
+in the application, so `issue_url` and `triaged_at` on the row and the issue itself are the whole
+record (`docs/known-issues.md`). `DONE` and `DISMISSED` are for the IT Manager to set by hand once
+an issue closes, until a screen for it earns its place.
+
 ## Scheduled tasks
 
 Registered in `nuxt.config.ts` and mirrored in the wrangler cron triggers; the two lists must

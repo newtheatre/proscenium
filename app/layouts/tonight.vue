@@ -47,6 +47,7 @@ onMounted(async () => {
 <template>
   <div class="dark flex min-h-dvh flex-col bg-default text-default [color-scheme:dark]">
     <div class="mx-auto flex min-h-12 w-full max-w-md items-center justify-end gap-1 px-2">
+      <FeedbackButton shell="tonight" />
       <DocsLink />
       <AuthStatus />
     </div>

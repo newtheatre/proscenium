@@ -75,6 +75,9 @@ The rest of the overview arrives with the stories that need it, and the screen s
   ::card{icon="i-lucide-database-backup" title="Backups" to="/docs/system/backups"}
   What is backed up, how a restore works, and the drill that proves it.
   ::
+  ::card{icon="i-lucide-megaphone" title="Reporting a problem or an idea" to="/docs/system/reporting-a-problem-or-an-idea"}
+  The megaphone button on every console and show-night screen, and what happens to a report.
+  ::
 ::
 
 ## Related pages

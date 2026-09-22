@@ -2687,6 +2687,16 @@ task opens one on the first unhealthy `/api/health` check and closes it the mome
 Whether the IT Manager has been told is `notification_log`'s own claim keyed on this id, not a
 column here (0048, J-106 criterion 5).
 
+### feedback_reports
+`id` PK · `reporter_id` → users restrict · `kind` CHECK `BUG|IDEA` · `body` · `page_path` ·
+`shell` CHECK `console|tonight` · `user_agent` · `recent_failures` (JSON, the browser's last few
+failed requests with their ray ids) · `status` CHECK `NEW|TRIAGED|DONE|DISMISSED` · `issue_url` ·
+`triaged_at` · `created_at`. A report from a signed-in screen, waiting for the daily triage run
+(K-134, 0086). Mutable by design and so not append-only: the run writes `status`, `issue_url` and
+`triaged_at` from outside the worker, by a conditional `UPDATE ... WHERE status = 'NEW'`, and a
+CHECK holds that a `NEW` row names no issue and any other row names one. The words are personal
+data: erasure scrubs `body`, `user_agent` and `recent_failures` and leaves the row as a count.
+
 ## The conditional-write claims (0006), in one place
 
 | Claim | Mechanism |
@@ -2698,6 +2708,7 @@ column here (0048, J-106 criterion 5).
 | Promotion / reminder at-most-once | conditional INSERT under a partial unique in notification_log |
 | Pass per performance | UNIQUE (pass_id, performance_id) |
 | One open bar session / stocktake | partial unique WHERE open |
+| Feedback triage claim | UPDATE feedback_reports SET status='TRIAGED', issue_url, triaged_at WHERE id=? AND status='NEW'; zero rows = another run got there first (0086) |
 | Same-slot room bookings | half-open overlap predicate on the INSERT/UPDATE |
 
 Each row in this table is a named racing test in CI (K-105, K-121).

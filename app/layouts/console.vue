@@ -100,6 +100,7 @@ function items(collapsed: boolean): NavigationMenuItem[][] {
             <UDashboardSidebarCollapse />
           </template>
           <template #right>
+            <FeedbackButton shell="console" />
             <DocsLink />
           </template>
         </UDashboardNavbar>

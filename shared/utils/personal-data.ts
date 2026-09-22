@@ -785,6 +785,18 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     why: 'Append-only (0010). The operator is a reference the tombstone still answers, as config\'s editor is.',
   },
+  {
+    name: 'feedback_reports',
+    column: 'reporter_id',
+    section: 'feedback',
+    columns: ['kind', 'page_path', 'shell', 'status', 'issue_url', 'created_at'],
+    erasure: 'scrub',
+    // The words and the browser details are theirs; how many reports arrived, from which screen
+    // and what came of them is the theatre's (K-134, 0086).
+    scrub: ['body', 'user_agent', 'recent_failures'],
+    scrubTo: { body: 'Erased report' },
+    why: 'What this person reported about a screen. The count and the outcome survive an erasure; their words and their browser do not.',
+  },
 ]
 
 export const EXPORTED_TABLES = PERSONAL_TABLES.filter(entry => entry.section !== null)

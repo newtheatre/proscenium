@@ -689,6 +689,17 @@ a transactional notification to every live `ADMIN` (`liveAdmins()`, the same aud
 is no open-items list yet; today "visible to the IT Manager" means an immediate notification and a
 permanent line in the trail, not a triaged, closeable queue (criterion 4, `known-issues.md`).
 
+**Reporting a problem or an idea is a queue (K-134, 0086).** The `console` and `tonight` shells
+carry one button beside the help link (`app/components/FeedbackButton.vue`); `POST /api/feedback`
+(`server/api/feedback/index.post.ts`) writes a `feedback_reports` row and a `feedback.submitted`
+trail line in one batch, rate-limited to ten an hour per reporter, with the words on the row and
+never in audit detail. The browser attaches the page, the shell, its user agent and the last few
+requests it saw fail (`app/plugins/recent-failures.client.ts`), ray ids included, so a defect can
+be found in the worker's logs. The worker never talks to the tracker: a daily triage run outside
+it reads `NEW` rows through the database connector, opens one issue per report and writes the
+outcome back conditionally (`docs/operations.md`, Feedback reports). The drift report above stays
+its own path.
+
 ## Settings, and a wide-blast-radius save (J-104, J-105)
 
 `CONFIG_KEYS` (`shared/utils/config.ts`) declares every operational number: a Zod schema, a
