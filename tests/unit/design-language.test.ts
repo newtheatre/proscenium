@@ -106,6 +106,36 @@ describe('colour is never the only thing saying it (K-101)', () => {
     }
     expect(offenders).toEqual([])
   })
+
+  // The same button written with a closing tag: empty between the tags is still icon-only.
+  test('an icon button that closes its own tag says what it is too', async () => {
+    const offenders: string[] = []
+    for (const file of (await appFiles()).filter(path => path.endsWith('.vue'))) {
+      const source = await Bun.file(file).text()
+      for (const button of source.matchAll(/<UButton\b([^<]*?)>([\s\S]*?)<\/UButton>/g)) {
+        const attributes = button[1] ?? ''
+        const between = (button[2] ?? '').replace(/<[^>]*>/g, ' ').trim()
+        const hasIcon = /\bicon\s*=/.test(attributes) || /:icon\s*=/.test(attributes)
+        const hasWords = /\blabel\s*=/.test(attributes) || /:label\s*=/.test(attributes)
+          || /aria-label\s*=/.test(attributes) || /:aria-label\s*=/.test(attributes) || between.length > 0
+        if (hasIcon && !hasWords) offenders.push(`${file}  an icon-only button with no name`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  // A state the eye reads from a colour is a state a name has to carry as well: a swatch is a
+  // picture of its colour, so it says which colour it is (K-101 criterion 3).
+  test('a colour swatch names its colour', async () => {
+    const offenders: string[] = []
+    for (const file of (await appFiles()).filter(path => path.endsWith('.vue'))) {
+      const source = await Bun.file(file).text()
+      for (const swatch of source.matchAll(/backgroundColor:[^\n]*\n(?:[^\n]*\n){0,3}/g)) {
+        if (!/aria-label/.test(swatch[0])) offenders.push(`${file}  a swatch with no name`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
 })
 
 // Photography rule: a `PhotoHero` picture is a backdrop behind the headline, so it carries an

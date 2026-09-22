@@ -330,7 +330,11 @@ Open questions for the committee:
   3. Creating an account from the console never generates a password: a 24-hour set-password link is emailed instead, and roles can be granted in the same action.
   4. Anonymised rows are hidden unless explicitly requested.
   5. Every account view links to that person's grants, sign-in methods, membership state and audit history.
-- Source: Audit SD-8 (filters and banners carry); Prompt Book A-4.
+  6. An account's own page is reached from the directory and says so: it carries the way back to
+     the directory, and it draws a skeleton of the cards that are coming while it loads rather
+     than an empty page that fills without warning.
+- Source: Audit SD-8 (filters and banners carry); Prompt Book A-4. Criterion 6 comes from the
+  console review of 21 September 2026 (issue 1151 item 10).
 
 ## A-122: Force logout, disable and reset MFA
 
@@ -359,7 +363,12 @@ Open questions for the committee:
   4. The losing account is left as a tombstone, so anything inside the system that referenced it still resolves; no legacy-id columns exist (decision 0015, amended).
   5. The winning account keeps its own sign-in methods and factors; the loser's are retired, never silently combined.
   6. The last-admin guard applies (A-120), and the merge is audited with the full moved-item summary.
-- Source: Prompt Book A-4; audit SD-10; Get-In part 2 (GDPR machinery becomes single-database operations).
+  7. The winning account is chosen from the account directory, searched by name, address or
+     student number, the way every other field naming somebody is (K-123 criterion 1). Typing an
+     address that has to match exactly is not choosing.
+- Source: Prompt Book A-4; audit SD-10; Get-In part 2 (GDPR machinery becomes single-database
+  operations). Criterion 7 comes from the console review of 21 September 2026 (issue 1151 item
+  10).
 
 ## A-124: Export my data in one action
 
@@ -506,6 +515,8 @@ Open questions for the committee:
      reason (0011).
   6. Erasure anonymises claims and is idempotent; a claim on an anonymised account is refused.
   7. Nothing here sells anything: SUMS remains the system of record (0005, 0031, A-202).
+  8. How many claims are waiting is on the register's toolbar row, in reach without opening a
+     panel: a queue nobody can see from the screen they are on is a queue nobody works.
 - Source: Pre-cutover review, 10 September 2026. The migration carries no memberships
   (`migration/identity.ts`), so at cutover every member reads as lapsed until recorded; this is
   the member-facing half of what A-201 does by upload.

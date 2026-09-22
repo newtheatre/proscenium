@@ -46,6 +46,12 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
      pair colour with text or shape, verified by the CI checks above.
   4. Focus order, visible focus and minimum contrast are enforced by design-system tokens, so a
      new screen inherits compliance by default rather than opting into it.
+  5. Every control carries a name, and a placeholder is an example rather than the name: an
+     input is labelled by the form field it sits in, or by an `aria-label` where the layout
+     genuinely cannot hold a visible label; an icon-only control and a row action repeated down
+     a column name what they act on; a tab keeps its label at every width; a chooser is a radio
+     group reachable from the keyboard, not a card that only takes a click; and a name assembled
+     from a value never reads an empty field back. A test over the screens holds the rule.
 - Source: Prompt Book K-1 (accessibility); audit PR-5, PR-9 (as-built operational screens);
   Get-In part 5 (standards)
 
@@ -549,6 +555,10 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
       reader has to act on, a refusal, a warning about this data or an empty result, and one
       that is always on screen is read by nobody. No console screen draws a page header of its
       own, because the navbar already carries the title.
+  12. A screen that is one step of a workflow spread across several sidebar entries names the
+      step after it, in place, as a link that carries whatever the next step needs. An officer
+      working a flow moves through it from the screens themselves; the sidebar is how a flow is
+      entered, not how it is walked.
 - Source: Review of the admin surface against the Nuxt UI component matrix, 30 August 2026;
   decision 0021 (the design language is enforced by test, not by review). Criterion 7 comes
   from the console review of 18 September 2026 (issue 1151 item 5), which counted the one-click
@@ -561,7 +571,9 @@ Stories: 31. Phases: 25 MVP, 1 V2, 0 Later, 5 resolved.
   empty header, and rows of up to seven ghost buttons with no overflow. Criterion 11 comes from
   the same review (issue 1151 item 2), which counted thirty-six permanent explainer alerts
   across the console, a page header duplicating the navbar title, and bare paragraphs of
-  explanation on the admin screens.
+  explanation on the admin screens. Criterion 12 comes from the console review of 21 September
+  2026 (issue 1151 item 10), which found the rota spread across four sidebar entries in a fixed
+  order with no screen naming the next one.
 
 ## K-124: Developer tools that do not ship
 

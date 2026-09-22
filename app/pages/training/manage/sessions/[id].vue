@@ -278,12 +278,22 @@ const registerLabel = computed(() => {
             <li
               v-for="module in data.modules"
               :key="module.id"
+              class="flex items-center gap-1"
             >
               <UBadge
                 :color="module.safetyCritical ? 'warning' : 'neutral'"
                 variant="subtle"
               >
                 {{ module.id }}
+              </UBadge>
+              <UBadge
+                v-if="module.safetyCritical"
+                color="warning"
+                variant="subtle"
+                size="sm"
+                :data-test="`safety-critical-${module.id}`"
+              >
+                Safety critical
               </UBadge>
             </li>
           </ul>

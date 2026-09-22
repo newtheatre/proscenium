@@ -139,7 +139,17 @@ watchEffect(() => {
   )
 })
 
-function begin(): void {
+// A module the demand board sent here, so answering a request begins with the module chosen
+// (G-104 criterion 7). Read once: the form is the officer's after that.
+const route = useRoute()
+
+onMounted(() => {
+  const asked = route.query.module
+  if (typeof asked !== 'string' || !asked) return
+  begin([asked])
+})
+
+function begin(chosen: string[] = []): void {
   Object.assign(state, {
     heldOn: '',
     startsAt: '19:00',
@@ -148,7 +158,7 @@ function begin(): void {
     capacity: 20,
     description: undefined,
     notes: undefined,
-    moduleIds: [],
+    moduleIds: chosen,
     opensAt: null,
   })
   opensNow.value = true

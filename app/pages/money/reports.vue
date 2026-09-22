@@ -28,7 +28,7 @@ const query = computed(() => (scopeKind.value === 'SHOW'
   ? { scope: 'SHOW' as const, showId: showId.value ?? '' }
   : { scope: 'PERIOD' as const, from: from.value, to: to.value }))
 
-const { data, status, error, refresh } = await useAsyncData(
+const { data, status, error } = await useAsyncData(
   'finance-foregone',
   () => (ready.value
     ? request<{ report: FinanceForegoneReport }>('/api/admin/finance/foregone', { query: query.value }).then(response => response.report)
@@ -87,6 +87,7 @@ const accessColumns: TableColumn<AccessAdmissionRow>[] = [
         <USelectMenu
           v-if="scopeKind === 'SHOW'"
           v-model="showId"
+          aria-label="Show"
           data-test="scope-show"
           :items="showOptions"
           value-key="value"
@@ -95,20 +96,15 @@ const accessColumns: TableColumn<AccessAdmissionRow>[] = [
         <template v-if="scopeKind === 'PERIOD'">
           <DateField
             v-model="from"
+            aria-label="From"
             data-test="scope-from"
           />
           <DateField
             v-model="to"
+            aria-label="To"
             data-test="scope-to"
           />
         </template>
-        <UButton
-          data-test="refresh-report"
-          variant="subtle"
-          @click="refresh()"
-        >
-          Refresh
-        </UButton>
       </template>
     </AdminToolbar>
 

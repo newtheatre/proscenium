@@ -149,6 +149,8 @@ watch(modalOpen, (nowOpen) => {
       Shift claims waiting for a decision.
     </p>
 
+    <RotaFlow step="approvals" />
+
     <AdminToolbar
       v-model:search="search"
       :placeholder="rotaApprovalsList.search?.placeholder"

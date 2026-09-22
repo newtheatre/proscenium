@@ -2,7 +2,7 @@
 title: Money
 description: The season dashboard, the reports built on the ledger, daily reconciliation, period close and the SU export.
 module: Finance
-updatedOn: 2026-09-21
+updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -40,20 +40,20 @@ The dashboard at `/money` is the first item in the group. It answers "how are we
 period: a day, a week, a month, a term or a season. The season runs from {{ SEASON_START }} to
 {{ SEASON_END }} (month and day, London), the same year the committee's roles run to.
 
-![The season dashboard with the period kind (1), the year (2), Refresh (3), revenue by source (4) and the other figures (5)](/images/docs/money/dashboard.png)
+![The season dashboard with the period kind (1), the period's own controls (2), revenue by source (3) and the other figures (4)](/images/docs/money/dashboard.png)
 
 1. **Period kind**: DAY, WEEK, MONTH, TERM or SEASON. A day or a week takes a date; a month takes
-   a month number and a year; a season takes the year it starts in.
-2. **Year**, and for a month the **month number**. For a term, a second list of the terms
-   themselves. A term has no rule behind it: its range is whatever was typed when the term was
-   defined on the [periods](/docs/money/periods) screen, so TERM appears only once at least one
-   term exists.
-3. **Refresh** reads the ledger again. Every figure is a query, so a sale made a moment ago is
-   already in the next read.
-4. **Revenue by source**: what each surface took on a card, Desk, Till and so on. With
+   a month and a year; a season is chosen from the seasons themselves.
+2. **Month** and **Year** are each a list, and a **Season** reads as the two years it spans,
+   "2025/26". For a term, a list of the terms themselves. A term has no rule behind it: its
+   range is whatever was typed when the term was defined on the
+   [periods](/docs/money/periods) screen, so TERM appears only once at least one term exists.
+   Changing any of these reads the ledger again at once; there is nothing else to press. Every
+   figure is a query, so a sale made a moment ago is already in the next read.
+3. **Revenue by source**: what each surface took on a card, Desk, Till and so on. With
    `finance.read` each row has an **Entries** button that opens the [ledger entries](/docs/money/ledger-entries)
    list filtered to that source and the dashboard's range.
-5. **Refunds**, **Foregone comps**, **Foregone discounts** and **Open variance**: the money
+4. **Refunds**, **Foregone comps**, **Foregone discounts** and **Open variance**: the money
    handed back, the value given away rather than taken, and the sum of every night's reader
    reading that still disagrees with the ledger and has not been written off.
 
@@ -87,8 +87,8 @@ The range the figures cover is printed above them, from and to, as London dates.
 ## If something goes wrong
 
 - **"The dashboard could not be read."**: the ledger query failed or you no longer hold a
-  finance permission. Press **Refresh**; if it persists, check your role under
-  [roles and the committee year](/docs/people/roles-and-the-committee-year).
+  finance permission. Change the period and back to read it again; if it persists, check your
+  role under [roles and the committee year](/docs/people/roles-and-the-committee-year).
 - **The Entries buttons are missing**: you hold `finance.summary` and not `finance.read`. The
   committee sees the season's totals, not the individual entries behind them.
 

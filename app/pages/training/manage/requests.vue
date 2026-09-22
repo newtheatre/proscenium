@@ -16,7 +16,7 @@ interface Demand {
 const request = useRequestFetch()
 const toast = useToast()
 const failure = ref<string | null>(null)
-const answering = ref<{ id: string, name: string, moduleId: string } | null>(null)
+const answering = ref<{ id: string, name: string, moduleName: string } | null>(null)
 const reason = ref('')
 const saving = ref(false)
 
@@ -59,7 +59,7 @@ type Requester = Demand['requesters'][number]
 
 // One table a module, so the board keeps its grouping and its order: the busiest module first,
 // and the people asking for it beneath it.
-function requesterColumns(moduleId: string): TableColumn<Requester>[] {
+function requesterColumns(moduleId: string, moduleName: string): TableColumn<Requester>[] {
   return [
     {
       id: 'person',
@@ -77,9 +77,10 @@ function requesterColumns(moduleId: string): TableColumn<Requester>[] {
         'size': 'xs',
         'color': 'neutral',
         'variant': 'outline',
+        'aria-label': `Answer ${row.original.name}'s request`,
         'data-test': `answer-${moduleId}`,
         'onClick': () => {
-          answering.value = { id: row.original.id, name: row.original.name, moduleId }
+          answering.value = { id: row.original.id, name: row.original.name, moduleName }
         },
       }, () => 'Answer'),
     },
@@ -163,19 +164,29 @@ watch(modalOpen, (nowOpen) => {
               {{ demand.department }}
             </UBadge>
           </div>
-          <UBadge
-            color="warning"
-            variant="subtle"
-            :data-test="`waiting-${demand.moduleId}`"
-          >
-            {{ plural(demand.waiting, 'waiting', 'waiting') }}
-          </UBadge>
+          <div class="flex flex-wrap items-center gap-2">
+            <UBadge
+              color="warning"
+              variant="subtle"
+              :data-test="`waiting-${demand.moduleId}`"
+            >
+              {{ plural(demand.waiting, 'waiting', 'waiting') }}
+            </UBadge>
+            <UButton
+              size="xs"
+              icon="i-lucide-calendar-plus"
+              :to="`/training/manage/sessions?module=${demand.moduleId}`"
+              :data-test="`schedule-${demand.moduleId}`"
+            >
+              Schedule a session
+            </UButton>
+          </div>
         </div>
 
         <UTable
           class="mt-3 text-sm"
           :data="demand.requesters"
-          :columns="requesterColumns(demand.moduleId)"
+          :columns="requesterColumns(demand.moduleId, demand.moduleName)"
           :data-test="`requesters-${demand.moduleId}`"
         >
           <template #empty>
@@ -208,7 +219,7 @@ watch(modalOpen, (nowOpen) => {
           v-if="answering"
           class="text-sm text-muted"
         >
-          {{ answering.name }} asked for {{ answering.moduleId }}. They are shown what you write, so
+          {{ answering.name }} asked for {{ answering.moduleName }}. They are shown what you write, so
           tell them where it stands, not only that it is declined.
         </p>
 

@@ -129,13 +129,6 @@ async function record(): Promise<void> {
           v-model="night"
           data-test="reconciliation-night"
         />
-        <UButton
-          data-test="refresh-reconciliation"
-          variant="subtle"
-          @click="refresh()"
-        >
-          Refresh
-        </UButton>
       </template>
     </AdminToolbar>
 
@@ -239,11 +232,16 @@ async function record(): Promise<void> {
         >
           {{ readerPence === null ? 'Give the figure as pounds and pence, such as 123.45.' : `Recording ${saysMoney(readerPence)}.` }}
         </p>
-        <UTextarea
-          v-model="note"
-          data-test="reading-note"
-          placeholder="Note (needed only if this differs from the expected figure)"
-        />
+        <UFormField
+          label="Note"
+          description="Needed only where this differs from the expected figure."
+        >
+          <UTextarea
+            v-model="note"
+            class="w-full"
+            data-test="reading-note"
+          />
+        </UFormField>
         <UCheckbox
           v-if="data.current"
           v-model="writeOff"

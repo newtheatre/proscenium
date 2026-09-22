@@ -72,8 +72,22 @@ computed outline.
 ## State is never only a colour
 
 Availability, validity and connection pair colour with words or shape (K-101 criterion 3). A badge
-with no text in it and an icon-only button with no accessible name both fail
-`design-language.test.ts`, which is how the rule survives the next screen.
+with no text in it, an icon-only button with no accessible name and a colour swatch that does not
+say which colour it is all fail `design-language.test.ts`, which is how the rule survives the next
+screen.
+
+## Every control has a name
+
+A control is named by the `UFormField` it sits in, so the name is visible and clicking it focuses
+the field. Where the layout genuinely cannot hold a visible label, a search box in a toolbar row or
+a control in a table cell, the name is an `aria-label` and the placeholder stays an example
+(K-101 criterion 5). A placeholder is never the name: it disappears as soon as anybody types.
+
+A row action repeated down a column names what it acts on, a tab keeps its label at every width
+(`sr-only sm:not-sr-only`, not `hidden`), and a chooser made of cards is a radio group with arrow
+keys rather than a card that only takes a click. A name assembled from values guards the parts that
+can be empty, so nothing reads "null" back. `admin-conventions.test.ts` holds all of it over the
+console.
 
 ## Type
 
