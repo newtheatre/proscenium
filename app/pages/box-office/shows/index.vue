@@ -320,6 +320,7 @@ const artless = computed(() => data.value.items.filter(one => one.status === 'DR
     >
       <template #body>
         <UForm
+          id="show-form"
           :schema="showForm"
           :state="state"
           class="space-y-4"
@@ -359,24 +360,25 @@ const artless = computed(() => data.value.items.filter(one => one.status === 'DR
               @update:model-value="slugEdited = true"
             />
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="show-submit"
-            >
-              Add the show
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="show-form"
+          :loading="saving"
+          data-test="show-submit"
+        >
+          Add the show
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
   </div>

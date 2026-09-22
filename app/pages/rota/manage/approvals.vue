@@ -213,6 +213,7 @@ watch(modalOpen, (nowOpen) => {
           :description="failure"
         />
         <UForm
+          id="decline-form"
           ref="declineForm"
           :schema="shiftDeclineForm"
           :state="decline"
@@ -233,14 +234,25 @@ watch(modalOpen, (nowOpen) => {
               class="w-full"
             />
           </UFormField>
-          <UButton
-            type="submit"
-            color="error"
-            data-test="decline-submit"
-          >
-            Decline
-          </UButton>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="decline-form"
+          color="error"
+          data-test="decline-submit"
+        >
+          Decline
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="declining = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
   </div>

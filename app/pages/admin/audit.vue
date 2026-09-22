@@ -393,6 +393,7 @@ onMounted(load)
     >
       <template #body>
         <UForm
+          id="audit-entry-form"
           ref="entryForm"
           :schema="manualEntryForm"
           :state="entry"
@@ -445,13 +446,24 @@ onMounted(load)
               class="w-full"
             />
           </UFormField>
-          <UButton
-            type="submit"
-            data-test="audit-entry-submit"
-          >
-            Sign and record it
-          </UButton>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="audit-entry-form"
+          data-test="audit-entry-submit"
+        >
+          Sign and record what happened
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="recording = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

@@ -310,33 +310,9 @@ const hasModal = async (test: (modal: string) => boolean): Promise<string[]> =>
 // The words the console spelled its way out with, so a sixth is caught as well as a relapse.
 const SPELLED_CANCEL = /<UButton\b[^>]*>\s*(?:Cancel|Back|Keep it|Close|OK|Never mind)\s*<\/UButton>/
 
-// A form modal whose Save still sits in the body. Moving each into the footer is mechanical and
-// changes no flow; the list may shrink and may not grow.
-const FORM_MODAL_ACTIONS_IN_THE_BODY = [
-  'app/components/box-office/show/Performances.vue',
-  'app/components/training/ModuleEditor.vue',
-  'app/pages/admin/audit.vue',
-  'app/pages/admin/backups.vue',
-  'app/pages/bar/categories.vue',
-  'app/pages/bar/discounts.vue',
-  'app/pages/bar/products/[id].vue',
-  'app/pages/bar/products/index.vue',
-  'app/pages/bar/stock/index.vue',
-  'app/pages/box-office/access-profiles.vue',
-  'app/pages/box-office/content-warnings.vue',
-  'app/pages/box-office/pass-types.vue',
-  'app/pages/box-office/seasons.vue',
-  'app/pages/box-office/show-categories.vue',
-  'app/pages/box-office/shows/index.vue',
-  'app/pages/box-office/ticket-types.vue',
-  'app/pages/box-office/venues.vue',
-  'app/pages/people/fellows.vue',
-  'app/pages/people/members.vue',
-  'app/pages/rooms/manage/other.vue',
-  'app/pages/rota/manage/approvals.vue',
-  'app/pages/training/manage/departments.vue',
-  'app/pages/training/manage/sessions/index.vue',
-]
+// A form modal whose Save still sits in the body. The list is empty and may not grow: a Save
+// belongs in the footer, with form="<id>" on the submit.
+const FORM_MODAL_ACTIONS_IN_THE_BODY: string[] = []
 
 describe('every console modal wears one frame (K-123 criterion 8, 0032)', () => {
   test('no modal spells its own way out', async () => {
@@ -673,5 +649,113 @@ describe('the console speaks one voice (K-128 criterion 2, issue 1151 item 12)',
   test('a failed read says so in the house shape, not in a pasted paragraph', async () => {
     expect((await saying(source => source.includes(THE_PASTED_FAILURE)))
       .filter(path => !STILL_PASTES_THE_FAILURE.includes(path))).toEqual([])
+  })
+})
+
+// What names a console control: the field it sits in, or an attribute where the layout cannot
+// hold a visible label. A placeholder is an example, never the name (K-101 criterion 5).
+const NAMED_CONTROL = /<UFormField\b|<\/UFormField>|<(?:UInput|UInputNumber|UInputTags|USelect|USelectMenu|UTextarea)\b/g
+
+// Every field control of a file, with the attributes it carries and whether a field encloses it.
+function fieldControls(source: string): { attributes: string, inField: boolean }[] {
+  const template = templateOf(source)
+  const found: { attributes: string, inField: boolean }[] = []
+  let depth = 0
+  let match: RegExpExecArray | null
+  NAMED_CONTROL.lastIndex = 0
+  while ((match = NAMED_CONTROL.exec(template)) !== null) {
+    if (match[0] === '</UFormField>') {
+      depth = Math.max(0, depth - 1)
+      continue
+    }
+    if (match[0].startsWith('<UFormField')) {
+      depth++
+      continue
+    }
+    let index = match.index + match[0].length
+    let quote = ''
+    for (; index < template.length; index++) {
+      const character = template[index]!
+      if (quote) {
+        if (character === quote) quote = ''
+      }
+      else if (character === '"' || character === '\'') quote = character
+      else if (character === '>') break
+    }
+    found.push({ attributes: template.slice(match.index + match[0].length, index), inField: depth > 0 })
+  }
+  return found
+}
+
+const CARRIES_A_NAME = /(?:^|\s):?aria-label\s*=/
+
+// A value the screen types as nullable: a name built from one reads "null" where it is empty.
+function nullableFields(source: string): Set<string> {
+  return new Set([...source.matchAll(/^\s*(\w+)\??:\s*[^\n]*\|\s*null/gm)].map(match => match[1]!))
+}
+
+// A name assembled from values, wherever it is written: an attribute on a tag, a prop in a cell.
+function assembledNames(source: string): string[] {
+  return [...source.matchAll(/'?aria-label'?'?\s*[:=]\s*"?`([^`]*)`/g)].map(match => match[1]!)
+}
+
+describe('every console control says what it is (K-101 criterion 5, issue 1151 item 11)', () => {
+  test('an input is named by its field or by an attribute, never by its placeholder', async () => {
+    const files = await consoleFiles()
+    expect(files.length).toBeGreaterThan(0)
+    const nameless = files
+      .filter(file => fieldControls(file.source).some(control => !control.inField && !CARRIES_A_NAME.test(control.attributes)))
+      .map(file => file.path)
+    expect(nameless).toEqual([])
+  })
+
+  test('the shared toolbar labels its search rather than naming it with the example', async () => {
+    const toolbar = await Bun.file('app/components/AdminToolbar.vue').text()
+    expect(toolbar).not.toContain(':aria-label="placeholder"')
+    expect(toolbar).toContain('<UFormField')
+    expect(toolbar).toContain('sr-only')
+  })
+
+  test('a name assembled from a value never reads an empty field back', async () => {
+    const printing = (await consoleFiles()).filter((file) => {
+      const nullable = nullableFields(file.source)
+      return assembledNames(file.source).some(name => [...name.matchAll(/\$\{([^}]*)\}/g)]
+        .some(([, expression]) => !expression!.includes('?') && nullable.has(expression!.trim().split('.').pop() ?? '')))
+    })
+    expect(printing.map(file => file.path)).toEqual([])
+  })
+
+  test('a row action that repeats down a column names what it acts on', async () => {
+    const requests = await Bun.file('app/pages/training/manage/requests.vue').text()
+    expect(requests).toContain('\'aria-label\': `Answer ${row.original.name}\'s request`')
+  })
+
+  // The settings screen repeats the same two words down every row, so each pair says which
+  // setting it acts on rather than leaving a list of buttons all called Save.
+  test('an action that repeats down a list of settings names the setting', async () => {
+    const settings = await Bun.file('app/pages/admin/settings.vue').text()
+    const repeated = openingTags(settings, 'UButton').filter(tag => /:data-test="`(?:save|revert)-/.test(tag))
+    expect(repeated.length).toBeGreaterThan(0)
+    expect(repeated.filter(tag => !/:aria-label=/.test(tag))).toEqual([])
+  })
+
+  test('safety-critical training says so in words wherever a colour says it', async () => {
+    const coloured = (await consoleFiles()).filter(file => file.source.includes('safetyCritical ?'))
+    expect(coloured.length).toBeGreaterThan(0)
+    expect(coloured.filter(file => !file.source.includes('Safety critical')).map(file => file.path)).toEqual([])
+  })
+
+  test('a shape is chosen from a radio group, not from a card that only takes a click', async () => {
+    const source = await Bun.file('app/pages/bar/products/new.vue').text()
+    expect(source).toContain('role="radiogroup"')
+    expect(source).toContain('role="radio"')
+    expect(source).toContain(':aria-checked=')
+    expect(source).toContain('@keydown.right')
+  })
+
+  test('a tab keeps its label at every width', async () => {
+    const source = await Bun.file('app/pages/box-office/shows/[id].vue').text()
+    expect(source).not.toContain('label: \'hidden sm:inline\'')
+    expect(source).toContain('sr-only sm:not-sr-only')
   })
 })

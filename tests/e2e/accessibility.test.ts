@@ -176,6 +176,11 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
       expect(await violationsOn(view, '/rooms/manage', '[data-test="rooms-table"]')).toEqual([])
       // K-101: raw enum values and unlabelled period fields.
       expect(await violationsOn(view, '/bar/reports', '[data-test="period-kind"]')).toEqual([])
+      // K-101 criterion 5: the screens whose controls were named (issue 1151 item 11).
+      expect(await violationsOn(view, '/admin/settings', '[data-test="config-search"]')).toEqual([])
+      expect(await violationsOn(view, '/bar/categories', '[data-test="toolbar-search"]')).toEqual([])
+      expect(await violationsOn(view, '/bar/products/new', '[data-test="shape-cards"]')).toEqual([])
+      expect(await violationsOn(view, '/money/reconciliation', '[data-test="reconciliation-night"]')).toEqual([])
     }
     finally {
       view.close()

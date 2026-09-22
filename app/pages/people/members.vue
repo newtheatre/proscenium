@@ -398,6 +398,17 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
 
       <template #actions>
         <UButton
+          v-if="!onQueue && waiting"
+          data-test="claims-waiting"
+          icon="i-lucide-inbox"
+          color="warning"
+          variant="subtle"
+          @click="set('filter', { key: 'filter', operator: 'is', values: [AWAITING_RECORD] })"
+        >
+          Record {{ plural(waiting, 'claim') }}
+        </UButton>
+
+        <UButton
           v-if="writes"
           data-test="record-membership"
           icon="i-lucide-user-plus"
@@ -483,6 +494,7 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
           :description="failure.message"
         />
         <UForm
+          id="claim-decline-form"
           :schema="claimDeclineForm"
           :state="decline"
           class="space-y-4"
@@ -507,15 +519,26 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
               class="w-full"
             />
           </UFormField>
-          <UButton
-            type="submit"
-            data-test="claim-decline-submit"
-            color="neutral"
-            :loading="deciding !== null"
-          >
-            Decline and tell them
-          </UButton>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="claim-decline-form"
+          data-test="claim-decline-submit"
+          color="neutral"
+          :loading="deciding !== null"
+        >
+          Decline and tell them
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="declining = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
@@ -534,6 +557,7 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
           :description="failure.message"
         />
         <UForm
+          id="grant-form"
           ref="grantForm"
           :schema="recordMembership"
           :state="grant"
@@ -601,13 +625,24 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
               class="w-full"
             />
           </UFormField>
-          <UButton
-            type="submit"
-            data-test="grant-submit"
-          >
-            Record the membership
-          </UButton>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="grant-form"
+          data-test="grant-submit"
+        >
+          Record the membership
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="granting = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
   </div>

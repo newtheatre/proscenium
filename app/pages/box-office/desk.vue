@@ -585,6 +585,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
         v-if="nightly && nightly.performances.length > 0"
         v-model="performanceId"
         :items="nightly.performances.map(p => ({ label: `${p.showTitle} · ${p.venueName}`, value: p.id }))"
+        aria-label="Performance"
         class="w-72"
         data-test="desk-performance"
       />
@@ -648,6 +649,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
             <UInput
               v-model="scanned"
               placeholder="Scan a booking's QR"
+              aria-label="Booking QR"
               class="w-64"
               data-test="desk-scan"
               @keyup.enter="scan"
@@ -682,6 +684,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
             <UInput
               v-model="q"
               placeholder="Reference or name"
+              aria-label="Reference or name"
               class="w-64"
               data-test="desk-search"
               @keyup.enter="search"

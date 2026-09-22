@@ -77,6 +77,7 @@ function requesterColumns(moduleId: string, moduleName: string): TableColumn<Req
         'size': 'xs',
         'color': 'neutral',
         'variant': 'outline',
+        'aria-label': `Answer ${row.original.name}'s request`,
         'data-test': `answer-${moduleId}`,
         'onClick': () => {
           answering.value = { id: row.original.id, name: row.original.name, moduleName }

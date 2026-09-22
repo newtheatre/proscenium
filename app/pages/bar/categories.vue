@@ -176,6 +176,8 @@ const columns: TableColumn<BarCategory>[] = [
         ? h('span', {
             'class': 'size-3 rounded-full border border-default',
             'style': { backgroundColor: row.original.colour },
+            'role': 'img',
+            'aria-label': `Colour ${row.original.colour}`,
             'data-test': `category-swatch-${row.original.id}`,
           })
         : null,
@@ -313,6 +315,7 @@ const columns: TableColumn<BarCategory>[] = [
     >
       <template #body>
         <UForm
+          id="category-form"
           :schema="categoryForm"
           :state="state"
           class="space-y-4"
@@ -361,24 +364,25 @@ const columns: TableColumn<BarCategory>[] = [
           >
             <ColourField v-model="state.colour" />
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="category-submit"
-            >
-              {{ editing ? 'Save the product category' : 'Add a product category' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="category-form"
+          :loading="saving"
+          data-test="category-submit"
+        >
+          {{ editing ? 'Save the product category' : 'Add a product category' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
@@ -391,6 +395,7 @@ const columns: TableColumn<BarCategory>[] = [
       <template #body>
         <div class="space-y-4">
           <UForm
+            id="category-price-form"
             :schema="categoryPriceForm"
             :state="price"
             class="space-y-4"
@@ -446,23 +451,6 @@ const columns: TableColumn<BarCategory>[] = [
                 data-test="category-price-from"
               />
             </UFormField>
-
-            <div class="flex flex-wrap gap-2">
-              <UButton
-                type="submit"
-                :loading="saving"
-                data-test="category-price-submit"
-              >
-                Set this default
-              </UButton>
-              <UButton
-                color="neutral"
-                variant="ghost"
-                @click="pricing = null"
-              >
-                {{ CONFIRM_BACK_LABEL }}
-              </UButton>
-            </div>
           </UForm>
 
           <UTable
@@ -477,6 +465,24 @@ const columns: TableColumn<BarCategory>[] = [
             </template>
           </UTable>
         </div>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="category-price-form"
+          :loading="saving"
+          data-test="category-price-submit"
+        >
+          Set this default
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="pricing = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

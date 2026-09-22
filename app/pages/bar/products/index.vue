@@ -369,6 +369,7 @@ const columns: TableColumn<BarProduct>[] = [
     >
       <template #body>
         <UForm
+          id="product-form"
           :schema="productForm"
           :state="state"
           class="space-y-4"
@@ -463,24 +464,25 @@ const columns: TableColumn<BarProduct>[] = [
             description="Kept off self-serve tabs, so it is sold across the bar by a person."
             data-test="product-staffed-only"
           />
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="product-submit"
-            >
-              {{ editing ? 'Save the product' : 'Add a product' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="product-form"
+          :loading="saving"
+          data-test="product-submit"
+        >
+          {{ editing ? 'Save the product' : 'Add a product' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

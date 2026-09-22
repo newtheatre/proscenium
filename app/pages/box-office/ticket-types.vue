@@ -356,6 +356,7 @@ const columns: TableColumn<TicketType>[] = [
     >
       <template #body>
         <UForm
+          id="ticket-type-form"
           :schema="editing ? ticketTypeForm : newTicketTypeForm"
           :state="state"
           class="space-y-4"
@@ -469,24 +470,25 @@ const columns: TableColumn<TicketType>[] = [
             description="A type that is off by default has to be turned on per show or per performance."
             data-test="ticket-type-active"
           />
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="ticket-type-submit"
-            >
-              {{ editing ? 'Save the ticket type' : 'Add a ticket type' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="ticket-type-form"
+          :loading="saving"
+          data-test="ticket-type-submit"
+        >
+          {{ editing ? 'Save the ticket type' : 'Add a ticket type' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

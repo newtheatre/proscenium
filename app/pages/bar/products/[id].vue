@@ -648,6 +648,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
     >
       <template #body>
         <UForm
+          id="variant-form"
           :schema="variantEditForm"
           :state="state"
           class="space-y-4"
@@ -702,24 +703,25 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               data-test="variant-sort"
             />
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="variant-submit"
-            >
-              {{ editing ? 'Save the serving size' : 'Add a serving size' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="variant-form"
+          :loading="saving"
+          data-test="variant-submit"
+        >
+          {{ editing ? 'Save the serving size' : 'Add a serving size' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
@@ -731,6 +733,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
     >
       <template #body>
         <UForm
+          id="recipe-form"
           :schema="componentsForm"
           :state="recipe"
           class="space-y-4"
@@ -818,22 +821,26 @@ const priceColumns: TableColumn<VariantPrice>[] = [
             >
               Add an ingredient
             </UButton>
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="recipe-submit"
-            >
-              Save the recipe
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="pouring = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
           </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="recipe-form"
+          :loading="saving"
+          data-test="recipe-submit"
+        >
+          Save the recipe
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="pouring = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
@@ -846,6 +853,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
       <template #body>
         <div class="space-y-4">
           <UForm
+            id="price-form"
             :schema="priceForm"
             :state="price"
             class="space-y-4"
@@ -887,23 +895,6 @@ const priceColumns: TableColumn<VariantPrice>[] = [
                 data-test="price-from"
               />
             </UFormField>
-
-            <div class="flex flex-wrap gap-2">
-              <UButton
-                type="submit"
-                :loading="saving"
-                data-test="price-submit"
-              >
-                Set this price
-              </UButton>
-              <UButton
-                color="neutral"
-                variant="ghost"
-                @click="pricing = null"
-              >
-                {{ CONFIRM_BACK_LABEL }}
-              </UButton>
-            </div>
           </UForm>
 
           <UTable
@@ -919,6 +910,24 @@ const priceColumns: TableColumn<VariantPrice>[] = [
           </UTable>
         </div>
       </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="price-form"
+          :loading="saving"
+          data-test="price-submit"
+        >
+          Set this price
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="pricing = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
+      </template>
     </UModal>
 
     <UModal
@@ -929,6 +938,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
     >
       <template #body>
         <UForm
+          id="choice-form"
           :schema="variantChoiceForm"
           :state="choiceState"
           class="space-y-4"
@@ -993,25 +1003,26 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               data-test="choice-included"
             />
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              :disabled="choiceGroupOptions.length === 0"
-              data-test="choice-submit"
-            >
-              Attach the choice group
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="choosing = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="choice-form"
+          :loading="saving"
+          :disabled="choiceGroupOptions.length === 0"
+          data-test="choice-submit"
+        >
+          Attach the choice group
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="choosing = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
@@ -1023,6 +1034,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
     >
       <template #body>
         <UForm
+          id="new-group-form"
           :schema="choiceGroupForm"
           :state="newGroup"
           class="space-y-4"
@@ -1107,22 +1119,26 @@ const priceColumns: TableColumn<VariantPrice>[] = [
             >
               Add an option
             </UButton>
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="new-group-submit"
-            >
-              Add the choice group
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="creatingGroup = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
           </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="new-group-form"
+          :loading="saving"
+          data-test="new-group-submit"
+        >
+          Add the choice group
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="creatingGroup = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

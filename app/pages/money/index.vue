@@ -3,7 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { PERIOD_KINDS } from '#shared/utils/season-dashboard'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
-import { currentSeasonYear } from '#shared/utils/season'
+import { currentSeasonYear, monthChoices, seasonChoices, yearChoices } from '#shared/utils/season'
 import type { PeriodInput, PeriodKind, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { Period } from '#shared/utils/period-locks'
 import type { TableColumn } from '@nuxt/ui'
@@ -28,14 +28,21 @@ const kind = ref<PeriodKind>('SEASON')
 const termId = ref(terms.value[0]?.id ?? '')
 const day = ref(today)
 const year = ref(currentYear)
-const month = ref(new Date().getMonth() + 1)
+// A month's year is a calendar year and a season's is the year it ends in, so they are two
+// controls and two lists, never one number standing for both.
+const monthYear = ref(Number(today.slice(0, 4)))
+const month = ref(Number(today.slice(5, 7)))
+
+const months = monthChoices()
+const seasons = seasonChoices(currentYear)
+const years = yearChoices(Number(today.slice(0, 4)))
 
 const term = computed(() => terms.value.find(one => one.id === termId.value) ?? terms.value[0])
 
 const period = computed<PeriodInput>(() => {
   if (kind.value === 'DAY') return { kind: 'DAY', day: day.value }
   if (kind.value === 'WEEK') return { kind: 'WEEK', day: day.value }
-  if (kind.value === 'MONTH') return { kind: 'MONTH', year: year.value, month: month.value }
+  if (kind.value === 'MONTH') return { kind: 'MONTH', year: monthYear.value, month: month.value }
   if (kind.value === 'TERM' && term.value) return { kind: 'TERM', fromDay: term.value.fromDay, toDay: term.value.toDay }
   return { kind: 'SEASON', year: year.value }
 })
@@ -55,7 +62,7 @@ const query = computed(() => {
   return base
 })
 
-const { data, status, error, refresh } = await useAsyncData(
+const { data, status, error } = await useAsyncData(
   'season-summary',
   () => request<{ summary: SeasonSummary }>('/api/admin/finance/season', { query: query.value }).then(response => response.summary),
   { watch: [query] },
@@ -133,25 +140,30 @@ const figures = computed(() => (data.value
           v-model="day"
           data-test="period-day"
         />
-        <UInputNumber
+        <USelect
           v-if="kind === 'MONTH'"
           v-model="month"
           aria-label="Month"
           data-test="period-month"
+          :items="months"
+          value-key="value"
         />
-        <UInputNumber
-          v-if="kind === 'MONTH' || kind === 'SEASON'"
-          v-model="year"
+        <USelect
+          v-if="kind === 'MONTH'"
+          v-model="monthYear"
           aria-label="Year"
           data-test="period-year"
+          :items="years"
+          value-key="value"
         />
-        <UButton
-          data-test="refresh-summary"
-          variant="subtle"
-          @click="refresh()"
-        >
-          Refresh
-        </UButton>
+        <USelect
+          v-if="kind === 'SEASON'"
+          v-model="year"
+          aria-label="Season"
+          data-test="period-season"
+          :items="seasons"
+          value-key="value"
+        />
       </template>
     </AdminToolbar>
 

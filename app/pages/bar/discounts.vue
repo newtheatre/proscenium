@@ -224,6 +224,7 @@ const columns: TableColumn<Discount>[] = [
     >
       <template #body>
         <UForm
+          id="discount-form"
           :schema="discountForm"
           :state="state"
           class="space-y-4"
@@ -265,24 +266,25 @@ const columns: TableColumn<Discount>[] = [
               data-test="discount-percent"
             />
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="discount-submit"
-            >
-              {{ editing ? 'Save the discount' : 'Add a discount' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="discount-form"
+          :loading="saving"
+          data-test="discount-submit"
+        >
+          {{ editing ? 'Save the discount' : 'Add a discount' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
