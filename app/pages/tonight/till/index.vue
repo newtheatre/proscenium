@@ -346,7 +346,7 @@ function timeOf(at: number): string {
 // Whichever the modal answers with, the same submission the reader, SumUp or comp path already
 // had. An answer to a tap settles the check for this sale and nothing else.
 function submitAgeCheck(outcome: InlineAgeCheckInput): void {
-  if (outcome.outcome === 'ACCEPTED') acceptAgeCheck(outcome)
+  if (outcome.outcome !== 'REFUSED') acceptAgeCheck(outcome)
   if (chargeVia.value === 'tap') {
     if (outcome.outcome === 'REFUSED') void refuseAgeCheck(outcome)
     ageCheckStep.value = 'closed'

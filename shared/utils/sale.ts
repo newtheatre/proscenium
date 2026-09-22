@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { inlineAgeCheckForm } from './age-checks'
-import type { AgeCheckOutcome } from './age-checks'
+import type { InlineAgeCheckOutcome } from './age-checks'
 import type { AllergenState, BarPriceSource, ServingKind } from './bar'
 
 // The till's basket: what is on offer and what pricing one up costs, in integer pence (F-103).
@@ -144,6 +144,13 @@ export interface SaleCategory {
   colour: string | null
 }
 
+// What the category row leaves on the grid (F-103 criterion 6): All, or one category; a chosen
+// category that has since emptied falls back to All rather than to a blank grid.
+export function categoriesShown<T extends { id: string }>(categories: T[], chosenId: string | null): T[] {
+  const chosen = chosenId === null ? undefined : categories.find(category => category.id === chosenId)
+  return chosen ? [chosen] : categories
+}
+
 export interface SaleCatalogue {
   on: string
   categories: SaleCategory[]
@@ -180,7 +187,8 @@ export interface SaleReceipt {
   entryId: string | null
   totalPence: number
   lines: PricedLine[]
-  ageCheck: { id: string, outcome: AgeCheckOutcome } | null
+  // `id` is null for Visibly over 25: the basis is on the sale's audit line, not the register (0085).
+  ageCheck: { id: string | null, outcome: InlineAgeCheckOutcome } | null
   refusedLines: PricedLine[]
   discount: { id: string, name: string, percent: number } | null
   tab: { holderName: string, outstandingPence: number, capOverridden: boolean } | null

@@ -4,8 +4,8 @@ import type { IdType, InlineAgeCheckInput, RefusalReason } from '#shared/utils/a
 
 export type AgeCheckStep = 'closed' | 'choose' | 'refuse'
 
-// Two taps for the routine pass case (F-106 criterion 2): the ID type button both records the
-// outcome and submits. A refusal needs a reason and a description before it can go through.
+// Two taps for the routine pass case (F-106 criterion 2): Visibly over 25 or an ID type both
+// settle and submit. A refusal needs a reason and a description before it can go through.
 
 const props = defineProps<{ charging: boolean, product: string | null }>()
 
@@ -30,6 +30,11 @@ watch(step, (value) => {
 
 function accept(idType: IdType): void {
   emit('accept', { outcome: 'ACCEPTED', idType, reason: null, description: description.value.trim() || 'Checked at the till', notes: null })
+}
+
+// No ID asked for, so nothing for the register (F-106 criterion 7, 0085).
+function visiblyOver(): void {
+  emit('accept', { outcome: 'NOT_REQUIRED', idType: null, reason: null, description: '', notes: null })
 }
 
 function refuse(): void {
@@ -62,7 +67,21 @@ function refuse(): void {
           class="text-sm text-muted"
           data-test="age-check-product"
         >
-          {{ says }} What ID was shown?
+          {{ says }}
+        </p>
+        <UButton
+          block
+          color="neutral"
+          variant="subtle"
+          class="min-h-12"
+          :loading="charging"
+          data-test="age-check-not-required"
+          @click="visiblyOver"
+        >
+          Visibly over 25
+        </UButton>
+        <p class="text-sm text-muted">
+          Otherwise, what ID was shown?
         </p>
         <div class="grid grid-cols-2 gap-2">
           <UButton

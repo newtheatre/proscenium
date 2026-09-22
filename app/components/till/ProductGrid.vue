@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
+import { categoriesShown } from '#shared/utils/sale'
 import { plural } from '#shared/utils/text'
 import type { SaleCategory, SaleChoice, SaleProduct, SaleVariant } from '#shared/utils/sale'
 
@@ -22,12 +23,11 @@ const emit = defineEmits<{
   closeChoosing: []
 }>()
 
-// A one-handed jump for a grid several screens tall (F-103 criterion 5, K-102 criterion 3).
+// The category row filters a grid several screens tall (F-103 criterion 6, K-102 criterion 3).
+// The choice outlives a sale: the next customer usually wants the same shelf.
 const nonEmptyCategories = computed(() => props.categories.filter(category => props.productsIn(category.id).length))
-
-function jumpTo(categoryId: string): void {
-  document.getElementById(`till-category-${categoryId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
+const chosenCategoryId = ref<string | null>(null)
+const shownCategories = computed(() => categoriesShown(nonEmptyCategories.value, chosenCategoryId.value))
 
 // What the tile says under the name, so a tile costing a second tap says so before it is tapped.
 function priceLine(product: SaleProduct): string {
@@ -45,21 +45,33 @@ function priceLine(product: SaleProduct): string {
       data-test="category-chips"
     >
       <UButton
+        size="sm"
+        color="neutral"
+        :variant="chosenCategoryId === null ? 'solid' : 'subtle'"
+        class="min-h-12 shrink-0"
+        :aria-pressed="chosenCategoryId === null"
+        data-test="category-chip-all"
+        @click="chosenCategoryId = null"
+      >
+        All
+      </UButton>
+      <UButton
         v-for="category in nonEmptyCategories"
         :key="category.id"
         size="sm"
         color="neutral"
-        variant="subtle"
+        :variant="chosenCategoryId === category.id ? 'solid' : 'subtle'"
         class="min-h-12 shrink-0"
+        :aria-pressed="chosenCategoryId === category.id"
         :data-test="`category-chip-${category.id}`"
-        @click="jumpTo(category.id)"
+        @click="chosenCategoryId = category.id"
       >
         {{ category.name }}
       </UButton>
     </div>
 
     <div
-      v-for="category in nonEmptyCategories"
+      v-for="category in shownCategories"
       :id="`till-category-${category.id}`"
       :key="category.id"
     >
