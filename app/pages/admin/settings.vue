@@ -348,6 +348,7 @@ onMounted(load)
                   color="neutral"
                   variant="outline"
                   :loading="saving === setting.key"
+                  :aria-label="`Save ${setting.describes}`"
                   :data-test="`save-${setting.key}`"
                   @click="attemptSave(setting, numbers[setting.key])"
                 >
@@ -367,6 +368,7 @@ onMounted(load)
                   color="neutral"
                   variant="outline"
                   :loading="saving === setting.key"
+                  :aria-label="`Save ${setting.describes}`"
                   :data-test="`save-${setting.key}`"
                   @click="attemptSave(setting, numbers[setting.key])"
                 >
@@ -385,6 +387,7 @@ onMounted(load)
                   color="neutral"
                   variant="outline"
                   :loading="saving === setting.key"
+                  :aria-label="`Save ${setting.describes}`"
                   :data-test="`save-${setting.key}`"
                   @click="attemptSave(setting, lists[setting.key] ?? [])"
                 >
@@ -403,6 +406,7 @@ onMounted(load)
                   color="neutral"
                   variant="outline"
                   :loading="saving === setting.key"
+                  :aria-label="`Save ${setting.describes}`"
                   :data-test="`save-${setting.key}`"
                   @click="saveText(setting)"
                 >
@@ -416,6 +420,7 @@ onMounted(load)
                 variant="ghost"
                 icon="i-lucide-undo-2"
                 :loading="reverting === setting.key"
+                :aria-label="`Revert ${setting.describes}`"
                 :data-test="`revert-${setting.key}`"
                 @click="revert(setting)"
               >
