@@ -120,25 +120,9 @@ describe('a console list filters by its declaration (K-129)', () => {
 // segment names what it undoes. A status flip is both directions; only the off one confirms.
 const DESTRUCTIVE_ROUTE = /method:\s*'DELETE'|\/(?:cancel|revoke|void|decline|retire|unconfirm|stand-down|status|security)['`]/
 
-// A destructive action that already confirms in a dialogue of its own, with a verb naming what it
-// destroys. Moving each onto ConfirmModal is mechanical; the list may shrink and may not grow.
-const CONFIRMS_IN_ITS_OWN_DIALOGUE = [
-  'app/pages/bar/categories.vue',
-  'app/pages/bar/tabs.vue',
-  'app/pages/box-office/content-warnings.vue',
-  'app/pages/box-office/pass-types.vue',
-  'app/pages/box-office/seasons.vue',
-  'app/pages/box-office/show-categories.vue',
-  'app/pages/box-office/ticket-types.vue',
-  'app/pages/box-office/venues.vue',
-  'app/pages/people/fellows.vue',
-  'app/pages/people/members.vue',
-  'app/pages/rooms/manage/closures.vue',
-  'app/pages/rota/manage/approvals.vue',
-  'app/pages/training/manage/records.vue',
-  'app/pages/training/manage/requests.vue',
-  'app/pages/training/manage/sessions/[id].vue',
-]
+// A destructive action that confirms in a dialogue of its own. The list is empty and may not
+// grow: one confirmation on the console, and it is ConfirmModal.
+const CONFIRMS_IN_ITS_OWN_DIALOGUE: string[] = []
 
 describe('a destructive action confirms before it happens (K-123, 0032)', () => {
   test('every console page that destroys something confirms first', async () => {
