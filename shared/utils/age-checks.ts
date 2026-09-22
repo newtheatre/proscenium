@@ -17,6 +17,15 @@ export function saysOutcome(outcome: AgeCheckOutcome): string {
   return outcome === 'ACCEPTED' ? 'ID accepted' : 'Refused'
 }
 
+// The till's third answer (F-106 criterion 7, 0085): no ID was asked for, so nothing reaches the
+// register. Only a sale ever carries it; the register's own forms below refuse it.
+export const INLINE_AGE_CHECK_OUTCOMES = [...AGE_CHECK_OUTCOMES, 'NOT_REQUIRED'] as const
+export type InlineAgeCheckOutcome = (typeof INLINE_AGE_CHECK_OUTCOMES)[number]
+
+export function saysInlineOutcome(outcome: InlineAgeCheckOutcome): string {
+  return outcome === 'NOT_REQUIRED' ? 'Visibly over 25' : saysOutcome(outcome)
+}
+
 export function saysIdType(idType: IdType): string {
   if (idType === 'PASSPORT') return 'Passport'
   if (idType === 'DRIVING_LICENCE') return 'Photocard driving licence'
@@ -46,7 +55,7 @@ const outcomeFields = {
 
 // Shared between a standalone check and one folded into a sale (F-106): what an outcome requires
 // is the same wherever it is asked, so the predicate is written once and wired to both shapes.
-interface OutcomeShape { outcome: AgeCheckOutcome, idType: IdType | null, reason: RefusalReason | null }
+interface OutcomeShape { outcome: InlineAgeCheckOutcome, idType: IdType | null, reason: RefusalReason | null }
 const acceptedNeedsIdType = (input: OutcomeShape): boolean => input.outcome !== 'ACCEPTED' || input.idType !== null
 const refusedNeedsReason = (input: OutcomeShape): boolean => input.outcome !== 'REFUSED' || input.reason !== null
 const acceptedHasNoReason = (input: OutcomeShape): boolean => input.outcome !== 'ACCEPTED' || input.reason === null
@@ -72,7 +81,16 @@ export type AgeCheckInput = z.output<typeof ageCheckForm>
 
 // Folded into a till sale (F-106): the performance is the till's own to resolve, and the product
 // is the basket's restricted lines, not a second thing for staff to type.
-export const inlineAgeCheckForm = z.object(outcomeFields)
+interface InlineShape extends OutcomeShape { description: string }
+const notRequiredCarriesNothing = (input: InlineShape): boolean => input.outcome !== 'NOT_REQUIRED' || (input.idType === null && input.reason === null)
+const registerEntryNeedsDescription = (input: InlineShape): boolean => input.outcome === 'NOT_REQUIRED' || input.description.length > 0
+export const inlineAgeCheckForm = z.object({
+  ...outcomeFields,
+  outcome: z.enum(INLINE_AGE_CHECK_OUTCOMES),
+  description: z.string().trim().max(DESCRIPTION_LIMIT).nullish().transform(value => (value ?? '').trim()),
+})
+  .refine(registerEntryNeedsDescription, { path: ['description'], message: 'Describe who you checked, never by name' })
+  .refine(notRequiredCarriesNothing, { path: ['idType'], message: 'Visibly over 25 names no ID and no reason: nothing was checked' })
   .refine(acceptedNeedsIdType, { path: ['idType'], message: 'Say what ID was shown' })
   .refine(refusedNeedsReason, { path: ['reason'], message: 'Say why you refused' })
   .refine(acceptedHasNoReason, { path: ['reason'], message: 'An accepted check has no refusal reason' })

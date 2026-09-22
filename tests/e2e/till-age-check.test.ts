@@ -140,6 +140,17 @@ function latestAgeCheck(): AgeCheckRow | undefined {
   }
 }
 
+function latestSaleAudit(): Record<string, unknown> | undefined {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    const row = database.query(`SELECT detail FROM audit_log WHERE action = 'bar.till.sale' ORDER BY rowid DESC LIMIT 1`).get() as { detail: string } | undefined
+    return row ? JSON.parse(row.detail) as Record<string, unknown> : undefined
+  }
+  finally {
+    database.close()
+  }
+}
+
 describe.skipIf(skip !== null)('a restricted basket is refused with no outcome on record (F-106 criteria 1, 5)', () => {
   test('the refusal names what needs a Challenge 25 check, and nothing is written', async () => {
     const { venueId, restrictedVariantId, restrictedProductName } = await aMixedBasketSetup()
@@ -189,6 +200,38 @@ describe.skipIf(skip !== null)('accepted sells the whole basket and logs the che
     const row = latestAgeCheck()
     expect(row).toMatchObject({ outcome: 'ACCEPTED', id_type: 'PASSPORT', reason: null })
     expect(row?.product).toBeTruthy()
+  })
+})
+
+describe.skipIf(skip !== null)('visibly over 25 sells the line and writes nothing to the register (F-106 criterion 7, 0085)', () => {
+  test('the sale goes through, the register is untouched, and the sale audit says on what basis', async () => {
+    const { venueId, restrictedVariantId, ordinaryVariantId } = await aMixedBasketSetup()
+
+    const before = counts()
+    const answered = await charge(
+      venueId,
+      [{ variantId: restrictedVariantId, qty: 1 }, { variantId: ordinaryVariantId, qty: 1 }],
+      550,
+      { outcome: 'NOT_REQUIRED' },
+    )
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { entryId: string, totalPence: number, lines: unknown[], ageCheck: { id: string | null, outcome: string }, refusedLines: unknown[] }
+    expect(body.totalPence).toBe(550)
+    expect(body.lines).toHaveLength(2)
+    expect(body.refusedLines).toHaveLength(0)
+    expect(body.ageCheck).toEqual({ id: null, outcome: 'NOT_REQUIRED' })
+
+    const after = counts()
+    expect(after.entries).toBe(before.entries + 1)
+    expect(after.ageChecks).toBe(before.ageChecks)
+    expect(after.ageCheckAudits).toBe(before.ageCheckAudits)
+    expect(after.saleAudits).toBe(before.saleAudits + 1)
+    expect(latestSaleAudit()).toMatchObject({ challenge25: 'NOT_REQUIRED' })
+  })
+
+  test('the register refuses it as a standalone entry: there is nothing to record', async () => {
+    const answered = await send('POST', '/api/tonight/age-checks', { outcome: 'NOT_REQUIRED', description: 'Grey beard' })
+    expect(answered.status).toBe(400)
   })
 })
 
@@ -321,6 +364,27 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     // The basket already passed, so charging does not ask a second time.
     await click(view, `[aria-label="Charge £2.50"]`)
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
+    view.close()
+  }, 120_000)
+
+  test('Visibly over 25 is one press, asks nothing else, and the register stays as it was', async () => {
+    const { venueId, restrictedProductId } = await aMixedBasketSetup()
+    const before = counts()
+    const view = await atTheTill(venueId, `[data-test="product-${restrictedProductId}"]`)
+
+    await click(view, `[data-test="product-${restrictedProductId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="age-check-not-required"]')`)
+    expect(await textOf(view, '[data-test="age-check-not-required"]')).toContain('Visibly over 25')
+    await click(view, '[data-test="age-check-not-required"]')
+    await waitFor(view, `document.querySelector('[data-test="age-check-not-required"]') === null`)
+
+    await click(view, `[data-test="product-${restrictedProductId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£5.00')`)
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="age-check-not-required"]') === null`)).toBe(true)
+
+    await click(view, `[aria-label="Charge £5.00"]`)
+    await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
+    expect(counts().ageChecks).toBe(before.ageChecks)
     view.close()
   }, 120_000)
 

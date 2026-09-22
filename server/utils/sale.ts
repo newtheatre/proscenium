@@ -435,6 +435,12 @@ function saleableAfterAgeCheck(
   return { restricted, sold }
 }
 
+// What the sale's audit line says a restricted line went out on (0085): the register outcome it
+// wrote, or Visibly over 25, which writes no register row and would otherwise leave no trace.
+function challenge25Basis(restricted: number[], ageCheck: InlineAgeCheckInput | null): InlineAgeCheckInput['outcome'] | null {
+  return restricted.length > 0 && ageCheck ? ageCheck.outcome : null
+}
+
 // Whether a guarded entry actually landed. Read back rather than inferred, the same way a
 // contended claim always answers for itself (0001, 0003).
 async function entryExists(id: string): Promise<boolean> {
@@ -708,6 +714,7 @@ export async function commitSale(
         ticketLines: ticketLines.length,
         discountId: discount?.id ?? null,
         tender: tab ? 'TAB' : 'CARD',
+        challenge25: challenge25Basis(restricted, ageCheck),
       },
     }))
     // A separate row from the sale itself: real because `actorId` above is only set by whoever
@@ -738,7 +745,10 @@ export async function commitSale(
   }
 
   let ageCheckResult: SaleReceipt['ageCheck'] = null
-  if (ageCheck && restricted.length > 0) {
+  if (ageCheck?.outcome === 'NOT_REQUIRED' && restricted.length > 0) {
+    ageCheckResult = { id: null, outcome: ageCheck.outcome }
+  }
+  else if (ageCheck && ageCheck.outcome !== 'NOT_REQUIRED' && restricted.length > 0) {
     const id = newId()
     const restrictedNames = [...new Set(restricted.map(index => priced[index]!.productName))]
     const write = recordAgeCheck(context.actorId, {
@@ -952,11 +962,14 @@ export async function commitCompSale(
     actorId: context.actorId,
     action: 'bar.till.sale',
     target: `till-session:${context.sessionId}`,
-    detail: { venueId: context.venueId, night: context.night, lines: soldResolved.length, tender: 'COMP', compRequestId: requestId },
+    detail: { venueId: context.venueId, night: context.night, lines: soldResolved.length, tender: 'COMP', compRequestId: requestId, challenge25: challenge25Basis(restricted, ageCheck) },
   })))
 
   let ageCheckResult: SaleReceipt['ageCheck'] = null
-  if (ageCheck && restricted.length > 0) {
+  if (ageCheck?.outcome === 'NOT_REQUIRED' && restricted.length > 0) {
+    ageCheckResult = { id: null, outcome: ageCheck.outcome }
+  }
+  else if (ageCheck && ageCheck.outcome !== 'NOT_REQUIRED' && restricted.length > 0) {
     const id = newId()
     const restrictedNames = [...new Set(restricted.map(index => priced[index]!.productName))]
     const write = recordAgeCheck(context.actorId, {

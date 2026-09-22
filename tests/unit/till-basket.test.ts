@@ -334,6 +334,32 @@ describe('a restricted tap asks before the drink is poured (F-106 criterion 6)',
   })
 })
 
+describe('visibly over 25 settles the sale like a pass, with nothing to write (F-106 criterion 7, 0085)', () => {
+  const visiblyOver: InlineAgeCheckInput = { outcome: 'NOT_REQUIRED', idType: null, reason: null, description: '', notes: null }
+
+  test('a later restricted tap in the same sale does not ask again', () => {
+    const second = aProduct({ id: 'p-2', name: 'Vodka', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Single' })] })
+    const { basket, scope } = setup([aProduct({ name: 'Gin', ageRestricted: true }), second])
+    basket.tapVariant('Gin', aVariant())
+    basket.acceptAgeCheck(visiblyOver)
+    expect(basket.askingAgeCheckFor.value).toBeNull()
+    basket.tapVariant('Vodka', aVariant({ id: 'variant-2', label: 'Single' }))
+    expect(basket.askingAgeCheckFor.value).toBeNull()
+    expect(basket.basket.value).toHaveLength(2)
+    scope.stop()
+  })
+
+  test('the charge sends it, and the full total stands', () => {
+    const { basket, scope } = setup([aProduct({ name: 'Gin', ageRestricted: true })])
+    basket.tapVariant('Gin', aVariant())
+    basket.priced.value = aPriced({ totalPence: 500, lines: [{ variantId: 'variant-1', productName: 'Gin', variantLabel: 'Pint', choiceItemName: null, qty: 1, unitPricePence: 500, priceSource: 'variant', amountPence: 500, discountPence: 0 }] })
+    basket.acceptAgeCheck(visiblyOver)
+    expect(basket.saleBody(basket.passedAgeCheck.value, 500).ageCheck).toEqual(visiblyOver)
+    expect(basket.expectedAfter(visiblyOver)).toBe(500)
+    scope.stop()
+  })
+})
+
 describe('a refusal at the tap takes the line back out and says so (F-106 criteria 3, 6)', () => {
   const refused: InlineAgeCheckInput = { outcome: 'REFUSED', idType: null, reason: 'NO_ID_SHOWN', description: 'Declined to show ID', notes: null }
 
