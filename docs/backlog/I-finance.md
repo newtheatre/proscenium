@@ -98,7 +98,7 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
      list of the months and the seasons, never typed into a number spinner (K-123 criterion 2).
      This holds on every money screen whose toolbar picks a period, not only this one.
 - Source: Prompt Book I-1, I-3 (role-scoped visibility), P4; audit PR-7 (season 1 August to 31
-  July). Criterion 6 comes from the console review of 19 September 2026 (issue 1151 item 10),
+  July). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10),
   which counted four Refresh buttons beside inputs that already refetch, and three number
   spinners standing in for a month and a year.
 

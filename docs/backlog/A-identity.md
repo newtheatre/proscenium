@@ -334,7 +334,7 @@ Open questions for the committee:
      the directory, and it draws a skeleton of the cards that are coming while it loads rather
      than an empty page that fills without warning.
 - Source: Audit SD-8 (filters and banners carry); Prompt Book A-4. Criterion 6 comes from the
-  console review of 19 September 2026 (issue 1151 item 10).
+  console review of 21 September 2026 (issue 1151 item 10).
 
 ## A-122: Force logout, disable and reset MFA
 
@@ -367,7 +367,7 @@ Open questions for the committee:
      student number, the way every other field naming somebody is (K-123 criterion 1). Typing an
      address that has to match exactly is not choosing.
 - Source: Prompt Book A-4; audit SD-10; Get-In part 2 (GDPR machinery becomes single-database
-  operations). Criterion 7 comes from the console review of 19 September 2026 (issue 1151 item
+  operations). Criterion 7 comes from the console review of 21 September 2026 (issue 1151 item
   10).
 
 ## A-124: Export my data in one action
