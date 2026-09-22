@@ -250,6 +250,7 @@ onMounted(load)
     >
       <template #body>
         <UForm
+          id="award-form"
           ref="awardForm"
           :schema="awardFellowship"
           :state="award"
@@ -306,13 +307,24 @@ onMounted(load)
               class="w-full"
             />
           </UFormField>
-          <UButton
-            type="submit"
-            data-test="award-submit"
-          >
-            Record the award
-          </UButton>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="award-form"
+          data-test="award-submit"
+        >
+          Record the award
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="awarding = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
@@ -324,6 +336,7 @@ onMounted(load)
     >
       <template #body>
         <UForm
+          id="revoke-form"
           ref="revokeForm"
           :schema="revokeFellowship"
           :state="revocation"
@@ -345,14 +358,25 @@ onMounted(load)
               class="w-full"
             />
           </UFormField>
-          <UButton
-            type="submit"
-            color="error"
-            data-test="revoke-submit"
-          >
-            Revoke
-          </UButton>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="revoke-form"
+          color="error"
+          data-test="revoke-submit"
+        >
+          Revoke
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="revoking = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
   </div>

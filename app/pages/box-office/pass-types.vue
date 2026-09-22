@@ -375,6 +375,7 @@ const columns: TableColumn<PassType>[] = [
     >
       <template #body>
         <UForm
+          id="pass-type-form"
           :schema="editing ? passTypeScreenForm : newPassTypeScreenForm"
           :state="state"
           class="space-y-4"
@@ -558,6 +559,7 @@ const columns: TableColumn<PassType>[] = [
               data-test="pass-type-shows"
             />
           </UFormField>
+
           <UFormField
             v-else
             label="Covers"
@@ -570,24 +572,25 @@ const columns: TableColumn<PassType>[] = [
               {{ coveredShowNames }}
             </p>
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="pass-type-submit"
-            >
-              {{ editing ? 'Save the pass type' : 'Add a pass type' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="pass-type-form"
+          :loading="saving"
+          data-test="pass-type-submit"
+        >
+          {{ editing ? 'Save the pass type' : 'Add a pass type' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

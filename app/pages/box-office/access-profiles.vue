@@ -317,6 +317,7 @@ watch(modalOpen, (nowOpen) => {
           </div>
 
           <UForm
+            id="verify-form"
             :schema="verifyAccessProfileForm"
             :state="decideState"
             class="space-y-3"
@@ -333,26 +334,34 @@ watch(modalOpen, (nowOpen) => {
                 data-test="foh-note"
               />
             </UFormField>
-
-            <div class="flex justify-end gap-2">
-              <UButton
-                variant="subtle"
-                color="error"
-                data-test="decline"
-                @click="declineFailure = null; declining = true"
-              >
-                Decline
-              </UButton>
-              <UButton
-                type="submit"
-                :loading="deciding"
-                data-test="verify"
-              >
-                Verify
-              </UButton>
-            </div>
           </UForm>
         </div>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="verify-form"
+          :loading="deciding"
+          data-test="verify"
+        >
+          Verify the declaration
+        </UButton>
+        <UButton
+          variant="subtle"
+          color="error"
+          data-test="decline"
+          @click="declineFailure = null; declining = true"
+        >
+          Decline the declaration
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="reviewing = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

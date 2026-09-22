@@ -323,6 +323,7 @@ watch(modalOpen, (nowOpen) => {
           :description="failure"
         />
         <UForm
+          id="department-form"
           :schema="editing ? departmentForm : newDepartmentForm"
           :state="state"
           class="space-y-4"
@@ -373,24 +374,25 @@ watch(modalOpen, (nowOpen) => {
             description="A retired department keeps its modules readable and takes no new ones."
             data-test="department-active"
           />
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="department-submit"
-            >
-              {{ editing ? 'Save the department' : 'Add a department' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="department-form"
+          :loading="saving"
+          data-test="department-submit"
+        >
+          {{ editing ? 'Save the department' : 'Add a department' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

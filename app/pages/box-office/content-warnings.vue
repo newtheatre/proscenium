@@ -299,6 +299,7 @@ const columns: TableColumn<ContentWarning>[] = [
     >
       <template #body>
         <UForm
+          id="warning-form"
           :schema="contentWarningForm"
           :state="state"
           class="space-y-4"
@@ -440,24 +441,25 @@ const columns: TableColumn<ContentWarning>[] = [
               />
             </UFormField>
           </div>
-
-          <div class="flex justify-end gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="save-warning"
-            >
-              Save
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="warning-form"
+          :loading="saving"
+          data-test="save-warning"
+        >
+          {{ editing ? 'Save the content warning' : 'Add a content warning' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

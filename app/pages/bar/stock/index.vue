@@ -490,6 +490,7 @@ const columns: TableColumn<StockItem>[] = [
     >
       <template #body>
         <UForm
+          id="item-form"
           :schema="stockItemForm"
           :state="state"
           class="space-y-4"
@@ -595,24 +596,25 @@ const columns: TableColumn<StockItem>[] = [
             description="Anything alcoholic. A product made of it should be restricted too."
             data-test="item-age-restricted"
           />
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="item-submit"
-            >
-              {{ editing ? 'Save the item' : 'Add an item' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="item-form"
+          :loading="saving"
+          data-test="item-submit"
+        >
+          {{ editing ? 'Save the item' : 'Add an item' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
@@ -624,6 +626,7 @@ const columns: TableColumn<StockItem>[] = [
     >
       <template #body>
         <UForm
+          id="movement-form"
           :schema="movementEntryForm"
           :state="movement"
           class="space-y-4"
@@ -725,24 +728,25 @@ const columns: TableColumn<StockItem>[] = [
               data-test="movement-reason"
             />
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="movement-submit"
-            >
-              Record the movement
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="moving = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="movement-form"
+          :loading="saving"
+          data-test="movement-submit"
+        >
+          Record the movement
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="moving = null"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

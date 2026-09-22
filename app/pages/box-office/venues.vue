@@ -322,6 +322,7 @@ const columns: TableColumn<AdminVenue>[] = [
     >
       <template #body>
         <UForm
+          id="venue-form"
           :schema="venueForm"
           :state="state"
           class="space-y-4"
@@ -404,24 +405,25 @@ const columns: TableColumn<AdminVenue>[] = [
             description="A union or off-site space. It appears in reports and takes no blackouts."
             data-test="venue-external"
           />
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="venue-submit"
-            >
-              {{ editing ? 'Save the venue' : 'Add a venue' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="venue-form"
+          :loading="saving"
+          data-test="venue-submit"
+        >
+          {{ editing ? 'Save the venue' : 'Add a venue' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

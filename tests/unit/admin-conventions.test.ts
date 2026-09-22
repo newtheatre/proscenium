@@ -310,33 +310,9 @@ const hasModal = async (test: (modal: string) => boolean): Promise<string[]> =>
 // The words the console spelled its way out with, so a sixth is caught as well as a relapse.
 const SPELLED_CANCEL = /<UButton\b[^>]*>\s*(?:Cancel|Back|Keep it|Close|OK|Never mind)\s*<\/UButton>/
 
-// A form modal whose Save still sits in the body. Moving each into the footer is mechanical and
-// changes no flow; the list may shrink and may not grow.
-const FORM_MODAL_ACTIONS_IN_THE_BODY = [
-  'app/components/box-office/show/Performances.vue',
-  'app/components/training/ModuleEditor.vue',
-  'app/pages/admin/audit.vue',
-  'app/pages/admin/backups.vue',
-  'app/pages/bar/categories.vue',
-  'app/pages/bar/discounts.vue',
-  'app/pages/bar/products/[id].vue',
-  'app/pages/bar/products/index.vue',
-  'app/pages/bar/stock/index.vue',
-  'app/pages/box-office/access-profiles.vue',
-  'app/pages/box-office/content-warnings.vue',
-  'app/pages/box-office/pass-types.vue',
-  'app/pages/box-office/seasons.vue',
-  'app/pages/box-office/show-categories.vue',
-  'app/pages/box-office/shows/index.vue',
-  'app/pages/box-office/ticket-types.vue',
-  'app/pages/box-office/venues.vue',
-  'app/pages/people/fellows.vue',
-  'app/pages/people/members.vue',
-  'app/pages/rooms/manage/other.vue',
-  'app/pages/rota/manage/approvals.vue',
-  'app/pages/training/manage/departments.vue',
-  'app/pages/training/manage/sessions/index.vue',
-]
+// A form modal whose Save still sits in the body. The list is empty and may not grow: a Save
+// belongs in the footer, with form="<id>" on the submit.
+const FORM_MODAL_ACTIONS_IN_THE_BODY: string[] = []
 
 describe('every console modal wears one frame (K-123 criterion 8, 0032)', () => {
   test('no modal spells its own way out', async () => {

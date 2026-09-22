@@ -276,6 +276,7 @@ const columns: TableColumn<AdminSeason>[] = [
     >
       <template #body>
         <UForm
+          id="season-form"
           :schema="seasonForm"
           :state="state"
           class="space-y-4"
@@ -334,24 +335,25 @@ const columns: TableColumn<AdminSeason>[] = [
               data-test="season-sort"
             />
           </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="season-submit"
-            >
-              {{ editing ? 'Save the season' : 'Add a season' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="season-form"
+          :loading="saving"
+          data-test="season-submit"
+        >
+          {{ editing ? 'Save the season' : 'Add a season' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 

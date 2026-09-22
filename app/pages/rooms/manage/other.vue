@@ -320,6 +320,7 @@ watch(modalOpen, (nowOpen) => {
           :description="failure"
         />
         <UForm
+          id="space-form"
           :schema="spaceForm"
           :state="state"
           class="space-y-4"
@@ -393,24 +394,25 @@ watch(modalOpen, (nowOpen) => {
             description="A retired room stays on old requests but is not offered to anybody."
             data-test="space-active"
           />
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="space-submit"
-            >
-              {{ editing ? 'Save the room' : 'List the room' }}
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="open = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
         </UForm>
+      </template>
+
+      <template #footer>
+        <UButton
+          type="submit"
+          form="space-form"
+          :loading="saving"
+          data-test="space-submit"
+        >
+          {{ editing ? 'Save the room' : 'List the room' }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="open = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
       </template>
     </UModal>
 
