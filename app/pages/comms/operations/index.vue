@@ -77,7 +77,7 @@ const columns: TableColumn<SendLogRow>[] = [
       // instead, so a phone keeps the outcome and the sent time in view (issue 922).
       h('div', { class: 'sm:hidden text-xs text-muted' }, [
         `${row.original.type}, ${row.original.channel}`,
-        `enqueued ${saysWhen(row.original.createdAt)}`,
+        `queued ${saysWhen(row.original.createdAt)}`,
         row.original.error,
       ].filter(Boolean).join(' · ')),
     ]),
@@ -91,7 +91,7 @@ const columns: TableColumn<SendLogRow>[] = [
   },
   {
     id: 'createdAt',
-    header: 'Enqueued',
+    header: 'Queued',
     meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
     cell: ({ row }) => saysWhen(row.original.createdAt),
   },

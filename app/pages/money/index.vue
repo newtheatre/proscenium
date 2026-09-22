@@ -107,8 +107,8 @@ const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
 const figures = computed(() => (data.value
   ? [
       { label: 'Refunds', test: 'refunds-pence', pence: data.value.refundsPence },
-      { label: 'Foregone comps', test: 'comps-pence', pence: data.value.compsPence },
-      { label: 'Foregone discounts', test: 'discounts-pence', pence: data.value.discountsPence },
+      { label: 'Forgone comps', test: 'comps-pence', pence: data.value.compsPence },
+      { label: 'Forgone discounts', test: 'discounts-pence', pence: data.value.discountsPence },
       { label: 'Open variance', test: 'open-variance-pence', pence: data.value.openVariancePence },
     ]
   : []))

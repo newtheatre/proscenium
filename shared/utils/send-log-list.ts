@@ -20,7 +20,7 @@ export const sendLogList = {
     { key: 'createdAt', label: 'Sent', kind: 'date-range', column: 'created_at', dateAs: 'unix', icon: 'i-lucide-calendar' },
   ],
   sort: {
-    fields: [{ key: 'createdAt', label: 'Enqueued', column: 'created_at' }],
+    fields: [{ key: 'createdAt', label: 'Queued', column: 'created_at' }],
     default: 'createdAt',
     direction: 'desc',
   },

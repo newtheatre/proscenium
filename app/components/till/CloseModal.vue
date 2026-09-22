@@ -67,7 +67,7 @@ const needsVarianceNote = computed(() => hasReading.value && props.variancePrevi
           </div>
           <div class="flex justify-between">
             <dt>Comps ({{ reconciliation.bar.compsCount }})</dt>
-            <dd>{{ saysMoney(reconciliation.bar.compsForegonePence) }} foregone</dd>
+            <dd>{{ saysMoney(reconciliation.bar.compsForegonePence) }} forgone</dd>
           </div>
           <div class="flex justify-between">
             <dt>Discounts given</dt>

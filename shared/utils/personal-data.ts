@@ -342,7 +342,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     // The same reasoning bar's own comp_requests already carries (F-110): a foregone-revenue
     // figure audits to who asked and who decided, and the request is financial evidence.
-    why: 'Who asked for a ticket comp and who decided it is what a foregone-revenue figure audits to; the tombstone still answers for it.',
+    why: 'Who asked for a ticket comp and who decided it is what a forgone-revenue figure audits to; the tombstone still answers for it.',
   },
   {
     name: 'reservation_reinstatements',
@@ -602,7 +602,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'keep',
     // `reason` and `decline_reason` naming somebody else is the same known gap as `incidents.body`
     // (docs/known-issues.md); the request is financial evidence and must answer for itself.
-    why: 'Who asked for a comp and who decided it is what a foregone-revenue figure audits to (F-110); the tombstone still answers for it.',
+    why: 'Who asked for a comp and who decided it is what a forgone-revenue figure audits to (F-110); the tombstone still answers for it.',
   },
 
   // Module G: training

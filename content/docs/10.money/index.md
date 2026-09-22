@@ -51,7 +51,7 @@ period: a day, a week, a month, a term or a season. The season runs from {{ SEAS
    the Treasurer, each row has an **Entries** button that opens the
    [ledger entries](/docs/money/ledger-entries) list filtered to that source and the
    dashboard's range.
-4. **Refunds**, **Foregone comps**, **Foregone discounts** and **Open variance**: the money
+4. **Refunds**, **Forgone comps**, **Forgone discounts** and **Open variance**: the money
    handed back, the value given away rather than taken, and the sum of every night's reader
    reading that still disagrees with the ledger and has not been written off.
 
@@ -65,7 +65,7 @@ The range the figures cover is printed above them, from and to, as London dates.
   told apart, and pass utilisation beside it.
   ::
   ::card{icon="i-lucide-gift" title="Comps and discounts" to="/docs/money/comps-and-discounts"}
-  Foregone value by show or by period, and access and companion admissions as counts only.
+  Forgone value by show or by period, and access and companion admissions as counts only.
   ::
   ::card{icon="i-lucide-scale" title="Daily reconciliation" to="/docs/money/daily-reconciliation"}
   The figure the reader's Z should read for a night, recording what it did read, and resolving

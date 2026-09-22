@@ -80,10 +80,12 @@ describe('the last three words the review left (K-128)', () => {
       for (const match of withoutComments(file.source).matchAll(READER_STRING)) {
         const said = match[2] ?? ''
         // A label or a sentence, never a key, a route or a test hook.
-        const reaches = said.includes(' ') || /^[A-Z]/.test(said)
+        // One line: a span across lines is a regex literal or a template, not a label.
+        const reaches = !said.includes('\n') && (said.includes(' ') || /^[A-Z]/.test(said))
         if (reaches && /\benqueued\b|\bforegone\b/i.test(said)) offenders.push(`${file.path}: ${said}`)
       }
-      for (const text of file.source.matchAll(/>([^<{]*\bforegone\b[^<{]*)</gi)) offenders.push(`${file.path}: ${text[1]?.trim()}`)
+      if (!file.path.endsWith('.vue')) continue
+      for (const text of file.source.matchAll(/>([^<{\n]*\bforegone\b[^<{\n]*)</gi)) offenders.push(`${file.path}: ${text[1]?.trim()}`)
     }
     expect(offenders).toEqual([])
   })

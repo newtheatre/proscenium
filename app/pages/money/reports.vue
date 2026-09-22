@@ -122,7 +122,7 @@ const accessColumns: TableColumn<AccessAdmissionRow>[] = [
         data-test="section-foregone"
       >
         <h2 class="font-semibold">
-          Foregone value
+          Forgone value
         </h2>
         <UTable
           :data="foregoneRows"
