@@ -48,3 +48,43 @@ describe('a refusal names the role by its title (K-128, copy-style section 4)', 
     expect(offenders).toEqual([])
   })
 })
+
+// The words the console review left behind (issue 1151 item 12, issue 1154 item 8): nothing is
+// done by "the system", a queued send is queued, and revenue given away is forgone.
+async function appFiles(): Promise<{ path: string, source: string }[]> {
+  const files: { path: string, source: string }[] = []
+  for (const dir of ['app/pages', 'app/components', 'shared/utils']) {
+    for (const entry of new Bun.Glob('**/*.{vue,ts}').scanSync({ cwd: dir, onlyFiles: true })) {
+      const path = `${dir}/${entry}`
+      files.push({ path, source: await Bun.file(path).text() })
+    }
+  }
+  return files
+}
+
+describe('the last three words the review left (K-128)', () => {
+  test('no refusal says the system did or did not do something', async () => {
+    const offenders: string[] = []
+    for (const file of await serverFiles()) {
+      for (const match of withoutComments(file.source).matchAll(READER_STRING)) {
+        const said = match[2] ?? ''
+        if (/^[A-Z][a-z].* /.test(said) && /\bthe system\b/i.test(said)) offenders.push(`${file.path}: ${said}`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('a send waiting to go is queued, and revenue given away is forgone', async () => {
+    const offenders: string[] = []
+    for (const file of await appFiles()) {
+      for (const match of withoutComments(file.source).matchAll(READER_STRING)) {
+        const said = match[2] ?? ''
+        // A label or a sentence, never a key, a route or a test hook.
+        const reaches = said.includes(' ') || /^[A-Z]/.test(said)
+        if (reaches && /\benqueued\b|\bforegone\b/i.test(said)) offenders.push(`${file.path}: ${said}`)
+      }
+      for (const text of file.source.matchAll(/>([^<{]*\bforegone\b[^<{]*)</gi)) offenders.push(`${file.path}: ${text[1]?.trim()}`)
+    }
+    expect(offenders).toEqual([])
+  })
+})
