@@ -16,16 +16,29 @@ function definesApiUrl(source: string, name: string): boolean {
   return source.slice(definition.index, end === -1 ? undefined : end).includes('/api/')
 }
 
+function tagEnd(source: string, from: number): number {
+  let quote: string | null = null
+  for (let at = from; at < source.length; at++) {
+    const character = source[at]
+    if (quote) {
+      if (character === quote) quote = null
+    }
+    else if (character === '"' || character === '\'') quote = character
+    else if (character === '>') return at
+  }
+  return source.length
+}
+
 function apiLinks(file: string, source: string): ApiLink[] {
   const found: ApiLink[] = []
-  for (const match of source.matchAll(/:to="([^"]+)"/g)) {
-    const expression = match[1] ?? ''
-    const identifier = /^[A-Za-z_$][\w$]*/.exec(expression.replace(/^.*\?\s*undefined\s*:\s*/, ''))?.[0]
+  for (const match of source.matchAll(/(:to|\bto|:href)="([^"]+)"/g)) {
+    const bound = match[1]?.startsWith(':') ?? false
+    const expression = match[2] ?? ''
+    const identifier = bound ? /^[A-Za-z_$][\w$]*/.exec(expression.replace(/^.*\?\s*undefined\s*:\s*/, ''))?.[0] : undefined
     const toApi = expression.includes('/api/') || (identifier !== undefined && definesApiUrl(source, identifier))
     if (!toApi) continue
     const start = source.lastIndexOf('<', match.index)
-    const close = source.slice(match.index).search(/\n\s*\/?>/)
-    const tag = source.slice(start, close === -1 ? undefined : match.index + close)
+    const tag = source.slice(start, tagEnd(source, match.index) + 1)
     found.push({ file, line: source.slice(0, match.index).split('\n').length, tag })
   }
   return found
@@ -42,6 +55,8 @@ describe('a link to a server route downloads rather than routing (I-108, D-129, 
     expect(where).toContain('pages/money/exports.vue')
     expect(where).toContain('pages/box-office/shows/index.vue')
     expect(where).toContain('pages/bar/reports.vue')
+    expect(where).toContain('pages/bar/stock/order-list.vue')
+    expect(where).toContain('pages/account/security.vue')
   })
 
   test('every link whose target is an /api/ route is marked external', () => {
