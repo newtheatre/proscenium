@@ -83,11 +83,31 @@ async function signUp(session: Session): Promise<void> {
   }
 }
 
-async function withdraw(session: Session): Promise<void> {
-  failure.value = null
+// Asked before it happens: a place passes straight to whoever is next (G-105 criterion 7).
+const withdrawing = ref<Session | null>(null)
+const withdrawFailure = ref<string | null>(null)
+const withdrawOpen = computed({
+  get: () => withdrawing.value !== null,
+  set: (value) => { if (!value) withdrawing.value = null },
+})
+
+function askToWithdraw(session: Session): void {
+  withdrawFailure.value = null
+  withdrawing.value = session
+}
+
+const withdrawConsequence = computed(() => withdrawing.value?.placed
+  ? 'Your place passes to whoever is next on the waiting list. Signing up again puts you at the back.'
+  : 'You leave the waiting list. Signing up again puts you at the back.')
+
+async function withdraw(): Promise<void> {
+  const session = withdrawing.value
+  if (!session) return
+  withdrawFailure.value = null
   working.value = session.id
   try {
     await $fetch(`/api/training/sessions/${session.id}/signup`, { method: 'DELETE' })
+    withdrawing.value = null
     toast.add({
       title: 'Withdrawn',
       description: 'Your place has gone to whoever was next. You can sign up again, at the back of the list.',
@@ -98,7 +118,7 @@ async function withdraw(session: Session): Promise<void> {
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    withdrawFailure.value = refusalText(error)
   }
   finally {
     working.value = null
@@ -199,9 +219,9 @@ const sessionDay = (session: Session): string =>
               size="xs"
               :loading="working === session.id"
               :data-test="`withdraw-${session.id}`"
-              @click="withdraw(session)"
+              @click="askToWithdraw(session)"
             >
-              Withdraw
+              Withdraw from the session
             </UButton>
           </div>
         </li>
@@ -317,5 +337,16 @@ const sessionDay = (session: Session): string =>
         </li>
       </ul>
     </section>
+
+    <ConfirmModal
+      v-model:open="withdrawOpen"
+      name="withdraw-session"
+      title="Withdraw from the session"
+      verb="Withdraw from the session"
+      :consequence="withdrawConsequence"
+      :loading="working !== null"
+      :failure="withdrawFailure"
+      @confirm="withdraw"
+    />
   </UContainer>
 </template>

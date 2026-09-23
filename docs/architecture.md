@@ -565,7 +565,7 @@ without naming it), and `nights:close` from E-125.
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Sends pre-expiry hold reminders (`HOLD_REMINDER_MINUTES_BEFORE`, 60 by default), then releases expired reservation holds (D-106, D-107). The one task that changes booking state, and only ever in the direction the customer was warned about. A release offers the freed seats to the waiting list in join order before returning (D-113 criterion 2). |
-| `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and `migrate.yml`'s own `health` job, both outside the application. |
+| `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). Bot Fight Mode challenges GitHub runners, so `migrate.yml` no longer checks health (issue 1014); after a migration the check is by hand in a browser, and `health-watch.yml` was removed for the same reason, leaving this task as the only automated "after every deploy" alert (`docs/operations.md`). |
 | `*/10 * * * *` | `notifications:retry` | Sends failed messages again, one claimed row at a time, when the doubling backoff since enqueue has passed (`NOTIFICATION_RETRY_BACKOFF_MINUTES`, 10 by default); marks an entry `FAILED_FINAL` once `NOTIFICATION_MAX_ATTEMPTS` is spent, so five attempts span about two and a half hours. Every guard runs again on each attempt, so an address change, a preference change or an erasure in between is honoured (H-105, 0056). Capped at 100 rows a run. |
 | `*/10 * * * *` | `notifications:digest` | Claims and sends every topic-and-person digest whose window has passed (`NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`, 60 minutes each by default), one email per pair, capped at 100 pairs a topic a run (H-104). |
 | `*/10 * * * *` | `waiting-list:sweep` | Lapses waiting-list offers past `WAITING_LIST_OFFER_WINDOW_MINUTES`, then re-offers each seat a lapse gives back to the next entry in join order (D-113 criterion 3). Every other freeing event (a hold release, a self-cancel, a refund, a raised capacity) offers inline at the point that frees the seat; this is the one with no such point of its own. |
@@ -1775,8 +1775,10 @@ Merging to `main` (once this branch becomes it) deploys via Workers Builds. Migr
 `.github/workflows/migrate.yml` on push to `main` or `unified/main` when the run touches
 `server/db/migrations/**` (restore point first, `nuxt-db migrate`, ledger re-read after), and
 `/api/health` returns 503 naming pending migrations whenever the deploy is ahead of its schema.
-Applying and deploying cannot be sequenced from CI, so the ordering is a race; the health check is
-what makes losing it visible rather than silent.
+Applying and deploying cannot be sequenced from CI, so the ordering is a race; the health endpoint is
+what makes losing it visible rather than silent. No workflow checks it after a migration, because Bot
+Fight Mode challenges GitHub runners (issue 1014): the operator opens `/api/health` in a browser, and
+the in-application `health:watch` task alerts if it stays unhealthy.
 
 CI gates, eleven of them: `build`, `typecheck`, `lint`, `typecheck:bun`, `test`, and the six
 checkers (comments, migrations, content tokens, ledger, notifications, audit). `typecheck` and
