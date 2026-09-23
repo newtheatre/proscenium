@@ -290,6 +290,8 @@ const artless = computed(() => data.value.items.filter(one => one.status === 'DR
             data-test="ticket-export-csv"
             icon="i-lucide-download"
             :to="ticketExportUrl"
+            external
+            target="_blank"
             :disabled="!exportFrom || !exportTo || exportTo < exportFrom"
           >
             Export CSV
