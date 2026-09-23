@@ -89,9 +89,10 @@ merging.**
 **The workflow does not check health afterwards** (issue 1014, 23 September 2026). It once had a
 second job, `health`, that polled `/api/health` after `migrate` succeeded; it failed on every run
 with a 403 and never reached the application. The `newtheatre.org.uk` zone (the pre-cutover host
-and production alike) is on Cloudflare's Free plan with Bot Fight Mode on, which challenges GitHub Actions runners, and on that plan it runs outside
-the WAF rules engine: no custom rule, skip rule or request header lets a runner through. A check
-that is red on every run teaches everyone to ignore red, so the job was dropped rather than kept.
+and production alike) is on Cloudflare's Free plan with Bot Fight Mode on, which challenges GitHub
+Actions runners, and on that plan it runs outside the WAF rules engine: no custom rule, skip rule
+or request header lets a runner through. A check that is red on every run teaches everyone to
+ignore red, so the job was dropped rather than kept.
 
 **After every migration run, check health by hand:** once the run is green and Workers Builds
 shows the deploy from the same push as finished, open `/api/health` on the live host in a browser
