@@ -452,7 +452,8 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   4. An opening's shifts appear on the claimant's own rota alongside their performance shifts, labelled by the opening's label and venue rather than by a show title, and the open-slot list offers them the same way.
   5. Cancelling an opening cancels its shifts; whoever held one keeps their name on it and is told, and an unclaimed slot names nobody, exactly as a cancelled performance's shifts behave.
   6. An opening names no performance and no show anywhere: no listing, no attendance figure and no night report derives from one.
-- Source: Matt's direction of 15 September 2026 (the ad-hoc shift is a bar opening record); decision 0077; module F open question 5.
+  7. A planned opening's staffing changes one-off after stamping, and the venue's template does not: an officer adds a bar slot, numbered after the highest the opening holds, and removes an open one. Removing a slot that names somebody (claimed, confirmed or declined) is refused and says to stand them down first, as the rota offers no way to remove a held shift; removing an opening's last slot is refused and says to cancel the opening instead. The removal's predicate rides the delete, so a removal and a claim racing on one slot resolve to exactly one winner; each change writes one audit row naming the opening and the slot, never a person. The screen points to the shift templates screen for changing a venue's usual count. Added 23 September 2026 (issue 1215).
+- Source: Matt's direction of 15 September 2026 (the ad-hoc shift is a bar opening record); decision 0077; module F open question 5; the IT Manager's direction on issue 1215 (criterion 7).
 
 ## E-131: Shifts carry their own start and end
 
