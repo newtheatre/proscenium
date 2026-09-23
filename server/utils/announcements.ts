@@ -75,7 +75,8 @@ export function sessionSignupsQuery(sessionId: string): SQL {
 // A live booking with a seat still owned: held, collected or admitted, and not wholly refunded.
 // One account per address, so DISTINCT is one message per address (H-108 criterion 8, 0089).
 function ticketHoldersQuery(performances: SQL): SQL {
-  const holding = sql.join(HOLDING_STATUSES.map(status => sql`${status}`), sql`, `)
+  // Literals from a fixed constant, so the statement binds only what the caller scopes it by.
+  const holding = sql.raw(HOLDING_STATUSES.map(status => `'${status}'`).join(', '))
   return sql`
     SELECT DISTINCT u.id AS id
     FROM reservations r
@@ -99,7 +100,7 @@ export function showTicketHoldersQuery(showId: string, from: number): SQL {
 }
 
 // Epoch seconds at which a show night opens, 04:00 London (0014).
-export function showNightStart(night: string): number {
+function nightOpensAt(night: string): number {
   return Math.floor(showNightBounds(night).from.getTime() / 1000)
 }
 
@@ -163,7 +164,7 @@ export function announceShowsQuery(term: string, from: number): SQL {
 }
 
 export async function announceShows(term: string): Promise<AnnounceShowOption[]> {
-  const found = await db.all<AnnounceShowRow>(announceShowsQuery(term, showNightStart(currentShowNight())))
+  const found = await db.all<AnnounceShowRow>(announceShowsQuery(term, nightOpensAt(currentShowNight())))
   const shows = new Map<string, AnnounceShowOption>()
   for (const row of found) {
     const show = shows.get(row.showId) ?? { id: row.showId, title: row.title, performances: [] }
@@ -184,8 +185,8 @@ export function audienceQuery(audience: AudienceDefinition, context: AudienceCon
   if (audience.kind === 'ALL_CURRENT_MEMBERS') return allCurrentMembersQuery(context.today, context.graceDays)
   if (audience.kind === 'ROLE_HOLDERS') return roleHoldersQuery(audience.role, context.nowEpoch)
   if (audience.kind === 'TONIGHT_ROTA') return tonightsRotaQuery(context.night)
-  if (audience.kind === 'PERFORMANCE_TICKET_HOLDERS') return performanceTicketHoldersQuery(audience.performanceId, showNightStart(context.night))
-  if (audience.kind === 'SHOW_TICKET_HOLDERS') return showTicketHoldersQuery(audience.showId, showNightStart(context.night))
+  if (audience.kind === 'PERFORMANCE_TICKET_HOLDERS') return performanceTicketHoldersQuery(audience.performanceId, nightOpensAt(context.night))
+  if (audience.kind === 'SHOW_TICKET_HOLDERS') return showTicketHoldersQuery(audience.showId, nightOpensAt(context.night))
   return sessionSignupsQuery(audience.sessionId)
 }
 
