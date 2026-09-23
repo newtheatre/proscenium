@@ -58,7 +58,7 @@ export const venueEmergencyInfo = sqliteTable('venue_emergency_info', {
   index('venue_emergency_info_venue_created').on(table.venueId, table.updatedAt),
 ])
 
-// The financial season runs 1 August to 31 July, which is the committee year.
+// Autumn, Spring, StuFF or the Fringe, dated by the Box Office Manager; never the whole year (0087).
 export const seasons = sqliteTable('seasons', {
   id: id(),
   name: text('name').notNull(),

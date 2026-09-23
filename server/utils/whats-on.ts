@@ -4,6 +4,7 @@ import { warningsForListedShowsQuery } from './content-warnings'
 import { performanceSoldColumn } from './programme'
 import { publicContentWarnings, warningAssessment } from '#shared/utils/content-warnings'
 import { offsetFor } from '#shared/utils/pagination'
+import { showNightOf } from '#shared/utils/show-night'
 import {
   listingCacheSeconds,
   performanceAvailability,
@@ -241,6 +242,27 @@ function assemble(
       performances: listed.get(row.id) ?? [],
     }]
   })
+}
+
+// The season the public heading names (0087): the current one, else the next to begin, else none.
+// A finished or retired season is never advertised, and nothing stands in for a missing name.
+export function headlineSeasonQuery(today: string): SQL {
+  return sql`
+    SELECT name FROM seasons
+    WHERE archived = 0 AND ends_on >= ${today}
+    ORDER BY (starts_on <= ${today}) DESC, starts_on, name COLLATE NOCASE
+    LIMIT 1
+  `
+}
+
+// The show night, not the calendar day (0014): a season's last night is still running until 04:00.
+export function headlineSeasonDay(at: Date): string {
+  return showNightOf(at)
+}
+
+export async function headlineSeason(at: Date): Promise<string | null> {
+  const [row] = await db.all<{ name: string }>(headlineSeasonQuery(headlineSeasonDay(at)))
+  return row?.name ?? null
 }
 
 // The limited threshold is passed in rather than read here: this file is imported by the test

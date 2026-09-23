@@ -51,6 +51,39 @@ function zReading(night: string, variancePence: number): void {
   }
 }
 
+function seasonRow(id: string, name: string, startsOn: string, endsOn: string): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query('INSERT INTO seasons (id, name, starts_on, ends_on, sort, archived) VALUES (?, ?, ?, ?, 0, 0)').run(id, name, startsOn, endsOn)
+  }
+  finally {
+    database.close()
+  }
+}
+
+describe.skipIf(skip !== null)('/money: the dashboard over one of the theatre\'s seasons (0087)', () => {
+  test('the finance roles list the seasons, box office reads them only from its own screens', async () => {
+    seasonRow('screens-season-autumn', 'Autumn 2018 (screens)', '2018-09-24', '2018-12-14')
+    const listed = await send('GET', '/api/admin/finance/seasons', undefined, committee.cookie)
+    expect(listed.status).toBe(200)
+    const { seasons } = await listed.json() as { seasons: { id: string, name: string, fromDay: string, toDay: string }[] }
+    expect(seasons).toContainEqual({ id: 'screens-season-autumn', name: 'Autumn 2018 (screens)', fromDay: '2018-09-24', toDay: '2018-12-14' })
+    expect((await send('GET', '/api/admin/finance/seasons', undefined, boxOffice.cookie)).status).toBe(403)
+  })
+
+  test('the summary answers a season as the days its row carries', async () => {
+    seasonRow('screens-season-stuff', 'StuFF 2019 (screens)', '2019-05-13', '2019-05-19')
+    const answered = await send('GET', '/api/admin/finance/season?kind=SEASON&seasonId=screens-season-stuff', undefined, treasurer.cookie)
+    expect(answered.status).toBe(200)
+    const { summary } = await answered.json() as { summary: { fromDay: string, toDay: string } }
+    expect(summary).toMatchObject({ fromDay: '2019-05-13', toDay: '2019-05-19' })
+  })
+
+  test('a season no row carries is refused rather than read as some other range', async () => {
+    expect((await send('GET', '/api/admin/finance/season?kind=SEASON&seasonId=screens-season-nobody', undefined, treasurer.cookie)).status).toBe(404)
+  })
+})
+
 describe.skipIf(skip !== null)('/money/periods: the preview shown before closing (I-107 criterion 5)', () => {
   test('a clear range previews with nothing blocking, and the treasurer closes it', async () => {
     const fromDay = '2019-01-01'

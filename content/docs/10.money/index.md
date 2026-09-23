@@ -42,18 +42,21 @@ and typing it in.
 ## The money dashboard
 
 The dashboard at `/money` is the first item in the group. It answers "how are we doing" for one
-period: a day, a week, a month, a term or a year. The year runs from {{ YEAR_START }} to
-{{ YEAR_END }} (month and day, London), the same year the committee's roles run to. A year is
-never called a season: at the theatre a season is Autumn, Spring, StuFF or the Fringe.
+period: a day, a week, a month, a term, a season or a year. The year runs from {{ YEAR_START }}
+to {{ YEAR_END }} (month and day, London), the same year the committee's roles run to. A season
+is one of the theatre's seasons, Autumn, Spring, StuFF or the Fringe, and runs on the days the
+Box Office Manager gave it on the [seasons](/docs/box-office/seasons) screen.
 
 ![The money dashboard with the period kind (1), the period's own controls (2), revenue by source (3) and the other figures (4)](/images/docs/money/dashboard.png)
 
-1. **Period kind**: DAY, WEEK, MONTH, TERM or YEAR. A day or a week takes a date; a month takes
-   a month and a calendar year; a year is chosen from the years themselves.
+1. **Period kind**: DAY, WEEK, MONTH, TERM, SEASON or YEAR. A day or a week takes a date; a
+   month takes a month and a calendar year; a term, a season and a year are each chosen from a
+   list of themselves.
 2. **Month** and **Calendar year** are each a list, and a **Year** reads as the two calendar
-   years it spans, "2025/26". For a term, a list of the terms themselves. A term has no rule behind it: its
-   range is whatever was typed when the term was defined on the
-   [periods](/docs/money/periods) screen, so TERM appears only once at least one term exists.
+   years it spans, "2025/26". A term has no rule behind it: its range is whatever was typed when
+   the term was defined on the [periods](/docs/money/periods) screen, so TERM appears only once
+   at least one term exists. A **Season** is listed by name, newest first, retired ones included,
+   and SEASON appears only once at least one season exists.
    Changing any of these reads the ledger again at once; there is nothing else to press. Every
    figure is a query, so a sale made a moment ago is already in the next read.
 3. **Revenue by source**: what each surface took on a card, Desk, Till and so on. With
