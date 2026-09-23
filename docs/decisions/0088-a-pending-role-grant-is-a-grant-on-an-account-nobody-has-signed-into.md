@@ -1,6 +1,6 @@
 # 0088: A pending role grant is a grant on an account nobody has signed into yet
 
-- Status: Proposed
+- Status: Accepted, 23 September 2026 (IT Manager)
 - Date: 2026-09-23
 
 ## Context
