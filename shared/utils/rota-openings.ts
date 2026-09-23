@@ -62,6 +62,19 @@ export function openingUnconfirmRefusal(status: ShiftStatus): string {
   return 'This slot is already open'
 }
 
+// Why removing a slot did not apply. Read only to explain a refusal: the predicate rides the
+// delete (E-130 criterion 7, 0003).
+export function openingSlotRemoveRefusal(
+  slot: { status: ShiftStatus, openingStatus: BarOpeningStatus } | null,
+  remaining: number,
+): string {
+  if (!slot) return 'That slot has already been removed'
+  if (slot.openingStatus === 'CANCELLED' || slot.status === 'CANCELLED') return 'This opening has been cancelled'
+  if (slot.status !== 'OPEN') return 'Somebody holds that slot: stand them down first, then remove it'
+  if (remaining <= 1) return 'That is the only slot on this opening: cancel the opening instead'
+  return 'That slot cannot be removed'
+}
+
 export function openingCancelRefusal(status: BarOpeningStatus): string {
   return status === 'CANCELLED' ? 'This opening has already been cancelled' : 'This opening cannot be cancelled'
 }
