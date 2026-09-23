@@ -323,9 +323,11 @@ confirmation uses.
 
 Closing warns before it commits (criterion 5): `blockingConditionsFor()` lists nights in the
 range with no Z reading at all, and nights whose reading still carries an open variance, both
-read from I-104's own outstanding-night queries rather than reimplemented. The first starts at
-`FIRST_RECONCILED_NIGHT` (I-104 criterion 6), so imported history with no reading never warns. A
-warning is not a refusal; the treasurer closes past it if that is the right call.
+read from I-104's own outstanding-night queries rather than reimplemented. Only the list of nights
+with no reading starts at `FIRST_RECONCILED_NIGHT` (I-104 criterion 6), so imported history never
+warns; the open-variance list is unfloored, since a recorded reading is a fact to
+resolve whatever its night. A warning is not a refusal; the treasurer closes past it if that is
+the right call.
 
 A term, unlike a season, has no fixed formula, so `periods` (`POST /api/admin/finance/terms`)
 names one ahead of closing it: a label and a range, defined once. `shared/utils/season-dashboard.ts`'s

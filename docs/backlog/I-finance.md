@@ -79,10 +79,11 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
   3. When expected and actual differ, a variance record is created: date, expected, actual, difference, recorder and a mandatory note; variance records are append-only.
   4. Resolving a variance posts a correction entry or an explicit write-off referencing the variance; a variance is never edited or deleted.
   5. Days with takings but no recorded Z reading surface on the treasurer dashboard until reconciled, and the list is never truncated.
-  6. Only nights from the first reconciled night (1 September 2026, `FIRST_RECONCILED_NIGHT` in
-     `shared/utils/show-night.ts`) onwards can be outstanding. Imported history before it never
-     carried a Z reading and never will, so it neither lists as needing attention nor warns
-     against closing a period (I-107 criterion 5).
+  6. A night with no Z reading is outstanding only from the first reconciled night (1 September
+     2026, `FIRST_RECONCILED_NIGHT` in `shared/utils/show-night.ts`) onwards. Imported history
+     before it never carried a reading, so a missing reading there neither lists as needing
+     attention nor warns against closing a period (I-107 criterion 5). A reading recorded for an
+     earlier night that still carries an open variance surfaces as criterion 5 says.
 - Source: Prompt Book I-1 (unmatched items surface as exceptions, adapted to the no-PSP constraint), D-3; audit PR-12 (reconciliation split); Get-In constraint 1. Criterion 6 comes from issue 1208,
   where the outstanding list reached back to 2014 on imported nights; the IT Manager set the date.
 
