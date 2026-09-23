@@ -36,3 +36,24 @@ export const boardWindowQuery = z.object({
   .refine(window => window.from <= window.to, { message: 'That window runs backwards', path: ['to'] })
   .refine(window => daysAfter(window.from, MAX_BOARD_WINDOW_NIGHTS) > window.to,
     { message: 'Choose a shorter span', path: ['to'] })
+
+export type BoardEntry<P, O> = ({ kind: 'performance' } & P) | ({ kind: 'opening' } & O)
+
+// Bar openings sit among the performances by when they start; on a tie the performance leads,
+// since the house is the evening's main event (E-130 criterion 8).
+export function boardEntries<P extends { startsAt: number }, O extends { startsAt: number }>(
+  performances: readonly P[],
+  openings: readonly O[],
+): BoardEntry<P, O>[] {
+  const entries: BoardEntry<P, O>[] = [
+    ...performances.map(performance => ({ kind: 'performance' as const, ...performance })),
+    ...openings.map(opening => ({ kind: 'opening' as const, ...opening })),
+  ]
+  const rank = (entry: BoardEntry<P, O>): number => entry.kind === 'performance' ? 0 : 1
+  return entries.sort((a, b) => a.startsAt - b.startsAt || rank(a) - rank(b))
+}
+
+// A bare day is read as "is" by the openings list's night filter, so the link lands on that night.
+export function openingsOnNightHref(night: string): string {
+  return `/rota/manage/openings?night=${night}`
+}
