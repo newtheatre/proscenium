@@ -2,7 +2,7 @@ import { ENTRY_SOURCES, TENDERS, saysEntrySource, saysTender } from './ledger'
 import type { ListSpec } from './list-filters'
 
 // The ledger entries list's declaration (K-129, I-105 criterion 3): a treasurer drills down from
-// the season dashboard by day, source or tender, never by editing a query string by hand.
+// the money dashboard by day, source or tender, never by editing a query string by hand.
 export const ledgerEntriesList = {
   key: 'ledger-entries',
   fields: [

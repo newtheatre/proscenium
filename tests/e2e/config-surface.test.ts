@@ -155,10 +155,10 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
   })
 
   test('a value the rules refuse is never stored, and the refusal names the rule', async () => {
-    const refused = await send('PUT', '/api/admin/config/SEASON_START', { value: '02-29' }, cookie)
+    const refused = await send('PUT', '/api/admin/config/YEAR_START', { value: '02-29' }, cookie)
     expect(refused.status).toBe(400)
     expect((await refused.json()).statusMessage ?? '').toContain('29 February')
-    expect((await settingFor('SEASON_START')).set).toBe(false)
+    expect((await settingFor('YEAR_START')).set).toBe(false)
   })
 
   // Arming would read as done while doing nothing: there is no sweep (J-105 criterion 4, K-111).

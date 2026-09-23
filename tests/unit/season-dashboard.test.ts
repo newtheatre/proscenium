@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { periodForm } from '#shared/utils/season-dashboard'
 
-describe('a season dashboard period', () => {
+describe('a money dashboard period', () => {
   test('a day takes a date', () => {
     expect(periodForm.safeParse({ kind: 'DAY', day: '2026-09-15' }).success).toBe(true)
   })
@@ -18,8 +18,12 @@ describe('a season dashboard period', () => {
     expect(periodForm.safeParse({ kind: 'MONTH', year: 2026, month: 13 }).success).toBe(false)
   })
 
-  test('a season takes the year it ends in', () => {
-    expect(periodForm.safeParse({ kind: 'SEASON', year: 2026 }).success).toBe(true)
+  test('a year takes the year it ends in (0087)', () => {
+    expect(periodForm.safeParse({ kind: 'YEAR', year: 2026 }).success).toBe(true)
+  })
+
+  test('a season is not the whole year: a season named by a year is refused (0087)', () => {
+    expect(periodForm.safeParse({ kind: 'SEASON', year: 2026 }).success).toBe(false)
   })
 
   test('a term takes the range the defined term itself carries', () => {

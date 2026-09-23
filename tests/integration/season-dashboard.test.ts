@@ -61,8 +61,8 @@ function person(database: TestDatabase, id: string): void {
 }
 
 describe('period boundaries, Europe/London (criterion 1)', () => {
-  test('the season is 1 August to 31 July, and an entry at 23:59 on 31 July is still inside it', () => {
-    const bounds = periodBounds({ kind: 'SEASON', year: 2026 })
+  test('the year is 1 August to 31 July, and an entry at 23:59 on 31 July is still inside it', () => {
+    const bounds = periodBounds({ kind: 'YEAR', year: 2026 })
     expect(bounds.fromDay).toBe('2025-08-01')
     expect(bounds.toDay).toBe('2026-07-31')
 
@@ -72,8 +72,8 @@ describe('period boundaries, Europe/London (criterion 1)', () => {
     expect(lastMinute).toBeLessThan(bounds.toAt)
   })
 
-  test('the instant the season turns over belongs to the next one', () => {
-    const bounds = periodBounds({ kind: 'SEASON', year: 2026 })
+  test('the instant the year turns over belongs to the next one', () => {
+    const bounds = periodBounds({ kind: 'YEAR', year: 2026 })
     // 23:00 UTC on 31 July 2026 is past midnight on 1 August BST.
     const firstMinuteOfNext = Math.floor(new Date('2026-07-31T23:00:00Z').getTime() / 1000)
     expect(firstMinuteOfNext).toBeGreaterThanOrEqual(bounds.toAt)
