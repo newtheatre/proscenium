@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { endOfTerm } from '#shared/utils/membership'
-import { recordClaimStatements } from '#shared/utils/membership-claims'
+import { recordClaimStatements, studentIdConstraintRefusal } from '#shared/utils/membership-claims'
 import type { MembershipTerm } from '#shared/utils/membership'
 
 // Record a claim: the number to the account, the membership row the A-117 route writes with the
@@ -22,17 +22,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
   }
 
-  // Unique across accounts, so a number typed against the wrong person is refused rather than
-  // quietly moved (0031).
-  const writesNumber = account.studentId !== claim.studentId
-  if (writesNumber) {
-    const [taken] = await db.select({ id: schema.users.id })
-      .from(schema.users).where(eq(schema.users.studentId, claim.studentId)).limit(1)
-    if (taken && taken.id !== claim.userId) {
-      throw createError({ statusCode: 409, statusMessage: 'Another account already holds that student number' })
-    }
-  }
-
   const membershipId = newId()
   const expiresOn = endOfTerm(claim.startsOn, claim.term as MembershipTerm)
   const now = Math.floor(Date.now() / 1000)
@@ -40,12 +29,6 @@ export default defineEventHandler(async (event) => {
 
   // The number never reaches the trail: detail carries identifiers, not people (0011).
   const entries = {
-    studentId: auditEntry({
-      actorId,
-      action: 'account.student-id.recorded',
-      target: `user:${claim.userId}`,
-      detail: { replaced: account.studentId !== null },
-    }),
     granted: auditEntry({
       actorId,
       action: 'membership.granted',
@@ -63,13 +46,22 @@ export default defineEventHandler(async (event) => {
   const statements = recordClaimStatements({
     claimId: id,
     userId: claim.userId,
-    studentId: writesNumber ? claim.studentId : null,
+    studentId: claim.studentId,
+    held: account.studentId,
     membership: { id: membershipId, startsOn: claim.startsOn, expiresOn },
     actorId,
     now,
     entries,
   }).map(statement => db.run(statement))
-  await db.batch([statements[0]!, ...statements.slice(1)])
+  // A number another account holds fails the whole batch on its index: nothing is written (0047).
+  try {
+    await db.batch([statements[0]!, ...statements.slice(1)])
+  }
+  catch (error) {
+    const refusal = studentIdConstraintRefusal(error)
+    if (refusal) throw createError(refusal)
+    throw error
+  }
 
   // Every write was guarded on the claim still being open, so the loser of a race wrote nothing:
   // the membership row is the proof of who won (0006).

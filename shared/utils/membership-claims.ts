@@ -1,8 +1,10 @@
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { auditEntry } from './audit'
 import { constraintRefusal } from './constraint-refusal'
-import { londonDayField, londonDay } from './membership'
+import { endOfTerm, londonDayField, londonDay } from './membership'
 import type { AuditRow } from './audit'
+import type { MembershipTerm } from './membership'
 import type { SQL } from 'drizzle-orm'
 
 // membershipState and its MembershipState now live in membership.ts, which the viewer's ability
@@ -46,13 +48,13 @@ export const claimDeclineForm = z.object({
 
 export type ClaimDeclineInput = z.output<typeof claimDeclineForm>
 
-// A trail entry that lands only while the claim is still open, so a decision that lost a race
-// leaves nothing behind (0006).
-function guardedEntry(entry: AuditRow, open: SQL): SQL {
+// A trail entry that lands only while its guard still holds, so a write that lost a race leaves
+// nothing behind (0006).
+function guardedEntry(entry: AuditRow, guard: SQL): SQL {
   return sql`
     insert into audit_log (id, actor_id, action, target, detail)
     select ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-    where exists ${open}
+    where exists ${guard}
   `
 }
 
@@ -62,30 +64,102 @@ const stillOpen = (claimId: string): SQL =>
   sql`(select 1 from membership_claims c join users u on u.id = c.user_id
     where c.id = ${claimId} and c.status = 'OPEN' and u.anonymised_at is null)`
 
+// A number another account holds: the `users_student_id` index is the whole check, and it fails
+// the batch the number rides in, membership and all (0031, 0047).
+const STUDENT_ID_REFUSALS = [
+  { violated: 'users.student_id', says: 'Another account already holds that student number' },
+]
+
+export function studentIdConstraintRefusal(error: unknown): { statusCode: 409, statusMessage: string } | null {
+  return constraintRefusal(STUDENT_ID_REFUSALS, error)
+}
+
+export interface StudentIdRecording {
+  userId: string
+  studentId: string
+  // What the account holds now, read by the caller: the same number writes nothing.
+  held: string | null
+  actorId: string
+  now: number
+  // What must still hold at commit time; by default, that the account has not been erased.
+  guard?: SQL
+}
+
+// One person, one student number, held on the account (0031). Statements, not a write, so both
+// membership routes put it in their own batch; the number never reaches the trail (0011).
+export function recordStudentId(input: StudentIdRecording): SQL[] {
+  if (input.held === input.studentId) return []
+  const guard = input.guard ?? sql`(select 1 from users where id = ${input.userId} and anonymised_at is null)`
+  const entry = auditEntry({
+    actorId: input.actorId,
+    action: 'account.student-id.recorded',
+    target: `user:${input.userId}`,
+    detail: { replaced: input.held !== null },
+  })
+  return [
+    sql`update users set student_id = ${input.studentId}, updated_at = ${input.now}
+      where id = ${input.userId} and anonymised_at is null and exists ${guard}`,
+    guardedEntry(entry, guard),
+  ]
+}
+
+export interface MembershipGrant {
+  id: string
+  userId: string
+  startsOn: string
+  years: MembershipTerm
+  evidence: string | null
+  actorId: string
+  now: number
+  studentId?: string
+  held: string | null
+}
+
+// "Record one" (A-117 criterion 4): the number, the membership and both trail entries, one batch.
+export function grantMembershipStatements(input: MembershipGrant): SQL[] {
+  const expiresOn = endOfTerm(input.startsOn, input.years)
+  const granted = auditEntry({
+    actorId: input.actorId,
+    action: 'membership.granted',
+    target: `user:${input.userId}`,
+    detail: { membership: input.id, years: input.years, expiresOn },
+  })
+  const number = input.studentId
+    ? recordStudentId({ userId: input.userId, studentId: input.studentId, held: input.held, actorId: input.actorId, now: input.now })
+    : []
+  return [
+    ...number,
+    sql`insert into memberships (id, user_id, starts_on, expires_on, source, evidence, granted_by)
+      values (${input.id}, ${input.userId}, ${input.startsOn}, ${expiresOn}, 'MANUAL', ${input.evidence}, ${input.actorId})`,
+    sql`insert into audit_log (id, actor_id, action, target, detail)
+      values (${granted.id}, ${granted.actorId}, ${granted.action}, ${granted.target}, ${JSON.stringify(granted.detail)})`,
+  ]
+}
+
 export interface ClaimRecording {
   claimId: string
   userId: string
-  // Null when the account already holds the claimed number, so nothing is written to it.
-  studentId: string | null
+  studentId: string
+  // The number the account already holds; the claimed one is written only where it differs.
+  held: string | null
   membership: { id: string, startsOn: string, expiresOn: string }
   actorId: string
   now: number
-  entries: { studentId: AuditRow, granted: AuditRow, recorded: AuditRow }
+  entries: { granted: AuditRow, recorded: AuditRow }
 }
 
 // Every write recording a claim is, in the order the route runs them: the account's number, the
 // membership by the A-117 path, the trail, and last the claim, whose status the guards read.
 export function recordClaimStatements(input: ClaimRecording): SQL[] {
   const open = stillOpen(input.claimId)
-  const statements: SQL[] = []
-
-  if (input.studentId !== null) {
-    statements.push(
-      sql`update users set student_id = ${input.studentId}, updated_at = ${input.now}
-        where id = ${input.userId} and anonymised_at is null and exists ${open}`,
-      guardedEntry(input.entries.studentId, open),
-    )
-  }
+  const statements: SQL[] = recordStudentId({
+    userId: input.userId,
+    studentId: input.studentId,
+    held: input.held,
+    actorId: input.actorId,
+    now: input.now,
+    guard: open,
+  })
 
   statements.push(
     sql`insert into memberships (id, user_id, starts_on, expires_on, source, evidence, granted_by)

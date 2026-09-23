@@ -1,7 +1,6 @@
 import { db, schema } from '@nuxthub/db'
 import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm'
 import { createError } from 'h3'
-import { auditEntry } from '#shared/utils/audit'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { membershipsList } from '#shared/utils/memberships-list'
@@ -49,33 +48,6 @@ export function membershipsClause(query: ListQuery, grace: number): ListClause {
   })
   const asked = conditionsOf(membershipsList, query).some(condition => condition.key === 'filter')
   return asked ? clause : { ...clause, where: and(registerFilterPredicate('current', grace)!, clause.where) }
-}
-
-// One person, one student number, held on the account rather than repeated on every membership
-// (0031). It is how the committee finds somebody against the SU's own record.
-export async function recordStudentId(userId: string, studentId: string, actorId: string): Promise<void> {
-  const [account] = await db.select({ studentId: schema.users.studentId })
-    .from(schema.users).where(eq(schema.users.id, userId)).limit(1)
-  if (account?.studentId === studentId) return
-
-  // Unique across accounts, so a number typed against the wrong person is refused rather than
-  // quietly moved.
-  const [taken] = await db.select({ id: schema.users.id })
-    .from(schema.users).where(eq(schema.users.studentId, studentId)).limit(1)
-  if (taken && taken.id !== userId) {
-    throw createError({ statusCode: 409, statusMessage: 'Another account already holds that student number' })
-  }
-
-  await db.batch([
-    db.update(schema.users).set({ studentId }).where(eq(schema.users.id, userId)),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId,
-      action: 'account.student-id.recorded',
-      target: `user:${userId}`,
-      // The number itself is not in the trail: it identifies a person outside this system (0011).
-      detail: { replaced: account?.studentId !== null && account?.studentId !== undefined },
-    })),
-  ])
 }
 
 export interface RenewalSweep { due: number, sent: number, cap: number }
