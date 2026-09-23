@@ -32,7 +32,14 @@ async function load(): Promise<void> {
 const reauthenticating = ref(false)
 const pending = ref<(() => Promise<void>) | null>(null)
 
-async function attempt(action: () => Promise<void>): Promise<void> {
+const confirmingRemoval = ref(false)
+const removeFailure = ref<string | null>(null)
+
+function sayOnPage(said: string): void {
+  notice.value = said
+}
+
+async function attempt(action: () => Promise<void>, refused = sayOnPage): Promise<void> {
   if (working.value) return
   working.value = true
   notice.value = null
@@ -41,11 +48,13 @@ async function attempt(action: () => Promise<void>): Promise<void> {
   }
   catch (error) {
     if (needsReauthentication(error)) {
+      // The confirmation gives way to the modal; what waits on it is the confirmed action itself.
+      confirmingRemoval.value = false
       pending.value = action
       reauthenticating.value = true
     }
     else {
-      notice.value = refusalText(error)
+      refused(refusalText(error))
     }
   }
   finally {
@@ -101,10 +110,24 @@ const regenerate = (): Promise<void> => attempt(async () => {
   step.value = 'codes'
 })
 
-const remove = (): Promise<void> => attempt(async () => {
+// Asked first (A-109 criterion 6), then re-authenticated if the session is stale, never both
+// twice: a retry runs removeFactor directly (A-128 criterion 9).
+function askToRemove(): void {
+  removeFailure.value = null
+  confirmingRemoval.value = true
+}
+
+async function removeFactor(): Promise<void> {
   await $fetch('/api/account/mfa', { method: 'DELETE' })
+  confirmingRemoval.value = false
   await load()
-})
+}
+
+function sayInTheDialogue(said: string): void {
+  removeFailure.value = said
+}
+
+const remove = (): Promise<void> => attempt(removeFactor, sayInTheDialogue)
 
 // Shown exactly once, so leaving this screen is the point at which they are gone.
 const finish = (): Promise<void> => attempt(async () => {
@@ -302,7 +325,7 @@ useSeoMeta({ title: 'Security' })
             color="error"
             variant="subtle"
             :loading="working"
-            @click="remove"
+            @click="askToRemove"
           >
             Remove the authenticator
           </UButton>
@@ -376,6 +399,17 @@ useSeoMeta({ title: 'Security' })
         </UForm>
       </template>
     </UModal>
+
+    <ConfirmModal
+      v-model:open="confirmingRemoval"
+      name="remove-authenticator"
+      title="Remove the authenticator"
+      verb="Remove the authenticator"
+      consequence="Signing in goes back to your password alone, and your recovery codes stop working. You can set one up again at any time."
+      :loading="working"
+      :failure="removeFailure"
+      @confirm="remove"
+    />
 
     <ReauthenticateModal
       v-model:open="reauthenticating"
