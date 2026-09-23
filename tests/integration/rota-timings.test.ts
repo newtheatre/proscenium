@@ -4,11 +4,13 @@ import {
   backfillShiftTimesStatement,
   backfillVenueStatement,
   barWindowsTonightQuery,
+  confirmedShiftsQuery,
   replaceTemplateStatements,
   restampShiftTimesStatement,
   stampPerformanceStatement,
 } from '#server/utils/rota'
 import { shiftWindow } from '#shared/utils/rota-times'
+import { showNightBounds } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -276,6 +278,19 @@ describe('a template left on an external venue never sets a window (E-101 criter
       run(database, restampShiftTimesStatement(tonight.performanceId, DEFAULTS))
       const [restamped] = timesOn(database, tonight.performanceId)
       expect({ starts_at: restamped!.starts_at, ends_at: restamped!.ends_at }).toEqual(defaultWindow(tonight.startsAt))
+    })
+  })
+
+  test('a reminder for a shift with no stored window reads no offset from it', async () => {
+    await withDatabase(async (database) => {
+      const tonight = externalWithStaleTemplate(database)
+      const holder = person(database, 'holder')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-held', tonight.performanceId, 'BAR', holder, 'CONFIRMED']])
+
+      const { from, to } = showNightBounds(tonight.night)
+      const [row] = run(database, confirmedShiftsQuery(from, to)) as { startsBeforeDoorsMinutes: number | null, endsAfterEndMinutes: number | null }[]
+      expect(row).toMatchObject({ startsBeforeDoorsMinutes: null, endsAfterEndMinutes: null })
     })
   })
 

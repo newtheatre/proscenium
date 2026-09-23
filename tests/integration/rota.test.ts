@@ -206,6 +206,16 @@ describe('a venue marked external loses its template in the same batch (E-101 cr
     })
   })
 
+  // The route reads the flag before it writes, so the write carries the predicate too (0003).
+  test('a template saved onto a venue marked external since the read writes no row', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database, { suffix: 'raced-external' })
+      external(database, venue.id)
+      template(database, venue.id)
+      expect(rows(database, 'SELECT 1 FROM shift_templates WHERE venue_id = ?', venue.id)).toEqual([])
+    })
+  })
+
   test('an external venue with no template writes no audit entry', async () => {
     await withDatabase(async (database) => {
       const venue = testVenue(database, { suffix: 'external-bare' })
