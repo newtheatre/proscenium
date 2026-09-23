@@ -108,7 +108,7 @@ export async function readingHistory(night: string): Promise<ZReading[]> {
 // Nights a till session ran or a performance was on, from the first reconciled night: bounded
 // in SQL too, so imported history back to 2014 is never walked (I-104 criterion 6).
 async function operationalNights(): Promise<Set<string>> {
-  const floorAt = Math.floor(showNightBounds(FIRST_RECONCILED_NIGHT).from.getTime() / 1000)
+  const floorAt = windowOf(FIRST_RECONCILED_NIGHT).fromAt
   const [sessions, performances] = await Promise.all([
     db.all<{ night: string }>(sql`SELECT DISTINCT night FROM till_sessions WHERE night >= ${FIRST_RECONCILED_NIGHT}`),
     db.all<{ startsAt: number }>(sql`SELECT DISTINCT starts_at AS startsAt FROM performances WHERE starts_at >= ${floorAt}`),
