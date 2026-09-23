@@ -13,7 +13,6 @@ definePageMeta({ layout: 'console', title: 'Money dashboard', middleware: 'conso
 const request = useRequestFetch()
 
 const today = londonDay(new Date())
-const thisYear = currentYear()
 const { data: terms } = await useAsyncData(
   'finance-terms',
   () => request<{ periods: Period[] }>('/api/admin/finance/terms').then(response => response.periods),
@@ -27,15 +26,15 @@ const termItems = computed(() => terms.value.map(one => ({ label: one.label, val
 const kind = ref<PeriodKind>('YEAR')
 const termId = ref(terms.value[0]?.id ?? '')
 const day = ref(today)
-const year = ref(thisYear)
+const year = ref(currentYear())
 // A month's year is a calendar year and a 1 August year is the one it ends in, so they are two
 // controls and two lists, never one number standing for both.
 const monthYear = ref(Number(today.slice(0, 4)))
 const month = ref(Number(today.slice(5, 7)))
 
 const months = monthChoices()
-const years = yearChoices(thisYear)
-const calendarYears = calendarYearChoices(Number(today.slice(0, 4)))
+const years = yearChoices(year.value)
+const calendarYears = calendarYearChoices(monthYear.value)
 
 const term = computed(() => terms.value.find(one => one.id === termId.value) ?? terms.value[0])
 
