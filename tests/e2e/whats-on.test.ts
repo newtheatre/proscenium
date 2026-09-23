@@ -161,7 +161,7 @@ describe.skipIf(skip !== null)('the listing answers without an account, and only
   test('the listing is an envelope, never a bare array', async () => {
     const answered = await (await send('GET', '/api/whats-on?page=1&pageSize=2', undefined, '')).json() as Record<string, unknown>
     expect(Object.keys(answered).sort())
-      .toEqual(['cacheMaxSeconds', 'cacheSeconds', 'items', 'page', 'pageSize', 'pages', 'total'])
+      .toEqual(['cacheMaxSeconds', 'cacheSeconds', 'items', 'page', 'pageSize', 'pages', 'season', 'total'])
   })
 })
 
