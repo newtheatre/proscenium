@@ -34,6 +34,7 @@ export const reachConsole = defineAbility((viewer: Viewer) =>
 
 export const viewAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.read'))
 export const disableAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.disable'))
+export const createAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.create'))
 export const grantRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.grant'))
 export const revokeRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.revoke'))
 export const viewMembers = defineAbility((viewer: Viewer) => holds(viewer, 'members.read'))
@@ -162,6 +163,7 @@ export function can(viewer: Viewer | null, ability: BouncerAbility<Viewer>): boo
 export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewAccounts: 'accounts.read',
   disableAccounts: 'accounts.disable',
+  createAccounts: 'accounts.create',
   grantRoles: 'roles.grant',
   revokeRoles: 'roles.revoke',
   viewMembers: 'members.read',

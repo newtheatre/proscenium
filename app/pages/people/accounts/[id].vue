@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysDay, saysWhen } from '#shared/utils/when'
-import { can, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
+import { can, createAccounts, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
 import { saysRole } from '#shared/utils/roles'
 import { describeAction } from '#shared/utils/audit-actions'
 
@@ -9,7 +9,7 @@ definePageMeta({ layout: 'console', title: 'Account', middleware: 'console', doc
 interface Grant { role: string, expiresAt: number | null, grantedAt: number, note: string | null, live: boolean }
 
 interface View {
-  account: { id: string, name: string, email: string, verified: boolean, disabled: boolean, anonymisedAt: number | null, shadow: boolean }
+  account: { id: string, name: string, email: string, verified: boolean, disabled: boolean, anonymisedAt: number | null, shadow: boolean, pendingGoogleEmail: string | null }
   methods: { password: boolean, google: boolean, passkeys: number, factor: boolean, recoveryCodesRemaining: number }
   grants: Grant[]
   memberships: { id: string, startsOn: string, expiresOn: string, source: string, confirmedAt: number | null }[]
@@ -38,7 +38,32 @@ const sees = computed(() => ({
   grants: can(useViewer().value, grantRoles),
   revokes: can(useViewer().value, revokeRoles),
   disables: can(useViewer().value, disableAccounts),
+  prelinks: can(useViewer().value, createAccounts),
 }))
+
+// The Workspace address their first Google sign-in claims; clearing it confirms, because the
+// next Google sign-in would then make them a second, empty account (A-121 criterion 7).
+const linkAddress = ref('')
+const linkFailure = ref<string | null>(null)
+const clearingLink = ref(false)
+
+async function saveGoogleLink(googleEmail: string | null): Promise<void> {
+  working.value = 'google-link'
+  linkFailure.value = null
+  try {
+    await $fetch(`/api/admin/accounts/${route.params.id}/google-link`, { method: 'PATCH', body: { googleEmail } })
+    clearingLink.value = false
+    linkAddress.value = ''
+    toast.add({ title: googleEmail === null ? 'Workspace address cleared' : 'Workspace address set', icon: 'i-lucide-check', color: 'success' })
+    await load()
+  }
+  catch (error) {
+    linkFailure.value = refusalText(error)
+  }
+  finally {
+    working.value = ''
+  }
+}
 
 // A role already held live is not offered again: re-granting it would renew the grant rather
 // than add one, which is a different act from the one this form offers (A-131 criterion 5).
@@ -303,6 +328,64 @@ onMounted(load)
         >
           Nothing yet. This account cannot sign in.
         </p>
+
+        <div
+          v-if="sees.prelinks && !view.methods.google && !view.account.anonymisedAt"
+          data-test="google-link"
+          class="mt-3 space-y-3 border-t border-default pt-3"
+        >
+          <p
+            v-if="view.account.pendingGoogleEmail"
+            data-test="google-link-pending"
+            class="text-sm"
+          >
+            Their first Google sign-in with
+            <span class="font-mono">{{ view.account.pendingGoogleEmail }}</span>
+            joins this account.
+          </p>
+          <UAlert
+            v-if="linkFailure && !clearingLink"
+            data-test="google-link-failure"
+            color="error"
+            variant="subtle"
+            :description="linkFailure"
+          />
+          <form
+            class="flex flex-wrap items-end gap-2"
+            @submit.prevent="saveGoogleLink(linkAddress)"
+          >
+            <UFormField
+              label="Workspace address"
+              description="A @newtheatre.org.uk address. Their own address stays as it is."
+              class="w-full sm:w-96"
+            >
+              <UInput
+                v-model="linkAddress"
+                data-test="google-link-address"
+                type="email"
+                required
+                :placeholder="view.account.pendingGoogleEmail ?? 'name@newtheatre.org.uk'"
+              />
+            </UFormField>
+            <UButton
+              type="submit"
+              data-test="google-link-save"
+              variant="subtle"
+              :loading="working === 'google-link' && !clearingLink"
+            >
+              {{ view.account.pendingGoogleEmail ? 'Change the address' : 'Set the address' }}
+            </UButton>
+            <UButton
+              v-if="view.account.pendingGoogleEmail"
+              data-test="google-link-clear"
+              color="error"
+              variant="ghost"
+              @click="linkFailure = null; clearingLink = true"
+            >
+              Clear the address
+            </UButton>
+          </form>
+        </div>
       </UPageCard>
 
       <UPageCard title="Roles">
@@ -636,6 +719,18 @@ onMounted(load)
       :failure="revokeFailure"
       @update:open="value => { if (!value) revoking = null }"
       @confirm="revokeRole"
+    />
+
+    <ConfirmModal
+      :open="clearingLink"
+      name="clear-google-link"
+      title="Clear the Workspace address"
+      verb="Clear the address"
+      :consequence="`Their next Google sign-in with ${view?.account.pendingGoogleEmail ?? 'it'} makes a second, empty account instead of joining this one.`"
+      :loading="working === 'google-link'"
+      :failure="linkFailure"
+      @update:open="value => { if (!value) clearingLink = false }"
+      @confirm="saveGoogleLink(null)"
     />
 
     <ConfirmModal

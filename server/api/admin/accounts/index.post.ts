@@ -1,11 +1,28 @@
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ROLES, defaultRoleExpiry } from '#shared/utils/roles'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
+import { PRE_LINKED } from '#shared/utils/pending-grants'
+import {
+  CONSOLE_ACCOUNT_TAKEN,
+  PRELINK_NOT_WORKSPACE,
+  PRELINK_OPEN_INSTEAD,
+  consoleAccountConstraintRefusal,
+  consoleAccountStatements,
+  preLinkAddress,
+  preLinkDetail,
+  preLinkHeldBy,
+  preLinkHolderStatement,
+  waitingForGoogle,
+} from '#shared/utils/google-prelink'
+import type { PreLinkHolder } from '#shared/utils/google-prelink'
 
 const body = z.object({
   email: z.string().email().max(320),
   name: z.string().trim().min(1).max(200),
   roles: z.array(z.enum(ROLES)).max(ROLES.length).default([]),
+  // The Workspace address their first Google sign-in claims (A-121 criterion 7).
+  googleEmail: z.string().trim().email().max(320).optional(),
 })
 
 // Create an account from the console. It never gets a password here (A-121 criterion 3).
@@ -15,7 +32,19 @@ export default defineEventHandler(async (event) => {
   const email = normaliseEmail(input.email)
 
   if (await findByEmail(email)) {
-    throw createError({ statusCode: 409, statusMessage: 'That address already has an account' })
+    throw createError({ statusCode: 409, statusMessage: CONSOLE_ACCOUNT_TAKEN })
+  }
+  const [waiting] = await db.select({ name: schema.users.name }).from(schema.users)
+    .where(eq(schema.users.pendingGoogleEmail, email)).limit(1)
+  if (waiting) throw createError({ statusCode: 409, statusMessage: waitingForGoogle(waiting.name) })
+
+  // Their own address already is what Google matches on, so the same one again links nothing new.
+  const given = preLinkAddress(input.googleEmail ?? null)
+  const googleEmail = given === email ? null : given
+  if (googleEmail !== null) {
+    if (!isWorkspaceEmail(googleEmail)) throw createError({ statusCode: 400, statusMessage: PRELINK_NOT_WORKSPACE })
+    const [holder] = await db.all<PreLinkHolder>(preLinkHolderStatement('', googleEmail))
+    if (holder) throw createError({ statusCode: 409, statusMessage: preLinkHeldBy(holder, PRELINK_OPEN_INSTEAD) })
   }
 
   if (undeliverableReason({ email, anonymisedAt: null })) {
@@ -27,7 +56,25 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'You do not have permission to grant roles' })
   }
 
-  const id = await createAccount({ email, name: input.name, passwordHash: null, actorId: resolved.account.id })
+  const id = newId()
+  const statements = consoleAccountStatements({
+    id,
+    email,
+    name: input.name,
+    googleEmail,
+    created: auditEntry({ actorId: resolved.account.id, action: 'account.created.console', target: `user:${id}` }),
+    prelinked: auditEntry({ actorId: resolved.account.id, action: 'account.google.prelinked', target: `user:${id}`, detail: preLinkDetail(false) }),
+  }).map(statement => db.run(statement))
+  try {
+    await db.batch([statements[0]!, ...statements.slice(1)])
+  }
+  catch (error) {
+    const refusal = consoleAccountConstraintRefusal(error)
+    if (refusal) throw createError(refusal)
+    throw error
+  }
+  // The batch's own predicate refused it: a pre-link landed between the checks and the write.
+  if (!await findById(id)) throw createError({ statusCode: 409, statusMessage: PRE_LINKED })
 
   if (input.roles.length > 0) {
     const expiresAt = defaultRoleExpiry(new Date())
