@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   countListedShowsQuery,
+  headlineSeasonDay,
   headlineSeasonQuery,
   listedPerformancesQuery,
   listedPricesQuery,
@@ -366,6 +367,17 @@ describe('the season the public heading names (0087)', () => {
     })
     await withDatabase((database) => {
       expect(named(database, '2026-10-15')).toBeNull()
+    })
+  })
+
+  // 0014: the heading turns with the show night at 04:00, not at midnight.
+  test('at 02:00 after a season\'s last night the heading still names that season', async () => {
+    await withDatabase((database) => {
+      theatreYear(database)
+      // 02:00 GMT on 12 December is 02:00 London, still the night of the 11th.
+      expect(named(database, headlineSeasonDay(new Date('2026-12-12T02:00:00Z')))).toBe('Autumn 2026')
+      // 04:00 London begins the night of the 12th, after Autumn has ended.
+      expect(named(database, headlineSeasonDay(new Date('2026-12-12T04:00:00Z')))).toBe('Spring 2027')
     })
   })
 
