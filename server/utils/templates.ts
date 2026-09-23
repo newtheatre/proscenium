@@ -30,6 +30,17 @@ ${body}
 const SITE_HOST = new URL(PRODUCTION_SITE_URL).host
 const GOES_TO_US = `The link goes to ${SITE_HOST}; if it does not, do not open it.`
 
+// The SU's purchase page where the committee has set one; an unset address leaves the sentence
+// out rather than guessing one (A-202, MEMBERSHIP_PURCHASE_URL).
+function purchaseLink(context: TemplateContext): { html: string, text: string } {
+  const url = typeof context.purchaseUrl === 'string' && context.purchaseUrl ? context.purchaseUrl : null
+  if (!url) return { html: '', text: '' }
+  return {
+    html: `\n<p><a href="${escapeHtml(url)}">Buy a membership from the Students' Union</a></p>`,
+    text: `\n\nBuy a membership from the Students' Union: ${url}`,
+  }
+}
+
 function expiry(at: Date): string {
   return formatLondon(at, { dateStyle: 'full', timeStyle: 'short' })
 }
@@ -1306,19 +1317,20 @@ The Nottingham New Theatre`,
   },
   'membership-expiring': (context: TemplateContext): Rendered => {
     const on = String(context.expiresOn)
+    const buy = purchaseLink(context)
     return {
       subject: 'Your membership is running out',
       html: layout(`<p>Hello ${context.name},</p>
 <p>Your Nottingham New Theatre membership runs out on ${on}.</p>
 <p>Membership is bought at the Students' Union, not from us, so renew it there and we will pick
-the change up from their record.</p>
+the change up from their record.</p>${buy.html}
 <p>Nothing is lost if you let it lapse: your account, your bookings and your history all stay.</p>`),
       text: `Hello ${context.name},
 
 Your Nottingham New Theatre membership runs out on ${on}.
 
 Membership is bought at the Students' Union, not from us, so renew it there and we will pick the
-change up from their record.
+change up from their record.${buy.text}
 
 Nothing is lost if you let it lapse: your account, your bookings and your history all stay.
 
@@ -1351,13 +1363,14 @@ The Nottingham New Theatre`,
   'membership-claim-declined': (context: TemplateContext): Rendered => {
     const reason = String(context.reason ?? '')
     const url = String(context.membershipUrl)
+    const buy = purchaseLink(context)
     return {
       subject: 'We could not record your membership',
       html: layout(`<p>Hello ${context.name},</p>
 <p>We could not record the membership you told us about.</p>
 <p>Why: ${reason}</p>
 <p>If that can be put right, <a href="${url}">claim it again</a> with the corrected details, or
-speak to the committee.</p>`),
+speak to the committee.</p>${buy.html}`),
       text: `Hello ${context.name},
 
 We could not record the membership you told us about.
@@ -1365,7 +1378,7 @@ We could not record the membership you told us about.
 Why: ${reason}
 
 If that can be put right, claim it again with the corrected details, or speak to the committee:
-${url}
+${url}${buy.text}
 
 The Nottingham New Theatre`,
     }

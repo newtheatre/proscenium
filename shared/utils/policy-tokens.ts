@@ -131,8 +131,14 @@ function span(node: { test: string, key: string, css: string, text: string, titl
   }, node.text]
 }
 
+// An address rather than a rule (J-110 criterion 6): a link, never marked unenforced.
+export const isAddressKey = (key: string): boolean => key.endsWith('_URL')
+
 function nodesFor(key: string, values: PolicyValues): unknown[] {
   const value = values[key]
+  if (value && isAddressKey(key)) {
+    return ['a', { 'href': value.text, 'class': VALUE_CLASS, 'data-test': 'policy-link', 'data-key': key }, value.text]
+  }
   if (!value) {
     return span({
       test: 'policy-error',
@@ -170,6 +176,15 @@ function splitText(text: string, values: PolicyValues): Node[] {
   return parts
 }
 
+// A paragraph pointing at an address nobody has set says nothing true, so it goes whole rather
+// than as a sentence with a hole or an error in it (J-110 criterion 6).
+function quotesUnsetAddress(node: Node, values: PolicyValues): boolean {
+  if (typeof node === 'string') return tokensInText(node).some(key => isAddressKey(key) && !values[key])
+  const bound = bindingKey(node)
+  if (bound) return isAddressKey(bound) && !values[bound]
+  return (node.slice(2) as Node[]).some(child => quotesUnsetAddress(child, values))
+}
+
 export function resolvePolicyTree<T>(tree: T, values: PolicyValues): T {
   if (!isTree(tree)) return tree
 
@@ -180,6 +195,7 @@ export function resolvePolicyTree<T>(tree: T, values: PolicyValues): T {
     if (bound) return [nodesFor(bound, values)]
 
     const [tag, props, ...children] = node as [string, unknown, ...Node[]]
+    if (tag === 'p' && quotesUnsetAddress(node, values)) return []
     return [[tag, props, ...children.flatMap(walk)]]
   }
 

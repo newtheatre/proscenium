@@ -55,6 +55,14 @@ export async function configValue<K extends ConfigKey>(event: H3Event | undefine
   return (CONFIG_KEYS[key] as { default: unknown }).default as ConfigValue<K>
 }
 
+// For a key whose absence has an honest meaning, such as a link nobody has named yet: unset reads
+// as null, quietly, and the caller leaves the thing out (A-202).
+export async function configValueIfSet<K extends ConfigKey>(event: H3Event | undefined, key: K): Promise<ConfigValue<K> | null> {
+  const set = await overrides(event)
+  if (set.has(key)) return set.get(key) as ConfigValue<K>
+  return hasDefault(key) ? (CONFIG_KEYS[key] as { default: unknown }).default as ConfigValue<K> : null
+}
+
 // Five keys, one query: the overrides are already loaded by the time the second await runs.
 export async function passwordPolicy(event?: H3Event): Promise<PasswordPolicy> {
   return {

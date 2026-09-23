@@ -499,6 +499,13 @@ export const CONFIG_KEYS = {
     workshop: 'people-and-communications',
     describes: 'The SU\'s annual membership fee, in pence, as quoted to a member. Nothing in this system charges it.',
   },
+  // No default on purpose: nobody has named the SU's page, and a guessed address sends members
+  // somewhere wrong. Unset, every sentence that would link it leaves the link out (A-202, 0019).
+  MEMBERSHIP_PURCHASE_URL: {
+    schema: z.string().url().startsWith('https://', 'Give the https address of the SU page'),
+    workshop: 'people-and-communications',
+    describes: 'The SU\'s own page for buying a New Theatre membership, linked wherever a member is told to buy one. Nothing here sells it.',
+  },
   MEMBERSHIP_RENEWAL_NOTICE_DAYS: {
     schema: z.number().int().positive(),
     default: 21,

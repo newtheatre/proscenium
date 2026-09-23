@@ -40,7 +40,12 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'membership.claim.declined',
     userId: claim.userId,
-    context: { name: '', reason: input.reason, membershipUrl: `${useRuntimeConfig(event).public.baseURL}/account/membership` },
+    context: {
+      name: '',
+      reason: input.reason,
+      membershipUrl: `${useRuntimeConfig(event).public.baseURL}/account/membership`,
+      purchaseUrl: await configValueIfSet(event, 'MEMBERSHIP_PURCHASE_URL'),
+    },
   })
 
   return { ok: true }

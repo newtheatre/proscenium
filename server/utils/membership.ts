@@ -4,7 +4,7 @@ import { createError } from 'h3'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { membershipsList } from '#shared/utils/memberships-list'
-import { configValue } from './configuration'
+import { configValue, configValueIfSet } from './configuration'
 import { tableColumns, whereFrom } from './list-filters'
 import { notify } from './notify'
 import type { ListQuery } from '#shared/utils/list-filters'
@@ -70,6 +70,7 @@ const RENEWAL_CAP = 200
 // rather than sending twice (A-117 criterion 3).
 export async function remindExpiringMemberships(event: H3Event | undefined, now = new Date()): Promise<RenewalSweep> {
   const notice = await configValue(event, 'MEMBERSHIP_RENEWAL_NOTICE_DAYS')
+  const purchaseUrl = await configValueIfSet(event, 'MEMBERSHIP_PURCHASE_URL')
   const today = londonDay(now)
   const horizon = daysAfter(today, notice)
 
@@ -99,7 +100,7 @@ export async function remindExpiringMemberships(event: H3Event | undefined, now 
     await notify(event, {
       type: 'membership.expiring',
       userId: membership.userId,
-      context: { name: '', expiresOn: membership.expiresOn },
+      context: { name: '', expiresOn: membership.expiresOn, purchaseUrl },
     })
     sent++
   }
