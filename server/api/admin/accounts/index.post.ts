@@ -25,27 +25,31 @@ const body = z.object({
   googleEmail: z.string().trim().email().max(320).optional(),
 })
 
+// Why either address already leads to somebody, naming them, or null when both are free.
+async function spokenFor(email: string, googleEmail: string | null): Promise<string | null> {
+  if (await findByEmail(email)) return CONSOLE_ACCOUNT_TAKEN
+  const [waiting] = await db.select({ name: schema.users.name }).from(schema.users)
+    .where(eq(schema.users.pendingGoogleEmail, email)).limit(1)
+  if (waiting) return waitingForGoogle(waiting.name)
+  if (googleEmail === null) return null
+  const [holder] = await db.all<PreLinkHolder>(preLinkHolderStatement('', googleEmail))
+  return holder ? preLinkHeldBy(holder, PRELINK_OPEN_INSTEAD) : null
+}
+
 // Create an account from the console. It never gets a password here (A-121 criterion 3).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'accounts.create')
   const input = await readValidatedBodyOrThrow(event, body)
   const email = normaliseEmail(input.email)
 
-  if (await findByEmail(email)) {
-    throw createError({ statusCode: 409, statusMessage: CONSOLE_ACCOUNT_TAKEN })
-  }
-  const [waiting] = await db.select({ name: schema.users.name }).from(schema.users)
-    .where(eq(schema.users.pendingGoogleEmail, email)).limit(1)
-  if (waiting) throw createError({ statusCode: 409, statusMessage: waitingForGoogle(waiting.name) })
-
   // Their own address already is what Google matches on, so the same one again links nothing new.
   const given = preLinkAddress(input.googleEmail ?? null)
   const googleEmail = given === email ? null : given
-  if (googleEmail !== null) {
-    if (!isWorkspaceEmail(googleEmail)) throw createError({ statusCode: 400, statusMessage: PRELINK_NOT_WORKSPACE })
-    const [holder] = await db.all<PreLinkHolder>(preLinkHolderStatement('', googleEmail))
-    if (holder) throw createError({ statusCode: 409, statusMessage: preLinkHeldBy(holder, PRELINK_OPEN_INSTEAD) })
+  if (googleEmail !== null && !isWorkspaceEmail(googleEmail)) {
+    throw createError({ statusCode: 400, statusMessage: PRELINK_NOT_WORKSPACE })
   }
+  const taken = await spokenFor(email, googleEmail)
+  if (taken) throw createError({ statusCode: 409, statusMessage: taken })
 
   if (undeliverableReason({ email, anonymisedAt: null })) {
     throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
@@ -69,12 +73,10 @@ export default defineEventHandler(async (event) => {
     await db.batch([statements[0]!, ...statements.slice(1)])
   }
   catch (error) {
-    const refusal = consoleAccountConstraintRefusal(error)
-    if (refusal) throw createError(refusal)
-    throw error
+    if (!consoleAccountConstraintRefusal(error)) throw error
   }
-  // The batch's own predicate refused it: a pre-link landed between the checks and the write.
-  if (!await findById(id)) throw createError({ statusCode: 409, statusMessage: PRE_LINKED })
+  // The predicate or a unique index refused it: something landed between the checks and the write.
+  if (!await findById(id)) throw createError({ statusCode: 409, statusMessage: await spokenFor(email, googleEmail) ?? PRE_LINKED })
 
   if (input.roles.length > 0) {
     const expiresAt = defaultRoleExpiry(new Date())

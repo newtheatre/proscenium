@@ -729,7 +729,7 @@ onMounted(load)
       :consequence="`Their next Google sign-in with ${view?.account.pendingGoogleEmail ?? 'it'} makes a second, empty account instead of joining this one.`"
       :loading="working === 'google-link'"
       :failure="linkFailure"
-      @update:open="value => { if (!value) clearingLink = false }"
+      @update:open="value => { if (!value) { clearingLink = false; linkFailure = null } }"
       @confirm="saveGoogleLink(null)"
     />
 
