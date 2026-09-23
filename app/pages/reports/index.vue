@@ -63,8 +63,15 @@ function exportUrl(report: Report): string {
 }
 
 const incidentColumns: TableColumn<IncidentTrendRow>[] = [
-  { id: 'venue', header: 'Venue', cell: ({ row }) => row.original.venueName },
-  { id: 'category', header: 'Category', cell: ({ row }) => saysCategory(row.original.category) },
+  { id: 'venue', header: 'Venue', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.venueName },
+  {
+    id: 'category',
+    header: 'Category',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, saysCategory(row.original.category)),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.venueName),
+    ]),
+  },
   { id: 'severity', header: 'Severity', cell: ({ row }) => saysSeverity(row.original.severity) },
   { id: 'count', header: 'Count', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.count) },
 ]
