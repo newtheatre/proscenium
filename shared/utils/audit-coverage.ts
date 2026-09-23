@@ -525,6 +525,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/venues.get.ts', exempt: 'reads which venues the caller may open a till at tonight' },
   { route: 'server/api/rota/openings/index.post.ts', actions: ['bar-opening.created'] },
   { route: 'server/api/rota/openings/[id]/cancel.post.ts', actions: ['bar-opening.cancelled'] },
+  { route: 'server/api/rota/openings/[id]/slots.post.ts', actions: ['bar-opening-shift.added'] },
   { route: 'server/api/rota/openings/shifts/[id]/claim.post.ts', actions: ['bar-opening-shift.claimed'] },
   { route: 'server/api/rota/openings/shifts/[id]/approve.post.ts', actions: ['bar-opening-shift.confirmed'] },
   { route: 'server/api/rota/openings/shifts/[id]/decline.post.ts', actions: ['bar-opening-shift.declined'] },
@@ -532,6 +533,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rota/openings/shifts/[id]/dismiss.post.ts', actions: ['bar-opening-shift.dismissed'] },
   { route: 'server/api/rota/openings/shifts/[id]/assign.post.ts', actions: ['bar-opening-shift.reassigned'] },
   { route: 'server/api/rota/openings/shifts/[id]/unconfirm.post.ts', actions: ['bar-opening-shift.unconfirmed'] },
+  { route: 'server/api/rota/openings/shifts/[id]/remove.post.ts', actions: ['bar-opening-shift.removed'] },
 
   // Module F: bar
 

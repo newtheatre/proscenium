@@ -1213,6 +1213,11 @@ nothing and is told so rather than given a slot the theatre never asked for. Cla
 `claimSlotStatement()`, the rota's own conditional write parameterised by table, so two
 simultaneous claims settle to one winner and one member holds one slot on an opening (E-104,
 0003). Cancelling an opening cancels its slots in the same batch, keeping whoever held one.
+A planned opening's staffing changes one-off after stamping without touching the template: an
+added slot takes the next number after the opening's highest, and only an `OPEN` slot on a
+`PLANNED` opening that keeps another slot is deleted, the predicate riding the `DELETE` so a
+claim landing first refuses the removal (E-130 criterion 7). The audit row names the opening and
+the slot number, since the slot's own row is gone.
 
 ### shift_contact_preferences
 `user_id` PK → users cascade · `visible` bool default false · `updated_at`. Consent, not a fact

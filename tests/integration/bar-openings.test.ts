@@ -313,7 +313,7 @@ describe('a planned opening\'s staffing changes one-off after stamping (E-130 cr
     await withDatabase(async (database) => {
       const { openingId } = opening(database)
 
-      const answers = await race(2, async (index) =>
+      const answers = await race(2, async index =>
         run(database, addOpeningShiftStatement(`slot-added-${index}`, openingId)).length)
 
       expect(answers).toEqual([1, 1])
