@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { seasonTicketRevenueQuery } from '#server/utils/revenue-by-show'
 import { toCsv } from '#server/utils/csv'
 import { periodBounds, seasonRangeQuery } from '#server/utils/season-dashboard'
+import { rangeClosedQuery } from '#server/utils/period-locks'
 import { nominalMappingsQuery, suExportCountQuery, suExportQuery } from '#server/utils/su-export'
 import { suExportCsvRows } from '#shared/utils/su-export'
 import type { SuExportRow } from '#shared/utils/su-export'
@@ -78,12 +79,10 @@ function lock(database: TestDatabase, id: string, fromDay: string, toDay: string
   ).run(id, fromDay, toDay, action, ACTOR, at)
 }
 
-// Exactly isRangeClosed()'s query.
+// Exactly isRangeClosed(): its own query, read the same way.
 function rangeClosed(database: TestDatabase, fromDay: string, toDay: string): boolean {
-  const [row] = rows<{ action: string }>(database, `
-    SELECT action FROM period_locks WHERE from_day <= ? AND to_day >= ? ORDER BY created_at DESC, id DESC LIMIT 1
-  `, fromDay, toDay)
-  return row?.action === 'CLOSED'
+  const [row] = read<{ action: string, reopenedSince: number }>(database, rangeClosedQuery(fromDay, toDay))
+  return row?.action === 'CLOSED' && !row.reopenedSince
 }
 
 describe('the nominal mapping seed (I-108 criterion 1)', () => {
@@ -234,6 +233,26 @@ describe('whether an exported range is still open to a correction (I-108)', () =
       lock(database, 'lock-1', '2026-09-01', '2026-09-30', 'CLOSED', 0)
       lock(database, 'lock-2', '2026-09-01', '2026-09-30', 'REOPENED', 1)
       expect(rangeClosed(database, '2026-09-01', '2026-09-30')).toBe(false)
+    })
+  })
+
+  test('a smaller close reopened inside a later, wider close makes the wider range open', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      lock(database, 'lock-1', '2025-09-01', '2025-09-30', 'CLOSED', 0)
+      lock(database, 'lock-2', '2025-08-01', '2026-07-31', 'CLOSED', 1)
+      lock(database, 'lock-3', '2025-09-01', '2025-09-30', 'REOPENED', 2)
+      expect(rangeClosed(database, '2025-08-01', '2026-07-31')).toBe(false)
+    })
+  })
+
+  test('a reopen from before the wider close does not open it', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      lock(database, 'lock-1', '2025-09-01', '2025-09-30', 'CLOSED', 0)
+      lock(database, 'lock-2', '2025-09-01', '2025-09-30', 'REOPENED', 1)
+      lock(database, 'lock-3', '2025-08-01', '2026-07-31', 'CLOSED', 2)
+      expect(rangeClosed(database, '2025-08-01', '2026-07-31')).toBe(true)
     })
   })
 })
