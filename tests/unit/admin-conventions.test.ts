@@ -793,6 +793,11 @@ const TOAST_TITLE_WITH_A_STOP = /toast\.add\(\{\s*title:\s*(['`])[^'`]*\.\1/
 describe('a console screen says what it is doing (K-123 criterion 5, issue 1151 item 7)', () => {
   test('no toast title ends in a full stop', async () => {
     expect(await saying(source => TOAST_TITLE_WITH_A_STOP.test(source))).toEqual([])
+    const stopped: string[] = []
+    for (const path of new Bun.Glob('app/composables/**/*.ts').scanSync({ onlyFiles: true })) {
+      if (TOAST_TITLE_WITH_A_STOP.test(await Bun.file(path).text())) stopped.push(path)
+    }
+    expect(stopped).toEqual([])
   })
 
   test('a toast confirming an action names what it acted on', async () => {
