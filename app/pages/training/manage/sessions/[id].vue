@@ -531,7 +531,7 @@ const registerLabel = computed(() => {
             data-test="edit-modules"
             @click="startChangingModules"
           >
-            Change what it teaches
+            Change the modules
           </UButton>
 
           <UAlert
@@ -614,7 +614,7 @@ const registerLabel = computed(() => {
                 :disabled="!modulesSavable"
                 data-test="modules-save"
               >
-                Save what it teaches
+                Save the modules
               </UButton>
               <UButton
                 color="neutral"
