@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysDay } from '#shared/utils/when'
-import { saysSessionStatus } from '#shared/utils/training'
+import { SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus } from '#shared/utils/training'
 
 definePageMeta({ layout: 'console', title: 'Session', middleware: 'console', docs: '/docs/training/sessions' })
 
@@ -76,6 +76,63 @@ async function callOff(): Promise<void> {
   }
   catch (caught) {
     failure.value = refusalText(caught)
+  }
+  finally {
+    working.value = false
+  }
+}
+
+// The route refuses once the register opens, so the screen does not offer what it would refuse.
+const canChangePlaces = computed(() =>
+  !!data.value && ['PLANNED', 'OPEN', 'FULL'].includes(data.value.status) && !registerOpen.value)
+
+const changingPlaces = ref(false)
+const places = ref(0)
+const placesFailure = ref<string | null>(null)
+const placesResult = ref<string | null>(null)
+
+const placedNow = computed(() => data.value?.attendees.filter(one => one.placed).length ?? 0)
+const waitingNow = computed(() => data.value?.attendees.filter(one => !one.placed).length ?? 0)
+
+// Said before saving, because either way somebody is emailed (G-106 criteria 1 and 6).
+const placesConsequence = computed(() => {
+  if (!data.value) return ''
+  const movedBack = Math.max(0, placedNow.value - places.value)
+  if (movedBack > 0) {
+    return `${plural(movedBack, 'person', 'people')} will move back to the waiting list, and each is emailed their number.`
+  }
+  const promoted = Math.min(waitingNow.value, Math.max(0, places.value - data.value.capacity))
+  if (promoted > 0) {
+    return `${plural(promoted, 'person', 'people')} waiting will get a place, and each is emailed.`
+  }
+  return 'Nobody moves.'
+})
+
+function startChangingPlaces(): void {
+  places.value = data.value?.capacity ?? SESSION_CAPACITY_MIN
+  placesFailure.value = null
+  placesResult.value = null
+  changingPlaces.value = true
+}
+
+async function savePlaces(): Promise<void> {
+  working.value = true
+  placesFailure.value = null
+  try {
+    const answered = await $fetch<{ promoted: number, movedBack: number }>(
+      `/api/admin/training/sessions/${route.params.id}/capacity`,
+      { method: 'POST', body: { capacity: places.value } },
+    )
+    const moved = [
+      answered.promoted > 0 ? `${answered.promoted} promoted` : null,
+      answered.movedBack > 0 ? `${answered.movedBack} moved back to the waiting list` : null,
+    ].filter(Boolean)
+    placesResult.value = `Places changed to ${places.value}. ${moved.length ? `${moved.join(', ')}, each emailed.` : 'Nobody moved.'}`
+    changingPlaces.value = false
+    await refresh()
+  }
+  catch (caught) {
+    placesFailure.value = refusalText(caught)
   }
   finally {
     working.value = false
@@ -265,9 +322,75 @@ const registerLabel = computed(() => {
           >
             Nobody has signed up yet. You can still add whoever turns up once the register is open.
           </p>
-          <p class="text-sm text-muted">
-            {{ plural(data.capacity, 'place') }} on this session.
-          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <p
+              class="text-sm text-muted"
+              data-test="session-places"
+            >
+              {{ plural(data.capacity, 'place') }} on this session.
+            </p>
+            <UButton
+              v-if="canChangePlaces && !changingPlaces"
+              size="xs"
+              variant="link"
+              icon="i-lucide-pencil"
+              data-test="edit-capacity"
+              @click="startChangingPlaces"
+            >
+              Change the places
+            </UButton>
+          </div>
+
+          <UAlert
+            v-if="placesResult"
+            color="success"
+            variant="subtle"
+            icon="i-lucide-check"
+            data-test="capacity-result"
+            :description="placesResult"
+          />
+
+          <form
+            v-if="changingPlaces"
+            class="space-y-3 rounded-md border border-default p-3"
+            data-test="capacity-form"
+            @submit.prevent="savePlaces"
+          >
+            <UFormField
+              label="Places"
+              :description="`Between ${SESSION_CAPACITY_MIN} and ${SESSION_CAPACITY_MAX}. ${placesConsequence}`"
+            >
+              <UInputNumber
+                v-model="places"
+                :min="SESSION_CAPACITY_MIN"
+                :max="SESSION_CAPACITY_MAX"
+                data-test="capacity-input"
+              />
+            </UFormField>
+            <UAlert
+              v-if="placesFailure"
+              color="error"
+              variant="subtle"
+              data-test="capacity-failure"
+              :description="placesFailure"
+            />
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                type="submit"
+                :loading="working"
+                data-test="capacity-save"
+              >
+                Save the places
+              </UButton>
+              <UButton
+                color="neutral"
+                variant="ghost"
+                @click="changingPlaces = false"
+              >
+                Keep it as it is
+              </UButton>
+            </div>
+          </form>
         </section>
 
         <section class="space-y-3">

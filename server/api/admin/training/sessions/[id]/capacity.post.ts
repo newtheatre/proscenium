@@ -1,8 +1,8 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { refreshBadgeStatement, sessionCapacityForm } from '#shared/utils/training-signup'
 
 // Change how many places a session has. Raising it promotes whoever the new room reaches, and
-// lowering it takes nobody off the list: they go back to waiting (G-105, G-106 criterion 1).
+// lowering it takes nobody off the list: they go back to waiting and are told (G-106 c1, c6).
 export default defineEventHandler(async (event) => {
   const resolved = await requireTrainer(event)
   const sessionId = getRouterParam(event, 'id')
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const before = await placesOnSession(sessionId)
-  if (before.capacity === input.capacity) return { ok: true, capacity: input.capacity, promoted: 0 }
+  if (before.capacity === input.capacity) return { ok: true, capacity: input.capacity, promoted: 0, movedBack: 0 }
 
   await db.batch([
     db.update(schema.trainingSessions)
@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
       .where(and(
         eq(schema.trainingSessions.id, sessionId),
         inArray(schema.trainingSessions.status, ['PLANNED', 'OPEN', 'FULL']),
+        isNull(schema.trainingSessions.registerOpenedAt),
       )),
     // The badge follows the capacity in the same batch, so a session that just gained room never
     // sits reading full and discouraging the sign-ups the trainer made space for.
@@ -51,5 +52,6 @@ export default defineEventHandler(async (event) => {
   ])
 
   const promoted = await notifyPromotions(event, sessionId, before.places)
-  return { ok: true, capacity: input.capacity, promoted }
+  const movedBack = await notifyDemotions(event, sessionId, before.places)
+  return { ok: true, capacity: input.capacity, promoted, movedBack }
 })

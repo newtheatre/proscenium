@@ -55,14 +55,37 @@ export function promotedBy(before: Place[], after: Place[]): Place[] {
   return after.filter(place => place.placed && !held.has(place.userId))
 }
 
-// One claim per sign-up rather than per person: withdrawing and re-joining is a new sign-up, so
-// a later promotion of the same member is a different claim and still sends (G-106 criterion 2).
-export function promotionClaimFor(sessionId: string, userId: string, signedUpAt: number): string {
-  return `training.session.promoted:${sessionId}:${userId}:${signedUpAt}`
+// Who a capacity drop moved from a place back to waiting, read off the later order so each
+// carries the waiting-list number they are told (G-106 criterion 6).
+export function demotedBy(before: Place[], after: Place[]): Place[] {
+  const held = new Set(before.filter(place => place.placed).map(place => place.userId))
+  return after.filter(place => !place.placed && held.has(place.userId))
+}
+
+// One claim per sign-up and per move back, so re-joining, or being moved back and promoted
+// again, is a different claim and still sends (G-106 criteria 2 and 6).
+export function promotionClaimFor(sessionId: string, userId: string, signedUpAt: number, movedBack = 0): string {
+  const key = `training.session.promoted:${sessionId}:${userId}:${signedUpAt}`
+  return movedBack > 0 ? `${key}:${movedBack}` : key
+}
+
+const demotionPrefix = (sessionId: string, userId: string, signedUpAt: number): string =>
+  `training.session.demoted:${sessionId}:${userId}:${signedUpAt}:`
+
+// Numbered by how often this sign-up has been moved back before, so two racing drops name the
+// same claim and one of them sends, while a later drop after a re-promotion still does.
+export function demotionClaimFor(sessionId: string, userId: string, signedUpAt: number, earlier: number): string {
+  return `${demotionPrefix(sessionId, userId, signedUpAt)}${earlier + 1}`
+}
+
+// How many times one sign-up has been moved back, counted off the session's demotion claims.
+export function movedBackCount(claims: string[], sessionId: string, userId: string, signedUpAt: number): number {
+  const prefix = demotionPrefix(sessionId, userId, signedUpAt)
+  return claims.filter(claim => claim.startsWith(prefix)).length
 }
 
 // Capacity is the only input to a place besides the order, so moving it is the other thing that
-// promotes somebody. Lowering it takes nobody off the list: they fall back to waiting (G-106 c1).
+// promotes somebody. Lowering it takes nobody off the list: they fall back to waiting (G-106 c6).
 export const sessionCapacityForm = z.object({
   capacity: z.number().int().min(SESSION_CAPACITY_MIN).max(SESSION_CAPACITY_MAX),
 })

@@ -678,6 +678,33 @@ The Nottingham New Theatre`,
     }
   },
 
+  // Bad news, so it says plainly what changed and that nothing is lost from the order: they are
+  // first to hear if room comes back.
+  'training-session-demoted': (context: TemplateContext): Rendered => {
+    const modules = context.modules as { id: string, name: string }[]
+    const taught = modules.map(module => `${module.name} (${module.id})`).join(', ')
+    return {
+      subject: 'Your training session place is back on the waiting list',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>The trainer has reduced the number of places on ${taught}, on ${context.heldOn} at
+${context.startsAt}, so you no longer have a place. You are now number ${context.position} on the
+waiting list.</p>
+<p>You keep your turn: if somebody drops out or the places go back up, we will email you. If you
+would rather not wait, you can <a href="${String(context.sessionsUrl)}">withdraw</a>.</p>`),
+      text: `Hello ${context.name},
+
+The trainer has reduced the number of places on ${taught}, on ${context.heldOn} at
+${context.startsAt}, so you no longer have a place. You are now number ${context.position} on the
+waiting list.
+
+You keep your turn: if somebody drops out or the places go back up, we will email you. If you
+would rather not wait, you can withdraw:
+${String(context.sessionsUrl)}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   // Asking is what put it in the diary, and saying so is the only feedback a request gives.
   'training-request-scheduled': (context: TemplateContext): Rendered => ({
     subject: `${String(context.moduleName)} is now scheduled`,

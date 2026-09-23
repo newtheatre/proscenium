@@ -2383,6 +2383,15 @@ in `tests/integration/races.test.ts`). The instant is in the key so a member who
 re-joined and was promoted again is told again. The message is transactional: no topic
 preference silences it and no sweep dry-run suppresses it (criterion 5).
 
+A capacity drop is the reverse, and is told the same way (G-106 criterion 6). Whoever signed up
+last among those holding a place goes back to waiting first, ahead of everybody already waiting,
+and each is emailed their new number once. The claim is
+`training.session.demoted:<session>:<user>:<signed_up_at>:<n>`, where `n` is one more than the
+number of move-back claims that sign-up already has, so two racing drops name one claim while a
+drop after a re-promotion is a new one. The promotion key takes the same count as a suffix once
+it is above nought, so a member moved back and promoted again is told again. Both are
+transactional.
+
 Validity is derived at read time, never stored; the diagram is the derivation, not a status
 column:
 
