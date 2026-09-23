@@ -1,14 +1,23 @@
 <script setup lang="ts">
-import { formatLondon } from '#shared/utils/london'
-import { saysBookingState } from '#shared/utils/bookings'
+import { formatLondon, fromLondonWallClock, londonClock } from '#shared/utils/london'
+import { SERIES_EDIT_REFUSAL, describePurpose, saysBookingState } from '#shared/utils/bookings'
 import { saysExternalState } from '#shared/utils/external-requests'
+import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
+import type { FormSubmitEvent } from '@nuxt/ui'
+import { z } from 'zod'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/my-room-bookings' })
 
 interface Booking {
   id: string
+  roomId: string
   room: string
   title: string
+  tier: string
+  purpose: string | null
+  notes: string | null
+  reason: string | null
+  editable: boolean
   attendees: number | null
   startsAt: number
   endsAt: number
@@ -190,6 +199,103 @@ async function cancel(): Promise<void> {
   }
 }
 
+// A request nobody has answered is still the member's to change; the server re-runs every check
+// and is the authority on what the change means (C-108 criterion 4).
+const editing = ref<Booking | null>(null)
+const editScope = ref<'occurrence' | 'series' | undefined>()
+
+const editFields = z.object({
+  roomId: z.string().min(1, 'Choose a room'),
+  title: z.string().trim().min(1, 'Say what the booking is for').max(200),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a day'),
+  from: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a start time'),
+  to: z.string().regex(/^\d{2}:\d{2}$/, 'Choose an end time'),
+  attendees: z.number().int().positive().nullish(),
+  purpose: z.string().min(1, 'Say what the room is for'),
+  reason: z.string().trim().min(1, 'Say why this one is worth an exception').max(REQUEST_REASON_LIMIT),
+}).refine(one => one.to > one.from, { path: ['to'], message: 'A booking ends after it starts' })
+
+type EditFields = z.output<typeof editFields>
+
+const draft = reactive<EditFields>({ roomId: '', title: '', day: '', from: '', to: '', attendees: undefined, purpose: '', reason: '' })
+
+const { data: editRooms } = await useAsyncData(
+  'my-bookings-rooms',
+  async () => (await request<{ rooms: { id: string, name: string }[] }>('/api/rooms/availability', {
+    query: { from: londonDay(new Date()), to: londonDay(new Date()) },
+  })).rooms,
+  { default: (): { id: string, name: string }[] => [] },
+)
+
+const { data: rules } = await useAsyncData(
+  'room-policy',
+  () => request<{ seriesCap: number, purposes: string[] }>('/api/rooms/policy'),
+  { default: () => ({ seriesCap: 12, purposes: [] as string[] }) },
+)
+
+watch(editing, (booking) => {
+  editScope.value = booking?.seriesId ? undefined : 'occurrence'
+  if (!booking) return
+  const start = new Date(booking.startsAt * 1000)
+  Object.assign(draft, {
+    roomId: booking.roomId,
+    title: booking.title,
+    day: londonDay(start),
+    from: londonClock(start),
+    to: londonClock(new Date(booking.endsAt * 1000)),
+    attendees: booking.attendees ?? undefined,
+    purpose: booking.purpose ?? '',
+    reason: booking.reason ?? '',
+  })
+})
+
+// The wall clock the member typed, turned into the instant it names in London (0014).
+function instantOf(day: string, clock: string): string {
+  const [year, month, date] = day.split('-').map(Number)
+  const [hour, minute] = clock.split(':').map(Number)
+  return fromLondonWallClock(year!, month!, date!, hour!, minute!).toISOString()
+}
+
+async function saveEdit(event: FormSubmitEvent<EditFields>): Promise<void> {
+  const booking = editing.value
+  if (!booking || editScope.value !== 'occurrence') return
+
+  working.value = true
+  try {
+    const answer = await $fetch<{ restartedClock: boolean }>(`/api/rooms/bookings/${booking.id}`, {
+      method: 'PUT',
+      body: {
+        roomId: event.data.roomId,
+        title: event.data.title,
+        startsAt: instantOf(event.data.day, event.data.from),
+        endsAt: instantOf(event.data.day, event.data.to),
+        attendees: event.data.attendees ?? null,
+        tier: booking.tier,
+        purpose: event.data.purpose,
+        notes: booking.notes,
+        reason: event.data.reason,
+        scope: editScope.value,
+      },
+    })
+    toast.add({
+      title: 'Request changed',
+      description: answer.restartedClock
+        ? 'A new room or day is a new question, so it waits for a decision as if asked today.'
+        : 'It still holds its slot while an officer decides.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    editing.value = null
+    await refresh()
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    working.value = false
+  }
+}
+
 useSeoMeta({ title: 'My bookings' })
 </script>
 
@@ -324,6 +430,18 @@ useSeoMeta({ title: 'My bookings' })
             :data-test="`ics-${booking.id}`"
           >
             Add to calendar
+          </UButton>
+
+          <UButton
+            v-if="booking.editable"
+            size="sm"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-pencil"
+            :data-test="`edit-${booking.id}`"
+            @click="editing = booking"
+          >
+            Change
           </UButton>
 
           <UButton
@@ -502,6 +620,176 @@ useSeoMeta({ title: 'My bookings' })
         >
           Keep it
         </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="editing !== null"
+      title="Change this request"
+      :description="editing ? `${editing.room}, ${spanOf(editing)}` : ''"
+      @update:open="editing = null"
+    >
+      <template #body>
+        <UForm
+          id="edit-request"
+          :schema="editFields"
+          :state="draft"
+          class="space-y-4"
+          data-test="edit-form"
+          @submit="saveEdit"
+        >
+          <!-- Both named, neither chosen, as for cancelling (C-111 criterion 1). -->
+          <URadioGroup
+            v-if="editing?.seriesId"
+            v-model="editScope"
+            data-test="edit-scope"
+            :items="[
+              { label: 'Just this one', description: `Week ${editing.occurrence} of ${editing.seriesLength}. The rest stay as they are.`, value: 'occurrence' },
+              { label: 'The whole series', description: 'Every date still waiting.', value: 'series' },
+            ]"
+          />
+
+          <UAlert
+            v-if="editScope === 'series'"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-info"
+            :description="SERIES_EDIT_REFUSAL"
+            data-test="edit-series-refused"
+          />
+
+          <template v-if="editScope === 'occurrence'">
+            <p class="text-sm text-muted">
+              Moving it to another room or another day starts the wait for a decision again.
+              Anything else leaves it where it is.
+            </p>
+
+            <UFormField
+              label="Room"
+              name="roomId"
+              required
+            >
+              <USelect
+                v-model="draft.roomId"
+                :items="editRooms.map(one => ({ label: one.name, value: one.id }))"
+                class="w-full"
+                data-test="edit-room"
+              />
+            </UFormField>
+
+            <UFormField
+              label="What it is for"
+              name="title"
+              required
+            >
+              <UInput
+                v-model="draft.title"
+                class="w-full"
+                data-test="edit-title"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Day"
+              name="day"
+              required
+            >
+              <DateField
+                v-model="draft.day"
+                data-test="edit-day"
+              />
+            </UFormField>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UFormField
+                label="From"
+                name="from"
+                required
+              >
+                <TimeField
+                  v-model="draft.from"
+                  class="w-full"
+                  data-test="edit-from"
+                />
+              </UFormField>
+
+              <UFormField
+                label="Until"
+                name="to"
+                required
+              >
+                <TimeField
+                  v-model="draft.to"
+                  class="w-full"
+                  data-test="edit-to"
+                />
+              </UFormField>
+            </div>
+
+            <UFormField
+              label="How many people"
+              name="attendees"
+              hint="Optional"
+            >
+              <UInputNumber
+                v-model="draft.attendees"
+                :min="1"
+                class="w-full"
+                data-test="edit-attendees"
+              />
+            </UFormField>
+
+            <UFormField
+              label="What the room is for"
+              name="purpose"
+              required
+            >
+              <USelect
+                v-model="draft.purpose"
+                :items="rules.purposes.map(purpose => ({ label: describePurpose(purpose), value: purpose }))"
+                value-key="value"
+                class="w-full"
+                data-test="edit-purpose"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Why this one is worth an exception"
+              name="reason"
+              required
+              :description="`Shown to whoever decides. Up to ${REQUEST_REASON_LIMIT} characters.`"
+            >
+              <UTextarea
+                v-model="draft.reason"
+                :maxlength="REQUEST_REASON_LIMIT"
+                :rows="3"
+                class="w-full"
+                data-test="edit-reason"
+              />
+            </UFormField>
+          </template>
+        </UForm>
+      </template>
+
+      <template #footer>
+        <div class="flex flex-wrap gap-2">
+          <UButton
+            type="submit"
+            form="edit-request"
+            :loading="working"
+            :disabled="editScope !== 'occurrence'"
+            data-test="edit-confirm"
+          >
+            Save the change
+          </UButton>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            @click="editing = null"
+          >
+            Leave it as it is
+          </UButton>
+        </div>
       </template>
     </UModal>
 

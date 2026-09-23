@@ -86,6 +86,19 @@ export function refusalToCancel(booking: { userId: string, status: string }, vie
   return null
 }
 
+// Only a request nobody has answered is the member's to change: once decided, the approver agreed
+// to (or refused) exactly what they read (C-108 criterion 4).
+export function refusalToEdit(booking: { userId: string, status: string }, viewerId: string): string | null {
+  if (booking.userId !== viewerId) return 'That is not your booking'
+  if (booking.status !== 'PENDING_APPROVAL') {
+    return `That booking is already ${saysBookingState(booking).toLowerCase()}, so it cannot be changed`
+  }
+  return null
+}
+
+// Series editing is not built (C-111): the question is still asked, and this is the answer to one side.
+export const SERIES_EDIT_REFUSAL = 'Changing the whole series at once is not possible yet. Change the weeks one at a time, or cancel the series and ask again.'
+
 // Which of the two a member meant. There is no default: a single button that might cancel one
 // week or a whole term is the ambiguity C-111 criterion 1 exists to remove.
 export const SCOPES = ['occurrence', 'series'] as const

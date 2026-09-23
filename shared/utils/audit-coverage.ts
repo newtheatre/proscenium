@@ -116,6 +116,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rooms/policy.get.ts', exempt: 'reads the published booking rules' },
   { route: 'server/api/rooms/bookings/index.get.ts', exempt: 'reads the bookings you hold' },
   { route: 'server/api/rooms/bookings/[id]/cancel.post.ts', actions: ['room.booking.cancelled'] },
+  { route: 'server/api/rooms/bookings/[id]/index.put.ts', actions: ['room.request.edited'] },
   { route: 'server/api/rooms/bookings/[id]/ics.get.ts', exempt: 'downloads a booking you already hold' },
   {
     route: 'server/routes/rooms/feed/[token]/calendar.ics.get.ts',

@@ -103,6 +103,7 @@ const CATALOGUE = {
   'room.updated': { label: 'Room changed', module: 'spaces' },
   'room.booked': { label: 'Room booked', module: 'spaces', self: true },
   'room.requested': { label: 'Room requested', module: 'spaces', self: true },
+  'room.request.edited': { label: 'Room request changed', module: 'spaces', self: true },
   'room.request.expired': { label: 'Room request lapsed', module: 'spaces' },
   'room.request.approved': { label: 'Room request approved', module: 'spaces' },
   'room.request.rejected': { label: 'Room request rejected', module: 'spaces' },

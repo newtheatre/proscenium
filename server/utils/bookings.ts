@@ -9,6 +9,7 @@ import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 import { isCurrent, londonDay } from '#shared/utils/membership'
 import type { BookingStatus, Conflict } from '#shared/utils/bookings'
 import type { H3Event } from 'h3'
+import type { SQL } from 'drizzle-orm'
 
 // The slot claim. One guarded statement, never a read then a check then a write: two requests
 // arriving together must not both see the slot free (0003, 0006, C-107 criterion 2).
@@ -65,7 +66,94 @@ export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
   return await whyItFailed(input)
 }
 
-async function whyItFailed(input: ClaimInput): Promise<ClaimOutcome> {
+export interface EditInput {
+  id: string
+  userId: string
+  roomId: string
+  title: string
+  attendees: number | null
+  startsAt: number
+  endsAt: number
+  tier: string
+  purpose: string
+  notes: string | null
+  reason: string
+  // Set by the route from restartsTheClock; the sweep measures both ages from created_at.
+  restartClock: boolean
+  now: number
+}
+
+export type EditOutcome
+  = | { won: true }
+    | { won: false, why: 'missing' | 'settled' | 'gone' }
+    | { won: false, why: 'conflict', conflicts: Conflict[] }
+
+// The claim's guarded twin for a request already held: owner, status and the clash rule all ride
+// the one UPDATE, so an edit racing an approval or a booking cannot land on a stale read (0003, 0006).
+export function editPendingStatement(input: EditInput): SQL {
+  const held = HOLDS_A_SLOT.map(status => sql`${status}`)
+  const clock = input.restartClock ? sql`, created_at = ${input.now}, escalated_at = NULL` : sql``
+
+  return sql`
+    UPDATE room_bookings AS target
+    SET room_id = ${input.roomId},
+        title = ${input.title},
+        attendees = ${input.attendees},
+        starts_at = ${input.startsAt},
+        ends_at = ${input.endsAt},
+        tier = ${input.tier},
+        purpose = ${input.purpose},
+        notes = ${input.notes},
+        reason = ${input.reason},
+        updated_at = ${input.now}${clock}
+    WHERE target.id = ${input.id}
+      AND target.user_id = ${input.userId}
+      AND target.status = 'PENDING_APPROVAL'
+      AND EXISTS (SELECT 1 FROM rooms WHERE id = ${input.roomId} AND is_active = 1)
+      AND NOT EXISTS (
+        SELECT 1 FROM room_bookings AS other
+        WHERE other.room_id = ${input.roomId}
+          AND other.id <> target.id
+          AND other.status IN (${sql.join(held, sql`, `)})
+          AND other.starts_at < ${input.endsAt}
+          AND other.ends_at > ${input.startsAt}
+      )
+    RETURNING id
+  `
+}
+
+export async function editPending(input: EditInput): Promise<EditOutcome> {
+  const edited = await db.all<{ id: string }>(editPendingStatement(input))
+  if (edited.length > 0) return { won: true }
+
+  // Nothing written, disambiguated rather than guessed, the way a lost claim is (0003).
+  const booking = await bookingFor(input.id)
+  if (!booking || booking.userId !== input.userId) return { won: false, why: 'missing' }
+  if (booking.status !== 'PENDING_APPROVAL') return { won: false, why: 'settled' }
+  return await whyItFailed({ roomId: input.roomId, startsAt: input.startsAt, endsAt: input.endsAt, exceptId: input.id })
+}
+
+// The morning sweep's writes, guarded on the age it read: an edit that restarted the clock since
+// (editPendingStatement) makes the lapse or the chase write nothing (0006, C-108 criterion 3).
+export function lapseStatement(id: string, createdAt: number, now: number): SQL {
+  return sql`
+    UPDATE room_bookings
+    SET status = 'REJECTED', rejection_reason = 'Nobody answered this in time, so it lapsed.', updated_at = ${now}
+    WHERE id = ${id} AND status = 'PENDING_APPROVAL' AND created_at = ${createdAt}
+    RETURNING title, starts_at AS startsAt
+  `
+}
+
+export function chaseStatement(id: string, createdAt: number, now: number): SQL {
+  return sql`
+    UPDATE room_bookings
+    SET escalated_at = ${now}
+    WHERE id = ${id} AND status = 'PENDING_APPROVAL' AND created_at = ${createdAt} AND escalated_at IS NULL
+    RETURNING title, starts_at AS startsAt
+  `
+}
+
+async function whyItFailed(input: Parameters<typeof conflictsWith>[0]): Promise<Exclude<ClaimOutcome, { won: true }>> {
   const [room] = await db.select({ id: schema.rooms.id })
     .from(schema.rooms)
     .where(and(eq(schema.rooms.id, input.roomId), eq(schema.rooms.isActive, true)))
@@ -133,6 +221,9 @@ export interface BookingRow {
   purpose: string | null
   attendees: number | null
   notes: string | null
+  tier: string
+  // The member's own words: read for an edit's diff, never returned or audited (0011).
+  reason: string | null
 }
 
 export async function bookingFor(id: string): Promise<BookingRow | undefined> {
@@ -153,6 +244,8 @@ export async function bookingFor(id: string): Promise<BookingRow | undefined> {
     purpose: schema.roomBookings.purpose,
     attendees: schema.roomBookings.attendees,
     notes: schema.roomBookings.notes,
+    tier: schema.roomBookings.tier,
+    reason: schema.roomBookings.reason,
   })
     .from(schema.roomBookings)
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))

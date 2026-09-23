@@ -93,8 +93,6 @@ export async function sweepRequests(event: H3Event | undefined, at = new Date())
     id: schema.roomBookings.id,
     userId: schema.roomBookings.userId,
     room: schema.rooms.name,
-    title: schema.roomBookings.title,
-    startsAt: schema.roomBookings.startsAt,
     createdAt: schema.roomBookings.createdAt,
     escalatedAt: schema.roomBookings.escalatedAt,
   })
@@ -109,31 +107,24 @@ export async function sweepRequests(event: H3Event | undefined, at = new Date())
   for (const request of waiting) {
     // Expiry first: one that has waited past both ages lapses rather than being told it is late.
     if (dueToExpire(request, now, expireAfter)) {
-      await expire(event, request, now)
-      expired++
+      if (await expire(event, request, now)) expired++
       continue
     }
 
-    if (dueToEscalate(request, now, escalateAfter)) {
-      await escalate(event, request, now)
-      escalated++
-    }
+    if (dueToEscalate(request, now, escalateAfter) && await escalate(event, request, now)) escalated++
   }
 
   return { escalated, expired }
 }
 
-type Waiting = { id: string, userId: string, room: string, title: string, startsAt: number }
+type Waiting = { id: string, userId: string, room: string, createdAt: number }
+type Asked = { title: string, startsAt: number }
 
-async function expire(event: H3Event | undefined, request: Waiting, now: number): Promise<void> {
-  // Guarded on the status it read: an approver deciding at the same moment wins, and the sweep
-  // leaves their decision alone (0006).
-  const lapsed = await db.update(schema.roomBookings)
-    .set({ status: 'REJECTED', rejectionReason: 'Nobody answered this in time, so it lapsed.', updatedAt: now })
-    .where(and(eq(schema.roomBookings.id, request.id), eq(schema.roomBookings.status, 'PENDING_APPROVAL')))
-    .returning({ id: schema.roomBookings.id })
-
-  if (lapsed.length === 0) return
+async function expire(event: H3Event | undefined, request: Waiting, now: number): Promise<boolean> {
+  // A decision or a clock-restarting edit landing since the read wins (0006); the title and time
+  // come back from the write, because an edit may have changed them since.
+  const [lapsed] = await db.all<Asked>(lapseStatement(request.id, request.createdAt, now))
+  if (!lapsed) return false
 
   await db.insert(schema.auditLog).values(auditEntry({
     actorId: null,
@@ -145,14 +136,14 @@ async function expire(event: H3Event | undefined, request: Waiting, now: number)
   await notify(event, {
     type: 'room.request.expired',
     userId: request.userId,
-    context: { name: '', room: request.room, title: request.title, when: whenOf(request) },
+    context: { name: '', room: request.room, title: lapsed.title, when: whenOf(lapsed) },
   })
+  return true
 }
 
-async function escalate(event: H3Event | undefined, request: Waiting, now: number): Promise<void> {
-  await db.update(schema.roomBookings)
-    .set({ escalatedAt: now })
-    .where(eq(schema.roomBookings.id, request.id))
+async function escalate(event: H3Event | undefined, request: Waiting, now: number): Promise<boolean> {
+  const [chased] = await db.all<Asked>(chaseStatement(request.id, request.createdAt, now))
+  if (!chased) return false
 
   for (const approver of await approvers()) {
     await notify(event, {
@@ -161,12 +152,13 @@ async function escalate(event: H3Event | undefined, request: Waiting, now: numbe
       context: {
         name: approver.name,
         room: request.room,
-        title: request.title,
-        when: whenOf(request),
+        title: chased.title,
+        when: whenOf(chased),
         queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/requests`,
       },
     })
   }
+  return true
 }
 
 function whenOf(request: { startsAt: number }): string {
