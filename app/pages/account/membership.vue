@@ -85,16 +85,26 @@ async function submit(event: FormSubmitEvent<MembershipClaimInput>): Promise<voi
   }
 }
 
+// Asked before it happens (A-130 criterion 9); a refusal stays in the dialogue that asked.
+const confirmingWithdrawal = ref(false)
+const withdrawFailure = ref<string | null>(null)
+
+function askToWithdraw(): void {
+  withdrawFailure.value = null
+  confirmingWithdrawal.value = true
+}
+
 async function withdraw(): Promise<void> {
   withdrawing.value = true
-  failure.value = null
+  withdrawFailure.value = null
   try {
     await $fetch('/api/account/membership/claim', { method: 'DELETE' })
+    confirmingWithdrawal.value = false
     toast.add({ title: 'Claim withdrawn', icon: 'i-lucide-undo-2', color: 'neutral' })
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    withdrawFailure.value = refusalText(error)
   }
   finally {
     withdrawing.value = false
@@ -220,7 +230,7 @@ useSeoMeta({ title: 'Membership' })
             variant="outline"
             size="sm"
             :loading="withdrawing"
-            @click="withdraw"
+            @click="askToWithdraw"
           >
             Withdraw the claim
           </UButton>
@@ -304,5 +314,16 @@ useSeoMeta({ title: 'Membership' })
         </UForm>
       </UPageCard>
     </div>
+
+    <ConfirmModal
+      v-model:open="confirmingWithdrawal"
+      name="withdraw-claim"
+      title="Withdraw the claim"
+      verb="Withdraw the claim"
+      consequence="No officer records a membership from it. You can send a new claim straight afterwards."
+      :loading="withdrawing"
+      :failure="withdrawFailure"
+      @confirm="withdraw"
+    />
   </UContainer>
 </template>

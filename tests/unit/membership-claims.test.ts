@@ -91,7 +91,7 @@ describe('the members area reaches it (A-130 criterion 4)', () => {
   })
 })
 
-// Once a day each, however many times the sweep runs (A-130 criterion 11).
+// Once a day each, however many times the sweep runs (A-130 criterion 12).
 describe('the waiting claims notice is claimed per person per London day', () => {
   test('two officers on one day, and one officer on two days, claim separately', () => {
     expect(claimsWaitingClaimFor('a1', '2026-09-23')).toBe('membership.claims.waiting:a1:2026-09-23')

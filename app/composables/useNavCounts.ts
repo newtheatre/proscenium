@@ -2,7 +2,7 @@ import { can, manageMembers } from '#shared/utils/abilities'
 import type { NavCount } from '#shared/utils/site-nav'
 
 // The queues counted on the console sidebar, shared so a screen that works one can refresh the
-// count the sidebar shows (A-130 criterion 10). Fetched only for somebody who can decide them.
+// count the sidebar shows (A-130 criterion 11). Fetched only for somebody who can decide them.
 export function useNavCounts() {
   const counts = useState<Partial<Record<NavCount, number>>>('nav-counts', () => ({}))
   const viewer = useViewer()

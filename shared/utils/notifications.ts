@@ -102,7 +102,7 @@ export const MESSAGE_TYPES = {
   },
 
   // An officer's duty rather than a preference: members are refused until somebody records what
-  // they bought, so no topic may silence the daily notice that claims wait (A-130 criterion 11).
+  // they bought, so no topic may silence the daily notice that claims wait (A-130 criterion 12).
   'membership.claims.waiting': {
     topic: null,
     channels: ['EMAIL', 'INBOX'],
@@ -715,7 +715,7 @@ export const TOPIC_LABELS: Record<NotificationTopic, string> = {
 
 // What each topic actually covers, so a member switching one off knows what goes quiet.
 export const TOPIC_DESCRIPTIONS: Record<NotificationTopic, string> = {
-  BOOKINGS: 'Changes to shows you have tickets for, and reminders before a performance.',
+  BOOKINGS: 'Changes to shows you have tickets for, and notices from the theatre about them.',
   SHIFTS: 'Rota reminders, and news about a shift you hold or asked for.',
   TRAINING: 'Session places, register marks and training that is running out.',
   ROOMS: 'Room requests and bookings, yours and any you approve.',
