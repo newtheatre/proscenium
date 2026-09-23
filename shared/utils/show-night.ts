@@ -5,6 +5,10 @@ import { daysAfter, londonDay } from './membership'
 // YYYY-MM-DD (0014, E-110). A constant, not configuration: nobody moves it under a live night.
 export const SHOW_NIGHT_START_HOUR = 4
 
+// The first night that must carry a Z reading (I-104 criterion 6); imported nights before it
+// never had one. Set by the IT Manager and quoted in docs/roadmap.md Phase 3.
+export const FIRST_RECONCILED_NIGHT = '2026-09-01'
+
 // Deliberately not the ledger's day. I-104 reconciles the SumUp Z by London calendar day
 // (`ledger_entries.london_day`), so a 01:00 bar sale is tonight's takings but tomorrow's Z.
 

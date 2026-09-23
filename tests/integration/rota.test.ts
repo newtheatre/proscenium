@@ -238,7 +238,7 @@ describe('the data migration clears templates already on external venues (E-101 
       template(database, away.id)
       external(database, away.id)
 
-      const migration = await Bun.file('server/db/migrations/sqlite/0114_an_external_venue_holds_no_shift_template.sql').text()
+      const migration = await Bun.file('server/db/migrations/sqlite/0115_an_external_venue_holds_no_shift_template.sql').text()
       for (const statement of migration.split('--> statement-breakpoint')) {
         if (statement.trim()) database.raw.exec(statement.trim())
       }

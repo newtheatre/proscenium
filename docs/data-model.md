@@ -1077,11 +1077,11 @@ of the same figures, adding only the desk's own itemised breakdown.
 `to_day >= from_day`) · `created_by` → users restrict · `created_at`. Indexed on
 `(from_day, to_day)`.
 
-**A named term, and only a term: a season needs no row here.** A season's range is computed
+**A named term, and only a term: a year needs no row here.** A year's range is computed
 from `committeeYearEnd` (`shared/utils/london.ts`), never stored, the boundary E-126 also reuses
 rather than resolving its own (I-107). A term has no fixed formula, so it is named once, ahead
 of closing it: `POST /api/admin/finance/terms` defines the range, `GET` lists every one, and the
-season dashboard's `TERM` period kind (I-105) reads its bounds from here. Closing a period does
+money dashboard's `TERM` period kind (I-105) reads its bounds from here. Closing a period does
 not reference this table: a lock names a range directly, whether or not that range was ever
 defined as a term.
 

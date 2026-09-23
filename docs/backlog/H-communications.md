@@ -138,7 +138,7 @@ Stories: 14 total (9 MVP, 4 V2, 1 Later).
 - Story: As a committee officer, I want to send an announcement to a defined audience without ever disclosing the recipient list so that one message reaches everyone it should and exposes no one.
 - Depends on: H-101, H-102, H-105
 - Acceptance criteria:
-  1. An authorised officer composes to a defined audience (all current members, holders of a role, tonight's rota, a session's sign-ups); the audience is resolved to individuals at send time from live data, not from a pasted list.
+  1. An authorised officer composes to a defined audience (all current members, holders of a role, tonight's rota, a session's sign-ups, ticket holders for a performance, ticket holders for a show); the audience is resolved to individuals at send time from live data, not from a pasted list.
   2. Delivery is one message per recipient (or blind copy where batched); no recipient can see any other recipient's address in any header or body, asserted by a test on the rendered provider payload.
   3. Announcements carry the committee-announcements topic and honour preferences; a safety notice may be flagged transactional at the type level, and doing so is visible in the composer.
   4. The composer shows a resolved recipient count and a preview before sending; sending records an audit entry with sender, audience definition and count, and per-recipient outcomes land in the send log.
@@ -147,7 +147,22 @@ Stories: 14 total (9 MVP, 4 V2, 1 Later).
   7. The count comes before the draft: choosing an audience says how many people it resolves to,
      without a subject or a message being written first. After a send the composer keeps what was
      sent on screen and says plainly that it went, rather than emptying itself.
-- Source: Prompt Book H-1; audit RM-1 (all admins emailed each request, subject to preferences), PR-10 (night reports emailed to configured recipients). Criterion 7 comes from the console review of 21 September 2026 (issue 1151 item 10).
+  8. Ticket holders for a performance, or for a show's remaining run, are everyone whose booking
+     for it is live when the message is sent: held but not yet collected, collected, or admitted at
+     the door, with at least one ticket not refunded, on a performance whose show night is tonight
+     or later (0014). A booking admitted at the door is in the audience like a collected one, since
+     that person is attending; this was confirmed by the IT Manager on 23 September 2026. A past
+     performance has no audience, and the picker offers neither a draft
+     show nor one whose run is over. A cancelled, expired, no-show or wholly refunded
+     booking is not in the audience. A guest who booked with an address and never made an account
+     is reached at that address. Somebody with several bookings across the run is one recipient,
+     and the audience is scoped by subquery from the performance or the show, never by a list of
+     ids read back from a result set (0006).
+  9. A message to ticket holders is about a booking, so a plain one carries the bookings topic and
+     its preference, and a safety notice is transactional exactly as criterion 3 allows; both come
+     from the box office identity and both reach a guest's unverified address, the reach a booking
+     confirmation already has (0089). Criteria 2, 4, 5 and 6 apply unchanged.
+- Source: Prompt Book H-1; audit RM-1 (all admins emailed each request, subject to preferences), PR-10 (night reports emailed to configured recipients). Criterion 7 comes from the console review of 21 September 2026 (issue 1151 item 10). Criteria 8 and 9 come from feedback issue 1213 (a safety notice has to reach the audience, not only the membership), accepted as drafted by the IT Manager on 23 September 2026.
 
 ## H-109: Templates and Europe/London formatting
 

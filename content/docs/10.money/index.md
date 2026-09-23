@@ -1,8 +1,8 @@
 ---
 title: Money
-description: The season dashboard, the reports built on the ledger, daily reconciliation, period close and the SU export.
+description: The money dashboard, the reports built on the ledger, daily reconciliation, period close and the SU export.
 module: Finance
-updatedOn: 2026-09-22
+updatedOn: 2026-09-23
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -21,13 +21,13 @@ the Students' Union at the end of a period.
   finance permission. Change the period and back to read it again; if it persists, check your
   role under [roles and the committee year](/docs/people/roles).
 - **The Entries buttons are missing**: you are on the Committee rather than the Treasurer. The
-  committee sees the season's totals, not the entries behind them.
+  committee sees the totals, not the entries behind them.
 
 ## Who reaches what
 
 - **The Treasurer** opens every screen in the group and every figure down to one ledger entry,
   records a reader reading, closes a period, changes an SU nominal code and takes the SU export.
-- **The Committee** opens the season dashboard only, with its totals but without the **Entries**
+- **The Committee** opens the money dashboard only, with its totals but without the **Entries**
   buttons that drill into who rang what in.
 - **The IT Manager** reopens a closed period, which nobody else does, and holds everything the
   Treasurer holds.
@@ -39,18 +39,19 @@ settlement feed to match against, so reconciliation is a person reading the read
 and typing it in.
 ::
 
-## The season dashboard
+## The money dashboard
 
 The dashboard at `/money` is the first item in the group. It answers "how are we doing" for one
-period: a day, a week, a month, a term or a season. The season runs from {{ SEASON_START }} to
-{{ SEASON_END }} (month and day, London), the same year the committee's roles run to.
+period: a day, a week, a month, a term or a year. The year runs from {{ YEAR_START }} to
+{{ YEAR_END }} (month and day, London), the same year the committee's roles run to. A year is
+never called a season: at the theatre a season is Autumn, Spring, StuFF or the Fringe.
 
-![The season dashboard with the period kind (1), the period's own controls (2), revenue by source (3) and the other figures (4)](/images/docs/money/dashboard.png)
+![The money dashboard with the period kind (1), the period's own controls (2), revenue by source (3) and the other figures (4)](/images/docs/money/dashboard.png)
 
-1. **Period kind**: DAY, WEEK, MONTH, TERM or SEASON. A day or a week takes a date; a month takes
-   a month and a year; a season is chosen from the seasons themselves.
-2. **Month** and **Year** are each a list, and a **Season** reads as the two years it spans,
-   "2025/26". For a term, a list of the terms themselves. A term has no rule behind it: its
+1. **Period kind**: DAY, WEEK, MONTH, TERM or YEAR. A day or a week takes a date; a month takes
+   a month and a calendar year; a year is chosen from the years themselves.
+2. **Month** and **Calendar year** are each a list, and a **Year** reads as the two calendar
+   years it spans, "2025/26". For a term, a list of the terms themselves. A term has no rule behind it: its
    range is whatever was typed when the term was defined on the
    [periods](/docs/money/periods) screen, so TERM appears only once at least one term exists.
    Changing any of these reads the ledger again at once; there is nothing else to press. Every

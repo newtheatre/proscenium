@@ -350,10 +350,10 @@ describe.skipIf(skip !== null)('cancelling a collected booking (criterion 6)', (
   }, CASE_TIMEOUT_MS)
 })
 
-describe.skipIf(skip !== null)('a real refund reaches the season dashboard (I-102 audit: seasonRefundsQuery)', () => {
-  test('the season summary reflects a refund posted through the real route, not a fixture that agrees with the query', async () => {
+describe.skipIf(skip !== null)('a real refund reaches the money dashboard (I-102 audit: seasonRefundsQuery)', () => {
+  test('the summary for the year reflects a refund posted through the real route, not a fixture that agrees with the query', async () => {
     const { reservationId, ticketId } = await collectedBooking(900)
-    const before = await send('GET', `/api/admin/finance/season?kind=SEASON&year=${committeeYearOf(new Date())}`, undefined, officer.cookie)
+    const before = await send('GET', `/api/admin/finance/season?kind=YEAR&year=${committeeYearOf(new Date())}`, undefined, officer.cookie)
     const beforeSummary = await before.json() as { summary: { refundsPence: number } }
 
     const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, {
@@ -361,7 +361,7 @@ describe.skipIf(skip !== null)('a real refund reaches the season dashboard (I-10
     }, manager.cookie)
     expect(refunded.status).toBe(200)
 
-    const after = await send('GET', `/api/admin/finance/season?kind=SEASON&year=${committeeYearOf(new Date())}`, undefined, officer.cookie)
+    const after = await send('GET', `/api/admin/finance/season?kind=YEAR&year=${committeeYearOf(new Date())}`, undefined, officer.cookie)
     const afterSummary = await after.json() as { summary: { refundsPence: number } }
     expect(afterSummary.summary.refundsPence).toBe(beforeSummary.summary.refundsPence + 900)
   }, CASE_TIMEOUT_MS)

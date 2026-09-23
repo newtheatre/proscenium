@@ -173,17 +173,18 @@ export const CONFIG_KEYS = {
   },
   // Module J: governance
 
-  SEASON_START: {
+  // The whole year, never a season, which is a dated row of the seasons table (0087).
+  YEAR_START: {
     schema: z.string().regex(/^\d{2}-\d{2}$/),
     default: '08-01',
     workshop: 'money-and-box-office',
-    describes: 'Month and day the season opens, London. Drives reporting and role expiry (0009).',
+    describes: 'Month and day the year opens, London. Bounds the ticket export\'s year (D-129); role expiry keeps its own 31 July (0009).',
   },
-  SEASON_END: {
+  YEAR_END: {
     schema: z.string().regex(/^\d{2}-\d{2}$/),
     default: '07-31',
     workshop: 'money-and-box-office',
-    describes: 'Month and day the season closes, London. Roles expire at the last London instant of it.',
+    describes: 'Month and day the year closes, London. The ticket export\'s year runs to the last London instant of it (D-129).',
   },
   // The keys a save must preview and a typed echo before it takes (J-105 criteria 1, 2, 5).
   // Itself configuration, so naming a key here is an administrator's audited act, not a deploy.
@@ -454,7 +455,7 @@ export const CONFIG_KEYS = {
   },
   PRIVILEGED_ROLES: {
     schema: z.array(z.string()),
-    default: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER', 'TREASURER', 'BOX_OFFICE', 'BAR_MANAGER', 'FOH_MANAGER'],
+    default: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER', 'TREASURER', 'BOX_OFFICE', 'BAR_MANAGER', 'FOH_MANAGER', 'SAFETY_OFFICER'],
     workshop: 'people-and-communications',
     describes: 'Roles that require a second factor: any role touching money, personal data or safety records (A-112). Changing this is audited.',
   },
@@ -804,8 +805,8 @@ export const ENFORCED_KEYS = [
   'NOTIFICATION_DIGEST_WINDOW_ANNOUNCEMENTS_MINUTES',
   'PRIVILEGED_ROLES',
   'PUBLIC_ORDER_SEAT_CAP',
-  'SEASON_START',
-  'SEASON_END',
+  'YEAR_START',
+  'YEAR_END',
   'WIDE_BLAST_RADIUS_KEYS',
   'REFUND_PAID_REQUIRES_MANAGER',
   'HOLD_RELEASE_MINUTES_BEFORE',
