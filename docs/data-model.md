@@ -1807,7 +1807,10 @@ the booking starts with `rowid` as the tiebreak, paged in SQL. A booking that ha
 unless `past` or `noShow` asks, the default closures use. Each row carries `noShowId`, the record
 currently standing against it by the ladder's own latest-entry rule, or null. The columns are an
 allow-list: the member's name and nothing else about them, never `notes`, `reason` or
-`rejection_reason`.
+`rejection_reason`. The console's row offers the one write its booking allows
+(`rowActionFor`): a bump before a confirmed booking ends, a no-show mark after, and a withdrawal
+of the standing record by its `noShowId`; the routes still decide, and each confirms first
+(C-115 criterion 7, C-116 criterion 7).
 Erasure scrubs `notes`, `reason` and `rejection_reason` to null and `title` to `Erased booking`,
 and keeps the row: the room was used, which is a fact about the room rather than about the person
 (0011). `title` is NOT NULL, and nulling it would fail the whole erasure batch, so the register

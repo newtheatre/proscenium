@@ -274,8 +274,13 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
      envelope. Its columns are an allow-list: the member's name and nothing else about them, never
      an address, the booking's notes or the reason they gave. A booking that has ended is hidden
      until the officer asks for past ones, and a booking currently marked as a no-show says so.
-- Source: Prompt Book C-2; audit RM-1 (priority order published, never enforced). Criterion 6
-  comes from feedback of 23 September 2026 (issue 1049): the bump and the no-show routes existed
+  7. A booking still to come is bumped from its row on that list, by an officer holding
+     `rooms.write`: the dialogue chooses the account the room is taken for with the person picker
+     (0032), asks for a title, a tier, a purpose and the mandatory reason, shows the slot the
+     displaced member would be offered (or that nothing equivalent is free), and states the
+     consequence before the one button that bumps (K-123). A refusal is quoted inside the dialogue.
+- Source: Prompt Book C-2; audit RM-1 (priority order published, never enforced). Criteria 6 and 7
+  come from feedback of 23 September 2026 (issue 1049): the bump and the no-show routes existed
   with no screen, and an officer could not even see another member's booking.
 
 ## C-116: No-show recording and the consequence ladder
@@ -291,7 +296,13 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   4. A member under pre-approval has every booking divert to the approval queue (C-109) regardless of policy compliance, and the booking form tells them so before submission.
   5. Members see their own no-show count and current standing; the ladder state is visible to them, not a surprise.
   6. Erasure keeps no-show statistics as anonymous rows; the ladder state itself dies with the account.
-- Source: Prompt Book C-2, P2; audit RM-1 (no-show tracking promised, never built).
+  7. The mark and the withdrawal are made from the booking's row on the officer's bookings list
+     (C-115 criterion 6): a confirmed booking that has ended and is not marked offers **Record a
+     no-show** with the optional reason, and a booking with a standing no-show offers **Withdraw**
+     with the mandatory one. Each confirms in a dialogue that says what it does to the member's
+     standing before it is written (K-123), and the list then shows the mark or its absence.
+- Source: Prompt Book C-2, P2; audit RM-1 (no-show tracking promised, never built). Criterion 7
+  comes from feedback of 23 September 2026 (issue 1049): the routes existed with no screen.
 
 ## C-117: Utilisation reporting
 
