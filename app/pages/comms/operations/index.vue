@@ -36,6 +36,7 @@ const loading = ref(false)
 const failure = ref<string | null>(null)
 
 const daily = ref<DailyCount[] | null>(null)
+const dailyLoading = ref(true)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -52,8 +53,13 @@ async function load(): Promise<void> {
 }
 
 async function loadDaily(): Promise<void> {
-  const response = await $fetch<{ days: DailyCount[] }>('/api/admin/comms/send-log/daily', { query: { days: 14 } })
-  daily.value = response.days
+  try {
+    const response = await $fetch<{ days: DailyCount[] }>('/api/admin/comms/send-log/daily', { query: { days: 14 } })
+    daily.value = response.days
+  }
+  finally {
+    dailyLoading.value = false
+  }
 }
 
 watch(query, load)
@@ -131,7 +137,7 @@ onMounted(() => {
     />
 
     <section
-      v-if="daily"
+      v-if="dailyLoading || daily"
       class="space-y-2"
       data-test="daily-counts"
     >
@@ -139,8 +145,9 @@ onMounted(() => {
         Last 14 days
       </h2>
       <UTable
-        :data="daily"
+        :data="daily ?? []"
         :columns="dailyColumns"
+        :loading="dailyLoading"
         data-test="daily-counts-table"
       >
         <template #empty>

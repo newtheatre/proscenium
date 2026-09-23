@@ -2,7 +2,7 @@
 title: Tonight
 description: The phone screens a show night runs on, who they open for, and the hub they all start from.
 module: Show night
-updatedOn: 2026-09-22
+updatedOn: 2026-09-23
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -46,7 +46,7 @@ which is how the committee sees a rota that is not being kept.
 | Screen | A shift of | Or the role |
 | --- | --- | --- |
 | The door, Admit pass holder | Door | Front of house manager |
-| Tonight at a glance, Checklist, Backstage, house numbers on the hub | Duty manager | Front of house manager |
+| Tonight at a glance, Checklist, Night report, Backstage, house numbers on the hub | Duty manager | Front of house manager |
 | The till | Bar | Bar manager |
 | Contacts and incidents, Challenge 25, Emergency | Any of the three | Either |
 
@@ -60,7 +60,7 @@ quietly moved on to the next night.
 ![The hub with the on-shift badge (1), the performance switcher (2), the house numbers (3), the Scan ticket tile (4), the Admit pass holder tile (5) and the Emergency tile (6)](/images/docs/show-night/hub.png)
 
 ::callout{icon="i-lucide-camera" color="warning"}
-The picture above was taken before the Checklist and Challenge 25 tiles were added and before the
+The picture above was taken before the Checklist, Night report and Challenge 25 tiles were added and before the
 house numbers were relabelled, so it shows six tiles and the old words. It needs retaking.
 ::
 
@@ -83,11 +83,11 @@ house numbers were relabelled, so it shows six tiles and the old words. It needs
 
 Every destination of the night is a tile, in the order they are pressed on a night: **Scan
 ticket**, **Admit pass holder**, **Till** (for a bar shift or the Bar manager only), **Tonight at
-a glance**, **Checklist**, **Challenge 25**, **Backstage**, **Contacts and incidents**, and
+a glance**, **Checklist**, **Night report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, and
 **Emergency** last. The **Checklist** tile says what is left on it: **3 pre-show items left**
 before the house opens, **2 post-show items left** after, **All ticked** when nothing is
-outstanding. On a matinee day the **Tonight at a glance**, **Checklist** and **Contacts and
-incidents** tiles carry the house you chose on the switcher, so each opens on it. The line at the
+outstanding. On a matinee day the **Tonight at a glance**, **Checklist**, **Night report** and
+**Contacts and incidents** tiles carry the house you chose on the switcher, so each opens on it. The line at the
 foot of the hub is the rule the whole night runs on: the door never sells tickets; unpaid and
 walk-up customers go to the bar.
 
@@ -111,6 +111,9 @@ required pre-show checklist item that is still not done.
   ::
   ::card{icon="i-lucide-list-checks" title="Checklist" to="/docs/tonight/checklist"}
   The pre-show and post-show checklist, exceptions, and closing the night.
+  ::
+  ::card{icon="i-lucide-file-signature" title="Night report" to="/docs/tonight/night-report"}
+  Tonight's report as it fills in, the closing note and signing the night off.
   ::
   ::card{icon="i-lucide-phone" title="Contacts and incidents" to="/docs/tonight/contacts-and-incidents"}
   Who is on tonight, the incident log and a one-press near miss.

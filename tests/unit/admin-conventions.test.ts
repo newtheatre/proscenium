@@ -118,11 +118,35 @@ describe('a console list filters by its declaration (K-129)', () => {
 
 // What a destructive route looks like from the page: a DELETE, or a POST to a path whose last
 // segment names what it undoes. A status flip is both directions; only the off one confirms.
-const DESTRUCTIVE_ROUTE = /method:\s*'DELETE'|\/(?:cancel|revoke|void|decline|retire|unconfirm|stand-down|status|security)['`]/
+const DESTRUCTIVE_ROUTE = /method:\s*'DELETE'|\/(?:cancel|revoke|void|decline|retire|unconfirm|stand-down|status|security|release|withdraw)['`]/
 
 // A destructive action that confirms in a dialogue of its own. The list is empty and may not
 // grow: one confirmation on the console, and it is ConfirmModal.
 const CONFIRMS_IN_ITS_OWN_DIALOGUE: string[] = []
+
+// The member's own screens answer to the same rule (issue 1153 item 7), and so does the one
+// component that holds a member's destructive action outside a page.
+const MEMBER_LAYOUT = /layout:\s*['"`]member['"`]/
+const MEMBER_COMPONENTS = ['app/components/SignInMethods.vue']
+
+// Cancelling a room booking already asks, with its choice of scope, in a dialogue of its own.
+// Moving it onto ConfirmModal is owed; this list may only shrink.
+const MEMBER_CONFIRMS_IN_ITS_OWN_DIALOGUE = ['app/pages/rooms/mine.vue']
+
+async function memberScreens(): Promise<{ path: string, source: string }[]> {
+  const found: { path: string, source: string }[] = []
+  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: PAGES, onlyFiles: true })) {
+    const path = join(PAGES, entry).replaceAll('\\', '/')
+    const source = await Bun.file(path).text()
+    if (MEMBER_LAYOUT.test(source)) found.push({ path, source })
+  }
+  for (const path of MEMBER_COMPONENTS) found.push({ path, source: await Bun.file(path).text() })
+  return found.sort((a, b) => a.path.localeCompare(b.path))
+}
+
+// Where a destructive action sits behind re-authentication, the two are asked once each (A-128
+// criterion 9): what waits on the modal is the confirmed call, never the handler that asks.
+const BEHIND_REAUTHENTICATION = ['app/pages/account/security.vue', 'app/components/SignInMethods.vue']
 
 describe('a destructive action confirms before it happens (K-123, 0032)', () => {
   test('every console page that destroys something confirms first', async () => {
@@ -132,6 +156,28 @@ describe('a destructive action confirms before it happens (K-123, 0032)', () => 
       .filter(screen => !screen.source.includes('<ConfirmModal') && !CONFIRMS_IN_ITS_OWN_DIALOGUE.includes(screen.path))
       .map(screen => screen.path)
     expect(unconfirmed).toEqual([])
+  })
+
+  test('every member screen that destroys something confirms first', async () => {
+    const destructive = (await memberScreens()).filter(screen => DESTRUCTIVE_ROUTE.test(screen.source))
+    // A floor: the six the issue named, the training request beside them and the room bookings.
+    expect(destructive.length).toBeGreaterThanOrEqual(8)
+    const unconfirmed = destructive
+      .filter(screen => !screen.source.includes('<ConfirmModal') && !MEMBER_CONFIRMS_IN_ITS_OWN_DIALOGUE.includes(screen.path))
+      .map(screen => screen.path)
+    expect(unconfirmed).toEqual([])
+  })
+
+  // The handler that opens a confirmation is named ask..., so a retry pointing at one would put
+  // the member through the confirmation twice, and a retry that skips it would be the bypass.
+  test('behind re-authentication the retry runs what was confirmed', async () => {
+    for (const path of BEHIND_REAUTHENTICATION) {
+      const source = await Bun.file(path).text()
+      expect(`${path} confirms: ${source.includes('<ConfirmModal')}`).toBe(`${path} confirms: true`)
+      expect(`${path} re-authenticates: ${source.includes('<ReauthenticateModal')}`).toBe(`${path} re-authenticates: true`)
+      const waiting = [...source.matchAll(/pending\.value = ([^\n]+)/g)].map(match => match[1]!)
+      expect(waiting.filter(line => /\bask[A-Z]/.test(line))).toEqual([])
+    }
   })
 
   // The cancel word is read from one place, so the modal-conventions job changes one string.
@@ -167,7 +213,7 @@ describe('feedback goes where it belongs (0032)', () => {
 
   test('a screen that confirms an action uses a toast', async () => {
     const confirming = (await screens()).filter(screen =>
-      /Recorded|Revoked\.|is on the (roll|trail)/.test(screen.source))
+      /Recorded|Role revoked|is on the (roll|trail)/.test(screen.source))
     expect(confirming.length).toBeGreaterThan(0)
     expect(confirming.filter(screen => !screen.source.includes('useToast')).map(screen => screen.path)).toEqual([])
   })
@@ -784,5 +830,42 @@ describe('a true-or-false column is a tick or a cross (K-135)', () => {
       if (!(await Bun.file(path).text()).includes('StatusCell')) missing.push(path)
     }
     expect(missing).toEqual([])
+  })
+})
+
+// A toast names the thing and what happened to it, with no full stop (K-128, `docs/copy-style.md`).
+const TOAST_TITLE_WITH_A_STOP = /toast\.add\(\{\s*title:\s*(['`])[^'`]*\.\1/
+
+describe('a console screen says what it is doing (K-123 criterion 5, issue 1151 item 7)', () => {
+  test('no toast title ends in a full stop', async () => {
+    expect(await saying(source => TOAST_TITLE_WITH_A_STOP.test(source))).toEqual([])
+    const stopped: string[] = []
+    for (const path of new Bun.Glob('app/composables/**/*.ts').scanSync({ onlyFiles: true })) {
+      if (TOAST_TITLE_WITH_A_STOP.test(await Bun.file(path).text())) stopped.push(path)
+    }
+    expect(stopped).toEqual([])
+  })
+
+  test('a toast confirming an action names what it acted on', async () => {
+    expect(await saying(source => /title:\s*'Pass issued'/.test(source))).toEqual([])
+  })
+
+  test('every security action on an account confirms in a toast', async () => {
+    const account = await Bun.file('app/pages/people/accounts/[id].vue').text()
+    for (const title of ['Role revoked', 'Signed out everywhere', 'Authenticator reset', 'Account disabled', 'Account enabled'])
+      expect(account).toContain(`'${title}'`)
+  })
+
+  test('a screen still reading shows the shared pending state, never a bare "Loading…"', async () => {
+    expect(await saying(source => />\s*Loading(?:…|\.\.\.)\s*</.test(templateOf(source)))).toEqual([])
+  })
+
+  // An empty state shown before the first read finishes says there is nothing when there may be.
+  test('the settings screen and the send log hold their place while they read', async () => {
+    const settings = await Bun.file('app/pages/admin/settings.vue').text()
+    expect(settings).toContain('<USkeleton')
+    expect(settings).not.toMatch(/v-if="!shown\.length"/)
+    const sendLog = await Bun.file('app/pages/comms/operations/index.vue').text()
+    expect(sendLog).not.toMatch(/v-if="daily"/)
   })
 })

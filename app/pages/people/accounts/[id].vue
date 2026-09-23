@@ -6,7 +6,7 @@ import { describeAction } from '#shared/utils/audit-actions'
 
 definePageMeta({ layout: 'console', title: 'Account', middleware: 'console', docs: '/docs/people/accounts' })
 
-interface Grant { role: string, expiresAt: number | null, grantedAt: number, live: boolean }
+interface Grant { role: string, expiresAt: number | null, grantedAt: number, note: string | null, live: boolean }
 
 interface View {
   account: { id: string, name: string, email: string, verified: boolean, disabled: boolean, anonymisedAt: number | null, shadow: boolean }
@@ -21,6 +21,7 @@ interface MergeCounts { bookings: number, records: number, shifts: number, membe
 interface MergePreview { winner: { id: string, name: string, email: string }, loser: { id: string, name: string, email: string }, counts: MergeCounts }
 
 const route = useRoute()
+const toast = useToast()
 const view = ref<View | null>(null)
 const failure = ref<string | null>(null)
 const working = ref('')
@@ -56,6 +57,8 @@ async function revokeRole(): Promise<void> {
     // Query, not body: a DELETE carrying a body hangs the Workers runtime when read (0068).
     await $fetch('/api/admin/roles', { method: 'DELETE', query: { userId: route.params.id, role } })
     revoking.value = null
+    const name = view.value?.account.name
+    toast.add({ title: 'Role revoked', description: name ? `${name} no longer holds ${saysRole(role)}.` : undefined, icon: 'i-lucide-check', color: 'success' })
     await load()
   }
   catch (error) {
@@ -69,6 +72,13 @@ async function revokeRole(): Promise<void> {
 // Disabling and resetting an authenticator both lock somebody out, so both confirm; signing out
 // everywhere and enabling do not (K-123 criterion 7).
 const securing = ref<'disable' | 'reset-mfa' | null>(null)
+
+const SECURED = {
+  'sign-out': 'Signed out everywhere',
+  'disable': 'Account disabled',
+  'enable': 'Account enabled',
+  'reset-mfa': 'Authenticator reset',
+} as const
 const secureFailure = ref<string | null>(null)
 
 async function secure(): Promise<void> {
@@ -79,6 +89,7 @@ async function secure(): Promise<void> {
   try {
     await $fetch(`/api/admin/accounts/${route.params.id}/security`, { method: 'POST', body: { operation } })
     securing.value = null
+    toast.add({ title: SECURED[operation], icon: 'i-lucide-check', color: 'success' })
     await load()
   }
   catch (error) {
@@ -162,11 +173,12 @@ async function load(): Promise<void> {
   }
 }
 
-async function operate(operation: string): Promise<void> {
+async function operate(operation: 'sign-out' | 'enable'): Promise<void> {
   working.value = operation
   failure.value = null
   try {
     await $fetch(`/api/admin/accounts/${route.params.id}/security`, { method: 'POST', body: { operation } })
+    toast.add({ title: SECURED[operation], icon: 'i-lucide-check', color: 'success' })
     await load()
   }
   catch (error) {
@@ -315,6 +327,13 @@ onMounted(load)
               <span class="text-muted">
                 {{ grant.live ? 'until' : 'lapsed' }}
                 {{ grant.expiresAt ? saysWhen(grant.expiresAt) : 'further notice' }}
+              </span>
+              <span
+                v-if="grant.note"
+                class="block text-xs text-muted"
+                :data-test="`grant-note-${grant.role}`"
+              >
+                {{ grant.note }}
               </span>
             </span>
             <UButton

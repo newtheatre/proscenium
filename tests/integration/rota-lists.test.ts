@@ -103,11 +103,13 @@ const parseEmergency = (raw: Record<string, string>) => {
   return result.data
 }
 
+// "Still to come" is asked an hour before the fixture's curtain rather than of the wall clock,
+// which late in a show night may already be past it (#1200).
 describe('unfilled shifts (E-107, K-129)', () => {
   test('every field the declaration names is answered', async () => {
     await withDatabase((database) => {
-      const now = Math.floor(Date.now() / 1000)
       const house = tonightsPerformance(database, { suffix: 'unfilled-answered' })
+      const now = house.startsAt - 3600
       shift(database, `${house.performanceId}-DOOR-1`, house.performanceId, 'DOOR')
 
       for (const field of unfilledShiftsList.fields as readonly FilterField[]) {
@@ -123,8 +125,8 @@ describe('unfilled shifts (E-107, K-129)', () => {
 
   test('a role filters to just that role', async () => {
     await withDatabase((database) => {
-      const now = Math.floor(Date.now() / 1000)
       const house = tonightsPerformance(database, { suffix: 'unfilled-role' })
+      const now = house.startsAt - 3600
       shift(database, `${house.performanceId}-DOOR-1`, house.performanceId, 'DOOR')
       shift(database, `${house.performanceId}-BAR-1`, house.performanceId, 'BAR')
 
@@ -136,8 +138,8 @@ describe('unfilled shifts (E-107, K-129)', () => {
 
   test('an any-of role list binds one parameter per role, never per shift (0006)', async () => {
     await withDatabase((database) => {
-      const now = Math.floor(Date.now() / 1000)
       const house = tonightsPerformance(database, { suffix: 'unfilled-any' })
+      const now = house.startsAt - 3600
       for (let index = 0; index < 5; index += 1) shift(database, `${house.performanceId}-BAR-${index + 1}`, house.performanceId, 'BAR', { slot: index + 1 })
 
       const clause = unfilledShiftsClause(parseUnfilled({ role: `any:${SHIFT_ROLES.join(',')}` }), now)
@@ -187,8 +189,8 @@ describe('unfilled shifts (E-107, K-129)', () => {
 
   test('open and declined list, and a confirmed one does not, whatever else is asked', async () => {
     await withDatabase((database) => {
-      const now = Math.floor(Date.now() / 1000)
       const house = tonightsPerformance(database, { suffix: 'unfilled-status' })
+      const now = house.startsAt - 3600
       shift(database, `${house.performanceId}-DOOR-1`, house.performanceId, 'DOOR', { status: 'OPEN' })
       shift(database, `${house.performanceId}-BAR-1`, house.performanceId, 'BAR', { status: 'DECLINED' })
       shift(database, `${house.performanceId}-DUTY_MANAGER-1`, house.performanceId, 'DUTY_MANAGER', { status: 'CONFIRMED' })

@@ -178,11 +178,19 @@ and a performance has something to sell." `people/accounts/index.vue` falls back
 accounts yet.", naming nothing to do. The action-naming form wins: it is what most of the console
 already does, and a bare "yet" leaves the reader guessing whether they may do anything at all.
 
+A screen still reading has not found nothing yet, so it never shows its empty state and never a
+bare "Loading…": a table carries its own loading state, and anything else holds its place with
+`USkeleton` until the first read finishes (issue 1151 item 7).
+
 ## 8. Buttons and labels
 
 Verb first, object second, sentence case, no trailing punctuation. "Save" not "Submit": `account/
 access.vue` still has one `'Submit'`, next to `'Save changes'` on the same button's other state;
 "Save changes" wins.
+
+A toast confirming an action names the thing and what happened to it, sentence case, no full stop:
+"Role revoked", "Venue deleted", "Signed out everywhere", "Adult pass issued". Every action that
+succeeds says so; one that succeeds in silence leaves the reader pressing it again.
 
 Destructive verbs are named for what they do, not left as bare "Delete". `rooms/mine.vue` already
 does this: "Cancel the whole series", "Cancel the booking". Set against that, `box-office/ticket-

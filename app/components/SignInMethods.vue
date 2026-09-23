@@ -127,17 +127,38 @@ async function addPasskey(): Promise<void> {
   }
 }
 
+// Asked first (A-113 criterion 6); a stale session then swaps the confirmation for the modal,
+// and the retry is remove itself, so nothing is asked twice or skipped (A-128 criterion 9).
+const removing = ref<SignInMethod | null>(null)
+const removeFailure = ref<string | null>(null)
+const removeOpen = computed({
+  get: () => removing.value !== null,
+  // Held open while the call runs: backing out then could not stop it, only orphan its outcome.
+  set: (value) => { if (!value && working.value === '') removing.value = null },
+})
+
+function askToRemove(method: SignInMethod): void {
+  removeFailure.value = null
+  removing.value = method
+}
+
 async function remove(method: SignInMethod): Promise<void> {
   working.value = method.id
+  removeFailure.value = null
   try {
     await $fetch(`/api/account/methods/${method.id}`, { method: 'DELETE' })
+    removing.value = null
     toast.add({ title: `${method.label} removed`, icon: 'i-lucide-check', color: 'success' })
     await load()
   }
   catch (error) {
     if (needsReauthentication(error)) {
+      removing.value = null
       pending.value = () => remove(method)
       reauthenticating.value = true
+    }
+    else if (removing.value) {
+      removeFailure.value = refusalText(error)
     }
     else {
       toast.add({ title: refusalText(error), color: 'error' })
@@ -197,7 +218,7 @@ onMounted(load)
           variant="subtle"
           :loading="working === method.id"
           :data-test="`remove-method-${method.id}`"
-          @click="remove(method)"
+          @click="askToRemove(method)"
         >
           Remove this way in
         </UButton>
@@ -297,6 +318,17 @@ onMounted(load)
       </div>
     </template>
   </UPageCard>
+
+  <ConfirmModal
+    v-model:open="removeOpen"
+    name="remove-method"
+    title="Remove this way in"
+    verb="Remove this way in"
+    :consequence="removing ? `${removing.label} stops working as a way in to this account, and we email you to say so.` : undefined"
+    :loading="working !== ''"
+    :failure="removeFailure"
+    @confirm="removing && remove(removing)"
+  />
 
   <ReauthenticateModal
     v-model:open="reauthenticating"
