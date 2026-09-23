@@ -1,8 +1,8 @@
 ---
 title: Spaces
-description: The rooms we control, the request queue, closures, the rooms we do not manage and the utilisation report.
+description: The rooms we control, the request queue, every booking, closures, the rooms we do not manage and the utilisation report.
 module: Spaces
-updatedOn: 2026-09-22
+updatedOn: 2026-09-23
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -24,6 +24,9 @@ without the buttons, and the request queue is not in their navigation at all.
   ::
   ::card{icon="i-lucide-inbox" title="Room requests" to="/docs/spaces/room-requests"}
   Deciding on what the policy could not confirm on its own, and on asks for rooms we do not manage.
+  ::
+  ::card{icon="i-lucide-calendar-range" title="Bookings" to="/docs/spaces/bookings"}
+  Every member's room bookings in one list, searched and filtered.
   ::
   ::card{icon="i-lucide-construction" title="Closures" to="/docs/spaces/closures"}
   Shutting a room, or every room, for a stated reason, and what that does to bookings.

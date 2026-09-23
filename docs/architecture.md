@@ -504,6 +504,8 @@ by reading `conditionsOf` directly rather than by a predicate. The queue keeps i
 envelope (`items`, `total`, `more`, `counts`) and its server-side cap, because a triage queue is
 tens of rows and not a paged list; its free-text search stayed client-side, now reading through
 `useListQuery` so it lives in the URL.
+The officer's bookings list (`room-bookings-list.ts`) is the module's one genuinely paged list:
+every member's bookings, filtered, searched and paged in SQL, hiding what has ended until asked.
 
 The small-module pass migrates the audit trail (`audit-list.ts`), the backup drill log
 (`backup-drills-list.ts`), the send log (`send-log-list.ts`), the membership register

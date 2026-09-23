@@ -1798,6 +1798,15 @@ offered against a room that has one, because it cannot be shown to be big enough
 equivalent is free the bump still goes ahead and the message says so. The whole thing is one batch:
 the displaced row flips guarded on `CONFIRMED`, and both the claimant's booking and the offer are
 written only if that flip landed, so a lost race leaves nothing behind.
+`GET /api/admin/rooms/bookings` (`rooms.read`) is the officer's list of every member's bookings,
+the list a bump or a no-show starts from (C-115 criterion 6). It filters by its declaration
+(`shared/utils/room-bookings-list.ts`, K-129): `status`, `room`, `member`, `tier`, `startsAt`,
+`past` and `noShow`, with `search` over the title, the member's name and the room, sorted by when
+the booking starts with `rowid` as the tiebreak, paged in SQL. A booking that has ended is hidden
+unless `past` or `noShow` asks, the default closures use. Each row carries `noShowId`, the record
+currently standing against it by the ladder's own latest-entry rule, or null. The columns are an
+allow-list: the member's name and nothing else about them, never `notes`, `reason` or
+`rejection_reason`.
 Erasure scrubs `notes`, `reason` and `rejection_reason` to null and `title` to `Erased booking`,
 and keeps the row: the room was used, which is a fact about the room rather than about the person
 (0011). `title` is NOT NULL, and nulling it would fail the whole erasure batch, so the register
