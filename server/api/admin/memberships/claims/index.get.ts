@@ -1,35 +1,16 @@
-import { and, eq, isNull, sql } from 'drizzle-orm'
-import { z } from 'zod'
+import { eq, sql } from 'drizzle-orm'
 import { filterQuerySchema } from '#shared/utils/list-filters'
-import { CLAIM_STATUSES } from '#shared/utils/membership-claims'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { envelope, offsetFor } from '#shared/utils/pagination'
-import { tableColumns, whereFrom } from '#server/utils/list-filters'
-import type { Reference } from '#server/utils/list-filters'
 
-// Status stays fixed at OPEN: nothing on the screen offers to see a decided claim, so it rides
-// beside the declared fields rather than joining them (K-129).
-const query = filterQuerySchema(membershipClaimsList).extend({
-  status: z.enum(CLAIM_STATUSES).default('OPEN'),
-})
-
-// `id` is not a guide to insertion order; `rowid` is, and is not a Drizzle column (0006).
-function claimsColumn(name: string): Reference | undefined {
-  if (name === 'rowid') return sql`${schema.membershipClaims}.rowid`
-  return tableColumns(schema.membershipClaims)(name)
-}
+const query = filterQuerySchema(membershipClaimsList)
 
 // The claims queue, oldest first, paged in SQL for the week after cutover when it holds
-// hundreds (A-130 criterion 2, K-129). An erased person's claim is nobody's to answer.
+// hundreds, and the decided claims behind it (A-130 criteria 2 and 10, K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'members.read')
   const input = await getValidatedQueryOrThrow(event, query)
-
-  const clause = whereFrom(membershipClaimsList, input, {
-    column: claimsColumn,
-    search: [schema.users.name, schema.users.email, schema.membershipClaims.studentId],
-  })
-  const where = and(eq(schema.membershipClaims.status, input.status), isNull(schema.users.anonymisedAt), clause.where)
+  const { where, orderBy } = claimsClause(input)
 
   const [total] = await db.select({ count: sql<number>`count(*)` })
     .from(schema.membershipClaims)
@@ -48,6 +29,9 @@ export default defineEventHandler(async (event) => {
     startsOn: schema.membershipClaims.startsOn,
     term: schema.membershipClaims.term,
     status: schema.membershipClaims.status,
+    // What an officer wrote back to the member, shown beside a decided claim.
+    reason: schema.membershipClaims.reason,
+    decidedAt: schema.membershipClaims.decidedAt,
     createdAt: schema.membershipClaims.createdAt,
     // The latest term already on the account: a claim for something "Record one" already wrote
     // is declined as such rather than recorded twice.
@@ -56,7 +40,7 @@ export default defineEventHandler(async (event) => {
     .from(schema.membershipClaims)
     .innerJoin(schema.users, eq(schema.users.id, schema.membershipClaims.userId))
     .where(where)
-    .orderBy(...clause.orderBy)
+    .orderBy(...orderBy)
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 
