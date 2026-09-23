@@ -4,7 +4,7 @@ import { auditEntry } from '#shared/utils/audit'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { CHOOSE_INSTEAD, PRE_LINKED, pendingGrantConstraintRefusal, pendingGrantDetail, pendingGrantStatements } from '#shared/utils/pending-grants'
 import { rolesList } from '#shared/utils/roles-list'
-import { grantsClause, holderCountsStatement, pendingClause, usableHolderWhere } from '#server/utils/roles-register'
+import { grantsClause, holderCountsStatement, pendingClause, permanentClause, usableHolderWhere } from '#server/utils/roles-register'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { race } from '#tests/helpers/race'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -32,9 +32,8 @@ function seed(database: TestDatabase): void {
   ])
 }
 
-function attemptGrant(database: TestDatabase, index: number, email = 'incoming@example.test', role = 'BAR_MANAGER'): { status: number } {
+function attemptGrant(database: TestDatabase, index: number, email = 'incoming@example.test', role = 'BAR_MANAGER', expiresAt: number | null = NOW + YEAR): { status: number } {
   const userId = `pending-${index}`
-  const expiresAt = NOW + YEAR
   try {
     database.batch(pendingGrantStatements({
       userId,
@@ -71,6 +70,12 @@ function registerIds(database: TestDatabase, raw: Record<string, string> = {}): 
 function pendingIds(database: TestDatabase): string[] {
   const [text, ...parameters] = boundStatement(database, sql`SELECT role_grants.id AS id FROM role_grants
     JOIN users ON users.id = role_grants.user_id WHERE ${pendingClause()}`)
+  return rows<{ id: string }>(database, text, ...parameters).map(row => row.id).sort()
+}
+
+function permanentIds(database: TestDatabase): string[] {
+  const [text, ...parameters] = boundStatement(database, sql`SELECT role_grants.id AS id FROM role_grants
+    JOIN users ON users.id = role_grants.user_id WHERE ${permanentClause()}`)
   return rows<{ id: string }>(database, text, ...parameters).map(row => row.id).sort()
 }
 
@@ -190,6 +195,19 @@ describe('pending is not holding (criterion 3)', () => {
       seed(database)
       attemptGrant(database, 0, 'next-it@example.test', 'ADMIN')
       expect(usableAdmins(database)).toEqual(['ada'])
+    })
+  })
+
+  test('a permanent grant made by address is pending, not in the permanent report (A-131 criterion 6)', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(attemptGrant(database, 0, 'incoming@example.test', 'BAR_MANAGER', null).status).toBe(200)
+      expect(pendingIds(database)).toEqual(['g-pending-0'])
+      expect(permanentIds(database)).toEqual(['g-ada'])
+
+      database.batch([[`UPDATE users SET last_login_at = ${NOW} WHERE id = 'pending-0'`]])
+      expect(pendingIds(database)).toEqual([])
+      expect(permanentIds(database)).toEqual(['g-ada', 'g-pending-0'])
     })
   })
 })

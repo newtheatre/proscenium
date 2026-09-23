@@ -1,9 +1,9 @@
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { envelope, offsetFor } from '#shared/utils/pagination'
 import { rolesList } from '#shared/utils/roles-list'
-import { grantsClause, holderCounts, pendingClause, registerTotal } from '#server/utils/roles-register'
+import { grantsClause, holderCounts, pendingClause, permanentClause, registerTotal } from '#server/utils/roles-register'
 
 // Lapsed grants ride beside the declared fields the way shadow accounts do: asked for without
 // filtering to them (0071, A-131 criterion 3).
@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
     .offset(offsetFor(input.page, input.pageSize))
 
   const permanent = await grants()
-    .where(and(isNull(schema.roleGrants.expiresAt), isNull(schema.users.anonymisedAt)))
+    .where(permanentClause())
     .orderBy(schema.roleGrants.role, sql`${schema.users.name} collate nocase`)
     .limit(PERMANENT_SHOWN)
 
