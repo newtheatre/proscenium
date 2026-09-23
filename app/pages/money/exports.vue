@@ -90,7 +90,7 @@ const seasonItems = computed(() => seasons.value.map(one => ({ label: one.name, 
 const kind = ref<SuExportPeriod['kind']>('YEAR')
 const kindItems = computed<{ label: string, value: SuExportPeriod['kind'] }[]>(() => [
   { label: 'Year', value: 'YEAR' },
-  ...(seasons.value.length > 0 ? [{ label: 'Season', value: 'SEASON' }] : []),
+  ...(seasons.value.length > 0 ? [{ label: 'Season', value: 'SEASON' as const }] : []),
   { label: 'Custom range', value: 'RANGE' },
 ])
 
