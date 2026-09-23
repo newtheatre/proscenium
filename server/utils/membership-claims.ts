@@ -2,9 +2,13 @@ import { db, schema } from '@nuxthub/db'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 // Named rather than auto-imported: `tests/` typechecks this file under Bun (CONTRIBUTING, 0055).
 import { conditionsOf } from '#shared/utils/list-filters'
+import { auditEntry } from '#shared/utils/audit'
+import { effectiveTerm, londonDay } from '#shared/utils/membership'
+import { withdrawClaimStatements } from '#shared/utils/membership-claims'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { tableColumns, whereFrom } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
+import type { Term } from '#shared/utils/membership'
 import type { Reference } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 
@@ -86,28 +90,34 @@ export async function findClaim(id: string): Promise<HeldClaim | undefined> {
   return row
 }
 
-// The longest-running term the person holds, which is the one that decides whether they are
-// current: the same choice hasCurrentMembership makes (0031).
-export async function longestTerm(userId: string): Promise<{ startsOn: string, expiresOn: string } | null> {
-  const [term] = await db.select({
-    startsOn: schema.memberships.startsOn,
-    expiresOn: schema.memberships.expiresOn,
-  })
+// Every term row on the account; a person holds few.
+export async function heldTerms(userId: string): Promise<Term[]> {
+  return await db.select({ startsOn: schema.memberships.startsOn, expiresOn: schema.memberships.expiresOn })
     .from(schema.memberships)
     .where(eq(schema.memberships.userId, userId))
-    .orderBy(desc(schema.memberships.expiresOn))
-    .limit(1)
-  return term ?? null
+}
+
+// The term that decides whether the person is current: the run of back-to-back rows around
+// today, so a renewal waiting to start extends it (0031, A-130 criterion 13).
+export async function longestTerm(userId: string, today = londonDay(new Date())): Promise<Term | null> {
+  return effectiveTerm(await heldTerms(userId), today)
 }
 
 // Withdraw by predicate: nothing to withdraw is not an error, and the claim is not open either way.
 export async function withdrawOpenClaim(userId: string, now: number): Promise<number> {
-  const withdrawn = await db.update(schema.membershipClaims)
-    .set({ status: 'WITHDRAWN', decidedAt: now })
-    .where(and(
-      eq(schema.membershipClaims.userId, userId),
-      eq(schema.membershipClaims.status, 'OPEN'),
-    ))
-    .returning({ id: schema.membershipClaims.id })
-  return withdrawn.length
+  const [open] = await db.select({ id: schema.membershipClaims.id })
+    .from(schema.membershipClaims)
+    .where(and(eq(schema.membershipClaims.userId, userId), eq(schema.membershipClaims.status, 'OPEN')))
+    .limit(1)
+  if (!open) return 0
+
+  const entry = auditEntry({
+    actorId: userId,
+    action: 'membership.claim.withdrawn',
+    target: `claim:${open.id}`,
+    detail: { claim: open.id },
+  })
+  const statements = withdrawClaimStatements({ claimId: open.id, userId, now, entry }).map(statement => db.run(statement))
+  await db.batch([statements[0]!, ...statements.slice(1)])
+  return 1
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { daysAfter, londonDay, membershipState } from '#shared/utils/membership'
+import { claimAgainstHeld, daysAfter, effectiveTerm, londonDay, membershipState, renewalTerm } from '#shared/utils/membership'
 import {
   CLAIM_STATUSES,
   CLAIM_REASON_LIMIT,
@@ -97,5 +97,80 @@ describe('the waiting claims notice is claimed per person per London day', () =>
     expect(claimsWaitingClaimFor('a1', '2026-09-23')).toBe('membership.claims.waiting:a1:2026-09-23')
     expect(claimsWaitingClaimFor('a1', '2026-09-23')).not.toBe(claimsWaitingClaimFor('a2', '2026-09-23'))
     expect(claimsWaitingClaimFor('a1', '2026-09-23')).not.toBe(claimsWaitingClaimFor('a1', '2026-09-24'))
+  })
+})
+
+// A renewal bought while a term still runs starts where that one ends, so buying early loses no
+// days; bought after it ended, it runs from the purchase (A-130 criterion 13, 0031).
+describe('a claim extends a running term (A-130 criterion 13)', () => {
+  test('nothing held: the term runs from the purchase', () => {
+    expect(renewalTerm('2026-09-14', 1, null)).toEqual({ startsOn: '2026-09-14', expiresOn: '2027-09-13', extends: false })
+  })
+
+  test('bought inside a running term: the new one starts the day after it ends', () => {
+    expect(renewalTerm('2027-08-01', 1, '2027-09-13')).toEqual({ startsOn: '2027-09-14', expiresOn: '2028-09-13', extends: true })
+    expect(renewalTerm('2027-08-01', 3, '2027-09-13')).toEqual({ startsOn: '2027-09-14', expiresOn: '2030-09-13', extends: true })
+  })
+
+  test('bought on the last day of the term still extends it', () => {
+    expect(renewalTerm('2027-09-13', 1, '2027-09-13')).toEqual({ startsOn: '2027-09-14', expiresOn: '2028-09-13', extends: true })
+  })
+
+  test('bought after the term ended, even inside grace, runs from the purchase', () => {
+    expect(renewalTerm('2027-09-20', 1, '2027-09-13')).toEqual({ startsOn: '2027-09-20', expiresOn: '2028-09-19', extends: false })
+  })
+
+  test('a leap day end carries into the first of March', () => {
+    expect(renewalTerm('2028-01-10', 1, '2028-02-28').startsOn).toBe('2028-02-29')
+  })
+})
+
+// A renewal row starts in the future, so the term that decides whether somebody is current is the
+// run of back-to-back rows around today, not whichever row ends last (A-130 criterion 13).
+describe('the term a person holds reads across a renewal', () => {
+  const held = { startsOn: '2026-09-14', expiresOn: '2027-09-13' }
+  const renewal = { startsOn: '2027-09-14', expiresOn: '2028-09-13' }
+
+  test('before the renewal starts, the person is current until the renewal ends', () => {
+    expect(effectiveTerm([renewal, held], '2027-08-20')).toEqual({ startsOn: '2026-09-14', expiresOn: '2028-09-13' })
+    expect(membershipState(effectiveTerm([held, renewal], '2027-08-20'), '2027-08-20', 14)).toEqual({ kind: 'current', until: '2028-09-13' })
+  })
+
+  test('a gap splits the run: an old lapsed term does not reach a later purchase', () => {
+    const old = { startsOn: '2024-09-01', expiresOn: '2025-08-31' }
+    const fresh = { startsOn: '2026-02-01', expiresOn: '2027-01-31' }
+    expect(effectiveTerm([old, fresh], '2025-12-01')).toEqual(old)
+    expect(effectiveTerm([old, fresh], '2026-03-01')).toEqual(fresh)
+  })
+
+  test('overlapping rows merge rather than one hiding the other', () => {
+    const first = { startsOn: '2026-09-14', expiresOn: '2027-09-13' }
+    const overlap = { startsOn: '2026-10-01', expiresOn: '2027-09-30' }
+    expect(effectiveTerm([first, overlap], '2026-09-20')).toEqual({ startsOn: '2026-09-14', expiresOn: '2027-09-30' })
+  })
+
+  test('nothing held is nothing', () => {
+    expect(effectiveTerm([], '2026-09-20')).toBeNull()
+  })
+})
+
+// The queue and the record route read a claim against the account through one rule, so the badge
+// says what recording will do, and a purchase already written down is never stacked (A-130).
+describe('a claim read against what the account holds (A-130 criterion 13)', () => {
+  test('a gap before a later grant: the badge and the route agree nothing is extended', () => {
+    const lapsed = { startsOn: '2025-01-01', expiresOn: '2025-12-31' }
+    const later = { startsOn: '2026-10-01', expiresOn: '2027-09-30' }
+    const read = claimAgainstHeld([lapsed, later], '2026-09-01')
+    expect(read).toEqual({ heldUntil: '2025-12-31', sameDay: false })
+    expect(renewalTerm('2026-09-01', 1, read.heldUntil).extends).toBe(false)
+  })
+
+  test('a term from the same purchase date is already this purchase', () => {
+    const recorded = { startsOn: '2026-09-01', expiresOn: '2027-08-31' }
+    expect(claimAgainstHeld([recorded], '2026-09-01')).toEqual({ heldUntil: '2027-08-31', sameDay: true })
+  })
+
+  test('nothing held is nothing to extend and nothing to repeat', () => {
+    expect(claimAgainstHeld([], '2026-09-01')).toEqual({ heldUntil: null, sameDay: false })
   })
 })

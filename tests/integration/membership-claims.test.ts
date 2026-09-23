@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { auditEntry } from '#shared/utils/audit'
 import { erasureStatements } from '#shared/utils/erasure'
-import { endOfTerm } from '#shared/utils/membership'
-import { claimsDecidersStatement, declineClaimStatements, grantMembershipStatements, waitingClaimsStatement, recordClaimStatements, recordStudentId, studentIdConstraintRefusal } from '#shared/utils/membership-claims'
+import { endOfTerm, renewalTerm } from '#shared/utils/membership'
+import { claimsDecidersStatement, declineClaimStatements, withdrawClaimStatements, grantMembershipStatements, waitingClaimsStatement, recordClaimStatements, recordStudentId, studentIdConstraintRefusal } from '#shared/utils/membership-claims'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -407,6 +407,90 @@ describe('the waiting claims notice (issue 1005)', () => {
       ])
 
       expect(read<{ id: string }>(database, claimsDecidersStatement(now)).map(row => row.id)).toEqual(['officer'])
+    })
+  })
+})
+
+// A renewal is another row: the running term is untouched and the new one follows it (A-130
+// criterion 13, 0010).
+describe('recording a renewal appends a term after the running one (issue 1005)', () => {
+  test('the held row is unchanged and the new row starts the day after it ends', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      database.batch([[
+        `INSERT INTO memberships (id, user_id, starts_on, expires_on, source, evidence) VALUES ('m-held', 'u1', '2026-09-14', '2027-09-13', 'MANUAL', 'claim c-0')`,
+      ]])
+      claim(database, { id: 'c-1', starts_on: '2027-08-01', term: 1 })
+      const term = renewalTerm('2027-08-01', 1, '2027-09-13')
+      run(database, recordClaimStatements({
+        claimId: 'c-1',
+        userId: 'u1',
+        studentId: '20123456',
+        held: null,
+        membership: { id: 'm-new', startsOn: term.startsOn, expiresOn: term.expiresOn },
+        actorId: 'officer',
+        now: 1_790_000_000,
+        entries: {
+          granted: auditEntry({ actorId: 'officer', action: 'membership.granted', target: 'user:u1', detail: { membership: 'm-new', years: 1, expiresOn: term.expiresOn, claim: 'c-1', extends: true } }),
+          recorded: auditEntry({ actorId: 'officer', action: 'membership.claim.recorded', target: 'claim:c-1', detail: { claim: 'c-1', membership: 'm-new' } }),
+        },
+      }))
+
+      expect(rows(database, `SELECT id, starts_on AS startsOn, expires_on AS expiresOn FROM memberships ORDER BY starts_on`)).toEqual([
+        { id: 'm-held', startsOn: '2026-09-14', expiresOn: '2027-09-13' },
+        { id: 'm-new', startsOn: '2027-09-14', expiresOn: '2028-09-13' },
+      ])
+    })
+  })
+})
+
+// Criterion 13: a withdrawal is on the trail with the claim id alone, once, and only while open.
+describe('withdrawing a claim is audited (A-130 criterion 14, 0011)', () => {
+  const withdraw = (database: TestDatabase, claimId: string, at: number): void => run(database, withdrawClaimStatements({
+    claimId,
+    userId: 'u1',
+    now: at,
+    entry: auditEntry({ actorId: 'u1', action: 'membership.claim.withdrawn', target: `claim:${claimId}`, detail: { claim: claimId } }),
+  }))
+
+  test('the claim closes and one entry names it, never the number', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      claim(database, { id: 'c-1' })
+      withdraw(database, 'c-1', 1_790_000_000)
+
+      expect(rows<{ status: string }>(database, `SELECT status FROM membership_claims WHERE id = 'c-1'`)[0]!.status).toBe('WITHDRAWN')
+      const trail = rows<{ actorId: string, target: string, detail: string }>(
+        database, `SELECT actor_id AS actorId, target, detail FROM audit_log WHERE action = 'membership.claim.withdrawn'`)
+      expect(trail).toHaveLength(1)
+      expect(trail[0]!.actorId).toBe('u1')
+      expect(trail[0]!.detail).toContain('"claim":"c-1"')
+      expect(`${trail[0]!.target} ${trail[0]!.detail}`).not.toContain('20123456')
+    })
+  })
+
+  test('withdrawing twice, or withdrawing a decided claim, writes nothing more', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      claim(database, { id: 'c-1' })
+      withdraw(database, 'c-1', 1_790_000_000)
+      withdraw(database, 'c-1', 1_790_000_001)
+      claim(database, { id: 'c-2', status: 'DECLINED', reason: 'Not on the list' })
+      withdraw(database, 'c-2', 1_790_000_002)
+
+      expect(rows(database, `SELECT id FROM audit_log WHERE action = 'membership.claim.withdrawn'`)).toHaveLength(1)
+      expect(rows<{ status: string }>(database, `SELECT status FROM membership_claims WHERE id = 'c-2'`)[0]!.status).toBe('DECLINED')
+    })
+  })
+
+  test('somebody else cannot withdraw a claim that is not theirs', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      claim(database, { id: 'c-2', user_id: 'u2' })
+      withdraw(database, 'c-2', 1_790_000_000)
+
+      expect(rows<{ status: string }>(database, `SELECT status FROM membership_claims WHERE id = 'c-2'`)[0]!.status).toBe('OPEN')
+      expect(rows(database, `SELECT id FROM audit_log`)).toHaveLength(0)
     })
   })
 })

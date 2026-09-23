@@ -15,20 +15,28 @@ import type { SQL } from 'drizzle-orm'
 
 export const MEMBER_FILTERS = ['current', 'awaiting-check', 'lapsed', 'everyone'] as const
 
+// Not yet over, grace included: a renewal waiting to start is here as well as the running term.
+function notOverPredicate(grace: number): SQL {
+  return sql`date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${londonDay(new Date())}`
+}
+
 function inTermPredicate(grace: number): SQL {
-  const today = londonDay(new Date())
-  return sql`${schema.memberships.startsOn} <= ${today}
-    and date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${today}`
+  return sql`${schema.memberships.startsOn} <= ${londonDay(new Date())} and ${notOverPredicate(grace)}`
 }
 
 // The register's own four states; "awaiting record" is the claims queue, a different screen and
 // a different table, never a predicate here (A-130, K-129).
 export function registerFilterPredicate(filter: typeof MEMBER_FILTERS[number], grace: number): SQL | undefined {
-  const inTerm = inTermPredicate(grace)
-  if (filter === 'current') return inTerm
-  if (filter === 'lapsed') return sql`not (${inTerm})`
-  if (filter === 'awaiting-check') return and(isNull(schema.memberships.confirmedAt), inTerm)
+  if (filter === 'current') return inTermPredicate(grace)
+  if (filter === 'lapsed') return sql`not (${notOverPredicate(grace)})`
+  if (filter === 'awaiting-check') return and(isNull(schema.memberships.confirmedAt), notOverPredicate(grace))
   return undefined
+}
+
+// A term with a later one after it has been renewed, so it is not "running out" (A-130).
+export function notRenewed(): SQL {
+  return sql`not exists (select 1 from memberships later
+    where later.user_id = ${schema.memberships.userId} and later.expires_on > ${schema.memberships.expiresOn})`
 }
 
 // The register's own declaration, read through one predicate (K-129): current is the hidden
@@ -86,6 +94,7 @@ export async function remindExpiringMemberships(event: H3Event | undefined, now 
     .from(schema.memberships)
     .where(and(
       isNull(schema.memberships.renewalNoticeAt),
+      notRenewed(),
       lte(schema.memberships.expiresOn, horizon),
       sql`${schema.memberships.expiresOn} >= ${today}`,
     ))

@@ -175,6 +175,25 @@ export function recordClaimStatements(input: ClaimRecording): SQL[] {
   return statements
 }
 
+export interface ClaimWithdrawal {
+  claimId: string
+  userId: string
+  now: number
+  entry: AuditRow
+}
+
+// The member's own, and only while open: the trail entry and the withdrawal land together or not
+// at all, and carry the claim id and never the number (A-130 criterion 14, 0011).
+export function withdrawClaimStatements(input: ClaimWithdrawal): SQL[] {
+  const own = sql`(select 1 from membership_claims
+    where id = ${input.claimId} and user_id = ${input.userId} and status = 'OPEN')`
+  return [
+    guardedEntry(input.entry, own),
+    sql`update membership_claims set status = 'WITHDRAWN', decided_at = ${input.now}
+      where id = ${input.claimId} and user_id = ${input.userId} and status = 'OPEN'`,
+  ]
+}
+
 export interface ClaimDecline {
   claimId: string
   reason: string

@@ -134,7 +134,15 @@ purchase source: membership is bought at the SU only) · `evidence` (grant note 
 never gates money) · `renewal_notice_at` · `created_at`.
 CHECK `expires_on > starts_on`. Current membership = today inside the term or inside
 `MEMBERSHIP_GRACE_DAYS` after it, read at query time (0031). A renewal is another row: history is
-never rewritten.
+never rewritten. Recording a claim bought while a term still runs appends the new term from the
+day after that one ends (`renewalTerm()`, A-130 criterion 13), so the term that decides currency
+is `effectiveTerm()`: back-to-back or overlapping rows fold into one run, and the run that counts
+is the latest to have begun by today (`longestTerm()` reads it for the viewer, the account menu
+and member pricing). The register's `lapsed` means over, grace included, so a renewal waiting to
+start is neither current nor lapsed but is under `awaiting-check`; the renewal reminder skips a
+term with a later one after it. A claim whose purchase date starts a row already held is
+refused as recorded already; the queue and the route read that and the extension through
+`claimAgainstHeld()`.
 
 `GET /api/admin/memberships` is the register at `/people/members`. Filtered by its declaration
 (`shared/utils/memberships-list.ts`, K-129): `filter` (`current`, `awaiting-check`, `lapsed` or
@@ -162,8 +170,9 @@ SUMS remains the system of record and nothing here sells anything (0005, 0031, A
 member-facing routes are `GET /api/account/membership` (the longest-running term, its state as
 `membershipState()` computes it from `MEMBERSHIP_GRACE_DAYS`, and the newest claim with its
 reason), `POST /api/account/membership/claim` (Zod: `studentId`, `startsOn` not after today,
-`term` 1 or 3) and `DELETE /api/account/membership/claim` (withdraws the open claim by predicate;
-idempotent). The screen is `/account/membership`, a `MY_NAV` entry.
+`term` 1 or 3) and `DELETE /api/account/membership/claim` (withdraws the open claim by predicate,
+idempotent, writing `membership.claim.withdrawn` with the member as actor and the claim id alone
+in the same batch, guarded on the claim still being open, A-130 criterion 14). The screen is `/account/membership`, a `MY_NAV` entry.
 
 **Recording is the officer's act** (`members.write`). `GET /api/admin/memberships/claims` is the
 queue behind the register's "Awaiting record" filter at `/people/members`: oldest first (a

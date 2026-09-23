@@ -1,7 +1,9 @@
 import { eq, sql } from 'drizzle-orm'
 import { filterQuerySchema } from '#shared/utils/list-filters'
+import { claimAgainstHeld } from '#shared/utils/membership'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { envelope, offsetFor } from '#shared/utils/pagination'
+import type { Term } from '#shared/utils/membership'
 
 const query = filterQuerySchema(membershipClaimsList)
 
@@ -33,9 +35,9 @@ export default defineEventHandler(async (event) => {
     reason: schema.membershipClaims.reason,
     decidedAt: schema.membershipClaims.decidedAt,
     createdAt: schema.membershipClaims.createdAt,
-    // The latest term already on the account: a claim for something "Record one" already wrote
-    // is declined as such rather than recorded twice.
-    heldUntil: sql<string | null>`(select max(expires_on) from memberships where user_id = ${schema.membershipClaims.userId})`,
+    // The account's terms, read per claim by subquery, so the queue says what recording will do.
+    terms: sql<string>`(select json_group_array(json_object('startsOn', starts_on, 'expiresOn', expires_on))
+      from memberships where user_id = ${schema.membershipClaims.userId})`,
   })
     .from(schema.membershipClaims)
     .innerJoin(schema.users, eq(schema.users.id, schema.membershipClaims.userId))
@@ -44,5 +46,11 @@ export default defineEventHandler(async (event) => {
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 
-  return envelope(items, Number(total?.count ?? 0), input.page, input.pageSize)
+  // The route's own rule (claimAgainstHeld): what a recording would extend, and a purchase that
+  // "Record one" already wrote, which is declined as such rather than recorded twice.
+  const read = items.map(({ terms, ...claim }) => {
+    const held = claimAgainstHeld(JSON.parse(terms) as Term[], claim.startsOn)
+    return { ...claim, heldUntil: held.heldUntil, heldSameDay: held.sameDay }
+  })
+  return envelope(read, Number(total?.count ?? 0), input.page, input.pageSize)
 })
