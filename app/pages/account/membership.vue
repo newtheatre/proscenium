@@ -120,6 +120,8 @@ const { data: fee } = await useAsyncData(
   () => request<{ values: PolicyValues }>('/api/policies/values', { query: { path: '/policies/membership' } }),
 )
 const feeValue = computed(() => fee.value?.values.MEMBERSHIP_FEE_PENCE ?? null)
+// The SU's own page, from the same policy page; unset, the alert simply has no link (A-130 criterion 15).
+const purchaseUrl = computed(() => fee.value?.values.MEMBERSHIP_PURCHASE_URL?.text || null)
 
 useSeoMeta({ title: 'Membership' })
 </script>
@@ -185,6 +187,7 @@ useSeoMeta({ title: 'Membership' })
         :description="feeValue
           ? `We cannot sell it here. The current fee is ${feeValue.text}. Once you have bought it, tell us below and an officer will record it on your account.`
           : 'We cannot sell it here. Once you have bought it, tell us below and an officer will record it on your account.'"
+        :actions="purchaseUrl ? [{ label: 'Buy a membership from the Students\' Union', to: purchaseUrl, target: '_blank', external: true, trailingIcon: 'i-lucide-external-link', color: 'neutral', variant: 'outline' }] : []"
         data-test="membership-fee"
       />
 

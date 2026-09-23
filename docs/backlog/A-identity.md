@@ -578,6 +578,10 @@ Open questions for the committee:
       `membership.claim.withdrawn`, the member as actor, carrying the claim id and never the
       student number (0011), in the same batch as the withdrawal, so "withdrew and claimed again
       with another number" can be reconstructed from the trail.
+  15. Added 23 September 2026 (issue 1005): where the SU's purchase page is configured
+      (`MEMBERSHIP_PURCHASE_URL`, A-202), `/account/membership` links to it beside "Membership is
+      bought at the Students' Union", read through the policy page's token (J-110). Unset, the
+      screen says the same sentence and no link.
 - Source: Pre-cutover review, 10 September 2026; issue 1153 item 7 (criterion 9, the withdrawal
   was one click). The migration carries no memberships
   (`migration/identity.ts`), so at cutover every member reads as lapsed until recorded; this is
@@ -727,6 +731,11 @@ Open questions for the committee:
 - Story: Withdrawn. Membership can only be purchased through the SU, so it syncs correctly with SUMS; the society cannot sell membership itself, even on the SumUp reader.
 - Resolution:
   1. The system never takes membership money and holds no purchase source for membership state; joining instructions on the site point at the SU's own purchase flow.
+     Added 23 September 2026 (issue 1005): the flow's address is `MEMBERSHIP_PURCHASE_URL`,
+     which ships unset until the committee names it (`docs/workshops.md`) rather than a guessed
+     address. Set, it is linked from `/account/membership`, the policy page, the expiring and the
+     declined emails and the room booking refusal; unset, each of them leaves the link out whole
+     and reads correctly without it (A-130 criterion 15).
   2. Membership state arrives by manual grant (A-117) and the hand-uploaded SU export (A-201); SUMS remains the system of record for who has paid.
 - Source: Committee direction, 26 August; Prompt Book A-2.
 

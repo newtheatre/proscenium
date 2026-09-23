@@ -349,18 +349,27 @@ Somebody holding `members.write` works the queue daily, from `/people/members?fi
    beside People and Members in the console sidebar, and while any claim waits every holder of
    `members.write` is sent one `membership.claims.waiting` message a day (A-130 criteria 11 and
    12). The count is what to watch until it stays near zero.
-2. Check each claim against the SU's membership list by student number, not by name: names do
-   not always match the SU's record, and a claim whose number differs from the one already on the
-   account is flagged in the queue.
+2. Record each claim that is not plainly wrong. The check against the SU's list comes after the
+   membership counts, never before it (0031): a member who paid is not refused at a desk while
+   the list is fetched. Decline only what the screen itself shows to be wrong: a claim marked
+   **Already recorded from that date**, or a number another account holds; recording either is
+   refused with that reason. A **Differs** badge means the number is not the one on the account;
+   an **Extends one ending** badge means recording renews a running term (A-130 criterion 13).
 3. **Record** writes the number to the account, the membership with the claim as its evidence and
    closes the claim, in one click and one batch. **Decline** asks for a reason the member reads;
-   write what to put right, because a declined member claims again rather than emailing.
+   write what to put right: a declined member claims again rather than emailing. A
+   decided claim is found again by setting **Status** under **Filters** on the queue.
 4. Focus moves to the next claim after each decision, so the keyboard alone works a page.
+5. When the SU's list arrives, work **Awaiting a check** on the register by student number, not by
+   name (names do not always match the SU's record), and **Confirm** each one found. Who at the SU
+   supplies the list, in what form and how often is not yet agreed (issue 1005); until it is, a
+   recorded claim simply waits there, counting.
 
 Both decisions notify the member and are on the audit trail with the claim id and never the
-number or the reason (0011). A membership counts from the moment it is recorded, and a recorded
-claim lands under "Awaiting a check" like any other manual grant: confirming it against the SU's
-list is the separate, later act 0031 describes, and it never holds anything up.
+number or the reason (0011), as is a member withdrawing their own claim. A membership counts
+from the moment it is recorded, and a recorded claim lands under "Awaiting a check" like any
+other manual grant: confirming it against the SU's list is the separate, later act 0031
+describes, and it never holds anything up.
 
 ### The staging duplicate
 

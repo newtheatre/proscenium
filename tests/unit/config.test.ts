@@ -7,6 +7,7 @@ import type { Permission } from '#shared/utils/roles'
 // The keys the workshop register proposes no value for (0019). They ship unset, and the
 // features needing them wait rather than guessing. Typed, so a typo here is a build error.
 const UNSET: ConfigKey[] = [
+  'MEMBERSHIP_PURCHASE_URL',
   'NIGHT_REPORT_RECIPIENTS',
   'RETENTION_FINAL_WARNING_DAYS',
   'RETENTION_WARNING_DAYS',
@@ -97,5 +98,18 @@ describe('configuration surface (0012, 0019)', () => {
   // must not reach the open-items list (A-112, #1211).
   test('the safety officer needs a second factor', () => {
     expect(CONFIG_KEYS.PRIVILEGED_ROLES.default).toContain('SAFETY_OFFICER')
+  })
+})
+
+// A-202: the SU's purchase page, never guessed. Only an https address is a place to send somebody.
+describe('the membership purchase address (issue 1005)', () => {
+  test('ships unset, is not a rule anything enforces, and takes only an https address', () => {
+    expect(hasDefault('MEMBERSHIP_PURCHASE_URL')).toBe(false)
+    expect(isEnforced('MEMBERSHIP_PURCHASE_URL')).toBe(false)
+    const schema = CONFIG_KEYS.MEMBERSHIP_PURCHASE_URL.schema
+    expect(schema.safeParse('https://su.example.invalid/shop/new-theatre').success).toBe(true)
+    expect(schema.safeParse('http://su.example.invalid/shop').success).toBe(false)
+    expect(schema.safeParse('ftp://su.example.invalid/shop').success).toBe(false)
+    expect(schema.safeParse('not a url').success).toBe(false)
   })
 })

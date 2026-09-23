@@ -7,6 +7,7 @@ import { fromLondonWallClock, londonWeekday } from '#shared/utils/london'
 import { saysDayLong } from '#shared/utils/when'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
+import type { PolicyValues } from '#shared/utils/policy-tokens'
 import { z } from 'zod'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/book-a-room' })
@@ -249,6 +250,20 @@ const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.
 // The server refuses NO_MEMBERSHIP outright (0031), so the form's job is to say where to put it
 // right rather than to invent its own wording (A-129).
 const needsMembership = computed(() => failures.value.some(failure => failure.reason === 'NO_MEMBERSHIP'))
+
+// The SU's own page, read from the membership policy page only when a refusal wants it; unset,
+// the refusal links our membership page alone (A-202).
+const purchaseUrl = ref<string | null>(null)
+watch(needsMembership, async (needed) => {
+  if (!needed || purchaseUrl.value) return
+  try {
+    const { values } = await $fetch<{ values: PolicyValues }>('/api/policies/values', { query: { path: '/policies/membership' } })
+    purchaseUrl.value = values.MEMBERSHIP_PURCHASE_URL?.text || null
+  }
+  catch {
+    purchaseUrl.value = null
+  }
+})
 
 const seriesReady = computed(() =>
   Boolean(state.roomId && state.title.trim() && state.day && state.purpose)
@@ -621,6 +636,20 @@ useSeoMeta({ title: 'Book a room' })
               data-test="booking-membership-link"
             >
               Tell us about your membership
+            </UButton>
+            <UButton
+              v-if="needsMembership && purchaseUrl"
+              class="mt-2 ml-2"
+              size="sm"
+              variant="outline"
+              color="neutral"
+              :to="purchaseUrl"
+              target="_blank"
+              external
+              trailing-icon="i-lucide-external-link"
+              data-test="booking-membership-buy"
+            >
+              Buy a membership from the Students' Union
             </UButton>
           </template>
         </UAlert>
