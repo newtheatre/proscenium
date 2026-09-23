@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-03
+- Amended: 23 September 2026 by 0090, under which `FOH_MANAGER` also holds the desk, so its
+  bypass reaches refund approval for tonight's performance
 
 ## Context
 

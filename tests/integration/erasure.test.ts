@@ -31,7 +31,7 @@ function seedPerson(database: TestDatabase, id = 'u-erase'): string {
     ['INSERT INTO memberships (id, user_id, starts_on, expires_on, source, evidence, granted_by) VALUES (?, ?, \'2026-09-14\', \'2027-09-13\', ?, ?, ?)',
       `m-${id}`, id, 'MANUAL', `paid in person, ${NAME}`, id],
     ['INSERT INTO role_grants (id, user_id, role, granted_at, note) VALUES (?, ?, ?, ?, ?)',
-      `g-${id}`, id, 'BOX_OFFICE', now, `${NAME} asked for this`],
+      `g-${id}`, id, 'FOH_MANAGER', now, `${NAME} asked for this`],
     ['INSERT INTO totp_secrets (user_id, secret, created_at) VALUES (?, ?, ?)', id, 'SECRETSECRET', now],
     ['INSERT INTO recovery_codes (id, user_id, code_hash) VALUES (?, ?, ?)', `r-${id}`, id, 'abcdef'],
     ['INSERT INTO passkeys (id, user_id, credential_id, public_key, counter, created_at) VALUES (?, ?, ?, ?, 0, ?)',

@@ -61,10 +61,10 @@ function seedDuplicate(database: TestDatabase): Seeded {
     ['INSERT INTO emergency_contacts (user_id, name, phone, relation, updated_at) VALUES (?, ?, ?, ?, ?)',
       loserId, 'Their Mother', '07700 900000', 'mother', now],
 
-    // The winner already holds BOX_OFFICE with a dated expiry; the loser holds it with no expiry
+    // The winner already holds FOH_MANAGER with a dated expiry; the loser holds it with no expiry
     // at all, so the merge must extend the winner's own row rather than leave two.
-    ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-winner', winnerId, 'BOX_OFFICE', now + 1000],
-    ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-loser', loserId, 'BOX_OFFICE', null],
+    ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-winner', winnerId, 'FOH_MANAGER', now + 1000],
+    ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-loser', loserId, 'FOH_MANAGER', null],
     // A role only the loser holds moves across untouched.
     ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-loser-only', loserId, 'TRAINING_MANAGER', null],
   ])
@@ -159,7 +159,7 @@ describe('merging duplicate accounts (A-123)', () => {
       await merge(database, winnerId, loserId)
 
       const boxOffice = rows<{ expiresAt: number | null }>(database,
-        'SELECT expires_at AS expiresAt FROM role_grants WHERE user_id = ? AND role = ?', winnerId, 'BOX_OFFICE')
+        'SELECT expires_at AS expiresAt FROM role_grants WHERE user_id = ? AND role = ?', winnerId, 'FOH_MANAGER')
       expect(boxOffice).toHaveLength(1)
       // The loser's never-expiring grant won: the winner's dated one is gone.
       expect(boxOffice[0]?.expiresAt).toBeNull()

@@ -32,7 +32,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, officer.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
 
   const database = new Database(app.databaseFile)
   try {

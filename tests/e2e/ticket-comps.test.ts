@@ -28,13 +28,13 @@ beforeAll(async () => {
   officer = await adminSession(app)
 
   boxOffice = await registerMember(app, 'comp-desk', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, officer.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
 
   // MANAGER is privileged (0037/A-112): requirePermission needs a confirmed second factor
   // before ticketing.write is honoured at all, not only ticketing.manage.
   const managerPassword = generatePassword()
   ticketingManager = await registerMember(app, 'comp-manager', managerPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: ticketingManager.id, role: 'BOX_OFFICE' }, officer.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: ticketingManager.id, role: 'FOH_MANAGER' }, officer.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: ticketingManager.id, role: 'MANAGER' }, officer.cookie)
 
   const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, ticketingManager.cookie)).json() as { secret: string }
@@ -171,7 +171,7 @@ describe.skipIf(skip !== null)('asking for a comp (criterion 1)', () => {
     const requestId = await requestedComp(id)
 
     const dutyManager = await registerMember(app, 'comp-duty', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'BOX_OFFICE' }, officer.cookie)
+    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'FOH_MANAGER' }, officer.cookie)
     confirmDutyManagerShift(performanceId, dutyManager.id)
 
     expect((await approve(requestId, dutyManager.cookie)).status).toBe(200)
@@ -241,7 +241,7 @@ describe.skipIf(skip !== null)('approval is claimed atomically (criterion 2)', (
     const requestId = await requestedComp(id)
 
     const dutyManager = await registerMember(app, 'comp-race-duty', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'BOX_OFFICE' }, officer.cookie)
+    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'FOH_MANAGER' }, officer.cookie)
     confirmDutyManagerShift(performanceId, dutyManager.id)
 
     const [first, second] = await Promise.all([approve(requestId, ticketingManager.cookie), approve(requestId, dutyManager.cookie)])

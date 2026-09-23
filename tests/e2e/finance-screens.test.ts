@@ -27,7 +27,7 @@ beforeAll(async () => {
   boxOffice = await registerMember(app, 'screens-box-office', generatePassword())
   committee = await registerMember(app, 'screens-committee', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, admin.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
 }, BOOT_TIMEOUT_MS)
 

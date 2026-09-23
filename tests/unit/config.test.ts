@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { ConfigKey } from '#shared/utils/config'
 import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, hasDefault, isConfigKey, isEnforced } from '#shared/utils/config'
-import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
+import { PERMISSION_MAP, ROLES, isRole } from '#shared/utils/roles'
 import type { Permission } from '#shared/utils/roles'
 
 // The keys the workshop register proposes no value for (0019). They ship unset, and the
@@ -86,5 +86,10 @@ describe('configuration surface (0012, 0019)', () => {
     const shouldBePrivileged = ROLES.filter(role => PERMISSION_MAP[role].some(permission => MONEY_OR_SAFETY_PERMISSIONS.includes(permission)))
     const privileged = new Set<string>(CONFIG_KEYS.PRIVILEGED_ROLES.default)
     expect(shouldBePrivileged.filter(role => !privileged.has(role))).toEqual([])
+  })
+
+  // A retired role left in the default reads as a requirement nobody can be subject to (0090).
+  test('every privileged role in the default is a role that can still be granted', () => {
+    expect(CONFIG_KEYS.PRIVILEGED_ROLES.default.filter(role => !isRole(role))).toEqual([])
   })
 })

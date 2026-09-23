@@ -180,7 +180,7 @@ describe.skipIf(skip !== null)('companion tickets price at zero (criterion 3)', 
     expect(tickets.find(t => t.ticketTypeId === companionTypeId)?.pricePaid).toBe(0)
 
     const boxOffice = await registerMember(app, 'collector', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, admin.cookie)
+    await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
     const searched = await send('GET', `/api/box-office/desk/search?performanceId=${performanceId}&q=${reference}`, undefined, boxOffice.cookie)
     const { items: results } = await searched.json() as { items: { id: string }[] }
     const collected = await send('POST', `/api/box-office/desk/reservations/${results[0]!.id}/collect`, { expectedTotalPence: totalPence, tender: 'CARD' }, boxOffice.cookie)
@@ -273,7 +273,7 @@ describe.skipIf(skip !== null)('the door sees the agreed wording, and nothing mo
     const { reference } = await booked.json() as { reference: string }
 
     const boxOffice = await registerMember(app, 'deskofficer', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, admin.cookie)
+    await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
 
     const searched = await send('GET', `/api/box-office/desk/search?performanceId=${performanceId}&q=${reference}`, undefined, boxOffice.cookie)
     const { items: results } = await searched.json() as { items: { id: string }[] }
@@ -293,7 +293,7 @@ describe.skipIf(skip !== null)('the door sees the agreed wording, and nothing mo
     const { reference } = await booked.json() as { reference: string }
 
     const boxOffice = await registerMember(app, 'deskofficer2', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, admin.cookie)
+    await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
 
     const searched = await send('GET', `/api/box-office/desk/search?performanceId=${performanceId}&q=${reference}`, undefined, boxOffice.cookie)
     const { items: results } = await searched.json() as { items: { id: string }[] }

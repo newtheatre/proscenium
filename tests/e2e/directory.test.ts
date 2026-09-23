@@ -194,10 +194,10 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
   test('role holders can be narrowed to one role', async () => {
     const email = await member('holder')
     const id = read<{ id: string }>('SELECT id FROM users WHERE email = ?', email)!.id
-    expect((await send('POST', '/api/admin/roles', { userId: id, role: 'BOX_OFFICE' }, cookie)).status).toBe(200)
+    expect((await send('POST', '/api/admin/roles', { userId: id, role: 'FOH_MANAGER' }, cookie)).status).toBe(200)
 
     expect(emails(await directory('?holdsRole=true'))).toContain(email)
-    expect(emails(await directory('?role=is:BOX_OFFICE'))).toContain(email)
+    expect(emails(await directory('?role=is:FOH_MANAGER'))).toContain(email)
     expect(emails(await directory('?role=is:FOH_MANAGER'))).not.toContain(email)
   })
 
@@ -251,7 +251,7 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
 describe.skipIf(skip !== null)('creating an account from the console (A-121 criterion 3)', () => {
   test('it makes no password and sends a set-password link', async () => {
     const email = registrableAddress('invited')
-    const created = await send('POST', '/api/admin/accounts', { email, name: 'Invited Person (test)', roles: ['BOX_OFFICE'] }, cookie)
+    const created = await send('POST', '/api/admin/accounts', { email, name: 'Invited Person (test)', roles: ['FOH_MANAGER'] }, cookie)
     expect(created.status).toBe(200)
     expect(await created.json()).toMatchObject({ ok: true, invited: true })
 
@@ -269,8 +269,8 @@ describe.skipIf(skip !== null)('creating an account from the console (A-121 crit
     expect(sent).toMatchObject({ type: 'account.set-password', status: 'SENT' })
 
     // Invited and not yet claimed is a shadow account, so the listing needs asking (0071).
-    expect(emails(await directory('?role=is:BOX_OFFICE'))).not.toContain(email)
-    expect(emails(await directory('?role=is:BOX_OFFICE&includeShadow=true'))).toContain(email)
+    expect(emails(await directory('?role=is:FOH_MANAGER'))).not.toContain(email)
+    expect(emails(await directory('?role=is:FOH_MANAGER&includeShadow=true'))).toContain(email)
   })
 
   test('the link sets a first password, and then signs the person in', async () => {

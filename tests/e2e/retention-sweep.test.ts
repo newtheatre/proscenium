@@ -206,7 +206,7 @@ describe.skipIf(skip !== null)('exemptions and the two caps (criteria 2, 4)', ()
 
   test('a live role holder is exempt', async () => {
     const id = await inactiveAccount(-10)
-    await send('POST', '/api/admin/roles', { userId: id, role: 'BOX_OFFICE' })
+    await send('POST', '/api/admin/roles', { userId: id, role: 'FOH_MANAGER' })
     await arm(true)
 
     try {

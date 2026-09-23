@@ -129,7 +129,7 @@ describe('permissions come from live grants only', () => {
     expect(bypass('BAR_MANAGER')).toEqual(['night.till'])
   })
 
-  // The bar manager administers the catalogue and the stock register, as the box office does the
+  // The bar manager administers the catalogue and the stock register, as front of house does the
   // programme. Selling over the bar is the till's and still derives from tonight (0009, F-111).
   test('the bar manager holds the bar administration and nothing else standing', () => {
     const held = [...permissionsFor([{ role: 'BAR_MANAGER', expiresAt: null }], now)]
@@ -137,12 +137,12 @@ describe('permissions come from live grants only', () => {
     expect(held).toEqual(['bar.read', 'bar.write'])
   })
 
-  // The front of house officer administers the rota, checklist, emergency card, licensing
-  // export, the cross-season report and the backstage board's own configuration (E-126).
+  // The front of house officer administers the rota, checklist, emergency card, licensing export,
+  // cross-season report, the board's configuration (E-126) and the programme's (0090).
   test('the front of house officer holds that standing administration and nothing else', () => {
     const held = [...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)]
       .filter(permission => !OPERATIONAL_PERMISSIONS.includes(permission)).sort()
-    expect(held).toEqual(['age-checks.export', 'board.read', 'board.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'reports.read', 'rota.read', 'rota.write'])
+    expect(held).toEqual(['age-checks.export', 'board.read', 'board.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'reports.read', 'rota.read', 'rota.write', 'ticketing.export', 'ticketing.read', 'ticketing.write'])
   })
 
   // Nothing outside the three named ones may be operational, whatever a role picks up later.
@@ -150,18 +150,27 @@ describe('permissions come from live grants only', () => {
     expect([...OPERATIONAL_PERMISSIONS]).toEqual(['night.door', 'night.till', 'night.manage'])
   })
 
-  // The box office administers the programme sitting down. Selling at the door and taking money
-  // at the desk are operational and still derive from tonight (0009, D-119).
-  test('the box office holds the programme configuration and nothing operational', () => {
-    const held = permissionsFor([{ role: 'BOX_OFFICE', expiresAt: null }], now)
-    expect([...held].sort()).toEqual(['ticketing.export', 'ticketing.read', 'ticketing.write'])
+  // One committee post, one grant: the programme's configuration joins the front of house
+  // officer's own, the night bypass included, as the IT Manager accepted (0090, A-132).
+  test('the front of house officer also holds the programme configuration', () => {
+    const held = permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)
+    for (const permission of ['ticketing.read', 'ticketing.write', 'ticketing.export', 'night.door', 'night.manage'] as const) {
+      expect(`${permission}: ${held.has(permission)}`).toBe(`${permission}: true`)
+    }
+    expect(held.has('ticketing.manage')).toBe(false)
+    expect(held.has('money.refund')).toBe(false)
+  })
+
+  test('the box office is no longer a role of its own, so nothing can grant it (A-132 criterion 2)', () => {
+    expect(isRole('BOX_OFFICE')).toBe(false)
+    expect(permissionsFor([{ role: 'BOX_OFFICE' as Role, expiresAt: null }], now).size).toBe(0)
   })
 
   // The whole point of the role: a named accessibility officer, never general box office
   // (D-127 criterion 2).
   test('only the accessibility officer holds access.verify, and the box office does not', () => {
     expect([...permissionsFor([{ role: 'ACCESSIBILITY_OFFICER', expiresAt: null }], now)]).toEqual(['access.verify'])
-    expect(permissionsFor([{ role: 'BOX_OFFICE', expiresAt: null }], now).has('access.verify')).toBe(false)
+    expect(permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now).has('access.verify')).toBe(false)
     for (const [role, held] of Object.entries(PERMISSION_MAP)) {
       if (role === 'ADMIN' || role === 'ACCESSIBILITY_OFFICER') continue
       expect(`${role}: ${held.includes('access.verify')}`).toBe(`${role}: false`)

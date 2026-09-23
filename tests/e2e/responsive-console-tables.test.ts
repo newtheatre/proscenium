@@ -28,7 +28,7 @@ beforeAll(async () => {
 
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   const officer = await registerMember(app, 'grantor', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, officer.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
 
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   await request(app, 'POST', '/api/auth/register', { email: adminEmail, name: person.name, password: adminPassword })

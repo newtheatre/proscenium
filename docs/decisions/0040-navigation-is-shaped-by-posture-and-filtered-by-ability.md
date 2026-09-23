@@ -4,6 +4,8 @@
 - Date: 2026-09-02
 - Amended: 21 September 2026 by 0082, which orders each console group as Every day then Set-up,
   renames the Tonight group to Rota, and leaves an opened group open
+- Amended: 23 September 2026 by 0090, which retires the Box Office role named in the context below;
+  the Front of House Manager now holds the programme's configuration
 
 ## Context
 
