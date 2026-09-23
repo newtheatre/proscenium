@@ -360,8 +360,8 @@ unknown one, and `GET /api/admin/finance/seasons` lists every row, retired ones 
 `finance.read` or `finance.summary`. Seasons should not overlap, since a day in two seasons counts
 in both; that is guidance on the Seasons page, not a constraint. The public What's on heading
 names a season too (`headlineSeasonQuery()`, `server/utils/whats-on.ts`, carried as `season` on
-`GET /api/whats-on`): the unretired row today falls in, else the next to begin, else `null` and no
-season word at all; a finished season is never named.
+`GET /api/whats-on`): the unretired row tonight's show night (0014) falls in, else the next to
+begin, else `null` and no season word at all; a finished season is never named.
 
 **Administration (D-131).** `/box-office/seasons`, over these routes, `ticketing.read` for the
 listing and `ticketing.write` for the rest:

@@ -3,8 +3,8 @@ import { sql } from 'drizzle-orm'
 import { warningsForListedShowsQuery } from './content-warnings'
 import { performanceSoldColumn } from './programme'
 import { publicContentWarnings, warningAssessment } from '#shared/utils/content-warnings'
-import { londonDayOf } from '#shared/utils/ledger'
 import { offsetFor } from '#shared/utils/pagination'
+import { showNightOf } from '#shared/utils/show-night'
 import {
   listingCacheSeconds,
   performanceAvailability,
@@ -255,8 +255,13 @@ export function headlineSeasonQuery(today: string): SQL {
   `
 }
 
+// The show night, not the calendar day (0014): a season's last night is still running until 04:00.
+export function headlineSeasonDay(at: Date): string {
+  return showNightOf(at)
+}
+
 export async function headlineSeason(at: Date): Promise<string | null> {
-  const [row] = await db.all<{ name: string }>(headlineSeasonQuery(londonDayOf(at)))
+  const [row] = await db.all<{ name: string }>(headlineSeasonQuery(headlineSeasonDay(at)))
   return row?.name ?? null
 }
 
