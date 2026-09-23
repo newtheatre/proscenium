@@ -1,10 +1,10 @@
 import { eq } from 'drizzle-orm'
-import { endOfTerm } from '#shared/utils/membership'
+import { renewalTerm } from '#shared/utils/membership'
 import { recordClaimStatements, studentIdConstraintRefusal } from '#shared/utils/membership-claims'
 import type { MembershipTerm } from '#shared/utils/membership'
 
 // Record a claim: the number to the account, the membership row the A-117 route writes with the
-// claim as its evidence, and the claim closed, in one batch (A-130 criterion 2).
+// claim as its evidence, and the claim closed, in one batch (A-130 criteria 2 and 12).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which claim you mean' })
@@ -22,8 +22,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
   }
 
+  // A purchase inside a running term extends it with a row of its own; nothing held is rewritten.
+  const held = await longestTerm(claim.userId, claim.startsOn)
+  const term = renewalTerm(claim.startsOn, claim.term as MembershipTerm, held?.expiresOn ?? null)
+  const expiresOn = term.expiresOn
   const membershipId = newId()
-  const expiresOn = endOfTerm(claim.startsOn, claim.term as MembershipTerm)
   const now = Math.floor(Date.now() / 1000)
   const actorId = resolved.account.id
 
@@ -33,7 +36,7 @@ export default defineEventHandler(async (event) => {
       actorId,
       action: 'membership.granted',
       target: `user:${claim.userId}`,
-      detail: { membership: membershipId, years: claim.term, expiresOn, claim: id },
+      detail: { membership: membershipId, years: claim.term, expiresOn, claim: id, extends: term.extends },
     }),
     recorded: auditEntry({
       actorId,
@@ -48,7 +51,7 @@ export default defineEventHandler(async (event) => {
     userId: claim.userId,
     studentId: claim.studentId,
     held: account.studentId,
-    membership: { id: membershipId, startsOn: claim.startsOn, expiresOn },
+    membership: { id: membershipId, startsOn: term.startsOn, expiresOn },
     actorId,
     now,
     entries,

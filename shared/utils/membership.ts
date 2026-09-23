@@ -27,6 +27,30 @@ export function daysAfter(day: string, days: number): string {
   return londonDay(new Date(Date.UTC(year, month - 1, date + days)))
 }
 
+// Back-to-back or overlapping rows are one run, so a renewal waiting to start extends the term
+// around it. The run that decides is the latest to have begun by today, else the first (A-130).
+export function effectiveTerm(terms: readonly Term[], today: string): Term | null {
+  const runs: Term[] = []
+  for (const term of [...terms].sort((a, b) => a.startsOn.localeCompare(b.startsOn))) {
+    const last = runs.at(-1)
+    if (last && term.startsOn <= daysAfter(last.expiresOn, 1)) {
+      if (term.expiresOn > last.expiresOn) last.expiresOn = term.expiresOn
+    }
+    else {
+      runs.push({ startsOn: term.startsOn, expiresOn: term.expiresOn })
+    }
+  }
+  return runs.filter(run => run.startsOn <= today).at(-1) ?? runs[0] ?? null
+}
+
+// A purchase while a term still runs extends it: the new term follows on the day after, so buying
+// early loses nothing. Otherwise it runs from the purchase (A-130 criterion 12, 0031).
+export function renewalTerm(boughtOn: string, years: MembershipTerm, heldUntil: string | null): { startsOn: string, expiresOn: string, extends: boolean } {
+  const extending = heldUntil !== null && heldUntil >= boughtOn
+  const startsOn = extending ? daysAfter(heldUntil, 1) : boughtOn
+  return { startsOn, expiresOn: endOfTerm(startsOn, years), extends: extending }
+}
+
 // The screen field for a civil date. The round trip refuses a day the calendar does not have
 // (2026-02-31 would roll into March), and guards the shape since every check runs after the regex.
 const DAY = /^\d{4}-\d{2}-\d{2}$/

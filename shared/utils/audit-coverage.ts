@@ -68,7 +68,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/memberships/claims/[id]/decline.post.ts', actions: ['membership.claim.declined'] },
   { route: 'server/api/account/membership/index.get.ts', exempt: 'reads your own membership and claim' },
   { route: 'server/api/account/membership/claim.post.ts', exempt: 'a claim about yourself, creating no membership and carrying no authority' },
-  { route: 'server/api/account/membership/claim.delete.ts', exempt: 'withdraws your own claim' },
+  {
+    route: 'server/api/account/membership/claim.delete.ts',
+    actions: ['membership.claim.withdrawn'],
+    via: ['server/utils/membership-claims.ts'],
+  },
   { route: 'server/api/admin/roles/index.delete.ts', actions: ['role.revoked'] },
   { route: 'server/api/admin/roles/index.post.ts', actions: ['role.granted', 'role.renewed', 'account.created.console'] },
   { route: 'server/api/auth/magic-link/consume.post.ts', actions: ['session.started.magic-link', 'mfa.challenged'] },

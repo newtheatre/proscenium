@@ -3,7 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { can, manageMembers } from '#shared/utils/abilities'
 import { recordMembership } from '#shared/utils/admin-forms'
 import { saysDay } from '#shared/utils/when'
-import { MEMBERSHIP_TERMS, isInGrace, londonDay } from '#shared/utils/membership'
+import { MEMBERSHIP_TERMS, daysAfter, isInGrace, londonDay } from '#shared/utils/membership'
 import { claimDeclineForm } from '#shared/utils/membership-claims'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { membershipsList } from '#shared/utils/memberships-list'
@@ -347,8 +347,9 @@ const claimBase: TableColumn<Claim>[] = [
       const held = row.original.heldUntil
       return h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
         h('span', {}, saysDay(row.original.createdAt)),
-        waitingView.value && held && held >= londonDay(new Date())
-          ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held' }, () => `Holds one until ${saysDay(held)}`)
+        // Recording extends a term still running on the purchase date (A-130 criterion 12).
+        waitingView.value && held && held >= row.original.startsOn
+          ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held', 'title': `Recording starts the new term on ${saysDay(daysAfter(held, 1))}` }, () => `Extends one ending ${saysDay(held)}`)
           : null,
       ])
     },
