@@ -96,6 +96,8 @@ const refusal = ref<string | null>(null)
 const bumping = ref<Booking | null>(null)
 const bump = reactive<Partial<BumpInput>>({})
 const offer = ref<Alternatives | null>(null)
+// Widened to string: the form's tier is a plain string, checked against the live order by the route.
+const tierItems: { label: string, value: string }[] = TIERS.map(tier => ({ label: saysTier(tier), value: tier }))
 
 async function openBump(booking: Booking): Promise<void> {
   refusal.value = null
@@ -393,7 +395,7 @@ onMounted(() => {
             >
               <USelect
                 v-model="bump.tier"
-                :items="TIERS.map(tier => ({ label: saysTier(tier), value: tier }))"
+                :items="tierItems"
                 value-key="value"
                 class="w-full"
                 data-test="bump-tier"
