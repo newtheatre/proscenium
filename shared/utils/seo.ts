@@ -27,6 +27,7 @@ export const ROBOTS_DISALLOW = [
   '/people',
   '/qr',
   '/register',
+  '/reports',
   '/reset',
   '/rooms',
   '/rota',
