@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { can, member, memberOrGrace, viewBarReports, workTonight } from '#shared/utils/abilities'
+import { can, member, memberOrGrace, viewBarReports, viewReports, workTonight } from '#shared/utils/abilities'
 import type { Viewer } from '#shared/utils/abilities'
 import type { MembershipState } from '#shared/utils/membership'
 
@@ -65,6 +65,22 @@ describe('viewBarReports admits the treasurer alongside the bar manager', () => 
 
   test('a viewer with neither permission is refused', () => {
     expect(can(withPermissions([]), viewBarReports)).toBe(false)
+  })
+})
+
+// E-126 criterion 5, #1042: the cross-season reports open to whoever holds reports.read, and a
+// finance or bar read opens nothing here.
+describe('viewReports rests on reports.read alone', () => {
+  const withPermissions = (permissions: Viewer['permissions']): Viewer => ({
+    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' },
+  })
+
+  test('reports.read satisfies it', () => {
+    expect(can(withPermissions(['reports.read']), viewReports)).toBe(true)
+  })
+
+  test('the money dashboard or the bar reports do not', () => {
+    expect(can(withPermissions(['finance.summary', 'finance.read', 'bar.read']), viewReports)).toBe(false)
   })
 })
 

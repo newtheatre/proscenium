@@ -11,6 +11,8 @@ const MONEY = 'app/pages/money/index.vue'
 const SHOWS = 'app/pages/money/shows.vue'
 const REPORTS = 'app/pages/money/reports.vue'
 const RECONCILIATION = 'app/pages/money/reconciliation.vue'
+const PERIOD_FORM = 'app/composables/usePeriodForm.ts'
+const PERIOD_FIELDS = 'app/components/PeriodFields.vue'
 
 const MONEY_SCREENS = [MONEY, SHOWS, REPORTS, RECONCILIATION]
 
@@ -63,14 +65,16 @@ describe('the period controls ask the question themselves (I-105 criterion 6)', 
   })
 
   test('a month and a year are each a select, not a number spinner', async () => {
-    const dashboard = await read(MONEY)
-    expect(dashboard).toContain('monthChoices')
-    expect(dashboard).toContain('yearChoices(')
+    expect(await read(MONEY)).toContain('<PeriodFields')
+    const form = await read(PERIOD_FORM)
+    expect(form).toContain('monthChoices')
+    expect(form).toContain('yearChoices(')
+    expect(await read(PERIOD_FIELDS)).toMatch(/<USelect\s+v-if="kind === 'MONTH'"\s+v-model="month"/)
     expect(await read(SHOWS)).toContain('yearChoices(')
   })
 
   test('no money screen leaves a number spinner on a period control', async () => {
-    for (const path of [MONEY, SHOWS]) {
+    for (const path of [MONEY, SHOWS, PERIOD_FIELDS]) {
       expect(await read(path)).not.toContain('UInputNumber')
     }
   })

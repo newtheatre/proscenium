@@ -104,20 +104,28 @@ export async function isDayLocked(day: string): Promise<boolean> {
   return row?.action === 'CLOSED'
 }
 
-// Whether a whole range is closed (I-108): the latest lock whose own range fully contains this
-// one. A range closed in two or more pieces reads as open rather than guessed at.
-function rangeCoveredByQuery(fromDay: string, toDay: string): SQL {
+// Whether a whole range is closed (I-108): the latest lock fully containing it, unless a later
+// reopen touches any of its days. Closed in pieces, or reopened in part, reads as open.
+export function rangeClosedQuery(fromDay: string, toDay: string): SQL {
   return sql`
-    SELECT action FROM period_locks
-    WHERE from_day <= ${fromDay} AND to_day >= ${toDay}
-    ORDER BY created_at DESC, id DESC
-    LIMIT 1
+    WITH cover AS (
+      SELECT id, action, created_at FROM period_locks
+      WHERE from_day <= ${fromDay} AND to_day >= ${toDay}
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    )
+    SELECT cover.action AS action, EXISTS (
+      SELECT 1 FROM period_locks later
+      WHERE later.action = 'REOPENED' AND later.from_day <= ${toDay} AND later.to_day >= ${fromDay}
+        AND (later.created_at > cover.created_at OR (later.created_at = cover.created_at AND later.id > cover.id))
+    ) AS reopenedSince
+    FROM cover
   `
 }
 
 export async function isRangeClosed(fromDay: string, toDay: string): Promise<boolean> {
-  const [row] = await db.all<{ action: PeriodLockAction }>(rangeCoveredByQuery(fromDay, toDay))
-  return row?.action === 'CLOSED'
+  const [row] = await db.all<{ action: PeriodLockAction, reopenedSince: number }>(rangeClosedQuery(fromDay, toDay))
+  return row?.action === 'CLOSED' && !row.reopenedSince
 }
 
 // Criterion 5: what closing warns about before it proceeds. Nights, filtered to the range by

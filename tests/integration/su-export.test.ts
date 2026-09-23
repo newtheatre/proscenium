@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { seasonTicketRevenueQuery } from '#server/utils/revenue-by-show'
-import { nominalMappingsQuery, suExportQuery } from '#server/utils/su-export'
+import { toCsv } from '#server/utils/csv'
+import { periodBounds, seasonRangeQuery } from '#server/utils/season-dashboard'
+import { rangeClosedQuery } from '#server/utils/period-locks'
+import { nominalMappingsQuery, suExportCountQuery, suExportQuery } from '#server/utils/su-export'
+import { suExportCsvRows } from '#shared/utils/su-export'
+import type { SuExportRow } from '#shared/utils/su-export'
 import { createTestDatabase, boundStatement, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -74,12 +79,10 @@ function lock(database: TestDatabase, id: string, fromDay: string, toDay: string
   ).run(id, fromDay, toDay, action, ACTOR, at)
 }
 
-// Exactly isRangeClosed()'s query.
+// Exactly isRangeClosed(): its own query, read the same way.
 function rangeClosed(database: TestDatabase, fromDay: string, toDay: string): boolean {
-  const [row] = rows<{ action: string }>(database, `
-    SELECT action FROM period_locks WHERE from_day <= ? AND to_day >= ? ORDER BY created_at DESC, id DESC LIMIT 1
-  `, fromDay, toDay)
-  return row?.action === 'CLOSED'
+  const [row] = read<{ action: string, reopenedSince: number }>(database, rangeClosedQuery(fromDay, toDay))
+  return row?.action === 'CLOSED' && !row.reopenedSince
 }
 
 describe('the nominal mapping seed (I-108 criterion 1)', () => {
@@ -230,6 +233,93 @@ describe('whether an exported range is still open to a correction (I-108)', () =
       lock(database, 'lock-1', '2026-09-01', '2026-09-30', 'CLOSED', 0)
       lock(database, 'lock-2', '2026-09-01', '2026-09-30', 'REOPENED', 1)
       expect(rangeClosed(database, '2026-09-01', '2026-09-30')).toBe(false)
+    })
+  })
+
+  test('a smaller close reopened inside a later, wider close makes the wider range open', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      lock(database, 'lock-1', '2025-09-01', '2025-09-30', 'CLOSED', 0)
+      lock(database, 'lock-2', '2025-08-01', '2026-07-31', 'CLOSED', 1)
+      lock(database, 'lock-3', '2025-09-01', '2025-09-30', 'REOPENED', 2)
+      expect(rangeClosed(database, '2025-08-01', '2026-07-31')).toBe(false)
+    })
+  })
+
+  test('a reopen from before the wider close does not open it', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      lock(database, 'lock-1', '2025-09-01', '2025-09-30', 'CLOSED', 0)
+      lock(database, 'lock-2', '2025-09-01', '2025-09-30', 'REOPENED', 1)
+      lock(database, 'lock-3', '2025-08-01', '2026-07-31', 'CLOSED', 2)
+      expect(rangeClosed(database, '2025-08-01', '2026-07-31')).toBe(true)
+    })
+  })
+})
+
+// Exactly what export.get.ts returns for a range: the same query, shaped and quoted the same way.
+function exportFile(database: TestDatabase, fromDay: string, toDay: string): string {
+  return toCsv(suExportCsvRows(read<SuExportRow>(database, suExportQuery(fromDay, toDay))))
+}
+
+describe('the yearly return, re-runnable identically (criterion 4)', () => {
+  test('a year runs 1 August to 31 July, the same days the money dashboard reads (0087)', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      for (const day of ['2025-07-31', '2025-08-01', '2026-07-31', '2026-08-01']) line(database, entry(database, day), 'WALK_UP', 100)
+
+      const { fromDay, toDay } = periodBounds({ kind: 'YEAR', year: 2026 })
+      expect({ fromDay, toDay }).toEqual({ fromDay: '2025-08-01', toDay: '2026-07-31' })
+      expect(read<{ londonDay: string }>(database, suExportQuery(fromDay, toDay)).map(row => row.londonDay)).toEqual(['2025-08-01', '2026-07-31'])
+    })
+  })
+
+  test('a season runs its own row\'s days, both inclusive', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      database.batch([['INSERT INTO seasons (id, name, starts_on, ends_on) VALUES (?, ?, ?, ?)', 'season-autumn', 'Autumn 2026', '2026-09-20', '2026-12-10']])
+      for (const day of ['2026-09-19', '2026-09-20', '2026-12-10', '2026-12-11']) line(database, entry(database, day), 'WALK_UP', 100)
+
+      const [range] = read<{ fromDay: string, toDay: string }>(database, seasonRangeQuery('season-autumn'))
+      expect(range).toEqual({ fromDay: '2026-09-20', toDay: '2026-12-10' })
+      expect(read<{ londonDay: string }>(database, suExportQuery(range!.fromDay, range!.toDay)).map(row => row.londonDay)).toEqual(['2026-09-20', '2026-12-10'])
+    })
+  })
+
+  test('two runs over a closed range are byte-identical, even after a post into it is tried', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      mapNominal(database, 'WALK_UP', 'DESK', '4100')
+      const sale = entry(database, '2025-09-15')
+      line(database, sale, 'WALK_UP', 900)
+      line(database, sale, 'WALK_UP', 450)
+      const bar = entry(database, '2025-09-15', 'TILL')
+      line(database, bar, 'BAR_ITEM', 350)
+      const refund = entry(database, '2026-02-01')
+      line(database, refund, 'REFUND', -900)
+      lock(database, 'lock-year', '2025-08-01', '2026-07-31', 'CLOSED')
+
+      const first = exportFile(database, '2025-08-01', '2026-07-31')
+      expect(() => entry(database, '2026-03-01')).toThrow(/ledger_entries_refuses_a_closed_period/)
+      const second = exportFile(database, '2025-08-01', '2026-07-31')
+
+      expect(rangeClosed(database, '2025-08-01', '2026-07-31')).toBe(true)
+      expect(first.split('\r\n').length).toBe(6)
+      expect(second).toBe(first)
+    })
+  })
+
+  test('the count the screen checks against the cap is the export\'s own row count', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      const sale = entry(database, '2026-09-15')
+      line(database, sale, 'WALK_UP', 900)
+      line(database, sale, 'WALK_UP', 450)
+      line(database, entry(database, '2026-10-01'), 'WALK_UP', 100)
+
+      const [counted] = read<{ rows: number }>(database, suExportCountQuery('2026-09-01', '2026-09-30'))
+      expect(counted?.rows).toBe(read(database, suExportQuery('2026-09-01', '2026-09-30')).length)
+      expect(counted?.rows).toBe(2)
     })
   })
 })
