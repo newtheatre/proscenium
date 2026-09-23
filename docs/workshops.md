@@ -24,7 +24,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | Bar discount cap | none: no discount capability existed | 50% maximum | F-117. Shipped as this session's proposed value rather than left unset, so the feature is live rather than dormant; this row is what confirms it, not the code default |
 | Authorised tab holders | committee only, informally | none, empty until named | F-108. Who qualifies (committee only, or a treasurer-approved list) is still open; the list starts empty rather than guessed, so nobody may charge to a tab until the session names who may |
 | Discount codes | none | none at launch | Capability exists, unused until wanted |
-| Season boundary | 1 August to 31 July | unchanged | Drives reporting and role expiry |
+| Year boundary (`YEAR_START`, `YEAR_END`) | 1 August to 31 July | unchanged | Drives the year period in reporting (0087); role expiry keeps its own 31 July (0009) |
 
 ## Session 2: spaces and training (90 minutes)
 

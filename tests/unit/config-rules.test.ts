@@ -16,12 +16,12 @@ describe('what a setting will accept (J-104 criterion 3)', () => {
 
   // The named refusal case: a yearly boundary must fall in every year (audit TR-7).
   test('29 February is refused as a yearly boundary, and says why', () => {
-    const problem = configProblem('SEASON_START', '02-29', shipped)
+    const problem = configProblem('YEAR_START', '02-29', shipped)
     expect(problem).toContain('29 February')
   })
 
   test('the same rule catches every impossible date, not just that one', () => {
-    expect(configProblem('SEASON_END', '04-31', shipped)).toBeTruthy()
+    expect(configProblem('YEAR_END', '04-31', shipped)).toBeTruthy()
     expect(configProblem('ACADEMIC_YEAR_BOUNDARY', '13-01', shipped)).toBeTruthy()
     expect(configProblem('ACADEMIC_YEAR_BOUNDARY', '02-28', shipped)).toBeNull()
   })

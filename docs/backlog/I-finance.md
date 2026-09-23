@@ -91,7 +91,7 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
   1. The year runs 1 August to 31 July, Europe/London; the boundary is a named test case, including an entry at 23:59 on 31 July. A season is one of the theatre's seasons (Autumn, Spring, StuFF or the Fringe of an academic year), never the whole year (0087).
   2. The dashboard shows the period's revenue by source, refunds, foregone comp and discount value, and the open variance total, every figure derived from ledger rows.
   3. Any figure drills down to its ledger entries; entry lists page in SQL and return a pagination envelope, never a bare array.
-  4. Periods are selectable (day, week, month, term, season, year) with grouping pinned to Europe/London; how a season's days are known is settled in 0087 before the season period is built.
+  4. Periods are selectable (day, week, month, term, season, year) with grouping pinned to Europe/London. A season's range is its own row in the `seasons` table, looked up by id under the finance permissions; a year's is criterion 1's (0087).
   5. Visibility is role-scoped: the treasurer and administrators see everything; other committee roles see the same aggregates without personal detail.
   6. The period controls are what ask the question: changing one reads the figures again, so no
      money screen carries a Refresh beside them. A month, a season and a year are each chosen
