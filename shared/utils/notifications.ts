@@ -707,7 +707,7 @@ export const TOPIC_LABELS: Record<NotificationTopic, string> = {
 
 // What each topic actually covers, so a member switching one off knows what goes quiet.
 export const TOPIC_DESCRIPTIONS: Record<NotificationTopic, string> = {
-  BOOKINGS: 'Messages to ticket holders about shows you have tickets for.',
+  BOOKINGS: 'Changes to shows you have tickets for, and notices from the theatre about them.',
   SHIFTS: 'Rota reminders, and news about a shift you hold or asked for.',
   TRAINING: 'Session places, register marks and training that is running out.',
   ROOMS: 'Room requests and bookings, yours and any you approve.',
