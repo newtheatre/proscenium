@@ -4,10 +4,12 @@ import {
   PRELINK_ALREADY_GOOGLE,
   PRELINK_ERASED,
   PRELINK_NOT_WORKSPACE,
+  PRELINK_OPEN_INSTEAD,
   preLinkAddress,
   preLinkDetail,
   preLinkHeldBy,
   preLinkRefusal,
+  waitingForGoogle,
 } from '#shared/utils/google-prelink'
 import type { PreLinkTarget } from '#shared/utils/google-prelink'
 
@@ -74,5 +76,21 @@ describe('the trail (0011)', () => {
     for (const action of ['account.google.prelinked', 'account.google.unlinked', 'account.google.claimed', 'account.google.claimed.pending']) {
       expect(isAuditAction(action)).toBe(true)
     }
+  })
+})
+
+describe('the Add someone dialogue\'s refusals (A-121 criterion 7)', () => {
+  test('a Workspace address already leading elsewhere sends them to that account, not to merge', () => {
+    const said = preLinkHeldBy({ name: 'Jo Bloggs', how: 'email' }, PRELINK_OPEN_INSTEAD)
+    expect(said).toContain('Jo Bloggs')
+    expect(said).toContain('Open that account instead.')
+    expect(said).not.toMatch(/merge/i)
+  })
+
+  test('an address an account is waiting on names that account', () => {
+    const said = waitingForGoogle('Jo Bloggs')
+    expect(said).toContain('Jo Bloggs')
+    expect(said).toContain('Google')
+    expect(said).toContain(PRELINK_OPEN_INSTEAD)
   })
 })
