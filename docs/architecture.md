@@ -1521,9 +1521,12 @@ rather than the live queries recomputing over data that has moved on since the f
 carrying the house the hub is showing. It reads the draft, takes the closing note and posts it
 with the `performanceId` it read. A 409 rereads the report: the frozen report arriving answers a
 lost race, and otherwise the refusal is the checklist gate, shown with a link to the checklist. A
-400 with no `performanceId` is a matinee day opened cold and shows the performance switcher. The
-screen asks `GET /api/tonight/authority` for `DUTY_MANAGER` alone, so an officer standing in is
-told before signing that the sign-off records as such (0044), whatever other shift they hold.
+400 with no `performanceId` is a matinee day opened cold and shows the performance switcher, or
+the refusal itself when authority lists no house to choose. The screen asks `GET
+/api/tonight/authority` for `DUTY_MANAGER` on the performance it shows, asking again on a switch,
+so an officer standing in is told before signing that the sign-off records as such (0044),
+whatever shift they hold elsewhere. The staffing bypass flag is the night's, shown once and never
+beside a slot, because the audit entry it reads names no shift.
 
 ## The programme (build-order contract d, 0043)
 

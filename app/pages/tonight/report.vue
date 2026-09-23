@@ -44,14 +44,22 @@ const ambiguous = ref(false)
 const via = ref<'SHIFT' | 'OFFICER' | null>(null)
 const choices = ref<{ performanceId: string, showTitle: string, startsAt: number }[]>([])
 
+let asking = 0
+
+// Scoped to the performance on screen, because a shift on the other house must not hide that
+// this one is signed as a stand-in; only the unscoped answer lists the houses to choose from.
 async function loadAuthority(): Promise<void> {
+  const mine = ++asking
+  const asked = performanceId.value
   try {
-    const answered = await request<{ via: 'SHIFT' | 'OFFICER', performances: Choice[] }>('/api/tonight/authority', { query: { role: 'DUTY_MANAGER' } })
+    const query = asked ? { role: 'DUTY_MANAGER', performanceId: asked } : { role: 'DUTY_MANAGER' }
+    const answered = await request<{ via: 'SHIFT' | 'OFFICER', performances: Choice[] }>('/api/tonight/authority', { query })
+    if (mine !== asking) return
     via.value = answered.via
-    choices.value = answered.performances.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt }))
+    if (!asked) choices.value = answered.performances.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt }))
   }
   catch {
-    via.value = null
+    if (mine === asking) via.value = null
   }
 }
 
@@ -66,8 +74,8 @@ async function load(): Promise<void> {
     syncedAt.value = new Date()
   }
   catch (refused) {
-    if (!performanceId.value && refusalStatus(refused) === 400) ambiguous.value = true
-    else failure.value = refusalText(refused)
+    ambiguous.value = !performanceId.value && refusalStatus(refused) === 400
+    failure.value = refusalText(refused)
   }
   finally {
     busy.value = false
@@ -76,6 +84,7 @@ async function load(): Promise<void> {
 
 function choose(chosen: string): void {
   performanceId.value = chosen
+  loadAuthority()
   load()
 }
 
@@ -152,16 +161,8 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
     :stale="syncedAt"
     :busy="busy"
   >
-    <UAlert
-      v-if="failure"
-      data-test="report-failure"
-      color="error"
-      variant="subtle"
-      :description="failure"
-    />
-
     <div
-      v-else-if="ambiguous"
+      v-if="ambiguous && choices.length > 0"
       class="space-y-3"
       data-test="report-performance-switcher"
     >
@@ -174,6 +175,14 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
         @choose="choose"
       />
     </div>
+
+    <UAlert
+      v-else-if="failure"
+      data-test="report-failure"
+      color="error"
+      variant="subtle"
+      :description="failure"
+    />
 
     <div
       v-else-if="report"
@@ -241,6 +250,17 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
       </NightBlock>
 
       <NightBlock title="Staffing">
+        <!-- The flag is the night's, not any slot's: the audit entry names no shift (0044). -->
+        <UBadge
+          v-if="report.staffing.some(row => row.officerBypass)"
+          color="warning"
+          variant="subtle"
+          size="sm"
+          class="mb-2"
+          data-test="staffing-officer-bypass"
+        >
+          An officer opened the duty manager's screens without the shift
+        </UBadge>
         <ul class="space-y-1 text-sm">
           <li
             v-for="row in report.staffing"
@@ -250,12 +270,6 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
             <span>{{ saysShiftRole(row.role) }}</span>
             <span :class="row.name ? '' : 'text-muted'">
               {{ row.name ?? 'Unfilled' }}
-              <UBadge
-                v-if="row.officerBypass"
-                color="warning"
-                variant="subtle"
-                size="sm"
-              >Officer, no shift</UBadge>
             </span>
           </li>
         </ul>
