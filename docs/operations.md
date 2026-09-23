@@ -953,9 +953,11 @@ Answered on 23 September 2026 from the code, for the question in issue 1213:
   unpaid (pending) booking `reservation.hold-expiring` once, `HOLD_REMINDER_MINUTES_BEFORE`
   minutes before the hold releases (D-107). It says when the seats go and what to do. The
   release itself sends the holder nothing further.
-- **There is no reminder before a performance.** A collected booking hears nothing between its
-  confirmation and the night. The Bookings topic's description mentions reminders before a
-  performance; no such message is registered yet.
+- **There is no reminder before a performance yet.** A collected booking hears nothing between
+  its confirmation and the night. The reminder is planned as V2 story H-205 (issue 1231), with
+  its window, `BOOKING_REMINDER_HOURS_BEFORE`, proposed at 24 hours in `docs/workshops.md` and
+  shipping unset until a session confirms it. The Bookings topic's description no longer mentions
+  reminders; it names them again when the reminder sends.
 - **A booker cancelling their own unpaid booking** from its confirmation page is emailed
   `reservation.cancelled` (D-110 criterion 3).
 - **The desk cancelling a collected booking, or refunding a ticket, sends the booker nothing.**
