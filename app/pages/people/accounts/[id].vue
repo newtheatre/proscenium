@@ -6,7 +6,7 @@ import { describeAction } from '#shared/utils/audit-actions'
 
 definePageMeta({ layout: 'console', title: 'Account', middleware: 'console', docs: '/docs/people/accounts' })
 
-interface Grant { role: string, expiresAt: number | null, grantedAt: number, live: boolean }
+interface Grant { role: string, expiresAt: number | null, grantedAt: number, note: string | null, live: boolean }
 
 interface View {
   account: { id: string, name: string, email: string, verified: boolean, disabled: boolean, anonymisedAt: number | null, shadow: boolean }
@@ -315,6 +315,13 @@ onMounted(load)
               <span class="text-muted">
                 {{ grant.live ? 'until' : 'lapsed' }}
                 {{ grant.expiresAt ? saysWhen(grant.expiresAt) : 'further notice' }}
+              </span>
+              <span
+                v-if="grant.note"
+                class="block text-xs text-muted"
+                :data-test="`grant-note-${grant.role}`"
+              >
+                {{ grant.note }}
               </span>
             </span>
             <UButton
