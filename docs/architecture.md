@@ -911,7 +911,11 @@ cancelled performance tells them (E-101, E-102, committee direction 4 September 
 Templates are administered at `/rota/manage/templates` under `rota.read` and `rota.write`. A
 member's own `/rota` (E-103) shows what they already hold and the open shifts on the diary, each
 carrying live eligibility rather than a cached one. `GET /api/admin/rota/templates` filters by
-venue name and by `staffed` through `shared/utils/rota-templates-list.ts` (K-129).
+venue name and by `staffed` through `shared/utils/rota-templates-list.ts` (K-129), and lists only
+our own current venues: an external or retired venue is left out of the page and its count. An
+external venue is refused a template and a stamp by `externalVenueTemplateRefusal()`, and the
+stamping statement joins `venues` on `is_external = 0`, so a template left on a venue since marked
+external stamps nothing; its performances are staffed through the ad hoc add (E-101 criterion 5).
 
 ### Claiming, confirming and declining (E-104, E-105)
 

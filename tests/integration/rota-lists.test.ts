@@ -300,7 +300,8 @@ describe('shift templates (E-101, K-129)', () => {
         ['UPDATE venues SET archived = 1 WHERE id = ?', retired.id],
       ])
 
-      for (const raw of [{}, { staffed: 'true' }, { staffed: 'false' }, { search: 'Test House' }]) {
+      const filters: Record<string, string>[] = [{}, { staffed: 'true' }, { staffed: 'false' }, { search: 'Test House' }]
+      for (const raw of filters) {
         const clause = venueTemplatesClause(parseTemplates(raw))
         const listed = (run(database, venueTemplatesQuery(clause, 25, 0)) as { venueId: string }[]).map(venue => venue.venueId)
         expect(listed).not.toContain(away.id)

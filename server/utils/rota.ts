@@ -25,8 +25,6 @@ import type { H3Event } from 'h3'
 // name several joined tables, so one alias would not do (K-129).
 const rawColumn = (name: string): SQL => sql.raw(name)
 
-const predicateOf = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
-
 export interface VenueTemplate {
   venueId: string
   venueName: string
@@ -48,6 +46,13 @@ export function venueTemplatesClause(query: ListQuery): ListClause {
   })
 }
 
+// Only our own current venues hold a template: an external one is staffed ad hoc and a retired
+// one takes no new work (E-101 criterion 5).
+const templatedVenues = (clause: ListClause): SQL => {
+  const filtered = clause.where ? sql` AND (${clause.where})` : sql``
+  return sql` WHERE vp.is_external = 0 AND vp.archived = 0${filtered}`
+}
+
 export function venueTemplatesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT v.id AS venueId, v.name AS venueName, t.role AS role, t."count" AS "count",
@@ -55,7 +60,7 @@ export function venueTemplatesQuery(clause: ListClause, limit: number, offset: n
     FROM venues v
     LEFT JOIN shift_templates t ON t.venue_id = v.id
     WHERE v.id IN (
-      SELECT vp.id FROM venues vp${predicateOf(clause)}
+      SELECT vp.id FROM venues vp${templatedVenues(clause)}
       ORDER BY ${sql.join(clause.orderBy, sql`, `)}
       LIMIT ${limit} OFFSET ${offset}
     )
@@ -84,8 +89,12 @@ export async function listVenueTemplates(clause: ListClause, limit: number, offs
   return [...templates.values()]
 }
 
+export function countVenueTemplatesQuery(clause: ListClause): SQL {
+  return sql`SELECT count(*) AS total FROM venues vp${templatedVenues(clause)}`
+}
+
 export async function countVenueTemplates(clause: ListClause): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues vp${predicateOf(clause)}`)
+  const [row] = await db.all<{ total: number }>(countVenueTemplatesQuery(clause))
   return row?.total ?? 0
 }
 
@@ -169,8 +178,8 @@ export function restampShiftTimesStatement(performanceId: string, defaults: Shif
   `
 }
 
-// Stamping. The slot ordinals come out of a recursive count rather than out of the request, so
-// the statement binds only what `scope` binds however many slots a template holds (0006).
+// Stamping. The slot ordinals come out of a recursive count, so this binds only what `scope` binds
+// (0006). An external venue stamps nothing, even from a template it held before (E-101 criterion 5).
 function stampStatement(scope: SQL, defaults: ShiftOffsets): SQL {
   return sql`
     WITH RECURSIVE slot(i) AS (
@@ -182,6 +191,7 @@ function stampStatement(scope: SQL, defaults: ShiftOffsets): SQL {
     SELECT lower(hex(randomblob(16))), p.id, t.role, slot.i, 'OPEN',
            ${windowStart(defaults)}, ${windowEnd(defaults)}
     FROM performances p
+    JOIN venues v ON v.id = p.venue_id AND v.is_external = 0
     JOIN shift_templates t ON t.venue_id = p.venue_id
     JOIN slot ON slot.i <= t."count"
     WHERE p.status <> 'CANCELLED' AND (${scope})
