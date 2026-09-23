@@ -1807,6 +1807,17 @@ never a deletion**: no member-facing delete path exists at all, rather than one 
 (C-112 criterion 2, audit RM-3). The write is guarded on the status it read, so two cancels racing
 leave one success. `CANCELLED`, `REJECTED` and `BUMPED` are terminal, and the row stays in the
 member's own list with its status (criterion 5).
+A member changes a request through `PUT /api/rooms/bookings/[id]`, and only while it is
+`PENDING_APPROVAL` (C-108 criterion 4). The route re-runs the closure check and `judge()` in full,
+counting the member's other held bookings rather than this one against the cap, then writes through
+`editPending()` in `server/utils/bookings.ts`, the claim's guarded twin: one `UPDATE ... RETURNING
+id` carrying the owner, the status and the clash rule (with the row itself excepted) on the
+statement, so an edit that meets an approval, a cancel or a competing claim writes nothing and is
+disambiguated afterwards (0003, 0006). The row stays `PENDING_APPROVAL` whatever the verdict.
+Moving it to another room or another London day sets `created_at` to the edit and clears
+`escalated_at`, so the sweep's two ages run again for what is now a different question; any other
+change leaves both alone. The audit entry (`room.request.edited`) carries the room, span, numbers,
+tier and purpose from and to, and only the names of any rewritten title, notes or reason (0011).
 Occupancy: `CONFIRMED` and `PENDING_APPROVAL` hold their slot; the clash rule is half-open
 and rides the write as a predicate. `server/utils/bookings.ts` is the only writer, and it is one
 guarded `INSERT ... SELECT ... WHERE NOT EXISTS ... RETURNING id`: a row returned is the win, and
@@ -2141,8 +2152,11 @@ in one predicate rather than an id list, so a term of any length is one statemen
 already cancelled or rejected occurrences are untouched (criterion 2). One message names the weeks
 that went, never one per occurrence (criterion 5).
 
-Editing an occurrence or a series is not built: no booking-edit path exists anywhere in the module
-yet, so a series edit would mean inventing a single-booking edit first.
+Editing asks the same question and answers only one side of it: `PUT /api/rooms/bookings/[id]`
+changes one occurrence of a pending request, and refuses a body naming `scope: 'series'` with a
+message saying series editing is not available yet (C-108 criterion 4, issue 1055). A series-wide
+edit would need criterion 4's all-or-nothing re-check across every occurrence, which is its own
+piece of work.
 
 Erasure scrubs the series title to `Erased series` and keeps the row, the same rule its occurrences
 follow. It exports under its own section, because the bundle keys by section and sharing the

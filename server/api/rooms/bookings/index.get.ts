@@ -23,6 +23,9 @@ export default defineEventHandler(async (event) => {
     status: schema.roomBookings.status,
     tier: schema.roomBookings.tier,
     purpose: schema.roomBookings.purpose,
+    // Their own words, returned to them alone so the edit form opens filled in (C-108 criterion 4).
+    notes: schema.roomBookings.notes,
+    reason: schema.roomBookings.reason,
     rejectionReason: schema.roomBookings.rejectionReason,
     seriesId: schema.roomBookings.seriesId,
     occurrence: schema.roomBookings.occurrence,
@@ -44,7 +47,11 @@ export default defineEventHandler(async (event) => {
 
   return {
     when: input.when,
-    items: rows.map(row => ({ ...row, cancellable: refusalToCancel({ userId: account.id, status: row.status }, account.id) === null })),
+    items: rows.map(row => ({
+      ...row,
+      cancellable: refusalToCancel({ userId: account.id, status: row.status }, account.id) === null,
+      editable: refusalToEdit({ userId: account.id, status: row.status }, account.id) === null,
+    })),
     total: rows.length,
   }
 })

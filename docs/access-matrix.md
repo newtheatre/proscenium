@@ -39,7 +39,7 @@ not be a refusal at a desk (0031).
 | `/rooms` | `signedIn` | None to browse the calendar. | n/a |
 | `/rooms/book` | `signedIn` to view; `POST /api/rooms/bookings` and `POST /api/rooms/series` check `memberOrGrace` server side (`hasCurrentMembership`). | Refused outright (`NO_MEMBERSHIP`, `judge()` in `shared/utils/booking-policy.ts`): "Booking a room needs a current membership. Renew it at the Students' Union." Not divertible into a request (`NOT_DIVERTIBLE`). | `/account/membership`, linked from the failure alert (`booking-membership-link`). |
 | `/rooms/external` | `signedIn` to view; `POST /api/rooms/external-requests` checks `memberOrGrace`. | Refused (`NO_MEMBERSHIP`, `judgeExternal()` in `shared/utils/external-requests.ts`): "Asking for a room needs a current membership." | `/account/membership`, linked from the failure alert (`external-membership-link`). |
-| `/rooms/mine` | `signedIn` | None: viewing or cancelling your own booking is not re-gated by today's membership state. | n/a |
+| `/rooms/mine` | `signedIn`; `PUT /api/rooms/bookings/[id]` re-runs `judge()` for a pending request. | None to view or cancel your own booking: neither is re-gated by today's membership state. Changing a pending request is a request re-asked, so a lapsed membership refuses it outright (`NO_MEMBERSHIP`). | n/a |
 
 ## Show night and training
 

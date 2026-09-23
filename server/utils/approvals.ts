@@ -1,7 +1,11 @@
+import { db, schema } from '@nuxthub/db'
 import { eq, inArray, sql } from 'drizzle-orm'
+// Named rather than auto-imported, because `tests/` typechecks this file under Bun (0055).
+import { conflictsWith } from './bookings'
 import { chunked, refusalToDecide } from '#shared/utils/approvals'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 import type { Conflict } from '#shared/utils/bookings'
+import type { SQL } from 'drizzle-orm'
 
 // Answering a request (C-109). The clash rule rides the approving write, so an approval that has
 // been beaten to the slot returns a conflict rather than confirming a double booking (criterion 3).
@@ -61,9 +65,18 @@ async function selectPending(where: ReturnType<typeof eq>): Promise<PendingRow[]
 // The whole predicate is on the statement: still waiting, room still bookable, and nothing
 // overlapping it in the room it is going into. A read then a write could be interleaved (0006).
 export async function approveOne(id: string, actorId: string, intoRoom: string | null, now: number): Promise<DecisionOutcome> {
+  const confirmed = await db.all<{ id: string }>(approveStatement(id, actorId, intoRoom, now))
+
+  // The alias is not usable in RETURNING, which is why the column is bare (SQLite).
+  if (confirmed.length > 0) return { id, ok: true, status: 'CONFIRMED' }
+  return whyItFailed(id, intoRoom)
+}
+
+// Built apart from its run so a test can race it against a member's edit on a real schema.
+export function approveStatement(id: string, actorId: string, intoRoom: string | null, now: number): SQL {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
 
-  const confirmed = await db.all<{ id: string }>(sql`
+  return sql`
     UPDATE room_bookings AS target
     SET status = 'CONFIRMED',
         room_id = COALESCE(${intoRoom}, target.room_id),
@@ -82,11 +95,7 @@ export async function approveOne(id: string, actorId: string, intoRoom: string |
           AND other.ends_at > target.starts_at
       )
     RETURNING id
-  `)
-
-  // The alias is not usable in RETURNING, which is why the column is bare (SQLite).
-  if (confirmed.length > 0) return { id, ok: true, status: 'CONFIRMED' }
-  return whyItFailed(id, intoRoom)
+  `
 }
 
 export async function rejectOne(id: string, actorId: string, reason: string, now: number): Promise<DecisionOutcome> {
