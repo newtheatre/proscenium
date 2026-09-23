@@ -23,7 +23,8 @@ interface Item {
 const model = defineModel<string | undefined>()
 
 // The name as well as the id, for a screen building a list of people rather than holding one.
-const emit = defineEmits<{ chosen: [{ id: string, name: string } | null] }>()
+// nobody carries the search that found no account, and null once one does (A-132's fallback).
+const emit = defineEmits<{ chosen: [{ id: string, name: string } | null], nobody: [string | null] }>()
 
 const props = withDefaults(defineProps<{
   placeholder?: string
@@ -83,6 +84,12 @@ const items = computed<Item[]>(() => (data.value?.items ?? []).map(person => ({
   hint: person.studentId ?? null,
   erased: (person.anonymisedAt ?? null) !== null,
 })))
+
+watch([data, status], () => {
+  const term = settled.value.trim()
+  const searched = term.length >= 2 && status.value === 'success'
+  emit('nobody', searched && items.value.length === 0 ? term : null)
+})
 
 const shown = computed<Item[]>(() =>
   chosen.value && !items.value.some(item => item.value === chosen.value!.value)

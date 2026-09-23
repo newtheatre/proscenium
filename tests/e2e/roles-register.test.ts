@@ -394,7 +394,7 @@ describe.skipIf(skip !== null)('a role is granted by address when the picker fin
     try {
       await view.navigate(`${app.baseURL}/people/roles?role=is:BAR_MANAGER`)
       await waitFor(view, `document.querySelector('[data-test="grant-form"]')`)
-      expect(await view.evaluate(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
 
       await click(view, '[data-test="grant-person"] input')
       await fill(view, '[data-test="grant-person"] input', email)
