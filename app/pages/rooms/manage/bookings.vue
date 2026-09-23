@@ -20,6 +20,7 @@ interface Booking {
   tier: string
   purpose: string | null
   status: string
+  convertedToRequestId: string | null
   attendees: number | null
   startsAt: number
   endsAt: number
