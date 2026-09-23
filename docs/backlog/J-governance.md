@@ -66,7 +66,7 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   6. The trail names each entry's subject the way the rest of the console does: a person by their
      account name, and a show, performance, season, venue, till, catalogue entry, room, space,
      module, department, preset, checklist item or finance period by its own name (a performance
-     and a bar opening also by when they start), looked up as the trail renders so an erased
+     and a bar opening also by when they start, a till by its night), looked up as the trail renders so an erased
      person reads as their tombstone. A subject with no readable name (a booking, a report, a
      request whose title is somebody's own words) or one since deleted shows its raw target, never
      a guess. The lookup is keyed on the target's kind and scopes by subquery, never by a list of

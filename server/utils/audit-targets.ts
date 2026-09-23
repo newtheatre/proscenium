@@ -8,6 +8,10 @@ import type { SQL } from 'drizzle-orm'
 
 type Lookup = (key: SQL) => SQL
 
+// A till is written `till:<venue>:<night>`, one session per venue and night.
+const tillVenue = (key: SQL): SQL => sql`substr(${key}, 1, instr(${key}, ':') - 1)`
+const tillNight = (key: SQL): SQL => sql`CASE WHEN instr(${key}, ':') > 0 THEN substr(${key}, instr(${key}, ':') + 1) END`
+
 // Aliased: the listing joins `users` for the actor, and this one is a different person.
 const subject = alias(schema.users, 'subject')
 
@@ -18,7 +22,7 @@ const NAMES = {
     JOIN ${schema.shows} ON ${schema.shows.id} = ${schema.performances.showId} WHERE ${schema.performances.id} = ${key}`,
   'season': key => sql`SELECT ${schema.seasons.name} FROM ${schema.seasons} WHERE ${schema.seasons.id} = ${key}`,
   'venue': key => sql`SELECT ${schema.venues.name} FROM ${schema.venues} WHERE ${schema.venues.id} = ${key}`,
-  'till': key => sql`SELECT ${schema.venues.name} FROM ${schema.venues} WHERE ${schema.venues.id} = ${key}`,
+  'till': key => sql`SELECT ${schema.venues.name} FROM ${schema.venues} WHERE ${schema.venues.id} = ${tillVenue(key)}`,
   'show-category': key => sql`SELECT ${schema.showCategories.name} FROM ${schema.showCategories} WHERE ${schema.showCategories.id} = ${key}`,
   'content-warning': key => sql`SELECT ${schema.contentWarnings.title} FROM ${schema.contentWarnings} WHERE ${schema.contentWarnings.id} = ${key}`,
   'ticket-type': key => sql`SELECT ${schema.ticketTypes.name} FROM ${schema.ticketTypes} WHERE ${schema.ticketTypes.id} = ${key}`,
@@ -47,6 +51,11 @@ const TIMES = {
   'bar-opening': key => sql`SELECT ${schema.barOpenings.startsAt} FROM ${schema.barOpenings} WHERE ${schema.barOpenings.id} = ${key}`,
 } satisfies Record<string, Lookup>
 
+// A till session is one night rather than one instant, so it says its London show night (0014).
+const NIGHTS = {
+  till: key => sql`SELECT ${tillNight(key)} FROM ${schema.venues} WHERE ${schema.venues.id} = ${tillVenue(key)}`,
+} satisfies Record<string, Lookup>
+
 export const NAMED_TARGET_KINDS = Object.keys(NAMES)
 
 // Kinds are fixed identifiers, so inlined as literals: the expression binds nothing, however many
@@ -63,3 +72,4 @@ function byKind(lookups: Record<string, Lookup>): SQL {
 
 export const auditTargetName: SQL = byKind(NAMES)
 export const auditTargetAt: SQL = byKind(TIMES)
+export const auditTargetNight: SQL = byKind(NIGHTS)

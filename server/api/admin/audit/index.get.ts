@@ -3,7 +3,7 @@ import { auditList } from '#shared/utils/audit-list'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { envelope, offsetFor } from '#shared/utils/pagination'
 import { auditClause } from '#server/utils/audit-search'
-import { auditTargetAt, auditTargetName } from '#server/utils/audit-targets'
+import { auditTargetAt, auditTargetName, auditTargetNight } from '#server/utils/audit-targets'
 
 const query = filterQuerySchema(auditList)
 
@@ -26,6 +26,7 @@ export default defineEventHandler(async (event) => {
     // readable name or the subject is gone, and the screen then shows the raw target (J-103).
     targetName: sql<string | null>`${auditTargetName}`,
     targetAt: sql<number | null>`${auditTargetAt}`,
+    targetNight: sql<string | null>`${auditTargetNight}`,
     detail: schema.auditLog.detail,
     createdAt: schema.auditLog.createdAt,
   })

@@ -21,6 +21,7 @@ interface Entry {
   target: string | null
   targetName: string | null
   targetAt: number | null
+  targetNight: string | null
   detail: Record<string, unknown> | null
   createdAt: number
 }
@@ -152,11 +153,13 @@ function readable(key: string, value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value)
 }
 
-// The subject by its name, and a performance or an opening by when it starts too; null where the
-// kind has nothing readable or the subject is gone, and the raw target is shown instead (J-103).
+// The subject by its name, with when it starts or the night it belongs to where one name covers
+// many; null where nothing readable names it, and the raw target is shown instead (J-103).
 function subjectOf(entry: Entry): string | null {
   if (entry.targetName === null) return null
-  return entry.targetAt === null ? entry.targetName : `${entry.targetName} (${saysWhen(entry.targetAt)})`
+  if (entry.targetAt !== null) return `${entry.targetName} (${saysWhen(entry.targetAt)})`
+  if (entry.targetNight !== null) return `${entry.targetName} (${saysDay(entry.targetNight)})`
+  return entry.targetName
 }
 
 const columns: TableColumn<Entry>[] = [

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
-import { NAMED_TARGET_KINDS, auditTargetAt, auditTargetName } from '#server/utils/audit-targets'
+import { NAMED_TARGET_KINDS, auditTargetAt, auditTargetName, auditTargetNight } from '#server/utils/audit-targets'
 import { erasureStatements } from '#shared/utils/erasure'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -26,10 +26,10 @@ function entry(database: TestDatabase, id: string, target: string | null): void 
   ]])
 }
 
-interface Named { name: string | null, at: number | null }
+interface Named { name: string | null, at: number | null, night: string | null }
 
 function named(database: TestDatabase, id: string): Named {
-  const statement = sql`SELECT ${auditTargetName} AS name, ${auditTargetAt} AS at FROM audit_log WHERE audit_log.id = ${id}`
+  const statement = sql`SELECT ${auditTargetName} AS name, ${auditTargetAt} AS at, ${auditTargetNight} AS night FROM audit_log WHERE audit_log.id = ${id}`
   const [text, ...parameters] = boundStatement(database, statement)
   const [row] = rows<Named>(database, text, ...parameters)
   if (!row) throw new Error(`no entry ${id}`)
@@ -46,14 +46,15 @@ describe('a subject reads as its own name', () => {
       entry(database, 'e-show', `show:${tonight.showId}`)
       entry(database, 'e-performance', `performance:${tonight.performanceId}`)
       entry(database, 'e-venue', `venue:${tonight.venueId}`)
-      entry(database, 'e-till', `till:${tonight.venueId}`)
+      // Written as the till routes write it: one session per venue and show night.
+      entry(database, 'e-till', `till:${tonight.venueId}:${tonight.night}`)
 
-      expect(named(database, 'e-user')).toEqual({ name: 'Member One', at: null })
-      expect(named(database, 'e-show')).toEqual({ name: 'A Test Show', at: null })
+      expect(named(database, 'e-user')).toEqual({ name: 'Member One', at: null, night: null })
+      expect(named(database, 'e-show')).toEqual({ name: 'A Test Show', at: null, night: null })
       // A show has many performances, so the one meant is told apart by when it starts.
-      expect(named(database, 'e-performance')).toEqual({ name: 'A Test Show', at: tonight.startsAt })
-      expect(named(database, 'e-venue')).toEqual({ name: 'The Studio', at: null })
-      expect(named(database, 'e-till')).toEqual({ name: 'The Studio', at: null })
+      expect(named(database, 'e-performance')).toEqual({ name: 'A Test Show', at: tonight.startsAt, night: null })
+      expect(named(database, 'e-venue')).toEqual({ name: 'The Studio', at: null, night: null })
+      expect(named(database, 'e-till')).toEqual({ name: 'The Studio', at: null, night: tonight.night })
     })
   })
 
@@ -103,9 +104,12 @@ describe('a subject with nothing readable says its raw target, never a guess', (
       entry(database, 'e-bare', tonight.showId)
       // A prefix that merely begins with a named kind is its own kind, not that one.
       entry(database, 'e-lookalike', `show-category:${tonight.showId}`)
+      // A till keyed on the whole remainder would be a venue called `<id>:<night>`; one without a
+      // night is malformed, not a venue.
+      entry(database, 'e-till-bare', `till:${tonight.venueId}`)
 
-      for (const id of ['e-feedback', 'e-deleted', 'e-none', 'e-bare', 'e-lookalike']) {
-        expect(named(database, id)).toEqual({ name: null, at: null })
+      for (const id of ['e-feedback', 'e-deleted', 'e-none', 'e-bare', 'e-lookalike', 'e-till-bare']) {
+        expect(named(database, id)).toEqual({ name: null, at: null, night: null })
       }
     })
   })
@@ -114,7 +118,7 @@ describe('a subject with nothing readable says its raw target, never a guess', (
     await withDatabase((database) => {
       for (const kind of NAMED_TARGET_KINDS) {
         entry(database, `e-${kind}`, `${kind}:missing`)
-        expect(named(database, `e-${kind}`)).toEqual({ name: null, at: null })
+        expect(named(database, `e-${kind}`)).toEqual({ name: null, at: null, night: null })
       }
     })
   })
@@ -125,8 +129,10 @@ describe('the lookup is fixed in size, whatever the page holds (0006)', () => {
     await withDatabase((database) => {
       const [, ...nameParameters] = boundStatement(database, sql`SELECT ${auditTargetName} FROM audit_log`)
       const [, ...atParameters] = boundStatement(database, sql`SELECT ${auditTargetAt} FROM audit_log`)
+      const [, ...nightParameters] = boundStatement(database, sql`SELECT ${auditTargetNight} FROM audit_log`)
       expect(nameParameters).toEqual([])
       expect(atParameters).toEqual([])
+      expect(nightParameters).toEqual([])
     })
   })
 })

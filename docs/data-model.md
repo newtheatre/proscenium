@@ -2658,8 +2658,9 @@ K-129): `actor` (a person, matching or excluding, with "is empty" finding a syst
 London day range against when the entry was recorded, not what it describes). `search` runs over
 `target`, so it now finds a substring rather than needing the exact `kind:id`. Sorted by
 `createdAt`, newest first, a same-second tie breaking on `rowid` rather than the random `id`.
-Each listed entry carries `targetName`, and `targetAt` for a performance or a bar opening, looked
-up as the page is read by one `CASE` over the target's kind (`server/utils/audit-targets.ts`, J-103
+Each listed entry carries `targetName`, `targetAt` for a performance or a bar opening, and
+`targetNight` for a till (written `till:<venue>:<night>`, so keyed on the venue part), looked up as
+the page is read by one `CASE` over the target's kind (`server/utils/audit-targets.ts`, J-103
 criterion 6): each kind reads its own table by primary key in a correlated subquery, so the lookup
 binds no parameter and never gathers the page's ids (0006). A person reads through `users.name`, so
 an erased one is their tombstone. A kind whose only readable text is somebody's own words (a room
