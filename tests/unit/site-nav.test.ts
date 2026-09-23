@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { ABILITY_PERMISSIONS, viewReports } from '#shared/utils/abilities'
 import { contentPathOf } from '#shared/utils/docs-paths'
 import { PERMISSIONS } from '#shared/utils/roles'
-import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor } from '#shared/utils/site-nav'
+import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor, navCount } from '#shared/utils/site-nav'
 
 // The navigation conventions are a test rather than a review habit (0040), the same way the admin
 // component conventions are (0032). What review still judges is whether a label reads well.
@@ -228,6 +228,22 @@ describe('the middleware and the sidebar read the same declaration', () => {
     expect(groupFor('/rooms/manage/closures')?.key).toBe('spaces')
     expect(groupFor('/people/members')?.key).toBe('people')
     expect(groupFor('/admin/audit')?.key).toBe('system')
+  })
+})
+
+// A queue nobody can see from the screen they are on is a queue nobody works (A-130 criterion 11).
+describe('a waiting count rides the entry that opens it', () => {
+  const people = CONSOLE_NAV.find(group => group.key === 'people')!
+
+  test('the Members entry carries the waiting claims', () => {
+    expect(people.items.find(entry => entry.to === '/people/members')?.count).toBe('membership-claims')
+  })
+
+  test('a group reads the sum of what its entries carry, and nothing when nothing waits', () => {
+    expect(navCount(people.items, { 'membership-claims': 4 })).toBe(4)
+    expect(navCount(people.items, { 'membership-claims': 0 })).toBe(0)
+    expect(navCount(people.items, {})).toBe(0)
+    expect(navCount(people.items.filter(entry => entry.to !== '/people/members'), { 'membership-claims': 4 })).toBe(0)
   })
 })
 

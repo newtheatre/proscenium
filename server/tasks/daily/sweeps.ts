@@ -1,5 +1,5 @@
 // Nightly tidy of rows that have expired unused, of the accounts whose address was never proved,
-// and of the grants that lapsed (0026, A-119, docs/architecture.md, Scheduled tasks).
+// and of the grants that lapsed; the membership notices (0026, A-119, A-130, docs/architecture.md).
 export default defineTask({
   meta: {
     name: 'daily:sweeps',
@@ -12,11 +12,12 @@ export default defineTask({
     const tokens = await sweepExpiredTokens(before)
     const unverified = await expireUnverifiedAccounts(before)
     const renewals = await remindExpiringMemberships(undefined, before)
+    const waitingClaims = await remindWaitingClaims(undefined, before)
     const withdrawnAccessProfiles = await sweepWithdrawnAccessProfiles(before)
     const backstage = await purgeStaleMessages(before)
     const roleLapses = await sweepRoleLapses(undefined, before)
     const sendLog = await pruneNotificationLog(undefined, before)
     const digestEntries = await pruneOrphanedDigestEntries()
-    return { result: { attempts, tokens, unverified, renewals, withdrawnAccessProfiles, backstage, roleLapses, sendLog, digestEntries } }
+    return { result: { attempts, tokens, unverified, renewals, waitingClaims, withdrawnAccessProfiles, backstage, roleLapses, sendLog, digestEntries } }
   },
 })

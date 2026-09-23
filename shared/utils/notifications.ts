@@ -101,6 +101,14 @@ export const MESSAGE_TYPES = {
     template: 'membership-claim-declined',
   },
 
+  // An officer's duty rather than a preference: members are refused until somebody records what
+  // they bought, so no topic may silence the daily notice that claims wait (A-130 criterion 12).
+  'membership.claims.waiting': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'membership-claims-waiting',
+  },
+
   // A handover is planned rather than discovered, so this is transactional: no topic may
   // suppress the notice that somebody's standing authority is about to end (A-119 criterion 1).
   'role.expiring': {

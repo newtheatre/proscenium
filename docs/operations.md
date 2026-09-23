@@ -345,8 +345,10 @@ and creates nothing until an officer records it. Expect hundreds in the first we
 
 Somebody holding `members.write` works the queue daily, from `/people/members?filter=awaiting-record`:
 
-1. Open the queue. It is oldest first and paged; the filter's label carries the count, and the
-   count is what to watch until it stays near zero.
+1. Open the queue. It is oldest first and paged; the count is on the register's toolbar and
+   beside People and Members in the console sidebar, and while any claim waits every holder of
+   `members.write` is sent one `membership.claims.waiting` message a day (A-130 criteria 11 and
+   12). The count is what to watch until it stays near zero.
 2. Check each claim against the SU's membership list by student number, not by name: names do
    not always match the SU's record, and a claim whose number differs from the one already on the
    account is flagged in the queue.

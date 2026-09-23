@@ -553,6 +553,15 @@ Open questions for the committee:
       declaration (`membershipClaimsList`, K-129), never the register's. Its `status` field
       defaults to waiting and also offers recorded, declined and withdrawn, so a decided claim can
       be found from the screen with its outcome, when and, for a decline, the reason sent.
+  11. Added 23 September 2026 (issue 1005): the console sidebar carries how many claims are
+      waiting on the People group and its Members entry, for anybody who can decide them
+      (`members.write`), so the queue is visible from every console screen and not only the
+      register.
+  12. Added 23 September 2026 (issue 1005): while any claim waits, every live holder of
+      `members.write` is sent one message a day (`membership.claims.waiting`, email and inbox)
+      saying how many wait and since when, linking the queue. It is claimed per person per London
+      day, so a second run sends nothing twice, and nothing is sent when nothing waits. It rides
+      the existing `daily:sweeps` task rather than a cron of its own.
 - Source: Pre-cutover review, 10 September 2026; issue 1153 item 7 (criterion 9, the withdrawal
   was one click). The migration carries no memberships
   (`migration/identity.ts`), so at cutover every member reads as lapsed until recorded; this is
