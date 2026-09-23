@@ -77,7 +77,7 @@ describe.skipIf(skip !== null)('signing off the night by hand (issue 1053)', () 
 
       await visit(view, `${app.baseURL}/tonight/report`)
       await waitFor(view, `document.querySelector('[data-test="report-draft"]')`)
-      expect(await textOf(view, '[data-test="report-draft"]')).toContain('Attendance')
+      expect(await textOf(view, '[data-test="report-draft"]')).toContain('Walk-ups')
 
       await fill(view, NOTE, 'A quiet house, nothing to report.')
       await click(view, '[data-test="sign-off"]')
