@@ -82,23 +82,30 @@ pins one before it touches anything.
 ### What it cannot do
 
 Applying and deploying cannot be sequenced from CI: the migration job and Workers Builds start
-from the same push and race. The health check below is what makes losing that race visible rather
-than silent. **Anything destructive is applied by hand, before merging.**
+from the same push and race. `/api/health` returning 503 while the schema is behind is what makes
+losing that race visible rather than silent. **Anything destructive is applied by hand, before
+merging.**
 
-The health check is its own job, `health`, gated on `migrate` succeeding first. Reading the two
-apart matters: `migrate` red is a schema problem, restore from its own bookmark; `migrate` green
-with `health` red is the ordering race above, which resolves itself once Workers Builds catches
-up. One job carrying both readings is how 21 real failures of this exact race went unattributed
-before the split.
+**The workflow does not check health afterwards** (issue 1014, 23 September 2026). It once had a
+second job, `health`, that polled `/api/health` after `migrate` succeeded; it failed on every run
+with a 403 and never reached the application. The `newtheatre.org.uk` zone (the pre-cutover host
+and production alike) is on Cloudflare's Free plan with Bot Fight Mode on, which challenges GitHub Actions runners, and on that plan it runs outside
+the WAF rules engine: no custom rule, skip rule or request header lets a runner through. A check
+that is red on every run teaches everyone to ignore red, so the job was dropped rather than kept.
 
-`health`'s target is `${{ vars.HEALTH_URL }}`, a **repository** variable, never a literal in the
-workflow file and never environment-scoped: `health-watch.yml`'s own job below declares no
-`environment:`, and an environment-scoped variable would need one added purely to read it, which
-risks a scheduled run stalling on an approval gate this repository does not currently have but
-could one day add. There is no fallback: both jobs fail fast naming the missing variable rather
-than silently checking the wrong system. **This is also cutover's whole mechanism for both**:
-pointing `HEALTH_URL` at the unified deploy, and back again if cutover needs to reverse, is one
-repository variable's value changing, not a pull request.
+**After every migration run, check health by hand:** once the run is green and Workers Builds
+shows the deploy from the same push as finished, open `/api/health` on the live host in a browser
+(a browser passes the challenge a runner cannot). `{"ok":true}` means schema and code agree. A 503
+naming migration files means the deploy is ahead of the schema: run this workflow again by hand
+(`workflow_dispatch`). If the run itself was red, restore from its bookmark first (above). The
+in-application `health:watch` task (`## The health check`) runs inside the Worker, is not
+challenged, and alerts the IT Manager if the endpoint stays unhealthy, so a check forgotten by
+hand is still caught, only later.
+
+`health-watch.yml` reads `${{ vars.HEALTH_URL }}`, a **repository** variable, never a literal in
+the workflow file. There is no fallback: it fails fast naming the missing variable rather than
+silently checking the wrong system. It curls from a GitHub runner too, so Bot Fight Mode blocks
+it exactly as it blocked the dropped `health` job.
 
 **`health-watch.yml`'s own schedule has never actually run.** GitHub only reads a `schedule:`
 trigger from a workflow file on the repository's default branch, still `main` until cutover; a
@@ -279,10 +286,10 @@ chosen at the time (`<archive-name>` below; nothing is decided yet). In order:
    work.
 
 3. **Change `HEALTH_URL`, the repository variable, to the production host** (Settings > Secrets
-   and variables > Actions > Variables, repository tab). `migrate.yml`'s own `health` job and
-   `health-watch.yml` both read it (`## Applying migrations`, "What it cannot do"); until this
-   changes, both are checking the pre-cutover host, and once cutover starts, checking that host
-   is checking nothing.
+   and variables > Actions > Variables, repository tab). `health-watch.yml` reads it
+   (`## Applying migrations`, "What it cannot do"); until this changes, it is checking the
+   pre-cutover host, and once cutover starts, checking that host is checking nothing. The
+   by-hand check after a migration run is likewise made against the production host from then on.
 
 4. **The DNS flip, and its ordering against the rename.** `wrangler.jsonc`'s one route today is
    `proscenium.newtheatre.org.uk` (`custom_domain: true`), the pre-cutover testing host; the
@@ -533,13 +540,12 @@ uncounted before it is applied; read that list.
 
 A 503 naming migrations means the deploy won the race. Run the migrate workflow by hand.
 
-**Nothing watches it from outside on its own** (J-106 criterion 3): `migrate.yml`'s own `health`
-job polls it once, with retries, right after `migrate` applies and verifies the schema, and
-`.github/workflows/health-watch.yml` polls it on a schedule so a Workers Builds deploy that
-touches no migration is still caught. Neither can be sequenced against the other pipeline's
-completion; both fail the GitHub Actions run loudly rather than passing silently. The
-`health:watch` task below is the third leg, for sustained unhealthiness reaching the IT Manager
-rather than a CI log.
+**No GitHub runner can reach it** (J-106 criterion 3, issue 1014): Bot Fight Mode on
+`newtheatre.org.uk` challenges every runner with a 403, so `migrate.yml` no longer checks it and
+`.github/workflows/health-watch.yml`, which polls it on a schedule, fails the same way. After a
+migration run, open `/api/health` in a browser by hand (`## Applying migrations`, "What it cannot
+do"). The `health:watch` task below runs inside the Worker, is not challenged, and is the
+automated check: sustained unhealthiness reaches the IT Manager through the notification centre.
 
 ## Changing a published rule
 
