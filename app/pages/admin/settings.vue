@@ -52,6 +52,7 @@ const drafts = reactive<Record<string, string>>({})
 const notices = reactive<Record<string, string>>({})
 const saving = ref('')
 const failure = ref<ListFailure | null>(null)
+const loaded = ref(false)
 
 const grouped = computed(() => Object.keys(WORKSHOPS).map(workshop => ({
   workshop,
@@ -224,7 +225,17 @@ function saveText(setting: Setting): Promise<void> {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  try {
+    await load()
+  }
+  catch (error) {
+    failure.value = { message: refusalText(error), enrolPath: enrolPath(error) }
+  }
+  finally {
+    loaded.value = true
+  }
+})
 </script>
 
 <template>
@@ -263,8 +274,20 @@ onMounted(load)
     >
       <template #group>
         <div class="mt-4 space-y-3">
+          <div
+            v-if="!loaded"
+            data-test="config-skeleton"
+            class="space-y-3"
+          >
+            <USkeleton
+              v-for="row in 4"
+              :key="row"
+              class="h-24 w-full"
+            />
+          </div>
+
           <p
-            v-if="!shown.length"
+            v-else-if="settings.length && !shown.length"
             class="py-6 text-center text-sm text-muted"
             data-test="config-empty"
           >

@@ -300,12 +300,17 @@ const columns: TableColumn<StocktakeLine>[] = [
         </template>
       </UTable>
     </template>
-    <p
+    <div
       v-else-if="status === 'pending'"
-      class="text-sm text-muted"
+      data-test="stocktake-skeleton"
+      class="space-y-6"
     >
-      Loading…
-    </p>
+      <div class="space-y-2">
+        <USkeleton class="h-5 w-20" />
+        <USkeleton class="h-4 w-72" />
+      </div>
+      <USkeleton class="h-64 w-full" />
+    </div>
 
     <UModal
       :open="confirming"

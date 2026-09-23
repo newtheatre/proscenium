@@ -581,6 +581,8 @@ Open questions for the committee:
      no detour through the account directory. The account page keeps its own Roles card, and both
      reach the same endpoint, the same guards and the same audit entries. Amended 23 September
      2026: when the picker finds nobody, the page offers granting by address instead (A-132).
+     Amended 23 September 2026: the account page's Roles card shows each grant's note beside its
+     expiry, read under the same `accounts.read` as the register (#1060).
   5. A grant's expiry is the committee year end (the default), a picked date, or permanent, and
      it carries a note of up to 500 characters (A-118 criteria 1 and 2). Re-granting a role the
      account already has a row for renews that row rather than silently doing nothing, and the

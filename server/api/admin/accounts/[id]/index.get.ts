@@ -18,6 +18,7 @@ export default defineEventHandler(async (event) => {
     expiresAt: schema.roleGrants.expiresAt,
     grantedAt: schema.roleGrants.grantedAt,
     grantedBy: schema.roleGrants.grantedBy,
+    note: schema.roleGrants.note,
   }).from(schema.roleGrants).where(eq(schema.roleGrants.userId, id))
 
   const [factor] = await db.select({ confirmedAt: schema.totpSecrets.confirmedAt })

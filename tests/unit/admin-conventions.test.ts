@@ -213,7 +213,7 @@ describe('feedback goes where it belongs (0032)', () => {
 
   test('a screen that confirms an action uses a toast', async () => {
     const confirming = (await screens()).filter(screen =>
-      /Recorded|Revoked\.|is on the (roll|trail)/.test(screen.source))
+      /Recorded|Role revoked|is on the (roll|trail)/.test(screen.source))
     expect(confirming.length).toBeGreaterThan(0)
     expect(confirming.filter(screen => !screen.source.includes('useToast')).map(screen => screen.path)).toEqual([])
   })
@@ -830,5 +830,42 @@ describe('a true-or-false column is a tick or a cross (K-135)', () => {
       if (!(await Bun.file(path).text()).includes('StatusCell')) missing.push(path)
     }
     expect(missing).toEqual([])
+  })
+})
+
+// A toast names the thing and what happened to it, with no full stop (K-128, `docs/copy-style.md`).
+const TOAST_TITLE_WITH_A_STOP = /toast\.add\(\{\s*title:\s*(['`])[^'`]*\.\1/
+
+describe('a console screen says what it is doing (K-123 criterion 5, issue 1151 item 7)', () => {
+  test('no toast title ends in a full stop', async () => {
+    expect(await saying(source => TOAST_TITLE_WITH_A_STOP.test(source))).toEqual([])
+    const stopped: string[] = []
+    for (const path of new Bun.Glob('app/composables/**/*.ts').scanSync({ onlyFiles: true })) {
+      if (TOAST_TITLE_WITH_A_STOP.test(await Bun.file(path).text())) stopped.push(path)
+    }
+    expect(stopped).toEqual([])
+  })
+
+  test('a toast confirming an action names what it acted on', async () => {
+    expect(await saying(source => /title:\s*'Pass issued'/.test(source))).toEqual([])
+  })
+
+  test('every security action on an account confirms in a toast', async () => {
+    const account = await Bun.file('app/pages/people/accounts/[id].vue').text()
+    for (const title of ['Role revoked', 'Signed out everywhere', 'Authenticator reset', 'Account disabled', 'Account enabled'])
+      expect(account).toContain(`'${title}'`)
+  })
+
+  test('a screen still reading shows the shared pending state, never a bare "Loading…"', async () => {
+    expect(await saying(source => />\s*Loading(?:…|\.\.\.)\s*</.test(templateOf(source)))).toEqual([])
+  })
+
+  // An empty state shown before the first read finishes says there is nothing when there may be.
+  test('the settings screen and the send log hold their place while they read', async () => {
+    const settings = await Bun.file('app/pages/admin/settings.vue').text()
+    expect(settings).toContain('<USkeleton')
+    expect(settings).not.toMatch(/v-if="!shown\.length"/)
+    const sendLog = await Bun.file('app/pages/comms/operations/index.vue').text()
+    expect(sendLog).not.toMatch(/v-if="daily"/)
   })
 })

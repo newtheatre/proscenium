@@ -223,6 +223,19 @@ describe.skipIf(skip !== null)('the account view (A-121 criterion 5)', () => {
     expect(view.history.map(entry => entry.action)).toContain('account.registered')
   })
 
+  test('each grant carries its note, as the register shows it (A-131 criterion 4, #1060)', async () => {
+    const person = await subject('annotated')
+    await send('POST', '/api/admin/roles', { userId: person.id, role: 'TREASURER', note: 'Covering the spring term' }, cookie)
+    await send('POST', '/api/admin/roles', { userId: person.id, role: 'FOH_MANAGER' }, cookie)
+
+    const view = await (await send('GET', `/api/admin/accounts/${person.id}`, null, cookie)).json() as {
+      grants: { role: string, note: string | null }[]
+    }
+
+    expect(view.grants.find(grant => grant.role === 'TREASURER')?.note).toBe('Covering the spring term')
+    expect(view.grants.find(grant => grant.role === 'FOH_MANAGER')?.note).toBeNull()
+  })
+
   test('it never carries the password hash', async () => {
     const person = await subject('opaque')
     const body = await (await send('GET', `/api/admin/accounts/${person.id}`, null, cookie)).text()
