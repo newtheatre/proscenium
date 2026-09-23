@@ -77,7 +77,7 @@ for (const [index, name] of NAMES.entries()) {
 }
 
 await send('POST', '/api/dev/seed', {}, cookie)
-await send('POST', '/api/admin/roles', { userId: ids[0], role: 'BOX_OFFICE' }, cookie)
+await send('POST', '/api/admin/roles', { userId: ids[0], role: 'FOH_MANAGER' }, cookie)
 await send('POST', '/api/admin/roles', { userId: ids[1], role: 'FRONT_OF_HOUSE' }, cookie)
 await send('PUT', '/api/admin/config/BAR_TAB_CAP_PENCE', { value: 2500 }, cookie)
 

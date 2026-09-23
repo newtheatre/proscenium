@@ -229,7 +229,7 @@ const mirrors = [
   { source: 'training', db: syntheticMirror('a-officer') },
   { source: 'proscenium', db: syntheticMirror('a-officer') },
 ]
-const roleMap = { 'ticketing:BOX_OFFICE': 'BOX_OFFICE' }
+const roleMap = { 'ticketing:BOX_OFFICE': 'FOH_MANAGER' }
 const idMap = new Map<string, string>()
 const core = await createCore(':memory:')
 

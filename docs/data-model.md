@@ -216,6 +216,8 @@ UNIQUE (`user_id`, `role`). Enforced at read time; the last-administrator guard 
 check, not a constraint. The stamp is for a reader: what stops a second warning is the claim in
 `notification_log`, which carries the expiry the warning was computed against (0048).
 A merge reconciles rather than reassigning: see "Merging duplicate accounts" above (A-123).
+The retired `BOX_OFFICE` role was folded into `FOH_MANAGER` in place by migration 0116, the later
+expiry winning for a holder of both, each moved grant audited as `role.merged` (0090, A-132).
 
 ### totp_secrets
 `user_id` PK → users cascade · `secret` · `confirmed_at` NULL until proven ·
@@ -767,7 +769,7 @@ a time, under the same expected-total cross-check collection uses. Approval (cri
 `money.refund` (manager and admin) or tonight's confirmed duty manager for that performance,
 gated by the `REFUND_PAID_REQUIRES_MANAGER` configuration key (default true, registered ahead of
 this story); the general desk permission (`ticketing.write`) is still needed to reach the screen
-at all, so a duty-manager shift with no box office role cannot use it. The race (criterion 4) is
+at all, so a duty-manager shift with no Front of House Manager role cannot use it (0090). The race (criterion 4) is
 the ticket's own conditional claim (`UPDATE tickets SET refunded_at = ? WHERE ... AND refunded_at
 IS NULL`): `postEntry()` (`server/utils/ledger.ts`) gained an optional `guard` parameter for
 exactly this, making the ledger entry conditional on the claim's own `changes()` and the line

@@ -7,7 +7,6 @@ export const ROLES = [
   'MANAGER',
   'THEATRE_MANAGER',
   'TRAINING_MANAGER',
-  'BOX_OFFICE',
   'FOH_MANAGER',
   'FRONT_OF_HOUSE',
   'BAR_MANAGER',
@@ -139,12 +138,9 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Owns the catalogue and appoints its stewards; `training.override` stays ADMIN because
   // never-expiring is the rarer break-glass (G-107, G-110, questions 7 and 8).
   TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.leads', 'training.read', 'training.revoke', 'training.write'],
-  // Owns the programme's configuration. Nothing operational is here: the door and the desk
-  // derive from tonight's performance and shift (0009).
-  BOX_OFFICE: ['ticketing.read', 'ticketing.write', 'ticketing.export'],
-  // Administers the rota in advance, and opens the door and duty manager screens without a shift
-  // tonight. The till is the bar manager's (0044, 0046, E-101 criterion 2).
-  FOH_MANAGER: ['night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read'],
+  // One committee post: the programme and the rota, and the door and duty manager screens without
+  // a shift tonight, refund approval included. The till is the bar manager's (0044, 0090).
+  FOH_MANAGER: ['ticketing.read', 'ticketing.write', 'ticketing.export', 'night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read'],
   FRONT_OF_HOUSE: [],
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).
@@ -202,7 +198,6 @@ const ROLE_WORDING: Record<Role, string> = {
   MANAGER: 'Manager',
   THEATRE_MANAGER: 'Theatre Manager',
   TRAINING_MANAGER: 'Training Manager',
-  BOX_OFFICE: 'Box Office Manager',
   FOH_MANAGER: 'Front of House Manager',
   FRONT_OF_HOUSE: 'Front of House',
   BAR_MANAGER: 'Bar Manager',
@@ -212,8 +207,13 @@ const ROLE_WORDING: Record<Role, string> = {
   COMMITTEE: 'Committee',
 }
 
+// Grantable no longer, but named by audit entries written before they were retired (0090).
+const RETIRED_ROLE_WORDING: Record<string, string> = {
+  BOX_OFFICE: 'Box Office Manager',
+}
+
 // For a message a holder reads rather than a console filter. The vocabulary is provisional until
 // the workshop signs the mapping, so an unregistered role reads as itself (0027's habit).
 export function saysRole(role: string): string {
-  return ROLE_WORDING[role as Role] ?? role
+  return ROLE_WORDING[role as Role] ?? RETIRED_ROLE_WORDING[role] ?? role
 }
