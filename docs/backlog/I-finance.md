@@ -81,24 +81,24 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
   5. Days with takings but no recorded Z reading surface on the treasurer dashboard until reconciled, and the list is never truncated.
 - Source: Prompt Book I-1 (unmatched items surface as exceptions, adapted to the no-PSP constraint), D-3; audit PR-12 (reconciliation split); Get-In constraint 1
 
-## I-105: Treasurer dashboard for the season
+## I-105: Treasurer dashboard for the year and the season
 
 - Role: Treasurer
 - Phase: MVP
-- Story: As the treasurer, I want a season dashboard derived entirely from the ledger so that "how are we doing" is a glance, not a spreadsheet.
+- Story: As the treasurer, I want a money dashboard derived entirely from the ledger so that "how are we doing" is a glance, not a spreadsheet.
 - Depends on: I-101, I-104
 - Acceptance criteria:
-  1. The season runs 1 August to 31 July, Europe/London; the boundary is a named test case, including an entry at 23:59 on 31 July.
-  2. The dashboard shows season revenue by source, refunds, foregone comp and discount value, and the open variance total, every figure derived from ledger rows.
+  1. The year runs 1 August to 31 July, Europe/London; the boundary is a named test case, including an entry at 23:59 on 31 July. A season is one of the theatre's seasons (Autumn, Spring, StuFF or the Fringe of an academic year), never the whole year (0087).
+  2. The dashboard shows the period's revenue by source, refunds, foregone comp and discount value, and the open variance total, every figure derived from ledger rows.
   3. Any figure drills down to its ledger entries; entry lists page in SQL and return a pagination envelope, never a bare array.
-  4. Periods are selectable (day, week, month, term, season) with grouping pinned to Europe/London.
-  5. Visibility is role-scoped: the treasurer and administrators see everything; other committee roles see season aggregates without personal detail.
+  4. Periods are selectable (day, week, month, term, season, year) with grouping pinned to Europe/London; how a season's days are known is settled in 0087 before the season period is built.
+  5. Visibility is role-scoped: the treasurer and administrators see everything; other committee roles see the same aggregates without personal detail.
   6. The period controls are what ask the question: changing one reads the figures again, so no
-     money screen carries a Refresh beside them. A month and a season are each chosen from a
-     list of the months and the seasons, never typed into a number spinner (K-123 criterion 2).
+     money screen carries a Refresh beside them. A month, a season and a year are each chosen
+     from a list of the months, the seasons and the years, never typed into a number spinner (K-123 criterion 2).
      This holds on every money screen whose toolbar picks a period, not only this one.
-- Source: Prompt Book I-1, I-3 (role-scoped visibility), P4; audit PR-7 (season 1 August to 31
-  July). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10),
+- Source: Prompt Book I-1, I-3 (role-scoped visibility), P4; audit PR-7 (the year 1 August to 31
+  July, which PR-7 called the season; renamed by 0087 after feedback, issue 1207). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10),
   which counted four Refresh buttons beside inputs that already refetch, and three number
   spinners standing in for a month and a year.
 
@@ -123,7 +123,7 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
 - Story: As the treasurer, I want to close a period with a lock so that reported figures stop moving, and corrections happen in the open period where everyone can see them.
 - Depends on: I-101, I-104
 - Acceptance criteria:
-  1. The treasurer closes a period (term or season); the close records who and when and writes an audit entry.
+  1. The treasurer closes a period (term, season or year, 0087); the close records who and when and writes an audit entry.
   2. New entries dated within a closed period are refused; a correction posts as a new entry in the open period referencing the original.
   3. A report over a closed period is stable: re-running it produces identical figures, asserted by a test.
   4. Reopening a closed period requires an administrator and a typed confirmation, and is audited; the close history is visible.
