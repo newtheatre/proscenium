@@ -631,6 +631,90 @@ describe.skipIf(skip !== null)('a promotion is told once (G-106)', () => {
   })
 })
 
+// Issue 1062, decided by the IT Manager: adding a prerequisite warns about who lacks it, and
+// never refuses; the freeze is released only when asked for (question 6).
+describe.skipIf(skip !== null)('changing what a session teaches (G-115 criteria 2 and 7)', () => {
+  interface Preview { lacking: { userId: string, name: string, missing: { requiresId: string }[] }[] }
+
+  const preview = (session: string, moduleIds: string[], as = cookie): Promise<Response> =>
+    send('GET', `/api/admin/training/sessions/${session}/modules-preview?moduleIds=${moduleIds.join(',')}`, undefined, as)
+
+  const change = (session: string, body: Record<string, unknown>, as = cookie): Promise<Response> =>
+    send('PUT', `/api/admin/training/sessions/${session}/modules`, body, as)
+
+  test('the preview names who lacks a prerequisite the change adds, and saving still goes ahead', async () => {
+    const needed = await addModule()
+    const already = await addModule()
+    const taught = await addModule()
+    const added = await addModule()
+    await send('POST', `/api/admin/training/modules/${taught}/prerequisites`, { requiresId: already })
+    await send('POST', `/api/admin/training/modules/${added}/prerequisites`, { requiresId: needed })
+    await send('POST', `/api/admin/training/modules/${added}/prerequisites`, { requiresId: already })
+
+    const session = await schedule({ moduleIds: [taught], capacity: 4 })
+    const lacks = await member()
+    const holds = await member()
+    award(holds.id, needed)
+    await signUp(session, lacks.cookie)
+    await signUp(session, holds.cookie)
+
+    const answered = await preview(session, [taught, added])
+    expect(answered.status).toBe(200)
+    const { lacking } = await answered.json() as Preview
+    // Only what is new: the prerequisite the session already needed is sign-up's own warning.
+    expect(lacking.map(one => [one.userId, one.missing.map(need => need.requiresId)])).toEqual([[lacks.id, [needed]]])
+
+    expect((await change(session, { moduleIds: [taught, added] })).status).toBe(200)
+    expect(all<{ module: string }>(
+      'SELECT module_id module FROM session_modules WHERE session_id = ? ORDER BY module_id', session,
+    ).map(row => row.module).sort()).toEqual([taught, added].sort())
+  })
+
+  test('an open register refuses a change until the freeze is released, and says so on the trail', async () => {
+    const taught = await addModule()
+    const added = await addModule()
+    const session = await schedule({ moduleIds: [taught] })
+    write('UPDATE training_sessions SET register_opened_at = unixepoch() WHERE id = ?', session)
+
+    const refused = await change(session, { moduleIds: [taught, added] })
+    expect(refused.status).toBe(409)
+    expect(await said(refused)).toContain('Release it deliberately')
+
+    const released = await change(session, { moduleIds: [taught, added], releaseFreeze: true })
+    expect(released.status).toBe(200)
+    expect(await released.json()).toMatchObject({ released: true })
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM audit_log WHERE action = 'register.freeze.released' AND target = ?`, `session:${session}`,
+    )?.n).toBe(1)
+  })
+
+  test('a marked register refuses every change, released or not', async () => {
+    const taught = await addModule()
+    const session = await schedule({ moduleIds: [taught] })
+    write('UPDATE training_sessions SET register_opened_at = unixepoch(), marked_at = unixepoch() WHERE id = ?', session)
+
+    expect((await change(session, { moduleIds: [taught], releaseFreeze: true })).status).toBe(409)
+  })
+
+  test('a module that cannot be taught is refused by the preview and the change alike', async () => {
+    const taught = await addModule()
+    const retired = await addModule({ status: 'RETIRED' })
+    const session = await schedule({ moduleIds: [taught] })
+
+    expect((await preview(session, [taught, retired])).status).toBe(422)
+    expect((await change(session, { moduleIds: [taught, retired] })).status).toBe(422)
+  })
+
+  test('a member can neither preview nor change what a session teaches', async () => {
+    const taught = await addModule()
+    const session = await schedule({ moduleIds: [taught] })
+    const person = await member()
+
+    expect((await preview(session, [taught], person.cookie)).status).toBe(403)
+    expect((await change(session, { moduleIds: [taught] }, person.cookie)).status).toBe(403)
+  })
+})
+
 describe.skipIf(skip !== null)('the member screen (G-105)', () => {
   test('a member signs up, sees where they stand, and withdraws', async () => {
     const module = await addModule({ name: 'Sound desk basics' })

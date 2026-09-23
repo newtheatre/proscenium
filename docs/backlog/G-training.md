@@ -245,7 +245,15 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   3. Opening the register closes sign-up.
   4. Two devices opening the same register concurrently result in one open register, pinned by a regression test: the stamp is a conditional write, so the loser's update matches nothing.
   5. Withdrawal remains open to members while the register is open.
-- Source: Prompt Book G-2; audit TR-5, TR-10
+  6. The session's own page changes what it teaches until the register is marked, offering what
+     may be taught and refusing, as scheduling does, a module the trainer does not hold. After the
+     register opens the change needs an explicit release of the freeze (question 6); once marked
+     it is not offered.
+  7. Before a change is saved, the page lists every member signed up who lacks a prerequisite the
+     change adds, with what they lack. It warns and never refuses; a prerequisite the session
+     already needed is sign-up's own warning and is not listed again.
+- Source: Prompt Book G-2; audit TR-5, TR-10; issue 1062 (criteria 6 and 7, criterion 7 decided
+  by the IT Manager)
 
 ## G-116: Mark the register, the single act that awards
 
