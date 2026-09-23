@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 30 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 31 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -579,7 +579,7 @@ Open questions for the committee:
 - Source: Requested 16 September 2026. A-118's expiry choices, note and audit diff had no screen;
   A-121 criterion 5 reaches grants from the account, which is the wrong way round at handover.
 
-## A-132: One role for the Front of House and Box Office Manager
+## A-133: One role for the Front of House and Box Office Manager
 
 - Role: Administrator
 - Phase: MVP

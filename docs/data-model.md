@@ -217,7 +217,7 @@ check, not a constraint. The stamp is for a reader: what stops a second warning 
 `notification_log`, which carries the expiry the warning was computed against (0048).
 A merge reconciles rather than reassigning: see "Merging duplicate accounts" above (A-123).
 The retired `BOX_OFFICE` role was folded into `FOH_MANAGER` in place by migration 0116, the later
-expiry winning for a holder of both, each moved grant audited as `role.merged` (0090, A-132).
+expiry winning for a holder of both, each moved grant audited as `role.merged` (0090, A-133).
 
 ### totp_secrets
 `user_id` PK → users cascade · `secret` · `confirmed_at` NULL until proven ·

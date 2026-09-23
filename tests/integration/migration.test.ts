@@ -215,7 +215,7 @@ describe('the identity import lands in the application schema (K-112)', () => {
   })
 
   // A decisions file written before 0090 can name the retired role; guessing its successor would
-  // be the mapped default 0070 refuses, so it is named and the review is run again (A-132 c5).
+  // be the mapped default 0070 refuses, so it is named and the review is run again (A-133 c5).
   test('a recorded decision naming a role that no longer exists is an exception, not a grant', async () => {
     const source = sourceEstate()
     addPerson(source, { id: 'old-1', email: 'stale@example.invalid' })

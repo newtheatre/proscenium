@@ -11,7 +11,7 @@ card, the board's presets, the Challenge 25 export, cross-season reports, and 00
 through `night.door` and `night.manage`) as two standing grants. On the committee they are one
 post: whoever is the Front of House Manager also runs the box office. Keeping two grants meant the
 IT Manager made two grants at every handover and kept them in step by habit, and `/people/roles`
-counted one person twice under two names (issue #1211, A-132).
+counted one person twice under two names (issue #1211, A-133).
 
 Merging is not free. `ticketing.write` reaches the desk, and the desk's refund route asks
 tonight's duty manager to approve a paid refund (D-116 criterion 2), which `night.manage` answers

@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { join } from 'node:path'
 import { isAuditAction } from '#shared/utils/audit-actions'
 
-// A-132 criteria 3 and 4 against a scratch database at the shape the merge meets (0090): the
+// A-133 criteria 3 and 4 against a scratch database at the shape the merge meets (0090): the
 // grants a real committee holds, then the one migration, then what each holder is left with.
 
 const MIGRATIONS_DIR = 'server/db/migrations/sqlite'
@@ -71,7 +71,7 @@ async function withMerged(seed: (raw: Database) => void, check: (raw: Database) 
   }
 }
 
-describe('the box office role folds into front of house (A-132 criterion 3)', () => {
+describe('the box office role folds into front of house (A-133 criterion 3)', () => {
   test('a box office grant with no front of house grant is renamed, keeping its expiry, granter and note', async () => {
     await withMerged((raw) => {
       person(raw, 'granter')
@@ -151,7 +151,7 @@ describe('the box office role folds into front of house (A-132 criterion 3)', ()
   })
 })
 
-describe('each moved grant is audited, with no free text (A-132 criterion 4, 0011)', () => {
+describe('each moved grant is audited, with no free text (A-133 criterion 4, 0011)', () => {
   test('one role.merged entry per box office grant, naming both roles and the resulting expiry', async () => {
     await withMerged((raw) => {
       person(raw, 'renamed')

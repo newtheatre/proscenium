@@ -151,7 +151,7 @@ describe('permissions come from live grants only', () => {
   })
 
   // One committee post, one grant: the programme's configuration joins the front of house
-  // officer's own, the night bypass included, as the IT Manager accepted (0090, A-132).
+  // officer's own, the night bypass included, as the IT Manager accepted (0090, A-133).
   test('the front of house officer also holds the programme configuration', () => {
     const held = permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)
     for (const permission of ['ticketing.read', 'ticketing.write', 'ticketing.export', 'night.door', 'night.manage'] as const) {
@@ -161,7 +161,7 @@ describe('permissions come from live grants only', () => {
     expect(held.has('money.refund')).toBe(false)
   })
 
-  test('the box office is no longer a role of its own, so nothing can grant it (A-132 criterion 2)', () => {
+  test('the box office is no longer a role of its own, so nothing can grant it (A-133 criterion 2)', () => {
     expect(isRole('BOX_OFFICE')).toBe(false)
     expect(permissionsFor([{ role: 'BOX_OFFICE' as Role, expiresAt: null }], now).size).toBe(0)
   })

@@ -1,5 +1,5 @@
 -- The Box Office Manager is the Front of House Manager, so BOX_OFFICE folds into FOH_MANAGER (0090,
--- A-132). role_grants is not append-only (renewed, revoked and pruned in place), so this updates in
+-- A-133). role_grants is not append-only (renewed, revoked and pruned in place), so this updates in
 -- place; D1 runs the file as one transaction, so no holder is ever between the two roles.
 -- Audited first, while each grant still reads as it stood: no actor, no note, no free text (0011).
 INSERT INTO audit_log (id, actor_id, action, target, detail)
