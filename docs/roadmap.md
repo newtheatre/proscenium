@@ -97,6 +97,9 @@ automated tests; two consecutive green migration rehearsals.**
 - **31 October: final import from frozen exports; the old estate goes read-only on 1 November.**
 - Rollback: the read-only old estate can be re-armed within a day for the remainder of the
   season if a cutover-blocking defect appears.
+- Daily reconciliation (I-104) starts before cutover: the first night that must carry a Z
+  reading is **1 September 2026**, recorded once as `FIRST_RECONCILED_NIGHT` in
+  `shared/utils/show-night.ts`. Imported nights before it are never outstanding.
 
 ### Phase 4: hardening (November to December)
 
