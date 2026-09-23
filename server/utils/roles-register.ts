@@ -34,9 +34,9 @@ export function pendingClause(): SQL {
   return and(heldByAnAccount(), pendingHolder())!
 }
 
-// The standing report of permanent grants, across every role (A-131 criterion 6).
+// Permanent grants across every role (A-131 criterion 6); a pending one is listed apart (A-132).
 export function permanentClause(): SQL {
-  return and(isNull(schema.roleGrants.expiresAt), heldByAnAccount())!
+  return and(isNull(schema.roleGrants.expiresAt), held())!
 }
 
 // Usable for the last-IT-Manager guard: live, on an account that is enabled, not erased and
