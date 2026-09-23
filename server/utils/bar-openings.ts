@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { approveSlotStatement, claimSlotStatement, declineSlotStatement } from './rota'
+import { approveSlotStatement, claimSlotStatement, declineSlotStatement, ourVenue } from './rota'
 import { predicate, whereFrom } from './list-filters'
 import { barOpeningConstraintRefusal } from '#shared/utils/rota-openings'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
@@ -21,10 +21,6 @@ import type { SQL } from 'drizzle-orm'
 // conditional write a claim on a performance does (0077).
 export const OPENING_CLAIM_SCOPE: ClaimScope = { table: 'bar_opening_shifts', event: 'opening_id' }
 
-// A bar row left on an external venue from before it was marked external is never read (E-101
-// criterion 5): that venue is staffed ad hoc.
-const OUR_VENUE = sql.raw('EXISTS (SELECT 1 FROM venues ours WHERE ours.id = t.venue_id AND ours.is_external = 0)')
-
 // Conditional on the venue's bar row, so a template emptied between the read and the write
 // leaves no opening at all rather than one nobody can claim a slot on (E-130 criterion 2).
 export function createOpeningStatement(openingId: string, input: BarOpeningInput, actorId: string): SQL {
@@ -32,7 +28,7 @@ export function createOpeningStatement(openingId: string, input: BarOpeningInput
     INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status, created_by)
     SELECT ${openingId}, ${input.venueId}, ${input.night}, ${input.label},
            ${input.startsAt}, ${input.endsAt}, 'PLANNED', ${actorId}
-    WHERE EXISTS (SELECT 1 FROM shift_templates t WHERE t.venue_id = ${input.venueId} AND t.role = 'BAR' AND ${OUR_VENUE})
+    WHERE EXISTS (SELECT 1 FROM shift_templates t WHERE t.venue_id = ${input.venueId} AND t.role = 'BAR' AND ${ourVenue('t')})
     RETURNING id
   `
 }
@@ -45,7 +41,7 @@ export function stampOpeningShiftsStatement(openingId: string): SQL {
   const barCount = sql`(
     SELECT coalesce(t."count", 0)
     FROM bar_openings o
-    JOIN shift_templates t ON t.venue_id = o.venue_id AND t.role = 'BAR' AND ${OUR_VENUE}
+    JOIN shift_templates t ON t.venue_id = o.venue_id AND t.role = 'BAR' AND ${ourVenue('t')}
     WHERE o.id = ${openingId}
   )`
   return sql`
@@ -57,7 +53,7 @@ export function stampOpeningShiftsStatement(openingId: string): SQL {
     INSERT INTO bar_opening_shifts (id, opening_id, slot, status)
     SELECT lower(hex(randomblob(16))), o.id, slot.i, 'OPEN'
     FROM bar_openings o
-    JOIN shift_templates t ON t.venue_id = o.venue_id AND t.role = 'BAR' AND ${OUR_VENUE}
+    JOIN shift_templates t ON t.venue_id = o.venue_id AND t.role = 'BAR' AND ${ourVenue('t')}
     JOIN slot ON slot.i <= t."count"
     WHERE o.id = ${openingId}
     ON CONFLICT DO NOTHING
@@ -68,7 +64,7 @@ export function stampOpeningShiftsStatement(openingId: string): SQL {
 // How many bar slots a venue stamps, read before the write so a venue with no bar row is told
 // rather than guessed at (E-130 criterion 2).
 export function barSlotCountQuery(venueId: string): SQL {
-  return sql`SELECT t."count" AS n FROM shift_templates t WHERE t.venue_id = ${venueId} AND t.role = 'BAR' AND ${OUR_VENUE}`
+  return sql`SELECT t."count" AS n FROM shift_templates t WHERE t.venue_id = ${venueId} AND t.role = 'BAR' AND ${ourVenue('t')}`
 }
 
 export async function barSlotCount(venueId: string): Promise<number> {

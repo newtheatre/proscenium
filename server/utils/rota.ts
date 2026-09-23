@@ -58,7 +58,7 @@ const templatedVenues = (clause: ListClause): SQL => {
 
 // A template is read only for one of our own venues. A row left on an external venue from before
 // it was marked external applies to nothing, wherever it is joined (E-101 criterion 5).
-const ourVenue = (templateAlias: string): SQL =>
+export const ourVenue = (templateAlias: string): SQL =>
   sql.raw(`EXISTS (SELECT 1 FROM venues ours WHERE ours.id = ${templateAlias}.venue_id AND ours.is_external = 0)`)
 
 export function venueTemplatesQuery(clause: ListClause, limit: number, offset: number): SQL {
@@ -107,22 +107,17 @@ export async function countVenueTemplates(clause: ListClause): Promise<number> {
   return row?.total ?? 0
 }
 
+const TEMPLATE_SLOT = sql.raw(`role, "count",
+  starts_before_doors_minutes AS startsBeforeDoorsMinutes, ends_after_end_minutes AS endsAfterEndMinutes`)
+
 export async function templateSlotsFor(venueId: string): Promise<TemplateSlot[]> {
-  return await db.all<TemplateSlot>(sql`
-    SELECT role, "count",
-           starts_before_doors_minutes AS startsBeforeDoorsMinutes, ends_after_end_minutes AS endsAfterEndMinutes
-    FROM shift_templates WHERE venue_id = ${venueId} ORDER BY role
-  `)
+  return await db.all<TemplateSlot>(sql`SELECT ${TEMPLATE_SLOT} FROM shift_templates WHERE venue_id = ${venueId} ORDER BY role`)
 }
 
 // What a performance at this venue is staffed from: nothing at an external venue, whatever rows
 // it still holds (E-101 criterion 5). The template screen reads the rows themselves.
 export function stampableSlotsQuery(venueId: string): SQL {
-  return sql`
-    SELECT role, "count",
-           starts_before_doors_minutes AS startsBeforeDoorsMinutes, ends_after_end_minutes AS endsAfterEndMinutes
-    FROM shift_templates t WHERE t.venue_id = ${venueId} AND ${ourVenue('t')} ORDER BY role
-  `
+  return sql`SELECT ${TEMPLATE_SLOT} FROM shift_templates t WHERE t.venue_id = ${venueId} AND ${ourVenue('t')} ORDER BY role`
 }
 
 export async function stampableSlotsFor(venueId: string): Promise<TemplateSlot[]> {
