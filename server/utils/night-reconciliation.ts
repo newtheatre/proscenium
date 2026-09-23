@@ -7,7 +7,7 @@ import { newId } from './accounts'
 import { performanceNight } from './performances'
 import { nightReconciliation } from './reconciliation'
 import { saysMoney } from '#shared/utils/bar'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { FIRST_RECONCILED_NIGHT, currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import type { ExpectedByKind, NightExpected, OutstandingNight, RecordZReadingInput, ZReading } from '#shared/utils/night-reconciliation'
 import type { SQL } from 'drizzle-orm'
 
@@ -105,31 +105,34 @@ export async function readingHistory(night: string): Promise<ZReading[]> {
   return rows.map(row => ({ ...row, writtenOff: Boolean(row.writtenOff) }))
 }
 
-// Nights a till session ran or a performance was on: small, bounded tables unlike the ledger
-// itself, so this never scales with how many money transactions the estate has ever posted.
+// Nights a till session ran or a performance was on, from the first reconciled night: bounded
+// in SQL too, so imported history back to 2014 is never walked (I-104 criterion 6).
 async function operationalNights(): Promise<Set<string>> {
+  const floorAt = Math.floor(showNightBounds(FIRST_RECONCILED_NIGHT).from.getTime() / 1000)
   const [sessions, performances] = await Promise.all([
-    db.all<{ night: string }>(sql`SELECT DISTINCT night FROM till_sessions`),
-    db.all<{ startsAt: number }>(sql`SELECT DISTINCT starts_at AS startsAt FROM performances`),
+    db.all<{ night: string }>(sql`SELECT DISTINCT night FROM till_sessions WHERE night >= ${FIRST_RECONCILED_NIGHT}`),
+    db.all<{ startsAt: number }>(sql`SELECT DISTINCT starts_at AS startsAt FROM performances WHERE starts_at >= ${floorAt}`),
   ])
   const nights = new Set(sessions.map(row => row.night))
   for (const { startsAt } of performances) nights.add(performanceNight(startsAt))
   return nights
 }
 
-// Every past night that ran and carries no reading at all, never truncated (criterion 5): the
-// treasurer dashboard shows every one, the same completeness F-109's unsettled-tabs list keeps.
+// Every night from the floor to tonight that ran with no reading, never truncated (criteria 5
+// and 6); pure, so `tests/` pins it, and period locks read the same list (I-107 criterion 5).
+export function outstandingNights(ran: Iterable<string>, covered: Set<string>, tonight: string): OutstandingNight[] {
+  return [...new Set(ran)]
+    .filter(night => night >= FIRST_RECONCILED_NIGHT && night <= tonight && !covered.has(night))
+    .sort()
+    .map(night => ({ night }))
+}
+
 export async function nightsMissingAReading(): Promise<OutstandingNight[]> {
   const [operational, recorded] = await Promise.all([
     operationalNights(),
     db.all<{ night: string }>(sql`SELECT DISTINCT night FROM z_readings`),
   ])
-  const covered = new Set(recorded.map(row => row.night))
-  const tonight = currentShowNight()
-  return [...operational]
-    .filter(night => night <= tonight && !covered.has(night))
-    .sort()
-    .map(night => ({ night }))
+  return outstandingNights(operational, new Set(recorded.map(row => row.night)), currentShowNight())
 }
 
 // A night whose live reading still disagrees with the ledger and has not been written off: open
