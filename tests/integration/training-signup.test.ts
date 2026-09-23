@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { placesFrom, refreshBadgeStatement, rejoinStatement, signUpOrderStatement, signUpStatement, withdrawStatement } from '#shared/utils/training-signup'
+import { demotedBy, demotionClaimFor, movedBackCount, placesFrom, promotionClaimFor, refreshBadgeStatement, rejoinStatement, signUpOrderStatement, signUpStatement, withdrawStatement } from '#shared/utils/training-signup'
 import type { SignUpOrder } from '#shared/utils/training-signup'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -269,6 +269,65 @@ describe('a promotion is claimed before it is sent (G-106 criterion 2)', () => {
         database,
         `SELECT session_id session FROM notification_log WHERE type = 'training.session.promoted'`,
       )[0]?.session).toBe('s1')
+    })
+  })
+})
+
+describe('a capacity drop moves the latest placed back, told once (G-106 criterion 6)', () => {
+  test('whoever signed up last among the placed waits first, ahead of those already waiting', async () => {
+    await withDatabase((database) => {
+      seed(database, 3)
+      for (const [index, id] of ['u-one', 'u-two', 'u-three', 'u-four'].entries()) {
+        member(database, id)
+        signUp(database, id, 100 + index)
+      }
+      const before = placesFrom(order(database), 3)
+
+      database.batch([[`UPDATE training_sessions SET capacity = 1 WHERE id = 's1'`]])
+      const capacity = rows<{ capacity: number }>(database, `SELECT capacity FROM training_sessions`)[0]!.capacity
+      const after = placesFrom(order(database), capacity)
+
+      expect(demotedBy(before, after).map(place => [place.userId, place.waitlistPosition]))
+        .toEqual([['u-two', 1], ['u-three', 2]])
+      expect(after.find(place => place.userId === 'u-four')?.waitlistPosition).toBe(3)
+      // Nobody is taken off the list: every row is still there, still signed up.
+      expect(rows<{ n: number }>(
+        database,
+        `SELECT count(*) n FROM session_attendees WHERE session_id = 's1' AND status = 'SIGNED_UP'`,
+      )[0]!.n).toBe(4)
+    })
+  })
+
+  test('the ledger refuses a second claim on one move back, and takes the next one', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      member(database, 'u-one')
+
+      const claim = (id: string, key: string): number => {
+        database.batch([[
+          `INSERT INTO notification_log (id, user_id, type, channel, status, session_id, claim, sent_at)
+           VALUES (?, 'u-one', 'training.session.demoted', 'EMAIL', 'SENT', 's1', ?, 1)
+           ON CONFLICT DO NOTHING`,
+          id, key,
+        ]])
+        return rows<{ n: number }>(database, 'SELECT count(*) n FROM notification_log WHERE id = ?', id)[0]!.n
+      }
+      const claims = (): string[] => rows<{ claim: string }>(
+        database,
+        `SELECT claim FROM notification_log WHERE session_id = 's1' AND type = 'training.session.demoted'`,
+      ).map(row => row.claim)
+
+      const first = demotionClaimFor('s1', 'u-one', 100, movedBackCount(claims(), 's1', 'u-one', 100))
+      expect(claim('n-first', first)).toBe(1)
+      // A racing drop read the same count, so it names the same claim and sends nothing.
+      expect(claim('n-racer', first)).toBe(0)
+
+      // Promoted again, then moved back again: a new count, a new claim, a new email.
+      expect(promotionClaimFor('s1', 'u-one', 100, movedBackCount(claims(), 's1', 'u-one', 100)))
+        .toBe('training.session.promoted:s1:u-one:100:1')
+      const second = demotionClaimFor('s1', 'u-one', 100, movedBackCount(claims(), 's1', 'u-one', 100))
+      expect(claim('n-second', second)).toBe(1)
+      expect(claims()).toHaveLength(2)
     })
   })
 })

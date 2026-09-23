@@ -112,7 +112,10 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   3. Two concurrent withdrawals produce exactly one notification per newly promoted member, proven by a named concurrency test.
   4. The notification ledger rows are retained as idempotency evidence and pruned only by the standard 24-month ledger pruning.
   5. Promotion notifications are transactional and send regardless of any dry-run mode on the sweeps.
-- Source: Prompt Book G-2; audit TR-3, TR-9
+  6. When a capacity drop moves a member from a place back to the waiting list, they are emailed
+     once with their new waiting-list number, claimed on the notification ledger the same way and
+     just as transactional. A member moved back and later promoted again is told again.
+- Source: Prompt Book G-2; audit TR-3, TR-9; issue 1062 (criterion 6, decided by the IT Manager)
 
 ## G-107: Module administration
 
@@ -196,7 +199,10 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   3. Retired modules and sign-off-only modules cannot be taught by session; the write path refuses them.
   4. Draft modules cannot be attached to a session visible to members.
   5. Sessions survive DST transitions: a 19:00 session is 19:00 London time on either side of a clock change, pinned by a named regression test.
-- Source: Prompt Book G-2; audit TR-4; Get-In part 5 (DST arithmetic)
+  6. The session's own page changes its places while it is planned, open or full and its register
+     is unopened, and says how many members the change promoted or moved back to the waiting list.
+- Source: Prompt Book G-2; audit TR-4; Get-In part 5 (DST arithmetic); issue 1062 (criterion 6,
+  the capacity route had no screen)
 
 ## G-113: Cancel a session with reason and notification
 

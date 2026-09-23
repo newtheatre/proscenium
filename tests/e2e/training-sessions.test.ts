@@ -442,6 +442,62 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
     }
   }, CASE_TIMEOUT_MS)
 
+  // G-112 criterion 6 (issue 1062): the capacity route had no screen until this.
+  test('a session\'s places are changed on its page, which says who moved', async () => {
+    const module = await addModule()
+    const { id } = await (await schedule({ moduleIds: [module], capacity: 2 })).json() as { id: string }
+    const officerId = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
+    write(`INSERT INTO session_attendees (id, session_id, user_id, status, source, signed_up_at, created_at)
+      VALUES (?, ?, ?, 'SIGNED_UP', 'SIGNUP', 100, 100)`, `a-${suffix()}`, id, trainerId)
+    write(`INSERT INTO session_attendees (id, session_id, user_id, status, source, signed_up_at, created_at)
+      VALUES (?, ?, ?, 'SIGNED_UP', 'SIGNUP', 200, 200)`, `a-${suffix()}`, id, officerId)
+
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage/sessions/${id}`, '[data-test="session-status"]')
+
+      await click(view, '[data-test="edit-capacity"]')
+      await waitFor(view, `document.querySelector('[data-test="capacity-input"]')`, 30_000)
+      await fillNumber(view, '[data-test="capacity-input"]', '1')
+      // Said before it is saved: lowering past the list moves somebody back and emails them.
+      expect(await textOf(view, '[data-test="capacity-form"]')).toContain('1 person')
+      await click(view, '[data-test="capacity-save"]')
+      await waitFor(view, `document.querySelector('[data-test="capacity-result"]')?.innerText.includes('1 moved back')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="waitlist-${officerId}"]')`, 30_000)
+
+      await click(view, '[data-test="edit-capacity"]')
+      await waitFor(view, `document.querySelector('[data-test="capacity-input"]')`, 30_000)
+      await fillNumber(view, '[data-test="capacity-input"]', '2')
+      await click(view, '[data-test="capacity-save"]')
+      await waitFor(view, `document.querySelector('[data-test="capacity-result"]')?.innerText.includes('1 promoted')`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ capacity: number }>('SELECT capacity FROM training_sessions WHERE id = ?', id)?.capacity).toBe(2)
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log
+       WHERE user_id = ? AND session_id = ? AND claim IS NOT NULL
+         AND type IN ('training.session.demoted', 'training.session.promoted')`, officerId, id,
+    )?.n).toBe(2)
+  }, CASE_TIMEOUT_MS)
+
+  test('a session whose register is open offers no change of places', async () => {
+    const module = await addModule()
+    const { id } = await (await schedule({ moduleIds: [module] })).json() as { id: string }
+    write('UPDATE training_sessions SET register_opened_at = unixepoch() WHERE id = ?', id)
+
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage/sessions/${id}`, '[data-test="session-status"]')
+      expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="edit-capacity"]')`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('a certification is absent from what the screen offers to teach', async () => {
     const view = await officerView()
     try {

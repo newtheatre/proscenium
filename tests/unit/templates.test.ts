@@ -67,6 +67,7 @@ const EVERYTHING: TemplateContext = {
   moduleId: 'WAH-1',
   period: 'October 2026',
   count: 3,
+  position: 2,
   first: 'Friday 2 October 2026',
   last: 'Friday 20 November 2026',
   preApprovalAt: 3,
@@ -334,6 +335,21 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     const quiet = render('training-expiry-digest', { ...EVERYTHING, expiring: [], expired: [] })
     expect(flat(quiet.html)).toContain('If this email ever stops arriving, the monthly sweep has stopped running')
     expect(quiet.html).not.toContain('clockwork')
+  })
+})
+
+// G-106 criterion 6: a place taken away says so, gives the number, and keeps the way out.
+describe('the move back to the waiting list (G-106 criterion 6)', () => {
+  test('it names the session, the new number and that they keep their turn, in both parts', () => {
+    const told = render('training-session-demoted', EVERYTHING)
+    expect(told.subject).toContain('waiting list')
+    for (const part of [flat(told.html), flat(told.text)]) {
+      expect(part).toContain('Working at height (WAH-1)')
+      expect(part).toContain('Friday 2 October 2026 at 19:30')
+      expect(part).toContain('number 2 on the waiting list')
+      expect(part).toContain('You keep your turn')
+    }
+    expect(told.html).toContain('href="https://newtheatre.org.uk/training/sessions"')
   })
 })
 
