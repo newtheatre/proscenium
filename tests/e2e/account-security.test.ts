@@ -191,6 +191,9 @@ describe.skipIf(skip !== null)('managing a second factor on the account (A-109, 
       await enrol(view, email)
       await visit(view, `${app.baseURL}/account/security`)
       await click(view, '[data-test="remove"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="confirm-remove-authenticator-verb"]\')')
+      expect(codeCount(email)).toBe(RECOVERY_CODE_COUNT)
+      await click(view, '[data-test="confirm-remove-authenticator-verb"]')
 
       await waitFor(view, 'document.querySelector(\'[data-test="begin"]\')')
       expect(codeCount(email)).toBe(0)
@@ -210,8 +213,9 @@ describe.skipIf(skip !== null)('managing a second factor on the account (A-109, 
       await visit(view, `${app.baseURL}/account/security`)
       await waitFor(view, 'document.querySelector(\'[data-test="mfa-required"]\')')
       await click(view, '[data-test="remove"]')
+      await click(view, '[data-test="confirm-remove-authenticator-verb"]')
 
-      await waitFor(view, 'document.body.innerText.includes("requires a second factor")')
+      await waitFor(view, 'document.querySelector(\'[data-test="confirm-remove-authenticator-failure"]\')?.innerText.includes("requires a second factor")')
       expect(codeCount(email)).toBe(RECOVERY_CODE_COUNT)
     }
     finally {
