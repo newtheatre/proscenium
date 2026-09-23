@@ -100,14 +100,35 @@ async function askFor(moduleId: string): Promise<void> {
   }
 }
 
-async function withdraw(id: string): Promise<void> {
-  failure.value = null
+// Asked before it happens, the same as every other withdrawal a member makes (G-104 criterion 8).
+const withdrawing = ref<Ask | null>(null)
+const withdrawFailure = ref<string | null>(null)
+const withdrawBusy = ref(false)
+const withdrawOpen = computed({
+  get: () => withdrawing.value !== null,
+  set: (value) => { if (!value) withdrawing.value = null },
+})
+
+function askToWithdraw(ask: Ask): void {
+  withdrawFailure.value = null
+  withdrawing.value = ask
+}
+
+async function withdraw(): Promise<void> {
+  const ask = withdrawing.value
+  if (!ask) return
+  withdrawFailure.value = null
+  withdrawBusy.value = true
   try {
-    await $fetch(`/api/training/requests/${id}`, { method: 'DELETE' })
+    await $fetch(`/api/training/requests/${ask.id}`, { method: 'DELETE' })
+    withdrawing.value = null
     await refreshAsks()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    withdrawFailure.value = refusalText(error)
+  }
+  finally {
+    withdrawBusy.value = false
   }
 }
 
@@ -473,7 +494,7 @@ const standings = computed(() => [
             color="neutral"
             variant="ghost"
             :data-test="`withdraw-${ask.moduleId}`"
-            @click="withdraw(ask.id)"
+            @click="askToWithdraw(ask)"
           >
             Withdraw the request
           </UButton>
@@ -519,5 +540,16 @@ const standings = computed(() => [
         </div>
       </template>
     </UModal>
+
+    <ConfirmModal
+      v-model:open="withdrawOpen"
+      name="withdraw-request"
+      title="Withdraw the request"
+      verb="Withdraw the request"
+      :consequence="withdrawing ? `The department stops counting you as wanting ${withdrawing.moduleName}. You can ask again at any time.` : undefined"
+      :loading="withdrawBusy"
+      :failure="withdrawFailure"
+      @confirm="withdraw"
+    />
   </UContainer>
 </template>

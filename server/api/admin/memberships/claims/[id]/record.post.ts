@@ -4,7 +4,7 @@ import { recordClaimStatements, studentIdConstraintRefusal } from '#shared/utils
 import type { MembershipTerm } from '#shared/utils/membership'
 
 // Record a claim: the number to the account, the membership row the A-117 route writes with the
-// claim as its evidence, and the claim closed, in one batch (A-130 criteria 2 and 12).
+// claim as its evidence, and the claim closed, in one batch (A-130 criteria 2 and 13).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which claim you mean' })

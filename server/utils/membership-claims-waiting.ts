@@ -8,7 +8,7 @@ import type { H3Event } from 'h3'
 export interface WaitingClaimsRun { waiting: number, sent: number }
 
 // Daily, from daily:sweeps: while any claim waits, each officer who can decide one is told once
-// that London day, so discovery never rests on somebody remembering (A-130 criterion 11).
+// that London day, so discovery never rests on somebody remembering (A-130 criterion 12).
 export async function remindWaitingClaims(event: H3Event | undefined, at = new Date()): Promise<WaitingClaimsRun> {
   const [summary] = await db.all<{ waiting: number, oldest: number | null }>(waitingClaimsStatement())
   const waiting = Number(summary?.waiting ?? 0)

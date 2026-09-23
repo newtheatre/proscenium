@@ -254,7 +254,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(html).not.toContain('membership secretary')
   })
 
-  test('the waiting claims notice counts them, says since when and links the queue (A-130 criterion 11)', () => {
+  test('the waiting claims notice counts them, says since when and links the queue (A-130 criterion 12)', () => {
     const queue = 'https://newtheatre.org.uk/people/members?filter=awaiting-record'
     const many = render('membership-claims-waiting', { ...EVERYTHING, count: 3, queueUrl: queue })
     expect(many.subject).toBe('3 membership claims are waiting to be recorded')

@@ -222,7 +222,7 @@ describe('the middleware and the sidebar read the same declaration', () => {
   })
 })
 
-// A queue nobody can see from the screen they are on is a queue nobody works (A-130 criterion 10).
+// A queue nobody can see from the screen they are on is a queue nobody works (A-130 criterion 11).
 describe('a waiting count rides the entry that opens it', () => {
   const people = CONSOLE_NAV.find(group => group.key === 'people')!
 

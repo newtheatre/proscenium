@@ -86,7 +86,8 @@ Open questions for the committee:
   3. Nothing is ever written for a disabled account.
   4. A Google identity already linked to a different account is treated as a merge case (A-123) and refused with guidance, never silently re-linked.
   5. No password can ever be set on a Workspace account through any path (A-113); every password write boundary refuses.
-- Source: Prompt Book A-1; audit SD-3; Get-In constraint 3 (rule carries verbatim).
+  6. An administrator holding `accounts.create` sets or clears an account's pending link (0008). The address must be a Workspace one and is lowercased exactly as sign-in lowercases it. It is refused, naming the other account and pointing to account merge (A-123), when it is another account's address or another account's pending link; refused when the account already has a Google link or has been erased. The write carries those conditions as its predicate, so of two administrators pre-linking one address to two accounts at once exactly one succeeds. Setting and clearing are audited as `account.google.prelinked` and `account.google.unlinked` with no address in the detail (0011). Claiming the link keeps the account's own address; only the Google link is added. Added 23 September 2026 (issue 1061): the pending link was read and consumed here but nothing but the import ever wrote one.
+- Source: Prompt Book A-1; audit SD-3; Get-In constraint 3 (rule carries verbatim). Criterion 6 comes from issue 1061.
 
 ## A-105: Sign in with a passkey
 
@@ -154,7 +155,11 @@ Open questions for the committee:
   3. Confirming a first factor invalidates every other session on the account.
   4. Enrolment requires a session fresher than 10 minutes.
   5. TOTP secrets imported from the old estate work unchanged; no re-enrolment is required for TOTP.
-- Source: Prompt Book A-4; audit SD-5; Get-In part 3 (secrets port intact).
+  6. Removing the authenticator asks first, in the shared confirmation: it says that signing in
+     goes back to the password alone and that the recovery codes stop working, and nothing is
+     removed until the member confirms.
+- Source: Prompt Book A-4; audit SD-5; Get-In part 3 (secrets port intact); issue 1153 item 7
+  (criterion 6, the removal was one click).
 
 ## A-110: Mint and redeem recovery codes
 
@@ -213,7 +218,10 @@ Open questions for the committee:
   3. A password can never be added to a @newtheatre.org.uk account; the refusal names Google as the credential.
   4. Each method is listed with when it was added and last used; removing one sends a notification to the account's email.
   5. Unlinking Google is refused if it would leave no sign-in method.
-- Source: Prompt Book A-1; audit SD-6; Get-In constraint 3.
+  6. Removing a method asks first, in the shared confirmation, naming the method and saying it
+     stops working as a way in; nothing is removed until the member confirms.
+- Source: Prompt Book A-1; audit SD-6; Get-In constraint 3; issue 1153 item 7 (criterion 6, the
+  removal was one click).
 
 ## A-114: Edit a profile with stated audiences
 
@@ -492,7 +500,12 @@ Open questions for the committee:
   8. Tests cover: a passkey session satisfying the factor; a password session on a passkey-owning
      account not inheriting it; a stale confirmation refused; and a Workspace account offered no
      password field.
-- Source: Matt, 10 September 2026.
+  9. Confirming and re-authenticating are asked once each, in that order. A confirmed action that
+     meets a stale session opens the modal, and success runs that same confirmed action once,
+     without asking for the confirmation again; re-authenticating never runs an action the member
+     did not confirm, and backing out of either runs nothing.
+- Source: Matt, 10 September 2026; issue 1153 item 7 (criterion 9, destructive actions behind
+  the modal gained a confirmation of their own).
 
 ## A-130: Claim a membership bought at the SU
 
@@ -523,20 +536,23 @@ Open questions for the committee:
   7. Nothing here sells anything: SUMS remains the system of record (0005, 0031, A-202).
   8. How many claims are waiting is on the register's toolbar row, in reach without opening a
      panel: a queue nobody can see from the screen they are on is a queue nobody works.
-  9. Added 23 September 2026 (issue 1005): the queue is filtered, searched and sorted by its own
-     declaration (`membershipClaimsList`, K-129), never the register's. Its `status` field
-     defaults to waiting and also offers recorded, declined and withdrawn, so a decided claim can
-     be found from the screen with its outcome, when and, for a decline, the reason sent.
-  10. Added 23 September 2026 (issue 1005): the console sidebar carries how many claims are
+  9. Withdrawing an open claim asks first, in the shared confirmation, saying that nothing is
+     recorded from it and that a new claim can be made afterwards; nothing is withdrawn until the
+     member confirms.
+  10. Added 23 September 2026 (issue 1005): the queue is filtered, searched and sorted by its own
+      declaration (`membershipClaimsList`, K-129), never the register's. Its `status` field
+      defaults to waiting and also offers recorded, declined and withdrawn, so a decided claim can
+      be found from the screen with its outcome, when and, for a decline, the reason sent.
+  11. Added 23 September 2026 (issue 1005): the console sidebar carries how many claims are
       waiting on the People group and its Members entry, for anybody who can decide them
       (`members.write`), so the queue is visible from every console screen and not only the
       register.
-  11. Added 23 September 2026 (issue 1005): while any claim waits, every live holder of
+  12. Added 23 September 2026 (issue 1005): while any claim waits, every live holder of
       `members.write` is sent one message a day (`membership.claims.waiting`, email and inbox)
       saying how many wait and since when, linking the queue. It is claimed per person per London
       day, so a second run sends nothing twice, and nothing is sent when nothing waits. It rides
       the existing `daily:sweeps` task rather than a cron of its own.
-  12. Added 23 September 2026 (issue 1005): recording a claim on an account whose latest term is
+  13. Added 23 September 2026 (issue 1005): recording a claim on an account whose latest term is
       still running on the claimed purchase date extends it. The new term starts the day after
       that term ends and runs the claimed one or three years from there, as a new row with the
       claim as its evidence: a renewal is another row and history is never rewritten (0010, A-201
@@ -545,15 +561,16 @@ Open questions for the committee:
       current reads the run of back-to-back terms around today, so a renewal that has not started
       yet neither lapses them early nor reads as lapsed itself; it waits under "Awaiting a check",
       and the term it follows is not reminded as running out.
-  13. Added 23 September 2026 (issue 1005): withdrawing a claim is audited as
+  14. Added 23 September 2026 (issue 1005): withdrawing a claim is audited as
       `membership.claim.withdrawn`, the member as actor, carrying the claim id and never the
       student number (0011), in the same batch as the withdrawal, so "withdrew and claimed again
       with another number" can be reconstructed from the trail.
-  14. Added 23 September 2026 (issue 1005): where the SU's purchase page is configured
+  15. Added 23 September 2026 (issue 1005): where the SU's purchase page is configured
       (`MEMBERSHIP_PURCHASE_URL`, A-202), `/account/membership` links to it beside "Membership is
       bought at the Students' Union", read through the policy page's token (J-110). Unset, the
       screen says the same sentence and no link.
-- Source: Pre-cutover review, 10 September 2026. The migration carries no memberships
+- Source: Pre-cutover review, 10 September 2026; issue 1153 item 7 (criterion 9, the withdrawal
+  was one click). The migration carries no memberships
   (`migration/identity.ts`), so at cutover every member reads as lapsed until recorded; this is
   the member-facing half of what A-201 does by upload.
 
@@ -685,7 +702,7 @@ Open questions for the committee:
   1. SP-2 established there is no direct or automatic roster access, so this is a manual upload: an administrator submits an SU-provided export file and previews the parsed result before anything is written.
   2. The import creates or extends membership states with source roster and an evidence reference to the upload; it never revokes a manual grant and never lapses a membership by itself. Discrepancies land on a reconciliation report for a human to decide (principle P6).
      Amended 23 September 2026 (issue 1005): "extends" means what recording a claim already does
-     (A-130 criterion 12, `renewalTerm()`): a purchase inside a running term appends a row starting
+     (A-130 criterion 13, `renewalTerm()`): a purchase inside a running term appends a row starting
      the day after it ends, so both routes into `memberships` agree.
   3. Matching is by the agreed key (email or student number); ambiguous matches are queued for review, never guessed.
   4. Applying the same file twice changes nothing the second time.
@@ -703,7 +720,7 @@ Open questions for the committee:
      which ships unset until the committee names it (`docs/workshops.md`) rather than a guessed
      address. Set, it is linked from `/account/membership`, the policy page, the expiring and the
      declined emails and the room booking refusal; unset, each of them leaves the link out whole
-     and reads correctly without it (A-130 criterion 14).
+     and reads correctly without it (A-130 criterion 15).
   2. Membership state arrives by manual grant (A-117) and the hand-uploaded SU export (A-201); SUMS remains the system of record for who has paid.
 - Source: Committee direction, 26 August; Prompt Book A-2.
 

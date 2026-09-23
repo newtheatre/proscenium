@@ -91,7 +91,7 @@ describe('the members area reaches it (A-130 criterion 4)', () => {
   })
 })
 
-// Once a day each, however many times the sweep runs (A-130 criterion 11).
+// Once a day each, however many times the sweep runs (A-130 criterion 12).
 describe('the waiting claims notice is claimed per person per London day', () => {
   test('two officers on one day, and one officer on two days, claim separately', () => {
     expect(claimsWaitingClaimFor('a1', '2026-09-23')).toBe('membership.claims.waiting:a1:2026-09-23')
@@ -101,8 +101,8 @@ describe('the waiting claims notice is claimed per person per London day', () =>
 })
 
 // A renewal bought while a term still runs starts where that one ends, so buying early loses no
-// days; bought after it ended, it runs from the purchase (A-130 criterion 12, 0031).
-describe('a claim extends a running term (A-130 criterion 12)', () => {
+// days; bought after it ended, it runs from the purchase (A-130 criterion 13, 0031).
+describe('a claim extends a running term (A-130 criterion 13)', () => {
   test('nothing held: the term runs from the purchase', () => {
     expect(renewalTerm('2026-09-14', 1, null)).toEqual({ startsOn: '2026-09-14', expiresOn: '2027-09-13', extends: false })
   })
@@ -126,7 +126,7 @@ describe('a claim extends a running term (A-130 criterion 12)', () => {
 })
 
 // A renewal row starts in the future, so the term that decides whether somebody is current is the
-// run of back-to-back rows around today, not whichever row ends last (A-130 criterion 12).
+// run of back-to-back rows around today, not whichever row ends last (A-130 criterion 13).
 describe('the term a person holds reads across a renewal', () => {
   const held = { startsOn: '2026-09-14', expiresOn: '2027-09-13' }
   const renewal = { startsOn: '2027-09-14', expiresOn: '2028-09-13' }

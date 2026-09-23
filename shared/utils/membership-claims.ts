@@ -183,7 +183,7 @@ export interface ClaimWithdrawal {
 }
 
 // The member's own, and only while open: the trail entry and the withdrawal land together or not
-// at all, and carry the claim id and never the number (A-130 criterion 13, 0011).
+// at all, and carry the claim id and never the number (A-130 criterion 14, 0011).
 export function withdrawClaimStatements(input: ClaimWithdrawal): SQL[] {
   const own = sql`(select 1 from membership_claims
     where id = ${input.claimId} and user_id = ${input.userId} and status = 'OPEN')`

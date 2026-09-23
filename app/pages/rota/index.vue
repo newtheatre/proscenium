@@ -83,20 +83,51 @@ function releasable(shift: MyShift): boolean {
   return shift.status === 'CLAIMED' || shift.status === 'CONFIRMED'
 }
 
-async function release(shift: MyShift): Promise<void> {
-  releasing.value = shift.shiftId
+// A release is asked first, the same for a shift and a slot on an opening (E-107 criterion 8); a
+// refusal stays in the dialogue that asked.
+interface Releasing { id: string, route: string, says: string }
+const releasingOne = ref<Releasing | null>(null)
+const releaseFailure = ref<string | null>(null)
+const releaseOpen = computed({
+  get: () => releasingOne.value !== null,
+  set: (value) => { if (!value) releasingOne.value = null },
+})
+
+function askToRelease(one: Releasing): void {
+  releaseFailure.value = null
+  releasingOne.value = one
+}
+
+const askToReleaseShift = (shift: MyShift): void => askToRelease({
+  id: shift.shiftId,
+  route: `/api/rota/shifts/${shift.shiftId}/release`,
+  says: `${saysShiftRole(shift.role)} at ${shift.venueName}`,
+})
+
+const askToReleaseSlot = (slot: MyOpeningShift): void => askToRelease({
+  id: slot.slotId,
+  route: `/api/rota/openings/shifts/${slot.slotId}/release`,
+  says: `${slot.label} at ${slot.venueName}`,
+})
+
+async function release(): Promise<void> {
+  const one = releasingOne.value
+  if (!one) return
+  releaseFailure.value = null
+  releasing.value = one.id
   try {
-    await $fetch(`/api/rota/shifts/${shift.shiftId}/release`, { method: 'POST' })
+    await $fetch(one.route, { method: 'POST' })
+    releasingOne.value = null
     toast.add({
       title: 'Released',
-      description: `${saysShiftRole(shift.role)} at ${shift.venueName} is back on the open list.`,
+      description: `${one.says} is back on the open list.`,
       icon: 'i-lucide-check',
       color: 'success',
     })
     await Promise.all([refresh(), refreshMine()])
   }
   catch (error) {
-    toast.add({ title: 'Could not release that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
+    releaseFailure.value = refusalText(error)
   }
   finally {
     releasing.value = null
@@ -115,27 +146,6 @@ async function dismiss(shift: MyShift): Promise<void> {
   }
   finally {
     dismissing.value = null
-  }
-}
-
-// A slot on an opening is given back and cleared exactly as a shift is (E-107, E-114).
-async function releaseOpening(slot: MyOpeningShift): Promise<void> {
-  releasing.value = slot.slotId
-  try {
-    await $fetch(`/api/rota/openings/shifts/${slot.slotId}/release`, { method: 'POST' })
-    toast.add({
-      title: 'Released',
-      description: `${slot.label} at ${slot.venueName} is back on the open list.`,
-      icon: 'i-lucide-check',
-      color: 'success',
-    })
-    await Promise.all([refresh(), refreshMine()])
-  }
-  catch (error) {
-    toast.add({ title: 'Could not release that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
-  }
-  finally {
-    releasing.value = null
   }
 }
 
@@ -268,7 +278,7 @@ useSeoMeta({ title: 'My rota' })
             variant="subtle"
             :loading="releasing === shift.shiftId"
             :data-test="`release-${shift.shiftId}`"
-            @click="release(shift)"
+            @click="askToReleaseShift(shift)"
           >
             Release the shift
           </UButton>
@@ -315,7 +325,7 @@ useSeoMeta({ title: 'My rota' })
             variant="subtle"
             :loading="releasing === slot.slotId"
             :data-test="`release-opening-${slot.slotId}`"
-            @click="releaseOpening(slot)"
+            @click="askToReleaseSlot(slot)"
           >
             Release the shift
           </UButton>
@@ -528,5 +538,16 @@ useSeoMeta({ title: 'My rota' })
         />
       </div>
     </section>
+
+    <ConfirmModal
+      v-model:open="releaseOpen"
+      name="release-shift"
+      title="Release the shift"
+      verb="Release the shift"
+      :consequence="releasingOne ? `${releasingOne.says} goes back on the open list for anyone who qualifies. Having it back means claiming it again, if it is still free.` : undefined"
+      :loading="releasing !== null"
+      :failure="releaseFailure"
+      @confirm="release"
+    />
   </UContainer>
 </template>

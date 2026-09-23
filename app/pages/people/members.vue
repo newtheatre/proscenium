@@ -70,7 +70,7 @@ const AWAITING_RECORD = 'awaiting-record'
 // keeps working, so the runbook's bookmark to the queue is unaffected.
 const { search, conditions, sort, page, query, active, set, setSort } = useListQuery(membershipsList, { ignore: ['status'] })
 // The queue reads the same URL through its own declaration, so its status and sort reach its
-// endpoint and the register's never do (A-130 criterion 9).
+// endpoint and the register's never do (A-130 criterion 10).
 const queue = useListQuery(membershipClaimsList, { ignore: ['filter'] })
 const route = useRoute()
 const router = useRouter()
@@ -347,7 +347,7 @@ const claimBase: TableColumn<Claim>[] = [
       const held = row.original.heldUntil
       return h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
         h('span', {}, saysDay(row.original.createdAt)),
-        // Recording extends a term still running on the purchase date (A-130 criterion 12).
+        // Recording extends a term still running on the purchase date (A-130 criterion 13).
         waitingView.value && held && held >= row.original.startsOn
           ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held', 'title': `Recording starts the new term on ${saysDay(daysAfter(held, 1))}` }, () => `Extends one ending ${saysDay(held)}`)
           : null,

@@ -44,7 +44,7 @@ export function effectiveTerm(terms: readonly Term[], today: string): Term | nul
 }
 
 // A purchase while a term still runs extends it: the new term follows on the day after, so buying
-// early loses nothing. Otherwise it runs from the purchase (A-130 criterion 12, 0031).
+// early loses nothing. Otherwise it runs from the purchase (A-130 criterion 13, 0031).
 export function renewalTerm(boughtOn: string, years: MembershipTerm, heldUntil: string | null): { startsOn: string, expiresOn: string, extends: boolean } {
   const extending = heldUntil !== null && heldUntil >= boughtOn
   const startsOn = extending ? daysAfter(heldUntil, 1) : boughtOn
