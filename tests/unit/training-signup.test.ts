@@ -4,7 +4,11 @@ import {
   blockingGaps,
   bySignUpOrder,
   configuredCloseAt,
+  demotedBy,
+  demotionClaimFor,
+  movedBackCount,
   placesFrom,
+  promotedBy,
   promotionClaimFor,
   saysPlace,
   sessionDayStarts,
@@ -81,6 +85,62 @@ describe('the promotion claim (G-106 criterion 2)', () => {
 
   test('two members on one session never share a claim', () => {
     expect(promotionClaimFor('s1', 'u1', 100)).not.toBe(promotionClaimFor('s1', 'u2', 100))
+  })
+})
+
+describe('a capacity drop moves the latest placed back to waiting (G-106 criterion 6)', () => {
+  const order = [at('a', 10, 1), at('b', 20, 2), at('c', 30, 3), at('d', 40, 4), at('e', 50, 5)]
+
+  test('the last in to a place are the first out, and they wait ahead of those already waiting', () => {
+    const before = placesFrom(order, 4)
+    const after = placesFrom(order, 2)
+
+    const moved = demotedBy(before, after)
+    expect(moved.map(place => place.id)).toEqual(['c', 'd'])
+    expect(moved.map(place => place.waitlistPosition)).toEqual([1, 2])
+    expect(after.find(place => place.id === 'e')?.waitlistPosition).toBe(3)
+  })
+
+  test('nobody already waiting is moved back, and a rise moves nobody back', () => {
+    expect(demotedBy(placesFrom(order, 2), placesFrom(order, 1)).map(place => place.id)).toEqual(['b'])
+    expect(demotedBy(placesFrom(order, 2), placesFrom(order, 4))).toEqual([])
+  })
+
+  test('a drop that still covers everybody signed up moves nobody', () => {
+    expect(demotedBy(placesFrom(order, 20), placesFrom(order, 5))).toEqual([])
+  })
+
+  test('a drop promotes nobody', () => {
+    expect(promotedBy(placesFrom(order, 4), placesFrom(order, 2))).toEqual([])
+  })
+})
+
+describe('the move-back claim (G-106 criterion 6)', () => {
+  test('two racing drops name the same claim, so one of them sends', () => {
+    expect(demotionClaimFor('s1', 'u1', 100, 0)).toBe('training.session.demoted:s1:u1:100:1')
+    expect(demotionClaimFor('s1', 'u1', 100, 0)).toBe(demotionClaimFor('s1', 'u1', 100, 0))
+  })
+
+  test('a second move back of the same sign-up is a new claim', () => {
+    expect(demotionClaimFor('s1', 'u1', 100, 1)).not.toBe(demotionClaimFor('s1', 'u1', 100, 0))
+  })
+
+  test('the count reads only this sign-up\'s claims', () => {
+    const claims = [
+      demotionClaimFor('s1', 'u1', 100, 0),
+      demotionClaimFor('s1', 'u1', 100, 1),
+      demotionClaimFor('s1', 'u1', 200, 0),
+      demotionClaimFor('s1', 'u10', 100, 0),
+    ]
+    expect(movedBackCount(claims, 's1', 'u1', 100)).toBe(2)
+    expect(movedBackCount(claims, 's1', 'u1', 200)).toBe(1)
+    expect(movedBackCount(claims, 's1', 'u2', 100)).toBe(0)
+  })
+
+  test('a member moved back and promoted again is told again', () => {
+    expect(promotionClaimFor('s1', 'u1', 100, 0)).toBe(promotionClaimFor('s1', 'u1', 100))
+    expect(promotionClaimFor('s1', 'u1', 100, 1)).not.toBe(promotionClaimFor('s1', 'u1', 100))
+    expect(promotionClaimFor('s1', 'u1', 100, 1)).not.toBe(promotionClaimFor('s1', 'u1', 100, 2))
   })
 })
 

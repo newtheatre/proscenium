@@ -72,6 +72,7 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'training.session.absent': 'TRAINING',
   'training.register.unmarked': 'TRAINING',
   'training.session.promoted': 'TRAINING',
+  'training.session.demoted': 'TRAINING',
   'training.session.cancelled': 'TRAINING',
   'training.expiry.window': 'TRAINING',
   'training.expiry.final': 'TRAINING',

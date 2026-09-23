@@ -168,9 +168,12 @@ idempotent). The screen is `/account/membership`, a `MY_NAV` entry.
 **Recording is the officer's act** (`members.write`). `GET /api/admin/memberships/claims` is the
 queue behind the register's "Awaiting record" filter at `/people/members`: oldest first (a
 same-second tie breaks on `rowid`), paged in SQL, searchable by name, address or claimed number,
-and never showing an erased person's claim. Filtered by its declaration
-(`shared/utils/membership-claims-list.ts`, K-129): nothing yet beyond `search`, `sort` and page;
-`status` stays fixed at `OPEN`, the endpoint's own job rather than a toolbar control.
+and never showing an erased person's claim. Filtered by its own declaration
+(`shared/utils/membership-claims-list.ts`, K-129, A-130 criterion 10), never the register's:
+`status` (`OPEN`, the hidden default when nothing is asked, or `RECORDED`, `DECLINED` or
+`WITHDRAWN`, so a decided claim can be found with its `decided_at` and `reason`), `search`, and a
+sort by waiting since, decided or recorded order. `claimsClause()` in
+`server/utils/membership-claims.ts` is the predicate the endpoint and its test share.
 `POST /api/admin/memberships/claims/[id]/record` runs `recordClaimStatements()`
 (`shared/utils/membership-claims.ts`) as one batch, every write guarded on the claim still being
 `OPEN`: the number to `users.student_id` (refused with 409 if another account holds it, exactly as
@@ -2417,6 +2420,15 @@ same promotion finds the claim and sends nothing (G-106 criteria 2 and 3, named 
 in `tests/integration/races.test.ts`). The instant is in the key so a member who withdrew,
 re-joined and was promoted again is told again. The message is transactional: no topic
 preference silences it and no sweep dry-run suppresses it (criterion 5).
+
+A capacity drop is the reverse, and is told the same way (G-106 criterion 6). Whoever signed up
+last among those holding a place goes back to waiting first, ahead of everybody already waiting,
+and each is emailed their new number once. The claim is
+`training.session.demoted:<session>:<user>:<signed_up_at>:<n>`, where `n` is one more than the
+number of move-back claims that sign-up already has, so two racing drops name one claim while a
+drop after a re-promotion is a new one. The promotion key takes the same count as a suffix once
+it is above nought, so a member moved back and promoted again is told again. Both are
+transactional.
 
 Validity is derived at read time, never stored; the diagram is the derivation, not a status
 column:

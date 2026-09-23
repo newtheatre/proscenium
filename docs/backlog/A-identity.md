@@ -543,6 +543,10 @@ Open questions for the committee:
   9. Withdrawing an open claim asks first, in the shared confirmation, saying that nothing is
      recorded from it and that a new claim can be made afterwards; nothing is withdrawn until the
      member confirms.
+  10. Added 23 September 2026 (issue 1005): the queue is filtered, searched and sorted by its own
+      declaration (`membershipClaimsList`, K-129), never the register's. Its `status` field
+      defaults to waiting and also offers recorded, declined and withdrawn, so a decided claim can
+      be found from the screen with its outcome, when and, for a decline, the reason sent.
 - Source: Pre-cutover review, 10 September 2026; issue 1153 item 7 (criterion 9, the withdrawal
   was one click). The migration carries no memberships
   (`migration/identity.ts`), so at cutover every member reads as lapsed until recorded; this is

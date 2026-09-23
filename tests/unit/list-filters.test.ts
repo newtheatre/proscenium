@@ -24,6 +24,7 @@ import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
 import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { fellowshipsList } from '#shared/utils/fellowships-list'
 import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
+import { CLAIM_STATUSES } from '#shared/utils/membership-claims'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { membershipsList } from '#shared/utils/memberships-list'
 import { performancesList } from '#shared/utils/performances-list'
@@ -296,6 +297,17 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
     expect(filter?.options?.map(option => option.value)).toEqual(['current', 'awaiting-record', 'awaiting-check', 'lapsed', 'everyone'])
     const parsed = parseCondition(filter!, 'awaiting-record')
     expect('condition' in parsed && parsed.condition).toEqual({ key: 'filter', operator: 'is', values: ['awaiting-record'] })
+  })
+
+  test('the claims queue declares its own status, so a decided claim can be found (A-130 criterion 10)', () => {
+    const status = fieldOf(membershipClaimsList, 'status')
+    expect(status?.column).toBe('status')
+    expect(operatorsOf(status!)).toEqual(['is'])
+    expect(status?.options?.map(option => option.value)).toEqual([...CLAIM_STATUSES])
+    expect(membershipClaimsList.sort.fields.map(one => one.key)).toContain('decidedAt')
+    expect(filterQuerySchema(membershipClaimsList).safeParse({ status: 'DECLINED', sort: 'decidedAt' }).success).toBe(true)
+    // The register's own view switch is not the queue's to answer.
+    expect(filterQuerySchema(membershipClaimsList).safeParse({ filter: 'awaiting-record' }).success).toBe(false)
   })
 
   test('every declared key is unique and no field shares a key with the paging or search keys', () => {

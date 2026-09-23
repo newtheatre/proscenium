@@ -42,6 +42,16 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
+function all<T>(statement: string, ...parameters: unknown[]): T[] {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query(statement).all(...parameters as never[]) as T[]
+  }
+  finally {
+    database.close()
+  }
+}
+
 function write(statement: string, ...parameters: unknown[]): void {
   const database = new Database(app.databaseFile)
   try {
@@ -545,8 +555,9 @@ describe.skipIf(skip !== null)('a promotion is told once (G-106)', () => {
     const people = [await member(), await member(), await member()]
     for (const person of people) await signUp(session, person.cookie)
 
-    expect((await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })).status)
-      .toBe(200)
+    const answered = await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toMatchObject({ capacity: 1, promoted: 0, movedBack: 2 })
 
     const listing = await (await send('GET', '/api/training/sessions', undefined, people[2]!.cookie)).json() as
       { items: { id: string, placed: boolean, waitlistPosition: number | null }[] }
@@ -556,6 +567,60 @@ describe.skipIf(skip !== null)('a promotion is told once (G-106)', () => {
     expect(read<{ n: number }>('SELECT count(*) n FROM session_attendees WHERE session_id = ?', session)?.n).toBe(3)
   })
 
+  // Criterion 6, decided on issue 1062: a place taken away is told, the same way one given is.
+  test('a capacity drop emails everybody it moves back, once, with their waiting number', async () => {
+    const module = await addModule()
+    const session = await schedule({ moduleIds: [module], capacity: 3 })
+    const people = [await member(), await member(), await member(), await member()]
+    for (const person of people) await signUp(session, person.cookie)
+
+    const lowered = await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    expect(await lowered.json()).toMatchObject({ movedBack: 2 })
+
+    const told = (userId: string): { status: string, subject: string }[] => all(
+      `SELECT status, subject FROM notification_log
+       WHERE type = 'training.session.demoted' AND user_id = ? AND claim IS NOT NULL`, userId,
+    )
+    expect(told(people[0]!.id)).toEqual([])
+    expect(told(people[3]!.id)).toEqual([])
+    for (const person of [people[1]!, people[2]!]) {
+      expect(told(person.id)).toHaveLength(1)
+      expect(told(person.id)[0]).toMatchObject({ status: 'SENT' })
+      expect(told(person.id)[0]!.subject).toContain('waiting list')
+    }
+
+    // Asking for the same capacity again is no change, so nobody hears a second time.
+    await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    expect(told(people[1]!.id)).toHaveLength(1)
+  })
+
+  test('a member moved back and promoted again is told again', async () => {
+    const module = await addModule()
+    const session = await schedule({ moduleIds: [module], capacity: 2 })
+    const first = await member()
+    const second = await member()
+    await signUp(session, first.cookie)
+    await signUp(session, second.cookie)
+
+    const claims = (type: string): number => read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE type = ? AND user_id = ? AND claim IS NOT NULL`,
+      type, second.id,
+    )!.n
+
+    await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    expect(claims('training.session.demoted')).toBe(1)
+
+    const raised = await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 2 })
+    expect(await raised.json()).toMatchObject({ promoted: 1, movedBack: 0 })
+    expect(claims('training.session.promoted')).toBe(1)
+
+    // Round again: each move is its own claim, so each is its own email.
+    await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 2 })
+    expect(claims('training.session.demoted')).toBe(2)
+    expect(claims('training.session.promoted')).toBe(2)
+  })
+
   test('a member cannot change a session\'s capacity', async () => {
     const module = await addModule()
     const session = await schedule({ moduleIds: [module] })
@@ -563,6 +628,90 @@ describe.skipIf(skip !== null)('a promotion is told once (G-106)', () => {
 
     expect((await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 5 }, person.cookie))
       .status).toBe(403)
+  })
+})
+
+// Issue 1062, decided by the IT Manager: adding a prerequisite warns about who lacks it, and
+// never refuses; the freeze is released only when asked for (question 6).
+describe.skipIf(skip !== null)('changing what a session teaches (G-115 criteria 2 and 7)', () => {
+  interface Preview { lacking: { userId: string, name: string, missing: { requiresId: string }[] }[] }
+
+  const preview = (session: string, moduleIds: string[], as = cookie): Promise<Response> =>
+    send('GET', `/api/admin/training/sessions/${session}/modules-preview?moduleIds=${moduleIds.join(',')}`, undefined, as)
+
+  const change = (session: string, body: Record<string, unknown>, as = cookie): Promise<Response> =>
+    send('PUT', `/api/admin/training/sessions/${session}/modules`, body, as)
+
+  test('the preview names who lacks a prerequisite the change adds, and saving still goes ahead', async () => {
+    const needed = await addModule()
+    const already = await addModule()
+    const taught = await addModule()
+    const added = await addModule()
+    await send('POST', `/api/admin/training/modules/${taught}/prerequisites`, { requiresId: already })
+    await send('POST', `/api/admin/training/modules/${added}/prerequisites`, { requiresId: needed })
+    await send('POST', `/api/admin/training/modules/${added}/prerequisites`, { requiresId: already })
+
+    const session = await schedule({ moduleIds: [taught], capacity: 4 })
+    const lacks = await member()
+    const holds = await member()
+    award(holds.id, needed)
+    await signUp(session, lacks.cookie)
+    await signUp(session, holds.cookie)
+
+    const answered = await preview(session, [taught, added])
+    expect(answered.status).toBe(200)
+    const { lacking } = await answered.json() as Preview
+    // Only what is new: the prerequisite the session already needed is sign-up's own warning.
+    expect(lacking.map(one => [one.userId, one.missing.map(need => need.requiresId)])).toEqual([[lacks.id, [needed]]])
+
+    expect((await change(session, { moduleIds: [taught, added] })).status).toBe(200)
+    expect(all<{ module: string }>(
+      'SELECT module_id module FROM session_modules WHERE session_id = ? ORDER BY module_id', session,
+    ).map(row => row.module).sort()).toEqual([taught, added].sort())
+  })
+
+  test('an open register refuses a change until the freeze is released, and says so on the trail', async () => {
+    const taught = await addModule()
+    const added = await addModule()
+    const session = await schedule({ moduleIds: [taught] })
+    write('UPDATE training_sessions SET register_opened_at = unixepoch() WHERE id = ?', session)
+
+    const refused = await change(session, { moduleIds: [taught, added] })
+    expect(refused.status).toBe(409)
+    expect(await said(refused)).toContain('Release it deliberately')
+
+    const released = await change(session, { moduleIds: [taught, added], releaseFreeze: true })
+    expect(released.status).toBe(200)
+    expect(await released.json()).toMatchObject({ released: true })
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM audit_log WHERE action = 'register.freeze.released' AND target = ?`, `session:${session}`,
+    )?.n).toBe(1)
+  })
+
+  test('a marked register refuses every change, released or not', async () => {
+    const taught = await addModule()
+    const session = await schedule({ moduleIds: [taught] })
+    write('UPDATE training_sessions SET register_opened_at = unixepoch(), marked_at = unixepoch() WHERE id = ?', session)
+
+    expect((await change(session, { moduleIds: [taught], releaseFreeze: true })).status).toBe(409)
+  })
+
+  test('a module that cannot be taught is refused by the preview and the change alike', async () => {
+    const taught = await addModule()
+    const retired = await addModule({ status: 'RETIRED' })
+    const session = await schedule({ moduleIds: [taught] })
+
+    expect((await preview(session, [taught, retired])).status).toBe(422)
+    expect((await change(session, { moduleIds: [taught, retired] })).status).toBe(422)
+  })
+
+  test('a member can neither preview nor change what a session teaches', async () => {
+    const taught = await addModule()
+    const session = await schedule({ moduleIds: [taught] })
+    const person = await member()
+
+    expect((await preview(session, [taught], person.cookie)).status).toBe(403)
+    expect((await change(session, { moduleIds: [taught] }, person.cookie)).status).toBe(403)
   })
 })
 

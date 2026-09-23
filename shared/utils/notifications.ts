@@ -466,6 +466,15 @@ export const MESSAGE_TYPES = {
     sender: 'TRAINING',
   },
 
+  // Transactional like the promotion it undoes: a member who turned training email off would
+  // otherwise arrive for a place they no longer hold (G-106 criterion 6).
+  'training.session.demoted': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'training-session-demoted',
+    sender: 'TRAINING',
+  },
+
   // Transactional, so no preference can silence it: the alternative to hearing this is a locked
   // door on the night (G-113 criterion 4).
   'training.session.cancelled': {
