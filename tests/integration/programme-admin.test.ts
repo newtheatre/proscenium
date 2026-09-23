@@ -434,7 +434,9 @@ describe('the unpaid queue is counted from open holds (D-132 criterion 2)', () =
   // performance ids back and binding them (0006).
   test('a show sums the unpaid holds of its performances, and states its house and next curtain', async () => {
     await withDatabase((database) => {
-      const seeded = tonightsPerformance(database, { capacityOverride: 30 })
+      // The next curtain is read against the database's own clock, so the night is one that has
+      // not begun whenever this runs (#1200).
+      const seeded = tonightsPerformance(database, { night: '2099-01-01', capacityOverride: 30 })
       ticketTypeFixture(database)
       hold(database, 'r-1', seeded.performanceId, 'PENDING')
 

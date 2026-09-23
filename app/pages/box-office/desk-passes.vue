@@ -87,6 +87,7 @@ const issueFailure = ref<string | null>(null)
 
 async function issue(): Promise<void> {
   if (!passTypeId.value || !priceId.value || !buyerId.value) return
+  const passName = selectedPassType.value?.name ?? 'Pass'
   issuing.value = true
   issueFailure.value = null
   try {
@@ -100,7 +101,7 @@ async function issue(): Promise<void> {
         requestId: requestId.value,
       },
     })
-    toast.add({ title: 'Pass issued', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: `${passName} issued`, icon: 'i-lucide-check', color: 'success' })
     buyerId.value = undefined
     requestId.value = undefined
     await Promise.all([refreshPassTypes(), loadRequests()])
