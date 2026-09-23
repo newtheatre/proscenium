@@ -455,7 +455,7 @@ export const CONFIG_KEYS = {
   },
   PRIVILEGED_ROLES: {
     schema: z.array(z.string()),
-    default: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER', 'TREASURER', 'BOX_OFFICE', 'BAR_MANAGER', 'FOH_MANAGER'],
+    default: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER', 'TREASURER', 'BOX_OFFICE', 'BAR_MANAGER', 'FOH_MANAGER', 'SAFETY_OFFICER'],
     workshop: 'people-and-communications',
     describes: 'Roles that require a second factor: any role touching money, personal data or safety records (A-112). Changing this is audited.',
   },

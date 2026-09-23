@@ -10,6 +10,7 @@ definePageMeta({ layout: 'console', title: 'Seasons', middleware: 'console', doc
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
+const StatusCell = resolveComponent('StatusCell')
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -153,7 +154,7 @@ const columns: TableColumn<AdminSeason>[] = [
     id: 'inUse',
     header: 'In use',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.inUse ? 'A show belongs to it' : 'Nothing yet'),
+    cell: ({ row }) => h(StatusCell, { value: row.original.inUse, yes: 'A show belongs to it', no: 'Nothing yet' }),
   },
   {
     id: 'act',

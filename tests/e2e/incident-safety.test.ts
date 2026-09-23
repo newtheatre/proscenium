@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, forgetSpentStep, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
+import { codeForStep, stepFor } from '#shared/utils/totp'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -25,9 +26,18 @@ beforeAll(async () => {
   if (skip) return
   app = await startApp()
   admin = await adminSession(app)
-  safety = await registerMember(app, 'safety-officer', generatePassword())
+  const safetyPassword = generatePassword()
+  safety = await registerMember(app, 'safety-officer', safetyPassword)
   bar = await registerMember(app, 'safety-bar', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: safety.id, role: 'SAFETY_OFFICER' }, admin.cookie)
+
+  // The role holds safety records, so it is privileged and needs a confirmed factor (A-112, #1211).
+  const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, safety.cookie)).json() as { secret: string }
+  await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, safety.cookie)
+  forgetSpentStep(app, safety.email)
+  const { attemptId } = await (await request(app, 'POST', '/api/auth/sign-in', { email: safety.email, password: safetyPassword })).json() as { attemptId: string }
+  const answered = await request(app, 'POST', '/api/auth/mfa/challenge', { attemptId, code: await codeForStep(secret, stepFor(new Date())) })
+  safety = { ...safety, cookie: (answered.headers.get('set-cookie') ?? '').split(';')[0]! }
   await request(app, 'POST', '/api/admin/roles', { userId: bar.id, role: 'BAR_MANAGER' }, admin.cookie)
 
   const database = new Database(app.databaseFile)

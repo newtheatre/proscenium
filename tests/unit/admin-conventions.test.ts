@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
-import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
+import { CONFIRM_BACK_LABEL, statusCell } from '#shared/utils/admin-conventions'
 import { penceFromPounds } from '#shared/utils/admin-forms'
 import { saysMoney } from '#shared/utils/bar'
 import { plural } from '#shared/utils/text'
@@ -741,5 +741,48 @@ describe('every console control says what it is (K-101 criterion 5, issue 1151 i
     const source = await Bun.file('app/pages/box-office/shows/[id].vue').text()
     expect(source).not.toContain('label: \'hidden sm:inline\'')
     expect(source).toContain('sr-only sm:not-sr-only')
+  })
+})
+
+// A true-or-false column is a tick or a cross carrying its words (K-135). The words stay because
+// a screen reader and a phone have no header to read the icon against.
+describe('a true-or-false column is a tick or a cross (K-135)', () => {
+  const IN_USE = { yes: 'Has records against it', no: 'Nothing yet' }
+
+  test('true is a tick and false is a cross, each labelled with its own words', () => {
+    expect(statusCell(true, IN_USE)).toEqual({ icon: 'i-lucide-check', label: 'Has records against it', tone: 'text-success' })
+    expect(statusCell(false, IN_USE)).toEqual({ icon: 'i-lucide-x', label: 'Nothing yet', tone: 'text-muted' })
+  })
+
+  // The icon is decoration for a reader that has the words; the words are hidden from sight only
+  // where the column header is on screen to read the icon against (criteria 1 and 4).
+  test('the shared cell hides its icon from a screen reader and shows its words below sm', async () => {
+    const component = await Bun.file('app/components/StatusCell.vue').text()
+    expect(component).toContain('statusCell(')
+    expect(component).toMatch(/<UIcon[^>]*aria-hidden="true"/)
+    expect(component).toContain('sm:sr-only')
+    expect(component).not.toMatch(/(^|[\s"])sr-only/)
+  })
+
+  // The tell is a whole cell that is one ternary between two quoted strings: a sentence standing
+  // in for a boolean (criterion 3).
+  test('no console table spells a true-or-false cell as a pair of sentences', async () => {
+    const SENTENCE_CELL = /cell: \(\{ row \}\) => (?:h\('span', \{[^}]*\}, )?\(?row\.original\.\w+ \? '[^']+' : '[^']+'/
+    expect((await tables()).filter(screen => SENTENCE_CELL.test(screen.source)).map(screen => screen.path)).toEqual([])
+  })
+
+  test('every screen the report named, and the two sold columns, use the shared cell', async () => {
+    const named = [
+      'app/pages/bar/products/index.vue',
+      'app/pages/box-office/seasons.vue',
+      'app/pages/box-office/show-categories.vue',
+      'app/pages/box-office/ticket-types.vue',
+      'app/pages/box-office/venues.vue',
+    ]
+    const missing: string[] = []
+    for (const path of named) {
+      if (!(await Bun.file(path).text()).includes('StatusCell')) missing.push(path)
+    }
+    expect(missing).toEqual([])
   })
 })
