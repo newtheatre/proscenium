@@ -108,7 +108,7 @@ export const PERMISSIONS = [
   'comms.operations',
   // Recording a daily Z reading and resolving a variance: the treasurer's own write (I-104).
   'finance.write',
-  // The season dashboard's aggregate figures, without the entry-level drill-down `finance.read`
+  // The money dashboard's aggregate figures, without the entry-level drill-down `finance.read`
   // carries (I-105 criterion 5): the committee sees how the season is doing, not who rang it in.
   'finance.summary',
   // Reopening a closed period. Deliberately not TREASURER's: I-107 criterion 4 asks for an

@@ -430,7 +430,7 @@ Open questions:
   treasurer read the bar's performance from the ledger, not from a spreadsheet.
 - Depends on: F-105, F-114, F-115, F-117
 - Acceptance criteria:
-  1. Reports run per period (night, week, season, custom range, on the London calendar): sales by
+  1. Reports run per period (night, week, year, custom range, on the London calendar): sales by
      product, variant and category; GP as revenue against the delivered cost of depleted stock;
      stocktake variance; comps; discounts.
   2. Every report exports as CSV; exports guard against formula injection and page rather than

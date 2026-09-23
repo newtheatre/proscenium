@@ -23,7 +23,7 @@ interface PeriodRow {
   createdAt: number
 }
 
-// A term's own definition, read by the season dashboard's TERM selector (I-105) as well as by
+// A term's own definition, read by the money dashboard's TERM selector (I-105) as well as by
 // closing one: the range a client submits for `kind: 'TERM'` is exactly what this lists.
 export function periodsQuery(): SQL {
   return sql`

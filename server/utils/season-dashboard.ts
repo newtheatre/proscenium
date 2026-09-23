@@ -12,7 +12,7 @@ import type { PeriodInput, RevenueBySource, SeasonSummary } from '#shared/utils/
 import type { ListClause } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 
-// The season dashboard (I-105): every figure a query scoped by a predicate over a resolved
+// The money dashboard (I-105): every figure a query scoped by a predicate over a resolved
 // range, never one parameter per row it covers (0001, 0003, 0006).
 
 const WEEK_DAYS = 7
@@ -53,7 +53,7 @@ export function periodBounds(period: PeriodInput): Bounds {
     const toDayExclusive = addDays(period.toDay, 1)
     return { fromAt: seconds(startOfLondonDay(period.fromDay)), toAt: seconds(startOfLondonDay(toDayExclusive)), fromDay: period.fromDay, toDay: period.toDay }
   }
-  // SEASON: 1 August to 31 July, named by the year it ends in (criterion 1, 0009).
+  // YEAR: 1 August to 31 July, named by the year it ends in (criterion 1, 0009, 0087).
   const from = fromLondonWallClock(period.year - 1, 8, 1)
   const to = new Date(committeeYearEnd(period.year).getTime() + 1)
   return { fromAt: seconds(from), toAt: seconds(to), fromDay: londonDayOf(from), toDay: `${period.year}-07-31` }
