@@ -100,6 +100,8 @@ interface Register {
   pages: number
   counts: Record<string, number>
   permanent: Holder[]
+  // Grants on an account nobody has signed into yet, listed apart and never counted (A-132).
+  pending: Holder[]
   lapsedHidden: number
 }
 
@@ -327,6 +329,83 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
       await waitFor(view, `document.querySelector('[data-test="grants"]')`)
       expect(await textOf(view, '[data-test="grants"]')).toContain('ADMIN')
       await waitFor(view, `document.querySelector('[data-test="open-register"]')`)
+    }
+    finally {
+      view.close()
+    }
+  }, BOOT_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('a role is granted by address when the picker finds nobody (A-132, 0088)', () => {
+  test('it makes a shadow account whose grant is pending, listed apart and not counted', async () => {
+    const email = registrableAddress('incoming')
+    const before = (await register()).counts.THEATRE_MANAGER ?? 0
+    const granted = await send('POST', '/api/admin/roles', { email, name: 'Incoming Officer', role: 'THEATRE_MANAGER', note: 'Elected at the AGM' }, cookie)
+    expect(granted.status).toBe(200)
+    expect(await granted.json()).toMatchObject({ pending: true, expiresAt: defaultRoleExpiry(new Date()) })
+
+    const account = read<{ id: string, password: string | null, google_sub: string | null }>('SELECT id, password, google_sub FROM users WHERE email = ?', email)!
+    expect(account).toMatchObject({ password: null, google_sub: null })
+
+    const listing = await register('?role=is:THEATRE_MANAGER')
+    expect(listing.items.map(item => item.email)).not.toContain(email)
+    expect(listing.pending.map(item => item.email)).toContain(email)
+    expect(listing.counts.THEATRE_MANAGER ?? 0).toBe(before)
+
+    const entry = read<{ detail: string }>('SELECT detail FROM audit_log WHERE target = ? AND action = ?', `user:${account.id}`, 'role.granted')!
+    expect(JSON.parse(entry.detail)).toMatchObject({ role: 'THEATRE_MANAGER', pending: true })
+    expect(entry.detail).not.toContain(email)
+    expect(entry.detail).not.toContain('Incoming Officer')
+  })
+
+  test('an address that has an account is refused: that person is chosen, never typed (K-123 criterion 1)', async () => {
+    const existing = await person('picked-not-typed')
+    const response = await send('POST', '/api/admin/roles', { email: existing.email, name: existing.name, role: 'COMMITTEE' }, cookie)
+    expect(response.status).toBe(409)
+    expect((await response.json()).statusMessage ?? '').toMatch(/choose it/i)
+    expect(read('SELECT id FROM role_grants WHERE user_id = ? AND role = ?', existing.id, 'COMMITTEE')).toBeUndefined()
+  })
+
+  test('both an account and an address, or neither, is refused', async () => {
+    const existing = await person('both-ways')
+    expect((await send('POST', '/api/admin/roles', { userId: existing.id, email: registrableAddress('both'), name: 'Both', role: 'COMMITTEE' }, cookie)).status).toBe(400)
+    expect((await send('POST', '/api/admin/roles', { role: 'COMMITTEE' }, cookie)).status).toBe(400)
+    expect((await send('POST', '/api/admin/roles', { email: registrableAddress('nameless'), role: 'COMMITTEE' }, cookie)).status).toBe(400)
+  })
+
+  test('a pending grant can be revoked before it is claimed (criterion 4)', async () => {
+    const email = registrableAddress('withdrawn')
+    expect((await send('POST', '/api/admin/roles', { email, name: 'Withdrawn Candidate', role: 'COMMITTEE' }, cookie)).status).toBe(200)
+    const id = read<{ id: string }>('SELECT id FROM users WHERE email = ?', email)!.id
+    expect((await send('DELETE', `/api/admin/roles?userId=${id}&role=COMMITTEE`, null, cookie)).status).toBe(200)
+    expect((await register()).pending.map(item => item.email)).not.toContain(email)
+  })
+
+  test('a pending IT Manager does not let the working one be revoked (A-120 criterion 3)', async () => {
+    const email = registrableAddress('next-it')
+    expect((await send('POST', '/api/admin/roles', { email, name: 'Next IT Manager', role: 'ADMIN' }, cookie)).status).toBe(200)
+    const self = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
+    expect((await send('DELETE', `/api/admin/roles?userId=${self}&role=ADMIN`, null, cookie)).status).toBe(409)
+  })
+
+  test('the page offers the address only once the search has found nobody', async () => {
+    const email = registrableAddress('screen-incoming')
+    const view = await signedInView()
+    try {
+      await view.navigate(`${app.baseURL}/people/roles?role=is:BAR_MANAGER`)
+      await waitFor(view, `document.querySelector('[data-test="grant-form"]')`)
+      expect(await view.evaluate(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
+
+      await click(view, '[data-test="grant-person"] input')
+      await fill(view, '[data-test="grant-person"] input', email)
+      await waitFor(view, `document.querySelector('[data-test="grant-nobody-found"]')`, 20_000)
+      await click(view, '[data-test="grant-nobody-found"]')
+      await waitFor(view, `document.querySelector('[data-test="grant-by-email"]')`)
+      await fill(view, '[data-test="grant-email"] input', email)
+      await fill(view, '[data-test="grant-name"] input', 'Screen Incoming')
+      await click(view, '[data-test="grant-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="pending-grants"]')?.innerText.includes('Screen Incoming')`)
+      expect(read('SELECT id FROM users WHERE email = ?', email)).toBeDefined()
     }
     finally {
       view.close()

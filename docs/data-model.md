@@ -216,6 +216,10 @@ UNIQUE (`user_id`, `role`). Enforced at read time; the last-administrator guard 
 check, not a constraint. The stamp is for a reader: what stops a second warning is the claim in
 `notification_log`, which carries the expiry the warning was computed against (0048).
 A merge reconciles rather than reassigning: see "Merging duplicate accounts" above (A-123).
+A grant on a shadow account whose `last_login_at` is NULL is pending (A-132, 0088): made by
+granting to an address the picker could not find, listed apart on the register, never counted as
+a holder and never usable for the last-administrator guard. It needs no column and no claim of its
+own: the account's first way in or first sign-in (A-116) is what makes it held.
 
 ### totp_secrets
 `user_id` PK → users cascade · `secret` · `confirmed_at` NULL until proven ·
