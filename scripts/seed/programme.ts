@@ -1,4 +1,4 @@
-// Where we perform, what we perform and when: two venues, two seasons and eight shows whose
+// Where we perform, what we perform and when: two venues, three seasons and eight shows whose
 // performances land in the past, tonight and the future, and in every status a screen shows.
 
 import { currentShowNight, showNightBounds, showNightOf } from '../../shared/utils/show-night'
@@ -203,6 +203,27 @@ export interface Programme {
   counts: { venues: number, seasons: number, shows: number, performances: number }
 }
 
+// Seed-only shapes, not policy: a real season's days are the Box Office Manager's to enter (0087).
+const SEASON_MARGIN_NIGHTS = 7
+const NEXT_SEASON_NIGHTS = 42
+
+function addNights(day: string, nights: number): string {
+  const [year, month, date] = day.split('-').map(Number) as [number, number, number]
+  return new Date(Date.UTC(year, month - 1, date + nights)).toISOString().slice(0, 10)
+}
+
+// Spring is January to April, StuFF May to July, Autumn August to December: names only, so a
+// seeded season reads like a real one.
+function termName(day: string): string {
+  const [year, month] = day.split('-').map(Number) as [number, number]
+  return `${month <= 4 ? 'Spring' : month <= 7 ? 'StuFF' : 'Autumn'} ${year}`
+}
+
+function termAfter(day: string): string {
+  const [year, month] = day.split('-').map(Number) as [number, number]
+  return month <= 4 ? `${year}-05-01` : month <= 7 ? `${year}-08-01` : `${year + 1}-01-01`
+}
+
 function curtainOf(night: string, hours: number): number {
   return Math.floor(showNightBounds(night).from.getTime() / 1000) + Math.round(hours * 3600)
 }
@@ -251,24 +272,33 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
     })])
   }
 
-  // A season is Autumn, Spring, StuFF or the Fringe, never the whole year (0087).
+  // Dated from the seeded shows themselves, so each season spans its shows whatever day the seed
+  // runs; the next season begins in the term after this one ends (0087).
+  const nightIn = (nights: number): string => (nights === 0 ? tonight : showNightOf(new Date((now + nights * DAY) * 1000)))
+  const spanOf = (season: SeedShow['season']): [string, string] => {
+    const nights = SHOWS.filter(show => show.season === season).flatMap(show => show.performances.map(one => one.nights))
+    return [nightIn(Math.min(...nights) - SEASON_MARGIN_NIGHTS), nightIn(Math.max(...nights) + SEASON_MARGIN_NIGHTS)]
+  }
+  const [currentFrom, currentTo] = spanOf('current')
+  const [previousFrom, previousTo] = spanOf('previous')
+  const nextFrom = termAfter(currentTo)
+  const dated = [
+    { key: 'current', from: currentFrom, to: currentTo, sort: 0, archived: 0 },
+    { key: 'next', from: nextFrom, to: addNights(nextFrom, NEXT_SEASON_NIGHTS), sort: 1, archived: 0 },
+    { key: 'previous', from: previousFrom, to: previousTo, sort: 2, archived: 1 },
+  ]
   const seasons = new Map<string, string>()
-  seasons.set('current', ensure(target, 'seasons', { column: 'name', value: 'Autumn 2026' }, {
-    id: seedId('season', 'autumn-2026'),
-    name: 'Autumn 2026',
-    starts_on: '2026-09-01',
-    ends_on: '2026-12-19',
-    sort: 0,
-    archived: 0,
-  }).id)
-  seasons.set('previous', ensure(target, 'seasons', { column: 'name', value: 'Spring 2026' }, {
-    id: seedId('season', 'spring-2026'),
-    name: 'Spring 2026',
-    starts_on: '2026-01-05',
-    ends_on: '2026-04-30',
-    sort: 1,
-    archived: 1,
-  }).id)
+  for (const season of dated) {
+    const name = termName(season.from)
+    seasons.set(season.key, ensure(target, 'seasons', { column: 'name', value: name }, {
+      id: seedId('season', name),
+      name,
+      starts_on: season.from,
+      ends_on: season.to,
+      sort: season.sort,
+      archived: season.archived,
+    }).id)
+  }
 
   const categories = new Map<string, string>()
   for (const [sort, name] of ['In-house', 'Studio', 'Fringe', 'External hire'].entries()) {

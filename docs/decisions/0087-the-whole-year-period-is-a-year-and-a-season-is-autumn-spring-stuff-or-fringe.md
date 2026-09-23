@@ -22,7 +22,7 @@ cover in a given year, and `docs/workshops.md` proposes no such dates.
 ## Decision
 
 Recorded after the IT Manager's answers of 23 September 2026 to the questions this record first
-left open.
+left open, including how the public site names a season.
 
 - **The 1 August to 31 July period is a year.** Its period kind is `YEAR` (it was `SEASON`), it
   is named by the two calendar years it spans ("2026/27", the same rule as the committee year,
@@ -46,10 +46,10 @@ left open.
   export's (D-129) whole-year filter move with them; the export's `season` filter becomes `year`.
 - **`TERM` stays beside `SEASON`.** A term is what the treasurer closes (I-107) and need not match
   a season.
-- **The public What's on heading names the current season** (amended 23 September 2026 at the IT
-  Manager's direction): the unretired `seasons` row today falls in, else the next one to begin,
-  else no season word at all. A finished season is never named and no name is ever guessed; the
-  whole-year "26/27" band is gone.
+- **The public What's on heading names the current season.** It is the unretired `seasons` row
+  tonight's show night falls in (04:00 to 04:00, 0014), else the next one to begin, else no season
+  word at all. A finished season is never named and no name is ever guessed, and the heading never
+  names the whole year.
 
 ## Consequences
 
@@ -59,6 +59,8 @@ left open.
 - The `seasons` table stops meaning the committee year: the seed, the Seasons page and D-131's
   documentation change with it, and the seasons already imported or entered as "2026/27" need
   renaming or splitting by the Box Office Manager, which is a data task, not a migration.
+- Between seasons, What's on names the next season before it begins, so an announced season must
+  be entered with its days for the public heading to say anything; with none entered it is blank.
 - A stored `SEASON_START` or `SEASON_END` row is renamed in place by migration, so a committee
   that changed the boundary keeps its value; the audit trail keeps the old key's history as it was.
 
