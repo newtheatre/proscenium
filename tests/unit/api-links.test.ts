@@ -64,14 +64,11 @@ describe('a link to a server route downloads rather than routing (I-108, D-129, 
     expect(routed).toEqual([])
   })
 
-  test('the SU export button is an external link (I-108)', () => {
-    const button = links.find(link => link.file === 'pages/money/exports.vue' && link.tag.includes('data-test="export-csv"'))
-    expect(button).toBeDefined()
-    expect(isExternal(button?.tag ?? '')).toBe(true)
-  })
-
-  test('the ticket sales export button is an external link (D-129)', () => {
-    const button = links.find(link => link.file === 'pages/box-office/shows/index.vue' && link.tag.includes('data-test="ticket-export-csv"'))
+  test.each([
+    ['SU export', 'I-108', 'pages/money/exports.vue', 'export-csv'],
+    ['ticket sales export', 'D-129', 'pages/box-office/shows/index.vue', 'ticket-export-csv'],
+  ])('the %s button is an external link (%s)', (_label, _story, file, dataTest) => {
+    const button = links.find(link => link.file === file && link.tag.includes(`data-test="${dataTest}"`))
     expect(button).toBeDefined()
     expect(isExternal(button?.tag ?? '')).toBe(true)
   })
