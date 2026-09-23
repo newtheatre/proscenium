@@ -345,6 +345,12 @@ it, and an unknown id is a 404 rather than some other range. `GET /api/admin/fin
 feeds the picker under `finance.read` or `finance.summary`, so choosing a season needs no box
 office permission.
 
+The picker itself is shared: `usePeriodForm()` (`app/composables/`) holds the controls' state and
+`PeriodFields.vue` renders them, and `periodQuery()` in `shared/utils/season-dashboard.ts` is the
+one spelling of a period as a query string. Each screen passes its own loader for the terms and
+seasons, so it reads them through its own gate: `/money` through the two finance routes above,
+`/reports` through `GET /api/admin/reports/periods` under `reports.read` (E-126 criterion 5).
+
 ### SU accounting exports (I-108)
 
 A period export (`GET /api/admin/finance/export?fromDay=...&toDay=...`) is one CSV row per
@@ -1099,6 +1105,12 @@ figure reads live from the operational tables, never the frozen `night_reports.r
 where the frozen report is one night's own snapshot rather than a queryable history. "Erased
 identities anonymised" needs no special-casing: `eraseAccount()` overwrites `users.name` to
 `TOMBSTONE_NAME` in place, so any join already reads it back that way.
+
+Criterion 5 is the screen, `/reports` (`app/pages/reports/index.vue`), the one item of its own
+top-level console group behind `viewReports`: its readers span front of house, safety and the
+committee, so it sits in none of their groups (issue 1042). An Incidents tab and a Performances
+tab each page their route, link to its export with the same period, and keep the open tab in the
+URL as `?tab=performances`. The period controls are the money dashboard's, above.
 
 Criterion 4, historical night reports imported from the old estate, is resolved rather than
 unbuilt: K-115's withdrawal (26 August 2026) already established that the old estate's incident

@@ -960,7 +960,7 @@ Answered on 23 September 2026 from the code, for the question in issue 1213:
   it must arrive at once and regardless of preference.
 
 The full catalogue of what is sent, by type, is the operator page **What the theatre sends**
-(`content/docs/11.communications/3.what-the-theatre-sends.md`).
+(`content/docs/12.communications/3.what-the-theatre-sends.md`).
 
 ## Checking whether a message sent (H-106)
 
