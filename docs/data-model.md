@@ -72,7 +72,7 @@ erDiagram
 (scrypt PHC, NULL for guest or Google-only; **never non-NULL on an @newtheatre.org.uk
 address**, import-enforced, 0008) · `phone` NULL (scrub) · `password_set_at` NULL · `password_last_used_at` NULL ·
 `google_sub` UNIQUE NULL · `google_linked_at` NULL · `google_last_used_at` NULL ·
-`pending_google_email` UNIQUE NULL (admin-set claim marker) · `student_id` UNIQUE NULL (how the committee finds somebody on the
+`pending_google_email` UNIQUE NULL (admin-set claim marker, lowercased, a Workspace address no other account uses as its `email`; consumed by the first Google sign-in, which keeps the account's own `email`, A-104) · `student_id` UNIQUE NULL (how the committee finds somebody on the
 SU's list: names do not always match and the address is often personal, 0031) · `verified` bool ·
 `disabled` bool · `session_epoch` int ·
 `anonymised_at` NULL · `last_login_at` · `created_at` · `updated_at`.
@@ -135,7 +135,7 @@ never gates money) · `renewal_notice_at` · `created_at`.
 CHECK `expires_on > starts_on`. Current membership = today inside the term or inside
 `MEMBERSHIP_GRACE_DAYS` after it, read at query time (0031). A renewal is another row: history is
 never rewritten. Recording a claim bought while a term still runs appends the new term from the
-day after that one ends (`renewalTerm()`, A-130 criterion 12), so the term that decides currency
+day after that one ends (`renewalTerm()`, A-130 criterion 13), so the term that decides currency
 is `effectiveTerm()`: back-to-back or overlapping rows fold into one run, and the run that counts
 is the latest to have begun by today (`longestTerm()` reads it for the viewer, the account menu
 and member pricing). The register's `lapsed` means over, grace included, so a renewal waiting to
@@ -170,13 +170,13 @@ member-facing routes are `GET /api/account/membership` (the longest-running term
 reason), `POST /api/account/membership/claim` (Zod: `studentId`, `startsOn` not after today,
 `term` 1 or 3) and `DELETE /api/account/membership/claim` (withdraws the open claim by predicate,
 idempotent, writing `membership.claim.withdrawn` with the member as actor and the claim id alone
-in the same batch, guarded on the claim still being open, A-130 criterion 13). The screen is `/account/membership`, a `MY_NAV` entry.
+in the same batch, guarded on the claim still being open, A-130 criterion 14). The screen is `/account/membership`, a `MY_NAV` entry.
 
 **Recording is the officer's act** (`members.write`). `GET /api/admin/memberships/claims` is the
 queue behind the register's "Awaiting record" filter at `/people/members`: oldest first (a
 same-second tie breaks on `rowid`), paged in SQL, searchable by name, address or claimed number,
 and never showing an erased person's claim. Filtered by its own declaration
-(`shared/utils/membership-claims-list.ts`, K-129, A-130 criterion 9), never the register's:
+(`shared/utils/membership-claims-list.ts`, K-129, A-130 criterion 10), never the register's:
 `status` (`OPEN`, the hidden default when nothing is asked, or `RECORDED`, `DECLINED` or
 `WITHDRAWN`, so a decided claim can be found with its `decided_at` and `reason`), `search`, and a
 sort by waiting since, decided or recorded order. `claimsClause()` in
@@ -340,6 +340,7 @@ listing and `accounts.create` for adding somebody:
 | --- | --- |
 | `GET /api/admin/accounts` | The paged envelope, allow-listed columns only, anonymised rows hidden unless `includeAnonymised=true` (the picker's flag) or the `anonymised` field asks for them, with the two triage banner counts. Filtered by its declaration (`shared/utils/accounts-list.ts`): `role`, `holdsRole`, `membership`, `verified`, `disabled`, `anonymised`, `authenticator`, `privilegedWithoutFactor`, `approachingRetention`, `neverSignedIn` and `lastLoginAt`, with `search` over name, address and student number and `sort` by name, last seen or joined. A key it does not declare is a 400. |
 | `POST /api/admin/accounts` | Creates an account with no password and sends a set-password link; a Workspace address gets none (0008). Roles may be granted in the same action. |
+| `PATCH /api/admin/accounts/[id]/google-link` | Sets `pending_google_email` from `googleEmail`, lowercased as sign-in lowercases it, or clears it on `null`; `accounts.create`. A non-Workspace address is a 400; an address that is another account's `email` or `pending_google_email` is a 409 naming that account and pointing to merge, as is an account already linked to Google or erased. The predicate rides the UPDATE and the audit entry (`account.google.prelinked` or `account.google.unlinked`, no address) rides `changes()` (A-104 criterion 6, 0003, 0011). |
 
 **"In use" is a count over rows, never a column.** `VENUE_REFERENCES` in `server/utils/venues.ts`
 declares every table that points at `venues`: `performances`, `venue_emergency_info`,

@@ -108,7 +108,7 @@ describe('sorting is by a declared field only', () => {
   })
 })
 
-// A renewal recorded early starts after today (A-130 criterion 12). It has not lapsed, it still
+// A renewal recorded early starts after today (A-130 criterion 13). It has not lapsed, it still
 // wants checking against the SU's list, and the term it follows is not "running out".
 describe('a renewal that has not started yet', () => {
   test('is neither current nor lapsed, and waits for a check', async () => {

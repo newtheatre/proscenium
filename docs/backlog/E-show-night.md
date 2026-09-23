@@ -128,7 +128,10 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   7. The board reads a window of dates rather than a fixed count of performances: it opens on the
      coming fortnight and takes a from and an until, so a quiet week and a festival week both show
      the nights an officer is working on.
-- Source: Prompt Book E-1; audit PR-13 (claim and release carry); issue 933 (criterion 6, confirming ad hoc shifts and unconfirm were in scope after all); issue 1151 item 10 (criterion 7, a board bounded by a count showed twenty performances whatever span they covered).
+  8. A holder's release, of a shift or of a slot on a bar opening, asks first in the shared
+     confirmation: it says the shift goes back on the open list for anyone who qualifies and that
+     having it back means claiming it again. Nothing is released until the holder confirms.
+- Source: Prompt Book E-1; audit PR-13 (claim and release carry); issue 933 (criterion 6, confirming ad hoc shifts and unconfirm were in scope after all); issue 1151 item 10 (criterion 7, a board bounded by a count showed twenty performances whatever span they covered); issue 1153 item 7 (criterion 8, releasing was one click).
 
 ## E-108: Unstaffed escalation seven days ahead
 

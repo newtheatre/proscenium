@@ -360,7 +360,7 @@ describe('the student number rides in the same batch as the membership (issue 10
   })
 })
 
-// Who is told that claims wait, and what they are told (A-130 criterion 11): every live holder
+// Who is told that claims wait, and what they are told (A-130 criterion 12): every live holder
 // of members.write, and only while a claim is open on a person who still exists.
 describe('the waiting claims notice (issue 1005)', () => {
   const now = 1_790_000_000
@@ -412,7 +412,7 @@ describe('the waiting claims notice (issue 1005)', () => {
 })
 
 // A renewal is another row: the running term is untouched and the new one follows it (A-130
-// criterion 12, 0010).
+// criterion 13, 0010).
 describe('recording a renewal appends a term after the running one (issue 1005)', () => {
   test('the held row is unchanged and the new row starts the day after it ends', async () => {
     await withDatabase((database) => {
@@ -445,7 +445,7 @@ describe('recording a renewal appends a term after the running one (issue 1005)'
 })
 
 // Criterion 13: a withdrawal is on the trail with the claim id alone, once, and only while open.
-describe('withdrawing a claim is audited (A-130 criterion 13, 0011)', () => {
+describe('withdrawing a claim is audited (A-130 criterion 14, 0011)', () => {
   const withdraw = (database: TestDatabase, claimId: string, at: number): void => run(database, withdrawClaimStatements({
     claimId,
     userId: 'u1',

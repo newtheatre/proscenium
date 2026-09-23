@@ -6,7 +6,7 @@ sends, and stage-door's warning trails. Every automated message flows through on
 per-topic preferences, a send log, retries and undeliverable-address protection; marketing is a V2
 capability built consent-first and structurally separated from operational messaging.
 
-Stories: 14 total (9 MVP, 4 V2, 1 Later).
+Stories: 15 total (9 MVP, 5 V2, 1 Later).
 
 ## Open questions
 
@@ -233,6 +233,22 @@ Stories: 14 total (9 MVP, 4 V2, 1 Later).
   4. Legacy rooms subscriptions are never imported; the channel launches with zero subscribers and consent collected fresh (Get-In: retire).
   5. A member on push-only for a topic whose subscription has died is detectable on the operations dashboard, so preference plus dead device does not become silence nobody notices.
 - Source: Prompt Book H-1 (push as a channel); audit RM-6 (subscriptions stored, sender a logged no-op, member on PUSH receives nothing); Get-In part 2 (push consent re-collected when push actually works).
+
+## H-205: Reminders before a performance
+
+- Role: Audience account
+- Phase: V2
+- Story: As somebody holding a ticket, I want a reminder before the performance, so that the date, time, venue and my ticket are in front of me when I need them, not only in a confirmation from weeks ago.
+- Depends on: H-101, H-102, H-105, H-107, H-108, D-107
+- Acceptance criteria:
+  1. A scheduled run emails each live booking for a performance starting within the configured window. A live booking is held, collected or admitted at the door, with at least one ticket not refunded, on a performance still to come, with an account that is not anonymised (H-108 criterion 8, H-107). The message names the show, the performance date and time (Europe/London), the venue and the booking reference, and links to the booking's page with its QR.
+  2. Links only: the reminder attaches no calendar file. The booking's page is the one place its details are kept current, and a calendar entry made from a reminder would not follow a moved performance.
+  3. Exactly one reminder is sent per booking per performance start time, claimed race-safely so that two runs cannot both send (D-107's shape). A performance moved to a new time re-arms the reminder; a cancelled performance or a cancelled booking sends none.
+  4. The reminder carries the Bookings topic, so a booker can switch it off, and is claimed and sent on its own, never waiting for a digest. It reaches a guest's unverified address, as a booking confirmation does (0089).
+  5. The window is `BOOKING_REMINDER_HOURS_BEFORE`, quoted on the operator page through its token. `docs/workshops.md` proposes 24 hours before curtain; the key ships unset, with the reminder dormant, until a session confirms that figure (0019, 0012).
+  6. The run is bounded by a batch cap and scoped by subquery from the performances in the window, never by a list of ids read back first (0006). A backlog after an outage drains over several runs, and a performance already started is never reminded.
+  7. Every outcome lands in the send log (H-105), the type is listed on "What the theatre sends", and the Bookings topic's description on the preferences screen names the reminder again once it sends.
+- Source: Feedback issue 1231, raised while answering issue 1213: a paid booking hears nothing between its confirmation and the night, while the Bookings topic promised reminders. Accepted by the IT Manager on 23 September 2026 as a V2 story, with the window proposed at 24 hours and links rather than a calendar file.
 
 ## H-301: Further channels (SMS for show-night-critical notices)
 

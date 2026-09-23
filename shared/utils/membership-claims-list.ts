@@ -1,6 +1,6 @@
 import type { ListSpec } from './list-filters'
 
-// The claims queue's own declaration (K-129, A-130 criterion 9), never the register's. With no
+// The claims queue's own declaration (K-129, A-130 criterion 10), never the register's. With no
 // status asked the endpoint shows what is waiting; the others find a claim already decided.
 export const membershipClaimsList = {
   key: 'membership-claims',
