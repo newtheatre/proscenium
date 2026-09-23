@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { formatLondon } from '#shared/utils/london'
 import { calendarFor } from '#shared/utils/ics'
 import { saysShiftRole } from '#shared/utils/rota'
@@ -50,22 +49,7 @@ interface ShiftReminderRow {
 
 async function confirmedShiftsOn(night: string): Promise<ShiftReminderRow[]> {
   const { from, to } = showNightBounds(night)
-  return await db.all<ShiftReminderRow>(sql`
-    SELECT s.id AS shiftId, s.user_id AS userId, s.role AS role, s.confirmed_at AS confirmedAt,
-           v.name AS venueName, sh.title AS showTitle,
-           p.starts_at AS startsAt, p.doors_at AS doorsAt, p.duration_minutes AS durationMinutes,
-           p.interval_count AS intervalCount, p.interval_minutes AS intervalMinutes,
-           s.starts_at AS shiftStartsAt, s.ends_at AS shiftEndsAt,
-           t.starts_before_doors_minutes AS startsBeforeDoorsMinutes, t.ends_after_end_minutes AS endsAfterEndMinutes
-    FROM shifts s
-    JOIN performances p ON p.id = s.performance_id
-    JOIN venues v ON v.id = p.venue_id
-    JOIN shows sh ON sh.id = p.show_id
-    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = s.role
-    WHERE s.status = 'CONFIRMED' AND p.status <> 'CANCELLED'
-      AND p.starts_at >= ${Math.floor(from.getTime() / 1000)} AND p.starts_at < ${Math.floor(to.getTime() / 1000)}
-    ORDER BY p.starts_at, s.role, s.slot
-  `)
+  return await db.all<ShiftReminderRow>(confirmedShiftsQuery(from, to))
 }
 
 // One message per shift, not per holder: a member working both a matinee and an evening

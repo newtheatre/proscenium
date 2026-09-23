@@ -15,6 +15,7 @@ const UButton = resolveComponent('UButton')
 interface VenueTemplate {
   venueId: string
   venueName: string
+  archived: boolean
   slots: TemplateSlot[]
 }
 
@@ -219,7 +220,13 @@ const columns: TableColumn<VenueTemplate>[] = [
   {
     id: 'venue',
     header: 'Venue',
-    cell: ({ row }) => h('span', {}, row.original.venueName),
+    // A retired venue is here only because it still holds a template, which Remove clears.
+    cell: ({ row }) => (row.original.archived
+      ? h('span', { class: 'flex items-center gap-2' }, [
+          h('span', {}, row.original.venueName),
+          h(UBadge, { color: 'neutral', variant: 'outline', size: 'sm' }, () => 'Retired'),
+        ])
+      : h('span', {}, row.original.venueName)),
   },
   {
     id: 'slots',
@@ -237,7 +244,7 @@ const columns: TableColumn<VenueTemplate>[] = [
     cell: ({ row }) => (writes.value === false
       ? null
       : h('div', { class: 'flex justify-end gap-1' }, [
-          row.original.slots.length === 0
+          row.original.slots.length === 0 || row.original.archived
             ? null
             : h(UButton, {
                 'size': 'sm',
@@ -245,13 +252,15 @@ const columns: TableColumn<VenueTemplate>[] = [
                 'data-test': `stamp-${row.original.venueId}`,
                 'onClick': () => stamp(row.original),
               }, () => 'Stamp the diary'),
-          h(UButton, {
-            'size': 'sm',
-            'color': 'neutral',
-            'variant': 'ghost',
-            'data-test': `edit-template-${row.original.venueId}`,
-            'onClick': () => edit(row.original),
-          }, () => (row.original.slots.length === 0 ? 'Set up the template' : 'Edit')),
+          row.original.archived
+            ? null
+            : h(UButton, {
+                'size': 'sm',
+                'color': 'neutral',
+                'variant': 'ghost',
+                'data-test': `edit-template-${row.original.venueId}`,
+                'onClick': () => edit(row.original),
+              }, () => (row.original.slots.length === 0 ? 'Set up the template' : 'Edit')),
           row.original.slots.length === 0
             ? null
             : h(UButton, {

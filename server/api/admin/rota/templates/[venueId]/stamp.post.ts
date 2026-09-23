@@ -1,3 +1,4 @@
+import { externalVenueTemplateRefusal } from '#shared/utils/rota'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 
 // Stamp a venue's template onto every performance from tonight onwards that is missing a slot.
@@ -5,6 +6,11 @@ import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 export default defineEventHandler(async (event) => {
   const venueId = getRouterParam(event, 'venueId') ?? ''
   const resolved = await requirePermission(event, 'rota.write')
+
+  const venue = await venueById(venueId)
+  if (!venue) throw noSuch('venue')
+  const external = externalVenueTemplateRefusal(venue)
+  if (external) throw createError({ statusCode: 409, statusMessage: external })
 
   const slots = await templateSlotsFor(venueId)
   if (slots.length === 0) {

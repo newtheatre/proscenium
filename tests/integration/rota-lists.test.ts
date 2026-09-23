@@ -8,6 +8,7 @@ import { SHIFT_ROLES } from '#shared/utils/rota'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import {
   countPendingApprovalsQuery,
+  countVenueTemplatesQuery,
   countUnfilledShiftsQuery,
   pendingApprovalsClause,
   pendingApprovalsQuery,
@@ -282,6 +283,56 @@ describe('shift templates (E-101, K-129)', () => {
       const bareVenues = run(database, venueTemplatesQuery(bareOnly, 25, 0)) as { venueId: string }[]
       expect(bareVenues.map(venue => venue.venueId)).toContain(bare.id)
       expect(bareVenues.map(venue => venue.venueId)).not.toContain(staffed.id)
+    })
+  })
+
+  // An external venue is staffed ad hoc and a retired one takes no new work, so neither is
+  // offered a new template, in the list or its count (E-101 criterion 5, issue 1210).
+  test('an external venue, or a retired one holding no template, is neither listed nor counted', async () => {
+    await withDatabase((database) => {
+      const ours = testVenue(database, { suffix: 'templates-ours' })
+      const away = testVenue(database, { suffix: 'templates-external' })
+      const retired = testVenue(database, { suffix: 'templates-retired' })
+      person(database, 'actor')
+      for (const statement of replaceTemplateStatements(away.id, [{ role: 'DUTY_MANAGER', count: 1 }], 'actor')) run(database, statement)
+      database.batch([
+        ['UPDATE venues SET is_external = 1 WHERE id = ?', away.id],
+        ['UPDATE venues SET archived = 1 WHERE id = ?', retired.id],
+      ])
+
+      const filters: Record<string, string>[] = [{}, { staffed: 'true' }, { staffed: 'false' }, { search: 'Test House' }]
+      for (const raw of filters) {
+        const clause = venueTemplatesClause(parseTemplates(raw))
+        const listed = (run(database, venueTemplatesQuery(clause, 25, 0)) as { venueId: string }[]).map(venue => venue.venueId)
+        expect(listed).not.toContain(away.id)
+        expect(listed).not.toContain(retired.id)
+
+        const [counted] = run(database, countVenueTemplatesQuery(clause)) as { total: number }[]
+        expect(counted!.total).toBe(new Set(listed).size)
+      }
+
+      const everything = run(database, venueTemplatesQuery(venueTemplatesClause(parseTemplates({})), 25, 0)) as { venueId: string }[]
+      expect(everything.map(venue => venue.venueId)).toContain(ours.id)
+    })
+  })
+
+  // Remove is the only way a template goes, so a retired venue still holding one stays listed
+  // until it is removed; one with none is not offered a new one (E-101 criterion 5).
+  test('a retired venue is listed while it still holds a template, and marked retired', async () => {
+    await withDatabase((database) => {
+      const retired = testVenue(database, { suffix: 'templates-retired-held' })
+      person(database, 'actor')
+      for (const statement of replaceTemplateStatements(retired.id, [{ role: 'DUTY_MANAGER', count: 1 }], 'actor')) run(database, statement)
+      database.batch([['UPDATE venues SET archived = 1 WHERE id = ?', retired.id]])
+
+      const clause = venueTemplatesClause(parseTemplates({}))
+      const listed = run(database, venueTemplatesQuery(clause, 25, 0)) as { venueId: string, archived: number }[]
+      expect(listed.find(venue => venue.venueId === retired.id)?.archived).toBe(1)
+      const [counted] = run(database, countVenueTemplatesQuery(clause)) as { total: number }[]
+      expect(counted!.total).toBe(new Set(listed.map(venue => venue.venueId)).size)
+
+      const bare = venueTemplatesClause(parseTemplates({ staffed: 'false' }))
+      expect((run(database, venueTemplatesQuery(bare, 25, 0)) as { venueId: string }[]).map(venue => venue.venueId)).not.toContain(retired.id)
     })
   })
 

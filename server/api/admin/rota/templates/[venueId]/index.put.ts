@@ -1,5 +1,5 @@
 import { changes } from '#shared/utils/audit'
-import { orderedSlots, shiftTemplateForm, templateRefusal } from '#shared/utils/rota'
+import { externalVenueTemplateRefusal, orderedSlots, shiftTemplateForm, templateRefusal } from '#shared/utils/rota'
 import type { TemplateSlot } from '#shared/utils/rota'
 
 // Set a venue's shift template. Editing one changes nothing already stamped: the backfill is what
@@ -8,8 +8,12 @@ export default defineEventHandler(async (event) => {
   const venueId = getRouterParam(event, 'venueId') ?? ''
   const resolved = await requirePermission(event, 'rota.write')
 
-  const venue = (await listVenues()).find(one => one.id === venueId)
+  const venue = await venueById(venueId)
   if (!venue) throw noSuch('venue')
+  const external = externalVenueTemplateRefusal(venue)
+  if (external) throw createError({ statusCode: 409, statusMessage: external })
+  // A retired venue keeps a template it already holds, for Remove, but takes no new work (D-131).
+  if (venue.archived) throw createError({ statusCode: 409, statusMessage: 'That venue has been retired' })
 
   const input = await readValidatedBodyOrThrow(event, shiftTemplateForm)
   const refusal = templateRefusal(input.slots)

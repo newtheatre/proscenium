@@ -3,11 +3,14 @@ import {
   addShiftStatement,
   backfillShiftTimesStatement,
   backfillVenueStatement,
+  barWindowsTonightQuery,
+  confirmedShiftsQuery,
   replaceTemplateStatements,
   restampShiftTimesStatement,
   stampPerformanceStatement,
 } from '#server/utils/rota'
 import { shiftWindow } from '#shared/utils/rota-times'
+import { showNightBounds } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -229,6 +232,73 @@ describe('the performance\'s own clock moves its windows (E-131 criterion 1)', (
         'SELECT role, slot, starts_at, ends_at FROM shifts WHERE id = ?', 'shift-added')
       expect(shift!.starts_at).toBe(tonight.startsAt - 1800 - 60 * 60)
       expect(shift!.ends_at).toBe(tonight.startsAt + (120 + 60) * 60)
+    })
+  })
+})
+
+// A row a venue kept from before it was marked external: the write path now deletes it, and
+// every read ignores it anyway, so a stale row never sets a window (E-101 criterion 5).
+describe('a template left on an external venue never sets a window (E-101 criterion 5)', () => {
+  const LATE_BAR: TemplateSlotInput[] = [
+    { role: 'DUTY_MANAGER', count: 1 },
+    { role: 'BAR', count: 1, startsBeforeDoorsMinutes: 60, endsAfterEndMinutes: 60 },
+  ]
+
+  function externalWithStaleTemplate(database: TestDatabase): ReturnType<typeof tonightsPerformance> {
+    const tonight = tonightsPerformance(database)
+    template(database, tonight.venueId, LATE_BAR)
+    database.batch([['UPDATE venues SET is_external = 1 WHERE id = ?', tonight.venueId]])
+    return tonight
+  }
+
+  // Doors are half an hour before the curtain and the show runs two hours, so the defaults give
+  // an hour before the curtain to two and a half hours after it.
+  const defaultWindow = (startsAt: number) => ({ starts_at: startsAt - 3600, ends_at: startsAt + 150 * 60 })
+
+  test('a shift added by hand takes the house defaults', async () => {
+    await withDatabase(async (database) => {
+      const tonight = externalWithStaleTemplate(database)
+      run(database, addShiftStatement('shift-away', { performanceId: tonight.performanceId, role: 'BAR', slot: 1 }, 'actor', DEFAULTS))
+
+      const [shift] = timesOn(database, tonight.performanceId)
+      expect({ starts_at: shift!.starts_at, ends_at: shift!.ends_at }).toEqual(defaultWindow(tonight.startsAt))
+    })
+  })
+
+  test('restamping and the backfill take the house defaults', async () => {
+    await withDatabase(async (database) => {
+      const tonight = externalWithStaleTemplate(database)
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)',
+        'shift-bare', tonight.performanceId, 'BAR', 'OPEN']])
+
+      run(database, backfillShiftTimesStatement(DEFAULTS, tonight.venueId))
+      const [filled] = timesOn(database, tonight.performanceId)
+      expect({ starts_at: filled!.starts_at, ends_at: filled!.ends_at }).toEqual(defaultWindow(tonight.startsAt))
+
+      run(database, restampShiftTimesStatement(tonight.performanceId, DEFAULTS))
+      const [restamped] = timesOn(database, tonight.performanceId)
+      expect({ starts_at: restamped!.starts_at, ends_at: restamped!.ends_at }).toEqual(defaultWindow(tonight.startsAt))
+    })
+  })
+
+  test('a reminder for a shift with no stored window reads no offset from it', async () => {
+    await withDatabase(async (database) => {
+      const tonight = externalWithStaleTemplate(database)
+      const holder = person(database, 'holder')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-held', tonight.performanceId, 'BAR', holder, 'CONFIRMED']])
+
+      const { from, to } = showNightBounds(tonight.night)
+      const [row] = run(database, confirmedShiftsQuery(from, to)) as { startsBeforeDoorsMinutes: number | null, endsAfterEndMinutes: number | null }[]
+      expect(row).toMatchObject({ startsBeforeDoorsMinutes: null, endsAfterEndMinutes: null })
+    })
+  })
+
+  test('the bar window a sale is read against takes the house defaults', async () => {
+    await withDatabase(async (database) => {
+      const tonight = externalWithStaleTemplate(database)
+      const [window] = run(database, barWindowsTonightQuery(tonight.venueId, 0, tonight.startsAt + 1, DEFAULTS)) as { startsAt: number, endsAt: number }[]
+      expect({ starts_at: window!.startsAt, ends_at: window!.endsAt }).toEqual(defaultWindow(tonight.startsAt))
     })
   })
 })

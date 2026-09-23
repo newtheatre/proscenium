@@ -3,6 +3,7 @@ import {
   addOpeningShiftStatement,
   addedSlotAuditStatement,
   approveOpeningShiftStatement,
+  barSlotCountQuery,
   cancelOpeningShiftsStatement,
   cancelOpeningStatement,
   claimOpeningShiftStatement,
@@ -150,6 +151,27 @@ describe('creating an opening stamps bar slots from the template (E-130 criterio
 
       expect(rows(database, 'SELECT id FROM bar_openings WHERE id = ?', openingId)).toHaveLength(0)
       expect(slotsOn(database, openingId)).toHaveLength(0)
+    })
+  })
+
+  // A bar row a venue kept from before it was marked external is read by nothing (E-101
+  // criterion 5): the venue is staffed ad hoc, and its bar with it.
+  test('an external venue\'s leftover bar row plans no opening and stamps no slot', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database)
+      template(database, venue.id, TWO_BAR)
+      database.batch([['UPDATE venues SET is_external = 1 WHERE id = ?', venue.id]])
+      expect(run(database, barSlotCountQuery(venue.id))).toEqual([])
+
+      const actorId = person(database, 'officer')
+      const input = { venueId: venue.id, night: NIGHT, label: 'Society social', startsAt: OPENS_AT, endsAt: CLOSES_AT }
+      run(database, createOpeningStatement('opening-away', input, actorId))
+      expect(rows(database, 'SELECT id FROM bar_openings WHERE id = ?', 'opening-away')).toHaveLength(0)
+
+      database.batch([[`INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, 'PLANNED', ?)`, 'opening-forced', venue.id, NIGHT, 'Forced', OPENS_AT, CLOSES_AT, actorId]])
+      run(database, stampOpeningShiftsStatement('opening-forced'))
+      expect(slotsOn(database, 'opening-forced')).toHaveLength(0)
     })
   })
 

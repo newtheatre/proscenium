@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
     || (input.intervalMinutes ?? null) !== held.intervalMinutes
   const active = moved ? await activeShifts(id) : []
   const heldShifts = active.filter(shift => COMMITTED_SHIFT_STATUSES.includes(shift.status) && shift.userId !== null)
-  const newRoles = moved ? new Set((await templateSlotsFor(input.venueId)).map(slot => slot.role)) : new Set<ShiftRole>()
+  const newRoles = moved ? new Set((await stampableSlotsFor(input.venueId)).map(slot => slot.role)) : new Set<ShiftRole>()
   const orphaned = heldShifts.filter(shift => !newRoles.has(shift.role))
   const carried = heldShifts.filter(shift => newRoles.has(shift.role))
 
