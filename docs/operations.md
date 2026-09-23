@@ -103,17 +103,17 @@ in-application `health:watch` task (`## The health check`) runs inside the Worke
 challenged, and alerts the IT Manager if the endpoint stays unhealthy, so a check forgotten by
 hand is still caught, only later.
 
-`health-watch.yml` reads `${{ vars.HEALTH_URL }}`, a **repository** variable, never a literal in
-the workflow file. There is no fallback: it fails fast naming the missing variable rather than
-silently checking the wrong system. It curls from a GitHub runner too, so Bot Fight Mode blocks
-it exactly as it blocked the dropped `health` job.
+**No workflow curls the site from a runner.** `health-watch.yml`, which polled `/api/health` every
+fifteen minutes to catch a deploy that touched no migration, was removed for the same reason
+(issue 1014): Bot Fight Mode would have failed every run. "After every deploy" is the
+`health:watch` task's job alone (J-106 criterion 5).
 
-**`health-watch.yml`'s own schedule has never actually run.** GitHub only reads a `schedule:`
-trigger from a workflow file on the repository's default branch, still `main` until cutover; a
-file that exists only on `unified/main` never registers. A `platform/register-scheduled-workflows`
-copy on `main` (checking `unified/main`'s deploy, since that is where the real code is) is what
-makes the schedule real before cutover rather than for the first time on the day it matters most,
-ADR-0021's lesson again. `e2e.yml`'s nightly run had the identical gap and the identical fix.
+**`e2e.yml`'s nightly schedule has never actually run.** GitHub only reads a `schedule:` trigger
+from a workflow file on the repository's default branch, still `main` until cutover; a file that
+exists only on `unified/main` never registers. A `platform/register-scheduled-workflows` copy on
+`main` (#825) is what makes the schedule real before cutover rather than for the first time on
+the day it matters most, ADR-0021's lesson again. That pull request also carries a copy of
+`health-watch.yml`, which should be dropped when #825 is next revisited.
 
 ### Applying a destructive migration by hand (K-107 criterion 3)
 
@@ -286,11 +286,10 @@ chosen at the time (`<archive-name>` below; nothing is decided yet). In order:
    reviewed, merged or explicitly abandoned first; anything left open is lost work, not deferred
    work.
 
-3. **Change `HEALTH_URL`, the repository variable, to the production host** (Settings > Secrets
-   and variables > Actions > Variables, repository tab). `health-watch.yml` reads it
-   (`## Applying migrations`, "What it cannot do"); until this changes, it is checking the
-   pre-cutover host, and once cutover starts, checking that host is checking nothing. The
-   by-hand check after a migration run is likewise made against the production host from then on.
+3. **Delete `HEALTH_URL`, the repository variable** (Settings > Secrets and variables > Actions >
+   Variables, repository tab). Nothing reads it since issue 1014 removed both workflows that
+   curled the site (`## Applying migrations`, "What it cannot do"). From here on, the by-hand
+   health check after a migration run is made against the production host.
 
 4. **The DNS flip, and its ordering against the rename.** `wrangler.jsonc`'s one route today is
    `proscenium.newtheatre.org.uk` (`custom_domain: true`), the pre-cutover testing host; the
@@ -392,8 +391,8 @@ environment, outside this repository's own configuration, reading a distinct dat
 serving the freed `proscenium.newtheatre.org.uk` route: this is the same shape `unified/main`
 itself already is today, a second environment deployed from a branch at its own hostname with its
 own database, just re-pointed at mock data instead of what was, until cutover, the pre-production
-copy of the real thing. Any health check or alert aimed at staging is its own workflow and its own
-variable, never `HEALTH_URL`, so a staging outage is never mistaken for a production one and never
+copy of the real thing. Any health check or alert aimed at staging is its own, never production's,
+so a staging outage is never mistaken for a production one and never
 pages the IT Manager as though it were.
 
 ### Old addresses, the subdomains and search (K-125)
@@ -542,11 +541,11 @@ uncounted before it is applied; read that list.
 A 503 naming migrations means the deploy won the race. Run the migrate workflow by hand.
 
 **No GitHub runner can reach it** (J-106 criterion 3, issue 1014): Bot Fight Mode on
-`newtheatre.org.uk` challenges every runner with a 403, so `migrate.yml` no longer checks it and
-`.github/workflows/health-watch.yml`, which polls it on a schedule, fails the same way. After a
-migration run, open `/api/health` in a browser by hand (`## Applying migrations`, "What it cannot
-do"). The `health:watch` task below runs inside the Worker, is not challenged, and is the
-automated check: sustained unhealthiness reaches the IT Manager through the notification centre.
+`newtheatre.org.uk` challenges every runner with a 403, so no workflow checks it: `migrate.yml`'s
+health job and the scheduled `health-watch.yml` were both removed. After a migration run, open
+`/api/health` in a browser by hand (`## Applying migrations`, "What it cannot do"). The
+`health:watch` task below runs inside the Worker, is not challenged, and is the automated check
+after every deploy: sustained unhealthiness reaches the IT Manager through the notification centre.
 
 ## Changing a published rule
 
