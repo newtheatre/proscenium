@@ -216,6 +216,10 @@ UNIQUE (`user_id`, `role`). Enforced at read time; the last-administrator guard 
 check, not a constraint. The stamp is for a reader: what stops a second warning is the claim in
 `notification_log`, which carries the expiry the warning was computed against (0048).
 A merge reconciles rather than reassigning: see "Merging duplicate accounts" above (A-123).
+A grant on a shadow account whose `last_login_at` is NULL is pending (A-132, 0088): made by
+granting to an address the picker could not find, listed apart on the register, never counted as
+a holder and never usable for the last-administrator guard. It needs no column and no claim of its
+own: the account's first way in or first sign-in (A-116) is what makes it held.
 The retired `BOX_OFFICE` role was folded into `FOH_MANAGER` in place by migration 0116, the later
 expiry winning for a holder of both, each moved grant audited as `role.merged` (0090, A-133).
 
@@ -1079,11 +1083,11 @@ of the same figures, adding only the desk's own itemised breakdown.
 `to_day >= from_day`) · `created_by` → users restrict · `created_at`. Indexed on
 `(from_day, to_day)`.
 
-**A named term, and only a term: a season needs no row here.** A season's range is computed
+**A named term, and only a term: a year needs no row here.** A year's range is computed
 from `committeeYearEnd` (`shared/utils/london.ts`), never stored, the boundary E-126 also reuses
 rather than resolving its own (I-107). A term has no fixed formula, so it is named once, ahead
 of closing it: `POST /api/admin/finance/terms` defines the range, `GET` lists every one, and the
-season dashboard's `TERM` period kind (I-105) reads its bounds from here. Closing a period does
+money dashboard's `TERM` period kind (I-105) reads its bounds from here. Closing a period does
 not reference this table: a lock names a range directly, whether or not that range was ever
 defined as a term.
 
@@ -1215,6 +1219,12 @@ nothing and is told so rather than given a slot the theatre never asked for. Cla
 `claimSlotStatement()`, the rota's own conditional write parameterised by table, so two
 simultaneous claims settle to one winner and one member holds one slot on an opening (E-104,
 0003). Cancelling an opening cancels its slots in the same batch, keeping whoever held one.
+A planned opening's staffing changes one-off after stamping without touching the template: an
+added slot takes the next number after the opening's highest, and only an `OPEN` slot on a
+`PLANNED` opening that keeps another slot is deleted, the predicate riding the `DELETE` so a
+claim landing first refuses the removal (E-130 criterion 7). Both audit rows target the opening
+and carry the slot's id and its number: numbers are reused once the highest slot goes, so the id
+is what ties the entry to that slot's own `bar-opening-shift:<id>` history.
 
 ### shift_contact_preferences
 `user_id` PK → users cascade · `visible` bool default false · `updated_at`. Consent, not a fact
@@ -2660,6 +2670,15 @@ K-129): `actor` (a person, matching or excluding, with "is empty" finding a syst
 London day range against when the entry was recorded, not what it describes). `search` runs over
 `target`, so it now finds a substring rather than needing the exact `kind:id`. Sorted by
 `createdAt`, newest first, a same-second tie breaking on `rowid` rather than the random `id`.
+Each listed entry carries `targetName`, `targetAt` for a performance or a bar opening, and
+`targetNight` for a till (written `till:<venue>:<night>`, so keyed on the venue part), looked up as
+the page is read by one `CASE` over the target's kind (`server/utils/audit-targets.ts`, J-103
+criterion 6): each kind reads its own table by primary key in a correlated subquery, so the lookup
+binds no parameter and never gathers the page's ids (0006). A person reads through `users.name`, so
+an erased one is their tombstone. A kind whose only readable text is somebody's own words (a room
+booking's or a request's title, a report) is left out on purpose, as is anything without a name
+(a booking, a shift, a ledger line), and both come back null with the raw `target` shown instead
+(0011). The CSV export carries the raw target only.
 
 ### mfa_attempts
 `id` PK · `user_id` → users cascade · `expires_at` · `created_at`. A first credential that has

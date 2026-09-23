@@ -196,7 +196,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     icon: 'i-lucide-banknote',
     prefix: '/money',
     items: [
-      { label: 'Season dashboard', icon: 'i-lucide-gauge', to: '/money', ability: viewSeasonSummary, exact: true },
+      { label: 'Money dashboard', icon: 'i-lucide-gauge', to: '/money', ability: viewSeasonSummary, exact: true },
       { label: 'Revenue by show', icon: 'i-lucide-trending-up', to: '/money/shows', ability: viewFinanceReports },
       { label: 'Comps and discounts', icon: 'i-lucide-gift', to: '/money/reports', ability: viewFinanceReports },
       { label: 'Daily reconciliation', icon: 'i-lucide-scale', to: '/money/reconciliation', ability: viewFinanceReports },

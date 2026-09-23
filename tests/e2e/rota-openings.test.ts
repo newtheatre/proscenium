@@ -178,6 +178,86 @@ describe.skipIf(skip !== null)('a slot is claimed and confirmed like any other (
   })
 })
 
+describe.skipIf(skip !== null)('an opening\'s staffing changes one-off (E-130 criterion 7)', () => {
+  async function quizNight(): Promise<{ opening: Opening, slots: Slot[] }> {
+    const { items, slots } = await listing(foh.cookie)
+    const opening = items.find(one => one.label === 'A quiz night')!
+    return { opening, slots: slots.filter(one => one.openingId === opening.openingId) }
+  }
+
+  test('an officer adds a slot, and the venue template keeps its count', async () => {
+    expect((await plan('A quiz night', foh.cookie)).status).toBe(200)
+    const { opening } = await quizNight()
+
+    const added = await request(app, 'POST', `/api/rota/openings/${opening.openingId}/slots`, {}, foh.cookie)
+    expect(added.status).toBe(200)
+    expect(await added.json() as { slot: number }).toMatchObject({ slot: 3 })
+
+    expect((await quizNight()).slots.map(slot => slot.slot)).toEqual([1, 2, 3])
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const row = database.query(`SELECT "count" AS count FROM shift_templates WHERE venue_id = ? AND role = 'BAR'`)
+        .get(venueId) as { count: number }
+      expect(row.count).toBe(2)
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('an ordinary member can neither add a slot nor remove one', async () => {
+    const { opening, slots } = await quizNight()
+    expect((await request(app, 'POST', `/api/rota/openings/${opening.openingId}/slots`, {}, member.cookie)).status).toBe(403)
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${slots[0]!.slotId}/remove`, {}, member.cookie)).status).toBe(403)
+  })
+
+  test('a slot somebody holds is refused, and says to stand them down first', async () => {
+    const { slots } = await quizNight()
+    const slot = slots[0]!
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${slot.slotId}/claim`, {}, member.cookie)).status).toBe(200)
+
+    const refused = await request(app, 'POST', `/api/rota/openings/shifts/${slot.slotId}/remove`, {}, foh.cookie)
+    expect(refused.status).toBe(409)
+    expect(await message(refused)).toContain('stand them down first')
+    expect((await quizNight()).slots.some(one => one.slotId === slot.slotId)).toBe(true)
+  })
+
+  test('an open slot is removed, and the change is audited against the opening', async () => {
+    const { opening, slots } = await quizNight()
+    const open = slots.filter(one => one.status === 'OPEN')
+    const removing = open[open.length - 1]!
+
+    const removed = await request(app, 'POST', `/api/rota/openings/shifts/${removing.slotId}/remove`, {}, foh.cookie)
+    expect(removed.status).toBe(200)
+    expect((await quizNight()).slots.some(one => one.slotId === removing.slotId)).toBe(false)
+
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const entries = database.query('SELECT action, detail FROM audit_log WHERE target = ? ORDER BY created_at')
+        .all(`bar-opening:${opening.openingId}`) as { action: string, detail: string }[]
+      const added = entries.find(row => row.action === 'bar-opening-shift.added')!
+      const removed = entries.find(row => row.action === 'bar-opening-shift.removed')!
+      // Both name the slot by id and by number, since a number is reused once the highest goes.
+      expect(JSON.parse(added.detail).changes).toMatchObject({ slot: { from: null, to: 3 } })
+      expect(JSON.parse(added.detail).changes.slotId.to).toEqual(expect.any(String))
+      expect(JSON.parse(removed.detail).changes).toEqual({
+        slotId: { from: removing.slotId, to: null },
+        slot: { from: removing.slot, to: null },
+      })
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('removing the same slot twice is refused rather than recorded twice', async () => {
+    const { slots } = await quizNight()
+    const open = slots.find(one => one.status === 'OPEN')!
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${open.slotId}/remove`, {}, foh.cookie)).status).toBe(200)
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${open.slotId}/remove`, {}, foh.cookie)).status).toBe(404)
+  })
+})
+
 describe.skipIf(skip !== null)('cancelling one cancels its slots (E-130 criterion 5)', () => {
   test('whoever held a slot keeps their name on it, and the opening is cancelled', async () => {
     expect((await plan('A get-in', foh.cookie)).status).toBe(200)

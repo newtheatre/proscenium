@@ -736,7 +736,8 @@ Open questions:
   3. Columns are explicitly allow-listed: reference, performance, type, snapshotted price,
      source, collected and refunded states; no internal notes and no access data ever export.
   4. Exports of personal data are audited with actor, filter and row count.
-  5. The season boundary for reporting runs 1 August to 31 July.
+  5. The year boundary for reporting runs 1 August to 31 July; the export's whole-year filter is
+     `year`, never `season`, which means one of the theatre's seasons (0087).
 - Source: Prompt Book D-1 reporting, K-1; audit PR-7 (20,000-row cap and injection guard carried)
 
 ## D-130: Admit a Fellow on their lifetime entitlement
@@ -779,7 +780,9 @@ Open questions:
      venue's performances apply blackouts to that room, and nothing else about a room is
      inferred from a venue or the reverse (0043).
   2. Seasons can be created, edited and retired, and carry the order they are presented in. A
-     show belongs to at most one season.
+     show belongs to at most one season. A season is one of the theatre's seasons (Autumn,
+     Spring, StuFF or the Fringe of an academic year), never the committee year, and seasons are
+     dated so they do not overlap; that is guidance on the page, not a constraint (0087).
   3. Show categories can be created, edited and retired.
   4. Nothing here is ever destroyed while it is in use: a venue with performances, a season with
      shows or a category with shows refuses deletion and offers retirement instead, and a

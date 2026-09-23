@@ -31,7 +31,7 @@ export function resolveReportPeriod(period: ReportPeriodInput): { fromAt: number
   if (period.kind === 'WEEK') {
     return { fromAt: londonDayStart(period.day), toAt: londonDayStart(period.day, WEEK_DAYS) }
   }
-  if (period.kind === 'SEASON') {
+  if (period.kind === 'YEAR') {
     // committeeYearEnd is the last instant of the year, inclusive; +1 makes the bound exclusive
     // like every other period here.
     const toAt = Math.floor(committeeYearEnd(period.year).getTime() / 1000) + 1

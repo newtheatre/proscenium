@@ -42,7 +42,8 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   2. Templates are editable by the FOH officer and administrators; every change is audited with a from/to diff.
   3. Editing a template affects only performances stamped afterwards; rotas already stamped are untouched.
   4. A performance created in a venue with no template stamps zero slots and immediately appears in the unstaffed escalation (E-108) rather than failing silently.
-- Source: Prompt Book E-1; audit PR-13; get-in disposition (rota carries).
+  5. Added 23 September 2026 (issue 1210): an external venue holds no template. Marking a venue external deletes its template in the same transaction as the flag, audited as a removal naming the slots and no person, and a data migration clears the templates of venues already external. Setting a template on an external venue is refused, including one saved as the flag is set, as is stamping one, and the refusal names the rota board. Every read of a template (stamping, a venue move, a hand-added shift's window, a shift reminder, bar openings and bar windows) ignores one left on an external venue, so a performance there stamps nothing and does not fail; its shifts are added ad hoc on the rota board (E-107 criterion 5). The templates screen and its count list our own current venues; a retired venue is listed, marked retired, only while it still holds a template, so Remove stays reachable, and is never offered a new one.
+- Source: Prompt Book E-1; audit PR-13; get-in disposition (rota carries); issue 1210.
 
 ## E-102: Stamping shifts onto performances
 
@@ -51,7 +52,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As the FOH officer, I want template slots stamped onto every performance automatically so that the rota exists the moment a performance does.
 - Depends on: E-101
 - Acceptance criteria:
-  1. Creating a performance stamps one open shift per template slot in the same transaction; a performance can never exist staffed-by-nothing while its venue has a template.
+  1. Creating a performance stamps one open shift per template slot in the same transaction; a performance can never exist staffed-by-nothing while its venue has a template. An external venue stamps nothing (E-101 criterion 5).
   2. A backfill action stamps missing slots for existing performances and is idempotent: running it twice creates no duplicate shifts, held by a uniqueness rule on (performance, slot).
   3. Stamped shifts are created OPEN with no person named, satisfying the E-106 constraint from birth.
   4. Cancelling a performance cancels its shifts; confirmed holders are notified, open shifts vanish from the claimable list.
@@ -452,7 +453,9 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   4. An opening's shifts appear on the claimant's own rota alongside their performance shifts, labelled by the opening's label and venue rather than by a show title, and the open-slot list offers them the same way.
   5. Cancelling an opening cancels its shifts; whoever held one keeps their name on it and is told, and an unclaimed slot names nobody, exactly as a cancelled performance's shifts behave.
   6. An opening names no performance and no show anywhere: no listing, no attendance figure and no night report derives from one.
-- Source: Matt's direction of 15 September 2026 (the ad-hoc shift is a bar opening record); decision 0077; module F open question 5.
+  7. A planned opening's staffing changes one-off after stamping, and the venue's template does not: an officer adds a bar slot, numbered after the highest the opening holds, and removes an open one. Removing a slot that names somebody (claimed, confirmed or declined) is refused and says to stand them down first, as the rota offers no way to remove a held shift; removing an opening's last slot is refused and says to cancel the opening instead. The removal's predicate rides the delete, so a removal and a claim racing on one slot resolve to exactly one winner; each change writes one audit row naming the opening and the slot, never a person. The screen points to the shift templates screen for changing a venue's usual count. Added 23 September 2026 (issue 1215).
+  8. A planned opening appears on the rota board (E-107) inside the window the board reads, ordered by when it opens among that window's performances: marked as a bar opening, labelled by its label and venue, with each slot's holder and status and the same confirmed count and staffing line a performance card carries. The board only shows it; its card links to that night on `/rota/manage/openings`, where it is staffed and cancelled. A cancelled opening and a cancelled slot are not shown. Showing an opening on the board derives nothing from it, so criterion 6 holds.
+- Source: Matt's direction of 15 September 2026 (the ad-hoc shift is a bar opening record); decision 0077; module F open question 5; the IT Manager's direction on issue 1215 (criterion 7); issue 1216 (criterion 8, the board showed only performances, so an officer planning the fortnight could not see a hire night's staffing beside the shows).
 
 ## E-131: Shifts carry their own start and end
 

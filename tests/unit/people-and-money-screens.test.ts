@@ -62,11 +62,11 @@ describe('the period controls ask the question themselves (I-105 criterion 6)', 
     }
   })
 
-  test('a month and a season are each a select, not a number spinner', async () => {
+  test('a month and a year are each a select, not a number spinner', async () => {
     const dashboard = await read(MONEY)
     expect(dashboard).toContain('monthChoices')
-    expect(dashboard).toContain('seasonChoices')
-    expect(await read(SHOWS)).toContain('seasonChoices')
+    expect(dashboard).toContain('yearChoices(')
+    expect(await read(SHOWS)).toContain('yearChoices(')
   })
 
   test('no money screen leaves a number spinner on a period control', async () => {

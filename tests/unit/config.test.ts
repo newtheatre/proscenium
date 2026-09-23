@@ -79,7 +79,7 @@ describe('configuration surface (0012, 0019)', () => {
   const MONEY_OR_SAFETY_PERMISSIONS: Permission[] = [
     'money.refund', 'finance.read', 'finance.write', 'finance.export', 'finance.reopen',
     'ticketing.export', 'bar.write', 'night.till', 'access.verify',
-    'emergency-card.write', 'age-checks.export',
+    'emergency-card.write', 'age-checks.export', 'safety.read', 'safety.write',
   ]
 
   test('every role touching money, personal data or safety records needs a second factor', () => {
@@ -91,5 +91,11 @@ describe('configuration surface (0012, 0019)', () => {
   // A retired role left in the default reads as a requirement nobody can be subject to (0090).
   test('every privileged role in the default is a role that can still be granted', () => {
     expect(CONFIG_KEYS.PRIVILEGED_ROLES.default.filter(role => !isRole(role))).toEqual([])
+  })
+
+  // Named as well as derived: the safety officer holds safety records, so a stolen password alone
+  // must not reach the open-items list (A-112, #1211).
+  test('the safety officer needs a second factor', () => {
+    expect(CONFIG_KEYS.PRIVILEGED_ROLES.default).toContain('SAFETY_OFFICER')
   })
 })

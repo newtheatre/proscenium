@@ -47,7 +47,7 @@ interface Listing {
   pages: number
 }
 
-interface VenueTemplate { venueId: string, venueName: string, slots: TemplateSlot[] }
+interface VenueTemplate { venueId: string, venueName: string, archived: boolean, slots: TemplateSlot[] }
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -77,7 +77,7 @@ const { data: templates } = await useAsyncData(
 )
 
 const venueOptions = computed(() => templates.value.venues
-  .filter(venue => venue.slots.some(slot => slot.role === 'BAR'))
+  .filter(venue => !venue.archived && venue.slots.some(slot => slot.role === 'BAR'))
   .map(venue => ({ label: venue.venueName, value: venue.venueId })))
 
 const plan = reactive({ venueId: '', evening: '', opensAt: '18:00', closesAt: '23:00', label: '' })
@@ -189,6 +189,52 @@ async function standDown(): Promise<void> {
   }
 }
 
+const adding = ref<string | null>(null)
+
+async function addSlot(opening: Opening): Promise<void> {
+  adding.value = opening.openingId
+  failure.value = null
+  try {
+    const answer = await $fetch<{ slot: number }>(`/api/rota/openings/${opening.openingId}/slots`, { method: 'POST' })
+    toast.add({
+      title: `Slot ${answer.slot} added`,
+      description: `For ${opening.label} only. The venue's template is unchanged.`,
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await refresh()
+  }
+  catch (error) {
+    failure.value = refusalText(error)
+  }
+  finally {
+    adding.value = null
+  }
+}
+
+const removing = ref<Slot | null>(null)
+const removeFailure = ref<string | null>(null)
+const removeWorking = ref(false)
+
+async function removeSlot(): Promise<void> {
+  const slot = removing.value
+  if (!slot) return
+  removeWorking.value = true
+  removeFailure.value = null
+  try {
+    await $fetch(`/api/rota/openings/shifts/${slot.slotId}/remove`, { method: 'POST' })
+    toast.add({ title: `Slot ${slot.slot} removed`, icon: 'i-lucide-check', color: 'success' })
+    removing.value = null
+    await refresh()
+  }
+  catch (error) {
+    removeFailure.value = refusalText(error)
+  }
+  finally {
+    removeWorking.value = false
+  }
+}
+
 const slotsOf = (openingId: string): Slot[] => listing.value.slots.filter(slot => slot.openingId === openingId)
 
 function spanOf(opening: Opening): string {
@@ -211,8 +257,8 @@ const columns: TableColumn<Opening>[] = [
   {
     id: 'staffing',
     header: 'Staffing',
-    cell: ({ row }) => h('div', { 'class': 'space-y-1', 'data-test': `staffing-${row.original.openingId}` },
-      slotsOf(row.original.openingId).map(slot => h('div', { class: 'flex items-center gap-2 text-sm' }, [
+    cell: ({ row }) => h('div', { 'class': 'space-y-1', 'data-test': `staffing-${row.original.openingId}` }, [
+      ...slotsOf(row.original.openingId).map(slot => h('div', { class: 'flex items-center gap-2 text-sm' }, [
         h('span', {}, `Slot ${slot.slot}`),
         h(UBadge, {
           color: slot.status === 'CONFIRMED' ? 'success' : slot.status === 'OPEN' ? 'neutral' : 'warning',
@@ -232,7 +278,32 @@ const columns: TableColumn<Opening>[] = [
               },
             }, () => 'Stand down')]
           : []),
-      ]))),
+        // Only an open slot is removed: one with a name on it is stood down first (E-130).
+        ...(writes.value && slot.status === 'OPEN' && row.original.status === 'PLANNED'
+          ? [h(UButton, {
+              'size': 'xs',
+              'color': 'neutral',
+              'variant': 'ghost',
+              'data-test': `remove-slot-${slot.slotId}`,
+              'onClick': () => {
+                removeFailure.value = null
+                removing.value = slot
+              },
+            }, () => 'Remove')]
+          : []),
+      ])),
+      ...(writes.value && row.original.status === 'PLANNED'
+        ? [h(UButton, {
+            'size': 'xs',
+            'color': 'neutral',
+            'variant': 'outline',
+            'icon': 'i-lucide-plus',
+            'loading': adding.value === row.original.openingId,
+            'data-test': `add-slot-${row.original.openingId}`,
+            'onClick': () => addSlot(row.original),
+          }, () => 'Add a slot')]
+        : []),
+    ]),
   },
   {
     accessorKey: 'status',
@@ -266,7 +337,8 @@ const columns: TableColumn<Opening>[] = [
 
 // A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
 // is shown wherever the action was taken.
-const modalOpen = computed(() => planning.value || cancellingOpening.value !== null || standingDown.value !== null)
+const modalOpen = computed(() => planning.value || cancellingOpening.value !== null || standingDown.value !== null
+  || removing.value !== null)
 
 watch(modalOpen, (nowOpen) => {
   if (!nowOpen) failure.value = null
@@ -285,6 +357,18 @@ watch(modalOpen, (nowOpen) => {
 
     <p class="text-sm text-muted">
       An evening with no performance, staffed like any other.
+    </p>
+
+    <p
+      class="text-sm text-muted"
+      data-test="template-pointer"
+    >
+      Each opening starts with its venue's usual bar count. Add or remove a slot here for one evening;
+      to change the usual count, edit the venue on
+      <ULink
+        to="/rota/manage/templates"
+        class="text-primary underline"
+      >shift templates</ULink>.
     </p>
 
     <RotaFlow step="openings" />
@@ -454,6 +538,18 @@ watch(modalOpen, (nowOpen) => {
       :failure="standDownFailure"
       @update:open="value => { if (!value) standingDown = null }"
       @confirm="standDown"
+    />
+
+    <ConfirmModal
+      :open="removing !== null"
+      name="remove-slot"
+      title="Remove the slot"
+      :verb="removing ? `Remove slot ${removing.slot}` : ''"
+      consequence="This opening needs one fewer person. The venue's template is unchanged."
+      :loading="removeWorking"
+      :failure="removeFailure"
+      @update:open="value => { if (!value) removing = null }"
+      @confirm="removeSlot"
     />
   </div>
 </template>

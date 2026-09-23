@@ -232,6 +232,8 @@ const CATALOGUE = {
   'bar-opening-shift.dismissed': { label: 'Declined bar opening claim cleared by its claimant', module: 'show-night' },
   'bar-opening-shift.reassigned': { label: 'Bar opening slot assigned by an officer', module: 'show-night' },
   'bar-opening-shift.unconfirmed': { label: 'Bar opening slot stood down to open by an officer', module: 'show-night' },
+  'bar-opening-shift.added': { label: 'Bar slot added to a planned opening', module: 'show-night' },
+  'bar-opening-shift.removed': { label: 'Open bar slot removed from a planned opening', module: 'show-night' },
   'age-check.logged': { label: 'Challenge 25 check logged', module: 'show-night' },
   'age-check.superseded': { label: 'Challenge 25 entry corrected', module: 'show-night' },
   'incident.logged': { label: 'Incident or near miss logged', module: 'show-night' },

@@ -34,6 +34,8 @@ interface Register {
   pages: number
   counts: Record<string, number>
   permanent: Holder[]
+  // Granted by address and waiting on a first sign-in: never counted as holders (A-132, 0088).
+  pending: Holder[]
   // Lapsed grants the default listing left out; 0 whenever they were not hidden.
   lapsedHidden: number
 }
@@ -44,7 +46,7 @@ const toast = useToast()
 // The chosen role lives in the URL like every other filter, so a register can be linked (K-129).
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(rolesList)
 
-const empty = (): Register => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1, counts: {}, permanent: [], lapsedHidden: 0 })
+const empty = (): Register => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1, counts: {}, permanent: [], pending: [], lapsedHidden: 0 })
 
 const { data: register, status, error, refresh } = await useAsyncData(
   'people-roles',
@@ -234,7 +236,7 @@ const columns: TableColumn<Holder>[] = [
       v-if="chosen && sees.grants"
       data-test="grant-card"
       :title="`Give somebody ${saysRole(chosen)}`"
-      description="Expires at the committee year end unless it is dated or marked permanent. Somebody who already has this role has their grant renewed."
+      description="Expires at the committee year end unless it is dated or marked permanent. Somebody who already has this role has their grant renewed. If the search finds nobody, you can grant it by address and it waits for their first sign-in."
     >
       <RoleGrantForm
         :role="chosen"
@@ -356,6 +358,46 @@ const columns: TableColumn<Holder>[] = [
         :items-per-page="register.pageSize"
       />
     </div>
+
+    <UPageCard
+      v-if="register.pending.length"
+      data-test="pending-grants"
+      title="Waiting for a first sign-in"
+      description="Granted by address to somebody with no account yet. Not counted as holders until they sign in."
+    >
+      <ul class="space-y-1 text-sm">
+        <li
+          v-for="grant in register.pending"
+          :key="grant.id"
+          class="flex flex-wrap items-center justify-between gap-2"
+        >
+          <span>
+            {{ grant.name }}
+            <span class="font-mono text-xs text-muted">{{ grant.email }}</span>
+            <span class="text-muted"> for {{ saysRole(grant.role) }}, until {{ when(grant.expiresAt) }}</span>
+            <UBadge
+              v-if="!grant.live"
+              class="ml-1"
+              color="warning"
+              variant="subtle"
+              size="sm"
+            >
+              Lapsed
+            </UBadge>
+          </span>
+          <UButton
+            v-if="sees.revokes"
+            size="xs"
+            color="error"
+            variant="ghost"
+            label="Revoke"
+            :loading="working === `${grant.userId}-${grant.role}`"
+            :data-test="`revoke-pending-${grant.userId}-${grant.role}`"
+            @click="askRevoke(grant)"
+          />
+        </li>
+      </ul>
+    </UPageCard>
 
     <UPageCard
       data-test="permanent-report"

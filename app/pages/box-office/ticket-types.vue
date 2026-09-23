@@ -17,6 +17,7 @@ definePageMeta({ layout: 'console', title: 'Ticket types', middleware: 'console'
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
+const StatusCell = resolveComponent('StatusCell')
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -222,7 +223,7 @@ const columns: TableColumn<TicketType>[] = [
     id: 'sold',
     header: 'Sold under',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.everSold ? 'Has been sold' : 'Never sold'),
+    cell: ({ row }) => h(StatusCell, { value: row.original.everSold, yes: 'Has been sold', no: 'Never sold' }),
   },
   {
     id: 'act',

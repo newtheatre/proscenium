@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 31 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 32 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -51,7 +51,7 @@ Open questions for the committee:
 - Depends on: A-101
 - Acceptance criteria:
   1. Verification uses a single-use token valid for 24 hours; consuming it marks the address verified and invalidates any other outstanding verification token for that account.
-  2. Nothing except verification, claim and password-reset messages is ever sent to an unverified address.
+  2. Nothing except verification, claim and password-reset messages is ever sent to an unverified address. Amended 23 September 2026: a message about a booking the address was given for may also reach it (the ticketing confirmations, and an officer's announcement to the ticket holders of a performance still to come), since a guest booker is never verified; each such type is bounded to a live booking, never a sweep of accounts (0089).
   3. An expired or already-used token offers a fresh send, not a dead end; the resend endpoint is enumeration-safe and rate limited.
   4. Sign-in paths that inherently prove the mailbox (consuming a magic link, Google sign-in with a matching address) also mark the address verified.
   5. Tokens are stored hashed; the plaintext exists only in the email.
@@ -563,7 +563,8 @@ Open questions for the committee:
      line says how many were hidden. A live count never includes a lapsed grant (0009).
   4. A holder is added from this page by choosing an account with the person picker (0032), with
      no detour through the account directory. The account page keeps its own Roles card, and both
-     reach the same endpoint, the same guards and the same audit entries.
+     reach the same endpoint, the same guards and the same audit entries. Amended 23 September
+     2026: when the picker finds nobody, the page offers granting by address instead (A-132).
   5. A grant's expiry is the committee year end (the default), a picked date, or permanent, and
      it carries a note of up to 500 characters (A-118 criteria 1 and 2). Re-granting a role the
      account already has a row for renews that row rather than silently doing nothing, and the
@@ -578,6 +579,38 @@ Open questions for the committee:
      only that one was written (0011).
 - Source: Requested 16 September 2026. A-118's expiry choices, note and audit diff had no screen;
   A-121 criterion 5 reaches grants from the account, which is the wrong way round at handover.
+
+## A-132: Grant a role by email before the person's first sign-in
+
+- Role: Administrator
+- Phase: MVP
+- Story: As the IT Manager handing over committee roles, I want to grant a role to somebody by
+  email before their first sign-in so that an incoming committee member's access is ready for
+  them rather than waiting on them to register first.
+- Depends on: A-116, A-131
+- Acceptance criteria:
+  1. Granting a role from `/people/roles` accepts an address and a name only when the person
+     picker finds nobody, never as an alternative to picking an existing account: an address
+     that already has an account, or that an account is pre-linked to for Google sign-in, is
+     refused with the instruction to choose that account (K-123 criterion 1, 0032, A-104). It makes a shadow account holding the grant, and the grant takes effect
+     when that address claims the account by A-116's own mechanism, with no second claim step
+     (0088).
+  2. The account, the grant and their audit entries are one batch, and the unique address is
+     the conditional write: two administrators granting the same address at once leave exactly
+     one account and one grant, and the other is refused (0003). It needs `accounts.create` as
+     well as `roles.grant`.
+  3. Until claimed, the pending grant is listed apart from live holders and is not counted in
+     the live total, as criterion 3 of A-131 already treats a lapsed grant; nor does a pending
+     IT Manager satisfy the last-IT-Manager guard (A-120 criterion 3).
+  4. A pending grant carries the same expiry choices and note as any grant, the committee year
+     end by default (0009), and can be revoked before it is claimed by the ordinary revoke.
+  5. A Workspace address is claimed only by Google sign-in and is sent nothing; a personal
+     address is sent the set-password link the console's Add someone sends (0008, A-121
+     criterion 3).
+  6. The audit detail says the grant is pending and never carries the address or the name
+     (0011).
+- Source: Feedback, 22 September 2026 (issue 1212); accepted by the IT Manager on 23 September
+  2026 with the address as the picker's fallback only.
 
 ## A-133: One role for the Front of House and Box Office Manager
 

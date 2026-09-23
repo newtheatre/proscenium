@@ -69,7 +69,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/membership/claim.post.ts', exempt: 'a claim about yourself, creating no membership and carrying no authority' },
   { route: 'server/api/account/membership/claim.delete.ts', exempt: 'withdraws your own claim' },
   { route: 'server/api/admin/roles/index.delete.ts', actions: ['role.revoked'] },
-  { route: 'server/api/admin/roles/index.post.ts', actions: ['role.granted'] },
+  { route: 'server/api/admin/roles/index.post.ts', actions: ['role.granted', 'role.renewed', 'account.created.console'] },
   { route: 'server/api/auth/magic-link/consume.post.ts', actions: ['session.started.magic-link', 'mfa.challenged'] },
   {
     route: 'server/api/auth/magic-link/request.post.ts',
@@ -168,7 +168,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/ticket-types/[id]/index.delete.ts', actions: ['ticket-type.deleted'] },
   { route: 'server/api/admin/reference-data/venues/index.get.ts', exempt: 'reads the venues, retired ones included' },
   { route: 'server/api/admin/reference-data/venues/index.post.ts', actions: ['venue.created'] },
-  { route: 'server/api/admin/reference-data/venues/[id]/index.put.ts', actions: ['venue.updated'] },
+  { route: 'server/api/admin/reference-data/venues/[id]/index.put.ts', actions: ['venue.updated', 'shift-template.removed'] },
   { route: 'server/api/admin/reference-data/venues/[id]/archive.post.ts', actions: ['venue.archived', 'venue.restored'] },
   { route: 'server/api/admin/reference-data/venues/[id]/index.delete.ts', actions: ['venue.deleted'] },
   { route: 'server/api/admin/reference-data/rooms.get.ts', exempt: 'reads active rooms for the venue form picker; nothing is written' },
@@ -519,12 +519,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rota/shifts/[id]/candidates.get.ts', exempt: 'reads who might be assigned, scoped to rota.write' },
   { route: 'server/api/admin/rota/shifts/[id]/unconfirm.post.ts', actions: ['shift.unconfirmed'] },
   { route: 'server/api/admin/rota/shifts/add.post.ts', actions: ['shift.added'] },
-  { route: 'server/api/admin/rota/shifts/board.get.ts', exempt: 'reads the per-performance rota, scoped to rota.write' },
+  { route: 'server/api/admin/rota/shifts/board.get.ts', exempt: 'reads the per-performance rota and the planned bar openings among it, scoped to rota.write' },
   { route: 'server/api/admin/rota/candidates.get.ts', exempt: 'reads who might take a role not yet on the rota, scoped to rota.write' },
   { route: 'server/api/rota/openings/index.get.ts', exempt: 'reads the planned bar openings and the slots on them' },
   { route: 'server/api/till/venues.get.ts', exempt: 'reads which venues the caller may open a till at tonight' },
   { route: 'server/api/rota/openings/index.post.ts', actions: ['bar-opening.created'] },
   { route: 'server/api/rota/openings/[id]/cancel.post.ts', actions: ['bar-opening.cancelled'] },
+  { route: 'server/api/rota/openings/[id]/slots.post.ts', actions: ['bar-opening-shift.added'] },
   { route: 'server/api/rota/openings/shifts/[id]/claim.post.ts', actions: ['bar-opening-shift.claimed'] },
   { route: 'server/api/rota/openings/shifts/[id]/approve.post.ts', actions: ['bar-opening-shift.confirmed'] },
   { route: 'server/api/rota/openings/shifts/[id]/decline.post.ts', actions: ['bar-opening-shift.declined'] },
@@ -532,6 +533,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rota/openings/shifts/[id]/dismiss.post.ts', actions: ['bar-opening-shift.dismissed'] },
   { route: 'server/api/rota/openings/shifts/[id]/assign.post.ts', actions: ['bar-opening-shift.reassigned'] },
   { route: 'server/api/rota/openings/shifts/[id]/unconfirm.post.ts', actions: ['bar-opening-shift.unconfirmed'] },
+  { route: 'server/api/rota/openings/shifts/[id]/remove.post.ts', actions: ['bar-opening-shift.removed'] },
 
   // Module F: bar
 

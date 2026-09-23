@@ -260,7 +260,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
     await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
-    expect(await menuOptions(view, '[data-test="period-kind"]')).toEqual(['Night', 'Week', 'Season', 'Custom range'])
+    expect(await menuOptions(view, '[data-test="period-kind"]')).toEqual(['Night', 'Week', 'Year', 'Custom range'])
 
     const labelTexts = async (): Promise<string[]> => JSON.parse(await view.evaluate<string>(
       `JSON.stringify([...document.querySelectorAll('label')].map(el => el.textContent.trim()))`,
@@ -273,9 +273,9 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="period-night"]')`)
     expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'Night']))
 
-    await pickOption(view, '[data-test="period-kind"]', 'Season')
-    await waitFor(view, `document.querySelector('[data-test="period-season"]')`)
-    expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'Season']))
+    await pickOption(view, '[data-test="period-kind"]', 'Year')
+    await waitFor(view, `document.querySelector('[data-test="period-year"]')`)
+    expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'Year']))
 
     view.close()
   }, 120_000)

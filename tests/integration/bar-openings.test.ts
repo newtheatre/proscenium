@@ -1,16 +1,21 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  addOpeningShiftStatement,
+  addedSlotAuditStatement,
   approveOpeningShiftStatement,
+  barSlotCountQuery,
   cancelOpeningShiftsStatement,
   cancelOpeningStatement,
   claimOpeningShiftStatement,
   confirmedOpeningShiftsTonightQuery,
   createOpeningStatement,
   declineOpeningShiftStatement,
+  removeOpeningShiftStatement,
   stampOpeningShiftsStatement,
   unconfirmOpeningShiftStatement,
 } from '#server/utils/bar-openings'
 import { replaceTemplateStatements } from '#server/utils/rota'
+import { auditEntry, changes } from '#shared/utils/audit'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
@@ -146,6 +151,27 @@ describe('creating an opening stamps bar slots from the template (E-130 criterio
 
       expect(rows(database, 'SELECT id FROM bar_openings WHERE id = ?', openingId)).toHaveLength(0)
       expect(slotsOn(database, openingId)).toHaveLength(0)
+    })
+  })
+
+  // A bar row a venue kept from before it was marked external is read by nothing (E-101
+  // criterion 5): the venue is staffed ad hoc, and its bar with it.
+  test('an external venue\'s leftover bar row plans no opening and stamps no slot', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database)
+      template(database, venue.id, TWO_BAR)
+      database.batch([['UPDATE venues SET is_external = 1 WHERE id = ?', venue.id]])
+      expect(run(database, barSlotCountQuery(venue.id))).toEqual([])
+
+      const actorId = person(database, 'officer')
+      const input = { venueId: venue.id, night: NIGHT, label: 'Society social', startsAt: OPENS_AT, endsAt: CLOSES_AT }
+      run(database, createOpeningStatement('opening-away', input, actorId))
+      expect(rows(database, 'SELECT id FROM bar_openings WHERE id = ?', 'opening-away')).toHaveLength(0)
+
+      database.batch([[`INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, 'PLANNED', ?)`, 'opening-forced', venue.id, NIGHT, 'Forced', OPENS_AT, CLOSES_AT, actorId]])
+      run(database, stampOpeningShiftsStatement('opening-forced'))
+      expect(slotsOn(database, 'opening-forced')).toHaveLength(0)
     })
   })
 
@@ -285,6 +311,164 @@ describe('cancelling an opening cancels its shifts (E-130 criterion 5)', () => {
       expect(after.every(slot => slot.status === 'CANCELLED')).toBe(true)
       expect(after[0]!.user_id).toBe('one')
       expect(after[1]!.user_id).toBeNull()
+    })
+  })
+})
+
+describe('a planned opening\'s staffing changes one-off after stamping (E-130 criterion 7)', () => {
+  test('an added slot is numbered after the highest the opening holds, open and naming nobody', async () => {
+    await withDatabase(async (database) => {
+      const { openingId, venueId } = opening(database)
+
+      const added = run(database, addOpeningShiftStatement('slot-added', openingId)) as { id: string, slot: number }[]
+      expect(added).toEqual([{ id: 'slot-added', slot: 3 }])
+
+      const after = slotsOn(database, openingId)
+      expect(after.map(slot => slot.slot)).toEqual([1, 2, 3])
+      expect(after[2]).toMatchObject({ status: 'OPEN', user_id: null })
+      // The venue's usual count is the template's business, and a one-off leaves it alone.
+      expect(rows<{ count: number }>(database,
+        `SELECT "count" AS count FROM shift_templates WHERE venue_id = ? AND role = 'BAR'`, venueId)[0])
+        .toMatchObject({ count: 2 })
+    })
+  })
+
+  // Numbers come back once the highest slot goes, so the entry carries the id as well.
+  test('an added slot is audited with its id and the number the write chose, and only when added', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      const entryFor = (slotId: string) => auditEntry({
+        actorId: 'officer',
+        action: 'bar-opening-shift.added',
+        target: `bar-opening:${openingId}`,
+        detail: changes({ slotId: [null, slotId], slot: [null, null] }),
+      })
+      const detailsOf = (): unknown[] => rows<{ detail: string }>(database,
+        `SELECT detail FROM audit_log WHERE action = 'bar-opening-shift.added' ORDER BY rowid`)
+        .map(row => JSON.parse(row.detail))
+
+      run(database, addOpeningShiftStatement('slot-added', openingId))
+      run(database, addedSlotAuditStatement(entryFor('slot-added'), 'slot-added'))
+      expect(detailsOf()).toEqual([{ changes: { slotId: { from: null, to: 'slot-added' }, slot: { from: null, to: 3 } } }])
+
+      run(database, cancelOpeningStatement(openingId))
+      expect(run(database, addOpeningShiftStatement('slot-late', openingId))).toHaveLength(0)
+      run(database, addedSlotAuditStatement(entryFor('slot-late'), 'slot-late'))
+      expect(detailsOf()).toHaveLength(1)
+    })
+  })
+
+  test('two slots added at once are both added, one number apart', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+
+      const answers = await race(2, async index =>
+        run(database, addOpeningShiftStatement(`slot-added-${index}`, openingId)).length)
+
+      expect(answers).toEqual([1, 1])
+      expect(slotsOn(database, openingId).map(slot => slot.slot)).toEqual([1, 2, 3, 4])
+    })
+  })
+
+  test('a cancelled opening takes no new slot', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      run(database, cancelOpeningStatement(openingId))
+      run(database, cancelOpeningShiftsStatement(openingId))
+
+      expect(run(database, addOpeningShiftStatement('slot-late', openingId))).toHaveLength(0)
+      expect(slotsOn(database, openingId)).toHaveLength(2)
+    })
+  })
+
+  test('an open slot is removed, and the others are left as they were', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      const [first, second] = slotsOn(database, openingId)
+
+      expect(run(database, removeOpeningShiftStatement(second!.id))).toEqual([{ id: second!.id, slot: 2 }])
+      expect(slotsOn(database, openingId).map(slot => slot.id)).toEqual([first!.id])
+    })
+  })
+
+  test('a slot that names somebody is refused, claimed, confirmed or declined', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database, [
+        { role: 'DUTY_MANAGER', count: 1 },
+        { role: 'BAR', count: 4 },
+      ])
+      person(database, 'one')
+      person(database, 'two')
+      person(database, 'three')
+      const [claimed, confirmed, declined] = slotsOn(database, openingId)
+      run(database, claimOpeningShiftStatement(claimed!.id, 'one', 'CLAIMED'))
+      run(database, claimOpeningShiftStatement(confirmed!.id, 'two', 'CONFIRMED'))
+      run(database, claimOpeningShiftStatement(declined!.id, 'three', 'CLAIMED'))
+      run(database, declineOpeningShiftStatement(declined!.id, 'Not trained yet'))
+
+      for (const slot of [claimed!, confirmed!, declined!]) {
+        expect(run(database, removeOpeningShiftStatement(slot.id))).toHaveLength(0)
+      }
+      expect(slotsOn(database, openingId)).toHaveLength(4)
+    })
+  })
+
+  test('the last slot on an opening is refused', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      const [first, second] = slotsOn(database, openingId)
+
+      expect(run(database, removeOpeningShiftStatement(first!.id))).toHaveLength(1)
+      expect(run(database, removeOpeningShiftStatement(second!.id))).toHaveLength(0)
+      expect(slotsOn(database, openingId)).toHaveLength(1)
+    })
+  })
+
+  test('a slot on a cancelled opening is refused', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      run(database, cancelOpeningStatement(openingId))
+      run(database, cancelOpeningShiftsStatement(openingId))
+      const [first] = slotsOn(database, openingId)
+
+      expect(run(database, removeOpeningShiftStatement(first!.id))).toHaveLength(0)
+    })
+  })
+
+  test('a removal and a claim racing on one open slot resolve to exactly one winner', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      person(database, 'one')
+      const [slot] = slotsOn(database, openingId)
+
+      const answers = await race(2, async (index) => {
+        const written = index === 0
+          ? run(database, removeOpeningShiftStatement(slot!.id))
+          : run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))
+        return { status: written.length === 1 ? 200 : 409 }
+      })
+
+      expectOneWinner(answers)
+
+      // Either the slot is gone and nobody holds it, or it is held and still there.
+      const left = slotsOn(database, openingId).filter(one => one.id === slot!.id)
+      if (left.length === 1) expect(left[0]).toMatchObject({ user_id: 'one', status: 'CONFIRMED' })
+      else expect(rows(database, 'SELECT id FROM bar_opening_shifts WHERE user_id = ?', 'one')).toHaveLength(0)
+    })
+  })
+
+  test('two removals racing for the last two slots leave one slot standing', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      const [first, second] = slotsOn(database, openingId)
+
+      const answers = await race(2, async (index) => {
+        const written = run(database, removeOpeningShiftStatement((index === 0 ? first : second)!.id))
+        return { status: written.length === 1 ? 200 : 409 }
+      })
+
+      expectOneWinner(answers)
+      expect(slotsOn(database, openingId)).toHaveLength(1)
     })
   })
 })

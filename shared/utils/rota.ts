@@ -78,6 +78,13 @@ export function templateRefusal(slots: TemplateSlot[]): string | null {
   return null
 }
 
+// An external venue is staffed ad hoc, so it is refused a template and a stamp (E-101 criterion 5).
+export function externalVenueTemplateRefusal(venue: { name: string, isExternal: boolean }): string | null {
+  return venue.isExternal
+    ? `${venue.name} is an external venue, so it has no shift template: add its shifts on the rota board`
+    : null
+}
+
 export interface StampedSlot {
   role: ShiftRole
   slot: number

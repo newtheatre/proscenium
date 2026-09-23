@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { toCsv } from '#server/utils/csv'
 import { ticketExportRows } from '#server/utils/ticket-export'
-import { resolveSeasonBounds, TICKET_EXPORT_CAP } from '#shared/utils/ticket-export'
+import { resolveYearBounds, TICKET_EXPORT_CAP } from '#shared/utils/ticket-export'
 import { RESERVATION_SOURCES } from '#shared/utils/reservations'
 import { saysReservationStatus } from '#shared/utils/capacity'
 import { saysMoney } from '#shared/utils/bar'
@@ -14,16 +14,16 @@ const query = z.object({
   showId: z.string().trim().min(1).optional(),
   performanceId: z.string().trim().min(1).optional(),
   source: z.enum(RESERVATION_SOURCES).optional(),
-  season: z.coerce.number().int().optional(),
+  year: z.coerce.number().int().optional(),
   from: isoDate.optional(),
   to: isoDate.optional(),
 })
-  .refine(input => input.season === undefined || (input.from === undefined && input.to === undefined),
-    { message: 'Use a season or a date range, not both' })
+  .refine(input => input.year === undefined || (input.from === undefined && input.to === undefined),
+    { message: 'Use a year or a date range, not both' })
   .refine(input => (input.from === undefined) === (input.to === undefined),
     { message: 'A date range needs both from and to' })
 
-// Season sales for reporting (D-129), filtered by show, performance, date range and source.
+// Ticket sales for reporting (D-129), filtered by show, performance, date range and source.
 // The column list is criterion 3 itself: no customer name, no notes, no access data, ever.
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.export')
@@ -35,10 +35,10 @@ export default defineEventHandler(async (event) => {
     source: input.source,
   }
 
-  if (input.season !== undefined) {
-    const seasonStart = await configValue(event, 'SEASON_START')
-    const seasonEnd = await configValue(event, 'SEASON_END')
-    const bounds = resolveSeasonBounds(input.season, seasonStart, seasonEnd)
+  if (input.year !== undefined) {
+    const yearStart = await configValue(event, 'YEAR_START')
+    const yearEnd = await configValue(event, 'YEAR_END')
+    const bounds = resolveYearBounds(input.year, yearStart, yearEnd)
     filter.fromAt = bounds.fromAt
     filter.toAt = bounds.toAt
   }
@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Taking a copy of season sales is an act on it, so it lands in the trail (criterion 4).
+  // Taking a copy of ticket sales is an act on it, so it lands in the trail (criterion 4).
   await db.insert(schema.auditLog).values(auditEntry({
     actorId: resolved.account.id,
     action: 'tickets.exported',

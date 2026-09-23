@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  addShiftStatement,
   approveShiftStatement,
   assignShiftStatement,
   backfillVenueStatement,
@@ -10,13 +11,17 @@ import {
   countOpenShiftsQuery,
   declineShiftStatement,
   dismissShiftStatement,
+  dropExternalTemplateStatements,
   myShiftsQuery,
   onShiftTonightQuery,
   openShiftsQuery,
   releaseShiftStatement,
   replaceTemplateStatements,
+  stampableSlotsQuery,
   stampPerformanceStatement,
 } from '#server/utils/rota'
+import { venueInUseQuery } from '#server/utils/venues'
+import { auditEntry } from '#shared/utils/audit'
 import { daysAfter } from '#shared/utils/membership'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
@@ -118,6 +123,160 @@ describe('a template stamps a rota onto a performance (E-102 criteria 1 and 3)',
       template(database, tonight.venueId)
       run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
       expect(shiftsOn(database, tonight.performanceId)).toEqual([])
+    })
+  })
+})
+
+// A flag set straight on the row, leaving behind the template the venue edit would have cleared:
+// the stale row older data can still hold, which every read must ignore (E-101 criterion 5).
+function external(database: TestDatabase, venueId: string): void {
+  database.batch([['UPDATE venues SET is_external = 1 WHERE id = ?', venueId]])
+}
+
+describe('an external venue is staffed ad hoc, never from a template (E-101 criterion 5)', () => {
+  test('a performance at an external venue with no template stamps nothing and does not fail', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      external(database, tonight.venueId)
+      expect(() => run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))).not.toThrow()
+      expect(shiftsOn(database, tonight.performanceId)).toEqual([])
+    })
+  })
+
+  test('a template left on a venue since marked external is stamped by neither path', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId)
+      external(database, tonight.venueId)
+
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
+      run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
+      expect(shiftsOn(database, tonight.performanceId)).toEqual([])
+    })
+  })
+
+  test('an officer can still add a shift by hand at an external venue', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      external(database, tonight.venueId)
+
+      run(database, addShiftStatement('shift-external', {
+        performanceId: tonight.performanceId, role: 'DUTY_MANAGER', slot: 1,
+      }, 'actor', OFFSETS))
+
+      const added = shiftsOn(database, tonight.performanceId)
+      expect(added.map(shift => `${shift.role}:${shift.slot}:${shift.status}`)).toEqual(['DUTY_MANAGER:1:OPEN'])
+    })
+  })
+})
+
+describe('a venue marked external loses its template in the same batch (E-101 criterion 5)', () => {
+  const dropped = (venueId: string) => auditEntry({ actorId: 'actor', action: 'shift-template.removed', target: `venue:${venueId}` })
+
+  test('the rows go, one audit entry names the slots and nobody, and the venue can be deleted', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database, { suffix: 'going-external' })
+      template(database, venue.id)
+      external(database, venue.id)
+
+      const entry = dropped(venue.id)
+      for (const statement of dropExternalTemplateStatements(venue.id, entry)) run(database, statement)
+
+      expect(rows(database, 'SELECT 1 FROM shift_templates WHERE venue_id = ?', venue.id)).toEqual([])
+      const [audit] = rows<{ action: string, target: string, detail: string }>(database,
+        'SELECT action, target, detail FROM audit_log WHERE id = ?', entry.id)
+      expect(audit).toMatchObject({ action: 'shift-template.removed', target: `venue:${venue.id}` })
+      expect(JSON.parse(audit!.detail)).toEqual({ slots: 'BAR:1, DOOR:2, DUTY_MANAGER:1', reason: 'external' })
+
+      const [inUse] = run(database, venueInUseQuery(venue.id)) as { inUse: number }[]
+      expect(inUse!.inUse).toBe(0)
+    })
+  })
+
+  test('a venue still ours keeps its template and nothing is audited', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database, { suffix: 'still-ours' })
+      template(database, venue.id)
+
+      const entry = dropped(venue.id)
+      for (const statement of dropExternalTemplateStatements(venue.id, entry)) run(database, statement)
+
+      expect(rows(database, 'SELECT 1 FROM shift_templates WHERE venue_id = ?', venue.id).length).toBe(3)
+      expect(rows(database, 'SELECT 1 FROM audit_log WHERE id = ?', entry.id)).toEqual([])
+    })
+  })
+
+  // The route reads the flag before it writes, so the write carries the predicate too (0003).
+  test('a template saved onto a venue marked external since the read writes no row', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database, { suffix: 'raced-external' })
+      external(database, venue.id)
+      template(database, venue.id)
+      expect(rows(database, 'SELECT 1 FROM shift_templates WHERE venue_id = ?', venue.id)).toEqual([])
+    })
+  })
+
+  test('an external venue with no template writes no audit entry', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database, { suffix: 'external-bare' })
+      external(database, venue.id)
+
+      const entry = dropped(venue.id)
+      for (const statement of dropExternalTemplateStatements(venue.id, entry)) run(database, statement)
+
+      expect(rows(database, 'SELECT 1 FROM audit_log WHERE id = ?', entry.id)).toEqual([])
+    })
+  })
+})
+
+describe('the data migration clears templates already on external venues (E-101 criterion 5)', () => {
+  test('an external venue\'s rows go and our own venue\'s stay', async () => {
+    await withDatabase(async (database) => {
+      const ours = testVenue(database, { suffix: 'migrated-ours' })
+      const away = testVenue(database, { suffix: 'migrated-away' })
+      template(database, ours.id)
+      template(database, away.id)
+      external(database, away.id)
+
+      const migration = await Bun.file('server/db/migrations/sqlite/0115_an_external_venue_holds_no_shift_template.sql').text()
+      for (const statement of migration.split('--> statement-breakpoint')) {
+        if (statement.trim()) database.raw.exec(statement.trim())
+      }
+
+      expect(rows(database, 'SELECT 1 FROM shift_templates WHERE venue_id = ?', away.id)).toEqual([])
+      expect(rows(database, 'SELECT 1 FROM shift_templates WHERE venue_id = ?', ours.id).length).toBe(3)
+    })
+  })
+})
+
+describe('a stale template on an external venue is read by nothing (E-101 criterion 5)', () => {
+  test('a venue marked external offers no role to stamp', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database, { suffix: 'stale' })
+      template(database, venue.id)
+      expect((run(database, stampableSlotsQuery(venue.id)) as unknown[]).length).toBe(3)
+
+      external(database, venue.id)
+      expect(run(database, stampableSlotsQuery(venue.id))).toEqual([])
+    })
+  })
+
+  test('moving a performance to one does not keep a held shift on the strength of that template', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId)
+      testVenue(database, { suffix: 'b' })
+      template(database, 'venue-b')
+      external(database, 'venue-b')
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
+      const who = person(database, 'holder')
+      database.batch([['UPDATE shifts SET user_id = ?, status = \'CONFIRMED\' WHERE performance_id = ? AND role = \'DUTY_MANAGER\'',
+        who, tonight.performanceId]])
+
+      run(database, cancelOrphanedShiftsStatement(tonight.performanceId, 'venue-b'))
+
+      const dutyManager = shiftsOn(database, tonight.performanceId).find(shift => shift.role === 'DUTY_MANAGER')
+      expect(dutyManager).toMatchObject({ status: 'CANCELLED', user_id: who })
     })
   })
 })

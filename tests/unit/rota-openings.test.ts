@@ -3,6 +3,7 @@ import {
   BAR_OPENING_STATUSES,
   barOpeningForm,
   openingClaimRefusal,
+  openingSlotRemoveRefusal,
   openingUnconfirmRefusal,
   saysBarOpeningStatus,
 } from '#shared/utils/rota-openings'
@@ -60,5 +61,22 @@ describe('why a slot refused what was asked of it (E-130 criterion 3)', () => {
   test('standing a slot down refuses only the two statuses that name nobody', () => {
     expect(openingUnconfirmRefusal('CANCELLED')).toContain('cancelled')
     expect(openingUnconfirmRefusal('OPEN')).toContain('already open')
+  })
+})
+
+describe('why removing a slot was refused (E-130 criterion 7)', () => {
+  test('a slot that names somebody is stood down first, whatever it names them as', () => {
+    for (const status of ['CLAIMED', 'CONFIRMED', 'DECLINED'] as const) {
+      expect(openingSlotRemoveRefusal({ status, openingStatus: 'PLANNED' }, 3)).toContain('stand them down first')
+    }
+  })
+
+  test('the last slot is not removed: cancelling is how an opening stops being staffed', () => {
+    expect(openingSlotRemoveRefusal({ status: 'OPEN', openingStatus: 'PLANNED' }, 1)).toContain('cancel the opening')
+  })
+
+  test('a cancelled opening, and a slot already gone, say so rather than anything else', () => {
+    expect(openingSlotRemoveRefusal({ status: 'CANCELLED', openingStatus: 'CANCELLED' }, 2)).toContain('cancelled')
+    expect(openingSlotRemoveRefusal(null, 2)).toContain('already been removed')
   })
 })

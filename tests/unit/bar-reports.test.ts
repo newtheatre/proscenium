@@ -22,10 +22,14 @@ describe('a report period names one shape per kind', () => {
     expect(reportPeriodForm.safeParse({ kind: 'WEEK' }).success).toBe(false)
   })
 
-  test('a season needs a year, coerced from a query string', () => {
-    const parsed = reportPeriodForm.safeParse({ kind: 'SEASON', year: '2027' })
+  test('a year needs the year it ends in, coerced from a query string (0087)', () => {
+    const parsed = reportPeriodForm.safeParse({ kind: 'YEAR', year: '2027' })
     expect(parsed.success).toBe(true)
-    expect(parsed.success && parsed.data.kind === 'SEASON' && parsed.data.year).toBe(2027)
+    expect(parsed.success && parsed.data.kind === 'YEAR' && parsed.data.year).toBe(2027)
+  })
+
+  test('the whole year is never called a season (0087)', () => {
+    expect(reportPeriodForm.safeParse({ kind: 'SEASON', year: '2027' }).success).toBe(false)
   })
 
   test('a custom range needs both ends', () => {
@@ -65,8 +69,8 @@ describe('resolveReportPeriod bounds every kind on the London calendar (F-119 cr
     expect(hours(period)).toBe(168)
   })
 
-  test('a season is 1 August to the following 31 July, London', () => {
-    expect(resolveReportPeriod({ kind: 'SEASON', year: 2027 })).toEqual({
+  test('a year is 1 August to the following 31 July, London', () => {
+    expect(resolveReportPeriod({ kind: 'YEAR', year: 2027 })).toEqual({
       fromAt: at(2026, 8, 1),
       toAt: at(2027, 8, 1),
     })

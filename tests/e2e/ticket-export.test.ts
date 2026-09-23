@@ -121,8 +121,8 @@ describe.skipIf(skip !== null)('exporting is audited (criterion 4)', () => {
 })
 
 describe.skipIf(skip !== null)('a bad filter combination is refused before any query runs', () => {
-  test('a season and an explicit range together are refused', async () => {
-    const answered = await send('GET', '/api/admin/tickets/export?season=2027&from=2026-08-01&to=2027-07-31', undefined, boxOffice.cookie)
+  test('a year and an explicit range together are refused', async () => {
+    const answered = await send('GET', '/api/admin/tickets/export?year=2027&from=2026-08-01&to=2027-07-31', undefined, boxOffice.cookie)
     expect(answered.status).toBe(400)
   })
 

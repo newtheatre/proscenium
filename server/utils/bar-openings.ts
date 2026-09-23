@@ -3,13 +3,14 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { approveSlotStatement, claimSlotStatement, declineSlotStatement } from './rota'
+import { approveSlotStatement, claimSlotStatement, declineSlotStatement, ourVenue } from './rota'
 import { predicate, whereFrom } from './list-filters'
 import { barOpeningConstraintRefusal } from '#shared/utils/rota-openings'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
 import type { ClaimScope } from './rota'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
+import type { AuditRow } from '#shared/utils/audit'
 import type { BarOpeningInput, BarOpeningStatus } from '#shared/utils/rota-openings'
 import type { ShiftStatus } from '#shared/utils/rota'
 import type { SQL } from 'drizzle-orm'
@@ -28,7 +29,7 @@ export function createOpeningStatement(openingId: string, input: BarOpeningInput
     INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status, created_by)
     SELECT ${openingId}, ${input.venueId}, ${input.night}, ${input.label},
            ${input.startsAt}, ${input.endsAt}, 'PLANNED', ${actorId}
-    WHERE EXISTS (SELECT 1 FROM shift_templates WHERE venue_id = ${input.venueId} AND role = 'BAR')
+    WHERE EXISTS (SELECT 1 FROM shift_templates t WHERE t.venue_id = ${input.venueId} AND t.role = 'BAR' AND ${ourVenue('t')})
     RETURNING id
   `
 }
@@ -41,7 +42,7 @@ export function stampOpeningShiftsStatement(openingId: string): SQL {
   const barCount = sql`(
     SELECT coalesce(t."count", 0)
     FROM bar_openings o
-    JOIN shift_templates t ON t.venue_id = o.venue_id AND t.role = 'BAR'
+    JOIN shift_templates t ON t.venue_id = o.venue_id AND t.role = 'BAR' AND ${ourVenue('t')}
     WHERE o.id = ${openingId}
   )`
   return sql`
@@ -53,7 +54,7 @@ export function stampOpeningShiftsStatement(openingId: string): SQL {
     INSERT INTO bar_opening_shifts (id, opening_id, slot, status)
     SELECT lower(hex(randomblob(16))), o.id, slot.i, 'OPEN'
     FROM bar_openings o
-    JOIN shift_templates t ON t.venue_id = o.venue_id AND t.role = 'BAR'
+    JOIN shift_templates t ON t.venue_id = o.venue_id AND t.role = 'BAR' AND ${ourVenue('t')}
     JOIN slot ON slot.i <= t."count"
     WHERE o.id = ${openingId}
     ON CONFLICT DO NOTHING
@@ -61,12 +62,64 @@ export function stampOpeningShiftsStatement(openingId: string): SQL {
   `
 }
 
+// One more bar slot on a planned opening, numbered after the highest it holds. The template is
+// untouched: a one-off is this opening's business (E-130 criterion 7).
+export function addOpeningShiftStatement(slotId: string, openingId: string): SQL {
+  return sql`
+    INSERT INTO bar_opening_shifts (id, opening_id, slot, status)
+    SELECT ${slotId}, o.id,
+           coalesce((SELECT max(s.slot) FROM bar_opening_shifts s WHERE s.opening_id = o.id), 0) + 1,
+           'OPEN'
+    FROM bar_openings o
+    WHERE o.id = ${openingId} AND o.status = 'PLANNED'
+    RETURNING id, slot
+  `
+}
+
+// The added slot's audit row, conditional on the insert and carrying the number the insert
+// chose, so the entry names both the slot's id and its number (0049, 0011).
+export function addedSlotAuditStatement(entry: AuditRow, slotId: string): SQL {
+  return sql`
+    INSERT INTO audit_log (id, actor_id, action, target, detail)
+    SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target},
+           json_set(${JSON.stringify(entry.detail ?? {})}, '$.changes.slot.to', s.slot)
+    FROM bar_opening_shifts s
+    WHERE s.id = ${slotId} AND changes() = 1
+  `
+}
+
+// Only an open slot on a planned opening that keeps another slot goes, and the predicate rides
+// the delete, so a claim landing first wins and a removal after it is refused (0003).
+export function removeOpeningShiftStatement(slotId: string): SQL {
+  return sql`
+    DELETE FROM bar_opening_shifts AS target
+    WHERE target.id = ${slotId}
+      AND target.status = 'OPEN'
+      AND EXISTS (SELECT 1 FROM bar_openings o WHERE o.id = target.opening_id AND o.status = 'PLANNED')
+      AND EXISTS (
+        SELECT 1 FROM bar_opening_shifts AS other
+        WHERE other.opening_id = target.opening_id AND other.id <> target.id AND other.status <> 'CANCELLED'
+      )
+    RETURNING id, slot
+  `
+}
+
+// How many slots an opening still staffs, read only to explain a refused removal.
+export async function openingSlotsRemaining(openingId: string): Promise<number> {
+  const [row] = await db.all<{ n: number }>(sql`
+    SELECT count(*) AS n FROM bar_opening_shifts WHERE opening_id = ${openingId} AND status <> 'CANCELLED'
+  `)
+  return row?.n ?? 0
+}
+
 // How many bar slots a venue stamps, read before the write so a venue with no bar row is told
 // rather than guessed at (E-130 criterion 2).
+export function barSlotCountQuery(venueId: string): SQL {
+  return sql`SELECT t."count" AS n FROM shift_templates t WHERE t.venue_id = ${venueId} AND t.role = 'BAR' AND ${ourVenue('t')}`
+}
+
 export async function barSlotCount(venueId: string): Promise<number> {
-  const [row] = await db.all<{ n: number }>(sql`
-    SELECT "count" AS n FROM shift_templates WHERE venue_id = ${venueId} AND role = 'BAR'
-  `)
+  const [row] = await db.all<{ n: number }>(barSlotCountQuery(venueId))
   return row?.n ?? 0
 }
 

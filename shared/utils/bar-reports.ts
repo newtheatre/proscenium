@@ -7,7 +7,7 @@ import type { Page } from '#shared/utils/pagination'
 // Sales, GP, variance, comp, discount and wastage reports (F-119, 0079): a query over the ledger
 // and the movement history, never a stored aggregate, so a correction lands immediately (criterion 4).
 
-export const REPORT_PERIOD_KINDS = ['NIGHT', 'WEEK', 'SEASON', 'CUSTOM'] as const
+export const REPORT_PERIOD_KINDS = ['NIGHT', 'WEEK', 'YEAR', 'CUSTOM'] as const
 export type ReportPeriodKind = (typeof REPORT_PERIOD_KINDS)[number]
 
 // The one civil-date field, shape and calendar both: 2026-13-45 has the shape and is no day at
@@ -18,7 +18,7 @@ const isoDate = londonDayField
 export const reportPeriodForm = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('NIGHT'), night: isoDate }),
   z.object({ kind: z.literal('WEEK'), day: isoDate }),
-  z.object({ kind: z.literal('SEASON'), year: z.coerce.number().int() }),
+  z.object({ kind: z.literal('YEAR'), year: z.coerce.number().int() }),
   z.object({ kind: z.literal('CUSTOM'), from: isoDate, to: isoDate }),
 ])
 

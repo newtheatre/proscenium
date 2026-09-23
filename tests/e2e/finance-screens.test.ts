@@ -140,6 +140,11 @@ describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105
     expect((await send('GET', '/api/admin/finance/terms', undefined, boxOffice.cookie)).status).toBe(403)
   })
 
+  test('the whole year is asked for as a year, and a season named by a year is refused (0087)', async () => {
+    expect((await send('GET', '/api/admin/finance/season?kind=YEAR&year=2020', undefined, treasurer.cookie)).status).toBe(200)
+    expect((await send('GET', '/api/admin/finance/season?kind=SEASON&year=2020', undefined, treasurer.cookie)).status).toBe(400)
+  })
+
   test('the summary answers a term as the range the term itself carries', async () => {
     const defined = await send('POST', '/api/admin/finance/terms', { label: 'Autumn 2019', fromDay: '2019-09-23', toDay: '2019-12-13' }, treasurer.cookie)
     expect(defined.status).toBe(200)
