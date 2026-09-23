@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { exportRangeForm, formatPoundsForExport, LEDGER_POSTING_PAIRS, nominalMappingForm, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportCsvRows, suExportForm, suExportLines, suExportParams } from '#shared/utils/su-export'
+import { exportRangeForm, formatPoundsForExport, LEDGER_POSTING_PAIRS, nominalMappingForm, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportCsvRows, suExportForm, suExportLines } from '#shared/utils/su-export'
+import { periodQuery } from '#shared/utils/season-dashboard'
 import type { SuExportRow } from '#shared/utils/su-export'
 
 describe('mapping a (kind, source) pair to a nominal code (I-108 criterion 1)', () => {
@@ -53,15 +54,30 @@ test('the row cap is a structural bound, not a policy one (0012)', () => {
 })
 
 describe('choosing the period by name: a year, a season or a custom range (criterion 4, 0087)', () => {
-  test('a range with no kind is still a custom range, so an older link keeps working', () => {
-    expect(suExportForm.parse({ fromDay: '2026-09-01', toDay: '2026-09-30' })).toEqual({ kind: 'RANGE', fromDay: '2026-09-01', toDay: '2026-09-30' })
+  test('a custom range is the shared TERM kind, so every period screen writes the same link', () => {
+    expect(suExportForm.parse({ kind: 'TERM', fromDay: '2026-09-01', toDay: '2026-09-30' })).toEqual({ kind: 'TERM', fromDay: '2026-09-01', toDay: '2026-09-30' })
   })
 
-  test('a custom range ending before it starts is refused on the to day', () => {
-    const parsed = suExportForm.safeParse({ kind: 'RANGE', fromDay: '2026-09-30', toDay: '2026-09-01' })
+  test.each([
+    { name: 'no kind', query: { fromDay: '2026-09-01', toDay: '2026-09-30' } },
+    { name: 'kind=RANGE', query: { kind: 'RANGE', fromDay: '2026-09-01', toDay: '2026-09-30' } },
+  ])('an older link with $name still reads as the same custom range', ({ query }) => {
+    expect(suExportForm.parse(query)).toEqual({ kind: 'TERM', fromDay: '2026-09-01', toDay: '2026-09-30' })
+  })
+
+  test.each([
+    { kind: 'TERM', fromDay: '2026-09-30', toDay: '2026-09-01' },
+    { kind: 'RANGE', fromDay: '2026-09-30', toDay: '2026-09-01' },
+    { fromDay: '2026-09-30', toDay: '2026-09-01' },
+  ])('a custom range ending before it starts is refused on the to day ($kind)', (query) => {
+    const parsed = suExportForm.safeParse(query)
     expect(parsed.success).toBe(false)
     expect(parsed.error?.issues[0]?.path).toEqual(['toDay'])
     expect(parsed.error?.issues[0]?.message).toBe('The range ends before it starts')
+  })
+
+  test('a kind the export does not offer is refused rather than read as a range', () => {
+    expect(suExportForm.safeParse({ kind: 'MONTH', year: '2026', month: '9' }).success).toBe(false)
   })
 
   test('a year is named by the year it ends in, read from the query string as text', () => {
@@ -80,9 +96,9 @@ describe('choosing the period by name: a year, a season or a custom range (crite
   test.each([
     { kind: 'YEAR', year: 2026 },
     { kind: 'SEASON', seasonId: 'season-1' },
-    { kind: 'RANGE', fromDay: '2026-09-01', toDay: '2026-09-30' },
-  ] as const)('the query string the download and its status share reads back as the same period ($kind)', (period) => {
-    expect(suExportForm.parse(suExportParams(period))).toEqual(period)
+    { kind: 'TERM', fromDay: '2026-09-01', toDay: '2026-09-30' },
+  ] as const)('the shared period query the download and its status send reads back as the same period ($kind)', (period) => {
+    expect(suExportForm.parse(periodQuery(period))).toEqual(period)
   })
 })
 

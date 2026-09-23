@@ -2,10 +2,9 @@
 import { can, exportFinance, manageNominalMappings } from '#shared/utils/abilities'
 import { describeKind } from '#shared/utils/ledger'
 import type { EntrySource } from '#shared/utils/ledger'
-import { SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportLines, suExportParams } from '#shared/utils/su-export'
-import { currentYear, yearChoices } from '#shared/utils/year'
+import { SU_EXPORT_KINDS, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportLines } from '#shared/utils/su-export'
 import type { FinanceSeason } from '#shared/utils/season-dashboard'
-import type { NominalMapping, SuExportCoverage, SuExportPeriod } from '#shared/utils/su-export'
+import type { NominalMapping, SuExportCoverage } from '#shared/utils/su-export'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Exports', middleware: 'console', docs: '/docs/money/exports' })
@@ -72,34 +71,16 @@ const columns: TableColumn<NominalMapping>[] = [
   { id: 'act', header: ACTIONS_HEADER },
 ]
 
-const { data: seasons } = await useAsyncData(
-  'finance-seasons',
-  () => request<{ seasons: FinanceSeason[] }>('/api/admin/finance/seasons').then(response => response.seasons),
-  { default: (): FinanceSeason[] => [] },
-)
-
-const today = londonDay(new Date())
-const from = ref(today)
-const to = ref(today)
-const year = ref(currentYear())
-const years = yearChoices(year.value)
-const seasonId = ref((seasons.value.find(one => one.fromDay <= today && today <= one.toDay) ?? seasons.value[0])?.id ?? '')
-const seasonItems = computed(() => seasons.value.map(one => ({ label: one.name, value: one.id })))
-
 // The yearly return is the reason this screen exists, so it opens on this year (I-108 criterion 4).
-const kind = ref<SuExportPeriod['kind']>('YEAR')
-const kindItems = computed<{ label: string, value: SuExportPeriod['kind'] }[]>(() => [
-  { label: 'Year', value: 'YEAR' },
-  ...(seasons.value.length > 0 ? [{ label: 'Season', value: 'SEASON' as const }] : []),
-  { label: 'Custom range', value: 'RANGE' },
-])
-
-const period = computed<SuExportPeriod | null>(() => {
-  if (kind.value === 'YEAR') return { kind: 'YEAR', year: year.value }
-  if (kind.value === 'SEASON') return seasonId.value ? { kind: 'SEASON', seasonId: seasonId.value } : null
-  return from.value && to.value && to.value >= from.value ? { kind: 'RANGE', fromDay: from.value, toDay: to.value } : null
+// Seasons come through the finance gate this screen already holds; a term is any two days.
+const periodForm = await usePeriodForm('su-export-period-choices', () => request<{ seasons: FinanceSeason[] }>('/api/admin/finance/seasons')
+  .then(response => ({ terms: [], seasons: response.seasons })), {
+  kinds: SU_EXPORT_KINDS,
+  customRange: true,
+  labels: { YEAR: 'Year', SEASON: 'Season', TERM: 'Custom range' },
 })
-const params = computed(() => (period.value ? suExportParams(period.value) : null))
+const { complete, query } = periodForm
+const params = computed(() => (complete.value ? query.value : null))
 
 // A GET link, not a fetch: the browser follows the content-disposition header and saves the
 // file itself, the same shape bar/reports.vue's own CSV export already uses.
@@ -127,39 +108,7 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
       </h2>
       <AdminToolbar :filterable="false">
         <template #actions>
-          <USelect
-            v-model="kind"
-            aria-label="Period"
-            data-test="export-kind"
-            :items="kindItems"
-            value-key="value"
-          />
-          <USelect
-            v-if="kind === 'YEAR'"
-            v-model="year"
-            aria-label="Year"
-            data-test="export-year"
-            :items="years"
-            value-key="value"
-          />
-          <USelect
-            v-if="kind === 'SEASON'"
-            v-model="seasonId"
-            aria-label="Season"
-            data-test="export-season"
-            :items="seasonItems"
-            value-key="value"
-          />
-          <template v-if="kind === 'RANGE'">
-            <DateField
-              v-model="from"
-              data-test="export-from"
-            />
-            <DateField
-              v-model="to"
-              data-test="export-to"
-            />
-          </template>
+          <PeriodFields :form="periodForm" />
           <UButton
             v-if="mayExport"
             data-test="export-csv"
@@ -167,7 +116,7 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
             :to="exportUrl"
             external
             target="_blank"
-            :disabled="!period || overCap"
+            :disabled="!params || overCap"
           >
             Export CSV
           </UButton>

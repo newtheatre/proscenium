@@ -47,25 +47,21 @@ export const exportRangeForm = z.object({
 
 export type ExportRangeInput = z.output<typeof exportRangeForm>
 
-// The yearly return is re-runnable by name (criterion 4): a year or a season row, resolved on the
-// server exactly as the money dashboard resolves them (0087). No kind at all is a custom range.
+// The yearly return is re-runnable by name (criterion 4): a year, a season or a custom range, the
+// shared period kinds (0087). A link with no kind, or kind=RANGE, predates that and is a range.
 export const suExportForm = z.preprocess(
-  input => (input && typeof input === 'object' && !('kind' in input) ? { ...input, kind: 'RANGE' } : input),
+  input => (input && typeof input === 'object' && (!('kind' in input) || input.kind === 'RANGE') ? { ...input, kind: 'TERM' } : input),
   z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('RANGE'), fromDay: londonDay, toDay: londonDay }),
+    z.object({ kind: z.literal('TERM'), fromDay: londonDay, toDay: londonDay }),
     z.object({ kind: z.literal('YEAR'), year: z.coerce.number().int() }),
     z.object({ kind: z.literal('SEASON'), seasonId: z.string().trim().min(1, 'Choose a season') }),
-  ]).refine(input => input.kind !== 'RANGE' || input.toDay >= input.fromDay, { path: ['toDay'], message: 'The range ends before it starts' }),
+  ]).refine(input => input.kind !== 'TERM' || input.toDay >= input.fromDay, { path: ['toDay'], message: 'The range ends before it starts' }),
 )
 
 export type SuExportPeriod = z.output<typeof suExportForm>
 
-// The query string both the download and its coverage read, so the two never describe different days.
-export function suExportParams(period: SuExportPeriod): Record<string, string> {
-  if (period.kind === 'YEAR') return { kind: 'YEAR', year: String(period.year) }
-  if (period.kind === 'SEASON') return { kind: 'SEASON', seasonId: period.seasonId }
-  return { kind: 'RANGE', fromDay: period.fromDay, toDay: period.toDay }
-}
+// The kinds the export screen offers, in its order; the dashboard's others make no SU return.
+export const SU_EXPORT_KINDS = ['YEAR', 'SEASON', 'TERM'] as const
 
 // What the screen shows before the download: the days a choice resolves to, whether they are
 // closed (so two runs match), and whether the file would pass the cap.

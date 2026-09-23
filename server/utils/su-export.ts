@@ -79,9 +79,8 @@ export async function suExportRowCount(fromDay: string, toDay: string): Promise<
   return row?.rows ?? 0
 }
 
-// A year and a season resolve exactly as the money dashboard's do (0087); an unknown season is a 404.
+// Every kind resolves exactly as the money dashboard's does (0087); an unknown season is a 404.
 export async function suExportBounds(period: SuExportPeriod): Promise<{ fromDay: string, toDay: string }> {
-  if (period.kind === 'RANGE') return { fromDay: period.fromDay, toDay: period.toDay }
   const { fromDay, toDay } = await resolvePeriodBounds(period)
   return { fromDay, toDay }
 }

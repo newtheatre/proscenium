@@ -102,8 +102,8 @@ export const money: Shot[] = [
     marker: '[data-test="section-export"]',
     width: CONSOLE_WIDTH,
     annotations: [
-      { selector: '[data-test="export-kind"]', label: 'Period' },
-      { selector: '[data-test="export-year"]', label: 'Year' },
+      { selector: '[data-test="period-kind"]', label: 'Period' },
+      { selector: '[data-test="period-year"]', label: 'Year' },
       { selector: '[data-test="export-csv"]', label: 'Export CSV' },
       { selector: '[data-test="export-status"]', label: 'What the export covers' },
       { selector: '[data-test="mappings-table"]', label: 'Nominal code mappings' },

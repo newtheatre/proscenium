@@ -1136,8 +1136,9 @@ migration enumerates the posting table in `architecture.md`, and a change is an 
 (`finance.nominal-mapping.changed`, `server/utils/su-export.ts`'s `setNominalMapping`).
 `GET /api/admin/finance/nominal-mappings` lists it, `POST` changes one pair.
 
-**`GET /api/admin/finance/export?fromDay=...&toDay=...`** (or `kind=YEAR&year=...`, or
-`kind=SEASON&seasonId=...`, resolved to days exactly as the money dashboard resolves them, 0087)
+**`GET /api/admin/finance/export?kind=TERM&fromDay=...&toDay=...`** (or `kind=YEAR&year=...`, or
+`kind=SEASON&seasonId=...`, resolved to days exactly as the money dashboard resolves them, 0087;
+an older link with no kind or `kind=RANGE` still reads as the custom range)
 is one CSV row per ledger line in the range, `le.london_day BETWEEN fromDay AND toDay`, joined against this table: a line whose pair
 has no mapping still exports, with an explicit `UNMAPPED` nominal code rather than a dropped or
 blank row (criterion 3). Every figure is the line's own signed `amount_pence`, read straight off
