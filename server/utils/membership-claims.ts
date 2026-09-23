@@ -9,7 +9,7 @@ import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { tableColumns, whereFrom } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { Term } from '#shared/utils/membership'
-import type { ListClause, Reference } from './list-filters'
+import type { Reference } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 
 // `id` is not a guide to insertion order; `rowid` is, and is not a Drizzle column (0006).
@@ -21,7 +21,7 @@ function claimsColumn(name: string): Reference | undefined {
 // The queue through its own declaration (A-130 criterion 10): waiting is the hidden default, and
 // an erased person's claim is nobody's to answer, whatever its status.
 export function claimsClause(query: ListQuery): { where: SQL, orderBy: SQL[] } {
-  const clause: ListClause = whereFrom(membershipClaimsList, query, {
+  const clause = whereFrom(membershipClaimsList, query, {
     column: claimsColumn,
     search: [schema.users.name, schema.users.email, schema.membershipClaims.studentId],
   })
@@ -90,16 +90,17 @@ export async function findClaim(id: string): Promise<HeldClaim | undefined> {
   return row
 }
 
-// The term that decides whether the person is current: the run of back-to-back rows around
-// today, so a renewal waiting to start extends it (0031, A-130 criterion 13). A person holds few.
-export async function longestTerm(userId: string, today = londonDay(new Date())): Promise<Term | null> {
-  const terms = await db.select({
-    startsOn: schema.memberships.startsOn,
-    expiresOn: schema.memberships.expiresOn,
-  })
+// Every term row on the account; a person holds few.
+export async function heldTerms(userId: string): Promise<Term[]> {
+  return await db.select({ startsOn: schema.memberships.startsOn, expiresOn: schema.memberships.expiresOn })
     .from(schema.memberships)
     .where(eq(schema.memberships.userId, userId))
-  return effectiveTerm(terms, today)
+}
+
+// The term that decides whether the person is current: the run of back-to-back rows around
+// today, so a renewal waiting to start extends it (0031, A-130 criterion 13).
+export async function longestTerm(userId: string, today = londonDay(new Date())): Promise<Term | null> {
+  return effectiveTerm(await heldTerms(userId), today)
 }
 
 // Withdraw by predicate: nothing to withdraw is not an error, and the claim is not open either way.

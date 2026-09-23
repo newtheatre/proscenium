@@ -3,6 +3,7 @@ import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
+import { studentIdConstraintRefusal } from '#shared/utils/membership-claims'
 import { membershipsList } from '#shared/utils/memberships-list'
 import { configValue, configValueIfSet } from './configuration'
 import { tableColumns, whereFrom } from './list-filters'
@@ -14,15 +15,13 @@ import type { SQL } from 'drizzle-orm'
 
 export const MEMBER_FILTERS = ['current', 'awaiting-check', 'lapsed', 'everyone'] as const
 
-function inTermPredicate(grace: number): SQL {
-  const today = londonDay(new Date())
-  return sql`${schema.memberships.startsOn} <= ${today}
-    and date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${today}`
-}
-
 // Not yet over, grace included: a renewal waiting to start is here as well as the running term.
 function notOverPredicate(grace: number): SQL {
   return sql`date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${londonDay(new Date())}`
+}
+
+function inTermPredicate(grace: number): SQL {
+  return sql`${schema.memberships.startsOn} <= ${londonDay(new Date())} and ${notOverPredicate(grace)}`
 }
 
 // The register's own four states; "awaiting record" is the claims queue, a different screen and
@@ -58,6 +57,20 @@ export function membershipsClause(query: ListQuery, grace: number): ListClause {
   })
   const asked = conditionsOf(membershipsList, query).some(condition => condition.key === 'filter')
   return asked ? clause : { ...clause, where: and(registerFilterPredicate('current', grace)!, clause.where) }
+}
+
+// Either membership route's statements as one batch. A number another account holds fails it on
+// the `users_student_id` index, so nothing is written and the refusal says why (0047).
+export async function batchMembershipWrites(statements: SQL[]): Promise<void> {
+  const runs = statements.map(statement => db.run(statement))
+  try {
+    await db.batch([runs[0]!, ...runs.slice(1)])
+  }
+  catch (error) {
+    const refusal = studentIdConstraintRefusal(error)
+    if (refusal) throw createError(refusal)
+    throw error
+  }
 }
 
 export interface RenewalSweep { due: number, sent: number, cap: number }

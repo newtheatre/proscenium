@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
-import { renewalTerm } from '#shared/utils/membership'
-import { recordClaimStatements, studentIdConstraintRefusal } from '#shared/utils/membership-claims'
+import { claimAgainstHeld, renewalTerm } from '#shared/utils/membership'
+import { recordClaimStatements } from '#shared/utils/membership-claims'
 import type { MembershipTerm } from '#shared/utils/membership'
 
 // Record a claim: the number to the account, the membership row the A-117 route writes with the
@@ -23,8 +23,12 @@ export default defineEventHandler(async (event) => {
   }
 
   // A purchase inside a running term extends it with a row of its own; nothing held is rewritten.
-  const held = await longestTerm(claim.userId, claim.startsOn)
-  const term = renewalTerm(claim.startsOn, claim.term as MembershipTerm, held?.expiresOn ?? null)
+  // A row from the same date is this purchase already, and recording it again would stack a term.
+  const held = claimAgainstHeld(await heldTerms(claim.userId), claim.startsOn)
+  if (held.sameDay) {
+    throw createError({ statusCode: 409, statusMessage: 'That account already holds a term bought on that date' })
+  }
+  const term = renewalTerm(claim.startsOn, claim.term as MembershipTerm, held.heldUntil)
   const expiresOn = term.expiresOn
   const membershipId = newId()
   const now = Math.floor(Date.now() / 1000)
@@ -46,7 +50,8 @@ export default defineEventHandler(async (event) => {
     }),
   }
 
-  const statements = recordClaimStatements({
+  // A number another account holds fails the whole batch on its index: nothing is written (0047).
+  await batchMembershipWrites(recordClaimStatements({
     claimId: id,
     userId: claim.userId,
     studentId: claim.studentId,
@@ -55,16 +60,7 @@ export default defineEventHandler(async (event) => {
     actorId,
     now,
     entries,
-  }).map(statement => db.run(statement))
-  // A number another account holds fails the whole batch on its index: nothing is written (0047).
-  try {
-    await db.batch([statements[0]!, ...statements.slice(1)])
-  }
-  catch (error) {
-    const refusal = studentIdConstraintRefusal(error)
-    if (refusal) throw createError(refusal)
-    throw error
-  }
+  }))
 
   // Every write was guarded on the claim still being open, so the loser of a race wrote nothing:
   // the membership row is the proof of who won (0006).

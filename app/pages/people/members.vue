@@ -52,6 +52,7 @@ interface Claim {
   decidedAt: number | null
   createdAt: number
   heldUntil: string | null
+  heldSameDay: boolean
 }
 
 interface ClaimListing {
@@ -137,7 +138,7 @@ async function load(): Promise<void> {
   try {
     if (onQueue.value) {
       claims.value = await $fetch<ClaimListing>('/api/admin/memberships/claims', { query: queue.query.value })
-      if (!search.value && claimStatus.value === 'OPEN') waiting.value = claims.value.total
+      if (!search.value && waitingView.value) waiting.value = claims.value.total
       else void countWaiting()
     }
     else {
@@ -249,6 +250,13 @@ const exportUrl = computed(() => {
 
 watch([query, queue.query], load)
 
+// A status belongs to the queue alone: leaving the queue drops it, so the queue is always
+// entered on what waits and never on an old view of what was decided.
+watch(onQueue, (on) => {
+  if (on || route.query.status === undefined) return
+  void router.replace({ query: Object.fromEntries(Object.entries(route.query).filter(([key]) => key !== 'status')) })
+})
+
 const columns: TableColumn<Member>[] = [
   {
     id: 'name',
@@ -347,10 +355,15 @@ const claimBase: TableColumn<Claim>[] = [
       const held = row.original.heldUntil
       return h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
         h('span', {}, saysDay(row.original.createdAt)),
-        // Recording extends a term still running on the purchase date (A-130 criterion 13).
-        waitingView.value && held && held >= row.original.startsOn
-          ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held', 'title': `Recording starts the new term on ${saysDay(daysAfter(held, 1))}` }, () => `Extends one ending ${saysDay(held)}`)
-          : null,
+        // A term from the same date is this purchase already, and recording it is refused; otherwise
+        // recording extends a term still running on the purchase date (A-130 criterion 13).
+        !waitingView.value
+          ? null
+          : row.original.heldSameDay
+            ? h(UBadge, { 'color': 'warning', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-recorded-already' }, () => 'Already recorded from that date')
+            : held && held >= row.original.startsOn
+              ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held', 'title': `Recording starts the new term on ${saysDay(daysAfter(held, 1))}` }, () => `Extends one ending ${saysDay(held)}`)
+              : null,
       ])
     },
     meta: { class: { td: 'text-sm text-muted' } },
@@ -358,7 +371,8 @@ const claimBase: TableColumn<Claim>[] = [
 ]
 
 const OUTCOME_COLOUR: Record<string, 'success' | 'warning' | 'neutral'> = { RECORDED: 'success', DECLINED: 'warning', WITHDRAWN: 'neutral' }
-const OUTCOME_WORD: Record<string, string> = { RECORDED: 'Recorded', DECLINED: 'Declined', WITHDRAWN: 'Withdrawn' }
+// The words the Status filter already uses, so the row and the filter never disagree.
+const OUTCOME_WORD: Record<string, string> = Object.fromEntries(membershipClaimsList.fields[0]!.options.map(option => [option.value, option.label]))
 
 // A decided claim shows what came of it and, for a decline, what the member was told.
 const outcomeColumn: TableColumn<Claim> = {
