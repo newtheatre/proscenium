@@ -96,7 +96,7 @@ async function revoke(): Promise<void> {
   try {
     // Query, not body: a DELETE carrying a body hangs the Workers runtime when read (0068).
     await $fetch('/api/admin/roles', { method: 'DELETE', query: { userId: holder.userId, role: holder.role } })
-    toast.add({ title: 'Revoked.', description: `${holder.name} no longer holds ${saysRole(holder.role)}.`, icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: 'Role revoked', description: `${holder.name} no longer holds ${saysRole(holder.role)}.`, icon: 'i-lucide-check', color: 'success' })
     revoking.value = null
     await refresh()
   }
@@ -109,7 +109,7 @@ async function revoke(): Promise<void> {
 }
 
 async function granted(): Promise<void> {
-  toast.add({ title: 'Granted.', description: 'The register is up to date.', icon: 'i-lucide-check', color: 'success' })
+  toast.add({ title: 'Role granted', description: 'The register is up to date.', icon: 'i-lucide-check', color: 'success' })
   await refresh()
 }
 

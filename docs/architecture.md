@@ -93,7 +93,7 @@ namespace, and asks the owner for one anywhere else.
 | Stream | Routes and files owned |
 | --- | --- |
 | Box office | `/whats-on`, `/shows/[slug]`, `/book`, `/qr` (retrieval, resend and self-service edit and cancel while unpaid: D-108, D-110), `/passes` (a pass's own QR retrieval, D-124), `/account/passes`, `/my/bookings`, `/box-office/**`, `/tonight/door`, `content/`, `app/pages/[...slug].vue` (the content catch-all, D-103) |
-| Show night | `/rota` and `/rota/manage/**` (templates, rota administration, the venue emergency card and the backstage board's own milestone types and presets at `/rota/manage/backstage`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**`, `/api/admin/backstage/**`, `/api/board/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
+| Show night | `/rota` and `/rota/manage/**` (templates, rota administration, the venue emergency card and the backstage board's own milestone types and presets at `/rota/manage/backstage`), the `/tonight` hub, `/tonight/incidents`, `/tonight/register`, `/tonight/checklist`, `/tonight/report`, `/tonight/board`, `/tonight/close`, `/board`, `/api/tonight/**`, `/api/admin/rota/**`, `/api/admin/backstage/**`, `/api/board/**` and `server/utils/night-authority.ts`. The console screens sit under `/rota/manage`, never `/admin`: `/tonight` is the phone-first shell rather than a console prefix (0040, 0046). |
 | Bar | `/tonight/till`, `/tonight/till/comps`, `/bar/**`, `/bar/stock/**` |
 | Platform | `/policies/**`, `/admin/config`, `/admin/docs`, `/admin/backups`, `/admin/retention`, `migration/**`, `app/components/Night*.vue`, `app/composables/useNightCache.ts`, `app/composables/useWriteQueue.ts`, `tests/helpers/race.ts` |
 | Communications | `/account/notifications`, `/comms/**`, `server/utils/notify.ts`, `server/utils/notification-preferences.ts`, `shared/utils/notifications.ts`, `shared/utils/senders.ts` |
@@ -558,7 +558,7 @@ without naming it), and `nights:close` from E-125.
 | Cron (UTC) | Task | Does |
 | --- | --- | --- |
 | `*/10 * * * *` | `holds:release` | Sends pre-expiry hold reminders (`HOLD_REMINDER_MINUTES_BEFORE`, 60 by default), then releases expired reservation holds (D-106, D-107). The one task that changes booking state, and only ever in the direction the customer was warned about. A release offers the freed seats to the waiting list in join order before returning (D-113 criterion 2). |
-| `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). The CI-side "after every deploy" half of criterion 3 is `.github/workflows/health-watch.yml` and `migrate.yml`'s own `health` job, both outside the application. |
+| `*/10 * * * *` | `health:watch` | Opens a `health_incidents` row on the first unhealthy `/api/health` check, notifies the IT Manager through the notification centre once `HEALTH_ALERT_WINDOW_MINUTES` has passed with it still open, and closes it the moment a check recovers so the next failure alerts again from cold (J-106 criterion 5). Bot Fight Mode challenges GitHub runners, so `migrate.yml` no longer checks health (issue 1014); after a migration the check is by hand in a browser, and `health-watch.yml` was removed for the same reason, leaving this task as the only automated "after every deploy" alert (`docs/operations.md`). |
 | `*/10 * * * *` | `notifications:retry` | Sends failed messages again, one claimed row at a time, when the doubling backoff since enqueue has passed (`NOTIFICATION_RETRY_BACKOFF_MINUTES`, 10 by default); marks an entry `FAILED_FINAL` once `NOTIFICATION_MAX_ATTEMPTS` is spent, so five attempts span about two and a half hours. Every guard runs again on each attempt, so an address change, a preference change or an erasure in between is honoured (H-105, 0056). Capped at 100 rows a run. |
 | `*/10 * * * *` | `notifications:digest` | Claims and sends every topic-and-person digest whose window has passed (`NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`, 60 minutes each by default), one email per pair, capped at 100 pairs a topic a run (H-104). |
 | `*/10 * * * *` | `waiting-list:sweep` | Lapses waiting-list offers past `WAITING_LIST_OFFER_WINDOW_MINUTES`, then re-offers each seat a lapse gives back to the next entry in join order (D-113 criterion 3). Every other freeing event (a hold release, a self-cancel, a refund, a raised capacity) offers inline at the point that frees the seat; this is the one with no such point of its own. |
@@ -1171,7 +1171,12 @@ first), unpaid, cancelled, an unknown reference and the door role itself.
 `tests/e2e/night-two-performances.test.ts` is criterion 6's own fixture: one venue, a matinee
 and an evening, the same person holding a shift on both (criterion 1's own clause), two age checks,
 one till session, a sale named to the matinee, and two independently-read reports proving neither
-crosses into the other.
+crosses into the other. The same file carries F-126 criterion 3: an officer's till covering both
+houses sells once with the real clock inside the matinee's bar window and once inside the evening's,
+and each `BAR_ITEM` line names its own performance while the session reconciles to both sales. With
+no clock to set, the case moves the two houses around the real now instead, the other house an
+hour off on whichever side of now the show night has room (0014), and waits out 04:00 if begun in
+the night's last two minutes.
 
 ### The Challenge 25 register (E-118)
 
@@ -1529,6 +1534,17 @@ rather than the live queries recomputing over data that has moved on since the f
 5, "a frozen report is immutable"). Before sign-off, the response is the live draft above with
 `signedOff: null` and `addenda: []`, so a caller reads one shape either way.
 
+`/tonight/report` is the duty manager's screen over both routes (issue 1053), a tile on the hub
+carrying the house the hub is showing. It reads the draft, takes the closing note and posts it
+with the `performanceId` it read. A 409 rereads the report: the frozen report arriving answers a
+lost race, and otherwise the refusal is the checklist gate, shown with a link to the checklist. A
+400 with no `performanceId` is a matinee day opened cold and shows the performance switcher, or
+the refusal itself when authority lists no house to choose. The screen asks `GET
+/api/tonight/authority` for `DUTY_MANAGER` on the performance it shows, asking again on a switch,
+so an officer standing in is told before signing that the sign-off records as such (0044),
+whatever shift they hold elsewhere. The staffing bypass flag is the night's, shown once and never
+beside a slot, because the audit entry it reads names no shift.
+
 ## The programme (build-order contract d, 0043)
 
 Where we perform, what we perform and when. `venues`, `seasons`, `show_categories`, `shows`,
@@ -1758,8 +1774,10 @@ Merging to `main` (once this branch becomes it) deploys via Workers Builds. Migr
 `.github/workflows/migrate.yml` on push to `main` or `unified/main` when the run touches
 `server/db/migrations/**` (restore point first, `nuxt-db migrate`, ledger re-read after), and
 `/api/health` returns 503 naming pending migrations whenever the deploy is ahead of its schema.
-Applying and deploying cannot be sequenced from CI, so the ordering is a race; the health check is
-what makes losing it visible rather than silent.
+Applying and deploying cannot be sequenced from CI, so the ordering is a race; the health endpoint is
+what makes losing it visible rather than silent. No workflow checks it after a migration, because Bot
+Fight Mode challenges GitHub runners (issue 1014): the operator opens `/api/health` in a browser, and
+the in-application `health:watch` task alerts if it stays unhealthy.
 
 CI gates, eleven of them: `build`, `typecheck`, `lint`, `typecheck:bun`, `test`, and the six
 checkers (comments, migrations, content tokens, ledger, notifications, audit). `typecheck` and

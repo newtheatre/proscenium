@@ -93,7 +93,7 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
     const view = await openView(PHONE)
     try {
       await visit(view, `${app.baseURL}/tonight`)
-      for (const selector of ['[data-test="tile-scan"]', '[data-test="tile-glance"]', '[data-test="tile-passes"]', '[data-test="tile-backstage"]', '[data-test="tile-emergency"]', '[data-test="tile-contacts"]', '[data-test="tile-checklist"]', '[data-test="tile-age-checks"]']) {
+      for (const selector of ['[data-test="tile-scan"]', '[data-test="tile-glance"]', '[data-test="tile-passes"]', '[data-test="tile-backstage"]', '[data-test="tile-emergency"]', '[data-test="tile-contacts"]', '[data-test="tile-checklist"]', '[data-test="tile-report"]', '[data-test="tile-age-checks"]']) {
         const tile = await boxOf(view, selector)
         expect(`${selector}: ${tile.height >= NIGHT_TAP_TARGET_PX && tile.width >= NIGHT_TAP_TARGET_PX}`).toBe(`${selector}: true`)
       }

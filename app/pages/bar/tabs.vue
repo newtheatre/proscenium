@@ -174,12 +174,17 @@ const columns: TableColumn<HolderRow>[] = [
           :description="tabFailure"
         />
 
-        <p
+        <div
           v-else-if="tabLoading"
-          class="py-6 text-center text-sm text-muted"
+          data-test="tab-skeleton"
+          class="space-y-3"
         >
-          Loading…
-        </p>
+          <USkeleton
+            v-for="row in 3"
+            :key="row"
+            class="h-10 w-full"
+          />
+        </div>
 
         <ul
           v-else-if="tab && tab.charges.length > 0"
