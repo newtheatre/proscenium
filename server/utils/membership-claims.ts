@@ -90,16 +90,17 @@ export async function findClaim(id: string): Promise<HeldClaim | undefined> {
   return row
 }
 
-// The term that decides whether the person is current: the run of back-to-back rows around
-// today, so a renewal waiting to start extends it (0031, A-130 criterion 13). A person holds few.
-export async function longestTerm(userId: string, today = londonDay(new Date())): Promise<Term | null> {
-  const terms = await db.select({
-    startsOn: schema.memberships.startsOn,
-    expiresOn: schema.memberships.expiresOn,
-  })
+// Every term row on the account; a person holds few.
+export async function heldTerms(userId: string): Promise<Term[]> {
+  return await db.select({ startsOn: schema.memberships.startsOn, expiresOn: schema.memberships.expiresOn })
     .from(schema.memberships)
     .where(eq(schema.memberships.userId, userId))
-  return effectiveTerm(terms, today)
+}
+
+// The term that decides whether the person is current: the run of back-to-back rows around
+// today, so a renewal waiting to start extends it (0031, A-130 criterion 13).
+export async function longestTerm(userId: string, today = londonDay(new Date())): Promise<Term | null> {
+  return effectiveTerm(await heldTerms(userId), today)
 }
 
 // Withdraw by predicate: nothing to withdraw is not an error, and the claim is not open either way.

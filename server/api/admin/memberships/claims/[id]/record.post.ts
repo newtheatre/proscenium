@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { renewalTerm } from '#shared/utils/membership'
+import { claimAgainstHeld, renewalTerm } from '#shared/utils/membership'
 import { recordClaimStatements } from '#shared/utils/membership-claims'
 import type { MembershipTerm } from '#shared/utils/membership'
 
@@ -23,8 +23,12 @@ export default defineEventHandler(async (event) => {
   }
 
   // A purchase inside a running term extends it with a row of its own; nothing held is rewritten.
-  const held = await longestTerm(claim.userId, claim.startsOn)
-  const term = renewalTerm(claim.startsOn, claim.term as MembershipTerm, held?.expiresOn ?? null)
+  // A row from the same date is this purchase already, and recording it again would stack a term.
+  const held = claimAgainstHeld(await heldTerms(claim.userId), claim.startsOn)
+  if (held.sameDay) {
+    throw createError({ statusCode: 409, statusMessage: 'That account already holds a term bought on that date' })
+  }
+  const term = renewalTerm(claim.startsOn, claim.term as MembershipTerm, held.heldUntil)
   const expiresOn = term.expiresOn
   const membershipId = newId()
   const now = Math.floor(Date.now() / 1000)

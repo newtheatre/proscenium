@@ -95,7 +95,7 @@ async function own(as: TestMember): Promise<Own> {
   return await response.json() as Own
 }
 
-interface Queued { id: string, userId: string, studentId: string, heldUntil: string | null }
+interface Queued { id: string, userId: string, studentId: string, heldUntil: string | null, heldSameDay: boolean }
 
 async function queue(query = ''): Promise<{ items: Queued[], total: number }> {
   const response = await send('GET', `/api/admin/memberships/claims${query}`, undefined, cookie)
@@ -226,7 +226,14 @@ describe.skipIf(skip !== null)('the officer records or declines (A-130 criteria 
     expect((await send('POST', '/api/admin/memberships', { userId: member.id, startsOn: today, years: 1 }, cookie)).status).toBe(200)
 
     const listed = await queue(`?search=${encodeURIComponent(member.email)}`)
-    expect(listed.items.find(item => item.id === id)).toMatchObject({ heldUntil: endOfTerm(today, 1) })
+    expect(listed.items.find(item => item.id === id)).toMatchObject({ heldUntil: endOfTerm(today, 1), heldSameDay: true })
+
+    // Recording it anyway would stack a second term on one payment, so it is refused (A-130).
+    const refused = await send('POST', `/api/admin/memberships/claims/${id}/record`, {}, cookie)
+    expect(refused.status).toBe(409)
+    expect(await said(refused)).toBe('That account already holds a term bought on that date')
+    expect(read<{ n: number }>(`SELECT count(*) n FROM memberships WHERE user_id = ?`, member.id)!.n).toBe(1)
+    expect(read<{ status: string }>('SELECT status FROM membership_claims WHERE id = ?', id)!.status).toBe('OPEN')
   })
 
   test('a number another account already holds is refused rather than moved', async () => {

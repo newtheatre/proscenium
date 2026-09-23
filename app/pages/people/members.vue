@@ -52,6 +52,7 @@ interface Claim {
   decidedAt: number | null
   createdAt: number
   heldUntil: string | null
+  heldSameDay: boolean
 }
 
 interface ClaimListing {
@@ -354,10 +355,15 @@ const claimBase: TableColumn<Claim>[] = [
       const held = row.original.heldUntil
       return h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
         h('span', {}, saysDay(row.original.createdAt)),
-        // Recording extends a term still running on the purchase date (A-130 criterion 13).
-        waitingView.value && held && held >= row.original.startsOn
-          ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held', 'title': `Recording starts the new term on ${saysDay(daysAfter(held, 1))}` }, () => `Extends one ending ${saysDay(held)}`)
-          : null,
+        // A term from the same date is this purchase already, and recording it is refused; otherwise
+        // recording extends a term still running on the purchase date (A-130 criterion 13).
+        !waitingView.value
+          ? null
+          : row.original.heldSameDay
+            ? h(UBadge, { 'color': 'warning', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-recorded-already' }, () => 'Already recorded from that date')
+            : held && held >= row.original.startsOn
+              ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held', 'title': `Recording starts the new term on ${saysDay(daysAfter(held, 1))}` }, () => `Extends one ending ${saysDay(held)}`)
+              : null,
       ])
     },
     meta: { class: { td: 'text-sm text-muted' } },

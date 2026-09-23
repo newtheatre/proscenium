@@ -560,7 +560,10 @@ Open questions for the committee:
       the purchase date, as before. The queue says which recording will do. Whether somebody is
       current reads the run of back-to-back terms around today, so a renewal that has not started
       yet neither lapses them early nor reads as lapsed itself; it waits under "Awaiting a check",
-      and the term it follows is not reminded as running out.
+      and the term it follows is not reminded as running out. A claim whose purchase date starts
+      a term the account already holds is that purchase recorded already ("Record one"): recording
+      it is refused with 409 rather than stacking a second term on one payment, and the queue
+      says so. The queue and the route read the account through one rule, `claimAgainstHeld()`.
   14. Added 23 September 2026 (issue 1005): withdrawing a claim is audited as
       `membership.claim.withdrawn`, the member as actor, carrying the claim id and never the
       student number (0011), in the same batch as the withdrawal, so "withdrew and claimed again

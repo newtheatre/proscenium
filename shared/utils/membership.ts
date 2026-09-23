@@ -43,6 +43,15 @@ export function effectiveTerm(terms: readonly Term[], today: string): Term | nul
   return runs.filter(run => run.startsOn <= today).at(-1) ?? runs[0] ?? null
 }
 
+// A claim bought on `boughtOn` read against the account's rows: the end of the run in force that
+// day, and whether a row from that very date already records this purchase (A-130 criterion 13).
+export function claimAgainstHeld(terms: readonly Term[], boughtOn: string): { heldUntil: string | null, sameDay: boolean } {
+  return {
+    heldUntil: effectiveTerm(terms, boughtOn)?.expiresOn ?? null,
+    sameDay: terms.some(term => term.startsOn === boughtOn),
+  }
+}
+
 // A purchase while a term still runs extends it: the new term follows on the day after, so buying
 // early loses nothing. Otherwise it runs from the purchase (A-130 criterion 13, 0031).
 export function renewalTerm(boughtOn: string, years: MembershipTerm, heldUntil: string | null): { startsOn: string, expiresOn: string, extends: boolean } {

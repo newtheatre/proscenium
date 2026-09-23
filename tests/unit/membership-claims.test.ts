@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { daysAfter, effectiveTerm, londonDay, membershipState, renewalTerm } from '#shared/utils/membership'
+import { claimAgainstHeld, daysAfter, effectiveTerm, londonDay, membershipState, renewalTerm } from '#shared/utils/membership'
 import {
   CLAIM_STATUSES,
   CLAIM_REASON_LIMIT,
@@ -151,5 +151,26 @@ describe('the term a person holds reads across a renewal', () => {
 
   test('nothing held is nothing', () => {
     expect(effectiveTerm([], '2026-09-20')).toBeNull()
+  })
+})
+
+// The queue and the record route read a claim against the account through one rule, so the badge
+// says what recording will do, and a purchase already written down is never stacked (A-130).
+describe('a claim read against what the account holds (A-130 criterion 13)', () => {
+  test('a gap before a later grant: the badge and the route agree nothing is extended', () => {
+    const lapsed = { startsOn: '2025-01-01', expiresOn: '2025-12-31' }
+    const later = { startsOn: '2026-10-01', expiresOn: '2027-09-30' }
+    const read = claimAgainstHeld([lapsed, later], '2026-09-01')
+    expect(read).toEqual({ heldUntil: '2025-12-31', sameDay: false })
+    expect(renewalTerm('2026-09-01', 1, read.heldUntil).extends).toBe(false)
+  })
+
+  test('a term from the same purchase date is already this purchase', () => {
+    const recorded = { startsOn: '2026-09-01', expiresOn: '2027-08-31' }
+    expect(claimAgainstHeld([recorded], '2026-09-01')).toEqual({ heldUntil: '2027-08-31', sameDay: true })
+  })
+
+  test('nothing held is nothing to extend and nothing to repeat', () => {
+    expect(claimAgainstHeld([], '2026-09-01')).toEqual({ heldUntil: null, sameDay: false })
   })
 })

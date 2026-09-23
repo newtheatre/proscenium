@@ -140,7 +140,9 @@ is `effectiveTerm()`: back-to-back or overlapping rows fold into one run, and th
 is the latest to have begun by today (`longestTerm()` reads it for the viewer, the account menu
 and member pricing). The register's `lapsed` means over, grace included, so a renewal waiting to
 start is neither current nor lapsed but is under `awaiting-check`; the renewal reminder skips a
-term with a later one after it.
+term with a later one after it. A claim whose purchase date starts a row already held is
+refused as recorded already; the queue and the route read that and the extension through
+`claimAgainstHeld()`.
 
 `GET /api/admin/memberships` is the register at `/people/members`. Filtered by its declaration
 (`shared/utils/memberships-list.ts`, K-129): `filter` (`current`, `awaiting-check`, `lapsed` or
