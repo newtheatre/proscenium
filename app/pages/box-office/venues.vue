@@ -10,6 +10,7 @@ definePageMeta({ layout: 'console', title: 'Venues', middleware: 'console', docs
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
+const StatusCell = resolveComponent('StatusCell')
 
 // The cards are show night's own screen (E-113), one list for every venue: this screen links
 // to that list once rather than once a row, where every row's link went to the same place.
@@ -191,7 +192,7 @@ const columns: TableColumn<AdminVenue>[] = [
     id: 'inUse',
     header: 'In use',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.inUse ? 'Has records against it' : 'Nothing yet'),
+    cell: ({ row }) => h(StatusCell, { value: row.original.inUse, yes: 'Has records against it', no: 'Nothing yet' }),
   },
   {
     id: 'act',

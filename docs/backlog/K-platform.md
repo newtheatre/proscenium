@@ -9,7 +9,7 @@ the cutover rather than after it. Phasing follows the roadmap: the platform stor
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 32. Phases: 26 MVP, 1 V2, 0 Later, 5 resolved.
+Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
 
 ## Open questions
 
@@ -866,6 +866,28 @@ Stories: 32. Phases: 26 MVP, 1 V2, 0 Later, 5 resolved.
 - Source: IT Manager request, September 2026. The drift report had no queue
   (`docs/known-issues.md`), and a defect found on a show night reached nobody unless somebody
   remembered to write an email afterwards.
+
+## K-135: A true-or-false column is a tick or a cross
+
+- Role: Administrator
+- Phase: MVP
+- Story: As somebody scanning an admin table, I want a true/false column shown as a tick or a
+  cross so that I can read a row's status at a glance instead of reading a sentence.
+- Depends on: K-123
+- Acceptance criteria:
+  1. `/box-office/venues`'s "In use" column shows a tick icon or a cross icon rather than "Has
+     records against it" / "Nothing yet", with an accessible label carrying the same words for a
+     screen reader.
+  2. The same treatment is applied to the other boolean-as-sentence columns on the console
+     (seasons and show categories "In use", ticket types "Sold under", bar products "Sold"), so
+     the convention is consistent across admin tables rather than fixed on one screen.
+  3. The convention is written down once, beside the existing admin table conventions, so a new
+     table column follows it without a fresh decision each time: one shared cell component, and
+     no console table cell spells a true/false value as a pair of sentences.
+  4. Below the small breakpoint, where a column of icons could lose its header context, the icon
+     keeps a visible text label rather than relying on colour alone.
+- Source: feedback report `e69d87e7ea5c4d4abda1bea793deab57`, 23 September 2026 (issue 1217),
+  accepted in full by the IT Manager.
 
 ## K-201: The console command palette
 

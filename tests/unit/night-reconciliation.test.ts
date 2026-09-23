@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { zReadingStatement } from '#server/utils/night-reconciliation'
+import { outstandingNights, zReadingStatement } from '#server/utils/night-reconciliation'
 import { recordZReadingForm } from '#shared/utils/night-reconciliation'
+import { FIRST_RECONCILED_NIGHT } from '#shared/utils/show-night'
 
 // I-104: the reader keys in what it shows; a variance needs a note before it can be recorded,
 // and a write-off names what it resolves.
@@ -60,5 +61,30 @@ describe('a variance with no note is refused in money, not in pence', () => {
 
   test('a reading that matches is not refused at all', () => {
     expect(refusalFor(4200, 4200)).toBe('')
+  })
+})
+
+describe('only nights since the first reconciled night are outstanding (criterion 5, issue 1208)', () => {
+  const TONIGHT = '2026-09-22'
+
+  test('the first reconciled night is 1 September 2026', () => {
+    expect(FIRST_RECONCILED_NIGHT).toBe('2026-09-01')
+  })
+
+  test('imported history before the floor never needs a reading', () => {
+    const ran = ['2014-10-03', '2025-06-14', '2026-08-31', '2026-09-01', '2026-09-15']
+    expect(outstandingNights(ran, new Set(), TONIGHT)).toEqual([{ night: '2026-09-01' }, { night: '2026-09-15' }])
+  })
+
+  test('a night with a reading, or not yet begun, is not outstanding', () => {
+    const ran = ['2026-09-15', '2026-09-20', '2026-09-22', '2026-09-23']
+    expect(outstandingNights(ran, new Set(['2026-09-20']), TONIGHT)).toEqual([{ night: '2026-09-15' }, { night: '2026-09-22' }])
+  })
+
+  test('the list is sorted and never truncated', () => {
+    const ran = Array.from({ length: 22 }, (_, index) => `2026-09-${String(22 - index).padStart(2, '0')}`)
+    const listed = outstandingNights(ran, new Set(), TONIGHT).map(row => row.night)
+    expect(listed).toHaveLength(22)
+    expect(listed).toEqual([...listed].sort())
   })
 })
