@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AUDIENCE_KINDS, AUDIENCE_LABELS, saysAnnouncementSent, saysAudienceCount } from '#shared/utils/announcements'
+import { AUDIENCE_KINDS, AUDIENCE_LABELS, isTicketHolderAudience, saysAnnouncementSent, saysAudienceCount } from '#shared/utils/announcements'
 import { ROLES, saysRole } from '#shared/utils/roles'
 import { saysClock, saysDay } from '#shared/utils/when'
 import type { AnnounceShowOption, AudienceKind } from '#shared/utils/announcements'
@@ -38,7 +38,7 @@ const audienceReady = computed(() =>
   && (kind.value !== 'PERFORMANCE_TICKET_HOLDERS' || Boolean(performanceId.value))
   && (kind.value !== 'SHOW_TICKET_HOLDERS' || Boolean(showId.value)))
 
-const ticketHolders = computed(() => kind.value === 'PERFORMANCE_TICKET_HOLDERS' || kind.value === 'SHOW_TICKET_HOLDERS')
+const ticketHolders = computed(() => isTicketHolderAudience(kind.value))
 
 const performanceItems = computed(() => (show.value?.performances ?? []).map(performance => ({
   label: `${saysDay(performance.startsAt, { year: true })}, ${saysClock(performance.startsAt)}, ${performance.venueName}${performance.status === 'CANCELLED' ? ' (cancelled)' : ''}`,

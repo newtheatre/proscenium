@@ -36,11 +36,14 @@ export const AUDIENCE_LABELS: Record<AudienceKind, string> = {
   SHOW_TICKET_HOLDERS: 'Ticket holders for a show',
 }
 
+export function isTicketHolderAudience(kind: AudienceKind): boolean {
+  return kind === 'PERFORMANCE_TICKET_HOLDERS' || kind === 'SHOW_TICKET_HOLDERS'
+}
+
 // A ticket holder is told about a booking, not addressed as a member, so the audience picks
 // the type and the safety tick only picks between two (0089).
 export function announcementType(audience: AudienceDefinition, safetyNotice: boolean): MessageTypeName {
-  const ticketHolders = audience.kind === 'PERFORMANCE_TICKET_HOLDERS' || audience.kind === 'SHOW_TICKET_HOLDERS'
-  if (ticketHolders) return safetyNotice ? 'admin.ticket-holders.safety-notice' : 'admin.ticket-holders'
+  if (isTicketHolderAudience(audience.kind)) return safetyNotice ? 'admin.ticket-holders.safety-notice' : 'admin.ticket-holders'
   return safetyNotice ? 'admin.safety-notice' : 'admin.announcement'
 }
 
