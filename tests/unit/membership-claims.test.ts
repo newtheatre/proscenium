@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { daysAfter, londonDay, membershipState, renewalTerm } from '#shared/utils/membership'
+import { daysAfter, effectiveTerm, londonDay, membershipState, renewalTerm } from '#shared/utils/membership'
 import {
   CLAIM_STATUSES,
   CLAIM_REASON_LIMIT,
@@ -122,5 +122,34 @@ describe('a claim extends a running term (A-130 criterion 12)', () => {
 
   test('a leap day end carries into the first of March', () => {
     expect(renewalTerm('2028-01-10', 1, '2028-02-28').startsOn).toBe('2028-02-29')
+  })
+})
+
+// A renewal row starts in the future, so the term that decides whether somebody is current is the
+// run of back-to-back rows around today, not whichever row ends last (A-130 criterion 12).
+describe('the term a person holds reads across a renewal', () => {
+  const held = { startsOn: '2026-09-14', expiresOn: '2027-09-13' }
+  const renewal = { startsOn: '2027-09-14', expiresOn: '2028-09-13' }
+
+  test('before the renewal starts, the person is current until the renewal ends', () => {
+    expect(effectiveTerm([renewal, held], '2027-08-20')).toEqual({ startsOn: '2026-09-14', expiresOn: '2028-09-13' })
+    expect(membershipState(effectiveTerm([held, renewal], '2027-08-20'), '2027-08-20', 14)).toEqual({ kind: 'current', until: '2028-09-13' })
+  })
+
+  test('a gap splits the run: an old lapsed term does not reach a later purchase', () => {
+    const old = { startsOn: '2024-09-01', expiresOn: '2025-08-31' }
+    const fresh = { startsOn: '2026-02-01', expiresOn: '2027-01-31' }
+    expect(effectiveTerm([old, fresh], '2025-12-01')).toEqual(old)
+    expect(effectiveTerm([old, fresh], '2026-03-01')).toEqual(fresh)
+  })
+
+  test('overlapping rows merge rather than one hiding the other', () => {
+    const first = { startsOn: '2026-09-14', expiresOn: '2027-09-13' }
+    const overlap = { startsOn: '2026-10-01', expiresOn: '2027-09-30' }
+    expect(effectiveTerm([first, overlap], '2026-09-20')).toEqual({ startsOn: '2026-09-14', expiresOn: '2027-09-30' })
+  })
+
+  test('nothing held is nothing', () => {
+    expect(effectiveTerm([], '2026-09-20')).toBeNull()
   })
 })

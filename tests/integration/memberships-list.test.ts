@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import { conditionsOf, filterQuerySchema } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { membershipsList } from '#shared/utils/memberships-list'
-import { membershipsClause } from '#server/utils/membership'
+import { membershipsClause, notRenewed } from '#server/utils/membership'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
@@ -105,5 +105,35 @@ describe('sorting is by a declared field only', () => {
 
   test('a column that is not declared cannot be sorted by', () => {
     expect(filterQuerySchema(membershipsList).safeParse({ sort: 'source' }).success).toBe(false)
+  })
+})
+
+// A renewal recorded early starts after today (A-130 criterion 12). It has not lapsed, it still
+// wants checking against the SU's list, and the term it follows is not "running out".
+describe('a renewal that has not started yet', () => {
+  test('is neither current nor lapsed, and waits for a check', async () => {
+    await withDatabase((database) => {
+      person(database, 'u-1', 'Rene Renewed')
+      membership(database, 'm-held', 'u-1', daysAfter(TODAY, -300), daysAfter(TODAY, 20), true)
+      membership(database, 'm-renewal', 'u-1', daysAfter(TODAY, 21), daysAfter(TODAY, 385), false)
+
+      expect(ids(database, {})).toEqual(['m-held'])
+      expect(ids(database, { filter: 'lapsed' })).toEqual([])
+      expect(ids(database, { filter: 'awaiting-check' })).toEqual(['m-renewal'])
+    })
+  })
+
+  test('the term it follows is not reminded as running out', async () => {
+    await withDatabase((database) => {
+      person(database, 'u-1', 'Rene Renewed')
+      person(database, 'u-2', 'Nora Notrenewed')
+      membership(database, 'm-held', 'u-1', daysAfter(TODAY, -300), daysAfter(TODAY, 20), true)
+      membership(database, 'm-renewal', 'u-1', daysAfter(TODAY, 21), daysAfter(TODAY, 385), false)
+      membership(database, 'm-alone', 'u-2', daysAfter(TODAY, -300), daysAfter(TODAY, 20), true)
+
+      const statement = sql`SELECT memberships.id AS id FROM memberships WHERE ${notRenewed()} ORDER BY memberships.id`
+      const [text, ...parameters] = boundStatement(database, statement)
+      expect(rows<{ id: string }>(database, text, ...parameters).map(row => row.id)).toEqual(['m-alone', 'm-renewal'])
+    })
   })
 })

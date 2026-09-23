@@ -541,7 +541,10 @@ Open questions for the committee:
       that term ends and runs the claimed one or three years from there, as a new row with the
       claim as its evidence: a renewal is another row and history is never rewritten (0010, A-201
       criterion 2's "creates or extends"). A purchase made after the latest term ended starts on
-      the purchase date, as before. The queue says which recording will do.
+      the purchase date, as before. The queue says which recording will do. Whether somebody is
+      current reads the run of back-to-back terms around today, so a renewal that has not started
+      yet neither lapses them early nor reads as lapsed itself; it waits under "Awaiting a check",
+      and the term it follows is not reminded as running out.
   13. Added 23 September 2026 (issue 1005): withdrawing a claim is audited as
       `membership.claim.withdrawn`, the member as actor, carrying the claim id and never the
       student number (0011), in the same batch as the withdrawal, so "withdrew and claimed again
