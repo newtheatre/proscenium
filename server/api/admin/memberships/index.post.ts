@@ -1,13 +1,16 @@
+import { eq } from 'drizzle-orm'
 import { recordMembership as body } from '#shared/utils/admin-forms'
 import { MEMBERSHIP_TERMS, endOfTerm, londonDay } from '#shared/utils/membership'
+import { grantMembershipStatements } from '#shared/utils/membership-claims'
 import type { MembershipTerm } from '#shared/utils/membership'
 
-// Record a membership bought at the SU (A-117).
+// Record a membership bought at the SU (A-117), its student number in the same batch.
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'members.write')
   const input = await readValidatedBodyOrThrow(event, body)
 
-  const account = await findById(input.userId)
+  const [account] = await db.select({ studentId: schema.users.studentId, anonymisedAt: schema.users.anonymisedAt })
+    .from(schema.users).where(eq(schema.users.id, input.userId)).limit(1)
   if (!account) throw noSuch('account')
   if (account.anonymisedAt !== null) {
     throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
@@ -17,26 +20,18 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = newId()
-  const writes = [
-    db.insert(schema.memberships).values({
-      id,
-      userId: input.userId,
-      startsOn: input.startsOn,
-      expiresOn: endOfTerm(input.startsOn, input.years as MembershipTerm),
-      source: 'MANUAL',
-      evidence: input.evidence ?? null,
-      grantedBy: resolved.account.id,
-    }),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'membership.granted',
-      target: `user:${input.userId}`,
-      detail: { membership: id, years: input.years, expiresOn: endOfTerm(input.startsOn, input.years as MembershipTerm) },
-    })),
-  ]
+  const years = input.years as MembershipTerm
+  await batchMembershipWrites(grantMembershipStatements({
+    id,
+    userId: input.userId,
+    startsOn: input.startsOn,
+    years,
+    evidence: input.evidence ?? null,
+    actorId: resolved.account.id,
+    now: Math.floor(Date.now() / 1000),
+    studentId: input.studentId,
+    held: account.studentId,
+  }))
 
-  await db.batch([writes[0]!, ...writes.slice(1)])
-  if (input.studentId) await recordStudentId(input.userId, input.studentId, resolved.account.id)
-
-  return { ok: true, id, expiresOn: endOfTerm(input.startsOn, input.years as MembershipTerm), terms: MEMBERSHIP_TERMS }
+  return { ok: true, id, expiresOn: endOfTerm(input.startsOn, years), terms: MEMBERSHIP_TERMS }
 })

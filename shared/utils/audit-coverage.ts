@@ -60,12 +60,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   {
     route: 'server/api/admin/memberships/index.post.ts',
     actions: ['membership.granted', 'account.student-id.recorded'],
-    via: ['server/utils/membership.ts'],
+    via: ['shared/utils/membership-claims.ts'],
   },
   { route: 'server/api/admin/memberships/claims/index.get.ts', exempt: 'reads the claims queue' },
   {
     route: 'server/api/admin/memberships/claims/[id]/record.post.ts',
     actions: ['membership.claim.recorded', 'membership.granted', 'account.student-id.recorded'],
+    via: ['shared/utils/membership-claims.ts'],
   },
   { route: 'server/api/admin/memberships/claims/[id]/decline.post.ts', actions: ['membership.claim.declined'] },
   { route: 'server/api/account/membership/index.get.ts', exempt: 'reads your own membership and claim' },

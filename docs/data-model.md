@@ -176,11 +176,17 @@ sort by waiting since, decided or recorded order. `claimsClause()` in
 `server/utils/membership-claims.ts` is the predicate the endpoint and its test share.
 `POST /api/admin/memberships/claims/[id]/record` runs `recordClaimStatements()`
 (`shared/utils/membership-claims.ts`) as one batch, every write guarded on the claim still being
-`OPEN`: the number to `users.student_id` (refused with 409 if another account holds it, exactly as
-`recordStudentId` refuses), the `memberships` row by the A-117 path with `source = 'MANUAL'` and
+`OPEN`: the number to `users.student_id` through `recordStudentId()` (statements, not a write,
+and nothing where the account already holds that number), the `memberships` row by the A-117 path
+with `source = 'MANUAL'` and
 `evidence = 'claim <id>'`, the three trail entries (`account.student-id.recorded`,
 `membership.granted`, `membership.claim.recorded`), and last the claim itself. The loser of a race
-writes nothing and reads 409; the membership row is the proof of who won.
+writes nothing and reads 409; the membership row is the proof of who won. The `users_student_id`
+index is the one uniqueness check for the number: a number another account holds fails the whole
+batch and reads 409 "Another account already holds that student number" (0047), so two claims for
+one number recorded at once leave one membership. `POST /api/admin/memberships` ("Record one",
+A-117) writes its membership, its trail entry and any number given with it through
+`grantMembershipStatements()`, the same `recordStudentId()` in the same single batch.
 `POST /api/admin/memberships/claims/[id]/decline` needs a `reason` (3 to 300 characters), writes it
 on the claim and `membership.claim.declined` on the trail. Neither entry's detail ever carries the
 student number or the reason (0011). Both decisions notify the member (`membership.claim.recorded`,
