@@ -4,12 +4,12 @@ import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, navLabels, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// E-126's routes: the permission gate, paging in SQL, and the CSV export with its audit trail.
-// The date-range grouping and per-performance figures are pinned in the integration suite.
+// E-126's routes and its screen: the permission gate, paging in SQL, the CSV export with its audit
+// trail, and /reports (#1042). The grouping and per-performance figures are pinned in integration.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -19,12 +19,13 @@ let admin: TestMember
 let foh: TestMember
 let bar: TestMember
 let performanceId: string
+const fohPassword = generatePassword()
 
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
   admin = await adminSession(app)
-  foh = await registerMember(app, 'reports-foh', generatePassword())
+  foh = await registerMember(app, 'reports-foh', fohPassword)
   bar = await registerMember(app, 'reports-bar', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: bar.id, role: 'BAR_MANAGER' }, admin.cookie)
@@ -134,4 +135,50 @@ describe.skipIf(skip !== null)('the CSV exports (criterion 2)', () => {
     expect(row?.actor_id).toBe(foh.id)
     expect(JSON.parse(row!.detail)).toMatchObject({ report: 'performances', fromDay: '2020-01-01', toDay: '2030-01-01' })
   })
+})
+
+describe.skipIf(skip !== null)('the periods the screen offers (criterion 5)', () => {
+  test('a reports reader lists the terms and seasons without a finance permission', async () => {
+    const answered = await send('GET', '/api/admin/reports/periods')
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { terms: unknown[], seasons: unknown[] }
+    expect(Array.isArray(body.terms)).toBe(true)
+    expect(Array.isArray(body.seasons)).toBe(true)
+  })
+
+  test('the bar manager cannot', async () => {
+    expect((await send('GET', '/api/admin/reports/periods', undefined, bar.cookie)).status).toBe(403)
+  })
+})
+
+describe.skipIf(skip !== null)('/reports, the screen (criterion 5, #1042)', () => {
+  async function signedInAsFoh(): Promise<Bun.WebView> {
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', foh.email)
+    await fill(view, 'form input[type="password"]', fohPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    return view
+  }
+
+  test('the incidents tab shows this year\'s fixture incident and links its export', async () => {
+    const view = await signedInAsFoh()
+    await visit(view, `${app.baseURL}/reports`, '[data-test="period-kind"]')
+    expect(await navLabels(view)).toContain('Reports')
+    await waitFor(view, `document.querySelector('[data-test="incidents-table"]')?.textContent.includes('Safety')`)
+    const href = await view.evaluate<string>(`document.querySelector('[data-test="export-incidents"]').getAttribute('href')`)
+    expect(href).toStartWith('/api/admin/reports/incidents/export?kind=YEAR')
+    view.close()
+  }, 120_000)
+
+  test('the performances tab shows the fixture performance', async () => {
+    const view = await signedInAsFoh()
+    await visit(view, `${app.baseURL}/reports?tab=performances`, '[data-test="period-kind"]')
+    await waitFor(view, `document.querySelector('[data-test="performances-table"]')`)
+    expect(await textOf(view, '[data-test="performances-table"]')).toContain('The Test House reports-house')
+    const href = await view.evaluate<string>(`document.querySelector('[data-test="export-performances"]').getAttribute('href')`)
+    expect(href).toStartWith('/api/admin/reports/performances/export?kind=YEAR')
+    view.close()
+  }, 120_000)
 })

@@ -78,6 +78,8 @@ export default defineEventHandler(async (event) => {
       verified: account.verified,
       disabled: account.disabled,
       anonymisedAt: account.anonymisedAt,
+      // The Workspace address the first Google sign-in claims (A-121 criterion 7).
+      pendingGoogleEmail: (account as { pendingGoogleEmail?: string | null }).pendingGoogleEmail ?? null,
       // The directory's isShadow, answered from what was already read (0071).
       shadow: !methods.password && !methods.google && methods.passkeys === 0,
     },

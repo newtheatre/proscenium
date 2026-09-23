@@ -53,8 +53,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   {
     route: 'server/api/admin/accounts/index.post.ts',
-    actions: ['account.created.console', 'role.granted'],
-    via: ['server/utils/accounts.ts'],
+    actions: ['account.created.console', 'account.google.prelinked', 'role.granted'],
   },
   { route: 'server/api/admin/memberships/[id]/confirm.post.ts', actions: ['membership.confirmed'] },
   { route: 'server/api/admin/memberships/export.get.ts', actions: ['membership.exported'] },
