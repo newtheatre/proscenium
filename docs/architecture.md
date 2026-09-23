@@ -1159,7 +1159,12 @@ first), unpaid, cancelled, an unknown reference and the door role itself.
 `tests/e2e/night-two-performances.test.ts` is criterion 6's own fixture: one venue, a matinee
 and an evening, the same person holding a shift on both (criterion 1's own clause), two age checks,
 one till session, a sale named to the matinee, and two independently-read reports proving neither
-crosses into the other.
+crosses into the other. The same file carries F-126 criterion 3: an officer's till covering both
+houses sells once with the real clock inside the matinee's bar window and once inside the evening's,
+and each `BAR_ITEM` line names its own performance while the session reconciles to both sales. With
+no clock to set, the case moves the two houses around the real now instead, the other house an
+hour off on whichever side of now the show night has room (0014), and waits out 04:00 if begun in
+the night's last two minutes.
 
 ### The Challenge 25 register (E-118)
 
