@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { createError } from 'h3'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (0055).
 import { committeeYearEnd, fromLondonWallClock, startOfLondonDay } from '#shared/utils/london'
@@ -8,7 +9,7 @@ import { londonDayOf } from '#shared/utils/ledger'
 import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
 import { aliasColumns, whereFrom } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { PeriodInput, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
+import type { FinanceSeason, PeriodInput, RangedPeriod, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { ListClause } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 
@@ -33,7 +34,7 @@ export interface Bounds { fromAt: number, toAt: number, fromDay: string, toDay: 
 
 // Both bounds are exclusive at the end in seconds, but `fromDay`/`toDay` are the inclusive
 // calendar range I-103's own `foregoneQuery` PERIOD scope already expects (criterion 4).
-export function periodBounds(period: PeriodInput): Bounds {
+export function periodBounds(period: RangedPeriod): Bounds {
   if (period.kind === 'DAY') {
     const toDayExclusive = addDays(period.day, 1)
     return { fromAt: seconds(startOfLondonDay(period.day)), toAt: seconds(startOfLondonDay(toDayExclusive)), fromDay: period.day, toDay: period.day }
@@ -57,6 +58,32 @@ export function periodBounds(period: PeriodInput): Bounds {
   const from = fromLondonWallClock(period.year - 1, 8, 1)
   const to = new Date(committeeYearEnd(period.year).getTime() + 1)
   return { fromAt: seconds(from), toAt: seconds(to), fromDay: londonDayOf(from), toDay: `${period.year}-07-31` }
+}
+
+// A season's days are its own row's, both inclusive (0087): read here, never sent by the caller.
+export function seasonRangeQuery(seasonId: string): SQL {
+  return sql`SELECT starts_on AS fromDay, ends_on AS toDay FROM seasons WHERE id = ${seasonId}`
+}
+
+// Retired seasons stay: a treasurer looks back at money a retired season took.
+export function financeSeasonsQuery(): SQL {
+  return sql`
+    SELECT id, name, starts_on AS fromDay, ends_on AS toDay
+    FROM seasons
+    ORDER BY starts_on DESC, name COLLATE NOCASE
+  `
+}
+
+export async function financeSeasons(): Promise<FinanceSeason[]> {
+  return db.all<FinanceSeason>(financeSeasonsQuery())
+}
+
+// The one resolver every period route calls: a season reads its row, and an unknown one is a 404.
+export async function resolvePeriodBounds(period: PeriodInput): Promise<Bounds> {
+  if (period.kind !== 'SEASON') return periodBounds(period)
+  const [range] = await db.all<{ fromDay: string, toDay: string }>(seasonRangeQuery(period.seasonId))
+  if (!range) throw createError({ statusCode: 404, statusMessage: 'That season does not exist' })
+  return periodBounds({ kind: 'TERM', fromDay: range.fromDay, toDay: range.toDay })
 }
 
 // Only a CARD-tendered line is money the theatre holds (I-106's own rule, kept here too): TAB is
@@ -94,7 +121,7 @@ export function openVarianceQuery(fromDay: string, toDay: string): SQL {
 }
 
 export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary> {
-  const bounds = periodBounds(period)
+  const bounds = await resolvePeriodBounds(period)
   const [bySource, [refunds], [openVariance], theForegone] = await Promise.all([
     db.all<RevenueBySource>(revenueBySourceQuery(bounds.fromAt, bounds.toAt)),
     db.all<{ refundsPence: number }>(seasonRefundsQuery(bounds.fromAt, bounds.toAt)),

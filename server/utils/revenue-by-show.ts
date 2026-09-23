@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (0055).
-import { periodBounds } from './season-dashboard'
+import { resolvePeriodBounds } from './season-dashboard'
 import type { PeriodInput } from '#shared/utils/season-dashboard'
 import type { PassUtilisationRow, RevenueByShowReport, ShowRevenueRow, UnattributedRevenue } from '#shared/utils/revenue-by-show'
 import type { SQL } from 'drizzle-orm'
@@ -70,7 +70,7 @@ export function passUtilisationQuery(fromAt: number, toAt: number): SQL {
 }
 
 export async function revenueByShowReport(period: PeriodInput): Promise<RevenueByShowReport> {
-  const bounds = periodBounds(period)
+  const bounds = await resolvePeriodBounds(period)
   const [rows, [unattributed], passes] = await Promise.all([
     db.all<Omit<ShowRevenueRow, 'netPence'>>(revenueByShowQuery(bounds.fromAt, bounds.toAt)),
     db.all<UnattributedRevenue>(unattributedRevenueQuery(bounds.fromAt, bounds.toAt)),

@@ -251,20 +251,21 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
     })])
   }
 
+  // A season is Autumn, Spring, StuFF or the Fringe, never the whole year (0087).
   const seasons = new Map<string, string>()
-  seasons.set('current', ensure(target, 'seasons', { column: 'name', value: '2026/27' }, {
-    id: seedId('season', '2026-27'),
-    name: '2026/27',
-    starts_on: '2026-08-01',
-    ends_on: '2027-07-31',
+  seasons.set('current', ensure(target, 'seasons', { column: 'name', value: 'Autumn 2026' }, {
+    id: seedId('season', 'autumn-2026'),
+    name: 'Autumn 2026',
+    starts_on: '2026-09-01',
+    ends_on: '2026-12-19',
     sort: 0,
     archived: 0,
   }).id)
-  seasons.set('previous', ensure(target, 'seasons', { column: 'name', value: '2025/26' }, {
-    id: seedId('season', '2025-26'),
-    name: '2025/26',
-    starts_on: '2025-08-01',
-    ends_on: '2026-07-31',
+  seasons.set('previous', ensure(target, 'seasons', { column: 'name', value: 'Spring 2026' }, {
+    id: seedId('season', 'spring-2026'),
+    name: 'Spring 2026',
+    starts_on: '2026-01-05',
+    ends_on: '2026-04-30',
     sort: 1,
     archived: 1,
   }).id)

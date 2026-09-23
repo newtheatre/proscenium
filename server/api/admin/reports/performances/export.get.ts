@@ -9,7 +9,7 @@ const query = periodForm.and(performanceReportFilter)
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'reports.read')
   const { venueId, ...period } = await getValidatedQueryOrThrow(event, query)
-  const { fromAt, toAt, fromDay, toDay } = periodBounds(period)
+  const { fromAt, toAt, fromDay, toDay } = await resolvePeriodBounds(period)
 
   const rows = await performanceReportsExport(fromAt, toAt, { venueId })
 

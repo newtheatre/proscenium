@@ -10,7 +10,7 @@ const query = periodForm.and(incidentTrendFilter)
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'reports.read')
   const { category, severity, venueId, ...period } = await getValidatedQueryOrThrow(event, query)
-  const { fromAt, toAt, fromDay, toDay } = periodBounds(period)
+  const { fromAt, toAt, fromDay, toDay } = await resolvePeriodBounds(period)
 
   const rows = await incidentTrendsExport(fromAt, toAt, { category, severity, venueId })
 
