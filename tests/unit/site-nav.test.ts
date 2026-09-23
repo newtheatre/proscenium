@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
-import { ABILITY_PERMISSIONS } from '#shared/utils/abilities'
+import { ABILITY_PERMISSIONS, viewReports } from '#shared/utils/abilities'
 import { contentPathOf } from '#shared/utils/docs-paths'
 import { PERMISSIONS } from '#shared/utils/roles'
 import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor, navCount } from '#shared/utils/site-nav'
@@ -80,8 +80,17 @@ describe('every console screen is in the navigation (0040)', () => {
 describe('a group is a job, and the order never varies (0040)', () => {
   test('the canonical order is what ships', () => {
     expect(CONSOLE_NAV.map(group => group.key)).toEqual([
-      'rota', 'box-office', 'bar', 'spaces', 'training', 'people', 'money', 'comms', 'system',
+      'rota', 'box-office', 'bar', 'spaces', 'training', 'people', 'money', 'reports', 'comms', 'system',
     ])
+  })
+
+  // Its holders span front of house, safety and the committee, so it is nobody's group but its
+  // own (E-126 criterion 5, #1042).
+  test('the cross-season reports are a group of their own, behind viewReports', () => {
+    const reports = CONSOLE_NAV.find(group => group.key === 'reports')
+    expect(reports).toMatchObject({ label: 'Reports', prefix: '/reports' })
+    expect(reports?.items.map(item => item.to)).toEqual(['/reports'])
+    expect(reports?.items[0]?.ability).toBe(viewReports)
   })
 
   // The group is desk work planned days ahead; Tonight is the phone shell a person works a show
