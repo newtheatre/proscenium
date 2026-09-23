@@ -5,6 +5,7 @@ import { recordMembership } from '#shared/utils/admin-forms'
 import { saysDay } from '#shared/utils/when'
 import { MEMBERSHIP_TERMS, isInGrace, londonDay } from '#shared/utils/membership'
 import { claimDeclineForm } from '#shared/utils/membership-claims'
+import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { membershipsList } from '#shared/utils/memberships-list'
 import type { RecordMembership } from '#shared/utils/admin-forms'
 import type { ClaimDeclineInput } from '#shared/utils/membership-claims'
@@ -47,6 +48,8 @@ interface Claim {
   startsOn: string
   term: number
   status: string
+  reason: string | null
+  decidedAt: number | null
   createdAt: number
   heldUntil: string | null
 }
@@ -65,7 +68,12 @@ const AWAITING_RECORD = 'awaiting-record'
 
 // Search, the register filter, sort and page live in the URL (K-129). A bare `?filter=` link
 // keeps working, so the runbook's bookmark to the queue is unaffected.
-const { search, conditions, sort, page, query, active, set, setSort, clear } = useListQuery(membershipsList)
+const { search, conditions, sort, page, query, active, set, setSort } = useListQuery(membershipsList, { ignore: ['status'] })
+// The queue reads the same URL through its own declaration, so its status and sort reach its
+// endpoint and the register's never do (A-130 criterion 9).
+const queue = useListQuery(membershipClaimsList, { ignore: ['filter'] })
+const route = useRoute()
+const router = useRouter()
 
 const listing = ref<Listing | null>(null)
 const claims = ref<ClaimListing | null>(null)
@@ -87,6 +95,20 @@ const deciding = ref<string | null>(null)
 // No condition means the default view, current, the same hidden default the endpoint applies.
 const filter = computed(() => conditions.value.find(one => one.key === 'filter')?.values[0] ?? 'current')
 const onQueue = computed(() => filter.value === AWAITING_RECORD)
+const claimStatus = computed(() => queue.conditions.value.find(one => one.key === 'status')?.values[0] ?? 'OPEN')
+// Only a waiting claim can be decided; the other statuses are the record of what was.
+const waitingView = computed(() => claimStatus.value === 'OPEN')
+
+// One set of chips for the screen: the register's view and search, then the queue's own.
+const chips = computed(() => (onQueue.value ? [...active.value, ...queue.active.value.filter(chip => chip.key !== 'search')] : active.value))
+
+// Both declarations share the URL, so clearing is one write rather than two racing ones; the
+// sort stays, as a single list's clear keeps it.
+function clear(): void {
+  search.value = ''
+  const kept = Object.fromEntries(Object.entries(route.query).filter(([key]) => key === 'sort' || key === 'direction'))
+  void router.push({ query: kept })
+}
 
 // The live count rides on the option's label, the runtime-known slot ConsoleFilters offers (0032).
 const filterOptions = computed<FilterOption[]>(() => membershipsList.fields[0]!.options.map(option =>
@@ -107,10 +129,8 @@ async function load(): Promise<void> {
   failure.value = null
   try {
     if (onQueue.value) {
-      claims.value = await $fetch<ClaimListing>('/api/admin/memberships/claims', {
-        query: { search: search.value || undefined, page: page.value },
-      })
-      if (!search.value) waiting.value = claims.value.total
+      claims.value = await $fetch<ClaimListing>('/api/admin/memberships/claims', { query: queue.query.value })
+      if (!search.value && claimStatus.value === 'OPEN') waiting.value = claims.value.total
       else void countWaiting()
     }
     else {
@@ -220,7 +240,7 @@ const exportUrl = computed(() => {
   return `/api/admin/memberships/export?${params.toString()}`
 })
 
-watch(query, load)
+watch([query, queue.query], load)
 
 const columns: TableColumn<Member>[] = [
   {
@@ -279,7 +299,7 @@ const columns: TableColumn<Member>[] = [
   },
 ]
 
-const claimColumns: TableColumn<Claim>[] = [
+const claimBase: TableColumn<Claim>[] = [
   {
     id: 'name',
     header: 'Member',
@@ -320,38 +340,57 @@ const claimColumns: TableColumn<Claim>[] = [
       const held = row.original.heldUntil
       return h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
         h('span', {}, saysDay(row.original.createdAt)),
-        held && held >= londonDay(new Date())
+        waitingView.value && held && held >= londonDay(new Date())
           ? h(UBadge, { 'color': 'info', 'variant': 'subtle', 'size': 'sm', 'data-test': 'claim-held' }, () => `Holds one until ${saysDay(held)}`)
           : null,
       ])
     },
     meta: { class: { td: 'text-sm text-muted' } },
   },
-  {
-    id: 'decide',
-    header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => (writes.value === false
-      ? null
-      : h('div', { class: 'flex justify-end gap-2' }, [
-          h(UButton, {
-            'size': 'sm',
-            'icon': 'i-lucide-check',
-            'data-test': `claim-record-${row.original.id}`,
-            'loading': deciding.value === row.original.id,
-            'onClick': () => recordClaim(row.original),
-          }, () => 'Record'),
-          h(UButton, {
-            'size': 'sm',
-            'color': 'neutral',
-            'variant': 'outline',
-            'data-test': `claim-decline-${row.original.id}`,
-            'disabled': deciding.value === row.original.id,
-            'onClick': () => askWhy(row.original),
-          }, () => 'Decline'),
-        ])),
-  },
 ]
+
+const OUTCOME_COLOUR: Record<string, 'success' | 'warning' | 'neutral'> = { RECORDED: 'success', DECLINED: 'warning', WITHDRAWN: 'neutral' }
+const OUTCOME_WORD: Record<string, string> = { RECORDED: 'Recorded', DECLINED: 'Declined', WITHDRAWN: 'Withdrawn' }
+
+// A decided claim shows what came of it and, for a decline, what the member was told.
+const outcomeColumn: TableColumn<Claim> = {
+  id: 'outcome',
+  header: 'Decided',
+  cell: ({ row }) => h('div', { 'class': 'space-y-1', 'data-test': `claim-outcome-${row.original.id}` }, [
+    h('div', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
+      h(UBadge, { color: OUTCOME_COLOUR[row.original.status] ?? 'neutral', variant: 'subtle', size: 'sm' }, () => OUTCOME_WORD[row.original.status] ?? row.original.status),
+      row.original.decidedAt ? h('span', { class: 'text-sm text-muted' }, saysDay(row.original.decidedAt)) : null,
+    ]),
+    row.original.reason ? h('p', { class: 'text-sm text-muted max-w-sm whitespace-normal' }, row.original.reason) : null,
+  ]),
+}
+
+const decideColumn: TableColumn<Claim> = {
+  id: 'decide',
+  header: ACTIONS_HEADER,
+  meta: { class: { td: 'text-right whitespace-nowrap' } },
+  cell: ({ row }) => (writes.value === false
+    ? null
+    : h('div', { class: 'flex justify-end gap-2' }, [
+        h(UButton, {
+          'size': 'sm',
+          'icon': 'i-lucide-check',
+          'data-test': `claim-record-${row.original.id}`,
+          'loading': deciding.value === row.original.id,
+          'onClick': () => recordClaim(row.original),
+        }, () => 'Record'),
+        h(UButton, {
+          'size': 'sm',
+          'color': 'neutral',
+          'variant': 'outline',
+          'data-test': `claim-decline-${row.original.id}`,
+          'disabled': deciding.value === row.original.id,
+          'onClick': () => askWhy(row.original),
+        }, () => 'Decline'),
+      ])),
+}
+
+const claimColumns = computed(() => [...claimBase, waitingView.value ? decideColumn : outcomeColumn])
 
 onMounted(() => {
   void load()
@@ -380,8 +419,8 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
 
     <AdminToolbar
       v-model:search="search"
-      :placeholder="membershipsList.search?.placeholder"
-      :active="active"
+      :placeholder="(onQueue ? membershipClaimsList : membershipsList).search?.placeholder"
+      :active="chips"
       :loading="loading"
       @clear="clear"
     >
@@ -393,6 +432,14 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
           :options="{ filter: filterOptions }"
           @set="set"
           @sort="setSort"
+        />
+        <ConsoleFilters
+          v-if="onQueue"
+          :spec="membershipClaimsList"
+          :conditions="queue.conditions.value"
+          :sort="queue.sort.value"
+          @set="queue.set"
+          @sort="queue.setSort"
         />
       </template>
 
@@ -440,7 +487,7 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ search ? 'No claim matches that.' : 'Nothing waiting to be recorded.' }}
+          {{ search || !waitingView ? 'No claim matches that.' : 'Nothing waiting to be recorded.' }}
         </p>
       </template>
     </UTable>

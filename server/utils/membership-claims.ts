@@ -1,5 +1,34 @@
 import { db, schema } from '@nuxthub/db'
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+// Named rather than auto-imported: `tests/` typechecks this file under Bun (CONTRIBUTING, 0055).
+import { conditionsOf } from '#shared/utils/list-filters'
+import { membershipClaimsList } from '#shared/utils/membership-claims-list'
+import { tableColumns, whereFrom } from './list-filters'
+import type { ListQuery } from '#shared/utils/list-filters'
+import type { ListClause, Reference } from './list-filters'
+import type { SQL } from 'drizzle-orm'
+
+// `id` is not a guide to insertion order; `rowid` is, and is not a Drizzle column (0006).
+function claimsColumn(name: string): Reference | undefined {
+  if (name === 'rowid') return sql`${schema.membershipClaims}.rowid`
+  return tableColumns(schema.membershipClaims)(name)
+}
+
+// The queue through its own declaration (A-130 criterion 9): waiting is the hidden default, and
+// an erased person's claim is nobody's to answer, whatever its status.
+export function claimsClause(query: ListQuery): { where: SQL, orderBy: SQL[] } {
+  const clause: ListClause = whereFrom(membershipClaimsList, query, {
+    column: claimsColumn,
+    search: [schema.users.name, schema.users.email, schema.membershipClaims.studentId],
+  })
+  const asked = conditionsOf(membershipClaimsList, query).some(condition => condition.key === 'status')
+  const where = and(
+    isNull(schema.users.anonymisedAt),
+    asked ? undefined : eq(schema.membershipClaims.status, 'OPEN'),
+    clause.where,
+  )!
+  return { where, orderBy: clause.orderBy }
+}
 
 export interface OwnClaim {
   id: string

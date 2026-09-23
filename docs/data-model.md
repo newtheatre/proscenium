@@ -168,9 +168,12 @@ idempotent). The screen is `/account/membership`, a `MY_NAV` entry.
 **Recording is the officer's act** (`members.write`). `GET /api/admin/memberships/claims` is the
 queue behind the register's "Awaiting record" filter at `/people/members`: oldest first (a
 same-second tie breaks on `rowid`), paged in SQL, searchable by name, address or claimed number,
-and never showing an erased person's claim. Filtered by its declaration
-(`shared/utils/membership-claims-list.ts`, K-129): nothing yet beyond `search`, `sort` and page;
-`status` stays fixed at `OPEN`, the endpoint's own job rather than a toolbar control.
+and never showing an erased person's claim. Filtered by its own declaration
+(`shared/utils/membership-claims-list.ts`, K-129, A-130 criterion 9), never the register's:
+`status` (`OPEN`, the hidden default when nothing is asked, or `RECORDED`, `DECLINED` or
+`WITHDRAWN`, so a decided claim can be found with its `decided_at` and `reason`), `search`, and a
+sort by waiting since, decided or recorded order. `claimsClause()` in
+`server/utils/membership-claims.ts` is the predicate the endpoint and its test share.
 `POST /api/admin/memberships/claims/[id]/record` runs `recordClaimStatements()`
 (`shared/utils/membership-claims.ts`) as one batch, every write guarded on the claim still being
 `OPEN`: the number to `users.student_id` (refused with 409 if another account holds it, exactly as
