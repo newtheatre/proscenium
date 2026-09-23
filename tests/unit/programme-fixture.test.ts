@@ -28,9 +28,9 @@ describe('tonight\'s performance on a fixed clock', () => {
     expect(evening.startsAt * 1000).toBe(fromLondonWallClock(2026, 9, 22, 23, 0).getTime())
   })
 
-  // Every five minutes across an ordinary night and the 25-hour one the clocks go back in.
+  // Every five minutes across an ordinary night and the 23- and 25-hour ones the clocks change in.
   test('whenever in the night the clock reads, the curtain is after it and inside the night', () => {
-    for (const night of ['2026-09-22', '2026-10-24']) {
+    for (const night of ['2026-09-22', '2026-03-28', '2026-10-24']) {
       const { from, to } = showNightBounds(night)
       for (let at = from.getTime(); at < to.getTime(); at += 5 * 60_000) {
         const seeded = seededAt(new Date(at))
@@ -39,6 +39,18 @@ describe('tonight\'s performance on a fixed clock', () => {
         expect(seeded.startsAt * 1000).toBeLessThan(to.getTime())
       }
     }
+  })
+
+  test('in the seconds before 03:30 the curtain is still a quarter of an hour away, not moments', () => {
+    const now = fromLondonWallClock(2026, 9, 23, 3, 29, 59)
+    const { startsAt } = seededAt(now)
+    expect(startsAt * 1000 - now.getTime()).toBeGreaterThanOrEqual(15 * 60_000)
+  })
+
+  test('in the last second of the night the curtain never spills into the next one', () => {
+    const now = new Date(showNightBounds('2026-09-22').to.getTime() - 400)
+    const { night, startsAt } = seededAt(now)
+    expect(startsAt * 1000).toBeLessThan(showNightBounds(night).to.getTime())
   })
 
   test('a night named outright keeps its 03:30 cap, whatever the clock', () => {
