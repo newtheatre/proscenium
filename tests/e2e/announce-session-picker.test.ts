@@ -56,6 +56,12 @@ beforeAll(async () => {
     'ts-picker-1', '2026-03-14', '18:00', '20:00', 10, trainer.id,
   )
   write('INSERT INTO session_modules (id, session_id, module_id) VALUES (?, ?, ?)', 'sm-picker-1', 'ts-picker-1', 'TECH-1')
+
+  const nextWeek = Math.floor(Date.now() / 1000) + 7 * 86_400
+  write('INSERT INTO venues (id, name, capacity) VALUES (?, ?, ?)', 'venue-announce', 'The Announce Studio', 60)
+  write('INSERT INTO shows (id, slug, title, status) VALUES (?, ?, ?, ?)', 'show-announce', 'evacuation-drill', 'Evacuation Drill', 'PUBLISHED')
+  write('INSERT INTO performances (id, show_id, venue_id, starts_at, status) VALUES (?, ?, ?, ?, ?)',
+    'performance-announce', 'show-announce', 'venue-announce', nextWeek, 'ON_SALE')
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -91,6 +97,27 @@ describe.skipIf(skip !== null)('the session picker on /comms/announce', () => {
     const resolved = await textOf(view, '[data-test="session-picker-resolved"]')
     expect(resolved).toContain('Fire safety orientation')
     expect(resolved).toContain('14 Mar 2026')
+    view.close()
+  }, 120_000)
+})
+
+// H-108 criterion 8: a show chosen for one audience does not linger, unseen, behind another.
+describe.skipIf(skip !== null)('the show picker on /comms/announce', () => {
+  test('a chosen show is dropped when the audience changes, so nothing is counted against it', async () => {
+    const view = await signedInView()
+    await visit(view, `${app.baseURL}/comms/announce`, '[data-test="audience-kind"]')
+    await pickOption(view, '[data-test="audience-kind"]', 'Ticket holders for a show')
+    await waitFor(view, `document.querySelector('[data-test="show-picker"]')`)
+    await pickPerson(view, '[data-test="show-picker"]', 'evacuation', 'Evacuation Drill')
+    await waitFor(view, `!!document.querySelector('[data-test="show-picker-resolved"]')`)
+    await waitFor(view, `/will get this|Nobody is in this audience/.test(document.querySelector('[data-test="audience-count"]').innerText)`)
+
+    await pickOption(view, '[data-test="audience-kind"]', 'Tonight\'s rota')
+    await pickOption(view, '[data-test="audience-kind"]', 'Ticket holders for a show')
+    await waitFor(view, `document.querySelector('[data-test="show-picker"]')`)
+
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="show-picker-resolved"]')`)).toBe(false)
+    await waitFor(view, `/Choose who it is for/.test(document.querySelector('[data-test="audience-count"]').innerText)`)
     view.close()
   }, 120_000)
 })

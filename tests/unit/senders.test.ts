@@ -78,6 +78,8 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'training.expiry.digest': 'TRAINING',
   'admin.announcement': 'ANNOUNCEMENTS',
   'admin.safety-notice': 'ANNOUNCEMENTS',
+  'admin.ticket-holders': 'BOX_OFFICE',
+  'admin.ticket-holders.safety-notice': 'BOX_OFFICE',
   'digest.bookings': 'BOX_OFFICE',
   'digest.shifts': 'ANNOUNCEMENTS',
   'digest.training': 'TRAINING',
