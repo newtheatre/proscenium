@@ -8,9 +8,9 @@ import type { SQL } from 'drizzle-orm'
 
 type Lookup = (key: SQL) => SQL
 
-// A till is written `till:<venue>:<night>`, one session per venue and night.
+// A till is written `till:<venue>:<night>`; without a night the venue part is empty and matches none.
 const tillVenue = (key: SQL): SQL => sql`substr(${key}, 1, instr(${key}, ':') - 1)`
-const tillNight = (key: SQL): SQL => sql`CASE WHEN instr(${key}, ':') > 0 THEN substr(${key}, instr(${key}, ':') + 1) END`
+const tillNight = (key: SQL): SQL => sql`substr(${key}, instr(${key}, ':') + 1)`
 
 // Aliased: the listing joins `users` for the actor, and this one is a different person.
 const subject = alias(schema.users, 'subject')
