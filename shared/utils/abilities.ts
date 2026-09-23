@@ -34,6 +34,7 @@ export const reachConsole = defineAbility((viewer: Viewer) =>
 
 export const viewAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.read'))
 export const disableAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.disable'))
+export const createAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.create'))
 export const grantRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.grant'))
 export const revokeRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.revoke'))
 export const viewMembers = defineAbility((viewer: Viewer) => holds(viewer, 'members.read'))
@@ -110,6 +111,10 @@ export const manageNominalMappings = defineAbility((viewer: Viewer) => holds(vie
 export const reopenFinancePeriods = defineAbility((viewer: Viewer) => holds(viewer, 'finance.reopen'))
 export const exportFinance = defineAbility((viewer: Viewer) => holds(viewer, 'finance.export'))
 
+// The cross-season report queries, read by front of house, safety and the committee alike, so
+// they sit in no one module's group (E-126 criterion 5).
+export const viewReports = defineAbility((viewer: Viewer) => holds(viewer, 'reports.read'))
+
 // Planning the rota is sit-down work done days ahead, so it is a standing permission and the
 // officer bypass is not what opens it (0009, 0046, E-101 criterion 2).
 export const viewRota = defineAbility((viewer: Viewer) => holds(viewer, 'rota.read'))
@@ -162,6 +167,7 @@ export function can(viewer: Viewer | null, ability: BouncerAbility<Viewer>): boo
 export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewAccounts: 'accounts.read',
   disableAccounts: 'accounts.disable',
+  createAccounts: 'accounts.create',
   grantRoles: 'roles.grant',
   revokeRoles: 'roles.revoke',
   viewMembers: 'members.read',
@@ -194,6 +200,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   manageNominalMappings: 'finance.write',
   reopenFinancePeriods: 'finance.reopen',
   exportFinance: 'finance.export',
+  viewReports: 'reports.read',
   verifyAccessProfiles: 'access.verify',
   viewRota: 'rota.read',
   manageRota: 'rota.write',

@@ -341,7 +341,7 @@ listing and `accounts.create` for adding somebody:
 | Route | What it does |
 | --- | --- |
 | `GET /api/admin/accounts` | The paged envelope, allow-listed columns only, anonymised rows hidden unless `includeAnonymised=true` (the picker's flag) or the `anonymised` field asks for them, with the two triage banner counts. Filtered by its declaration (`shared/utils/accounts-list.ts`): `role`, `holdsRole`, `membership`, `verified`, `disabled`, `anonymised`, `authenticator`, `privilegedWithoutFactor`, `approachingRetention`, `neverSignedIn` and `lastLoginAt`, with `search` over name, address and student number and `sort` by name, last seen or joined. A key it does not declare is a 400. |
-| `POST /api/admin/accounts` | Creates an account with no password and sends a set-password link; a Workspace address gets none (0008). Roles may be granted in the same action. |
+| `POST /api/admin/accounts` | Creates an account with no password and sends a set-password link; a Workspace address gets none (0008). Roles may be granted in the same action. An optional `googleEmail` is pre-linked in the same batch as the account, refused as the PATCH below refuses it. An address some account's `pending_google_email` already holds is a 409 naming that account, checked up front and repeated as the predicate on the insert (A-121 criterion 7, 0088). |
 | `PATCH /api/admin/accounts/[id]/google-link` | Sets `pending_google_email` from `googleEmail`, lowercased as sign-in lowercases it, or clears it on `null`; `accounts.create`. A non-Workspace address is a 400; an address that is another account's `email` or `pending_google_email` is a 409 naming that account and pointing to merge, as is an account already linked to Google or erased. The predicate rides the UPDATE and the audit entry (`account.google.prelinked` or `account.google.unlinked`, no address) rides `changes()` (A-104 criterion 6, 0003, 0011). |
 
 **"In use" is a count over rows, never a column.** `VENUE_REFERENCES` in `server/utils/venues.ts`
@@ -1154,8 +1154,10 @@ migration enumerates the posting table in `architecture.md`, and a change is an 
 (`finance.nominal-mapping.changed`, `server/utils/su-export.ts`'s `setNominalMapping`).
 `GET /api/admin/finance/nominal-mappings` lists it, `POST` changes one pair.
 
-**`GET /api/admin/finance/export?fromDay=...&toDay=...`** is one CSV row per ledger line in the
-range, `le.london_day BETWEEN fromDay AND toDay`, joined against this table: a line whose pair
+**`GET /api/admin/finance/export?kind=TERM&fromDay=...&toDay=...`** (or `kind=YEAR&year=...`, or
+`kind=SEASON&seasonId=...`, resolved to days exactly as the money dashboard resolves them, 0087;
+an older link with no kind or `kind=RANGE` still reads as the custom range)
+is one CSV row per ledger line in the range, `le.london_day BETWEEN fromDay AND toDay`, joined against this table: a line whose pair
 has no mapping still exports, with an explicit `UNMAPPED` nominal code rather than a dropped or
 blank row (criterion 3). Every figure is the line's own signed `amount_pence`, read straight off
 the row: nothing here computes a total that could disagree with I-106's gross, refunded and net
@@ -1164,6 +1166,9 @@ figures for the same range, because nothing here computes a total at all. Rows a
 truncated silently. The export is audited (`finance.exported`) with who, when and the range.
 An open range exports anyway, permitted rather than refused: the `x-period-status` response
 header says `closed` or `open`, read from `period_locks` the same way a single day is (I-107).
+`GET /api/admin/finance/export/coverage` takes the same query and answers `{ fromDay, toDay, rows,
+closed }` from a count over the same predicate, so the screen shows the period's state and the
+cap before anything is downloaded.
 
 ## Show night (module E)
 
@@ -1817,6 +1822,18 @@ offered against a room that has one, because it cannot be shown to be big enough
 equivalent is free the bump still goes ahead and the message says so. The whole thing is one batch:
 the displaced row flips guarded on `CONFIRMED`, and both the claimant's booking and the offer are
 written only if that flip landed, so a lost race leaves nothing behind.
+`GET /api/admin/rooms/bookings` (`rooms.read`) is the officer's list of every member's bookings,
+the list a bump or a no-show starts from (C-115 criterion 6). It filters by its declaration
+(`shared/utils/room-bookings-list.ts`, K-129): `status`, `room`, `member`, `tier`, `startsAt`,
+`past` and `noShow`, with `search` over the title, the member's name and the room, sorted by when
+the booking starts with `rowid` as the tiebreak, paged in SQL. A booking that has ended is hidden
+unless `past` or `noShow` asks, the default closures use. Each row carries `noShowId`, the record
+currently standing against it by the ladder's own latest-entry rule, or null. The columns are an
+allow-list: the member's name and nothing else about them, never `notes`, `reason` or
+`rejection_reason`. The console's row offers the one write its booking allows
+(`rowActionFor`): a bump before a confirmed booking ends, a no-show mark after, and a withdrawal
+of the standing record by its `noShowId`; the routes still decide, and each confirms first
+(C-115 criterion 7, C-116 criterion 7).
 Erasure scrubs `notes`, `reason` and `rejection_reason` to null and `title` to `Erased booking`,
 and keeps the row: the room was used, which is a fact about the room rather than about the person
 (0011). `title` is NOT NULL, and nulling it would fail the whole erasure batch, so the register

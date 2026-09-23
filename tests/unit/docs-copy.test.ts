@@ -9,11 +9,11 @@ import { PERMISSIONS } from '#shared/utils/roles'
 
 // The send log shows a message's type against every line, so the page that decodes one names
 // them, as Settings names a key. It is the only page that may, and it names nothing else.
-const CATALOGUE_PAGE = `${DOCS_ROOT}/11.communications/3.what-the-theatre-sends.md`
+const CATALOGUE_PAGE = `${DOCS_ROOT}/12.communications/3.what-the-theatre-sends.md`
 
 // Settings is the one screen that shows a key, in the font it stores it in, so the page for it
 // names the row the reader is looking at (copy-style section 10, 0012).
-const SETTINGS_PAGE = `${DOCS_ROOT}/12.system/1.settings.md`
+const SETTINGS_PAGE = `${DOCS_ROOT}/13.system/1.settings.md`
 
 async function pages(): Promise<{ file: string, source: string }[]> {
   const found: { file: string, source: string }[] = []

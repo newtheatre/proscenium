@@ -23,6 +23,7 @@ import {
   viewMembers,
   viewPassTypes,
   viewProgramme,
+  viewReports,
   viewRooms,
   viewRota,
   viewSafety,
@@ -163,6 +164,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     prefix: '/rooms/manage',
     items: [
       { label: 'Room requests', icon: 'i-lucide-inbox', to: '/rooms/manage/requests', ability: decideRoomRequests, section: 'Every day' },
+      { label: 'Bookings', icon: 'i-lucide-calendar-search', to: '/rooms/manage/bookings', ability: viewRooms, section: 'Every day' },
       { label: 'Closures', icon: 'i-lucide-construction', to: '/rooms/manage/closures', ability: viewRooms, section: 'Every day' },
       { label: 'Utilisation', icon: 'i-lucide-chart-column', to: '/rooms/manage/utilisation', ability: viewRooms, section: 'Every day' },
       { label: 'Rooms', icon: 'i-lucide-house', to: '/rooms/manage', ability: viewRooms, exact: true, section: 'Set-up' },
@@ -214,6 +216,18 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Ledger entries', icon: 'i-lucide-book-open-text', to: '/money/entries', ability: viewFinanceReports },
       { label: 'Periods', icon: 'i-lucide-lock', to: '/money/periods', ability: viewFinanceReports },
       { label: 'Exports', icon: 'i-lucide-file-down', to: '/money/exports', ability: viewFinanceReports },
+    ],
+  },
+
+  // Module E's cross-season reports: read by front of house, safety and the committee, so a
+  // group of their own rather than a corner of any one of theirs (E-126 criterion 5).
+  {
+    key: 'reports',
+    label: 'Reports',
+    icon: 'i-lucide-chart-line',
+    prefix: '/reports',
+    items: [
+      { label: 'Reports', icon: 'i-lucide-chart-no-axes-combined', to: '/reports', ability: viewReports },
     ],
   },
 

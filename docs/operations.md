@@ -848,6 +848,34 @@ one passes `--additional`; there is no such escape hatch against a real database
 Anyone holding a privileged role must set up an authenticator app before the role works
 (`/account/security`), so step 3 is not finished until they have.
 
+## Linking an incoming officer's Workspace address (A-104, A-121)
+
+At handover an incoming officer usually already has an account under a personal address. Their
+first Google sign-in with their new `@newtheatre.org.uk` address finds that account only if an
+administrator has pre-linked the address to it first; otherwise sign-in makes a second, empty
+account and the two have to be merged by hand (0008).
+
+**What refuses, and what to do:**
+
+- **"Only a newtheatre.org.uk address can be linked for Google sign-in"**: a personal address
+  needs no link. It signs in with a password or a magic link.
+- **"That address already belongs to X's account."** or **"That address is already waiting to be
+  linked to X's account."**: one address leads to one account. If X is the same person, merge the
+  two accounts (the merge card on the account page), then set the link on the one that won.
+- **"That account already signs in with Google"**: there is nothing to link. If it is the wrong
+  Google identity, that is a merge too; a link is never moved silently (A-123).
+- **"That account has been erased"**: nothing is written to a closed account.
+- **"That address is waiting to be linked to X's account for Google sign-in."** from Add someone:
+  the address is already spoken for. Open X's account instead of making a new one.
+
+**Doing it:** open the officer's account under **People, Accounts**, and under **Signs in with**
+type the Workspace address and press **Set the address** (it needs `accounts.create`). For
+somebody with no account yet, **Add someone** takes the Workspace address as an optional field
+beside their own. The first Google sign-in with it joins that account, keeps the account's own
+address, marks it verified and clears the link; the trail records it as **Google sign-in linked
+by a set Workspace address**. Setting and clearing are trailed with who did it and never the
+address (0011). Clearing asks first, since it puts the second-account problem back.
+
 ## Secrets
 
 | Name | Where | Notes |
@@ -979,7 +1007,7 @@ Answered on 23 September 2026 from the code, for the question in issue 1213:
   it must arrive at once and regardless of preference.
 
 The full catalogue of what is sent, by type, is the operator page **What the theatre sends**
-(`content/docs/11.communications/3.what-the-theatre-sends.md`).
+(`content/docs/12.communications/3.what-the-theatre-sends.md`).
 
 ## Checking whether a message sent (H-106)
 

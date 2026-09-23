@@ -299,6 +299,8 @@ const SHOTS: Shot[] = [
   { name: '10e1-other-rooms-filters', path: '/rooms/manage/other', marker: '[data-test="spaces-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10f-requests-unlisted', path: '/rooms/manage/requests?kind=unlisted', marker: '[data-test="requests-table"]' },
   { name: '10f1-requests-filters', path: '/rooms/manage/requests', marker: '[data-test="requests-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
+  { name: '10f1a-room-bookings', path: '/rooms/manage/bookings', marker: '[data-test="bookings-table"]' },
+  { name: '10f1b-room-bookings-filters', path: '/rooms/manage/bookings', marker: '[data-test="bookings-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10f2-closures', path: '/rooms/manage/closures', marker: '[data-test="blackouts-table"]' },
   { name: '10f3-closures-filters', path: '/rooms/manage/closures', marker: '[data-test="blackouts-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '10f4-utilisation', path: '/rooms/manage/utilisation', marker: '[data-test="utilisation-table"]' },

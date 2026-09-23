@@ -146,7 +146,7 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
   1. Category mappings are configurable: each ledger entry type and source maps to an SU nominal code, managed in the configuration surface (J-104) and audited on change.
   2. A period export produces CSV with date, category, nominal code and amounts in pence (a pounds column is formatted at export time only); output guards CSV formula injection.
   3. Entries whose type has no mapping appear on an explicit unmapped line; the export never drops or hides a row.
-  4. The yearly SU return is a saved report, re-runnable identically for any season.
+  4. The yearly SU return is a saved report, re-runnable identically for any year (1 August to 31 July) or season (a `seasons` row, decision 0087), and the screen shows whether the chosen period is closed, so a treasurer knows before taking it whether two runs will match.
   5. Every export is audited: who, when, which period.
 - Source: Prompt Book I-3; audit PR-7 (export caps and formula-injection guard)
 
