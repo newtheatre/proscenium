@@ -242,6 +242,13 @@ const exportUrl = computed(() => {
 
 watch([query, queue.query], load)
 
+// A status belongs to the queue alone: leaving the queue drops it, so the queue is always
+// entered on what waits and never on an old view of what was decided.
+watch(onQueue, (on) => {
+  if (on || route.query.status === undefined) return
+  void router.replace({ query: Object.fromEntries(Object.entries(route.query).filter(([key]) => key !== 'status')) })
+})
+
 const columns: TableColumn<Member>[] = [
   {
     id: 'name',
