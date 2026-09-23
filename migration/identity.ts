@@ -2,6 +2,7 @@
 // stage-door id. The old-to-new map is an input as well as an output (0015, migration/README.md).
 import { Database } from 'bun:sqlite'
 import { join } from 'node:path'
+import { isRole } from '../shared/utils/roles'
 import { ROOT, nanoid } from './lib'
 import { decisionKey } from './role-decisions'
 import type { RoleDecisions } from './role-decisions'
@@ -159,6 +160,12 @@ export function transformIdentity(input: TransformInput): TransformResult {
       continue
     }
     if (decision === 'SKIP') {
+      grantsSkipped++
+      continue
+    }
+    // A decisions file can outlive a role (0090); re-reviewing it is the fix, never a guess (0070).
+    if (!isRole(decision.role)) {
+      exceptions.push(`grant ${grant.role} (user ${grant.user_id}): decided as ${decision.role}, which is no longer a role; run review-roles.ts again to decide it`)
       grantsSkipped++
       continue
     }

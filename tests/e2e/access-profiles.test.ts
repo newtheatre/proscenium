@@ -40,7 +40,7 @@ beforeAll(async () => {
   await request(app, 'POST', '/api/admin/roles', { userId: accessOfficer.id, role: 'ACCESSIBILITY_OFFICER' }, admin.cookie)
 
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, admin.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
 
   patron = await registerMember(app, 'patron', patronPassword)
 }, BOOT_TIMEOUT_MS)

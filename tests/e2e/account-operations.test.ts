@@ -208,7 +208,7 @@ describe.skipIf(skip !== null)('security operations on an account (A-122)', () =
 describe.skipIf(skip !== null)('the account view (A-121 criterion 5)', () => {
   test('it carries the methods, the roles and the recent history', async () => {
     const person = await subject('viewed')
-    await send('POST', '/api/admin/roles', { userId: person.id, role: 'BOX_OFFICE' }, cookie)
+    await send('POST', '/api/admin/roles', { userId: person.id, role: 'FOH_MANAGER' }, cookie)
 
     const view = await (await send('GET', `/api/admin/accounts/${person.id}`, null, cookie)).json() as {
       account: { email: string }
@@ -219,7 +219,7 @@ describe.skipIf(skip !== null)('the account view (A-121 criterion 5)', () => {
 
     expect(view.account.email).toBe(person.email)
     expect(view.methods).toMatchObject({ password: true, factor: false })
-    expect(view.grants).toEqual([expect.objectContaining({ role: 'BOX_OFFICE', live: true })])
+    expect(view.grants).toEqual([expect.objectContaining({ role: 'FOH_MANAGER', live: true })])
     expect(view.history.map(entry => entry.action)).toContain('account.registered')
   })
 
@@ -275,21 +275,21 @@ describe.skipIf(skip !== null)('the account screen', () => {
     try {
       await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="grant-role"]')
 
-      await pickOption(view, '[data-test="grant-role"]', saysRole('BOX_OFFICE'))
+      await pickOption(view, '[data-test="grant-role"]', saysRole('FOH_MANAGER'))
       await click(view, '[data-test="grant-submit"]')
-      await waitFor(view, 'document.querySelector(\'[data-test="revoke-BOX_OFFICE"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="revoke-FOH_MANAGER"]\')')
 
       const granted = read<{ expires_at: number | null }>(
-        'SELECT expires_at FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'BOX_OFFICE',
+        'SELECT expires_at FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'FOH_MANAGER',
       )
       expect(granted?.expires_at).not.toBeNull()
 
-      await click(view, '[data-test="revoke-BOX_OFFICE"]')
+      await click(view, '[data-test="revoke-FOH_MANAGER"]')
       await waitFor(view, 'document.querySelector(\'[data-test="confirm-revoke-role-verb"]\')')
       await click(view, '[data-test="confirm-revoke-role-verb"]')
-      await waitFor(view, '!document.querySelector(\'[data-test="revoke-BOX_OFFICE"]\')')
+      await waitFor(view, '!document.querySelector(\'[data-test="revoke-FOH_MANAGER"]\')')
 
-      expect(read('SELECT user_id FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'BOX_OFFICE')).toBeUndefined()
+      expect(read('SELECT user_id FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'FOH_MANAGER')).toBeUndefined()
     }
     finally {
       view.close()

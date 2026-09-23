@@ -3,7 +3,7 @@ import { mergedTombstoneEmail, mergeStatements, planGrantMerge } from '#shared/u
 import type { GrantRow, MergeStatementsInput, TrainingRecordRow } from '#shared/utils/account-merge'
 import { boundFromSQL } from '../../scripts/seed/statements'
 
-const grant = (over: Partial<GrantRow> = {}): GrantRow => ({ id: 'g-1', role: 'BOX_OFFICE', expiresAt: null, ...over })
+const grant = (over: Partial<GrantRow> = {}): GrantRow => ({ id: 'g-1', role: 'FOH_MANAGER', expiresAt: null, ...over })
 
 const base: MergeStatementsInput = {
   winnerId: 'w', loserId: 'l', actorId: 'admin',
@@ -20,27 +20,27 @@ const record = (over: Partial<TrainingRecordRow> = {}): TrainingRecordRow => ({
 
 describe('planning a role_grants merge (A-123 criterion 1, 0009)', () => {
   test('a role the winner does not hold moves across untouched', () => {
-    const plan = planGrantMerge([], [grant({ id: 'loser-grant', role: 'BOX_OFFICE', expiresAt: 100 })])
+    const plan = planGrantMerge([], [grant({ id: 'loser-grant', role: 'FOH_MANAGER', expiresAt: 100 })])
     expect(plan).toEqual({ reassign: ['loser-grant'], extend: [], retire: [] })
   })
 
   test('the loser never expiring beats a winner with a date: the winner is extended, the loser retires', () => {
-    const winnerGrants = [grant({ id: 'winner-grant', role: 'BOX_OFFICE', expiresAt: 100 })]
-    const loserGrants = [grant({ id: 'loser-grant', role: 'BOX_OFFICE', expiresAt: null })]
+    const winnerGrants = [grant({ id: 'winner-grant', role: 'FOH_MANAGER', expiresAt: 100 })]
+    const loserGrants = [grant({ id: 'loser-grant', role: 'FOH_MANAGER', expiresAt: null })]
     const plan = planGrantMerge(winnerGrants, loserGrants)
     expect(plan).toEqual({ reassign: [], extend: [{ id: 'winner-grant', expiresAt: null }], retire: ['loser-grant'] })
   })
 
   test('a later dated expiry on the loser extends the winner', () => {
-    const winnerGrants = [grant({ id: 'winner-grant', role: 'BOX_OFFICE', expiresAt: 100 })]
-    const loserGrants = [grant({ id: 'loser-grant', role: 'BOX_OFFICE', expiresAt: 200 })]
+    const winnerGrants = [grant({ id: 'winner-grant', role: 'FOH_MANAGER', expiresAt: 100 })]
+    const loserGrants = [grant({ id: 'loser-grant', role: 'FOH_MANAGER', expiresAt: 200 })]
     const plan = planGrantMerge(winnerGrants, loserGrants)
     expect(plan).toEqual({ reassign: [], extend: [{ id: 'winner-grant', expiresAt: 200 }], retire: ['loser-grant'] })
   })
 
   test('a winner already holding the more generous grant is left alone; the loser still retires so the merged account never holds two rows for one role', () => {
-    const winnerGrants = [grant({ id: 'winner-grant', role: 'BOX_OFFICE', expiresAt: null })]
-    const loserGrants = [grant({ id: 'loser-grant', role: 'BOX_OFFICE', expiresAt: 200 })]
+    const winnerGrants = [grant({ id: 'winner-grant', role: 'FOH_MANAGER', expiresAt: null })]
+    const loserGrants = [grant({ id: 'loser-grant', role: 'FOH_MANAGER', expiresAt: 200 })]
     const plan = planGrantMerge(winnerGrants, loserGrants)
     expect(plan).toEqual({ reassign: [], extend: [], retire: ['loser-grant'] })
   })
@@ -52,7 +52,7 @@ describe('planning a role_grants merge (A-123 criterion 1, 0009)', () => {
   })
 
   test('unrelated roles on each side both move, independently of each other', () => {
-    const winnerGrants = [grant({ id: 'w-1', role: 'BOX_OFFICE', expiresAt: 100 })]
+    const winnerGrants = [grant({ id: 'w-1', role: 'TREASURER', expiresAt: 100 })]
     const loserGrants = [grant({ id: 'l-1', role: 'FOH_MANAGER', expiresAt: 100 })]
     expect(planGrantMerge(winnerGrants, loserGrants)).toEqual({ reassign: ['l-1'], extend: [], retire: [] })
   })

@@ -220,6 +220,8 @@ A grant on a shadow account whose `last_login_at` is NULL is pending (A-132, 008
 granting to an address the picker could not find, listed apart on the register, never counted as
 a holder and never usable for the last-administrator guard. It needs no column and no claim of its
 own: the account's first way in or first sign-in (A-116) is what makes it held.
+The retired `BOX_OFFICE` role was folded into `FOH_MANAGER` in place by migration 0116, the later
+expiry winning for a holder of both, each moved grant audited as `role.merged` (0090, A-133).
 
 ### totp_secrets
 `user_id` PK → users cascade · `secret` · `confirmed_at` NULL until proven ·
@@ -782,7 +784,7 @@ a time, under the same expected-total cross-check collection uses. Approval (cri
 `money.refund` (manager and admin) or tonight's confirmed duty manager for that performance,
 gated by the `REFUND_PAID_REQUIRES_MANAGER` configuration key (default true, registered ahead of
 this story); the general desk permission (`ticketing.write`) is still needed to reach the screen
-at all, so a duty-manager shift with no box office role cannot use it. The race (criterion 4) is
+at all, so a duty-manager shift with no Front of House Manager role cannot use it (0090). The race (criterion 4) is
 the ticket's own conditional claim (`UPDATE tickets SET refunded_at = ? WHERE ... AND refunded_at
 IS NULL`): `postEntry()` (`server/utils/ledger.ts`) gained an optional `guard` parameter for
 exactly this, making the ledger entry conditional on the claim's own `changes()` and the line

@@ -160,7 +160,7 @@ describe.skipIf(skip !== null)('the role register answers who holds what (A-131 
     const holder = await person('forever')
     expect((await send('POST', '/api/admin/roles', { userId: holder.id, role: 'COMMITTEE', expiresAt: null }, cookie)).status).toBe(200)
 
-    const listing = await register('?role=is:BOX_OFFICE')
+    const listing = await register('?role=is:FOH_MANAGER')
     expect(listing.permanent.map(item => item.email)).toContain(holder.email)
     expect(listing.permanent.every(item => item.expiresAt === null)).toBe(true)
   })
@@ -169,6 +169,13 @@ describe.skipIf(skip !== null)('the role register answers who holds what (A-131 
     expect((await send('GET', '/api/admin/roles/register?role=is:SUPREME_LEADER', null, cookie)).status).toBe(400)
     expect((await send('GET', '/api/admin/roles/register?sort=note', null, cookie)).status).toBe(400)
     expect((await send('GET', `/api/admin/roles/register?role=any:${[...ROLES, 'ADMIN'].join(',')}`, null, cookie)).status).toBe(400)
+  })
+
+  // Retired into the Front of House Manager (0090, A-133 criterion 2): no longer grantable anywhere.
+  test('the retired box office role cannot be granted', async () => {
+    const holder = await person('retired')
+    expect((await send('POST', '/api/admin/roles', { userId: holder.id, role: 'BOX_OFFICE' }, cookie)).status).toBe(400)
+    expect(read('SELECT 1 FROM role_grants WHERE user_id = ?', holder.id)).toBeUndefined()
   })
 
   test('reading the register needs a permission, and a signed-out caller never reaches it', async () => {
@@ -280,18 +287,18 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
     const holder = await person('onscreen')
     const view = await signedInView()
     try {
-      await view.navigate(`${app.baseURL}/people/roles?role=is:BOX_OFFICE`)
+      await view.navigate(`${app.baseURL}/people/roles?role=is:FOH_MANAGER`)
       await waitFor(view, `document.querySelector('[data-test="role-tiles"]')`)
-      expect(await textOf(view, '[data-test="role-tiles"]')).toContain('Box office')
+      expect(await textOf(view, '[data-test="role-tiles"]')).toContain('Front of House Manager')
 
       await pickPerson(view, '[data-test="grant-person"]', holder.email.split('@')[0]!, holder.name)
       await click(view, '[data-test="grant-submit"]')
       await waitFor(view, `document.body.innerText.includes(${JSON.stringify(holder.name)})`)
 
-      expect(read<{ role: string }>('SELECT role FROM role_grants WHERE user_id = ?', holder.id)?.role).toBe('BOX_OFFICE')
+      expect(read<{ role: string }>('SELECT role FROM role_grants WHERE user_id = ?', holder.id)?.role).toBe('FOH_MANAGER')
 
       // K-123: the press opens the confirmation, and the named verb is what revokes.
-      await click(view, `[data-test="revoke-${holder.id}-BOX_OFFICE"]`)
+      await click(view, `[data-test="revoke-${holder.id}-FOH_MANAGER"]`)
       await waitFor(view, `document.querySelector('[data-test="confirm-revoke-role-verb"]')`)
       await click(view, '[data-test="confirm-revoke-role-verb"]')
       await waitFor(view, `!document.body.innerText.includes(${JSON.stringify(holder.name)})`)

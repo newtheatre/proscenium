@@ -813,6 +813,13 @@
       "when": 1790175886117,
       "tag": "0115_an_external_venue_holds_no_shift_template",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "6",
+      "when": 1790176511133,
+      "tag": "0116_the_box_office_role_folds_into_front_of_house",
+      "breakpoints": true
     }
   ]
 }

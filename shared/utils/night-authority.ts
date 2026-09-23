@@ -32,9 +32,9 @@ export const NIGHT_ROLE_WORDS: Record<NightRole, string> = {
 // The officer a refusal points at. A unit test fails when the role named here stops holding the
 // permission above, so the advice cannot drift from the permission map (0044).
 export const NIGHT_ROLE_OFFICER: Record<NightRole, { role: Role, words: string }> = {
-  DUTY_MANAGER: { role: 'FOH_MANAGER', words: 'the front of house manager\'s role' },
-  DOOR: { role: 'FOH_MANAGER', words: 'the front of house manager\'s role' },
-  BAR: { role: 'BAR_MANAGER', words: 'the bar manager\'s role' },
+  DUTY_MANAGER: { role: 'FOH_MANAGER', words: 'the Front of House Manager\'s role' },
+  DOOR: { role: 'FOH_MANAGER', words: 'the Front of House Manager\'s role' },
+  BAR: { role: 'BAR_MANAGER', words: 'the Bar Manager\'s role' },
 }
 
 // What the caller says it is working on. Every field is optional because the common case is

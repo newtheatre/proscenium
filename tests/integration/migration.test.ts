@@ -11,7 +11,7 @@ import type { TestDatabase } from '#tests/helpers/database'
 // The import proved on a source it can assert about, against the real schema the migrations build
 // (K-112). The rehearsal against production dumps is the other half, and cannot run here.
 
-const ROLE_MAP = { 'auth:ADMIN': 'ADMIN', 'ticketing:BOX_OFFICE': 'BOX_OFFICE' }
+const ROLE_MAP: Record<string, string> = { 'auth:ADMIN': 'ADMIN', 'ticketing:BOX_OFFICE': 'FOH_MANAGER' }
 
 // A stand-in for one stage-door export: the tables the transform reads, and nothing else.
 function sourceEstate(): Database {
@@ -61,10 +61,10 @@ interface Run {
 
 // One pass of the whole pipeline: transform into the core, build the SQL, apply it to the schema
 // the application's own migrations produce.
-async function importInto(source: Database, target: TestDatabase, ids = new Map<string, string>()): Promise<Run> {
+async function importInto(source: Database, target: TestDatabase, ids = new Map<string, string>(), roleMap = ROLE_MAP): Promise<Run> {
   const core = await createCore(':memory:')
   try {
-    const { summary, exceptions } = transformIdentity({ auth: source, mirrors: [], decisions: decideByMap(source.query('SELECT user_id, role FROM user_roles').all() as { user_id: string, role: string }[], ROLE_MAP, null), idMap: ids, target: core })
+    const { summary, exceptions } = transformIdentity({ auth: source, mirrors: [], decisions: decideByMap(source.query('SELECT user_id, role FROM user_roles').all() as { user_id: string, role: string }[], roleMap, null), idMap: ids, target: core })
     applyLoad(buildLoad(core), target.raw)
     return { target, ids, exceptions, summary }
   }
@@ -204,9 +204,29 @@ describe('the identity import lands in the application schema (K-112)', () => {
 
       expect(rows<{ by: string | null }>(target, 'SELECT granted_by AS by FROM role_grants WHERE role = ?', 'ADMIN')[0]!.by)
         .toBe(granter)
-      expect(rows<{ by: string | null }>(target, 'SELECT granted_by AS by FROM role_grants WHERE role = ?', 'BOX_OFFICE')[0]!.by)
+      expect(rows<{ by: string | null }>(target, 'SELECT granted_by AS by FROM role_grants WHERE role = ?', 'FOH_MANAGER')[0]!.by)
         .toBeNull()
       expect(run.exceptions.join('\n')).toMatch(/granted by an unknown/i)
+    }
+    finally {
+      target.close()
+      source.close()
+    }
+  })
+
+  // A decisions file written before 0090 can name the retired role; guessing its successor would
+  // be the mapped default 0070 refuses, so it is named and the review is run again (A-133 c5).
+  test('a recorded decision naming a role that no longer exists is an exception, not a grant', async () => {
+    const source = sourceEstate()
+    addPerson(source, { id: 'old-1', email: 'stale@example.invalid' })
+    source.query('INSERT INTO user_roles VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('old-1', 'ticketing:BOX_OFFICE', null, null, 1700000000, null, null)
+
+    const target = await createTestDatabase()
+    try {
+      const run = await importInto(source, target, new Map(), { 'ticketing:BOX_OFFICE': 'BOX_OFFICE' })
+      expect(rows(target, 'SELECT 1 FROM role_grants')).toHaveLength(0)
+      expect(run.exceptions.join('\n')).toMatch(/BOX_OFFICE.*no longer a role/i)
     }
     finally {
       target.close()

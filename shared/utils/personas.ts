@@ -28,12 +28,11 @@ export const PERSONAS: Persona[] = [
 
   // Module D: ticketing
 
-  { email: 'dev-boxoffice@e2e.newtheatre.org.uk', name: 'Bo Boxoffice (dev)', role: 'BOX_OFFICE', shape: 'full', describes: 'Adds, prices and archives ticket types. Nothing operational: the door derives from tonight.' },
   { email: 'dev-access@e2e.newtheatre.org.uk', name: 'Ash Access (dev)', role: 'ACCESSIBILITY_OFFICER', shape: 'full', describes: 'Sights evidence and verifies access profile declarations. Nothing else: not general box office (D-127).' },
 
   // Module E: show night
 
-  { email: 'dev-foh@e2e.newtheatre.org.uk', name: 'Fen Foh (dev)', role: 'FOH_MANAGER', shape: 'full', describes: 'Opens the door and the duty manager screens with no shift, and is audited for it (0044).' },
+  { email: 'dev-foh@e2e.newtheatre.org.uk', name: 'Fen Foh (dev)', role: 'FOH_MANAGER', shape: 'full', describes: 'Sets up the programme and its prices, works the desk, and opens the door and the duty manager screens with no shift, audited for it (0044, 0090).' },
   { email: 'dev-bar@e2e.newtheatre.org.uk', name: 'Bex Bar (dev)', role: 'BAR_MANAGER', shape: 'full', describes: 'Opens the till with no bar shift. Opens nothing else: the roles are not interchangeable.' },
 
   // Module F: bar

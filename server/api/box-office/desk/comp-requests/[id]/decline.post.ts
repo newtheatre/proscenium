@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
 
   const account = await requireAccount(event)
   if (!await isDutyManagerOrTicketingManager(account.id, night)) {
-    throw createError({ statusCode: 403, statusMessage: 'A duty manager or the Box Office Manager decides a comp request' })
+    throw createError({ statusCode: 403, statusMessage: 'A duty manager or a Manager decides a comp request' })
   }
 
   const refusal = await decideTicketCompRequest(id, account.id, 'DECLINED', input.reason, expiryMinutes)

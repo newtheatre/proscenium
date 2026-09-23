@@ -723,7 +723,8 @@ and writes through the first.
 **A key named in `WIDE_BLAST_RADIUS_KEYS`**, itself a `config` row and so itself audited (criterion
 5), needs a live preview and a typed echo before it saves (criteria 1, 2). `blastRadiusPreview()`
 (`server/utils/blast-radius.ts`) is one function per key: `REFUND_PAID_REQUIRES_MANAGER` counts
-box office officers who would gain or lose self-approval, `RETENTION_ARMED` counts accounts
+holders of a role with the desk (`ticketing.write`) and no `money.refund`, read from the permission
+map (`refundPreviewRoles()`), who would gain or lose self-approval, `RETENTION_ARMED` counts accounts
 already due anonymisation, read with no side effect at all
 (`dueForAnonymisation()`, `server/utils/retention-candidates.ts`). `GET
 /api/admin/config/[key]/blast-radius` answers with the count and its category; `PUT` requires a
@@ -811,7 +812,8 @@ standing grant to begin with (0044); it also writes no audit row of its own, bec
 hold it. Only when no shift covers the request does the guard fall through to `OFFICER`, which
 stands on the permissions `night.door`, `night.till` and `night.manage`, held by `FOH_MANAGER`
 (door and manage) and `BAR_MANAGER` (till), the one named exception to standing permissions being
-administrative only (0009, 0044). Planning the rota is not one of them: `rota.read` and
+administrative only (0009, 0044). `FOH_MANAGER` also holds the programme and the desk
+(`ticketing.*`), so its `DUTY_MANAGER` bypass reaches refund approval for tonight's performance (0090). Planning the rota is not one of them: `rota.read` and
 `rota.write` are ordinary administrative permissions, held by `FOH_MANAGER` and `ADMIN`, and they
 are what open `/rota/manage/**` (0046). Every officer resolution writes `night.officer-bypass`
 once per account, night, venue and role, held by a partial unique index rather than by reading

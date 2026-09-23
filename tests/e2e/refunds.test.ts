@@ -31,13 +31,13 @@ beforeAll(async () => {
   officer = await adminSession(app)
 
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'BOX_OFFICE' }, officer.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
 
   // MANAGER is privileged (0037/A-112) and now carries money.refund (D-116 criterion 2), so the
   // full MFA dance is needed before requirePermission honours the grant, exactly as D-114's did.
   const managerPassword = generatePassword()
   manager = await registerMember(app, 'manager', managerPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'BOX_OFFICE' }, officer.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'FOH_MANAGER' }, officer.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'MANAGER' }, officer.cookie)
 
   const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, manager.cookie)).json() as { secret: string }
@@ -257,7 +257,7 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2)', () => {
     // The desk screen itself needs ticketing.write to reach at all; the confirmed shift is
     // what then carries the refund's own approval, not a second standing grant (D-116 criterion 2).
     const dutyManager = await registerMember(app, 'dutymanager', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'BOX_OFFICE' }, officer.cookie)
+    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'FOH_MANAGER' }, officer.cookie)
     confirmDutyManagerTonight(dutyManager.id, seeded.performanceId)
 
     const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, dutyManager.cookie)
@@ -277,7 +277,7 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2)', () => {
     }
 
     const dutyManager = await registerMember(app, 'dutymanager', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'BOX_OFFICE' }, officer.cookie)
+    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'FOH_MANAGER' }, officer.cookie)
     confirmDutyManagerTonight(dutyManager.id, elsewhere.performanceId)
 
     const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, dutyManager.cookie)

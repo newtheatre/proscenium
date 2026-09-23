@@ -111,7 +111,7 @@ const grantExists = (id: string): boolean =>
 describe.skipIf(skip !== null)('a holder is warned before a grant lapses (criterion 1)', () => {
   test('a grant inside the notice window warns its holder once, however often the sweep runs', async () => {
     const userId = await holder()
-    grant(userId, 'BOX_OFFICE', now() + 10 * DAY)
+    grant(userId, 'FOH_MANAGER', now() + 10 * DAY)
 
     const run = await runSweep()
     expect(run.warned).toBeGreaterThan(0)
@@ -134,7 +134,7 @@ describe.skipIf(skip !== null)('a holder is warned before a grant lapses (criter
   test('four grants lapsing together are one message naming all four', async () => {
     const userId = await holder()
     const at = now() + 9 * DAY
-    for (const role of ['BOX_OFFICE', 'BAR_MANAGER', 'SAFETY_OFFICER', 'COMMITTEE']) grant(userId, role, at)
+    for (const role of ['FOH_MANAGER', 'BAR_MANAGER', 'SAFETY_OFFICER', 'COMMITTEE']) grant(userId, role, at)
 
     await runSweep()
     const claims = claimsFor(userId).filter(row => row.type === 'role.expiring')
@@ -169,7 +169,7 @@ describe.skipIf(skip !== null)('a holder is warned before a grant lapses (criter
   test('an unverified holder is not claimed for, since the warning could not be sent', async () => {
     const userId = await holder()
     write('UPDATE users SET verified = 0 WHERE id = ?', userId)
-    grant(userId, 'BOX_OFFICE', now() + 10 * DAY)
+    grant(userId, 'FOH_MANAGER', now() + 10 * DAY)
 
     await runSweep()
     expect(claimsFor(userId)).toEqual([])
@@ -187,7 +187,7 @@ describe.skipIf(skip !== null)('a holder is warned before a grant lapses (criter
 describe.skipIf(skip !== null)('the warning is attributed to system (criterion 5)', () => {
   test('the trail records the warning with no actor', async () => {
     const userId = await holder()
-    grant(userId, 'BOX_OFFICE', now() + 10 * DAY)
+    grant(userId, 'FOH_MANAGER', now() + 10 * DAY)
 
     await runSweep()
     const trail = trailFor(userId)
@@ -199,7 +199,7 @@ describe.skipIf(skip !== null)('the warning is attributed to system (criterion 5
 describe.skipIf(skip !== null)('grants long lapsed are tidied away (criterion 4)', () => {
   test('a grant lapsed longer ago than the prune window is deleted and trailed', async () => {
     const userId = await holder()
-    const id = grant(userId, 'BOX_OFFICE', now() - 200 * DAY)
+    const id = grant(userId, 'FOH_MANAGER', now() - 200 * DAY)
 
     const run = await runSweep()
     expect(run.pruned).toBeGreaterThan(0)
@@ -212,7 +212,7 @@ describe.skipIf(skip !== null)('grants long lapsed are tidied away (criterion 4)
 
   test('a grant that lapsed recently is left alone, so the digest can still show it', async () => {
     const userId = await holder()
-    const id = grant(userId, 'BOX_OFFICE', now() - 10 * DAY)
+    const id = grant(userId, 'FOH_MANAGER', now() - 10 * DAY)
 
     await runSweep()
     expect(grantExists(id)).toBe(true)
@@ -257,7 +257,7 @@ describe.skipIf(skip !== null)('the digest (criteria 2, 3)', () => {
 
   test('a recently lapsed grant is reported, and one that never expires is not counted as lapsed', async () => {
     const userId = await holder()
-    grant(userId, 'BOX_OFFICE', now() - 5 * DAY)
+    grant(userId, 'FOH_MANAGER', now() - 5 * DAY)
 
     const run = await runSweep()
     expect(run.standing.lapsed).toBeGreaterThan(0)

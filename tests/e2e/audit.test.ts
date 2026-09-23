@@ -112,7 +112,7 @@ describe.skipIf(skip !== null)('reading the audit trail (J-103)', () => {
 
   test('a grant is findable by actor, by action, by module, by target and by date', async () => {
     const member = await registerMember(app, 'granted', password, { signIn: false })
-    expect((await send('POST', '/api/admin/roles', { userId: member.id, role: 'BOX_OFFICE' }, cookie)).status).toBe(200)
+    expect((await send('POST', '/api/admin/roles', { userId: member.id, role: 'FOH_MANAGER' }, cookie)).status).toBe(200)
 
     const target = `user:${member.id}`
     const carries = (listing: Listing): boolean =>

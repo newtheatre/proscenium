@@ -6,7 +6,7 @@ import { OUT, ROOT, ensureOut, latestStamp, loadDump } from './lib'
 import { decisionKey, formatRoleDecisions, parseRoleDecisions } from './role-decisions'
 import type { RoleDecision, RoleDecisions } from './role-decisions'
 import { formatLondon, nextCommitteeYearEnd } from '../shared/utils/london'
-import { ROLES } from '../shared/utils/roles'
+import { ROLES, isRole } from '../shared/utils/roles'
 
 interface Holder {
   id: string
@@ -63,7 +63,11 @@ if (import.meta.main) {
 
   let asked = 0
   for (const [userId, held] of byHolder) {
-    const pending = held.filter(grant => reviewAll || !decisions.has(decisionKey(userId, grant.role)))
+    // A decision naming a role that has since been retired is asked again, never carried (0090).
+    const pending = held.filter((grant) => {
+      const decided = decisions.get(decisionKey(userId, grant.role))
+      return reviewAll || !decided || (decided !== 'SKIP' && !isRole(decided.role))
+    })
     if (!pending.length) continue
 
     const holder = auth.query<Holder, [string]>('SELECT * FROM users WHERE id = ?').get(userId)

@@ -396,7 +396,8 @@ describe('the shared labels (item 8)', () => {
     expect(saysRole('FOH_MANAGER')).toBe('Front of House Manager')
   })
 
-  test('the box office role names a person, not a desk', () => {
+  // Retired, but an audit entry written before 0090 still names it, and should read as a title.
+  test('the retired box office role still names a person, not a desk', () => {
     expect(saysRole('BOX_OFFICE')).toBe('Box Office Manager')
   })
 })

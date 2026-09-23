@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 31 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 32 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -611,6 +611,31 @@ Open questions for the committee:
      (0011).
 - Source: Feedback, 22 September 2026 (issue 1212); accepted by the IT Manager on 23 September
   2026 with the address as the picker's fallback only.
+
+## A-133: One role for the Front of House and Box Office Manager
+
+- Role: Administrator
+- Phase: MVP
+- Story: As the IT Manager, I want the Box Office Manager and the Front of House Manager, one
+  committee post, to be one grantable role so that a handover is one grant and the register counts
+  the holder once.
+- Depends on: A-118, A-131
+- Acceptance criteria:
+  1. `FOH_MANAGER` holds `ticketing.read`, `ticketing.write` and `ticketing.export` in addition to
+     what it already held, including 0044's `night.door` and `night.manage` (0090).
+  2. `BOX_OFFICE` is not a role: granting it is refused as an unknown role, it is not offered on
+     `/people/roles` or an account's page, and a stored grant naming it grants nothing.
+  3. Existing `BOX_OFFICE` grants become `FOH_MANAGER` grants in one migration, with no moment at
+     which a holder has neither. A holder of both keeps one `FOH_MANAGER` grant with the later
+     expiry, and a permanent grant beats any date. A renamed grant keeps its expiry, granter and
+     note.
+  4. Each moved grant writes a `role.merged` audit entry naming both roles and the resulting
+     expiry, with no free text (0011).
+  5. The import maps both old box office roles to `FOH_MANAGER`, and a recorded decision naming a
+     role that no longer exists is an exception rather than an imported grant (0070).
+  6. `/people/roles` lists one role for the post and counts each holder once.
+- Source: Issue #1211, decided by the IT Manager on 23 September 2026 (0090). The other pairings
+  that issue's audit raised are still under review and are not part of this story.
 
 ## A-201: Import an SU membership list by hand
 

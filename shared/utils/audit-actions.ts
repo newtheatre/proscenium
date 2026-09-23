@@ -75,6 +75,8 @@ const CATALOGUE = {
   // criterion 5). Neither changes what anybody holds: expiry is enforced at read time (0009).
   'role.lapse-warned': { label: 'Role expiry warning sent', module: 'identity' },
   'role.pruned': { label: 'Lapsed role grant tidied away', module: 'identity' },
+  // Written only by migration 0116, with no actor, when the box office role folded away (0090).
+  'role.merged': { label: 'Role folded into another', module: 'identity' },
   // Written by scripts/grant-admin.ts, which is the one writer outside a request (K-122).
   'role.granted.bootstrap': { label: 'First administrator created', module: 'identity' },
 

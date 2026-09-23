@@ -23,7 +23,7 @@ beforeAll(async () => {
   const database = new Database(app.databaseFile)
   try {
     database.query(`INSERT INTO users (id, email, name, verified) VALUES ('officer-1', 'officer-1@e2e.newtheatre.org.uk', 'An officer (test)', 1)`).run()
-    database.query(`INSERT INTO role_grants (id, user_id, role) VALUES ('officer-1-box-office', 'officer-1', 'BOX_OFFICE')`).run()
+    database.query(`INSERT INTO role_grants (id, user_id, role) VALUES ('officer-1-box-office', 'officer-1', 'FOH_MANAGER')`).run()
   }
   finally {
     database.close()

@@ -1,7 +1,7 @@
 import { CONSOLE_WIDTH } from './types'
 import type { Shot } from './types'
 
-const persona = 'dev-boxoffice@e2e.newtheatre.org.uk'
+const persona = 'dev-foh@e2e.newtheatre.org.uk'
 
 export const boxOffice: Shot[] = [
   {
