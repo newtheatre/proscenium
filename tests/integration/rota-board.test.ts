@@ -108,7 +108,7 @@ describe('the rows the board reads are ordered by when the night starts', () => 
   })
 })
 
-// A bar opening on the board (E-130 criterion 7, issue 1216): the same window, read by its own
+// A bar opening on the board (E-130 criterion 8, issue 1216): the same window, read by its own
 // scope, because an opening names no performance (0077).
 function barOpening(database: TestDatabase, id: string, night: string, status = 'PLANNED'): void {
   const opensAt = Math.floor(showNightBounds(night).from.getTime() / 1000) + 18 * 3600
@@ -122,7 +122,7 @@ const openingsFound = (database: TestDatabase, from: string, to: string): string
   run<{ openingId: string }>(database, rosterOpeningsQuery(boardWindowBounds({ from, to })))
     .map(row => row.openingId)
 
-describe('the board reads bar openings in the same window (E-130 criterion 7)', () => {
+describe('the board reads bar openings in the same window (E-130 criterion 8)', () => {
   test('an opening inside the window is read and one outside it is not', async () => {
     await withDatabase((database) => {
       testVenue(database, { suffix: 'a' })

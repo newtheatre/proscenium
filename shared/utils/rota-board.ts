@@ -40,7 +40,7 @@ export const boardWindowQuery = z.object({
 export type BoardEntry<P, O> = ({ kind: 'performance' } & P) | ({ kind: 'opening' } & O)
 
 // Bar openings sit among the performances by when they start; on a tie the performance leads,
-// since the house is the evening's main event (E-130 criterion 7).
+// since the house is the evening's main event (E-130 criterion 8).
 export function boardEntries<P extends { startsAt: number }, O extends { startsAt: number }>(
   performances: readonly P[],
   openings: readonly O[],

@@ -2,7 +2,7 @@ import { boardEntries, boardWindowBounds, boardWindowQuery } from '#shared/utils
 import type { RosterOpening, RosterOpeningShiftRow, RosterPerformance, RosterShiftRow } from '#server/utils/rota'
 
 // Every non-cancelled shift on the nights the window names, whole rather than paged (E-107
-// criterion 7), with the planned bar openings among them to read, not to act on (E-130 criterion 7).
+// criterion 7), with the planned bar openings among them to read, not to act on (E-130 criterion 8).
 
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'rota.write')

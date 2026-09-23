@@ -24,7 +24,7 @@ interface RosterPerformance {
   shifts: RosterShift[]
 }
 
-// Shown, never acted on here: an opening is staffed on its own screen (E-130 criterion 7).
+// Shown, never acted on here: an opening is staffed on its own screen (E-130 criterion 8).
 interface RosterOpening {
   openingId: string
   label: string

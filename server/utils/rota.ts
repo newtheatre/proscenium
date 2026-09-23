@@ -599,7 +599,7 @@ export interface RosterOpeningShiftRow {
 }
 
 // The board's second scope: a bar opening names no performance, so it is windowed on its own
-// start, the column the openings list's night filter reads too (E-130 criterion 7, 0077).
+// start, the column the openings list's night filter reads too (E-130 criterion 8, 0077).
 const rosterOpeningScope = (bounds: BoardBounds): SQL => sql`
   SELECT o.id FROM bar_openings o
   WHERE o.status = 'PLANNED' AND o.starts_at >= ${bounds.from} AND o.starts_at < ${bounds.to}

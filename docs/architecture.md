@@ -943,7 +943,7 @@ come, filtered by role, status and night through `shared/utils/unfilled-shifts-l
 list any more. `/rota/manage/shifts` is the Rota board (E-107 criterion 6, issue 933): it reads
 `GET /api/admin/rota/shifts/board`, which returns the next `BOARD_WINDOW` performances whole,
 every shift on them, filled ones included, and is what an officer reassigns from. Its `items`
-also carry the window's `PLANNED` bar openings with their uncancelled slots (E-130 criterion 7,
+also carry the window's `PLANNED` bar openings with their uncancelled slots (E-130 criterion 8,
 issue 1216), each entry tagged `kind: 'performance'` or `kind: 'opening'` and merged by start
 through `boardEntries` in `shared/utils/rota-board.ts`. Openings are read by a scope of their own,
 a subquery on `bar_openings.starts_at` like the performances' (0006), and are shown only: the card

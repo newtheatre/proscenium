@@ -53,7 +53,7 @@ describe('the board shows the nights it was asked for (E-107 criterion 7)', () =
   })
 })
 
-describe('the board shows bar openings beside performances (E-130 criterion 7)', () => {
+describe('the board shows bar openings beside performances (E-130 criterion 8)', () => {
   test('an opening card is marked as a bar opening', async () => {
     const source = await read(BOARD)
     expect(source).toContain(':data-test="`opening-${entry.openingId}`"')

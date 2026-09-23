@@ -3,7 +3,7 @@ import { boardEntries, openingsOnNightHref } from '#shared/utils/rota-board'
 import { parseCondition } from '#shared/utils/list-filters'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
 
-// Bar openings on the rota board (E-130 criterion 7, issue 1216): one list ordered by when each
+// Bar openings on the rota board (E-130 criterion 8, issue 1216): one list ordered by when each
 // evening starts, an opening marked as one, and a link to where it is staffed.
 
 const performance = (performanceId: string, startsAt: number) => ({ performanceId, startsAt, shifts: [] })
