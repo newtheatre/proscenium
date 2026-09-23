@@ -130,19 +130,7 @@ export async function editPending(input: EditInput): Promise<EditOutcome> {
   const booking = await bookingFor(input.id)
   if (!booking || booking.userId !== input.userId) return { won: false, why: 'missing' }
   if (booking.status !== 'PENDING_APPROVAL') return { won: false, why: 'settled' }
-
-  const [room] = await db.select({ id: schema.rooms.id })
-    .from(schema.rooms)
-    .where(and(eq(schema.rooms.id, input.roomId), eq(schema.rooms.isActive, true)))
-    .limit(1)
-  if (!room) return { won: false, why: 'gone' }
-
-  return { won: false, why: 'conflict', conflicts: await conflictsWith({
-    roomId: input.roomId,
-    startsAt: input.startsAt,
-    endsAt: input.endsAt,
-    exceptId: input.id,
-  }) }
+  return await whyItFailed({ roomId: input.roomId, startsAt: input.startsAt, endsAt: input.endsAt, exceptId: input.id })
 }
 
 // The morning sweep's writes, guarded on the age it read: an edit that restarted the clock since
@@ -165,7 +153,7 @@ export function chaseStatement(id: string, createdAt: number, now: number): SQL 
   `
 }
 
-async function whyItFailed(input: ClaimInput): Promise<ClaimOutcome> {
+async function whyItFailed(input: Parameters<typeof conflictsWith>[0]): Promise<Exclude<ClaimOutcome, { won: true }>> {
   const [room] = await db.select({ id: schema.rooms.id })
     .from(schema.rooms)
     .where(and(eq(schema.rooms.id, input.roomId), eq(schema.rooms.isActive, true)))
