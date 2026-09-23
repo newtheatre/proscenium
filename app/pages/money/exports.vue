@@ -2,7 +2,10 @@
 import { can, exportFinance, manageNominalMappings } from '#shared/utils/abilities'
 import { describeKind } from '#shared/utils/ledger'
 import type { EntrySource } from '#shared/utils/ledger'
-import type { NominalMapping } from '#shared/utils/su-export'
+import { SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportParams } from '#shared/utils/su-export'
+import { currentYear, yearChoices } from '#shared/utils/year'
+import type { FinanceSeason } from '#shared/utils/season-dashboard'
+import type { NominalMapping, SuExportPeriod, SuExportStatus } from '#shared/utils/su-export'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Exports', middleware: 'console', docs: '/docs/money/exports' })
@@ -69,13 +72,48 @@ const columns: TableColumn<NominalMapping>[] = [
   { id: 'act', header: ACTIONS_HEADER },
 ]
 
+const { data: seasons } = await useAsyncData(
+  'finance-seasons',
+  () => request<{ seasons: FinanceSeason[] }>('/api/admin/finance/seasons').then(response => response.seasons),
+  { default: (): FinanceSeason[] => [] },
+)
+
 const today = londonDay(new Date())
 const from = ref(today)
 const to = ref(today)
+const year = ref(currentYear())
+const years = yearChoices(year.value)
+const seasonId = ref((seasons.value.find(one => one.fromDay <= today && today <= one.toDay) ?? seasons.value[0])?.id ?? '')
+const seasonItems = computed(() => seasons.value.map(one => ({ label: one.name, value: one.id })))
+
+// The yearly return is the reason this screen exists, so it opens on this year (I-108 criterion 4).
+const kind = ref<SuExportPeriod['kind']>('YEAR')
+const kindItems = computed<{ label: string, value: SuExportPeriod['kind'] }[]>(() => [
+  { label: 'Year', value: 'YEAR' },
+  ...(seasons.value.length > 0 ? [{ label: 'Season', value: 'SEASON' }] : []),
+  { label: 'Custom range', value: 'RANGE' },
+])
+
+const period = computed<SuExportPeriod | null>(() => {
+  if (kind.value === 'YEAR') return { kind: 'YEAR', year: year.value }
+  if (kind.value === 'SEASON') return seasonId.value ? { kind: 'SEASON', seasonId: seasonId.value } : null
+  return from.value && to.value && to.value >= from.value ? { kind: 'RANGE', fromDay: from.value, toDay: to.value } : null
+})
+const params = computed(() => (period.value ? suExportParams(period.value) : null))
 
 // A GET link, not a fetch: the browser follows the content-disposition header and saves the
 // file itself, the same shape bar/reports.vue's own CSV export already uses.
-const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParams({ fromDay: from.value, toDay: to.value }).toString()}`)
+const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParams(params.value ?? {}).toString()}`)
+
+const { data: exportStatus, error: statusError } = await useAsyncData(
+  'su-export-status',
+  () => (mayExport.value && params.value
+    ? request<SuExportStatus>('/api/admin/finance/export/status', { query: params.value })
+    : Promise.resolve(null)),
+  { watch: [params] },
+)
+const statusFailure = computed(() => (statusError.value ? refusalText(statusError.value, 'What this export covers could not be read.') : null))
+const overCap = computed(() => (exportStatus.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
 </script>
 
 <template>
@@ -89,14 +127,39 @@ const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParam
       </h2>
       <AdminToolbar :filterable="false">
         <template #actions>
-          <DateField
-            v-model="from"
-            data-test="export-from"
+          <USelect
+            v-model="kind"
+            aria-label="Period"
+            data-test="export-kind"
+            :items="kindItems"
+            value-key="value"
           />
-          <DateField
-            v-model="to"
-            data-test="export-to"
+          <USelect
+            v-if="kind === 'YEAR'"
+            v-model="year"
+            aria-label="Year"
+            data-test="export-year"
+            :items="years"
+            value-key="value"
           />
+          <USelect
+            v-if="kind === 'SEASON'"
+            v-model="seasonId"
+            aria-label="Season"
+            data-test="export-season"
+            :items="seasonItems"
+            value-key="value"
+          />
+          <template v-if="kind === 'RANGE'">
+            <DateField
+              v-model="from"
+              data-test="export-from"
+            />
+            <DateField
+              v-model="to"
+              data-test="export-to"
+            />
+          </template>
           <UButton
             v-if="mayExport"
             data-test="export-csv"
@@ -104,12 +167,41 @@ const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParam
             :to="exportUrl"
             external
             target="_blank"
-            :disabled="!from || !to || to < from"
+            :disabled="!period || overCap"
           >
             Export CSV
           </UButton>
         </template>
       </AdminToolbar>
+
+      <UAlert
+        v-if="statusFailure"
+        data-test="export-status-failure"
+        color="error"
+        variant="subtle"
+        :description="statusFailure"
+      />
+      <UAlert
+        v-else-if="overCap"
+        data-test="export-over-cap"
+        color="error"
+        variant="subtle"
+        :description="suExportCapRefusal()"
+      />
+      <p
+        v-if="exportStatus"
+        class="text-sm text-muted"
+        data-test="export-status"
+      >
+        {{ saysDay(exportStatus.fromDay, { year: true }) }} to {{ saysDay(exportStatus.toDay, { year: true }) }},
+        {{ exportStatus.rows.toLocaleString('en-GB') }} {{ exportStatus.rows === 1 ? 'line' : 'lines' }}.
+        <template v-if="exportStatus.closed">
+          <strong>Closed</strong>: nothing can post into these days, so taking the export again gives the same file unless a nominal code below is changed.
+        </template>
+        <template v-else>
+          <strong>Open</strong>: the figures may still move until the period is closed, so treat the file as provisional.
+        </template>
+      </p>
     </section>
 
     <section

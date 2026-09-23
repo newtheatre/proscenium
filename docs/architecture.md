@@ -370,6 +370,18 @@ is checked, and the response carries the answer as `x-period-status: closed|open
 CSV column, so the file itself stays exactly the shape the SU's own import expects. A range only
 partly closed reads as open: nothing here assumes a term is closed in one row.
 
+**The yearly return is chosen by name, not typed in (criterion 4).** The export takes
+`kind=YEAR&year=`, `kind=SEASON&seasonId=` or a custom `fromDay`/`toDay` (`suExportForm`), and a
+year or a season resolves through `resolvePeriodBounds()`, the money dashboard's own resolver
+(0087), so the export and the dashboard never disagree about which days a year covers.
+`GET /api/admin/finance/export/status` takes the same query and answers the resolved days, the
+row count and whether the range is closed, without returning or auditing any row: the screen
+shows it before the download, and disables the download over the cap with the same refusal the
+export gives. Over a closed range the file is byte-identical from run to run: the ledger trigger
+refuses a post into it (I-107), the query orders by day, instant and line id, and
+`suExportCsvRows()` shapes every run the same way. A nominal code changed between two runs is
+the one thing that changes the file, because mappings are current configuration, not history.
+
 ### The money paths
 
 The triple every path posts under. A module adding a money path adds a row here in the same pull

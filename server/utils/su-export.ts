@@ -3,8 +3,9 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (0055).
 import { auditedWrite } from './audit'
+import { resolvePeriodBounds } from './season-dashboard'
 import { auditEntry, changes } from '#shared/utils/audit'
-import type { NominalMappingInput, NominalMapping, SuExportRow } from '#shared/utils/su-export'
+import type { NominalMappingInput, NominalMapping, SuExportPeriod, SuExportRow } from '#shared/utils/su-export'
 import type { SQL } from 'drizzle-orm'
 
 // I-108. `su_nominal_mappings` is committee configuration, mutable and seeded by migration like
@@ -61,4 +62,26 @@ export function suExportQuery(fromDay: string, toDay: string): SQL {
 
 export async function suExportRows(fromDay: string, toDay: string): Promise<SuExportRow[]> {
   return db.all<SuExportRow>(suExportQuery(fromDay, toDay))
+}
+
+// The same predicate as suExportQuery, counted: what the screen checks against the cap first.
+export function suExportCountQuery(fromDay: string, toDay: string): SQL {
+  return sql`
+    SELECT count(*) AS rows
+    FROM ledger_lines ll
+    JOIN ledger_entries le ON le.id = ll.entry_id
+    WHERE le.london_day BETWEEN ${fromDay} AND ${toDay}
+  `
+}
+
+export async function suExportRowCount(fromDay: string, toDay: string): Promise<number> {
+  const [row] = await db.all<{ rows: number }>(suExportCountQuery(fromDay, toDay))
+  return row?.rows ?? 0
+}
+
+// A year and a season resolve exactly as the money dashboard's do (0087); an unknown season is a 404.
+export async function suExportBounds(period: SuExportPeriod): Promise<{ fromDay: string, toDay: string }> {
+  if (period.kind === 'RANGE') return { fromDay: period.fromDay, toDay: period.toDay }
+  const { fromDay, toDay } = await resolvePeriodBounds(period)
+  return { fromDay, toDay }
 }
