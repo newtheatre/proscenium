@@ -82,8 +82,10 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   7. The demand board carries the grant beside the decline: every module on it links straight to
      scheduling a session for that module, with the module already chosen, so the answer that
      resolves the requests is as near to hand as the answer that closes one.
+  8. Withdrawing a request asks first, in the shared confirmation, naming the module and saying
+     the department stops counting it as demand; nothing is withdrawn until the member confirms.
 - Source: Prompt Book G-1; audit TR-2; issue 1151 item 10 (criterion 7, the board offered a
-  decline and nothing else)
+  decline and nothing else); issue 1153 item 7 (criterion 8, withdrawing was one click)
 
 ## G-105: Session sign-up with derived places
 
@@ -98,7 +100,11 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   4. The sign-up confirmation states either the place or the exact waitlist position at the moment of signing up.
   5. Sign-up closes when the register opens, when the configured close time passes, or when the session date arrives, whichever is first; withdrawal remains open while the register is open.
   6. EXPIRING prerequisite records count as held for both the block and the warning.
-- Source: Prompt Book G-2; audit TR-3
+  7. Withdrawing asks first, in the shared confirmation: it says that a place passes to whoever
+     is next on the waiting list, or that a waiting member leaves the list, and that signing up
+     again joins at the back; nothing is withdrawn until the member confirms.
+- Source: Prompt Book G-2; audit TR-3; issue 1153 item 7 (criterion 7, withdrawing was one
+  click)
 
 ## G-106: Promotion notifications claimed at most once
 

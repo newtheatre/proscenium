@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, declareAccessProfileForm, saysAccessProfileStatus } from '#shared/utils/access-profiles'
+import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, declareAccessProfileForm, saysAccessProfileStatus, WITHDRAWAL_TOMBSTONE_DAYS } from '#shared/utils/access-profiles'
 import type { AccessFlag, DeclareAccessProfileInput, OwnAccessProfile } from '#shared/utils/access-profiles'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
@@ -60,15 +60,26 @@ async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<
   }
 }
 
+// Asked before it happens (D-127 criterion 6); a refusal stays in the dialogue that asked.
+const confirmingWithdrawal = ref(false)
+const withdrawFailure = ref<string | null>(null)
+
+function askToWithdraw(): void {
+  withdrawFailure.value = null
+  confirmingWithdrawal.value = true
+}
+
 async function withdraw(): Promise<void> {
   withdrawing.value = true
+  withdrawFailure.value = null
   try {
     await $fetch('/api/account/access-profile/withdraw', { method: 'POST' })
+    confirmingWithdrawal.value = false
     toast.add({ title: 'Access profile withdrawn', icon: 'i-lucide-check', color: 'success' })
     await load()
   }
   catch (error) {
-    toast.add({ title: refusalText(error), color: 'error' })
+    withdrawFailure.value = refusalText(error)
   }
   finally {
     withdrawing.value = false
@@ -192,7 +203,7 @@ useSeoMeta({ title: 'Access requirements' })
           <USeparator />
           <div>
             <p class="text-sm text-muted">
-              Withdrawing deletes this after 30 days. The people on the door are shown nothing in the meantime.
+              Withdrawing deletes this after {{ WITHDRAWAL_TOMBSTONE_DAYS }} days. The people on the door are shown nothing in the meantime.
             </p>
             <UButton
               color="error"
@@ -200,7 +211,7 @@ useSeoMeta({ title: 'Access requirements' })
               class="mt-2"
               :loading="withdrawing"
               data-test="access-withdraw"
-              @click="withdraw"
+              @click="askToWithdraw"
             >
               Withdraw my requirements
             </UButton>
@@ -208,5 +219,16 @@ useSeoMeta({ title: 'Access requirements' })
         </template>
       </div>
     </UPageCard>
+
+    <ConfirmModal
+      v-model:open="confirmingWithdrawal"
+      name="withdraw-access"
+      title="Withdraw your access requirements"
+      verb="Withdraw my requirements"
+      :consequence="`The people on the door are shown nothing from now on, and the profile is deleted after ${WITHDRAWAL_TOMBSTONE_DAYS} days. Only you can put it back before then.`"
+      :loading="withdrawing"
+      :failure="withdrawFailure"
+      @confirm="withdraw"
+    />
   </UContainer>
 </template>

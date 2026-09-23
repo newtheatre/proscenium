@@ -298,7 +298,7 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
     expect('condition' in parsed && parsed.condition).toEqual({ key: 'filter', operator: 'is', values: ['awaiting-record'] })
   })
 
-  test('the claims queue declares its own status, so a decided claim can be found (A-130 criterion 9)', () => {
+  test('the claims queue declares its own status, so a decided claim can be found (A-130 criterion 10)', () => {
     const status = fieldOf(membershipClaimsList, 'status')
     expect(status?.column).toBe('status')
     expect(operatorsOf(status!)).toEqual(['is'])

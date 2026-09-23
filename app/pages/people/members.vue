@@ -70,7 +70,7 @@ const AWAITING_RECORD = 'awaiting-record'
 // keeps working, so the runbook's bookmark to the queue is unaffected.
 const { search, conditions, sort, page, query, active, set, setSort } = useListQuery(membershipsList, { ignore: ['status'] })
 // The queue reads the same URL through its own declaration, so its status and sort reach its
-// endpoint and the register's never do (A-130 criterion 9).
+// endpoint and the register's never do (A-130 criterion 10).
 const queue = useListQuery(membershipClaimsList, { ignore: ['filter'] })
 const route = useRoute()
 const router = useRouter()

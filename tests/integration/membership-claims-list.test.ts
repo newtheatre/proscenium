@@ -6,7 +6,7 @@ import { claimsClause } from '#server/utils/membership-claims'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// The claims queue through its own declaration (K-129, A-130 criterion 9): status, search, sort
+// The claims queue through its own declaration (K-129, A-130 criterion 10): status, search, sort
 // and page, with waiting the default and an erased person's claim never shown.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
@@ -47,7 +47,7 @@ function ids(database: TestDatabase, query: Record<string, string>): string[] {
   return rows<{ id: string }>(database, text, ...parameters).map(row => row.id)
 }
 
-describe('the queue reads its own declaration (A-130 criterion 9)', () => {
+describe('the queue reads its own declaration (A-130 criterion 10)', () => {
   test('search reaches the name, the address and the student number', async () => {
     await withDatabase((database) => {
       person(database, 'u-1', 'Ivy Ivory')
