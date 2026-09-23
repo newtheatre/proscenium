@@ -42,6 +42,16 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
+function all<T>(statement: string, ...parameters: unknown[]): T[] {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query(statement).all(...parameters as never[]) as T[]
+  }
+  finally {
+    database.close()
+  }
+}
+
 function write(statement: string, ...parameters: unknown[]): void {
   const database = new Database(app.databaseFile)
   try {
@@ -545,8 +555,9 @@ describe.skipIf(skip !== null)('a promotion is told once (G-106)', () => {
     const people = [await member(), await member(), await member()]
     for (const person of people) await signUp(session, person.cookie)
 
-    expect((await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })).status)
-      .toBe(200)
+    const answered = await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toMatchObject({ capacity: 1, promoted: 0, movedBack: 2 })
 
     const listing = await (await send('GET', '/api/training/sessions', undefined, people[2]!.cookie)).json() as
       { items: { id: string, placed: boolean, waitlistPosition: number | null }[] }
@@ -554,6 +565,60 @@ describe.skipIf(skip !== null)('a promotion is told once (G-106)', () => {
     expect(theirs?.placed).toBe(false)
     expect(theirs?.waitlistPosition).toBe(2)
     expect(read<{ n: number }>('SELECT count(*) n FROM session_attendees WHERE session_id = ?', session)?.n).toBe(3)
+  })
+
+  // Criterion 6, decided on issue 1062: a place taken away is told, the same way one given is.
+  test('a capacity drop emails everybody it moves back, once, with their waiting number', async () => {
+    const module = await addModule()
+    const session = await schedule({ moduleIds: [module], capacity: 3 })
+    const people = [await member(), await member(), await member(), await member()]
+    for (const person of people) await signUp(session, person.cookie)
+
+    const lowered = await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    expect(await lowered.json()).toMatchObject({ movedBack: 2 })
+
+    const told = (userId: string): { status: string, subject: string }[] => all(
+      `SELECT status, subject FROM notification_log
+       WHERE type = 'training.session.demoted' AND user_id = ? AND claim IS NOT NULL`, userId,
+    )
+    expect(told(people[0]!.id)).toEqual([])
+    expect(told(people[3]!.id)).toEqual([])
+    for (const person of [people[1]!, people[2]!]) {
+      expect(told(person.id)).toHaveLength(1)
+      expect(told(person.id)[0]).toMatchObject({ status: 'SENT' })
+      expect(told(person.id)[0]!.subject).toContain('waiting list')
+    }
+
+    // Asking for the same capacity again is no change, so nobody hears a second time.
+    await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    expect(told(people[1]!.id)).toHaveLength(1)
+  })
+
+  test('a member moved back and promoted again is told again', async () => {
+    const module = await addModule()
+    const session = await schedule({ moduleIds: [module], capacity: 2 })
+    const first = await member()
+    const second = await member()
+    await signUp(session, first.cookie)
+    await signUp(session, second.cookie)
+
+    const claims = (type: string): number => read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE type = ? AND user_id = ? AND claim IS NOT NULL`,
+      type, second.id,
+    )!.n
+
+    await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    expect(claims('training.session.demoted')).toBe(1)
+
+    const raised = await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 2 })
+    expect(await raised.json()).toMatchObject({ promoted: 1, movedBack: 0 })
+    expect(claims('training.session.promoted')).toBe(1)
+
+    // Round again: each move is its own claim, so each is its own email.
+    await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 1 })
+    await send('POST', `/api/admin/training/sessions/${session}/capacity`, { capacity: 2 })
+    expect(claims('training.session.demoted')).toBe(2)
+    expect(claims('training.session.promoted')).toBe(2)
   })
 
   test('a member cannot change a session\'s capacity', async () => {

@@ -1,6 +1,9 @@
 import { asc, eq, sql } from 'drizzle-orm'
 import {
   blockingGaps,
+  demotedBy,
+  demotionClaimFor,
+  movedBackCount,
   placesFrom,
   promotedBy,
   promotionClaimFor,
@@ -11,6 +14,7 @@ import {
 import type { ClosureReason, Place, SignUpOrder, SignUpStatus, SignUpWindow } from '#shared/utils/training-signup'
 import { prerequisiteGaps } from '#shared/utils/training'
 import type { PrerequisiteGap } from '#shared/utils/training'
+import type { TemplateContext } from '#server/utils/templates'
 import type { H3Event } from 'h3'
 
 // Reading and writing sign-ups. Nothing here stores a place: every answer is the order against
@@ -228,6 +232,17 @@ export async function sessionsForMember(
   })
 }
 
+// What a promotion and a move back both say about the session they concern.
+function placeMessageContext(event: H3Event | undefined, session: SignUpSession): TemplateContext {
+  return {
+    name: '',
+    heldOn: session.heldOn,
+    startsAt: session.startsAt,
+    modules: session.modules.map(module => ({ id: module.id, name: module.name })),
+    sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,
+  }
+}
+
 // Everybody who moved into a place since `before`, told once each. Transactional: it reads no
 // sweep switch, so a promotion goes out whatever the sweeps are set to (G-106 criterion 5).
 export async function notifyPromotions(
@@ -242,11 +257,15 @@ export async function notifyPromotions(
   const session = await sessionForSignUp(sessionId)
   if (!session) return 0
 
+  const movedBack = await movedBackClaims(sessionId)
   let sent = 0
   for (const place of promoted) {
     // The claim is written before the message is composed, so a second process finds it and
     // sends nothing rather than reading a ledger another one is still writing (0006).
-    const key = promotionClaimFor(sessionId, place.userId, place.signedUpAt)
+    const key = promotionClaimFor(
+      sessionId, place.userId, place.signedUpAt,
+      movedBackCount(movedBack, sessionId, place.userId, place.signedUpAt),
+    )
     const took = await claimNotification({
       userId: place.userId,
       type: 'training.session.promoted',
@@ -260,12 +279,62 @@ export async function notifyPromotions(
       userId: place.userId,
       claim: key,
       context: {
-        name: '',
-        heldOn: session.heldOn,
-        startsAt: session.startsAt,
+        ...placeMessageContext(event, session),
         where: session.place ?? 'a place the trainer will confirm',
-        modules: session.modules.map(module => ({ id: module.id, name: module.name })),
-        sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,
+      },
+    })
+    sent++
+  }
+  return sent
+}
+
+// Every move-back claim on one session, read once and scoped by the session rather than by a list
+// of who was moved, so a long list binds nothing extra (0003).
+async function movedBackClaims(sessionId: string): Promise<string[]> {
+  const rows = await db.select({ claim: schema.notificationLog.claim })
+    .from(schema.notificationLog)
+    .where(sql`${schema.notificationLog.sessionId} = ${sessionId}
+      and ${schema.notificationLog.type} = 'training.session.demoted'
+      and ${schema.notificationLog.claim} is not null`)
+  return rows.flatMap(row => row.claim ? [row.claim] : [])
+}
+
+// Everybody a capacity drop moved from a place back to waiting, told once each with their number.
+// Transactional for the same reason a promotion is: nobody should arrive for a place they lost.
+export async function notifyDemotions(
+  event: H3Event | undefined,
+  sessionId: string,
+  before: Place[],
+): Promise<number> {
+  const after = await placesOnSession(sessionId)
+  const moved = demotedBy(before, after.places)
+  if (moved.length === 0) return 0
+
+  const session = await sessionForSignUp(sessionId)
+  if (!session) return 0
+
+  const earlier = await movedBackClaims(sessionId)
+  let sent = 0
+  for (const place of moved) {
+    const key = demotionClaimFor(
+      sessionId, place.userId, place.signedUpAt,
+      movedBackCount(earlier, sessionId, place.userId, place.signedUpAt),
+    )
+    const took = await claimNotification({
+      userId: place.userId,
+      type: 'training.session.demoted',
+      key,
+      sessionId,
+    })
+    if (!took) continue
+
+    await notify(event, {
+      type: 'training.session.demoted',
+      userId: place.userId,
+      claim: key,
+      context: {
+        ...placeMessageContext(event, session),
+        position: place.waitlistPosition ?? 1,
       },
     })
     sent++
