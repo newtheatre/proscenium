@@ -20,8 +20,7 @@ export default defineEventHandler(async (event) => {
 
   const applied = await auditedWrite(db.all<{ id: string }>(removeOpeningShiftStatement(id)), entry)
   if (!applied) {
-    const now = await openingShiftDetail(id)
-    const remaining = await openingSlotsRemaining(held.openingId)
+    const [now, remaining] = await Promise.all([openingShiftDetail(id), openingSlotsRemaining(held.openingId)])
     throw createError({ statusCode: 409, statusMessage: openingSlotRemoveRefusal(now, remaining) })
   }
 

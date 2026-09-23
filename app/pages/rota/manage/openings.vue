@@ -195,9 +195,9 @@ async function addSlot(opening: Opening): Promise<void> {
   adding.value = opening.openingId
   failure.value = null
   try {
-    const answer = await $fetch<{ slot: number | null }>(`/api/rota/openings/${opening.openingId}/slots`, { method: 'POST' })
+    const answer = await $fetch<{ slot: number }>(`/api/rota/openings/${opening.openingId}/slots`, { method: 'POST' })
     toast.add({
-      title: answer.slot ? `Slot ${answer.slot} added` : 'Slot added',
+      title: `Slot ${answer.slot} added`,
       description: `For ${opening.label} only. The venue's template is unchanged.`,
       icon: 'i-lucide-check',
       color: 'success',
