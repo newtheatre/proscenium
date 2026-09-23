@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auditEntry } from './audit'
 import { constraintRefusal } from './constraint-refusal'
 import { endOfTerm, londonDayField, londonDay } from './membership'
+import { PERMISSION_MAP, ROLES } from './roles'
 import type { AuditRow } from './audit'
 import type { MembershipTerm } from './membership'
 import type { SQL } from 'drizzle-orm'
@@ -191,4 +192,27 @@ export function declineClaimStatements(input: ClaimDecline): SQL[] {
       set status = 'DECLINED', reason = ${input.reason}, decided_by = ${input.actorId}, decided_at = ${input.now}
       where id = ${input.claimId} and exists ${open}`,
   ]
+}
+
+// One waiting-claims notice per officer per London day, however often the sweep runs (A-130).
+export function claimsWaitingClaimFor(userId: string, day: string): string {
+  return `membership.claims.waiting:${userId}:${day}`
+}
+
+// How many claims wait and since when; an erased person's claim is nobody's to answer.
+export function waitingClaimsStatement(): SQL {
+  return sql`select count(*) as waiting, min(c.created_at) as oldest
+    from membership_claims c join users u on u.id = c.user_id
+    where c.status = 'OPEN' and u.anonymised_at is null`
+}
+
+// Everybody who can decide a claim: a live members.write grant on a reachable account. The role
+// list is the permission map's, a constant, never a list read from rows (0006).
+export function claimsDecidersStatement(now: number): SQL {
+  const roles = ROLES.filter(role => PERMISSION_MAP[role].includes('members.write'))
+  return sql`select distinct u.id as id from role_grants g join users u on u.id = g.user_id
+    where g.role in (${sql.join(roles.map(role => sql`${role}`), sql`, `)})
+      and (g.expires_at is null or g.expires_at > ${now})
+      and u.anonymised_at is null and u.disabled = 0 and u.verified = 1
+    order by u.id`
 }

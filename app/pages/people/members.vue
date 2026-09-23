@@ -114,6 +114,8 @@ function clear(): void {
 const filterOptions = computed<FilterOption[]>(() => membershipsList.fields[0]!.options.map(option =>
   option.value === AWAITING_RECORD && waiting.value !== null ? { ...option, label: `${option.label} (${waiting.value})` } : option))
 
+const nav = useNavCounts()
+
 async function countWaiting(): Promise<void> {
   try {
     const answer = await $fetch<ClaimListing>('/api/admin/memberships/claims', { query: { pageSize: 1 } })
@@ -123,6 +125,11 @@ async function countWaiting(): Promise<void> {
     waiting.value = null
   }
 }
+
+// The sidebar's count follows what this screen knows, so deciding a claim moves both at once.
+watch(waiting, (count) => {
+  if (count !== null && writes.value) nav.counts.value = { ...nav.counts.value, 'membership-claims': count }
+})
 
 async function load(): Promise<void> {
   loading.value = true

@@ -50,6 +50,17 @@ export interface NavEntry {
   // The footer column this entry sits under. Public entries only, and required of them, so a new
   // public page joins a column by saying which rather than by being listed a second time.
   group?: PublicGroup
+  // A queue waiting behind this entry, counted on the sidebar so it is seen from any screen.
+  count?: NavCount
+}
+
+export const NAV_COUNTS = ['membership-claims'] as const
+
+export type NavCount = (typeof NAV_COUNTS)[number]
+
+// What a group or an entry shows: the sum of the counts its visible entries carry (A-130).
+export function navCount(items: readonly NavEntry[], counts: Partial<Record<NavCount, number>>): number {
+  return items.reduce((sum, entry) => sum + (entry.count ? counts[entry.count] ?? 0 : 0), 0)
 }
 
 // The work of a week against what a committee configures once and leaves alone (0082).
@@ -184,7 +195,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     items: [
       { label: 'Accounts', icon: 'i-lucide-user-round', to: '/people/accounts', ability: viewAccounts },
       { label: 'Roles', icon: 'i-lucide-shield', to: '/people/roles', ability: viewAccounts },
-      { label: 'Members', icon: 'i-lucide-badge-check', to: '/people/members', ability: viewMembers },
+      { label: 'Members', icon: 'i-lucide-badge-check', to: '/people/members', ability: viewMembers, count: 'membership-claims' },
       { label: 'Fellows', icon: 'i-lucide-award', to: '/people/fellows', ability: viewFellows },
     ],
   },

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { can } from '#shared/utils/abilities'
-import { CONSOLE_HOME, CONSOLE_NAV, groupFor } from '#shared/utils/site-nav'
+import { CONSOLE_HOME, CONSOLE_NAV, groupFor, navCount } from '#shared/utils/site-nav'
 import type { NavEntry, NavSection } from '#shared/utils/site-nav'
 import type { NavigationMenuItem } from '@nuxt/ui'
 
@@ -16,11 +16,20 @@ const groups = computed(() => CONSOLE_NAV
   .map(group => ({ ...group, items: group.items.filter(entry => can(viewer.value, entry.ability)) }))
   .filter(group => group.items.length > 0))
 
+// A waiting queue is counted on its entry and on its group, so a closed group still says so.
+const { counts, refresh } = useNavCounts()
+onMounted(refresh)
+watch(() => route.path, refresh)
+
+const badge = (count: number): NavigationMenuItem['badge'] =>
+  count > 0 ? { label: String(count), color: 'warning', variant: 'subtle', size: 'sm' } : undefined
+
 const link = (entry: NavEntry): NavigationMenuItem => ({
   label: entry.label,
   icon: entry.icon,
   to: entry.to,
   exact: entry.exact,
+  badge: badge(navCount([entry], counts.value)),
 })
 
 // A group opens when the route lands in it and stays open until the officer closes it, so moving
@@ -51,6 +60,7 @@ function items(collapsed: boolean): NavigationMenuItem[][] {
     label: group.label,
     icon: group.icon,
     value: group.key,
+    badge: badge(navCount(group.items, counts.value)),
     children: withSections(group.items, collapsed),
   }))
   const dev: NavigationMenuItem[] = import.meta.dev
