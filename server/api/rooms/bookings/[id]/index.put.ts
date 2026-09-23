@@ -80,21 +80,21 @@ export default defineEventHandler(async (event) => {
   // Stays a request whatever the verdict: the approvers were asked, and an edit does not answer.
   const edited = await editPending({ ...after, id, userId: account.id, restartClock, now: nowSeconds })
 
-  if (!edited.won && edited.why === 'missing') {
-    throw createError({ statusCode: 404, statusMessage: 'That is not your booking' })
-  }
-  if (!edited.won && edited.why === 'settled') {
-    throw createError({ statusCode: 409, statusMessage: 'That booking has already been decided' })
-  }
-  if (!edited.won && edited.why === 'gone') {
-    throw createError({ statusCode: 410, statusMessage: 'That room is no longer bookable' })
-  }
   if (!edited.won) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'Somebody already holds that slot, so your request is as it was',
-      data: { conflicts: maskConflicts(edited.conflicts, permissions.has('rooms.read')) },
-    })
+    switch (edited.why) {
+      case 'missing':
+        throw createError({ statusCode: 404, statusMessage: 'That is not your booking' })
+      case 'settled':
+        throw createError({ statusCode: 409, statusMessage: 'That booking has already been decided' })
+      case 'gone':
+        throw createError({ statusCode: 410, statusMessage: 'That room is no longer bookable' })
+      case 'conflict':
+        throw createError({
+          statusCode: 409,
+          statusMessage: 'Somebody already holds that slot, so your request is as it was',
+          data: { conflicts: maskConflicts(edited.conflicts, permissions.has('rooms.read')) },
+        })
+    }
   }
 
   await db.insert(schema.auditLog).values(auditEntry({
