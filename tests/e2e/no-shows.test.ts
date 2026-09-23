@@ -152,6 +152,21 @@ describe.skipIf(skip !== null)('a correction supersedes, never edits (criterion 
     expect(read<{ kind: string }>('SELECT kind FROM room_no_shows WHERE id = ?', id)?.kind).toBe('RECORDED')
   })
 
+  // The console's row reads the standing record off the list, and withdraws by that id (criterion 7).
+  test('the officer\'s list names the standing record, and forgets it once withdrawn', async () => {
+    const booking = pastBooking()
+    const { id } = await (await mark(booking)).json() as { id: string }
+    const listed = async (): Promise<string | null | undefined> => {
+      const body = await (await send('GET', `/api/admin/rooms/bookings?past=true&room=is:${room}&sort=bookedOrder&direction=desc`, null, officer))
+        .json() as { items: { id: string, noShowId: string | null }[] }
+      return body.items.find(item => item.id === booking)?.noShowId
+    }
+
+    expect(await listed()).toBe(id)
+    await send('POST', `/api/admin/rooms/no-shows/${id}/withdraw`, { reason: 'Recorded against the wrong booking' }, officer)
+    expect(await listed()).toBeNull()
+  })
+
   test('a withdrawal needs a reason', async () => {
     const { id } = await (await mark(pastBooking())).json() as { id: string }
     expect((await send('POST', `/api/admin/rooms/no-shows/${id}/withdraw`, {}, officer)).status).toBe(400)
