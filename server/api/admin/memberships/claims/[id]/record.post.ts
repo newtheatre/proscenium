@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { endOfTerm } from '#shared/utils/membership'
-import { recordClaimStatements, studentIdConstraintRefusal } from '#shared/utils/membership-claims'
+import { recordClaimStatements } from '#shared/utils/membership-claims'
 import type { MembershipTerm } from '#shared/utils/membership'
 
 // Record a claim: the number to the account, the membership row the A-117 route writes with the
@@ -43,7 +43,8 @@ export default defineEventHandler(async (event) => {
     }),
   }
 
-  const statements = recordClaimStatements({
+  // A number another account holds fails the whole batch on its index: nothing is written (0047).
+  await batchMembershipWrites(recordClaimStatements({
     claimId: id,
     userId: claim.userId,
     studentId: claim.studentId,
@@ -52,16 +53,7 @@ export default defineEventHandler(async (event) => {
     actorId,
     now,
     entries,
-  }).map(statement => db.run(statement))
-  // A number another account holds fails the whole batch on its index: nothing is written (0047).
-  try {
-    await db.batch([statements[0]!, ...statements.slice(1)])
-  }
-  catch (error) {
-    const refusal = studentIdConstraintRefusal(error)
-    if (refusal) throw createError(refusal)
-    throw error
-  }
+  }))
 
   // Every write was guarded on the claim still being open, so the loser of a race wrote nothing:
   // the membership row is the proof of who won (0006).
