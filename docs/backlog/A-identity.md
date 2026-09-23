@@ -341,8 +341,18 @@ Open questions for the committee:
   6. An account's own page is reached from the directory and says so: it carries the way back to
      the directory, and it draws a skeleton of the cards that are coming while it loads rather
      than an empty page that fills without warning.
+  7. An account's own page shows the Workspace address its first Google sign-in will claim, and an
+     administrator holding `accounts.create` sets, changes or clears it there (A-104 criterion 6).
+     Clearing it asks for confirmation first, because the person would then get a second, empty
+     account on their next Google sign-in. The field is not offered on an account already linked to
+     Google or erased. The Add someone dialogue takes an optional Workspace address as well, pre-linked
+     in the same batch that makes the account. An address that some account is already pre-linked
+     to is refused as the new account's address, naming that account, the same way the role
+     register's fallback refuses it (0088), and so is a Workspace address that already leads to
+     another account. Added 23 September 2026 (issue 1061): this is the way to pre-link that 0088's
+     consequences recorded as missing.
 - Source: Audit SD-8 (filters and banners carry); Prompt Book A-4. Criterion 6 comes from the
-  console review of 21 September 2026 (issue 1151 item 10).
+  console review of 21 September 2026 (issue 1151 item 10). Criterion 7 comes from issue 1061.
 
 ## A-122: Force logout, disable and reset MFA
 
@@ -633,7 +643,9 @@ Open questions for the committee:
   6. The audit detail says the grant is pending and never carries the address or the name
      (0011).
 - Source: Feedback, 22 September 2026 (issue 1212); accepted by the IT Manager on 23 September
-  2026 with the address as the picker's fallback only.
+  2026 with the address as the picker's fallback only. 0088's last consequence records that nothing
+  could set a pre-link (issue 1061); since 23 September 2026 A-104 criterion 6 and A-121
+  criterion 7 do, and 0088 itself stands unedited as an accepted record.
 
 ## A-133: One role for the Front of House and Box Office Manager
 

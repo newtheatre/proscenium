@@ -59,6 +59,9 @@ the screens are for.
   ::card{icon="i-lucide-coins" title="Money" to="/docs/money"}
   The money dashboard, revenue by show, comps and discounts, reconciliation, the ledger, periods and exports.
   ::
+  ::card{icon="i-lucide-chart-line" title="Reports" to="/docs/reports"}
+  Incident trends, and each performance's attendance and staffing, across any period.
+  ::
   ::card{icon="i-lucide-send" title="Communications" to="/docs/communications"}
   Announcements, the send log and what goes out on its own.
   ::

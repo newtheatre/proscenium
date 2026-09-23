@@ -2,7 +2,9 @@
 import { can, exportFinance, manageNominalMappings } from '#shared/utils/abilities'
 import { describeKind } from '#shared/utils/ledger'
 import type { EntrySource } from '#shared/utils/ledger'
-import type { NominalMapping } from '#shared/utils/su-export'
+import { SU_EXPORT_KINDS, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportLines } from '#shared/utils/su-export'
+import type { FinanceSeason } from '#shared/utils/season-dashboard'
+import type { NominalMapping, SuExportCoverage } from '#shared/utils/su-export'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Exports', middleware: 'console', docs: '/docs/money/exports' })
@@ -69,13 +71,30 @@ const columns: TableColumn<NominalMapping>[] = [
   { id: 'act', header: ACTIONS_HEADER },
 ]
 
-const today = londonDay(new Date())
-const from = ref(today)
-const to = ref(today)
+// The yearly return is the reason this screen exists, so it opens on this year (I-108 criterion 4).
+// Seasons come through the finance gate this screen already holds; a term is any two days.
+const periodForm = await usePeriodForm('su-export-period-choices', () => request<{ seasons: FinanceSeason[] }>('/api/admin/finance/seasons')
+  .then(response => ({ terms: [], seasons: response.seasons })), {
+  kinds: SU_EXPORT_KINDS,
+  customRange: true,
+  labels: { YEAR: 'Year', SEASON: 'Season', TERM: 'Custom range' },
+})
+const { complete, query } = periodForm
+const params = computed(() => (complete.value ? query.value : null))
 
 // A GET link, not a fetch: the browser follows the content-disposition header and saves the
 // file itself, the same shape bar/reports.vue's own CSV export already uses.
-const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParams({ fromDay: from.value, toDay: to.value }).toString()}`)
+const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParams(params.value ?? {}).toString()}`)
+
+const { data: coverage, error: coverageError } = await useAsyncData(
+  'su-export-coverage',
+  () => (mayExport.value && params.value
+    ? request<SuExportCoverage>('/api/admin/finance/export/coverage', { query: params.value })
+    : Promise.resolve(null)),
+  { watch: [params] },
+)
+const coverageFailure = computed(() => (coverageError.value ? refusalText(coverageError.value, 'What this export covers could not be read.') : null))
+const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
 </script>
 
 <template>
@@ -89,14 +108,7 @@ const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParam
       </h2>
       <AdminToolbar :filterable="false">
         <template #actions>
-          <DateField
-            v-model="from"
-            data-test="export-from"
-          />
-          <DateField
-            v-model="to"
-            data-test="export-to"
-          />
+          <PeriodFields :form="periodForm" />
           <UButton
             v-if="mayExport"
             data-test="export-csv"
@@ -104,12 +116,41 @@ const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParam
             :to="exportUrl"
             external
             target="_blank"
-            :disabled="!from || !to || to < from"
+            :disabled="!params || overCap"
           >
             Export CSV
           </UButton>
         </template>
       </AdminToolbar>
+
+      <UAlert
+        v-if="coverageFailure"
+        data-test="export-status-failure"
+        color="error"
+        variant="subtle"
+        :description="coverageFailure"
+      />
+      <UAlert
+        v-else-if="overCap"
+        data-test="export-over-cap"
+        color="error"
+        variant="subtle"
+        :description="suExportCapRefusal()"
+      />
+      <p
+        v-if="coverage"
+        class="text-sm text-muted"
+        data-test="export-status"
+      >
+        {{ saysDay(coverage.fromDay, { year: true }) }} to {{ saysDay(coverage.toDay, { year: true }) }},
+        {{ suExportLines(coverage.rows) }}.
+        <template v-if="coverage.closed">
+          <strong>Closed</strong>: nothing can post into these days, so taking the export again gives the same file unless a nominal code below is changed.
+        </template>
+        <template v-else>
+          <strong>Open</strong>: the figures may still move until the period is closed, so treat the file as provisional.
+        </template>
+      </p>
     </section>
 
     <section
