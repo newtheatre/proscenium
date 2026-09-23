@@ -194,6 +194,33 @@ describe.skipIf(skip !== null)('a venue template is the front of house officer\'
     expect((await send('PUT', '/api/admin/rota/templates/venue-nobody-has', { slots: HOUSE_SLOTS })).status).toBe(404)
   })
 
+  test('an external venue is not listed, is refused a template and a stamp, and takes shifts by hand (issue 1210)', async () => {
+    const away = programme('external')
+    const database = new Database(app.databaseFile)
+    try {
+      database.run('UPDATE venues SET is_external = 1 WHERE id = ?', [away.venueId])
+    }
+    finally {
+      database.close()
+    }
+
+    expect((await templates(foh.cookie)).map(venue => venue.venueId)).not.toContain(away.venueId)
+
+    const set = await send('PUT', `/api/admin/rota/templates/${away.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
+    expect(set.status).toBe(409)
+    expect((await set.json() as { statusMessage: string }).statusMessage).toContain('rota board')
+
+    const stamp = await send('POST', `/api/admin/rota/templates/${away.venueId}/stamp`, {}, foh.cookie)
+    expect(stamp.status).toBe(409)
+    expect((await stamp.json() as { statusMessage: string }).statusMessage).toContain('rota board')
+
+    const added = await send('POST', '/api/admin/rota/shifts/add', {
+      performanceId: away.performanceId, role: 'DUTY_MANAGER', slot: 1,
+    }, foh.cookie)
+    expect(added.status).toBe(200)
+    expect(shiftsOn(away.performanceId).map(shift => `${shift.role}:${shift.slot}`)).toEqual(['DUTY_MANAGER:1'])
+  })
+
   test('an ordinary member reads and writes nothing here', async () => {
     expect((await send('GET', '/api/admin/rota/templates', undefined, member.cookie)).status).toBe(403)
     expect((await send('PUT', `/api/admin/rota/templates/${house.venueId}`, { slots: HOUSE_SLOTS }, member.cookie)).status).toBe(403)

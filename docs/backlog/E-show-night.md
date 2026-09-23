@@ -42,7 +42,8 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   2. Templates are editable by the FOH officer and administrators; every change is audited with a from/to diff.
   3. Editing a template affects only performances stamped afterwards; rotas already stamped are untouched.
   4. A performance created in a venue with no template stamps zero slots and immediately appears in the unstaffed escalation (E-108) rather than failing silently.
-- Source: Prompt Book E-1; audit PR-13; get-in disposition (rota carries).
+  5. Added 23 September 2026 (issue 1210): a template belongs to one of our own current venues. The templates screen and its count list neither an external venue nor a retired one; setting a template on an external venue is refused, as is stamping one, and the refusal names the rota board. A performance at an external venue stamps nothing, even from a template the venue held before it was marked external, and does not fail; its shifts are added ad hoc on the rota board (E-107 criterion 5).
+- Source: Prompt Book E-1; audit PR-13; get-in disposition (rota carries); issue 1210.
 
 ## E-102: Stamping shifts onto performances
 
@@ -51,7 +52,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As the FOH officer, I want template slots stamped onto every performance automatically so that the rota exists the moment a performance does.
 - Depends on: E-101
 - Acceptance criteria:
-  1. Creating a performance stamps one open shift per template slot in the same transaction; a performance can never exist staffed-by-nothing while its venue has a template.
+  1. Creating a performance stamps one open shift per template slot in the same transaction; a performance can never exist staffed-by-nothing while its venue has a template. An external venue stamps nothing (E-101 criterion 5).
   2. A backfill action stamps missing slots for existing performances and is idempotent: running it twice creates no duplicate shifts, held by a uniqueness rule on (performance, slot).
   3. Stamped shifts are created OPEN with no person named, satisfying the E-106 constraint from birth.
   4. Cancelling a performance cancels its shifts; confirmed holders are notified, open shifts vanish from the claimable list.

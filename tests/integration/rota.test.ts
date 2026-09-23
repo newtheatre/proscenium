@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  addShiftStatement,
   approveShiftStatement,
   assignShiftStatement,
   backfillVenueStatement,
@@ -118,6 +119,49 @@ describe('a template stamps a rota onto a performance (E-102 criteria 1 and 3)',
       template(database, tonight.venueId)
       run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
       expect(shiftsOn(database, tonight.performanceId)).toEqual([])
+    })
+  })
+})
+
+// Marked external after a template was set is the only way one can hold a template at all,
+// since the write path refuses one; it still stamps nothing (E-101 criterion 5, issue 1210).
+function external(database: TestDatabase, venueId: string): void {
+  database.batch([['UPDATE venues SET is_external = 1 WHERE id = ?', venueId]])
+}
+
+describe('an external venue is staffed ad hoc, never from a template (E-101 criterion 5)', () => {
+  test('a performance at an external venue with no template stamps nothing and does not fail', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      external(database, tonight.venueId)
+      expect(() => run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))).not.toThrow()
+      expect(shiftsOn(database, tonight.performanceId)).toEqual([])
+    })
+  })
+
+  test('a template left on a venue since marked external is stamped by neither path', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId)
+      external(database, tonight.venueId)
+
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
+      run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
+      expect(shiftsOn(database, tonight.performanceId)).toEqual([])
+    })
+  })
+
+  test('an officer can still add a shift by hand at an external venue', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      external(database, tonight.venueId)
+
+      run(database, addShiftStatement('shift-external', {
+        performanceId: tonight.performanceId, role: 'DUTY_MANAGER', slot: 1,
+      }, 'actor', OFFSETS))
+
+      const added = shiftsOn(database, tonight.performanceId)
+      expect(added.map(shift => `${shift.role}:${shift.slot}:${shift.status}`)).toEqual(['DUTY_MANAGER:1:OPEN'])
     })
   })
 })

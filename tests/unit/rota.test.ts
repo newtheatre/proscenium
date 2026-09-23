@@ -4,6 +4,7 @@ import {
   approvalRefusal,
   ASSIGNED_SHIFT_STATUSES,
   COMMITTED_SHIFT_STATUSES,
+  externalVenueTemplateRefusal,
   MAX_SLOT_COUNT,
   reassignRefusal,
   releaseRefusal,
@@ -54,6 +55,18 @@ describe('every venue template holds exactly one duty manager (E-101 criterion 1
   // template rather than a template with no slots (E-101 criterion 4).
   test('an empty list is refused as a template', () => {
     expect(templateRefusal([])).not.toBeNull()
+  })
+})
+
+describe('an external venue holds no template (E-101 criterion 5, issue 1210)', () => {
+  test('one of our own venues may hold a template', () => {
+    expect(externalVenueTemplateRefusal({ name: 'Main House', isExternal: false })).toBeNull()
+  })
+
+  test('an external venue is refused by name and pointed at the rota board', () => {
+    const refusal = externalVenueTemplateRefusal({ name: 'The Union Hall', isExternal: true })
+    expect(refusal).toContain('The Union Hall')
+    expect(refusal).toContain('rota board')
   })
 })
 
