@@ -7,19 +7,17 @@ import type { BoundStatement } from './database'
 // 19:30 London, which is 15.5 hours after the night's 04:00 start whatever the clocks did.
 const CURTAIN_HOURS_AFTER_NIGHT_START = 15.5
 
-// Later of 19:30 and two hours from now, capped half an hour short of the 04:00 close (0014); in
-// that last half-hour, halfway from now to the close, so tonight's curtain is still to come (#1200).
+// Later of 19:30 and two hours from now, capped at 03:30 or halfway from now to the 04:00 close,
+// whichever is later (0014): the curtain stays at least half the remaining night ahead (#1200).
 function defaultCurtainHours(night: string, now: Date): number {
   const bounds = showNightBounds(night)
   const nightLengthHours = (bounds.to.getTime() - bounds.from.getTime()) / 3_600_000
   const hoursElapsed = (now.getTime() - bounds.from.getTime()) / 3_600_000
   const HOURS_AHEAD_OF_NOW = 2
   const CLOSE_MARGIN_HOURS = 0.5
-  const lastCurtain = nightLengthHours - CLOSE_MARGIN_HOURS
-  if (hoursElapsed >= lastCurtain && hoursElapsed < nightLengthHours) {
-    return (hoursElapsed + nightLengthHours) / 2
-  }
-  return Math.min(Math.max(CURTAIN_HOURS_AFTER_NIGHT_START, hoursElapsed + HOURS_AHEAD_OF_NOW), lastCurtain)
+  const halfwayToClose = hoursElapsed < nightLengthHours ? (hoursElapsed + nightLengthHours) / 2 : 0
+  const cap = Math.max(nightLengthHours - CLOSE_MARGIN_HOURS, halfwayToClose)
+  return Math.min(Math.max(CURTAIN_HOURS_AFTER_NIGHT_START, hoursElapsed + HOURS_AHEAD_OF_NOW), cap)
 }
 
 export interface TonightsPerformanceOptions {
@@ -87,7 +85,8 @@ export function tonightsPerformance(into: AcceptsStatements, options: TonightsPe
   const night = options.night ?? showNightOf(now)
   const suffix = options.suffix ?? 'a'
   const hours = options.curtainHoursAfterNightStart ?? defaultCurtainHours(night, now)
-  const startsAt = Math.floor(showNightBounds(night).from.getTime() / 1000) + Math.round(hours * 3600)
+  // Rounded down, so a curtain seeded in the night's last second never lands on the next night's start.
+  const startsAt = Math.floor(showNightBounds(night).from.getTime() / 1000) + Math.floor(hours * 3600)
 
   const venueId = options.venueId ?? `venue-${suffix}`
   const showId = `show-${suffix}`
