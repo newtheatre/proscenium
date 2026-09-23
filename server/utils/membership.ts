@@ -15,15 +15,13 @@ import type { SQL } from 'drizzle-orm'
 
 export const MEMBER_FILTERS = ['current', 'awaiting-check', 'lapsed', 'everyone'] as const
 
-function inTermPredicate(grace: number): SQL {
-  const today = londonDay(new Date())
-  return sql`${schema.memberships.startsOn} <= ${today}
-    and date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${today}`
-}
-
 // Not yet over, grace included: a renewal waiting to start is here as well as the running term.
 function notOverPredicate(grace: number): SQL {
   return sql`date(${schema.memberships.expiresOn}, ${`+${grace} days`}) >= ${londonDay(new Date())}`
+}
+
+function inTermPredicate(grace: number): SQL {
+  return sql`${schema.memberships.startsOn} <= ${londonDay(new Date())} and ${notOverPredicate(grace)}`
 }
 
 // The register's own four states; "awaiting record" is the claims queue, a different screen and
