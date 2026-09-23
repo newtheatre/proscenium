@@ -305,7 +305,7 @@ whichever call site remembered to catch it (I-107, and see "Period close" below)
 
 ### Period close (I-107)
 
-A period (a term, a season, any range the treasurer names) closes as a row in `period_locks`,
+A period (a term, a season, a year, any range the treasurer names) closes as a row in `period_locks`,
 never as a flag on the entries it covers: closing cannot mutate what it closes, the same rule
 that keeps the ledger itself append-only (0010). The enforcement is a single trigger,
 `ledger_entries_refuses_a_closed_period`, `BEFORE INSERT ON ledger_entries`: a day is locked if
@@ -326,7 +326,7 @@ range with no Z reading at all, and nights whose reading still carries an open v
 read from I-104's own outstanding-night queries rather than reimplemented. A warning is not a
 refusal; the treasurer closes past it if that is the right call.
 
-A term, unlike a season, has no fixed formula, so `periods` (`POST /api/admin/finance/terms`)
+A term, unlike a year, has no fixed formula, so `periods` (`POST /api/admin/finance/terms`)
 names one ahead of closing it: a label and a range, defined once. `shared/utils/season-dashboard.ts`'s
 `periodBounds()` gains a `TERM` kind that takes the range directly, the same as `DAY` and `WEEK`
 already do, so the file stays a pure function reading nothing from the database itself; the
@@ -1055,7 +1055,7 @@ reporting reaches through a second tap on the incident log screen rather than a 
 ### Cross-season report queries (E-126)
 
 Two result sets, both scoped by `periodBounds` (`server/utils/season-dashboard.ts`, I-103
-through I-107), reused as-is rather than a second resolver of when a season starts: the risk
+through I-107), reused as-is rather than a second resolver of when a year starts: the risk
 0009 and this story both depend on is three answers to that question, not the absence of a
 helper. `GET /api/admin/reports/incidents` groups `incidents` by category, severity and venue
 inside the range, with each dimension an optional filter; `GET /api/admin/reports/performances`
@@ -1563,10 +1563,10 @@ to a performance (E-127 criterion 1). `performancesOnNightQuery()` is the statem
 `performancesOnNight()` runs, exported so an integration test executes the real SQL; it binds two
 parameters, or three when narrowed by venue, however many performances the night holds (0006).
 
-### Season ticket export (D-129)
+### Ticket export (D-129)
 
 `GET /api/admin/tickets/export`, gated on `ticketing.export`, is the box office's own copy of
-season sales: one row per seat, filtered by show, performance, date range or season, and source.
+ticket sales: one row per seat, filtered by show, performance, date range or year, and source.
 `ticketExportQuery()` (`server/utils/ticket-export.ts`) fetches one row over the 20,000-row cap
 (`TICKET_EXPORT_CAP`), so the route can tell "exactly full" from "more exists" without a separate
 count; over the cap it 400s naming the guidance to narrow the filter, rather than truncating
@@ -1575,8 +1575,8 @@ silently (criterion 1). The column list is criterion 3 itself: `reference`, the 
 the source, the reservation's status read through `saysReservationStatus()` and whether the ticket
 is refunded; no customer name, no note of either kind, no access-profile data is ever selected.
 CSV goes through `toCsv()`/`csvField()` (`server/utils/csv.ts`), the same formula-injection guard
-E-119's export already uses. A `season` filter resolves through `resolveSeasonBounds()`
-(`shared/utils/ticket-export.ts`) against the `SEASON_START`/`SEASON_END` configuration keys,
+E-119's export already uses. A `year` filter resolves through `resolveYearBounds()`
+(`shared/utils/ticket-export.ts`) against the `YEAR_START`/`YEAR_END` configuration keys (0087),
 1 August to 31 July by default (criterion 5); an explicit `from`/`to` range is the alternative, not
 both at once. Every export writes a `tickets.exported` audit entry naming the actor, the filter
 and the row count, before the file body is built (criterion 4). `/box-office/shows` carries the

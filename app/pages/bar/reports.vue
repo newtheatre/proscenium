@@ -2,6 +2,7 @@
 import { h } from 'vue'
 import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
+import { currentYear, yearChoices } from '#shared/utils/year'
 import type {
   BarReport,
   CompRow,
@@ -21,7 +22,7 @@ definePageMeta({ layout: 'console', title: 'Reports', middleware: 'console', doc
 // Words, not the enum's own shouting-capitals spelling: the same treatment every other bar
 // screen gives a stored value (K-101).
 function saysReportPeriod(value: ReportPeriodKind): string {
-  return value === 'NIGHT' ? 'Night' : value === 'WEEK' ? 'Week' : value === 'SEASON' ? 'Season' : 'Custom range'
+  return value === 'NIGHT' ? 'Night' : value === 'WEEK' ? 'Week' : value === 'YEAR' ? 'Year' : 'Custom range'
 }
 
 const periodKindOptions = REPORT_PERIOD_KINDS.map(value => ({ label: saysReportPeriod(value), value }))
@@ -32,14 +33,15 @@ const today = londonDay(new Date())
 const kind = ref<(typeof REPORT_PERIOD_KINDS)[number]>('CUSTOM')
 const night = ref(today)
 const day = ref(today)
-const year = ref(new Date().getFullYear())
+const year = ref(currentYear())
+const years = yearChoices(year.value)
 const from = ref(today)
 const to = ref(today)
 
 const period = computed<ReportPeriodInput>(() => {
   if (kind.value === 'NIGHT') return { kind: 'NIGHT', night: night.value }
   if (kind.value === 'WEEK') return { kind: 'WEEK', day: day.value }
-  if (kind.value === 'SEASON') return { kind: 'SEASON', year: year.value }
+  if (kind.value === 'YEAR') return { kind: 'YEAR', year: year.value }
   return { kind: 'CUSTOM', from: from.value, to: to.value }
 })
 
@@ -47,7 +49,7 @@ const query = computed(() => {
   const base: Record<string, string> = { kind: period.value.kind }
   if (period.value.kind === 'NIGHT') base.night = period.value.night
   else if (period.value.kind === 'WEEK') base.day = period.value.day
-  else if (period.value.kind === 'SEASON') base.year = String(period.value.year)
+  else if (period.value.kind === 'YEAR') base.year = String(period.value.year)
   else {
     base.from = period.value.from
     base.to = period.value.to
@@ -177,12 +179,14 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
           />
         </UFormField>
         <UFormField
-          v-if="kind === 'SEASON'"
-          label="Season"
+          v-if="kind === 'YEAR'"
+          label="Year"
         >
-          <UInputNumber
+          <USelect
             v-model="year"
-            data-test="period-season"
+            data-test="period-year"
+            :items="years"
+            value-key="value"
           />
         </UFormField>
         <template v-if="kind === 'CUSTOM'">

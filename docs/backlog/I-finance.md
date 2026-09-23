@@ -113,7 +113,7 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
   2. Refund entries subtract from the show's reported revenue whenever they post, and the report states the gross, refunded and net figures separately.
   3. Door (walk-up) and pre-booked sales are distinguishable in every per-show report, because the source is recorded at the door in the new model.
   4. Pass-covered admissions report as zero-value admissions against the show; pass revenue reports at pass level with a per-admission utilisation figure, never double-counted into show revenue.
-  5. The sum of per-show figures reconciles to the season dashboard total in an automated test.
+  5. The sum of per-show figures reconciles to the money dashboard's year total in an automated test.
 - Source: Prompt Book I-1, D-7; audit PR-7 (collected unrefunded rule), PR-5 (walk-in source defect), PR-8
 
 ## I-107: Period close with locks

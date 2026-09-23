@@ -3,17 +3,17 @@ import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { PERIOD_KINDS } from '#shared/utils/season-dashboard'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
-import { currentSeasonYear, monthChoices, seasonChoices, yearChoices } from '#shared/utils/season'
+import { calendarYearChoices, currentYear, monthChoices, yearChoices } from '#shared/utils/year'
 import type { PeriodInput, PeriodKind, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { Period } from '#shared/utils/period-locks'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Season dashboard', middleware: 'console', docs: '/docs/money' })
+definePageMeta({ layout: 'console', title: 'Money dashboard', middleware: 'console', docs: '/docs/money' })
 
 const request = useRequestFetch()
 
 const today = londonDay(new Date())
-const currentYear = currentSeasonYear()
+const thisYear = currentYear()
 const { data: terms } = await useAsyncData(
   'finance-terms',
   () => request<{ periods: Period[] }>('/api/admin/finance/terms').then(response => response.periods),
@@ -24,18 +24,18 @@ const { data: terms } = await useAsyncData(
 // the range submitted is the defined term's own, never a rule this screen computes.
 const selectableKinds = computed(() => PERIOD_KINDS.filter(one => one !== 'TERM' || terms.value.length > 0))
 const termItems = computed(() => terms.value.map(one => ({ label: one.label, value: one.id })))
-const kind = ref<PeriodKind>('SEASON')
+const kind = ref<PeriodKind>('YEAR')
 const termId = ref(terms.value[0]?.id ?? '')
 const day = ref(today)
-const year = ref(currentYear)
-// A month's year is a calendar year and a season's is the year it ends in, so they are two
+const year = ref(thisYear)
+// A month's year is a calendar year and a 1 August year is the one it ends in, so they are two
 // controls and two lists, never one number standing for both.
 const monthYear = ref(Number(today.slice(0, 4)))
 const month = ref(Number(today.slice(5, 7)))
 
 const months = monthChoices()
-const seasons = seasonChoices(currentYear)
-const years = yearChoices(Number(today.slice(0, 4)))
+const years = yearChoices(thisYear)
+const calendarYears = calendarYearChoices(Number(today.slice(0, 4)))
 
 const term = computed(() => terms.value.find(one => one.id === termId.value) ?? terms.value[0])
 
@@ -44,7 +44,7 @@ const period = computed<PeriodInput>(() => {
   if (kind.value === 'WEEK') return { kind: 'WEEK', day: day.value }
   if (kind.value === 'MONTH') return { kind: 'MONTH', year: monthYear.value, month: month.value }
   if (kind.value === 'TERM' && term.value) return { kind: 'TERM', fromDay: term.value.fromDay, toDay: term.value.toDay }
-  return { kind: 'SEASON', year: year.value }
+  return { kind: 'YEAR', year: year.value }
 })
 
 const query = computed(() => {
@@ -54,7 +54,7 @@ const query = computed(() => {
     base.year = String(period.value.year)
     base.month = String(period.value.month)
   }
-  else if (period.value.kind === 'SEASON') base.year = String(period.value.year)
+  else if (period.value.kind === 'YEAR') base.year = String(period.value.year)
   else {
     base.fromDay = period.value.fromDay
     base.toDay = period.value.toDay
@@ -151,17 +151,17 @@ const figures = computed(() => (data.value
         <USelect
           v-if="kind === 'MONTH'"
           v-model="monthYear"
-          aria-label="Year"
-          data-test="period-year"
-          :items="years"
+          aria-label="Calendar year"
+          data-test="period-calendar-year"
+          :items="calendarYears"
           value-key="value"
         />
         <USelect
-          v-if="kind === 'SEASON'"
+          v-if="kind === 'YEAR'"
           v-model="year"
-          aria-label="Season"
-          data-test="period-season"
-          :items="seasons"
+          aria-label="Year"
+          data-test="period-year"
+          :items="years"
           value-key="value"
         />
       </template>

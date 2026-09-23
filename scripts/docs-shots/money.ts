@@ -22,10 +22,10 @@ export const money: Shot[] = [
     name: 'money/revenue-by-show',
     persona,
     url: '/money/shows',
-    marker: '[data-test="season-year"]',
+    marker: '[data-test="period-year"]',
     width: CONSOLE_WIDTH,
     annotations: [
-      { selector: '[data-test="season-year"]', label: 'Season year' },
+      { selector: '[data-test="period-year"]', label: 'Year' },
       { selector: '[data-test="refresh-revenue"]', label: 'Refresh' },
       { selector: '[data-test="show-row"]', label: 'A show\'s row' },
       { selector: '[data-test="section-passes"]', label: 'Pass utilisation' },
