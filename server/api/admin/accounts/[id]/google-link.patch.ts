@@ -35,10 +35,10 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, body)
   const email = preLinkAddress(input.googleEmail)
 
-  const account = await target(id)
+  const [account, holder] = await Promise.all([target(id), holderOf(id, email)])
   if (!account) throw noSuch('account')
 
-  const refusal = preLinkRefusal(account, email, await holderOf(id, email))
+  const refusal = preLinkRefusal(account, email, holder)
   if (refusal) throw createError(refusal)
   if (account.pendingGoogleEmail === email) return { ok: true, googleEmail: email, changed: false }
 
@@ -53,8 +53,8 @@ export default defineEventHandler(async (event) => {
   }
 
   // The predicate refused it: something changed between the read and the write, so say what.
-  const now = await target(id)
+  const [now, lateHolder] = await Promise.all([target(id), holderOf(id, email)])
   if (now && now.pendingGoogleEmail === email) return { ok: true, googleEmail: email, changed: false }
-  const late = now ? preLinkRefusal(now, email, await holderOf(id, email)) : null
+  const late = now ? preLinkRefusal(now, email, lateHolder) : null
   throw createError(late ?? { statusCode: 409, statusMessage: PRELINK_LOST_RACE })
 })

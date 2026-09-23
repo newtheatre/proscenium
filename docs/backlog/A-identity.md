@@ -155,7 +155,11 @@ Open questions for the committee:
   3. Confirming a first factor invalidates every other session on the account.
   4. Enrolment requires a session fresher than 10 minutes.
   5. TOTP secrets imported from the old estate work unchanged; no re-enrolment is required for TOTP.
-- Source: Prompt Book A-4; audit SD-5; Get-In part 3 (secrets port intact).
+  6. Removing the authenticator asks first, in the shared confirmation: it says that signing in
+     goes back to the password alone and that the recovery codes stop working, and nothing is
+     removed until the member confirms.
+- Source: Prompt Book A-4; audit SD-5; Get-In part 3 (secrets port intact); issue 1153 item 7
+  (criterion 6, the removal was one click).
 
 ## A-110: Mint and redeem recovery codes
 
@@ -214,7 +218,10 @@ Open questions for the committee:
   3. A password can never be added to a @newtheatre.org.uk account; the refusal names Google as the credential.
   4. Each method is listed with when it was added and last used; removing one sends a notification to the account's email.
   5. Unlinking Google is refused if it would leave no sign-in method.
-- Source: Prompt Book A-1; audit SD-6; Get-In constraint 3.
+  6. Removing a method asks first, in the shared confirmation, naming the method and saying it
+     stops working as a way in; nothing is removed until the member confirms.
+- Source: Prompt Book A-1; audit SD-6; Get-In constraint 3; issue 1153 item 7 (criterion 6, the
+  removal was one click).
 
 ## A-114: Edit a profile with stated audiences
 
@@ -500,7 +507,12 @@ Open questions for the committee:
   8. Tests cover: a passkey session satisfying the factor; a password session on a passkey-owning
      account not inheriting it; a stale confirmation refused; and a Workspace account offered no
      password field.
-- Source: Matt, 10 September 2026.
+  9. Confirming and re-authenticating are asked once each, in that order. A confirmed action that
+     meets a stale session opens the modal, and success runs that same confirmed action once,
+     without asking for the confirmation again; re-authenticating never runs an action the member
+     did not confirm, and backing out of either runs nothing.
+- Source: Matt, 10 September 2026; issue 1153 item 7 (criterion 9, destructive actions behind
+  the modal gained a confirmation of their own).
 
 ## A-130: Claim a membership bought at the SU
 
@@ -528,7 +540,11 @@ Open questions for the committee:
   7. Nothing here sells anything: SUMS remains the system of record (0005, 0031, A-202).
   8. How many claims are waiting is on the register's toolbar row, in reach without opening a
      panel: a queue nobody can see from the screen they are on is a queue nobody works.
-- Source: Pre-cutover review, 10 September 2026. The migration carries no memberships
+  9. Withdrawing an open claim asks first, in the shared confirmation, saying that nothing is
+     recorded from it and that a new claim can be made afterwards; nothing is withdrawn until the
+     member confirms.
+- Source: Pre-cutover review, 10 September 2026; issue 1153 item 7 (criterion 9, the withdrawal
+  was one click). The migration carries no memberships
   (`migration/identity.ts`), so at cutover every member reads as lapsed until recorded; this is
   the member-facing half of what A-201 does by upload.
 
