@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { auditEntry } from '#shared/utils/audit'
 import { erasureStatements } from '#shared/utils/erasure'
 import { endOfTerm } from '#shared/utils/membership'
-import { declineClaimStatements, grantMembershipStatements, recordClaimStatements, recordStudentId, studentIdConstraintRefusal } from '#shared/utils/membership-claims'
+import { claimsDecidersStatement, declineClaimStatements, grantMembershipStatements, waitingClaimsStatement, recordClaimStatements, recordStudentId, studentIdConstraintRefusal } from '#shared/utils/membership-claims'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -356,6 +356,57 @@ describe('the student number rides in the same batch as the membership (issue 10
       expect(rows(database, `SELECT id FROM users WHERE student_id = '20123456'`)).toHaveLength(1)
       expect(rows(database, `SELECT id FROM audit_log WHERE action = 'account.student-id.recorded'`)).toHaveLength(1)
       expect(rows(database, `SELECT id FROM membership_claims WHERE status = 'OPEN'`)).toHaveLength(1)
+    })
+  })
+})
+
+// Who is told that claims wait, and what they are told (A-130 criterion 11): every live holder
+// of members.write, and only while a claim is open on a person who still exists.
+describe('the waiting claims notice (issue 1005)', () => {
+  const now = 1_790_000_000
+  const read = <T>(database: TestDatabase, statement: ReturnType<typeof waitingClaimsStatement>): T[] => {
+    const [text, ...parameters] = boundStatement(database, statement)
+    return rows<T>(database, text, ...parameters)
+  }
+
+  test('the count is open claims on living accounts, and the oldest is when the first was made', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      database.batch([['INSERT INTO users (id, email, name, verified, anonymised_at) VALUES (?, ?, ?, 1, 1)', 'gone', 'gone@example.invalid', 'Gone']])
+      claim(database, { id: 'c-1', user_id: 'u1', created_at: 1_780_000_500 })
+      claim(database, { id: 'c-2', user_id: 'u2', created_at: 1_780_000_100 })
+      claim(database, { id: 'c-3', user_id: 'officer', status: 'DECLINED', created_at: 1_780_000_000 })
+      claim(database, { id: 'c-4', user_id: 'gone', created_at: 1_780_000_050 })
+
+      expect(read<{ waiting: number, oldest: number | null }>(database, waitingClaimsStatement())).toEqual([{ waiting: 2, oldest: 1_780_000_100 }])
+    })
+  })
+
+  test('nothing open reads as none, so the sweep sends nothing', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      claim(database, { id: 'c-1', status: 'RECORDED' })
+      expect(read<{ waiting: number }>(database, waitingClaimsStatement())[0]!.waiting).toBe(0)
+    })
+  })
+
+  test('the deciders are live holders of members.write on reachable accounts, each once', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      database.batch([
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'lapsed', 'lapsed@example.invalid', 'Lapsed'],
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 0)', 'unverified', 'unverified@example.invalid', 'Unverified'],
+        ['INSERT INTO users (id, email, name, verified, disabled) VALUES (?, ?, ?, 1, 1)', 'disabled', 'disabled@example.invalid', 'Disabled'],
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'reader', 'reader@example.invalid', 'Reader'],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g1', 'officer', 'MANAGER', now + 86_400],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g2', 'officer', 'ADMIN', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g3', 'lapsed', 'MANAGER', now - 1],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g4', 'unverified', 'MANAGER', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g5', 'disabled', 'MANAGER', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g6', 'reader', 'THEATRE_MANAGER', null],
+      ])
+
+      expect(read<{ id: string }>(database, claimsDecidersStatement(now)).map(row => row.id)).toEqual(['officer'])
     })
   })
 })

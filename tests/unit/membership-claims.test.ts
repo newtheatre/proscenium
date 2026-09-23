@@ -5,6 +5,7 @@ import {
   CLAIM_REASON_LIMIT,
   canTransition,
   claimDeclineForm,
+  claimsWaitingClaimFor,
   membershipClaimForm,
 } from '#shared/utils/membership-claims'
 import { MY_NAV } from '#shared/utils/site-nav'
@@ -87,5 +88,14 @@ describe('what the page says about a membership (A-130 criterion 4)', () => {
 describe('the members area reaches it (A-130 criterion 4)', () => {
   test('Membership is a MY_NAV entry', () => {
     expect(MY_NAV.find(entry => entry.to === '/account/membership')?.label).toBe('Membership')
+  })
+})
+
+// Once a day each, however many times the sweep runs (A-130 criterion 11).
+describe('the waiting claims notice is claimed per person per London day', () => {
+  test('two officers on one day, and one officer on two days, claim separately', () => {
+    expect(claimsWaitingClaimFor('a1', '2026-09-23')).toBe('membership.claims.waiting:a1:2026-09-23')
+    expect(claimsWaitingClaimFor('a1', '2026-09-23')).not.toBe(claimsWaitingClaimFor('a2', '2026-09-23'))
+    expect(claimsWaitingClaimFor('a1', '2026-09-23')).not.toBe(claimsWaitingClaimFor('a1', '2026-09-24'))
   })
 })

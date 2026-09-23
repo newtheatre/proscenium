@@ -19,6 +19,7 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'membership.expiring': 'ACCOUNTS',
   'membership.claim.recorded': 'ACCOUNTS',
   'membership.claim.declined': 'ACCOUNTS',
+  'membership.claims.waiting': 'ACCOUNTS',
   'role.expiring': 'ACCOUNTS',
   'role.expiry.digest': 'ACCOUNTS',
   'room.booking.confirmed': 'ROOMS',

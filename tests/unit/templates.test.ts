@@ -254,6 +254,17 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(html).not.toContain('membership secretary')
   })
 
+  test('the waiting claims notice counts them, says since when and links the queue (A-130 criterion 11)', () => {
+    const queue = 'https://newtheatre.org.uk/people/members?filter=awaiting-record'
+    const many = render('membership-claims-waiting', { ...EVERYTHING, count: 3, queueUrl: queue })
+    expect(many.subject).toBe('3 membership claims are waiting to be recorded')
+    expect(flat(many.html)).toContain('since Friday 2 October 2026 at 06:00')
+    expect(many.html).toContain(queue)
+    expect(many.text).toContain(queue)
+    expect(render('membership-claims-waiting', { ...EVERYTHING, count: 1, queueUrl: queue }).subject)
+      .toBe('1 membership claim is waiting to be recorded')
+  })
+
   test('the waiting officer notice carries the queue link', () => {
     const { html, text } = render('room-request-waiting', EVERYTHING)
     expect(html).toContain('https://newtheatre.org.uk/admin/requests')
