@@ -14,6 +14,7 @@ import {
 import type { ClosureReason, Place, SignUpOrder, SignUpStatus, SignUpWindow } from '#shared/utils/training-signup'
 import { prerequisiteGaps } from '#shared/utils/training'
 import type { PrerequisiteGap } from '#shared/utils/training'
+import type { TemplateContext } from '#server/utils/templates'
 import type { H3Event } from 'h3'
 
 // Reading and writing sign-ups. Nothing here stores a place: every answer is the order against
@@ -231,6 +232,17 @@ export async function sessionsForMember(
   })
 }
 
+// What a promotion and a move back both say about the session they concern.
+function placeMessageContext(event: H3Event | undefined, session: SignUpSession): TemplateContext {
+  return {
+    name: '',
+    heldOn: session.heldOn,
+    startsAt: session.startsAt,
+    modules: session.modules.map(module => ({ id: module.id, name: module.name })),
+    sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,
+  }
+}
+
 // Everybody who moved into a place since `before`, told once each. Transactional: it reads no
 // sweep switch, so a promotion goes out whatever the sweeps are set to (G-106 criterion 5).
 export async function notifyPromotions(
@@ -267,12 +279,8 @@ export async function notifyPromotions(
       userId: place.userId,
       claim: key,
       context: {
-        name: '',
-        heldOn: session.heldOn,
-        startsAt: session.startsAt,
+        ...placeMessageContext(event, session),
         where: session.place ?? 'a place the trainer will confirm',
-        modules: session.modules.map(module => ({ id: module.id, name: module.name })),
-        sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,
       },
     })
     sent++
@@ -325,12 +333,8 @@ export async function notifyDemotions(
       userId: place.userId,
       claim: key,
       context: {
-        name: '',
-        heldOn: session.heldOn,
-        startsAt: session.startsAt,
+        ...placeMessageContext(event, session),
         position: place.waitlistPosition ?? 1,
-        modules: session.modules.map(module => ({ id: module.id, name: module.name })),
-        sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,
       },
     })
     sent++

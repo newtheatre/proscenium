@@ -1,5 +1,5 @@
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
-import { refreshBadgeStatement, sessionCapacityForm } from '#shared/utils/training-signup'
+import { eq } from 'drizzle-orm'
+import { capacityChangeStatement, refreshBadgeStatement, sessionCapacityForm } from '#shared/utils/training-signup'
 
 // Change how many places a session has. Raising it promotes whoever the new room reaches, and
 // lowering it takes nobody off the list: they go back to waiting and are told (G-106 c1, c6).
@@ -32,24 +32,21 @@ export default defineEventHandler(async (event) => {
   const before = await placesOnSession(sessionId)
   if (before.capacity === input.capacity) return { ok: true, capacity: input.capacity, promoted: 0, movedBack: 0 }
 
-  await db.batch([
-    db.update(schema.trainingSessions)
-      .set({ capacity: input.capacity, updatedAt: sql`(unixepoch())` })
-      .where(and(
-        eq(schema.trainingSessions.id, sessionId),
-        inArray(schema.trainingSessions.status, ['PLANNED', 'OPEN', 'FULL']),
-        isNull(schema.trainingSessions.registerOpenedAt),
-      )),
-    // The badge follows the capacity in the same batch, so a session that just gained room never
-    // sits reading full and discouraging the sign-ups the trainer made space for.
-    db.run(refreshBadgeStatement(sessionId)),
-    db.insert(schema.auditLog).values(auditEntry({
+  const applied = await auditedWrite(
+    db.all<{ id: string }>(capacityChangeStatement(sessionId, before.capacity, input.capacity)),
+    auditEntry({
       actorId: resolved.account.id,
       action: 'session.capacity.changed',
       target: `session:${sessionId}`,
       detail: { from: before.capacity, to: input.capacity },
-    })),
-  ])
+    }),
+    // The badge follows the capacity in the same batch, so a session that just gained room never
+    // sits reading full and discouraging the sign-ups the trainer made space for.
+    db.run(refreshBadgeStatement(sessionId)),
+  )
+  if (!applied) {
+    throw createError({ statusCode: 409, statusMessage: 'That session changed while you were editing it, so open it again' })
+  }
 
   const promoted = await notifyPromotions(event, sessionId, before.places)
   const movedBack = await notifyDemotions(event, sessionId, before.places)

@@ -181,6 +181,17 @@ export function refreshBadgeStatement(sessionId: string): SQL {
   `
 }
 
+// The capacity it was read against rides the predicate, so of two trainers moving it at once one
+// applies and the other is refused, rather than both telling people off a stale order (0003).
+export function capacityChangeStatement(sessionId: string, from: number, to: number): SQL {
+  return sql`
+    update training_sessions set capacity = ${to}, updated_at = unixepoch()
+    where id = ${sessionId} and capacity = ${from}
+      and status in ('PLANNED', 'OPEN', 'FULL') and register_opened_at is null
+    returning id
+  `
+}
+
 export type ClosureReason = 'NOT_OPEN_YET' | 'REGISTER_OPEN' | 'CLOSE_TIME' | 'SESSION_DAY' | 'OFF'
 
 export interface SignUpWindow {
