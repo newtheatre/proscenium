@@ -1,7 +1,8 @@
 import { db, schema } from '@nuxthub/db'
-import { and, gt, isNull, lte, or, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, lte, or, sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING, 0055).
+import { isShadow } from './directory'
 import { tableColumns, whereFrom, yesNo } from './list-filters'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { rolesList } from '#shared/utils/roles-list'
@@ -22,6 +23,27 @@ const lapsed = (now: number): SQL => lte(schema.roleGrants.expiresAt, now)
 // A tombstone holds no office: "usable" excludes the anonymised the same way the last-admin
 // guard does (A-120 criterion 3). Erasure scrubs the note and leaves the row (0011).
 const heldByAnAccount = (): SQL => sql`${schema.users.anonymisedAt} is null`
+
+// Nobody can use it yet: A-116's claim, or a first sign-in, is what makes it held (A-132, 0088).
+const pendingHolder = (): SQL => and(isShadow(), isNull(schema.users.lastLoginAt))!
+
+const held = (): SQL => and(heldByAnAccount(), sql`not (${pendingHolder()})`)!
+
+// Pending grants are listed apart from the holders, live or lapsed alike (A-132 criterion 3).
+export function pendingClause(): SQL {
+  return and(heldByAnAccount(), pendingHolder())!
+}
+
+// Usable for the last-IT-Manager guard: live, on an account that is enabled, not erased and
+// not waiting for its first sign-in (A-120 criterion 3, 0088).
+export function usableHolderWhere(role: string, now: number): SQL {
+  return and(
+    eq(schema.roleGrants.role, role),
+    live(now),
+    eq(schema.users.disabled, false),
+    held(),
+  )!
+}
 
 export interface RolesQuery extends ListQuery {
   // Asks for lapsed grants without filtering to them, the way includeShadow does (0071).
@@ -55,8 +77,8 @@ export function grantsClause(query: RolesQuery, now: number): RolesClause {
 
   return {
     ...clause,
-    where: and(heldByAnAccount(), asked ? undefined : live(now), clause.where),
-    hiddenLapsed: asked ? undefined : and(heldByAnAccount(), lapsed(now), clause.where),
+    where: and(held(), asked ? undefined : live(now), clause.where),
+    hiddenLapsed: asked ? undefined : and(held(), lapsed(now), clause.where),
   }
 }
 
@@ -66,7 +88,7 @@ export function holderCountsStatement(now: number): SQL {
   return sql`select ${schema.roleGrants.role} as role, count(*) as holders
     from ${schema.roleGrants}
     join ${schema.users} on ${schema.users.id} = ${schema.roleGrants.userId}
-    where ${heldByAnAccount()} and ${live(now)}
+    where ${held()} and ${live(now)}
     group by ${schema.roleGrants.role}`
 }
 

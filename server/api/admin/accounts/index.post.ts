@@ -49,18 +49,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // A Workspace address signs in with Google and can hold no password, so it gets no link.
-  if (!isWorkspaceEmail(email)) {
-    const { plaintext, expiresAt } = await issueToken(id, 'SET_PASSWORD', await configValue(event, 'ADMIN_TOKEN_HOURS'))
-    await notify(event, {
-      type: 'account.set-password',
-      userId: id,
-      context: {
-        name: input.name,
-        url: `${useRuntimeConfig(event).public.baseURL}/reset?token=${plaintext}&kind=set`,
-        expiresAt,
-      },
-    })
-  }
+  if (!isWorkspaceEmail(email)) await inviteToSetPassword(event, id, input.name)
 
   return { ok: true, id, invited: !isWorkspaceEmail(email) }
 })
