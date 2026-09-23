@@ -86,7 +86,8 @@ Open questions for the committee:
   3. Nothing is ever written for a disabled account.
   4. A Google identity already linked to a different account is treated as a merge case (A-123) and refused with guidance, never silently re-linked.
   5. No password can ever be set on a Workspace account through any path (A-113); every password write boundary refuses.
-- Source: Prompt Book A-1; audit SD-3; Get-In constraint 3 (rule carries verbatim).
+  6. An administrator holding `accounts.create` sets or clears an account's pending link (0008). The address must be a Workspace one and is lowercased exactly as sign-in lowercases it. It is refused, naming the other account and pointing to account merge (A-123), when it is another account's address or another account's pending link; refused when the account already has a Google link or has been erased. The write carries those conditions as its predicate, so of two administrators pre-linking one address to two accounts at once exactly one succeeds. Setting and clearing are audited as `account.google.prelinked` and `account.google.unlinked` with no address in the detail (0011). Claiming the link keeps the account's own address; only the Google link is added. Added 23 September 2026 (issue 1061): the pending link was read and consumed here but nothing but the import ever wrote one.
+- Source: Prompt Book A-1; audit SD-3; Get-In constraint 3 (rule carries verbatim). Criterion 6 comes from issue 1061.
 
 ## A-105: Sign in with a passkey
 
