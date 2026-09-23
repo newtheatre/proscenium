@@ -9,6 +9,7 @@ import { BUMP_REASON_LIMIT, bumpForm } from '#shared/utils/tiers'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { Standing } from '#shared/utils/no-shows'
 import type { BumpInput } from '#shared/utils/tiers'
+import type { Page } from '#shared/utils/pagination'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Bookings', middleware: 'console', docs: '/docs/spaces/bookings' })
@@ -26,6 +27,7 @@ interface Booking {
   tier: string
   purpose: string | null
   status: string
+  convertedToRequestId: string | null
   attendees: number | null
   startsAt: number
   endsAt: number
@@ -36,14 +38,6 @@ interface Offer {
   room: string
   startsAt: number
   endsAt: number
-}
-
-interface Listing {
-  items: Booking[]
-  page: number
-  pageSize: number
-  total: number
-  pages: number
 }
 
 interface Alternatives { nearest: Offer | null, total: number }
@@ -65,11 +59,11 @@ const { search, conditions, sort, page, query, active, filtered, set, setSort, c
   options: computed(() => ({ room: roomOptions.value })),
 })
 
-const empty = (): Listing => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 })
+const empty = (): Page<Booking> => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 })
 
 const { data: listing, status, refresh, error } = await useAsyncData(
   'rooms-bookings',
-  () => request<Listing>('/api/admin/rooms/bookings', { query: query.value }),
+  () => request<Page<Booking>>('/api/admin/rooms/bookings', { query: query.value }),
   { watch: [query], default: empty },
 )
 

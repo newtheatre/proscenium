@@ -126,4 +126,12 @@ describe('a standing no-show is the latest entry, as the ladder counts it (C-116
       expect(ids(database, { noShow: 'true' })).toEqual(['b-missed'])
     })
   })
+
+  test('asking for bookings not marked keeps the past hidden until it is asked for too', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(ids(database, { noShow: 'false' })).toEqual(['b-soon', 'b-later'])
+      expect(ids(database, { noShow: 'false', past: 'true' })).toEqual(['b-withdrawn'])
+    })
+  })
 })

@@ -25,6 +25,7 @@ export default defineEventHandler(async (event) => {
     tier: schema.roomBookings.tier,
     purpose: schema.roomBookings.purpose,
     status: schema.roomBookings.status,
+    convertedToRequestId: schema.roomBookings.convertedToRequestId,
     attendees: schema.roomBookings.attendees,
     startsAt: schema.roomBookings.startsAt,
     endsAt: schema.roomBookings.endsAt,

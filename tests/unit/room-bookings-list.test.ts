@@ -44,6 +44,10 @@ describe('the columns are an allow-list (C-115 criterion 6, 0011)', () => {
     }
   })
 
+  test('a booking moved to a room we do not manage says so, as the member\'s own view does', async () => {
+    expect(await read(ROUTE)).toContain('convertedToRequestId: schema.roomBookings.convertedToRequestId')
+  })
+
   test('the select names its columns rather than taking the whole row', async () => {
     const source = await read(ROUTE)
     expect(source).not.toMatch(/db\.select\(\)\s*\.from\(schema\.roomBookings\)/)
@@ -53,7 +57,7 @@ describe('the columns are an allow-list (C-115 criterion 6, 0011)', () => {
 describe('the screen reads through the declaration (K-129)', () => {
   test('filters, search, sort and page live in the URL', async () => {
     const source = await read(PAGE)
-    expect(source).toContain('useListQuery(roomBookingsList)')
+    expect(source).toContain('useListQuery(roomBookingsList')
     expect(source).toContain('<ConsoleFilters')
     expect(source).toContain('<UPagination')
     expect(source).toContain('\'/api/admin/rooms/bookings\'')

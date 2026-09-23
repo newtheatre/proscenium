@@ -2,7 +2,7 @@ import { schema } from '@nuxthub/db'
 import { and, gt, lte, sql } from 'drizzle-orm'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { roomBookingsList } from '#shared/utils/room-bookings-list'
-import { tableColumns, whereFrom, yesNo } from './list-filters'
+import { tableColumns, whereFrom, yes, yesNo } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { ListClause, Reference } from './list-filters'
 
@@ -32,7 +32,9 @@ export function bookingsClause(query: ListQuery, now: number): ListClause {
       noShow: yesNo(sql`${standingNoShow} IS NOT NULL`),
     },
   })
-  // A no-show is always in the past, so asking for one is asking for the past as well.
-  const asked = conditionsOf(roomBookingsList, query).some(condition => condition.key === 'past' || condition.key === 'noShow')
+  // A no-show is always in the past, so asking for one is asking for the past as well; asking
+  // for bookings not marked is not.
+  const asked = conditionsOf(roomBookingsList, query)
+    .some(condition => condition.key === 'past' || (condition.key === 'noShow' && yes(condition)))
   return asked ? clause : { ...clause, where: and(gt(schema.roomBookings.endsAt, now), clause.where) }
 }

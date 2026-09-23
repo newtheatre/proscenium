@@ -33,6 +33,7 @@ const SHOW_NIGHT_FILES = [
   'shared/utils/door.ts',
   'shared/utils/incidents.ts',
   'shared/utils/night-hub.ts',
+  'shared/utils/night-signoff.ts',
   'shared/utils/sale.ts',
   'shared/utils/till.ts',
   'shared/utils/tonight.ts',

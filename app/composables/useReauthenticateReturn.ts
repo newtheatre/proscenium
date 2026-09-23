@@ -7,7 +7,7 @@ export function useReauthenticateReturn(): void {
 
   onMounted(() => {
     if (route.query.reauthenticated !== '1') return
-    toast.add({ title: 'Confirmed. Try that again.', icon: 'i-lucide-shield-check', color: 'success' })
+    toast.add({ title: 'Confirmed, try that again', icon: 'i-lucide-shield-check', color: 'success' })
     const query = { ...route.query }
     delete query.reauthenticated
     void router.replace({ query })
