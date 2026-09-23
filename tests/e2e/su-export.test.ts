@@ -178,10 +178,10 @@ describe.skipIf(skip !== null)('the yearly return by name: a year or a season (c
   })
 
   test('the status says what a download would cover without taking one, for the exporter only', async () => {
-    const answered = await send('GET', `/api/admin/finance/export/status?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
+    const answered = await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
     expect(answered.status).toBe(200)
     expect(await answered.json()).toEqual({ fromDay: '2011-08-01', toDay: '2012-07-31', rows: 1, closed: false })
-    expect((await send('GET', `/api/admin/finance/export/status?kind=YEAR&year=${YEAR}`, undefined, front.cookie)).status).toBe(403)
+    expect((await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, front.cookie)).status).toBe(403)
   })
 
   test('once the year is closed, two runs are byte-identical and both say closed', async () => {
@@ -194,7 +194,7 @@ describe.skipIf(skip !== null)('the yearly return by name: a year or a season (c
     expect(second.headers.get('x-period-status')).toBe('closed')
     expect(new Uint8Array(await second.arrayBuffer())).toEqual(new Uint8Array(await first.arrayBuffer()))
 
-    const status = await send('GET', `/api/admin/finance/export/status?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
+    const status = await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
     expect(await status.json()).toMatchObject({ closed: true })
   })
 })

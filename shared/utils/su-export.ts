@@ -60,7 +60,7 @@ export const suExportForm = z.preprocess(
 
 export type SuExportPeriod = z.output<typeof suExportForm>
 
-// The query string both the download and its status read, so the two never describe different days.
+// The query string both the download and its coverage read, so the two never describe different days.
 export function suExportParams(period: SuExportPeriod): Record<string, string> {
   if (period.kind === 'YEAR') return { kind: 'YEAR', year: String(period.year) }
   if (period.kind === 'SEASON') return { kind: 'SEASON', seasonId: period.seasonId }
@@ -69,15 +69,21 @@ export function suExportParams(period: SuExportPeriod): Record<string, string> {
 
 // What the screen shows before the download: the days a choice resolves to, whether they are
 // closed (so two runs match), and whether the file would pass the cap.
-export interface SuExportStatus {
+export interface SuExportCoverage {
   fromDay: string
   toDay: string
   rows: number
   closed: boolean
 }
 
+const britishDigits = new Intl.NumberFormat('en-GB')
+
+export function suExportLines(rows: number): string {
+  return `${britishDigits.format(rows)} ${rows === 1 ? 'line' : 'lines'}`
+}
+
 export function suExportCapRefusal(): string {
-  return `This export would return more than ${new Intl.NumberFormat('en-GB').format(SU_EXPORT_ROW_CAP)} `
+  return `This export would return more than ${britishDigits.format(SU_EXPORT_ROW_CAP)} `
     + 'rows. Narrow the date range and try again.'
 }
 

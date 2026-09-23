@@ -1147,7 +1147,7 @@ figures for the same range, because nothing here computes a total at all. Rows a
 truncated silently. The export is audited (`finance.exported`) with who, when and the range.
 An open range exports anyway, permitted rather than refused: the `x-period-status` response
 header says `closed` or `open`, read from `period_locks` the same way a single day is (I-107).
-`GET /api/admin/finance/export/status` takes the same query and answers `{ fromDay, toDay, rows,
+`GET /api/admin/finance/export/coverage` takes the same query and answers `{ fromDay, toDay, rows,
 closed }` from a count over the same predicate, so the screen shows the period's state and the
 cap before anything is downloaded.
 

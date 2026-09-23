@@ -2,10 +2,10 @@
 import { can, exportFinance, manageNominalMappings } from '#shared/utils/abilities'
 import { describeKind } from '#shared/utils/ledger'
 import type { EntrySource } from '#shared/utils/ledger'
-import { SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportParams } from '#shared/utils/su-export'
+import { SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportLines, suExportParams } from '#shared/utils/su-export'
 import { currentYear, yearChoices } from '#shared/utils/year'
 import type { FinanceSeason } from '#shared/utils/season-dashboard'
-import type { NominalMapping, SuExportPeriod, SuExportStatus } from '#shared/utils/su-export'
+import type { NominalMapping, SuExportCoverage, SuExportPeriod } from '#shared/utils/su-export'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Exports', middleware: 'console', docs: '/docs/money/exports' })
@@ -105,15 +105,15 @@ const params = computed(() => (period.value ? suExportParams(period.value) : nul
 // file itself, the same shape bar/reports.vue's own CSV export already uses.
 const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParams(params.value ?? {}).toString()}`)
 
-const { data: exportStatus, error: statusError } = await useAsyncData(
-  'su-export-status',
+const { data: coverage, error: coverageError } = await useAsyncData(
+  'su-export-coverage',
   () => (mayExport.value && params.value
-    ? request<SuExportStatus>('/api/admin/finance/export/status', { query: params.value })
+    ? request<SuExportCoverage>('/api/admin/finance/export/coverage', { query: params.value })
     : Promise.resolve(null)),
   { watch: [params] },
 )
-const statusFailure = computed(() => (statusError.value ? refusalText(statusError.value, 'What this export covers could not be read.') : null))
-const overCap = computed(() => (exportStatus.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
+const coverageFailure = computed(() => (coverageError.value ? refusalText(coverageError.value, 'What this export covers could not be read.') : null))
+const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
 </script>
 
 <template>
@@ -175,11 +175,11 @@ const overCap = computed(() => (exportStatus.value?.rows ?? 0) > SU_EXPORT_ROW_C
       </AdminToolbar>
 
       <UAlert
-        v-if="statusFailure"
+        v-if="coverageFailure"
         data-test="export-status-failure"
         color="error"
         variant="subtle"
-        :description="statusFailure"
+        :description="coverageFailure"
       />
       <UAlert
         v-else-if="overCap"
@@ -189,13 +189,13 @@ const overCap = computed(() => (exportStatus.value?.rows ?? 0) > SU_EXPORT_ROW_C
         :description="suExportCapRefusal()"
       />
       <p
-        v-if="exportStatus"
+        v-if="coverage"
         class="text-sm text-muted"
         data-test="export-status"
       >
-        {{ saysDay(exportStatus.fromDay, { year: true }) }} to {{ saysDay(exportStatus.toDay, { year: true }) }},
-        {{ exportStatus.rows.toLocaleString('en-GB') }} {{ exportStatus.rows === 1 ? 'line' : 'lines' }}.
-        <template v-if="exportStatus.closed">
+        {{ saysDay(coverage.fromDay, { year: true }) }} to {{ saysDay(coverage.toDay, { year: true }) }},
+        {{ suExportLines(coverage.rows) }}.
+        <template v-if="coverage.closed">
           <strong>Closed</strong>: nothing can post into these days, so taking the export again gives the same file unless a nominal code below is changed.
         </template>
         <template v-else>

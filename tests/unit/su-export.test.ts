@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { exportRangeForm, formatPoundsForExport, LEDGER_POSTING_PAIRS, nominalMappingForm, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportCsvRows, suExportForm, suExportParams } from '#shared/utils/su-export'
+import { exportRangeForm, formatPoundsForExport, LEDGER_POSTING_PAIRS, nominalMappingForm, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportCsvRows, suExportForm, suExportLines, suExportParams } from '#shared/utils/su-export'
 import type { SuExportRow } from '#shared/utils/su-export'
 
 describe('mapping a (kind, source) pair to a nominal code (I-108 criterion 1)', () => {
@@ -103,5 +103,11 @@ describe('the file itself (criteria 2, 3, 4)', () => {
 
   test('the cap refusal names the cap, the same sentence the download refuses with', () => {
     expect(suExportCapRefusal()).toBe(`This export would return more than ${SU_EXPORT_ROW_CAP.toLocaleString('en-GB')} rows. Narrow the date range and try again.`)
+  })
+
+  test('the coverage line counts in British digits and agrees in number', () => {
+    expect(suExportLines(1)).toBe('1 line')
+    expect(suExportLines(0)).toBe('0 lines')
+    expect(suExportLines(12345)).toBe('12,345 lines')
   })
 })
