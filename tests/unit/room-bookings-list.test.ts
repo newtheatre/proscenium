@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { viewRooms } from '#shared/utils/abilities'
 import { fieldOf } from '#shared/utils/list-filters'
-import { roomBookingsList } from '#shared/utils/room-bookings-list'
+import { roomBookingsList, rowActionFor } from '#shared/utils/room-bookings-list'
 import { CONSOLE_NAV } from '#shared/utils/site-nav'
 
 // The officer's bookings list, read as source (C-115 criterion 6, issue 1049). What its filters
@@ -67,5 +67,73 @@ describe('the screen reads through the declaration (K-129)', () => {
   test('the navigation lists it for anybody who reads rooms', () => {
     const entry = CONSOLE_NAV.flatMap(group => group.items).find(item => item.to === '/rooms/manage/bookings')
     expect(entry?.ability).toBe(viewRooms)
+  })
+})
+
+describe('each row offers the one action its booking allows (C-115 criterion 7, C-116 criterion 7)', () => {
+  const NOW = 1_800_000_000
+  const booking = (over: Partial<{ status: string, endsAt: number, noShowId: string | null }> = {}) =>
+    ({ status: 'CONFIRMED', endsAt: NOW + 3600, noShowId: null, ...over })
+
+  test('a confirmed booking still to come may be bumped', () => {
+    expect(rowActionFor(booking(), NOW)).toBe('bump')
+  })
+
+  test('a confirmed booking that has ended may be marked, and one ending now has ended', () => {
+    expect(rowActionFor(booking({ endsAt: NOW - 1 }), NOW)).toBe('record')
+    expect(rowActionFor(booking({ endsAt: NOW }), NOW)).toBe('record')
+  })
+
+  test('a standing no-show may be withdrawn, and cannot be marked twice', () => {
+    expect(rowActionFor(booking({ endsAt: NOW - 1, noShowId: 'n-1' }), NOW)).toBe('withdraw')
+  })
+
+  test('anything not confirmed offers nothing', () => {
+    for (const status of ['PENDING_APPROVAL', 'REJECTED', 'CANCELLED', 'BUMPED']) {
+      expect(rowActionFor(booking({ status }), NOW)).toBeNull()
+      expect(rowActionFor(booking({ status, endsAt: NOW - 1 }), NOW)).toBeNull()
+    }
+  })
+})
+
+describe('the row actions reach their routes and confirm first (K-123, 0032)', () => {
+  test('bumping posts the bump form to its route, with the account chosen by the picker', async () => {
+    const source = await read(PAGE)
+    expect(source).toContain('/bump`')
+    expect(source).toContain(':schema="bumpForm"')
+    expect(source).toContain('<PersonPicker')
+    expect(source).toContain('BUMP_REASON_LIMIT')
+  })
+
+  test('the bump dialogue shows where the displaced member would go first', async () => {
+    const source = await read(PAGE)
+    expect(source).toContain('/alternatives`')
+    expect(source).toContain('data-test="bump-offer"')
+  })
+
+  test('a no-show is recorded and withdrawn through their own routes', async () => {
+    const source = await read(PAGE)
+    expect(source).toContain('/no-show`')
+    expect(source).toContain('/api/admin/rooms/no-shows/${')
+    expect(source).toContain('/withdraw`')
+  })
+
+  test('every one of the three confirms in the shared dialogue before it writes', async () => {
+    const source = await read(PAGE)
+    for (const name of ['bump-booking', 'record-no-show', 'withdraw-no-show']) {
+      expect(source).toContain(`name="${name}"`)
+    }
+    expect(source.match(/<ConfirmModal/g)?.length).toBe(3)
+  })
+
+  test('a withdrawal cannot be sent without its reason', async () => {
+    const source = await read(PAGE)
+    const withdrawing = source.slice(source.indexOf('name="withdraw-no-show"'))
+    expect(withdrawing.slice(0, withdrawing.indexOf('>'))).toContain(':disabled="!withdrawal.trim()"')
+  })
+
+  test('the actions appear only for somebody who may write rooms', async () => {
+    const source = await read(PAGE)
+    expect(source).toContain('can(useViewer().value, manageRoomsEstate)')
   })
 })
