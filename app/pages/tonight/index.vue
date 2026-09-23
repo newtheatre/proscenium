@@ -207,6 +207,13 @@ onUnmounted(() => {
         data-test="tile-checklist"
       />
       <NightTile
+        label="Night report"
+        hint="Read · sign off"
+        icon="i-lucide-file-signature"
+        :to="scoped('/tonight/report')"
+        data-test="tile-report"
+      />
+      <NightTile
         label="Challenge 25"
         hint="Log a check · register"
         icon="i-lucide-id-card"
