@@ -1816,7 +1816,10 @@ statement, so an edit that meets an approval, a cancel or a competing claim writ
 disambiguated afterwards (0003, 0006). The row stays `PENDING_APPROVAL` whatever the verdict.
 Moving it to another room or another London day sets `created_at` to the edit and clears
 `escalated_at`, so the sweep's two ages run again for what is now a different question; any other
-change leaves both alone. The audit entry (`room.request.edited`) carries the room, span, numbers,
+change leaves both alone. Because `created_at` can now move, the sweep's lapse and chase
+(`lapseStatement()`, `chaseStatement()`) carry the `created_at` they read, and the chase
+`escalated_at IS NULL`, on the statement, so an edit landing between the sweep's read and its
+write leaves the restarted wait untouched. The audit entry (`room.request.edited`) carries the room, span, numbers,
 tier and purpose from and to, and only the names of any rewritten title, notes or reason (0011).
 Occupancy: `CONFIRMED` and `PENDING_APPROVAL` hold their slot; the clash rule is half-open
 and rides the write as a predicate. `server/utils/bookings.ts` is the only writer, and it is one

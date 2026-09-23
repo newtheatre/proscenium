@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
 import { approveStatement } from '#server/utils/approvals'
-import { editPendingStatement } from '#server/utils/bookings'
+import { chaseStatement, editPendingStatement, lapseStatement } from '#server/utils/bookings'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { EditInput } from '#server/utils/bookings'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -212,6 +212,58 @@ describe('the escalation clock (issue 1055)', () => {
       seed(database, 'CONFIRMED')
       run(database, editPendingStatement(edit({ restartClock: true })))
       expect(asked(database)).toMatchObject({ created_at: CREATED, escalated_at: NOW - 6 * HOUR })
+    })
+  })
+})
+
+// The sweep reads every waiting request and writes later, so an edit can restart the clock in
+// between; the lapse and the chase are guarded on the age they read (0006).
+describe('an edit racing the morning sweep (C-108 criterion 3)', () => {
+  test('a request whose clock an edit restarted does not lapse on the stale read', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      run(database, editPendingStatement(edit({ roomId: 'r-green', restartClock: true })))
+      expect(run(database, lapseStatement('b-asked', CREATED, NOW))).toBe(0)
+      expect(asked(database).status).toBe('PENDING_APPROVAL')
+    })
+  })
+
+  test('an untouched request lapses', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(run(database, lapseStatement('b-asked', CREATED, NOW))).toBe(1)
+      expect(asked(database).status).toBe('REJECTED')
+    })
+  })
+
+  test('a chase does not overwrite the wait an edit has just restarted', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      database.batch([['UPDATE room_bookings SET escalated_at = NULL WHERE id = ?', 'b-asked']])
+      run(database, editPendingStatement(edit({ roomId: 'r-green', restartClock: true, now: NOW + HOUR })))
+      expect(run(database, chaseStatement('b-asked', CREATED, NOW + HOUR))).toBe(0)
+      expect(asked(database).escalated_at).toBeNull()
+    })
+  })
+
+  test('a request already chased or already decided is not chased again', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(run(database, chaseStatement('b-asked', CREATED, NOW))).toBe(0)
+    })
+    await withDatabase((database) => {
+      seed(database, 'CONFIRMED')
+      database.batch([['UPDATE room_bookings SET escalated_at = NULL WHERE id = ?', 'b-asked']])
+      expect(run(database, chaseStatement('b-asked', CREATED, NOW))).toBe(0)
+    })
+  })
+
+  test('an unchased request is chased once', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      database.batch([['UPDATE room_bookings SET escalated_at = NULL WHERE id = ?', 'b-asked']])
+      expect(run(database, chaseStatement('b-asked', CREATED, NOW))).toBe(1)
+      expect(asked(database).escalated_at).toBe(NOW)
     })
   })
 })

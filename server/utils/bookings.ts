@@ -145,6 +145,26 @@ export async function editPending(input: EditInput): Promise<EditOutcome> {
   }) }
 }
 
+// The morning sweep's writes, guarded on the age it read: an edit that restarted the clock since
+// (editPendingStatement) makes the lapse or the chase write nothing (0006, C-108 criterion 3).
+export function lapseStatement(id: string, createdAt: number, now: number): SQL {
+  return sql`
+    UPDATE room_bookings
+    SET status = 'REJECTED', rejection_reason = 'Nobody answered this in time, so it lapsed.', updated_at = ${now}
+    WHERE id = ${id} AND status = 'PENDING_APPROVAL' AND created_at = ${createdAt}
+    RETURNING title, starts_at AS startsAt
+  `
+}
+
+export function chaseStatement(id: string, createdAt: number, now: number): SQL {
+  return sql`
+    UPDATE room_bookings
+    SET escalated_at = ${now}
+    WHERE id = ${id} AND status = 'PENDING_APPROVAL' AND created_at = ${createdAt} AND escalated_at IS NULL
+    RETURNING title, starts_at AS startsAt
+  `
+}
+
 async function whyItFailed(input: ClaimInput): Promise<ClaimOutcome> {
   const [room] = await db.select({ id: schema.rooms.id })
     .from(schema.rooms)
