@@ -265,6 +265,20 @@ describe('the rewritten bodies and subjects (item 7)', () => {
       .toBe('1 membership claim is waiting to be recorded')
   })
 
+  // A-202, issue 1005: the SU's page where it is configured, and a clean sentence where it is not.
+  test('the expiring and declined emails link the SU\'s purchase page only when there is one', () => {
+    const buy = 'https://su.example.invalid/buy/new-theatre'
+    for (const name of ['membership-expiring', 'membership-claim-declined']) {
+      const linked = render(name, { ...EVERYTHING, purchaseUrl: buy })
+      expect(linked.html).toContain(`href="${buy}"`)
+      expect(linked.text).toContain(buy)
+
+      const bare = render(name, { ...EVERYTHING, purchaseUrl: null })
+      expect(bare.html).not.toContain('su.example.invalid')
+      expect(`${bare.html} ${bare.text}`).not.toMatch(/undefined|null/)
+    }
+  })
+
   test('the waiting officer notice carries the queue link', () => {
     const { html, text } = render('room-request-waiting', EVERYTHING)
     expect(html).toContain('https://newtheatre.org.uk/admin/requests')

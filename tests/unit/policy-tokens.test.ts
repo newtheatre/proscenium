@@ -211,6 +211,29 @@ describe('what a page renders (criteria 2, 4, 5)', () => {
     expect(resolvePolicyTree(original, values)).toEqual(original)
   })
 
+  // J-110 criterion 6: an address is a link, and a sentence pointing at an unset one is left out.
+  test('a set address renders as a link, never marked unenforced', () => {
+    const linked: PolicyValues = { ...values, MEMBERSHIP_PURCHASE_URL: { text: 'https://su.example.invalid/buy', enforced: false } }
+    const resolved = resolvePolicyTree(tree(['p', {}, 'Buy it at the SU: {{MEMBERSHIP_PURCHASE_URL}}']), linked)
+    const rendered = JSON.stringify(resolved)
+    expect(rendered).toContain('"href":"https://su.example.invalid/buy"')
+    expect(rendered).toContain('policy-link')
+    expect(rendered).not.toContain('applied by hand')
+  })
+
+  test('a paragraph quoting an unset address is left out whole, and its neighbours stay', () => {
+    const resolved = resolvePolicyTree(tree(
+      ['p', {}, 'Sold by the SU.'],
+      ['p', {}, 'Buy it at the SU: {{MEMBERSHIP_PURCHASE_URL}}'],
+      ['p', {}, 'up to {{ROOM_MAX_BOOKING_HOURS}}'],
+    ), values)
+    const rendered = JSON.stringify(resolved)
+    expect(resolved.value).toHaveLength(2)
+    expect(rendered).not.toContain('Buy it at the SU')
+    expect(rendered).not.toContain('policy-error')
+    expect(rendered).toContain('Sold by the SU.')
+  })
+
   test('tokens inside a nested element resolve too, and their siblings survive', () => {
     const resolved = resolvePolicyTree(
       tree(['ul', {}, ['li', {}, 'at most ', ['strong', {}, '{{ROOM_MAX_BOOKING_HOURS}}'], ' each']]),
