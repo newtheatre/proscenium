@@ -30,19 +30,29 @@ export interface PendingGrant {
   entries: { created: AuditRow, granted: AuditRow }
 }
 
-function entry(row: AuditRow): SQL {
+// An imported account pre-linked to this address is who Google signs in first (A-104), so a
+// second account for it would take the grant away from the person it was meant for.
+export const PRE_LINKED = 'That address is waiting to be linked to an existing account. Find that account with the search instead.'
+
+function entry(row: AuditRow, made: SQL): SQL {
   return sql`insert into audit_log (id, actor_id, action, target, detail)
-    values (${row.id}, ${row.actorId}, ${row.action}, ${row.target}, ${row.detail === null ? null : JSON.stringify(row.detail)})`
+    select ${row.id}, ${row.actorId}, ${row.action}, ${row.target}, ${row.detail === null ? null : JSON.stringify(row.detail)}
+    where exists ${made}`
 }
 
-// The account, its grant and both trail entries, in the order the route batches them.
+// The account, its grant and both trail entries, in the order the route batches them. The account
+// is written only while no row is pre-linked to the address, and the rest only if it was (0003).
 export function pendingGrantStatements(input: PendingGrant): SQL[] {
+  const made = sql`(select 1 from users where id = ${input.userId})`
   return [
-    sql`insert into users (id, email, name) values (${input.userId}, ${input.email}, ${input.name})`,
-    entry(input.entries.created),
+    sql`insert into users (id, email, name)
+      select ${input.userId}, ${input.email}, ${input.name}
+      where not exists (select 1 from users where pending_google_email = ${input.email})`,
+    entry(input.entries.created, made),
     sql`insert into role_grants (id, user_id, role, expires_at, granted_by, note)
-      values (${input.grantId}, ${input.userId}, ${input.role}, ${input.expiresAt}, ${input.actorId}, ${input.note})`,
-    entry(input.entries.granted),
+      select ${input.grantId}, ${input.userId}, ${input.role}, ${input.expiresAt}, ${input.actorId}, ${input.note}
+      where exists ${made}`,
+    entry(input.entries.granted, made),
   ]
 }
 

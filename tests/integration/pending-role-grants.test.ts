@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
 import { auditEntry } from '#shared/utils/audit'
 import { filterQuerySchema } from '#shared/utils/list-filters'
-import { CHOOSE_INSTEAD, pendingGrantConstraintRefusal, pendingGrantDetail, pendingGrantStatements } from '#shared/utils/pending-grants'
+import { CHOOSE_INSTEAD, PRE_LINKED, pendingGrantConstraintRefusal, pendingGrantDetail, pendingGrantStatements } from '#shared/utils/pending-grants'
 import { rolesList } from '#shared/utils/roles-list'
 import { grantsClause, holderCountsStatement, pendingClause, usableHolderWhere } from '#server/utils/roles-register'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -54,7 +54,8 @@ function attemptGrant(database: TestDatabase, index: number, email = 'incoming@e
   catch (error) {
     return { status: pendingGrantConstraintRefusal(error)?.statusCode ?? 500 }
   }
-  return { status: 200 }
+  // The batch's own predicate refused it, as the route reads back after committing.
+  return { status: rows(database, 'SELECT id FROM users WHERE id = ?', userId).length ? 200 : 409 }
 }
 
 const listSchema = filterQuerySchema(rolesList)
@@ -119,6 +120,42 @@ describe('granting by address makes one shadow account holding the grant (criter
       expect(rows(database, `SELECT id FROM role_grants WHERE role = 'BAR_MANAGER'`)).toHaveLength(1)
       expect(rows(database, `SELECT id FROM audit_log WHERE action = 'role.granted'`)).toHaveLength(1)
       expect(rows(database, `SELECT id FROM audit_log WHERE action = 'account.created.console'`)).toHaveLength(1)
+    })
+  })
+})
+
+describe('an address pre-linked to an imported account is that account\'s (criterion 1, A-104)', () => {
+  function preLink(database: TestDatabase): void {
+    database.batch([[
+      'INSERT INTO users (id, email, name, pending_google_email) VALUES (?, ?, ?, ?)',
+      'jo',
+      'jo.personal@example.test',
+      'Jo Imported',
+      'jo@newtheatre.org.uk',
+    ]])
+  }
+
+  test('the batch writes nothing for it, even when no check ran first', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      preLink(database)
+      expect(attemptGrant(database, 0, 'jo@newtheatre.org.uk').status).toBe(409)
+      expect(rows(database, `SELECT id FROM users WHERE email = 'jo@newtheatre.org.uk'`)).toHaveLength(0)
+      expect(rows(database, `SELECT id FROM role_grants WHERE user_id = 'pending-0'`)).toHaveLength(0)
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(0)
+      expect(PRE_LINKED).toMatch(/search/)
+    })
+  })
+
+  test('racing grants to a pre-linked address all lose, and nothing is left behind', async () => {
+    await withDatabase(async (database) => {
+      seed(database)
+      preLink(database)
+      const answers = await race(3, async index => attemptGrant(database, index, 'jo@newtheatre.org.uk'))
+      expect(answers.map(answer => answer.status)).toEqual([409, 409, 409])
+      expect(rows(database, `SELECT id FROM users WHERE id LIKE 'pending-%'`)).toHaveLength(0)
+      expect(rows(database, `SELECT id FROM role_grants WHERE user_id LIKE 'pending-%'`)).toHaveLength(0)
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(0)
     })
   })
 })

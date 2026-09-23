@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { changes } from '#shared/utils/audit'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
-import { CHOOSE_INSTEAD, pendingGrantConstraintRefusal, pendingGrantDetail, pendingGrantStatements } from '#shared/utils/pending-grants'
+import { CHOOSE_INSTEAD, PRE_LINKED, pendingGrantConstraintRefusal, pendingGrantDetail, pendingGrantStatements } from '#shared/utils/pending-grants'
 import { ROLES } from '#shared/utils/roles'
 
 // Provenance on the grant, never in the audit trail's detail, which carries identifiers and never
@@ -38,6 +38,11 @@ export default defineEventHandler(async (event) => {
     const name = input.name!
     // The picker is the way to anybody with an account (K-123 criterion 1).
     if (await findByEmail(email)) throw createError({ statusCode: 409, statusMessage: CHOOSE_INSTEAD })
+    const [preLinked] = await db.select({ name: schema.users.name }).from(schema.users)
+      .where(eq(schema.users.pendingGoogleEmail, email)).limit(1)
+    if (preLinked) {
+      throw createError({ statusCode: 409, statusMessage: `That address is waiting to be linked to ${preLinked.name}'s account. Choose them with the search instead.` })
+    }
     if (undeliverableReason({ email, anonymisedAt: null })) {
       throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
     }
@@ -70,6 +75,8 @@ export default defineEventHandler(async (event) => {
       if (refusal) throw createError(refusal)
       throw error
     }
+    // The batch's own predicate refused it: a pre-link landed between the check and the write.
+    if (!await findById(userId)) throw createError({ statusCode: 409, statusMessage: PRE_LINKED })
 
     // A Workspace address is claimed by Google sign-in alone, so it is sent nothing (0008).
     if (!isWorkspaceEmail(email)) await inviteToSetPassword(event, userId, name)

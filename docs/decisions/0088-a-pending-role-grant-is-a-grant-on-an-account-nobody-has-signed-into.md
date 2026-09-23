@@ -28,7 +28,9 @@ race or forget.
 **Granting by email is the register's fallback when the picker finds nobody.** The grant route
 takes an address and a name in place of an account id, and only when no account holds that
 address; an address that has one is refused with the instruction to choose it, so the picker
-rule is unchanged for every existing account. The shadow account, its grant and both audit
+rule is unchanged for every existing account. An address some account is pre-linked to for
+Google (`pending_google_email`) is refused the same way, because that account is who the address
+signs in as. The shadow account, its grant and both audit
 entries are one batch, and the unique address on `users` is the conditional write: of two
 administrators granting the same address at once, exactly one account and one grant exist
 afterwards and the other is refused with the same instruction. It needs `accounts.create` as
@@ -59,9 +61,16 @@ console's Add someone sends.
   the person claims the account.
 - Revoking a pending grant leaves the shadow account behind, as the console's Add someone
   does; it is hidden from the directory (0071) and swept like any other shadow account.
-- This does not make 0008's `pending_google_email` pre-link reachable (issue 1061). That flow is
-  for an incoming officer who already has an account under a personal address and must gain a
-  Workspace link on it; the picker finds them, so the email fallback never applies.
+- An address that is some account's `pending_google_email` is refused as well. The import
+  carries that pre-link across (`migration/identity.ts`), and Google sign-in resolves it before
+  an address match (A-104 criterion 2), so a shadow account made for the same address would hold
+  a grant its person never signs into. The route checks it up front, naming the account to
+  choose, and the batch repeats it as the predicate on the account's insert, so a pre-link
+  landing in between still leaves nothing written.
+- This does not give an administrator a way to set a pre-link (issue 1061). That flow is for an
+  incoming officer who already has an account under a personal address and must gain a
+  Workspace link on it; the picker finds them, so the email fallback never applies. It only
+  keeps the fallback from colliding with a pre-link that already exists.
 
 ## Options considered
 

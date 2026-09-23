@@ -366,6 +366,17 @@ describe.skipIf(skip !== null)('a role is granted by address when the picker fin
     expect(read('SELECT id FROM role_grants WHERE user_id = ? AND role = ?', existing.id, 'COMMITTEE')).toBeUndefined()
   })
 
+  test('an address pre-linked to an imported account is refused, naming who to choose (A-104)', async () => {
+    const imported = await person('pre-linked')
+    const workspace = `pre-linked-${Math.floor(Math.random() * 1_000_000)}@newtheatre.org.uk`
+    write('UPDATE users SET pending_google_email = ? WHERE id = ?', workspace, imported.id)
+
+    const response = await send('POST', '/api/admin/roles', { email: workspace, name: 'Somebody Else', role: 'COMMITTEE' }, cookie)
+    expect(response.status).toBe(409)
+    expect((await response.json()).statusMessage ?? '').toContain(imported.name)
+    expect(read('SELECT id FROM users WHERE email = ?', workspace)).toBeUndefined()
+  })
+
   test('both an account and an address, or neither, is refused', async () => {
     const existing = await person('both-ways')
     expect((await send('POST', '/api/admin/roles', { userId: existing.id, email: registrableAddress('both'), name: 'Both', role: 'COMMITTEE' }, cookie)).status).toBe(400)
@@ -406,6 +417,17 @@ describe.skipIf(skip !== null)('a role is granted by address when the picker fin
       await click(view, '[data-test="grant-submit"]')
       await waitFor(view, `document.querySelector('[data-test="pending-grants"]')?.innerText.includes('Screen Incoming')`)
       expect(read('SELECT id FROM users WHERE email = ?', email)).toBeDefined()
+
+      // A granted address is not offered again: the fallback goes with the search that found nobody.
+      await waitFor(view, `document.querySelector('[data-test="grant-person"]')`)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
+
+      await fill(view, '[data-test="grant-person"] input', registrableAddress('screen-again'))
+      await waitFor(view, `document.querySelector('[data-test="grant-nobody-found"]')`, 20_000)
+      await click(view, '[data-test="grant-nobody-found"]')
+      await click(view, '[data-test="grant-search-again"]')
+      await waitFor(view, `document.querySelector('[data-test="grant-person"]')`)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
     }
     finally {
       view.close()

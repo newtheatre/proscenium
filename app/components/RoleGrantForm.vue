@@ -45,7 +45,9 @@ function grantByAddress(): void {
   byAddress.value = true
 }
 
+// The picker comes back empty-handed, so a stale "nobody" would offer the address just used.
 function searchAgain(): void {
+  nobody.value = null
   byAddress.value = false
   address.value = ''
   name.value = ''

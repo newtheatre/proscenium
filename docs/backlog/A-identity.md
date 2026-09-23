@@ -591,8 +591,8 @@ Open questions for the committee:
 - Acceptance criteria:
   1. Granting a role from `/people/roles` accepts an address and a name only when the person
      picker finds nobody, never as an alternative to picking an existing account: an address
-     that already has an account is refused with the instruction to choose it (K-123
-     criterion 1, 0032). It makes a shadow account holding the grant, and the grant takes effect
+     that already has an account, or that an account is pre-linked to for Google sign-in, is
+     refused with the instruction to choose that account (K-123 criterion 1, 0032, A-104). It makes a shadow account holding the grant, and the grant takes effect
      when that address claims the account by A-116's own mechanism, with no second claim step
      (0088).
   2. The account, the grant and their audit entries are one batch, and the unique address is
