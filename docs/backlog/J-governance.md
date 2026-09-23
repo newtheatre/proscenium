@@ -63,7 +63,15 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   3. A manual entry is signed: written against the authenticated officer entering it, from an MFA-verified session, with the stated real-world actor and date carried as structured fields distinct from the signer. Amended 29 August 2026: the real-world actor is an account reference and never a name, because a name is personal free text and the trail's only sanctioned edit is redaction. A person with no account cannot be named (0028).
   4. Manual entries are append-only under the same trigger as the rest of the trail.
   5. Search results export as CSV, and the export is itself audited.
-- Source: Prompt Book J-1 (signed manual entries, namespaced); audit SD-11 (manual.* namespace)
+  6. The trail names each entry's subject the way the rest of the console does: a person by their
+     account name, and a show, performance, season, venue, till, catalogue entry, room, space,
+     module, department, preset, checklist item or finance period by its own name (a performance
+     and a bar opening also by when they start, a till by its night), looked up as the trail renders so an erased
+     person reads as their tombstone. A subject with no readable name (a booking, a report, a
+     request whose title is somebody's own words) or one since deleted shows its raw target, never
+     a guess. The lookup is keyed on the target's kind and scopes by subquery, never by a list of
+     the page's ids (0006), and surfaces no personal free text (0011).
+- Source: Prompt Book J-1 (signed manual entries, namespaced); audit SD-11 (manual.* namespace). Criterion 6 comes from issue 1209.
 
 ## J-104: The configuration surface
 

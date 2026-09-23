@@ -581,6 +581,52 @@ export function rosterShiftsQuery(bounds: BoardBounds): SQL {
   `
 }
 
+export interface RosterOpening {
+  openingId: string
+  label: string
+  venueName: string
+  night: string
+  startsAt: number
+  endsAt: number
+}
+
+export interface RosterOpeningShiftRow {
+  openingId: string
+  shiftId: string
+  slot: number
+  status: ShiftStatus
+  holderName: string | null
+}
+
+// The board's second scope: a bar opening names no performance, so it is windowed on its own
+// start, the column the openings list's night filter reads too (E-130 criterion 8, 0077).
+const rosterOpeningScope = (bounds: BoardBounds): SQL => sql`
+  SELECT o.id FROM bar_openings o
+  WHERE o.status = 'PLANNED' AND o.starts_at >= ${bounds.from} AND o.starts_at < ${bounds.to}
+`
+
+export function rosterOpeningsQuery(bounds: BoardBounds): SQL {
+  return sql`
+    SELECT o.id AS openingId, o.label AS label, v.name AS venueName, o.night AS night,
+           o.starts_at AS startsAt, o.ends_at AS endsAt
+    FROM bar_openings o
+    JOIN venues v ON v.id = o.venue_id
+    WHERE o.id IN (${rosterOpeningScope(bounds)})
+    ORDER BY o.starts_at, o.id
+  `
+}
+
+export function rosterOpeningShiftsQuery(bounds: BoardBounds): SQL {
+  return sql`
+    SELECT s.opening_id AS openingId, s.id AS shiftId, s.slot AS slot, s.status AS status,
+           u.name AS holderName
+    FROM bar_opening_shifts s
+    LEFT JOIN users u ON u.id = s.user_id
+    WHERE s.opening_id IN (${rosterOpeningScope(bounds)}) AND s.status <> 'CANCELLED'
+    ORDER BY s.opening_id, s.slot
+  `
+}
+
 export interface PendingApprovalRow {
   shiftId: string
   role: ShiftRole

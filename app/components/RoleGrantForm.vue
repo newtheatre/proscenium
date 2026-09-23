@@ -34,6 +34,25 @@ const note = ref('')
 const working = ref(false)
 const failure = ref<string | null>(null)
 
+// The address is only ever the fallback once the picker has found nobody (A-132, K-123 criterion 1).
+const nobody = ref<string | null>(null)
+const byAddress = ref(false)
+const address = ref('')
+const name = ref('')
+
+function grantByAddress(): void {
+  address.value = nobody.value?.includes('@') ? nobody.value : ''
+  byAddress.value = true
+}
+
+// The picker comes back empty-handed, so a stale "nobody" would offer the address just used.
+function searchAgain(): void {
+  nobody.value = null
+  byAddress.value = false
+  address.value = ''
+  name.value = ''
+}
+
 watch(() => props.role, (role) => {
   chosenRole.value = role
 })
@@ -42,7 +61,8 @@ const offered = computed(() => ROLES
   .filter(role => !props.held.includes(role))
   .map(role => ({ label: saysRole(role), value: role })))
 
-const ready = computed(() => Boolean(chosenRole.value && chosenPerson.value && (until.value !== 'date' || day.value)))
+const someone = computed(() => byAddress.value ? Boolean(address.value.trim() && name.value.trim()) : Boolean(chosenPerson.value))
+const ready = computed(() => Boolean(chosenRole.value && someone.value && (until.value !== 'date' || day.value)))
 
 // Omitted is the committee year end, null is permanent, and a picked day expires at its last
 // instant in London, never at midnight UTC (0009, 0014).
@@ -60,13 +80,14 @@ async function grant(): Promise<void> {
     await $fetch('/api/admin/roles', {
       method: 'POST',
       body: {
-        userId: chosenPerson.value,
+        ...(byAddress.value ? { email: address.value.trim(), name: name.value.trim() } : { userId: chosenPerson.value }),
         role: chosenRole.value,
         ...expiry(),
         ...(note.value.trim() ? { note: note.value.trim() } : {}),
       },
     })
     if (!props.userId) chosenPerson.value = undefined
+    searchAgain()
     if (!props.role) chosenRole.value = undefined
     until.value = 'year'
     day.value = undefined
@@ -98,15 +119,63 @@ async function grant(): Promise<void> {
 
     <div class="grid gap-3 sm:grid-cols-2">
       <UFormField
-        v-if="!props.userId"
+        v-if="!props.userId && !byAddress"
         label="Who"
       >
         <PersonPicker
           v-model="chosenPerson"
           data-test="grant-person"
           placeholder="Search by name, address or student number"
+          @nobody="term => nobody = term"
         />
+        <UButton
+          v-if="nobody"
+          class="mt-1 p-0"
+          variant="link"
+          size="sm"
+          data-test="grant-nobody-found"
+          @click="grantByAddress"
+        >
+          Nobody found? Grant it by address before their first sign-in
+        </UButton>
       </UFormField>
+
+      <div
+        v-if="byAddress"
+        class="space-y-3 sm:col-span-2"
+        data-test="grant-by-email"
+      >
+        <p class="text-sm text-muted">
+          The role waits for them: it takes effect when this address first signs in. A theatre
+          address signs in with Google; any other address is sent a link to set a password.
+        </p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <UFormField label="Address">
+            <UInput
+              v-model="address"
+              type="email"
+              class="w-full"
+              data-test="grant-email"
+            />
+          </UFormField>
+          <UFormField label="Name">
+            <UInput
+              v-model="name"
+              class="w-full"
+              data-test="grant-name"
+            />
+          </UFormField>
+        </div>
+        <UButton
+          variant="link"
+          size="sm"
+          class="p-0"
+          data-test="grant-search-again"
+          @click="searchAgain"
+        >
+          Search again
+        </UButton>
+      </div>
 
       <UFormField
         v-if="!props.role"

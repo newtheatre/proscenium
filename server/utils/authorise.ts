@@ -81,16 +81,11 @@ export function owns(resolved: Authority, userId: string): boolean {
 // because it depends on every other row (A-120).
 export async function wouldStrandTheSystem(role: Role, userId: string, now = new Date()): Promise<boolean> {
   if (role !== PROTECTED_ROLE) return false
-  // Usable excludes disabled and anonymised accounts: a disabled second administrator does not
-  // satisfy the guard, or revoking the working one locks everybody out (A-120).
+  // Usable excludes disabled, anonymised and pending accounts: a disabled second administrator,
+  // or one who has never signed in, does not satisfy the guard (A-120, 0088).
   const holders = await db.select({ userId: schema.roleGrants.userId })
     .from(schema.roleGrants)
     .innerJoin(schema.users, eq(schema.users.id, schema.roleGrants.userId))
-    .where(and(
-      eq(schema.roleGrants.role, PROTECTED_ROLE),
-      or(isNull(schema.roleGrants.expiresAt), gt(schema.roleGrants.expiresAt, Math.floor(now.getTime() / 1000))),
-      eq(schema.users.disabled, false),
-      isNull(schema.users.anonymisedAt),
-    ))
+    .where(usableHolderWhere(PROTECTED_ROLE, Math.floor(now.getTime() / 1000)))
   return holders.filter(holder => holder.userId !== userId).length === 0
 }

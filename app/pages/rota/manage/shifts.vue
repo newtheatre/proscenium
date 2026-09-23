@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { saysDay, saysClock, saysDayLong } from '#shared/utils/when'
-import { defaultBoardWindow } from '#shared/utils/rota-board'
+import { defaultBoardWindow, openingsOnNightHref } from '#shared/utils/rota-board'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import type { BoardEntry } from '#shared/utils/rota-board'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
 definePageMeta({ layout: 'console', title: 'Rota board', middleware: 'console', docs: '/docs/rota/rota-board' })
@@ -23,6 +24,19 @@ interface RosterPerformance {
   shifts: RosterShift[]
 }
 
+// Shown, never acted on here: an opening is staffed on its own screen (E-130 criterion 8).
+interface RosterOpening {
+  openingId: string
+  label: string
+  venueName: string
+  night: string
+  startsAt: number
+  endsAt: number
+  shifts: { shiftId: string, slot: number, status: ShiftStatus, holderName: string | null }[]
+}
+
+type Board = { items: BoardEntry<RosterPerformance, RosterOpening>[] }
+
 interface Candidate { id: string, name: string, email: string, eligible: boolean }
 
 const request = useRequestFetch()
@@ -35,10 +49,10 @@ const window = reactive(defaultBoardWindow(new Date()))
 
 const { data, status, refresh } = await useAsyncData(
   'rota-shifts-board',
-  () => request<{ items: RosterPerformance[] }>('/api/admin/rota/shifts/board', {
+  () => request<Board>('/api/admin/rota/shifts/board', {
     query: { from: window.from, to: window.to },
   }),
-  { watch: [() => window.from, () => window.to], default: (): { items: RosterPerformance[] } => ({ items: [] }) },
+  { watch: [() => window.from, () => window.to], default: (): Board => ({ items: [] }) },
 )
 
 const opened = defaultBoardWindow(new Date())
@@ -57,12 +71,18 @@ function spanOf(startsAt: number): string {
   return `${saysDay(startsAt)} · ${saysClock(startsAt)}`
 }
 
-function confirmedCount(performance: RosterPerformance): number {
-  return performance.shifts.filter(shift => shift.status === 'CONFIRMED').length
+interface Staffed { shifts: { status: ShiftStatus }[] }
+
+function confirmedCount(entry: Staffed): number {
+  return entry.shifts.filter(shift => shift.status === 'CONFIRMED').length
 }
 
-function staffingLabel(performance: RosterPerformance): string {
-  return confirmedCount(performance) === performance.shifts.length ? 'Fully staffed' : 'Needs people'
+function staffingLabel(entry: Staffed): string {
+  return confirmedCount(entry) === entry.shifts.length ? 'Fully staffed' : 'Needs people'
+}
+
+function hoursOf(opening: RosterOpening): string {
+  return `${spanOf(opening.startsAt)} to ${saysClock(opening.endsAt)}`
 }
 
 const statusColor: Record<ShiftStatus, 'success' | 'warning' | 'neutral' | 'error'> = {
@@ -260,8 +280,9 @@ watch(modalOpen, (nowOpen) => {
       class="text-sm text-muted"
       data-test="board-empty"
     >
-      No performance between {{ saysDayLong(window.from) }} and {{ saysDayLong(window.to) }} carries
-      a shift. Widen the dates, or stamp a venue's template onto the diary.
+      No performance or bar opening between {{ saysDayLong(window.from) }} and
+      {{ saysDayLong(window.to) }} carries a shift. Widen the dates, or stamp a venue's template onto
+      the diary.
     </p>
 
     <div
@@ -269,40 +290,52 @@ watch(modalOpen, (nowOpen) => {
       class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
       data-test="rota-board"
     >
-      <UCard
-        v-for="performance in data.items"
-        :key="performance.performanceId"
-        :data-test="`performance-${performance.performanceId}`"
+      <template
+        v-for="entry in data.items"
+        :key="entry.kind === 'opening' ? `opening-${entry.openingId}` : `performance-${entry.performanceId}`"
       >
-        <template #header>
-          <div>
-            <p class="font-semibold">
-              {{ spanOf(performance.startsAt) }}
-            </p>
-            <p class="text-sm text-muted">
-              {{ performance.showTitle }}
-            </p>
-          </div>
-        </template>
-
-        <ul class="space-y-2">
-          <li
-            v-for="shift in performance.shifts"
-            :key="shift.shiftId"
-            class="flex items-center justify-between gap-2 rounded-lg border p-2"
-            :class="shift.status === 'OPEN' || shift.status === 'DECLINED' ? 'border-warning' : 'border-default'"
-            :data-test="`shift-${shift.shiftId}`"
-          >
+        <UCard
+          v-if="entry.kind === 'opening'"
+          class="ring-info/40 bg-info/5"
+          :data-test="`opening-${entry.openingId}`"
+        >
+          <template #header>
             <div>
-              <p class="text-xs text-muted">
-                {{ saysShiftRole(shift.role) }}
-              </p>
-              <p class="font-medium">
-                {{ shift.holderName ?? 'Unfilled' }}
+              <div class="flex items-center justify-between gap-2">
+                <p class="font-semibold">
+                  {{ hoursOf(entry) }}
+                </p>
+                <UBadge
+                  color="info"
+                  variant="subtle"
+                  size="sm"
+                  icon="i-lucide-beer"
+                >
+                  Bar opening
+                </UBadge>
+              </div>
+              <p class="text-sm text-muted">
+                {{ entry.label }} · {{ entry.venueName }}
               </p>
             </div>
+          </template>
 
-            <div class="flex items-center gap-2">
+          <ul class="space-y-2">
+            <li
+              v-for="shift in entry.shifts"
+              :key="shift.shiftId"
+              class="flex items-center justify-between gap-2 rounded-lg border p-2"
+              :class="shift.status === 'OPEN' || shift.status === 'DECLINED' ? 'border-warning' : 'border-default'"
+              :data-test="`opening-shift-${shift.shiftId}`"
+            >
+              <div>
+                <p class="text-xs text-muted">
+                  {{ saysShiftRole('BAR') }}
+                </p>
+                <p class="font-medium">
+                  {{ shift.holderName ?? 'Unfilled' }}
+                </p>
+              </div>
               <UBadge
                 :color="statusColor[shift.status]"
                 variant="subtle"
@@ -310,72 +343,147 @@ watch(modalOpen, (nowOpen) => {
               >
                 {{ saysShiftStatus(shift.status) }}
               </UBadge>
+            </li>
+          </ul>
 
-              <UButton
-                v-if="shift.status === 'OPEN' || shift.status === 'DECLINED'"
-                size="xs"
-                variant="subtle"
-                icon="i-lucide-user-plus"
-                :data-test="`assign-${shift.shiftId}`"
-                @click="openAssign(shift)"
+          <template #footer>
+            <div class="flex items-center justify-between">
+              <p
+                class="text-sm text-muted"
+                :data-test="`confirmed-count-${entry.openingId}`"
               >
-                Assign
-              </UButton>
-              <UButton
-                v-else-if="shift.status === 'CLAIMED'"
-                size="xs"
-                color="secondary"
-                variant="subtle"
-                icon="i-lucide-check"
-                :data-test="`confirm-${shift.shiftId}`"
-                @click="confirm(shift)"
+                {{ confirmedCount(entry) }}/{{ entry.shifts.length }} confirmed
+              </p>
+              <p
+                class="text-sm"
+                :class="staffingLabel(entry) === 'Fully staffed' ? 'text-success' : 'text-warning'"
               >
-                Confirm
-              </UButton>
-              <UButton
-                v-else-if="shift.status === 'CONFIRMED'"
-                size="xs"
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-undo-2"
-                :data-test="`unconfirm-${shift.shiftId}`"
-                @click="unconfirmFailure = null; unconfirming = shift"
-              >
-                Unconfirm
-              </UButton>
+                {{ staffingLabel(entry) }}
+              </p>
             </div>
-          </li>
-        </ul>
+            <UButton
+              block
+              size="sm"
+              variant="outline"
+              color="neutral"
+              class="mt-3"
+              icon="i-lucide-arrow-right"
+              trailing
+              :to="openingsOnNightHref(entry.night)"
+              :data-test="`manage-opening-${entry.openingId}`"
+            >
+              Staff it on Bar openings
+            </UButton>
+          </template>
+        </UCard>
 
-        <template #footer>
-          <div class="flex items-center justify-between">
-            <p
-              class="text-sm text-muted"
-              :data-test="`confirmed-count-${performance.performanceId}`"
+        <UCard
+          v-else
+          :data-test="`performance-${entry.performanceId}`"
+        >
+          <template #header>
+            <div>
+              <p class="font-semibold">
+                {{ spanOf(entry.startsAt) }}
+              </p>
+              <p class="text-sm text-muted">
+                {{ entry.showTitle }}
+              </p>
+            </div>
+          </template>
+
+          <ul class="space-y-2">
+            <li
+              v-for="shift in entry.shifts"
+              :key="shift.shiftId"
+              class="flex items-center justify-between gap-2 rounded-lg border p-2"
+              :class="shift.status === 'OPEN' || shift.status === 'DECLINED' ? 'border-warning' : 'border-default'"
+              :data-test="`shift-${shift.shiftId}`"
             >
-              {{ confirmedCount(performance) }}/{{ performance.shifts.length }} confirmed
-            </p>
-            <p
-              class="text-sm"
-              :class="staffingLabel(performance) === 'Fully staffed' ? 'text-success' : 'text-warning'"
+              <div>
+                <p class="text-xs text-muted">
+                  {{ saysShiftRole(shift.role) }}
+                </p>
+                <p class="font-medium">
+                  {{ shift.holderName ?? 'Unfilled' }}
+                </p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <UBadge
+                  :color="statusColor[shift.status]"
+                  variant="subtle"
+                  size="sm"
+                >
+                  {{ saysShiftStatus(shift.status) }}
+                </UBadge>
+
+                <UButton
+                  v-if="shift.status === 'OPEN' || shift.status === 'DECLINED'"
+                  size="xs"
+                  variant="subtle"
+                  icon="i-lucide-user-plus"
+                  :data-test="`assign-${shift.shiftId}`"
+                  @click="openAssign(shift)"
+                >
+                  Assign
+                </UButton>
+                <UButton
+                  v-else-if="shift.status === 'CLAIMED'"
+                  size="xs"
+                  color="secondary"
+                  variant="subtle"
+                  icon="i-lucide-check"
+                  :data-test="`confirm-${shift.shiftId}`"
+                  @click="confirm(shift)"
+                >
+                  Confirm
+                </UButton>
+                <UButton
+                  v-else-if="shift.status === 'CONFIRMED'"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-undo-2"
+                  :data-test="`unconfirm-${shift.shiftId}`"
+                  @click="unconfirmFailure = null; unconfirming = shift"
+                >
+                  Unconfirm
+                </UButton>
+              </div>
+            </li>
+          </ul>
+
+          <template #footer>
+            <div class="flex items-center justify-between">
+              <p
+                class="text-sm text-muted"
+                :data-test="`confirmed-count-${entry.performanceId}`"
+              >
+                {{ confirmedCount(entry) }}/{{ entry.shifts.length }} confirmed
+              </p>
+              <p
+                class="text-sm"
+                :class="staffingLabel(entry) === 'Fully staffed' ? 'text-success' : 'text-warning'"
+              >
+                {{ staffingLabel(entry) }}
+              </p>
+            </div>
+            <UButton
+              block
+              size="sm"
+              variant="outline"
+              color="neutral"
+              class="mt-3"
+              icon="i-lucide-plus"
+              :data-test="`add-shift-${entry.performanceId}`"
+              @click="beginAdding(entry.performanceId)"
             >
-              {{ staffingLabel(performance) }}
-            </p>
-          </div>
-          <UButton
-            block
-            size="sm"
-            variant="outline"
-            color="neutral"
-            class="mt-3"
-            icon="i-lucide-plus"
-            :data-test="`add-shift-${performance.performanceId}`"
-            @click="beginAdding(performance.performanceId)"
-          >
-            Add a shift
-          </UButton>
-        </template>
-      </UCard>
+              Add a shift
+            </UButton>
+          </template>
+        </UCard>
+      </template>
     </div>
 
     <UModal
