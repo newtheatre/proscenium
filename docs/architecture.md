@@ -368,7 +368,8 @@ close would make I-108 depend on a close that has its own separate warnings and 
 (I-107). `isRangeClosed()` checks the requested range against `period_locks` the same way a day
 is checked, and the response carries the answer as `x-period-status: closed|open` rather than a
 CSV column, so the file itself stays exactly the shape the SU's own import expects. A range only
-partly closed reads as open: nothing here assumes a term is closed in one row.
+partly closed, or with any day reopened after the close that covers it, reads as open: nothing
+here assumes a term is closed in one row.
 
 **The yearly return is chosen by name, not typed in (criterion 4).** The export takes
 `kind=YEAR&year=`, `kind=SEASON&seasonId=` or a custom `fromDay`/`toDay` (`suExportForm`), and a
