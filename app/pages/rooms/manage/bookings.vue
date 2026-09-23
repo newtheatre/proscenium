@@ -4,6 +4,7 @@ import { saysBookingState } from '#shared/utils/bookings'
 import { saysSpan } from '#shared/utils/blackouts'
 import { roomBookingsList, saysTier } from '#shared/utils/room-bookings-list'
 import type { FilterOption } from '#shared/utils/list-filters'
+import type { Page } from '#shared/utils/pagination'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Bookings', middleware: 'console', docs: '/docs/spaces/bookings' })
@@ -27,14 +28,6 @@ interface Booking {
   noShowId: string | null
 }
 
-interface Listing {
-  items: Booking[]
-  page: number
-  pageSize: number
-  total: number
-  pages: number
-}
-
 const request = useRequestFetch()
 const failure = ref<ListFailure | null>(null)
 const rooms = ref<{ id: string, name: string }[]>([])
@@ -46,11 +39,11 @@ const { search, conditions, sort, page, query, active, filtered, set, setSort, c
   options: computed(() => ({ room: roomOptions.value })),
 })
 
-const empty = (): Listing => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 })
+const empty = (): Page<Booking> => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 })
 
 const { data: listing, status, error } = await useAsyncData(
   'rooms-bookings',
-  () => request<Listing>('/api/admin/rooms/bookings', { query: query.value }),
+  () => request<Page<Booking>>('/api/admin/rooms/bookings', { query: query.value }),
   { watch: [query], default: empty },
 )
 
