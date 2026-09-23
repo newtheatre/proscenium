@@ -6,7 +6,7 @@ import { envelope, offsetFor } from '#shared/utils/pagination'
 const query = filterQuerySchema(membershipClaimsList)
 
 // The claims queue, oldest first, paged in SQL for the week after cutover when it holds
-// hundreds, and the decided claims behind it (A-130 criteria 2 and 9, K-129).
+// hundreds, and the decided claims behind it (A-130 criteria 2 and 10, K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'members.read')
   const input = await getValidatedQueryOrThrow(event, query)

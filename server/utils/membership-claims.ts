@@ -14,7 +14,7 @@ function claimsColumn(name: string): Reference | undefined {
   return tableColumns(schema.membershipClaims)(name)
 }
 
-// The queue through its own declaration (A-130 criterion 9): waiting is the hidden default, and
+// The queue through its own declaration (A-130 criterion 10): waiting is the hidden default, and
 // an erased person's claim is nobody's to answer, whatever its status.
 export function claimsClause(query: ListQuery): { where: SQL, orderBy: SQL[] } {
   const clause: ListClause = whereFrom(membershipClaimsList, query, {

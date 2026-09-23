@@ -82,30 +82,38 @@ pins one before it touches anything.
 ### What it cannot do
 
 Applying and deploying cannot be sequenced from CI: the migration job and Workers Builds start
-from the same push and race. The health check below is what makes losing that race visible rather
-than silent. **Anything destructive is applied by hand, before merging.**
+from the same push and race. `/api/health` returning 503 while the schema is behind is what makes
+losing that race visible rather than silent. **Anything destructive is applied by hand, before
+merging.**
 
-The health check is its own job, `health`, gated on `migrate` succeeding first. Reading the two
-apart matters: `migrate` red is a schema problem, restore from its own bookmark; `migrate` green
-with `health` red is the ordering race above, which resolves itself once Workers Builds catches
-up. One job carrying both readings is how 21 real failures of this exact race went unattributed
-before the split.
+**The workflow does not check health afterwards** (issue 1014, 23 September 2026). It once had a
+second job, `health`, that polled `/api/health` after `migrate` succeeded; it failed on every run
+with a 403 and never reached the application. The `newtheatre.org.uk` zone (the pre-cutover host
+and production alike) is on Cloudflare's Free plan with Bot Fight Mode on, which challenges GitHub
+Actions runners, and on that plan it runs outside the WAF rules engine: no custom rule, skip rule
+or request header lets a runner through. A check that is red on every run teaches everyone to
+ignore red, so the job was dropped rather than kept.
 
-`health`'s target is `${{ vars.HEALTH_URL }}`, a **repository** variable, never a literal in the
-workflow file and never environment-scoped: `health-watch.yml`'s own job below declares no
-`environment:`, and an environment-scoped variable would need one added purely to read it, which
-risks a scheduled run stalling on an approval gate this repository does not currently have but
-could one day add. There is no fallback: both jobs fail fast naming the missing variable rather
-than silently checking the wrong system. **This is also cutover's whole mechanism for both**:
-pointing `HEALTH_URL` at the unified deploy, and back again if cutover needs to reverse, is one
-repository variable's value changing, not a pull request.
+**After every migration run, check health by hand:** once the run is green and Workers Builds
+shows the deploy from the same push as finished, open `/api/health` on the live host in a browser
+(a browser passes the challenge a runner cannot). `{"ok":true}` means schema and code agree. A 503
+naming migration files means the deploy is ahead of the schema: run this workflow again by hand
+(`workflow_dispatch`). If the run itself was red, restore from its bookmark first (above). The
+in-application `health:watch` task (`## The health check`) runs inside the Worker, is not
+challenged, and alerts the IT Manager if the endpoint stays unhealthy, so a check forgotten by
+hand is still caught, only later.
 
-**`health-watch.yml`'s own schedule has never actually run.** GitHub only reads a `schedule:`
-trigger from a workflow file on the repository's default branch, still `main` until cutover; a
-file that exists only on `unified/main` never registers. A `platform/register-scheduled-workflows`
-copy on `main` (checking `unified/main`'s deploy, since that is where the real code is) is what
-makes the schedule real before cutover rather than for the first time on the day it matters most,
-ADR-0021's lesson again. `e2e.yml`'s nightly run had the identical gap and the identical fix.
+**No workflow curls the site from a runner.** `health-watch.yml`, which polled `/api/health` every
+fifteen minutes to catch a deploy that touched no migration, was removed for the same reason
+(issue 1014): Bot Fight Mode would have failed every run. "After every deploy" is the
+`health:watch` task's job alone (J-106 criterion 5).
+
+**`e2e.yml`'s nightly schedule has never actually run.** GitHub only reads a `schedule:` trigger
+from a workflow file on the repository's default branch, still `main` until cutover; a file that
+exists only on `unified/main` never registers. A `platform/register-scheduled-workflows` copy on
+`main` (#825) is what makes the schedule real before cutover rather than for the first time on
+the day it matters most, ADR-0021's lesson again. That pull request also carries a copy of
+`health-watch.yml`, which should be dropped when #825 is next revisited.
 
 ### Applying a destructive migration by hand (K-107 criterion 3)
 
@@ -278,11 +286,10 @@ chosen at the time (`<archive-name>` below; nothing is decided yet). In order:
    reviewed, merged or explicitly abandoned first; anything left open is lost work, not deferred
    work.
 
-3. **Change `HEALTH_URL`, the repository variable, to the production host** (Settings > Secrets
-   and variables > Actions > Variables, repository tab). `migrate.yml`'s own `health` job and
-   `health-watch.yml` both read it (`## Applying migrations`, "What it cannot do"); until this
-   changes, both are checking the pre-cutover host, and once cutover starts, checking that host
-   is checking nothing.
+3. **Delete `HEALTH_URL`, the repository variable** (Settings > Secrets and variables > Actions >
+   Variables, repository tab). Nothing reads it since issue 1014 removed both workflows that
+   curled the site (`## Applying migrations`, "What it cannot do"). From here on, the by-hand
+   health check after a migration run is made against the production host.
 
 4. **The DNS flip, and its ordering against the rename.** `wrangler.jsonc`'s one route today is
    `proscenium.newtheatre.org.uk` (`custom_domain: true`), the pre-cutover testing host; the
@@ -384,8 +391,8 @@ environment, outside this repository's own configuration, reading a distinct dat
 serving the freed `proscenium.newtheatre.org.uk` route: this is the same shape `unified/main`
 itself already is today, a second environment deployed from a branch at its own hostname with its
 own database, just re-pointed at mock data instead of what was, until cutover, the pre-production
-copy of the real thing. Any health check or alert aimed at staging is its own workflow and its own
-variable, never `HEALTH_URL`, so a staging outage is never mistaken for a production one and never
+copy of the real thing. Any health check or alert aimed at staging is its own, never production's,
+so a staging outage is never mistaken for a production one and never
 pages the IT Manager as though it were.
 
 ### Old addresses, the subdomains and search (K-125)
@@ -533,13 +540,12 @@ uncounted before it is applied; read that list.
 
 A 503 naming migrations means the deploy won the race. Run the migrate workflow by hand.
 
-**Nothing watches it from outside on its own** (J-106 criterion 3): `migrate.yml`'s own `health`
-job polls it once, with retries, right after `migrate` applies and verifies the schema, and
-`.github/workflows/health-watch.yml` polls it on a schedule so a Workers Builds deploy that
-touches no migration is still caught. Neither can be sequenced against the other pipeline's
-completion; both fail the GitHub Actions run loudly rather than passing silently. The
-`health:watch` task below is the third leg, for sustained unhealthiness reaching the IT Manager
-rather than a CI log.
+**No GitHub runner can reach it** (J-106 criterion 3, issue 1014): Bot Fight Mode on
+`newtheatre.org.uk` challenges every runner with a 403, so no workflow checks it: `migrate.yml`'s
+health job and the scheduled `health-watch.yml` were both removed. After a migration run, open
+`/api/health` in a browser by hand (`## Applying migrations`, "What it cannot do"). The
+`health:watch` task below runs inside the Worker, is not challenged, and is the automated check
+after every deploy: sustained unhealthiness reaches the IT Manager through the notification centre.
 
 ## Changing a published rule
 
@@ -947,9 +953,11 @@ Answered on 23 September 2026 from the code, for the question in issue 1213:
   unpaid (pending) booking `reservation.hold-expiring` once, `HOLD_REMINDER_MINUTES_BEFORE`
   minutes before the hold releases (D-107). It says when the seats go and what to do. The
   release itself sends the holder nothing further.
-- **There is no reminder before a performance.** A collected booking hears nothing between its
-  confirmation and the night. The Bookings topic's description mentions reminders before a
-  performance; no such message is registered yet.
+- **There is no reminder before a performance yet.** A collected booking hears nothing between
+  its confirmation and the night. The reminder is planned as V2 story H-205 (issue 1231), with
+  its window, `BOOKING_REMINDER_HOURS_BEFORE`, proposed at 24 hours in `docs/workshops.md` and
+  shipping unset until a session confirms it. The Bookings topic's description no longer mentions
+  reminders; it names them again when the reminder sends.
 - **A booker cancelling their own unpaid booking** from its confirmation page is emailed
   `reservation.cancelled` (D-110 criterion 3).
 - **The desk cancelling a collected booking, or refunding a ticket, sends the booker nothing.**
