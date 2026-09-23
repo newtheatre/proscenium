@@ -232,7 +232,13 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    string. `tests/unit/admin-conventions.test.ts` is what holds the rule. It serves the public
    shell's destructive actions too, cancelling a booking and leaving a waiting list among them: a
    visitor undoing something irreversible is owed the same sentence an officer is (D-110
-   criterion 6, D-113 criterion 6).
+   criterion 6, D-113 criterion 6). The member shell answers to it as well: withdrawing from a
+   session or a request, releasing a shift, withdrawing access requirements or a membership
+   claim, and removing an authenticator or a way in all ask first (issue 1153 item 7). Where the
+   action also sits behind re-authentication, the confirmation comes first and gives way to the
+   re-authentication modal, whose success runs the confirmed call once without asking again
+   (A-128 criterion 9). Cancelling a room booking still confirms in a dialogue of its own, with
+   its choice of scope; moving it onto `ConfirmModal` is owed.
 9. **Every console modal wears that same frame, whether it confirms or collects.** Its actions
    sit in the `#footer` slot, the primary verb first and the way out beside it, so no modal
    puts a Save halfway down a scrolling body. The way out is one word everywhere, read from

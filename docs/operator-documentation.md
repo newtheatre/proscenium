@@ -20,9 +20,9 @@ Markdown files under `content/docs/`, one folder per section and one file per sc
 
 ```
 content/docs/index.md                      /docs
-content/docs/12.system/index.md            /docs/system
-content/docs/12.system/1.settings.md       /docs/system/settings
-content/docs/12.system/.navigation.yml     the section's title and icon in the sidebar
+content/docs/13.system/index.md            /docs/system
+content/docs/13.system/1.settings.md       /docs/system/settings
+content/docs/13.system/.navigation.yml     the section's title and icon in the sidebar
 ```
 
 The number at the front of a folder or a file orders it in the sidebar and is dropped from the

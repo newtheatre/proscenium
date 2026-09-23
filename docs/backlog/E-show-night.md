@@ -128,7 +128,10 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   7. The board reads a window of dates rather than a fixed count of performances: it opens on the
      coming fortnight and takes a from and an until, so a quiet week and a festival week both show
      the nights an officer is working on.
-- Source: Prompt Book E-1; audit PR-13 (claim and release carry); issue 933 (criterion 6, confirming ad hoc shifts and unconfirm were in scope after all); issue 1151 item 10 (criterion 7, a board bounded by a count showed twenty performances whatever span they covered).
+  8. A holder's release, of a shift or of a slot on a bar opening, asks first in the shared
+     confirmation: it says the shift goes back on the open list for anyone who qualifies and that
+     having it back means claiming it again. Nothing is released until the holder confirms.
+- Source: Prompt Book E-1; audit PR-13 (claim and release carry); issue 933 (criterion 6, confirming ad hoc shifts and unconfirm were in scope after all); issue 1151 item 10 (criterion 7, a board bounded by a count showed twenty performances whatever span they covered); issue 1153 item 7 (criterion 8, releasing was one click).
 
 ## E-108: Unstaffed escalation seven days ahead
 
@@ -389,7 +392,8 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   2. Query results page in SQL and export to CSV with the formula-injection guard.
   3. Access is limited to officers and administrators; results obey the same redaction rules as the reports themselves (access counts only, erased identities anonymised).
   4. Historical night reports imported from the old estate are included, marked with their source.
-- Source: Prompt Book E-5; audit PR-10; get-in migration (night reports import verbatim).
+  5. The queries have a screen: `/reports`, the one item of a top-level Reports console group (its holders span front of house, safety and the committee, so it belongs to none of their groups), gated by a `viewReports` ability on `reports.read`. An Incidents tab and a Performances tab each page the result, choose the range with the money dashboard's own period controls (DAY, WEEK, MONTH, TERM, SEASON, YEAR, 0087), and link to that range's CSV export. The terms and seasons the controls offer come from a route gated on `reports.read`, so reading them opens no finance permission (issue 1042, decided by the IT Manager).
+- Source: Prompt Book E-5; audit PR-10; get-in migration (night reports import verbatim); issue 1042 (criterion 5).
 
 ## E-127: Two shows, one venue, one day
 
