@@ -52,13 +52,13 @@ export default defineEventHandler(async (event) => {
       heldNow(today),
     ))
 
+  const held = new Map<string, Set<string>>()
+  for (const record of records) held.set(record.userId, (held.get(record.userId) ?? new Set()).add(record.moduleId))
+
   const lacking = lackingNewPrerequisites(
     needs(current),
     needs(input.moduleIds),
-    members.map(member => ({
-      ...member,
-      held: new Set(records.filter(record => record.userId === member.userId).map(record => record.moduleId)),
-    })),
+    members.map(member => ({ ...member, held: held.get(member.userId) ?? new Set<string>() })),
   )
 
   return { lacking }

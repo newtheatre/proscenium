@@ -528,6 +528,29 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
     expect(read<{ n: number }>('SELECT count(*) n FROM session_modules WHERE session_id = ?', id)?.n).toBe(2)
   }, CASE_TIMEOUT_MS)
 
+  test('a module retired since scheduling is still offered, so it can be taken off', async () => {
+    const taught = await addModule()
+    const added = await addModule()
+    const { id } = await (await schedule({ moduleIds: [taught] })).json() as { id: string }
+    write(`UPDATE training_modules SET status = 'RETIRED' WHERE id = ?`, taught)
+
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage/sessions/${id}`, '[data-test="session-status"]')
+      await click(view, '[data-test="edit-modules"]')
+      await waitFor(view, `document.querySelector('[data-test="modules-input"]')`, 30_000)
+      await pickOptions(view, '[data-test="modules-input"]', [taught, added])
+      await click(view, '[data-test="modules-save"]')
+      await waitFor(view, `document.querySelector('[data-test="modules-result"]')`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ moduleId: string }>('SELECT module_id moduleId FROM session_modules WHERE session_id = ?', id)?.moduleId).toBe(added)
+    expect(read<{ n: number }>('SELECT count(*) n FROM session_modules WHERE session_id = ?', id)?.n).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
   test('an open register asks for the freeze to be released, and a marked one offers nothing', async () => {
     const taught = await addModule()
     const added = await addModule()

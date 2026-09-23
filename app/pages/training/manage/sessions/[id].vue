@@ -158,9 +158,13 @@ const modulesFailure = ref<string | null>(null)
 const modulesResult = ref<string | null>(null)
 
 // What may be taught: active, and not proved by experience rather than by a session (G-112 c3).
-const teachableOptions = computed(() => catalogue.value
-  .filter(module => module.status === 'ACTIVE' && !module.signoffRequired)
-  .map(module => ({ label: `${module.id} ${module.name}`, value: module.id })))
+// What it teaches now is always offered too, so a module retired since can still be taken off.
+const teachableOptions = computed(() => {
+  const teachable = catalogue.value.filter(module => module.status === 'ACTIVE' && !module.signoffRequired)
+  const offered = new Set(teachable.map(module => module.id))
+  return [...teachable, ...(data.value?.modules ?? []).filter(module => !offered.has(module.id))]
+    .map(module => ({ label: `${module.id} ${module.name}`, value: module.id }))
+})
 
 const modulesUnchanged = computed(() => {
   const now = new Set(data.value?.modules.map(module => module.id) ?? [])
