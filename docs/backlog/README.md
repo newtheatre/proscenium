@@ -1,6 +1,6 @@
 # Backlog index
 
-304 stories across 11 modules. Detailed stories carry testable acceptance criteria; Later
+305 stories across 11 modules. Detailed stories carry testable acceptance criteria; Later
 entries are epic stubs awaiting their own definition pass. Story ids are stable once merged:
 MVP stories number from x-101, V2 from x-201, Later from x-301. Cross-module dependencies are
 named by module (or by the specification's story ids) until all files' numbering is final; the
@@ -15,11 +15,11 @@ first tracker import resolves them.
 | `E-show-night.md` | Show night operations | 31 | 4 | 1 | 36 |
 | `F-bar.md` | Bar | 28 | 3 | 1 | 33 |
 | `G-training.md` | Training and safety records | 26 | 11 | 2 | 42 |
-| `H-communications.md` | Communications | 9 | 4 | 1 | 14 |
+| `H-communications.md` | Communications | 9 | 5 | 1 | 15 |
 | `I-finance.md` | Finance | 9 | 3 | 1 | 13 |
 | `J-governance.md` | Governance and handover | 10 | 6 | 0 | 17 |
 | `K-platform.md` | Platform foundations and migration | 29 | 1 | 0 | 33 |
-| **Total** | | **226** | **47** | **20** | **304** |
+| **Total** | | **226** | **48** | **20** | **305** |
 
 The show night row also took a correction when E-130 and E-131 were added: E-128 and E-129 had
 reached their file without this table following, so its MVP count moved by four rather than two.

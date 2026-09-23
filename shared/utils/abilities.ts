@@ -110,6 +110,10 @@ export const manageNominalMappings = defineAbility((viewer: Viewer) => holds(vie
 export const reopenFinancePeriods = defineAbility((viewer: Viewer) => holds(viewer, 'finance.reopen'))
 export const exportFinance = defineAbility((viewer: Viewer) => holds(viewer, 'finance.export'))
 
+// The cross-season report queries, read by front of house, safety and the committee alike, so
+// they sit in no one module's group (E-126 criterion 5).
+export const viewReports = defineAbility((viewer: Viewer) => holds(viewer, 'reports.read'))
+
 // Planning the rota is sit-down work done days ahead, so it is a standing permission and the
 // officer bypass is not what opens it (0009, 0046, E-101 criterion 2).
 export const viewRota = defineAbility((viewer: Viewer) => holds(viewer, 'rota.read'))
@@ -194,6 +198,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   manageNominalMappings: 'finance.write',
   reopenFinancePeriods: 'finance.reopen',
   exportFinance: 'finance.export',
+  viewReports: 'reports.read',
   verifyAccessProfiles: 'access.verify',
   viewRota: 'rota.read',
   manageRota: 'rota.write',

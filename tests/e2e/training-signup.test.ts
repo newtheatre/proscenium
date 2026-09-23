@@ -732,7 +732,12 @@ describe.skipIf(skip !== null)('the member screen (G-105)', () => {
       // The bug this pins: the session staying under "Coming up" with its Sign up button live.
       expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="session-${session}"]')`)).toBe(true)
 
+      // Asked first, and nothing is withdrawn until the member confirms (criterion 7).
       await click(view, `[data-test="withdraw-${session}"]`)
+      await waitFor(view, `document.querySelector('[data-test="confirm-withdraw-session-verb"]')`, 30_000)
+      expect(await textOf(view, 'body')).toContain('Your place passes to whoever is next on the waiting list.')
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="mine-${session}"]')`)).toBe(true)
+      await click(view, '[data-test="confirm-withdraw-session-verb"]')
       await waitFor(view, `document.querySelector('[data-test="signup-${session}"]')`, 30_000)
       expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="mine-${session}"]')`)).toBe(true)
     }

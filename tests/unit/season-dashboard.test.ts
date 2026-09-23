@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { periodForm } from '#shared/utils/season-dashboard'
+import { periodForm, periodQuery } from '#shared/utils/season-dashboard'
 
 describe('a money dashboard period', () => {
   test('a day takes a date', () => {
@@ -41,5 +41,21 @@ describe('a money dashboard period', () => {
 
   test('a term named by id rather than by its range is refused: the screen resolves the range', () => {
     expect(periodForm.safeParse({ kind: 'TERM', id: 'autumn-2026' }).success).toBe(false)
+  })
+})
+
+// The money dashboard and the reports screen send a period the same way (E-126 criterion 5), and
+// what they send must parse back as the period it came from.
+describe('a period as a query string', () => {
+  test.each([
+    [{ kind: 'DAY', day: '2026-09-15' }, { kind: 'DAY', day: '2026-09-15' }],
+    [{ kind: 'WEEK', day: '2026-09-15' }, { kind: 'WEEK', day: '2026-09-15' }],
+    [{ kind: 'MONTH', year: 2026, month: 9 }, { kind: 'MONTH', year: '2026', month: '9' }],
+    [{ kind: 'YEAR', year: 2027 }, { kind: 'YEAR', year: '2027' }],
+    [{ kind: 'TERM', fromDay: '2026-09-21', toDay: '2026-12-11' }, { kind: 'TERM', fromDay: '2026-09-21', toDay: '2026-12-11' }],
+    [{ kind: 'SEASON', seasonId: 'autumn-2026' }, { kind: 'SEASON', seasonId: 'autumn-2026' }],
+  ] as const)('%o is sent as %o', (period, sent) => {
+    expect(periodQuery(period)).toEqual(sent)
+    expect(periodForm.parse(periodQuery(period))).toEqual(period)
   })
 })

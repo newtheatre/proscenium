@@ -112,10 +112,10 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
 - Acceptance criteria:
   1. A public GET /api/health requires no authentication and returns 200 when healthy.
   2. The endpoint compares the compiled migration journal to the applied-migrations ledger and returns 503 naming the pending files when the schema is behind the code.
-  3. The deploy pipeline checks health after every deploy and after every migration apply; an unhealthy result raises an alert rather than passing silently.
+  3. The deploy pipeline checks health after every deploy and after every migration apply; an unhealthy result raises an alert rather than passing silently. Amended 23 September 2026 (issue 1014): the migrate workflow's automated health job is dropped, because Bot Fight Mode on the `newtheatre.org.uk` zone challenges GitHub Actions runners and cannot be bypassed on the Free plan. After a migration apply the operator opens `/api/health` in a browser by hand (`docs/operations.md`), and the in-application `health:watch` task (criterion 5), which no challenge reaches, is the automated "after every deploy" alert. No workflow curls the site from a runner: the scheduled health-watch workflow is removed for the same reason.
   4. The response exposes no internal detail beyond migration filenames: no secrets, no dependency versions, no stack traces.
   5. Sustained unhealthiness beyond a configurable window notifies the IT Manager through the notification centre.
-- Source: Prompt Book K-1 (schema-ahead-of-code detection); audit EW-3
+- Source: Prompt Book K-1 (schema-ahead-of-code detection); audit EW-3; issue 1014 (criterion 3's amendment).
 
 ## J-107: Backups, point-in-time restore and the termly drill
 
