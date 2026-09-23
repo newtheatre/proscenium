@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { demotedBy, demotionClaimFor, movedBackCount, placesFrom, promotionClaimFor, refreshBadgeStatement, rejoinStatement, signUpOrderStatement, signUpStatement, withdrawStatement } from '#shared/utils/training-signup'
+import { capacityChangeStatement, demotedBy, demotionClaimFor, movedBackCount, placesFrom, promotionClaimFor, refreshBadgeStatement, rejoinStatement, signUpOrderStatement, signUpStatement, withdrawStatement } from '#shared/utils/training-signup'
 import type { SignUpOrder } from '#shared/utils/training-signup'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -328,6 +328,28 @@ describe('a capacity drop moves the latest placed back, told once (G-106 criteri
       const second = demotionClaimFor('s1', 'u-one', 100, movedBackCount(claims(), 's1', 'u-one', 100))
       expect(claim('n-second', second)).toBe(1)
       expect(claims()).toHaveLength(2)
+    })
+  })
+})
+
+describe('a capacity change applies only over the capacity it was read against (0003)', () => {
+  test('a racing change lands first, so the stale one writes nothing and tells nobody', async () => {
+    await withDatabase((database) => {
+      seed(database, 10)
+      const capacity = (): number => rows<{ capacity: number }>(database, `SELECT capacity FROM training_sessions`)[0]!.capacity
+
+      expect(read(database, capacityChangeStatement('s1', 10, 8))).toHaveLength(1)
+      expect(read(database, capacityChangeStatement('s1', 10, 12))).toEqual([])
+      expect(capacity()).toBe(8)
+    })
+  })
+
+  test('once the register is open the capacity no longer moves', async () => {
+    await withDatabase((database) => {
+      seed(database, 10)
+      database.batch([[`UPDATE training_sessions SET register_opened_at = 1 WHERE id = 's1'`]])
+
+      expect(read(database, capacityChangeStatement('s1', 10, 12))).toEqual([])
     })
   })
 })
