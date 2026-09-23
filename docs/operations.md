@@ -915,14 +915,49 @@ whichever runs first.
 ## Sending an announcement (H-108)
 
 `/comms/announce`, behind `comms.announce`, composes to an audience resolved fresh from live
-data at send time: all current members, holders of a named role, tonight's rota, or a training
-session's sign-ups (the last taken by id, typed in, since no session picker exists yet). Preview
-before sending: it renders the message and counts the audience without sending anything. Sending
-is one `notify()` call per recipient, so nobody on the list ever sees another's address, and
-writes one audit entry naming the sender, the audience and the count, never the subject or body.
+data at send time: all current members, holders of a named role, tonight's rota, a training
+session's sign-ups (chosen by searching what the session teaches or its date), or the ticket
+holders for one performance or for a show's whole run (chosen by searching the show's title,
+then picking a performance from its run). Preview before sending: it renders the message and
+counts the audience without sending anything. Sending is one `notify()` call per recipient, so
+nobody on the list ever sees another's address, and writes one audit entry naming the sender,
+the audience (with the role, session, performance or show it names) and the count, never the
+subject or body.
 
 Flagging a safety notice sends it as a different, transactional message type: it ignores the
-announcements preference entirely, the same as a ticket or a refund would.
+recipient's preference entirely, the same as a ticket or a refund would.
+
+Ticket holders are everyone whose booking is held, collected or admitted at the door, with at
+least one ticket not refunded; a cancelled, expired, no-show or wholly refunded booking is not
+reached, and a cancelled performance's holders still are. A guest who booked with an address and
+never made an account is reached at that address. Somebody with several bookings across a run is
+one recipient. These messages go out as `admin.ticket-holders` (the Bookings topic, joining the
+bookings digest) or `admin.ticket-holders.safety-notice` (transactional), from the box office
+address, and both reach an unverified guest address the way a booking confirmation does (0089).
+An imported booking with no booker behind it has no address and is not counted.
+
+## What a booker is sent without anybody sending it
+
+Answered on 23 September 2026 from the code, for the question in issue 1213:
+
+- **Hold reminders are automatic.** `holds:release`, every ten minutes, emails the holder of an
+  unpaid (pending) booking `reservation.hold-expiring` once, `HOLD_REMINDER_MINUTES_BEFORE`
+  minutes before the hold releases (D-107). It says when the seats go and what to do. The
+  release itself sends the holder nothing further.
+- **There is no reminder before a performance.** A collected booking hears nothing between its
+  confirmation and the night. The Bookings topic's description mentions reminders before a
+  performance; no such message is registered yet.
+- **A booker cancelling their own unpaid booking** from its confirmation page is emailed
+  `reservation.cancelled` (D-110 criterion 3).
+- **The desk cancelling a collected booking, or refunding a ticket, sends the booker nothing.**
+- **Cancelling a performance does not email its ticket holders.** It cancels the rota and emails
+  each person holding a claimed or confirmed shift `shift.performance-cancelled`, and it reports
+  how many tickets are owed a refund; the audience is not told. To tell them, send an
+  announcement to the performance's ticket holders from `/comms/announce`, as a safety notice if
+  it must arrive at once and regardless of preference.
+
+The full catalogue of what is sent, by type, is the operator page **What the theatre sends**
+(`content/docs/11.communications/3.what-the-theatre-sends.md`).
 
 ## Checking whether a message sent (H-106)
 

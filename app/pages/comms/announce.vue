@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { AUDIENCE_KINDS, AUDIENCE_LABELS, saysAnnouncementSent, saysAudienceCount } from '#shared/utils/announcements'
 import { ROLES, saysRole } from '#shared/utils/roles'
-import type { AudienceKind } from '#shared/utils/announcements'
+import { saysClock, saysDay } from '#shared/utils/when'
+import type { AnnounceShowOption, AudienceKind } from '#shared/utils/announcements'
 
 definePageMeta({ layout: 'console', title: 'Announce', middleware: 'console', docs: '/docs/communications/announce' })
 
@@ -10,6 +11,9 @@ const toast = useToast()
 const kind = ref<AudienceKind>('ALL_CURRENT_MEMBERS')
 const role = ref<(typeof ROLES)[number] | undefined>(undefined)
 const sessionId = ref<string | undefined>(undefined)
+const showId = ref<string | undefined>(undefined)
+const show = ref<AnnounceShowOption | null>(null)
+const performanceId = ref<string | undefined>(undefined)
 const subject = ref('')
 const body = ref('')
 const safetyNotice = ref(false)
@@ -23,12 +27,29 @@ const sent = ref<{ count: number, held: number } | null>(null)
 const audience = computed(() => {
   if (kind.value === 'ROLE_HOLDERS') return { kind: kind.value, role: role.value }
   if (kind.value === 'SESSION_SIGNUPS') return { kind: kind.value, sessionId: sessionId.value ?? '' }
+  if (kind.value === 'PERFORMANCE_TICKET_HOLDERS') return { kind: kind.value, performanceId: performanceId.value ?? '' }
+  if (kind.value === 'SHOW_TICKET_HOLDERS') return { kind: kind.value, showId: showId.value ?? '' }
   return { kind: kind.value }
 })
 
 const audienceReady = computed(() =>
   (kind.value !== 'ROLE_HOLDERS' || Boolean(role.value))
-  && (kind.value !== 'SESSION_SIGNUPS' || Boolean(sessionId.value)))
+  && (kind.value !== 'SESSION_SIGNUPS' || Boolean(sessionId.value))
+  && (kind.value !== 'PERFORMANCE_TICKET_HOLDERS' || Boolean(performanceId.value))
+  && (kind.value !== 'SHOW_TICKET_HOLDERS' || Boolean(showId.value)))
+
+const ticketHolders = computed(() => kind.value === 'PERFORMANCE_TICKET_HOLDERS' || kind.value === 'SHOW_TICKET_HOLDERS')
+
+const performanceItems = computed(() => (show.value?.performances ?? []).map(performance => ({
+  label: `${saysDay(performance.startsAt, { year: true })}, ${saysClock(performance.startsAt)}, ${performance.venueName}${performance.status === 'CANCELLED' ? ' (cancelled)' : ''}`,
+  value: performance.id,
+})))
+
+// A different show is a different run, so a performance picked from the last one is dropped.
+function chooseShow(chosen: AnnounceShowOption | null): void {
+  show.value = chosen
+  performanceId.value = undefined
+}
 
 const request = useRequestFetch()
 
@@ -45,12 +66,11 @@ const { data: counted, status: countStatus } = await useAsyncData(
 const ready = computed(() =>
   subject.value.trim().length > 0
   && body.value.trim().length > 0
-  && (kind.value !== 'ROLE_HOLDERS' || role.value)
-  && (kind.value !== 'SESSION_SIGNUPS' || Boolean(sessionId.value)))
+  && audienceReady.value)
 
 // A fresh count and rendering every time the message or the audience changes: a stale preview
 // naming yesterday's audience is worse than none (criterion 4).
-watch([kind, role, sessionId, subject, body, safetyNotice], () => {
+watch([kind, role, sessionId, showId, performanceId, subject, body, safetyNotice], () => {
   preview.value = null
   sent.value = null
 })
@@ -148,6 +168,30 @@ async function send(): Promise<void> {
       <SessionPicker v-model="sessionId" />
     </UFormField>
 
+    <UFormField
+      v-if="ticketHolders"
+      label="Show"
+    >
+      <ShowPicker
+        v-model="showId"
+        @chosen="chooseShow"
+      />
+    </UFormField>
+
+    <UFormField
+      v-if="kind === 'PERFORMANCE_TICKET_HOLDERS' && show"
+      label="Performance"
+    >
+      <USelect
+        v-model="performanceId"
+        data-test="audience-performance"
+        :items="performanceItems"
+        value-key="value"
+        placeholder="Choose a performance"
+        class="w-full"
+      />
+    </UFormField>
+
     <p
       class="text-sm text-muted"
       data-test="audience-count"
@@ -171,7 +215,7 @@ async function send(): Promise<void> {
       :icon="sent.held > 0 ? 'i-lucide-clock' : 'i-lucide-send'"
       :title="saysAnnouncementSent(sent.count, sent.held)"
       :description="sent.held > 0
-        ? 'Each one has an inbox entry now; the email goes out with the next announcements digest.'
+        ? 'Each one has an inbox entry now; the email goes out with the next digest.'
         : 'What went out is below, exactly as it was sent.'"
     >
       <template #actions>
@@ -206,7 +250,9 @@ async function send(): Promise<void> {
       v-model="safetyNotice"
       data-test="announce-safety"
       label="This is a safety notice"
-      description="Reaches the audience regardless of their announcement preference, the same as a ticket or a refund does."
+      :description="ticketHolders
+        ? 'Reaches every ticket holder at once, regardless of their bookings preference, the same as a ticket or a refund does.'
+        : 'Reaches the audience regardless of their announcement preference, the same as a ticket or a refund does.'"
     />
 
     <div class="flex flex-wrap items-center gap-3">

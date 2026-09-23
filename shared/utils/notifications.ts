@@ -513,6 +513,24 @@ export const MESSAGE_TYPES = {
     sender: 'ANNOUNCEMENTS',
   },
 
+  // The same composer to people holding a ticket: about a booking, so the bookings topic, and
+  // reaching a guest's unverified address as a confirmation does (H-108 criterion 9, 0089).
+  'admin.ticket-holders': {
+    topic: 'BOOKINGS',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'admin-announcement',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
+  'admin.ticket-holders.safety-notice': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'admin-announcement',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
   // One per topic, never coalesced itself: `topic: null` keeps a digest out of `notify()`'s own
   // hold branch, and no INBOX channel, since those entries already went out individually (H-104).
   'digest.bookings': { topic: null, channels: ['EMAIL'], template: 'notification-digest', sender: 'BOX_OFFICE' },

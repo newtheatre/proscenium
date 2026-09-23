@@ -7,9 +7,11 @@ import { notify } from './notify'
 import { render } from './templates'
 import { auditEntry } from '#shared/utils/audit'
 import { londonDay } from '#shared/utils/membership'
+import { announcementType } from '#shared/utils/announcements'
+import { HOLDING_STATUSES } from '#shared/utils/capacity'
 import { messageType } from '#shared/utils/notifications'
 import { currentShowNight } from '#shared/utils/show-night'
-import type { AudienceDefinition, ComposeAnnouncementInput } from '#shared/utils/announcements'
+import type { AnnounceShowOption, AudienceDefinition, ComposeAnnouncementInput } from '#shared/utils/announcements'
 import type { Outcome } from './notify'
 import type { Rendered } from '#server/utils/templates'
 import type { SQL } from 'drizzle-orm'
@@ -70,6 +72,30 @@ export function sessionSignupsQuery(sessionId: string): SQL {
   `
 }
 
+// A live booking with a seat still owned: held, collected or admitted, and not wholly refunded.
+// One account per address, so DISTINCT is one message per address (H-108 criterion 8, 0089).
+function ticketHoldersQuery(performances: SQL): SQL {
+  const holding = sql.join(HOLDING_STATUSES.map(status => sql`${status}`), sql`, `)
+  return sql`
+    SELECT DISTINCT u.id AS id
+    FROM reservations r
+    JOIN users u ON u.id = r.user_id
+    WHERE r.performance_id IN (${performances})
+      AND r.status IN (${holding})
+      AND u.anonymised_at IS NULL
+      AND EXISTS (SELECT 1 FROM tickets t WHERE t.reservation_id = r.id AND t.refunded_at IS NULL)
+  `
+}
+
+export function performanceTicketHoldersQuery(performanceId: string): SQL {
+  return ticketHoldersQuery(sql`SELECT ${performanceId}`)
+}
+
+// The run is a subquery, never a list of performance ids read back first (0006).
+export function showTicketHoldersQuery(showId: string): SQL {
+  return ticketHoldersQuery(sql`SELECT p.id FROM performances p WHERE p.show_id = ${showId}`)
+}
+
 export interface AnnounceSessionOption {
   id: string
   title: string
@@ -99,6 +125,46 @@ export async function announceSessions(term: string): Promise<AnnounceSessionOpt
   return db.all<AnnounceSessionOption>(announceSessionsQuery(term))
 }
 
+export interface AnnounceShowRow {
+  showId: string
+  title: string
+  performanceId: string
+  startsAt: number
+  status: string
+  venueName: string
+}
+
+// A show is found by its title with every performance, a cancelled one included: its holders
+// are the ones who most need telling. Titles and times are public, so no permission beyond this.
+export function announceShowsQuery(term: string): SQL {
+  const like = contains(term)
+  return sql`
+    SELECT s.id AS showId, s.title AS title, p.id AS performanceId, p.starts_at AS startsAt,
+      p.status AS status, v.name AS venueName
+    FROM shows s
+    JOIN performances p ON p.show_id = s.id
+    JOIN venues v ON v.id = p.venue_id
+    WHERE s.id IN (
+      SELECT s2.id FROM shows s2
+      WHERE s2.title LIKE ${like} ESCAPE '\\'
+      ORDER BY (SELECT max(p2.starts_at) FROM performances p2 WHERE p2.show_id = s2.id) DESC
+      LIMIT 20
+    )
+    ORDER BY s.title, s.id, p.starts_at
+  `
+}
+
+export async function announceShows(term: string): Promise<AnnounceShowOption[]> {
+  const found = await db.all<AnnounceShowRow>(announceShowsQuery(term))
+  const shows = new Map<string, AnnounceShowOption>()
+  for (const row of found) {
+    const show = shows.get(row.showId) ?? { id: row.showId, title: row.title, performances: [] }
+    show.performances.push({ id: row.performanceId, startsAt: row.startsAt, status: row.status, venueName: row.venueName })
+    shows.set(row.showId, show)
+  }
+  return [...shows.values()]
+}
+
 export interface AudienceContext {
   today: string
   graceDays: number
@@ -110,6 +176,8 @@ export function audienceQuery(audience: AudienceDefinition, context: AudienceCon
   if (audience.kind === 'ALL_CURRENT_MEMBERS') return allCurrentMembersQuery(context.today, context.graceDays)
   if (audience.kind === 'ROLE_HOLDERS') return roleHoldersQuery(audience.role, context.nowEpoch)
   if (audience.kind === 'TONIGHT_ROTA') return tonightsRotaQuery(context.night)
+  if (audience.kind === 'PERFORMANCE_TICKET_HOLDERS') return performanceTicketHoldersQuery(audience.performanceId)
+  if (audience.kind === 'SHOW_TICKET_HOLDERS') return showTicketHoldersQuery(audience.showId)
   return sessionSignupsQuery(audience.sessionId)
 }
 
@@ -131,15 +199,11 @@ export async function resolveAudience(event: H3Event, audience: AudienceDefiniti
   return rows.map(row => row.id)
 }
 
-function typeFor(safetyNotice: boolean): string {
-  return safetyNotice ? 'admin.safety-notice' : 'admin.announcement'
-}
-
 // The composer's own view of what it is about to send: a count and the rendered message, never
 // the recipient list itself (criterion 4).
 export async function previewAnnouncement(event: H3Event, input: ComposeAnnouncementInput, previewName: string): Promise<{ count: number, rendered: Rendered }> {
   const ids = await resolveAudience(event, input.audience)
-  const rendered = render(messageType(typeFor(input.safetyNotice)).template, {
+  const rendered = render(messageType(announcementType(input.audience, input.safetyNotice)).template, {
     name: previewName,
     subject: input.subject,
     body: input.body,
@@ -164,7 +228,7 @@ export function heldForDigest(outcomes: AnnouncementOutcome[]): number {
 // recipient's header or body ever names another. Outcomes land in the send log by that call alone.
 export async function sendAnnouncement(event: H3Event, actorId: string, input: ComposeAnnouncementInput): Promise<{ count: number, outcomes: AnnouncementOutcome[] }> {
   const ids = await resolveAudience(event, input.audience)
-  const type = typeFor(input.safetyNotice)
+  const type = announcementType(input.audience, input.safetyNotice)
 
   const outcomes: AnnouncementOutcome[] = []
   for (const userId of ids) {
@@ -181,6 +245,8 @@ export async function sendAnnouncement(event: H3Event, actorId: string, input: C
       audienceKind: input.audience.kind,
       ...(input.audience.kind === 'ROLE_HOLDERS' ? { role: input.audience.role } : {}),
       ...(input.audience.kind === 'SESSION_SIGNUPS' ? { sessionId: input.audience.sessionId } : {}),
+      ...(input.audience.kind === 'PERFORMANCE_TICKET_HOLDERS' ? { performanceId: input.audience.performanceId } : {}),
+      ...(input.audience.kind === 'SHOW_TICKET_HOLDERS' ? { showId: input.audience.showId } : {}),
       recipientCount: ids.length,
       safetyNotice: input.safetyNotice,
     },
