@@ -26,6 +26,15 @@ describe('a money dashboard period', () => {
     expect(periodForm.safeParse({ kind: 'SEASON', year: 2026 }).success).toBe(false)
   })
 
+  test('a season is named by its own row in the seasons table (0087)', () => {
+    expect(periodForm.safeParse({ kind: 'SEASON', seasonId: 'season-autumn-2026' }).success).toBe(true)
+  })
+
+  test('a season with no id, or with a range instead, is refused: the server resolves its days', () => {
+    expect(periodForm.safeParse({ kind: 'SEASON', seasonId: '  ' }).success).toBe(false)
+    expect(periodForm.safeParse({ kind: 'SEASON', fromDay: '2026-09-21', toDay: '2026-12-11' }).success).toBe(false)
+  })
+
   test('a term takes the range the defined term itself carries', () => {
     expect(periodForm.safeParse({ kind: 'TERM', fromDay: '2026-09-21', toDay: '2026-12-11' }).success).toBe(true)
   })
