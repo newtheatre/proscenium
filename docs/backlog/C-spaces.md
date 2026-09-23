@@ -166,7 +166,7 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   1. When a booking fails policy, the member may convert it to a request; the form shows exactly which rules failed and requires a reason (up to 1,000 characters).
   2. The request lands PENDING with its room and span held (pending-holds-slot), so the slot cannot be instant-booked out from under a decision in progress.
   3. A pending request unactioned after a configurable age triggers an escalation notification to the approvers and, after a second configurable age, expires with notification to the requester; the old app let pending requests sit forever.
-  4. The member can edit a request only while PENDING; an edit re-runs policy and conflict checks in full.
+  4. The member can edit a request only while PENDING; an edit re-runs policy and conflict checks in full, and one that lost the slot or met a decision in the meantime changes nothing. Moving the request to another room or another day restarts its escalation and expiry ages; any other change (the times within the same day, the title, the numbers, the reason) leaves them running. An edit changes one occurrence of a series; a series-wide edit is refused with a message saying so until series editing is built (C-111).
   5. Sensitive-space requests follow this same path whether or not they breach policy.
 - Source: Prompt Book C-1; audit RM-1, RM-2, RM-6 (no auto-expiry existed).
 
@@ -207,7 +207,7 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
 - Story: As a member, I want series edits and single-occurrence edits to be distinct, explicit actions so that changing one week never silently changes the term.
 - Depends on: C-110
 - Acceptance criteria:
-  1. Editing or cancelling from a series always asks "this occurrence" or "the whole series"; there is no implicit default and no single-button ambiguity.
+  1. Editing or cancelling from a series always asks "this occurrence" or "the whole series"; there is no implicit default and no single-button ambiguity. Editing is built for a pending request's single occurrence only (C-108 criterion 4): "the whole series" is still asked, and refused with a message saying series editing is not available yet.
   2. Series-scoped actions cover every non-terminal occurrence, resolved server-side; already cancelled or rejected occurrences are untouched.
   3. Cancelling or deleting the head occurrence promotes the next occurrence to series head atomically, so the series never splits; this is an automated test case.
   4. A series-scoped change re-runs policy and conflict checks across every affected occurrence before any row changes, with the same all-or-nothing rule as creation.

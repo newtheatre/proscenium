@@ -200,3 +200,123 @@ describe.skipIf(skip !== null)('a request nobody answers (C-108 criterion 3)', (
     expect(found.rooms[0]?.taken).toEqual([])
   })
 })
+
+// Criterion 4 (issue 1055): the owner changes a request while it waits, and every check re-runs.
+describe.skipIf(skip !== null)('editing a request while it waits (C-108 criterion 4)', () => {
+  const change = (id: string, roomId: string, span: { startsAt: string, endsAt: string }, over: Record<string, unknown> = {}, as = member.cookie): Promise<Response> =>
+    send('PUT', `/api/rooms/bookings/${id}`, { roomId, title: 'Dress run', purpose: 'REHEARSAL', ...span, reason: 'Still needed.', ...over }, as)
+
+  const startOf = (id: string): number | undefined =>
+    read<{ startsAt: number }>('SELECT starts_at AS startsAt FROM room_bookings WHERE id = ?', id)?.startsAt
+
+  test('the owner changes the numbers and the request stays waiting', async () => {
+    const room = await makeRoom()
+    const span = soon(3, 9)
+    const { id } = await (await ask(room, span, 'The get-in is that afternoon.')).json() as { id: string }
+
+    const changed = await change(id, room, span, { attendees: 12 })
+    expect(changed.status).toBe(200)
+    expect(read<{ attendees: number, status: string }>('SELECT attendees, status FROM room_bookings WHERE id = ?', id))
+      .toEqual({ attendees: 12, status: 'PENDING_APPROVAL' })
+  })
+
+  test('a confirmed booking is refused', async () => {
+    const room = await makeRoom()
+    const span = soon(3, 11)
+    const { id } = await (await ask(room, span, 'Please.')).json() as { id: string }
+    await send('POST', '/api/admin/rooms/requests/decide', { ids: [id], action: 'APPROVE' }, officer)
+
+    const refused = await change(id, room, span, { attendees: 3 })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { statusMessage: string }).statusMessage).toBe('That booking is already confirmed, so it cannot be changed')
+  })
+
+  test('somebody else\'s request reads as not theirs', async () => {
+    const room = await makeRoom()
+    const span = soon(3, 13)
+    const { id } = await (await ask(room, span, 'Please.')).json() as { id: string }
+    const other = await registerMember(app, 'nosy', generatePassword())
+    giveMembership(other.id)
+    expect((await change(id, room, span, {}, other.cookie)).status).toBe(404)
+  })
+
+  // The policy re-runs in full: a span nothing could make right is refused, not queued.
+  test('the policy re-runs, so a move into the past is refused outright', async () => {
+    const room = await makeRoom()
+    const span = soon(3, 15)
+    const { id } = await (await ask(room, span, 'Please.')).json() as { id: string }
+    const refused = await change(id, room, soon(-2, 10))
+    expect(refused.status).toBe(422)
+    expect((await refused.json() as { data: { canRequest: boolean } }).data.canRequest).toBe(false)
+    expect(startOf(id)).toBe(Math.floor(new Date(span.startsAt).getTime() / 1000))
+  })
+
+  test('a span somebody else holds is refused and the request keeps its slot', async () => {
+    const room = await makeRoom()
+    const mine = soon(4, 9)
+    const theirs = soon(4, 14)
+    const { id } = await (await ask(room, mine, 'Please.')).json() as { id: string }
+    const other = await registerMember(app, 'holder', generatePassword())
+    giveMembership(other.id)
+    expect((await ask(room, theirs, 'Mine first.', other.cookie)).status).toBe(200)
+
+    expect((await change(id, room, theirs)).status).toBe(409)
+    expect(startOf(id)).toBe(Math.floor(new Date(mine.startsAt).getTime() / 1000))
+  })
+
+  test('moving the day restarts the escalation clock; changing the title does not', async () => {
+    const room = await makeRoom()
+    const span = soon(5, 10)
+    const { id } = await (await ask(room, span, 'Please.')).json() as { id: string }
+    const long = Math.floor(Date.now() / 1000) - 60 * 3600
+    write('UPDATE room_bookings SET created_at = ?, escalated_at = ? WHERE id = ?', long, long + 3600, id)
+
+    expect((await change(id, room, span, { title: 'Tech run' })).status).toBe(200)
+    expect(read<{ createdAt: number }>('SELECT created_at AS createdAt FROM room_bookings WHERE id = ?', id)?.createdAt).toBe(long)
+
+    expect((await change(id, room, soon(6, 10))).status).toBe(200)
+    const restarted = read<{ createdAt: number, escalatedAt: number | null }>(
+      'SELECT created_at AS createdAt, escalated_at AS escalatedAt FROM room_bookings WHERE id = ?', id)
+    expect(restarted?.createdAt).toBeGreaterThan(long)
+    expect(restarted?.escalatedAt).toBeNull()
+  })
+
+  test('the trail records what moved, and never the member\'s own words', async () => {
+    const room = await makeRoom()
+    const span = soon(7, 10)
+    const { id } = await (await ask(room, span, 'Please.')).json() as { id: string }
+    await change(id, room, span, { attendees: 5, reason: 'My grandmother is visiting.' })
+
+    const entry = read<{ detail: string }>(
+      `SELECT detail FROM audit_log WHERE target = ? AND action = 'room.request.edited'`, `booking:${id}`)
+    expect(entry?.detail).toContain('attendees')
+    expect(entry?.detail).toContain('reason')
+    expect(entry?.detail).not.toContain('grandmother')
+  })
+
+  // C-111 criterion 1: asked, and the whole series is refused until series editing is built.
+  test('a week of a series asks which, and the whole series is refused', async () => {
+    const room = await makeRoom()
+    const day = soon(1, 10).startsAt.slice(0, 10)
+    const series = await send('POST', '/api/rooms/series', {
+      roomId: room,
+      title: 'Term rehearsals',
+      purpose: 'REHEARSAL',
+      frequency: 'DAILY',
+      startsOn: day,
+      from: '19:00',
+      to: '21:00',
+      occurrences: 2,
+    }, member.cookie)
+    const { id: seriesId } = await series.json() as { id: string }
+    const week = read<{ id: string, startsAt: number, endsAt: number }>(
+      `SELECT id, starts_at AS startsAt, ends_at AS endsAt FROM room_bookings WHERE series_id = ? ORDER BY occurrence LIMIT 1`, seriesId)!
+    const span = { startsAt: new Date(week.startsAt * 1000).toISOString(), endsAt: new Date(week.endsAt * 1000).toISOString() }
+
+    expect((await change(week.id, room, span)).status).toBe(422)
+    const whole = await change(week.id, room, span, { scope: 'series' })
+    expect(whole.status).toBe(422)
+    expect((await whole.json() as { statusMessage: string }).statusMessage).toContain('whole series')
+    expect((await change(week.id, room, span, { scope: 'occurrence', attendees: 4 })).status).toBe(200)
+  })
+})
