@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
 import { auditEntry } from '#shared/utils/audit'
-import { preLinkDetail, preLinkHolderStatement, preLinkStatement } from '#shared/utils/google-prelink'
+import { consoleAccountConstraintRefusal, consoleAccountStatements, preLinkDetail, preLinkHolderStatement, preLinkStatement } from '#shared/utils/google-prelink'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import type { PreLinkHolder } from '#shared/utils/google-prelink'
@@ -165,6 +165,87 @@ describe('two administrators pre-linking one address to two accounts at once', (
       seed(database)
       attempt(database, 'sam', WORKSPACE)
       expect(() => database.batch([['UPDATE users SET pending_google_email = ? WHERE id = ?', WORKSPACE, 'jo']])).toThrow()
+    })
+  })
+})
+
+// A-121 criterion 7: Add someone, with or without a Workspace address to pre-link.
+function add(database: TestDatabase, index: number, email: string, googleEmail: string | null = null): { status: number } {
+  const id = `added-${index}`
+  try {
+    database.batch(consoleAccountStatements({
+      id,
+      email,
+      name: 'Added Person',
+      googleEmail,
+      created: auditEntry({ actorId: 'ada', action: 'account.created.console', target: `user:${id}` }),
+      prelinked: auditEntry({ actorId: 'ada', action: 'account.google.prelinked', target: `user:${id}`, detail: preLinkDetail(false) }),
+    }).map(statement => boundStatement(database, statement)))
+  }
+  catch (error) {
+    return { status: consoleAccountConstraintRefusal(error)?.statusCode ?? 500 }
+  }
+  return { status: rows(database, 'SELECT id FROM users WHERE id = ?', id).length ? 200 : 409 }
+}
+
+describe('adding someone from the console', () => {
+  test('with a Workspace address, the account and its pre-link are made together, each audited', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(add(database, 0, 'new.person@example.test', WORKSPACE).status).toBe(200)
+      expect(rows(database, `SELECT email, pending_google_email AS pending FROM users WHERE id = 'added-0'`))
+        .toEqual([{ email: 'new.person@example.test', pending: WORKSPACE }])
+      expect(rows<{ action: string }>(database, 'SELECT action FROM audit_log ORDER BY rowid').map(row => row.action))
+        .toEqual(['account.created.console', 'account.google.prelinked'])
+    })
+  })
+
+  test('without one, only the account and its creation entry', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(add(database, 0, 'new.person@example.test').status).toBe(200)
+      expect(pendingOf(database, 'added-0')).toBeNull()
+      expect(rows<{ action: string }>(database, 'SELECT action FROM audit_log').map(row => row.action)).toEqual(['account.created.console'])
+    })
+  })
+
+  test('an address some account is pre-linked to is refused as the new account\'s own, writing nothing', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      attempt(database, 'jo', WORKSPACE)
+      expect(add(database, 0, WORKSPACE).status).toBe(409)
+      expect(rows(database, `SELECT id FROM users WHERE id = 'added-0'`)).toHaveLength(0)
+      expect(rows(database, `SELECT id FROM audit_log WHERE action = 'account.created.console'`)).toHaveLength(0)
+    })
+  })
+
+  test('a Workspace address that already leads to another account is refused, writing nothing', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      attempt(database, 'jo', WORKSPACE)
+      expect(add(database, 0, 'new.person@example.test', WORKSPACE).status).toBe(409)
+      database.batch([['INSERT INTO users (id, email, name) VALUES (?, ?, ?)', 'ws', 'taken@newtheatre.org.uk', 'Workspace Somebody']])
+      expect(add(database, 1, 'other.person@example.test', 'taken@newtheatre.org.uk').status).toBe(409)
+      expect(rows(database, `SELECT id FROM users WHERE id LIKE 'added-%'`)).toHaveLength(0)
+      expect(rows(database, `SELECT id FROM audit_log WHERE target LIKE 'user:added-%'`)).toHaveLength(0)
+    })
+  })
+
+  test('an address that already has an account is the unique key\'s refusal', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(add(database, 0, 'jo.personal@example.test').status).toBe(409)
+    })
+  })
+
+  test('a pre-link and an Add someone racing for one address leave it leading to one account', async () => {
+    await withDatabase(async (database) => {
+      seed(database)
+      const answers = await race(2, async index => index === 0
+        ? attempt(database, 'jo', WORKSPACE)
+        : add(database, 1, 'new.person@example.test', WORKSPACE))
+      expectOneWinner(answers)
+      expect(rows(database, 'SELECT id FROM users WHERE pending_google_email = ?', WORKSPACE)).toHaveLength(1)
     })
   })
 })

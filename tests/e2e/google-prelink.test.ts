@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { expectOneWinner } from '#tests/helpers/race'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // Pre-linking a Workspace address to an account from the console, end to end (A-104 criterion 6,
@@ -169,4 +169,140 @@ describe.skipIf(skip !== null)('pre-linking a Workspace address (A-104 criterion
   test('an account that does not exist is a 404', async () => {
     expect((await link('no-such-account', workspace('nobody'))).status).toBe(404)
   })
+})
+
+async function officerView(): Promise<Bun.WebView> {
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', officer.email)
+  await fill(view, 'form input[type="password"]', password)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, 'document.querySelectorAll(\'[data-test="mfa-challenge"] input\').length >= 6')
+  forgetSpentStep(app, officer.email)
+  await fillPin(view, '[data-test="mfa-challenge"] input', await codeForStep(secret, stepFor(new Date())))
+  await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+  return view
+}
+
+const add = (body: Record<string, unknown>): Promise<Response> => send('POST', '/api/admin/accounts', { roles: [], ...body }, cookie)
+
+describe.skipIf(skip !== null)('adding someone with a Workspace address (A-121 criterion 7)', () => {
+  test('the account is made pre-linked, and its page reads the address back', async () => {
+    const email = registrableAddress('added-linked')
+    const address = workspace('added')
+    const response = await add({ email, name: 'Added Linked (test)', googleEmail: address.toUpperCase() })
+    expect(response.status).toBe(200)
+    const { id } = await response.json() as { id: string }
+    expect(pendingOf(id)).toBe(address)
+    expect(read('SELECT id FROM audit_log WHERE target = ? AND action = ?', `user:${id}`, 'account.google.prelinked')).toBeDefined()
+
+    const page = await (await send('GET', `/api/admin/accounts/${id}`, undefined, cookie)).json() as { account: { pendingGoogleEmail: string | null } }
+    expect(page.account.pendingGoogleEmail).toBe(address)
+  })
+
+  test('a personal address as the Workspace one is refused, and nothing is made', async () => {
+    const email = registrableAddress('added-personal')
+    expect((await add({ email, name: 'Added Personal (test)', googleEmail: registrableAddress('not-workspace') })).status).toBe(400)
+    expect(read('SELECT id FROM users WHERE email = ?', email)).toBeUndefined()
+  })
+
+  test('a Workspace address already leading to another account is refused, naming it', async () => {
+    const holder = await person('added-holder')
+    const address = workspace('held')
+    expect((await link(holder.id, address)).status).toBe(200)
+    const email = registrableAddress('added-collides')
+    const response = await add({ email, name: 'Added Collides (test)', googleEmail: address })
+    expect(response.status).toBe(409)
+    expect((await response.json() as { statusMessage?: string }).statusMessage ?? '').toContain(holder.name)
+    expect(read('SELECT id FROM users WHERE email = ?', email)).toBeUndefined()
+  })
+
+  test('an address some account is waiting on is refused as the new account\'s own, as the register refuses it', async () => {
+    const holder = await person('added-waiting')
+    const address = workspace('waiting')
+    expect((await link(holder.id, address)).status).toBe(200)
+    const response = await add({ email: address, name: 'Somebody Else (test)' })
+    expect(response.status).toBe(409)
+    expect((await response.json() as { statusMessage?: string }).statusMessage ?? '').toContain(holder.name)
+    expect(read('SELECT id FROM users WHERE email = ?', address)).toBeUndefined()
+  })
+})
+
+describe.skipIf(skip !== null)('the screens', () => {
+  test('an administrator sets the Workspace address on an account page, then clears it after confirming', async () => {
+    const incoming = await person('screen-link')
+    const address = workspace('screen')
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${incoming.id}`, '[data-test="google-link-address"]')
+      await fill(view, '[data-test="google-link-address"]', address)
+      await click(view, '[data-test="google-link-save"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="google-link-pending"]\')')
+      expect(await textOf(view, '[data-test="google-link-pending"]')).toContain(address)
+      expect(pendingOf(incoming.id)).toBe(address)
+
+      // Clearing is what gives them a second account on their next Google sign-in, so it confirms.
+      await click(view, '[data-test="google-link-clear"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="confirm-clear-google-link-verb"]\')')
+      expect(pendingOf(incoming.id)).toBe(address)
+      await click(view, '[data-test="confirm-clear-google-link-verb"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="google-link-pending"]\') === null')
+      expect(pendingOf(incoming.id)).toBeNull()
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('a refusal on the account page names the other account', async () => {
+    const holder = await person('screen-holder')
+    const incoming = await person('screen-refused')
+    const address = workspace('screen-held')
+    expect((await link(holder.id, address)).status).toBe(200)
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${incoming.id}`, '[data-test="google-link-address"]')
+      await fill(view, '[data-test="google-link-address"]', address)
+      await click(view, '[data-test="google-link-save"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="google-link-failure"]\')')
+      expect(await textOf(view, '[data-test="google-link-failure"]')).toContain(holder.name)
+      expect(pendingOf(incoming.id)).toBeNull()
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('the field is not offered on an account already linked to Google', async () => {
+    const linked = await person('screen-google')
+    write('UPDATE users SET google_sub = ? WHERE id = ?', `sub-${linked.id}`, linked.id)
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${linked.id}`, '[data-test="methods"]')
+      expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="google-link-address"]\'))')).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('Add someone takes an optional Workspace address', async () => {
+    const email = registrableAddress('screen-added')
+    const address = workspace('screen-added')
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts`, '[data-test="invite"]')
+      await click(view, '[data-test="invite"]')
+      await fill(view, '[data-test="invite-name"]', 'Added On Screen (test)')
+      await fill(view, '[data-test="invite-email"]', email)
+      await fill(view, '[data-test="invite-google-email"]', address)
+      await click(view, '[data-test="invite-submit"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="invite-submit"]\') === null')
+      const made = read<{ pending: string | null }>('SELECT pending_google_email AS pending FROM users WHERE email = ?', email)
+      expect(made?.pending).toBe(address)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
 })

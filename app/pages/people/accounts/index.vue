@@ -59,16 +59,19 @@ const listingFailure = useListFailure(error, 'The accounts could not be read.')
 const show = (key: FieldKey<typeof accountsList>): void => set(key, { key, operator: 'is', values: ['true'] })
 
 const inviting = ref(false)
-const invitation = reactive({ email: '', name: '', roles: [] as Role[] })
+const invitation = reactive({ email: '', name: '', googleEmail: '', roles: [] as Role[] })
 
 async function invite(): Promise<void> {
   failure.value = null
   try {
-    await $fetch('/api/admin/accounts', { method: 'POST', body: { ...invitation } })
+    const { googleEmail, ...rest } = invitation
+    // Optional, so an empty field sends nothing rather than an address to be refused.
+    await $fetch('/api/admin/accounts', { method: 'POST', body: googleEmail.trim() ? { ...rest, googleEmail } : rest })
     toast.add({ title: 'Account created', description: `${invitation.email} has a link to choose a password.`, icon: 'i-lucide-check', color: 'success' })
     inviting.value = false
     invitation.email = ''
     invitation.name = ''
+    invitation.googleEmail = ''
     invitation.roles = []
     await refresh()
   }
@@ -279,6 +282,16 @@ const columns: TableColumn<Account>[] = [
               data-test="invite-email"
               type="email"
               required
+            />
+          </UFormField>
+          <UFormField
+            label="Workspace address"
+            description="Optional. Their first Google sign-in with this @newtheatre.org.uk address joins this account."
+          >
+            <UInput
+              v-model="invitation.googleEmail"
+              data-test="invite-google-email"
+              type="email"
             />
           </UFormField>
           <UFormField
