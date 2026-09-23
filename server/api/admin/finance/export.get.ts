@@ -6,7 +6,7 @@ import { SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportCsvRows, suExportForm } 
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'finance.export')
   const period = await getValidatedQueryOrThrow(event, suExportForm)
-  const { fromDay, toDay } = await suExportBounds(period)
+  const { fromDay, toDay } = await resolvePeriodBounds(period)
 
   const [rows, closed] = await Promise.all([
     suExportRows(fromDay, toDay),

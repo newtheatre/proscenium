@@ -65,7 +65,6 @@ export async function usePeriodForm(key: string, choices: () => Promise<PeriodCh
 
   return {
     customRange,
-    selectableKinds,
     kindItems,
     termItems,
     seasonItems,
@@ -81,7 +80,6 @@ export async function usePeriodForm(key: string, choices: () => Promise<PeriodCh
     months,
     years,
     calendarYears,
-    period,
     query,
     complete,
   }

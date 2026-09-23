@@ -6,7 +6,7 @@ import type { SuExportCoverage } from '#shared/utils/su-export'
 export default defineEventHandler(async (event): Promise<SuExportCoverage> => {
   await requirePermission(event, 'finance.export')
   const period = await getValidatedQueryOrThrow(event, suExportForm)
-  const { fromDay, toDay } = await suExportBounds(period)
+  const { fromDay, toDay } = await resolvePeriodBounds(period)
   const [rows, closed] = await Promise.all([suExportRowCount(fromDay, toDay), isRangeClosed(fromDay, toDay)])
   return { fromDay, toDay, rows, closed }
 })
