@@ -1,6 +1,6 @@
 # 0089: A message to ticket holders is a booking message, and reaches the address the booking was made with
 
-- Status: Proposed
+- Status: Accepted, 23 September 2026 (IT Manager)
 - Date: 2026-09-23
 
 ## Context

@@ -150,7 +150,9 @@ Stories: 14 total (9 MVP, 4 V2, 1 Later).
   8. Ticket holders for a performance, or for a show's remaining run, are everyone whose booking
      for it is live when the message is sent: held but not yet collected, collected, or admitted at
      the door, with at least one ticket not refunded, on a performance whose show night is tonight
-     or later (0014). A past performance has no audience, and the picker offers neither a draft
+     or later (0014). A booking admitted at the door is in the audience like a collected one, since
+     that person is attending; this was confirmed by the IT Manager on 23 September 2026. A past
+     performance has no audience, and the picker offers neither a draft
      show nor one whose run is over. A cancelled, expired, no-show or wholly refunded
      booking is not in the audience. A guest who booked with an address and never made an account
      is reached at that address. Somebody with several bookings across the run is one recipient,
