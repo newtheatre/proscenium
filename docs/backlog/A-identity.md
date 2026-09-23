@@ -536,6 +536,16 @@ Open questions for the committee:
       saying how many wait and since when, linking the queue. It is claimed per person per London
       day, so a second run sends nothing twice, and nothing is sent when nothing waits. It rides
       the existing `daily:sweeps` task rather than a cron of its own.
+  12. Added 23 September 2026 (issue 1005): recording a claim on an account whose latest term is
+      still running on the claimed purchase date extends it. The new term starts the day after
+      that term ends and runs the claimed one or three years from there, as a new row with the
+      claim as its evidence: a renewal is another row and history is never rewritten (0010, A-201
+      criterion 2's "creates or extends"). A purchase made after the latest term ended starts on
+      the purchase date, as before. The queue says which recording will do.
+  13. Added 23 September 2026 (issue 1005): withdrawing a claim is audited as
+      `membership.claim.withdrawn`, the member as actor, carrying the claim id and never the
+      student number (0011), in the same batch as the withdrawal, so "withdrew and claimed again
+      with another number" can be reconstructed from the trail.
 - Source: Pre-cutover review, 10 September 2026. The migration carries no memberships
   (`migration/identity.ts`), so at cutover every member reads as lapsed until recorded; this is
   the member-facing half of what A-201 does by upload.
@@ -667,6 +677,9 @@ Open questions for the committee:
 - Acceptance criteria:
   1. SP-2 established there is no direct or automatic roster access, so this is a manual upload: an administrator submits an SU-provided export file and previews the parsed result before anything is written.
   2. The import creates or extends membership states with source roster and an evidence reference to the upload; it never revokes a manual grant and never lapses a membership by itself. Discrepancies land on a reconciliation report for a human to decide (principle P6).
+     Amended 23 September 2026 (issue 1005): "extends" means what recording a claim already does
+     (A-130 criterion 12, `renewalTerm()`): a purchase inside a running term appends a row starting
+     the day after it ends, so both routes into `memberships` agree.
   3. Matching is by the agreed key (email or student number); ambiguous matches are queued for review, never guessed.
   4. Applying the same file twice changes nothing the second time.
   5. Every run is audited with counts of created, extended, skipped and queued rows.

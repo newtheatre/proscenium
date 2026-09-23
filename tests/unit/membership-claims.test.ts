@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { daysAfter, londonDay, membershipState } from '#shared/utils/membership'
+import { daysAfter, londonDay, membershipState, renewalTerm } from '#shared/utils/membership'
 import {
   CLAIM_STATUSES,
   CLAIM_REASON_LIMIT,
@@ -97,5 +97,30 @@ describe('the waiting claims notice is claimed per person per London day', () =>
     expect(claimsWaitingClaimFor('a1', '2026-09-23')).toBe('membership.claims.waiting:a1:2026-09-23')
     expect(claimsWaitingClaimFor('a1', '2026-09-23')).not.toBe(claimsWaitingClaimFor('a2', '2026-09-23'))
     expect(claimsWaitingClaimFor('a1', '2026-09-23')).not.toBe(claimsWaitingClaimFor('a1', '2026-09-24'))
+  })
+})
+
+// A renewal bought while a term still runs starts where that one ends, so buying early loses no
+// days; bought after it ended, it runs from the purchase (A-130 criterion 12, 0031).
+describe('a claim extends a running term (A-130 criterion 12)', () => {
+  test('nothing held: the term runs from the purchase', () => {
+    expect(renewalTerm('2026-09-14', 1, null)).toEqual({ startsOn: '2026-09-14', expiresOn: '2027-09-13', extends: false })
+  })
+
+  test('bought inside a running term: the new one starts the day after it ends', () => {
+    expect(renewalTerm('2027-08-01', 1, '2027-09-13')).toEqual({ startsOn: '2027-09-14', expiresOn: '2028-09-13', extends: true })
+    expect(renewalTerm('2027-08-01', 3, '2027-09-13')).toEqual({ startsOn: '2027-09-14', expiresOn: '2030-09-13', extends: true })
+  })
+
+  test('bought on the last day of the term still extends it', () => {
+    expect(renewalTerm('2027-09-13', 1, '2027-09-13')).toEqual({ startsOn: '2027-09-14', expiresOn: '2028-09-13', extends: true })
+  })
+
+  test('bought after the term ended, even inside grace, runs from the purchase', () => {
+    expect(renewalTerm('2027-09-20', 1, '2027-09-13')).toEqual({ startsOn: '2027-09-20', expiresOn: '2028-09-19', extends: false })
+  })
+
+  test('a leap day end carries into the first of March', () => {
+    expect(renewalTerm('2028-01-10', 1, '2028-02-28').startsOn).toBe('2028-02-29')
   })
 })
