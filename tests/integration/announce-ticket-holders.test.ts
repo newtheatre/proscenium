@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { announceShowsQuery, audienceQuery, performanceTicketHoldersQuery, showTicketHoldersQuery } from '#server/utils/announcements'
+import { announceShowsQuery, audienceQuery, performanceTicketHoldersQuery, showNightStart, showTicketHoldersQuery } from '#server/utils/announcements'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
@@ -71,7 +71,7 @@ describe('ticket holders for a performance (criterion 8)', () => {
       booking(database, tonight.performanceId, booker(database), 'EXPIRED')
       booking(database, tonight.performanceId, booker(database), 'NO_SHOW')
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId))).toEqual([pending, collected, door].sort())
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightStart(tonight.night)))).toEqual([pending, collected, door].sort())
     })
   })
 
@@ -83,7 +83,7 @@ describe('ticket holders for a performance (criterion 8)', () => {
       booking(database, tonight.performanceId, booker(database), 'COLLECTED', [true, true])
       booking(database, tonight.performanceId, partlyRefunded, 'COLLECTED', [true, false])
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId))).toEqual([partlyRefunded])
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightStart(tonight.night)))).toEqual([partlyRefunded])
     })
   })
 
@@ -96,7 +96,7 @@ describe('ticket holders for a performance (criterion 8)', () => {
       booking(database, tonight.performanceId, booker(database, { anonymisedAt: 1_700_000_000 }), 'COLLECTED')
       booking(database, tonight.performanceId, null, 'COLLECTED')
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId))).toEqual([guest])
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightStart(tonight.night)))).toEqual([guest])
     })
   })
 
@@ -110,7 +110,7 @@ describe('ticket holders for a performance (criterion 8)', () => {
       booking(database, tonight.performanceId, twice, 'PENDING')
       booking(database, later, booker(database), 'COLLECTED')
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId))).toEqual([twice])
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightStart(tonight.night)))).toEqual([twice])
     })
   })
 
@@ -121,7 +121,50 @@ describe('ticket holders for a performance (criterion 8)', () => {
       const holder = booker(database)
       booking(database, tonight.performanceId, holder, 'COLLECTED')
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId))).toEqual([holder])
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightStart(tonight.night)))).toEqual([holder])
+    })
+  })
+})
+
+// 0089: an imported booking is COLLECTED with a booker, so only the night keeps a past
+// production's audience, years of it, from being one message away.
+describe('only a performance still to come has an audience (criterion 8)', () => {
+  test('last night\'s bookers are not reached for that performance, nor for the show', async () => {
+    await withDatabase((database) => {
+      ticketTypeFixture(database)
+      const tonight = tonightsPerformance(database)
+      const lastNight = laterPerformance(database, tonight, 'performance-last-night', -1)
+      const coming = booker(database)
+      const been = booker(database)
+      booking(database, tonight.performanceId, coming, 'COLLECTED')
+      booking(database, lastNight, been, 'COLLECTED')
+      const from = showNightStart(tonight.night)
+
+      expect(ids(database, performanceTicketHoldersQuery(lastNight, from))).toEqual([])
+      expect(ids(database, showTicketHoldersQuery(tonight.showId, from))).toEqual([coming])
+    })
+  })
+
+  test('a show whose run is over has nobody to reach', async () => {
+    await withDatabase((database) => {
+      ticketTypeFixture(database)
+      const tonight = tonightsPerformance(database)
+      const lastNight = laterPerformance(database, tonight, 'performance-last-night', -1)
+      booking(database, lastNight, booker(database), 'COLLECTED')
+      database.batch([['DELETE FROM performances WHERE id = ?', tonight.performanceId]])
+
+      expect(ids(database, showTicketHoldersQuery(tonight.showId, showNightStart(tonight.night)))).toEqual([])
+    })
+  })
+
+  test('a performance earlier tonight still counts, since the night runs from 04:00', async () => {
+    await withDatabase((database) => {
+      ticketTypeFixture(database)
+      const tonight = tonightsPerformance(database, { curtainHoursAfterNightStart: 0.5 })
+      const holder = booker(database)
+      booking(database, tonight.performanceId, holder, 'COLLECTED')
+
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightStart(tonight.night)))).toEqual([holder])
     })
   })
 })
@@ -142,19 +185,19 @@ describe('ticket holders for a show (criterion 8)', () => {
       booking(database, later, both, 'COLLECTED')
       booking(database, elsewhere.performanceId, booker(database), 'COLLECTED')
 
-      expect(ids(database, showTicketHoldersQuery(tonight.showId))).toEqual([firstNight, secondNight, both].sort())
+      expect(ids(database, showTicketHoldersQuery(tonight.showId, showNightStart(tonight.night)))).toEqual([firstNight, secondNight, both].sort())
     })
   })
 
-  // 0006: the run is scoped by subquery, so the statement binds the show and nothing read back
-  // from a result set, however many performances the run has.
-  test('the statement binds one parameter whatever the length of the run', async () => {
+  // 0006: the run is scoped by subquery, so the statement binds the show and the night and
+  // nothing read back from a result set, however many performances the run has.
+  test('the statement binds two parameters whatever the length of the run', async () => {
     await withDatabase((database) => {
       const tonight = tonightsPerformance(database)
       for (let night = 1; night <= 120; night++) laterPerformance(database, tonight, `performance-run-${night}`, night)
 
-      const [, ...parameters] = boundStatement(database, showTicketHoldersQuery(tonight.showId))
-      expect(parameters).toEqual([tonight.showId])
+      const [, ...parameters] = boundStatement(database, showTicketHoldersQuery(tonight.showId, showNightStart(tonight.night)))
+      expect(parameters).toEqual([tonight.showId, showNightStart(tonight.night)])
     })
   })
 
@@ -173,18 +216,33 @@ describe('ticket holders for a show (criterion 8)', () => {
 })
 
 describe('the announce composer\'s show picker', () => {
+  test('a draft show and a show whose run is over are not offered, and past nights are not listed', async () => {
+    await withDatabase((database) => {
+      const tonight = tonightsPerformance(database)
+      laterPerformance(database, tonight, 'performance-last-night', -1)
+      const draft = tonightsPerformance(database, { suffix: 'draft', showStatus: 'DRAFT' })
+      const over = tonightsPerformance(database, { suffix: 'over' })
+      database.batch([['UPDATE performances SET starts_at = ? WHERE id = ?', over.startsAt - 86_400, over.performanceId]])
+
+      const [query, ...parameters] = boundStatement(database, announceShowsQuery('test show', showNightStart(tonight.night)))
+      const found = rows<{ showId: string, performanceId: string }>(database, query, ...parameters)
+      expect(found.map(row => row.performanceId)).toEqual([tonight.performanceId])
+      expect(found.map(row => row.showId)).not.toContain(draft.showId)
+    })
+  })
+
   test('finds a show by its title with every performance, a cancelled one included, and not by an unrelated term', async () => {
     await withDatabase((database) => {
       const tonight = tonightsPerformance(database)
       laterPerformance(database, tonight, 'performance-later')
       database.batch([['UPDATE performances SET status = ? WHERE id = ?', 'CANCELLED', 'performance-later']])
 
-      const [query, ...parameters] = boundStatement(database, announceShowsQuery('test show'))
+      const [query, ...parameters] = boundStatement(database, announceShowsQuery('test show', showNightStart(tonight.night)))
       const found = rows<{ showId: string, performanceId: string }>(database, query, ...parameters)
       expect(found.map(row => row.showId)).toEqual([tonight.showId, tonight.showId])
       expect(found.map(row => row.performanceId).sort()).toEqual([tonight.performanceId, 'performance-later'].sort())
 
-      const [none, ...noParameters] = boundStatement(database, announceShowsQuery('rigging'))
+      const [none, ...noParameters] = boundStatement(database, announceShowsQuery('rigging', showNightStart(tonight.night)))
       expect(rows(database, none, ...noParameters)).toEqual([])
     })
   })

@@ -10,7 +10,7 @@ import { londonDay } from '#shared/utils/membership'
 import { announcementType } from '#shared/utils/announcements'
 import { HOLDING_STATUSES } from '#shared/utils/capacity'
 import { messageType } from '#shared/utils/notifications'
-import { currentShowNight } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import type { AnnounceShowOption, AudienceDefinition, ComposeAnnouncementInput } from '#shared/utils/announcements'
 import type { Outcome } from './notify'
 import type { Rendered } from '#server/utils/templates'
@@ -87,13 +87,20 @@ function ticketHoldersQuery(performances: SQL): SQL {
   `
 }
 
-export function performanceTicketHoldersQuery(performanceId: string): SQL {
-  return ticketHoldersQuery(sql`SELECT ${performanceId}`)
+// `from` is the start of tonight's show night (0014): a past performance's bookers, imported
+// history included, are never an audience (0089).
+export function performanceTicketHoldersQuery(performanceId: string, from: number): SQL {
+  return ticketHoldersQuery(sql`SELECT p.id FROM performances p WHERE p.id = ${performanceId} AND p.starts_at >= ${from}`)
 }
 
-// The run is a subquery, never a list of performance ids read back first (0006).
-export function showTicketHoldersQuery(showId: string): SQL {
-  return ticketHoldersQuery(sql`SELECT p.id FROM performances p WHERE p.show_id = ${showId}`)
+// The run's remaining nights as a subquery, never a list of ids read back first (0006).
+export function showTicketHoldersQuery(showId: string, from: number): SQL {
+  return ticketHoldersQuery(sql`SELECT p.id FROM performances p WHERE p.show_id = ${showId} AND p.starts_at >= ${from}`)
+}
+
+// Epoch seconds at which a show night opens, 04:00 London (0014).
+export function showNightStart(night: string): number {
+  return Math.floor(showNightBounds(night).from.getTime() / 1000)
 }
 
 export interface AnnounceSessionOption {
@@ -134,20 +141,21 @@ export interface AnnounceShowRow {
   venueName: string
 }
 
-// A show is found by its title with every performance, a cancelled one included: its holders
-// are the ones who most need telling. Titles and times are public, so no permission beyond this.
-export function announceShowsQuery(term: string): SQL {
+// A show that is not a draft, by its title, with its performances from tonight's show night on;
+// a cancelled one stays listed, since its holders most need telling. Titles and times are public.
+export function announceShowsQuery(term: string, from: number): SQL {
   const like = contains(term)
   return sql`
     SELECT s.id AS showId, s.title AS title, p.id AS performanceId, p.starts_at AS startsAt,
       p.status AS status, v.name AS venueName
     FROM shows s
-    JOIN performances p ON p.show_id = s.id
+    JOIN performances p ON p.show_id = s.id AND p.starts_at >= ${from}
     JOIN venues v ON v.id = p.venue_id
     WHERE s.id IN (
       SELECT s2.id FROM shows s2
-      WHERE s2.title LIKE ${like} ESCAPE '\\'
-      ORDER BY (SELECT max(p2.starts_at) FROM performances p2 WHERE p2.show_id = s2.id) DESC
+      WHERE s2.status <> 'DRAFT' AND s2.title LIKE ${like} ESCAPE '\\'
+        AND EXISTS (SELECT 1 FROM performances p2 WHERE p2.show_id = s2.id AND p2.starts_at >= ${from})
+      ORDER BY (SELECT min(p3.starts_at) FROM performances p3 WHERE p3.show_id = s2.id AND p3.starts_at >= ${from})
       LIMIT 20
     )
     ORDER BY s.title, s.id, p.starts_at
@@ -155,7 +163,7 @@ export function announceShowsQuery(term: string): SQL {
 }
 
 export async function announceShows(term: string): Promise<AnnounceShowOption[]> {
-  const found = await db.all<AnnounceShowRow>(announceShowsQuery(term))
+  const found = await db.all<AnnounceShowRow>(announceShowsQuery(term, showNightStart(currentShowNight())))
   const shows = new Map<string, AnnounceShowOption>()
   for (const row of found) {
     const show = shows.get(row.showId) ?? { id: row.showId, title: row.title, performances: [] }
@@ -176,8 +184,8 @@ export function audienceQuery(audience: AudienceDefinition, context: AudienceCon
   if (audience.kind === 'ALL_CURRENT_MEMBERS') return allCurrentMembersQuery(context.today, context.graceDays)
   if (audience.kind === 'ROLE_HOLDERS') return roleHoldersQuery(audience.role, context.nowEpoch)
   if (audience.kind === 'TONIGHT_ROTA') return tonightsRotaQuery(context.night)
-  if (audience.kind === 'PERFORMANCE_TICKET_HOLDERS') return performanceTicketHoldersQuery(audience.performanceId)
-  if (audience.kind === 'SHOW_TICKET_HOLDERS') return showTicketHoldersQuery(audience.showId)
+  if (audience.kind === 'PERFORMANCE_TICKET_HOLDERS') return performanceTicketHoldersQuery(audience.performanceId, showNightStart(context.night))
+  if (audience.kind === 'SHOW_TICKET_HOLDERS') return showTicketHoldersQuery(audience.showId, showNightStart(context.night))
   return sessionSignupsQuery(audience.sessionId)
 }
 

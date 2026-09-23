@@ -928,8 +928,11 @@ Flagging a safety notice sends it as a different, transactional message type: it
 recipient's preference entirely, the same as a ticket or a refund would.
 
 Ticket holders are everyone whose booking is held, collected or admitted at the door, with at
-least one ticket not refunded; a cancelled, expired, no-show or wholly refunded booking is not
-reached, and a cancelled performance's holders still are. A guest who booked with an address and
+least one ticket not refunded, on a performance whose show night is tonight or later; for a show,
+that is its remaining performances only. A past performance has no audience (imported history is
+`COLLECTED` with a booker, and must never be one message away), and the picker offers neither a
+draft show nor one whose run is over. A cancelled, expired, no-show or wholly refunded booking is
+not reached, and a cancelled performance's holders still are. A guest who booked with an address and
 never made an account is reached at that address. Somebody with several bookings across a run is
 one recipient. These messages go out as `admin.ticket-holders` (the Bookings topic, joining the
 bookings digest) or `admin.ticket-holders.safety-notice` (transactional), from the box office

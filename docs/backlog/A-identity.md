@@ -51,7 +51,7 @@ Open questions for the committee:
 - Depends on: A-101
 - Acceptance criteria:
   1. Verification uses a single-use token valid for 24 hours; consuming it marks the address verified and invalidates any other outstanding verification token for that account.
-  2. Nothing except verification, claim and password-reset messages is ever sent to an unverified address.
+  2. Nothing except verification, claim and password-reset messages is ever sent to an unverified address. Amended 23 September 2026: a message about a booking the address was given for may also reach it (the ticketing confirmations, and an officer's announcement to the ticket holders of a performance still to come), since a guest booker is never verified; each such type is bounded to a live booking, never a sweep of accounts (0089).
   3. An expired or already-used token offers a fresh send, not a dead end; the resend endpoint is enumeration-safe and rate limited.
   4. Sign-in paths that inherently prove the mailbox (consuming a magic link, Google sign-in with a matching address) also mark the address verified.
   5. Tokens are stored hashed; the plaintext exists only in the email.

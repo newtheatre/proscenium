@@ -147,9 +147,11 @@ Stories: 14 total (9 MVP, 4 V2, 1 Later).
   7. The count comes before the draft: choosing an audience says how many people it resolves to,
      without a subject or a message being written first. After a send the composer keeps what was
      sent on screen and says plainly that it went, rather than emptying itself.
-  8. Ticket holders for a performance, or for a show's whole run, are everyone whose booking for
-     it is live when the message is sent: held but not yet collected, collected, or admitted at the
-     door, with at least one ticket not refunded. A cancelled, expired, no-show or wholly refunded
+  8. Ticket holders for a performance, or for a show's remaining run, are everyone whose booking
+     for it is live when the message is sent: held but not yet collected, collected, or admitted at
+     the door, with at least one ticket not refunded, on a performance whose show night is tonight
+     or later (0014). A past performance has no audience, and the picker offers neither a draft
+     show nor one whose run is over. A cancelled, expired, no-show or wholly refunded
      booking is not in the audience. A guest who booked with an address and never made an account
      is reached at that address. Somebody with several bookings across the run is one recipient,
      and the audience is scoped by subquery from the performance or the show, never by a list of

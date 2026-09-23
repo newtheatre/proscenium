@@ -51,6 +51,14 @@ function chooseShow(chosen: AnnounceShowOption | null): void {
   performanceId.value = undefined
 }
 
+// The picker remounts empty on a change of audience, so a show kept behind it would be counted,
+// previewed and sent to with nothing on screen naming it.
+watch(kind, () => {
+  showId.value = undefined
+  show.value = null
+  performanceId.value = undefined
+})
+
 const request = useRequestFetch()
 
 // Answered from the audience alone, so the count is on screen before a word is written

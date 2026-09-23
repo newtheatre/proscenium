@@ -35,18 +35,25 @@ criterion 6), and both may reach an unverified address. That reach is the one th
 types already have (`reservation.confirmed`, `reservation.cancelled`): the guest gave the address
 so the theatre could tell them about this booking, and this is a message about this booking. It
 is bounded by the audience, not by the officer: the type is only ever enqueued for somebody the
-resolver found holding a live booking for the performance or show named.
+resolver found holding a live booking for a performance still to come.
 
 The audience is resolved from live reservations at send time, scoped by subquery from the
 performance or the show (0006): a booking held, collected or admitted at the door, with at least
-one ticket not refunded, for a booker whose account is not anonymised (H-107). The resolver
+one ticket not refunded, for a booker whose account is not anonymised (H-107), on a performance
+whose show night (04:00 to 04:00 London, 0014) is tonight or later. For a show that is its
+remaining performances only; a performance in an earlier show night has no audience at all, and
+the composer's show picker offers neither a draft show nor one whose run is over. The resolver
 returns distinct accounts, and an address belongs to one account, so a booker with three bookings
 across a run is one recipient.
 
 ## Consequences
 
 - A-102 criterion 2's list of what may reach an unverified address grows by two types. Both are
-  bounded to a live booking, so neither can become a bulk send to the imported estate.
+  bounded to a live booking for a performance still to come. That bound is what keeps them from
+  becoming a bulk send to the imported estate: an imported booking is `COLLECTED` with a booker,
+  so without it a past production's whole audience would be one message away.
+- Telling a past performance's audience something (a lost-property notice, say) is not possible
+  from the composer. That is deliberate; it would be its own story.
 - A booking with no account behind it (an imported row with no booker) has no address and is not
   in the audience. The count the composer shows is the count of people it can reach.
 - The Bookings topic now carries a message, so `digest.bookings` has something to carry and the
