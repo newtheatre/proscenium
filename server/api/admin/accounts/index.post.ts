@@ -1,12 +1,40 @@
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ROLES, defaultRoleExpiry } from '#shared/utils/roles'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
+import { PRE_LINKED } from '#shared/utils/pending-grants'
+import {
+  CONSOLE_ACCOUNT_TAKEN,
+  PRELINK_NOT_WORKSPACE,
+  PRELINK_OPEN_INSTEAD,
+  consoleAccountConstraintRefusal,
+  consoleAccountStatements,
+  preLinkAddress,
+  preLinkDetail,
+  preLinkHeldBy,
+  preLinkHolderStatement,
+  waitingForGoogle,
+} from '#shared/utils/google-prelink'
+import type { PreLinkHolder } from '#shared/utils/google-prelink'
 
 const body = z.object({
   email: z.string().email().max(320),
   name: z.string().trim().min(1).max(200),
   roles: z.array(z.enum(ROLES)).max(ROLES.length).default([]),
+  // The Workspace address their first Google sign-in claims (A-121 criterion 7).
+  googleEmail: z.string().trim().email().max(320).optional(),
 })
+
+// Why either address already leads to somebody, naming them, or null when both are free.
+async function spokenFor(email: string, googleEmail: string | null): Promise<string | null> {
+  if (await findByEmail(email)) return CONSOLE_ACCOUNT_TAKEN
+  const [waiting] = await db.select({ name: schema.users.name }).from(schema.users)
+    .where(eq(schema.users.pendingGoogleEmail, email)).limit(1)
+  if (waiting) return waitingForGoogle(waiting.name)
+  if (googleEmail === null) return null
+  const [holder] = await db.all<PreLinkHolder>(preLinkHolderStatement('', googleEmail))
+  return holder ? preLinkHeldBy(holder, PRELINK_OPEN_INSTEAD) : null
+}
 
 // Create an account from the console. It never gets a password here (A-121 criterion 3).
 export default defineEventHandler(async (event) => {
@@ -14,9 +42,14 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, body)
   const email = normaliseEmail(input.email)
 
-  if (await findByEmail(email)) {
-    throw createError({ statusCode: 409, statusMessage: 'That address already has an account' })
+  // Their own address already is what Google matches on, so the same one again links nothing new.
+  const given = preLinkAddress(input.googleEmail ?? null)
+  const googleEmail = given === email ? null : given
+  if (googleEmail !== null && !isWorkspaceEmail(googleEmail)) {
+    throw createError({ statusCode: 400, statusMessage: PRELINK_NOT_WORKSPACE })
   }
+  const taken = await spokenFor(email, googleEmail)
+  if (taken) throw createError({ statusCode: 409, statusMessage: taken })
 
   if (undeliverableReason({ email, anonymisedAt: null })) {
     throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
@@ -27,7 +60,23 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'You do not have permission to grant roles' })
   }
 
-  const id = await createAccount({ email, name: input.name, passwordHash: null, actorId: resolved.account.id })
+  const id = newId()
+  const statements = consoleAccountStatements({
+    id,
+    email,
+    name: input.name,
+    googleEmail,
+    created: auditEntry({ actorId: resolved.account.id, action: 'account.created.console', target: `user:${id}` }),
+    prelinked: auditEntry({ actorId: resolved.account.id, action: 'account.google.prelinked', target: `user:${id}`, detail: preLinkDetail(false) }),
+  }).map(statement => db.run(statement))
+  try {
+    await db.batch([statements[0]!, ...statements.slice(1)])
+  }
+  catch (error) {
+    if (!consoleAccountConstraintRefusal(error)) throw error
+  }
+  // The predicate or a unique index refused it: something landed between the checks and the write.
+  if (!await findById(id)) throw createError({ statusCode: 409, statusMessage: await spokenFor(email, googleEmail) ?? PRE_LINKED })
 
   if (input.roles.length > 0) {
     const expiresAt = defaultRoleExpiry(new Date())
