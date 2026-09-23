@@ -47,7 +47,7 @@ interface Listing {
   pages: number
 }
 
-interface VenueTemplate { venueId: string, venueName: string, slots: TemplateSlot[] }
+interface VenueTemplate { venueId: string, venueName: string, archived: boolean, slots: TemplateSlot[] }
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -77,7 +77,7 @@ const { data: templates } = await useAsyncData(
 )
 
 const venueOptions = computed(() => templates.value.venues
-  .filter(venue => venue.slots.some(slot => slot.role === 'BAR'))
+  .filter(venue => !venue.archived && venue.slots.some(slot => slot.role === 'BAR'))
   .map(venue => ({ label: venue.venueName, value: venue.venueId })))
 
 const plan = reactive({ venueId: '', evening: '', opensAt: '18:00', closesAt: '23:00', label: '' })

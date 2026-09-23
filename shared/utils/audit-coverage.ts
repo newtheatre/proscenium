@@ -168,7 +168,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/ticket-types/[id]/index.delete.ts', actions: ['ticket-type.deleted'] },
   { route: 'server/api/admin/reference-data/venues/index.get.ts', exempt: 'reads the venues, retired ones included' },
   { route: 'server/api/admin/reference-data/venues/index.post.ts', actions: ['venue.created'] },
-  { route: 'server/api/admin/reference-data/venues/[id]/index.put.ts', actions: ['venue.updated'] },
+  { route: 'server/api/admin/reference-data/venues/[id]/index.put.ts', actions: ['venue.updated', 'shift-template.removed'] },
   { route: 'server/api/admin/reference-data/venues/[id]/archive.post.ts', actions: ['venue.archived', 'venue.restored'] },
   { route: 'server/api/admin/reference-data/venues/[id]/index.delete.ts', actions: ['venue.deleted'] },
   { route: 'server/api/admin/reference-data/rooms.get.ts', exempt: 'reads active rooms for the venue form picker; nothing is written' },

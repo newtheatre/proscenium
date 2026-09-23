@@ -11,6 +11,7 @@ import { shiftConstraintRefusal } from '#shared/utils/rota'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ListClause } from './list-filters'
+import type { AuditRow } from '#shared/utils/audit'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { BoardBounds } from '#shared/utils/rota-board'
 import type { AddShiftInput, ShiftRole, ShiftStatus, TemplateSlot } from '#shared/utils/rota'
@@ -28,11 +29,12 @@ const rawColumn = (name: string): SQL => sql.raw(name)
 export interface VenueTemplate {
   venueId: string
   venueName: string
+  archived: boolean
   slots: TemplateSlot[]
 }
 
 // `role` is null for a venue with no template, which is what the LEFT JOIN is for.
-interface TemplateRow extends Omit<TemplateSlot, 'role'> { venueId: string, venueName: string, role: ShiftRole | null }
+interface TemplateRow extends Omit<TemplateSlot, 'role'> { venueId: string, venueName: string, archived: number, role: ShiftRole | null }
 
 // Search and "staffed" through the declaration (K-129); paging scopes the outer join by a
 // subquery over the venues it covers, never by an id list read back from a result set (0006).
@@ -46,16 +48,22 @@ export function venueTemplatesClause(query: ListQuery): ListClause {
   })
 }
 
-// Only our own current venues hold a template: an external one is staffed ad hoc and a retired
-// one takes no new work (E-101 criterion 5).
+// Our own venues: an external one is staffed ad hoc, and a retired one is listed only while it
+// holds a template, so Remove stays reachable (E-101 criterion 5).
 const templatedVenues = (clause: ListClause): SQL => {
   const filtered = clause.where ? sql` AND (${clause.where})` : sql``
-  return sql` WHERE vp.is_external = 0 AND vp.archived = 0${filtered}`
+  return sql` WHERE vp.is_external = 0
+    AND (vp.archived = 0 OR EXISTS (SELECT 1 FROM shift_templates held WHERE held.venue_id = vp.id))${filtered}`
 }
+
+// A template is read only for one of our own venues. A row left on an external venue from before
+// it was marked external applies to nothing, wherever it is joined (E-101 criterion 5).
+const ourVenue = (templateAlias: string): SQL =>
+  sql.raw(`EXISTS (SELECT 1 FROM venues ours WHERE ours.id = ${templateAlias}.venue_id AND ours.is_external = 0)`)
 
 export function venueTemplatesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
-    SELECT v.id AS venueId, v.name AS venueName, t.role AS role, t."count" AS "count",
+    SELECT v.id AS venueId, v.name AS venueName, v.archived AS archived, t.role AS role, t."count" AS "count",
            t.starts_before_doors_minutes AS startsBeforeDoorsMinutes, t.ends_after_end_minutes AS endsAfterEndMinutes
     FROM venues v
     LEFT JOIN shift_templates t ON t.venue_id = v.id
@@ -75,7 +83,8 @@ export async function listVenueTemplates(clause: ListClause, limit: number, offs
 
   const templates = new Map<string, VenueTemplate>()
   for (const row of rows) {
-    const held = templates.get(row.venueId) ?? { venueId: row.venueId, venueName: row.venueName, slots: [] }
+    const held = templates.get(row.venueId)
+      ?? { venueId: row.venueId, venueName: row.venueName, archived: row.archived === 1, slots: [] }
     if (row.role !== null) {
       held.slots.push({
         role: row.role,
@@ -104,6 +113,39 @@ export async function templateSlotsFor(venueId: string): Promise<TemplateSlot[]>
            starts_before_doors_minutes AS startsBeforeDoorsMinutes, ends_after_end_minutes AS endsAfterEndMinutes
     FROM shift_templates WHERE venue_id = ${venueId} ORDER BY role
   `)
+}
+
+// What a performance at this venue is staffed from: nothing at an external venue, whatever rows
+// it still holds (E-101 criterion 5). The template screen reads the rows themselves.
+export function stampableSlotsQuery(venueId: string): SQL {
+  return sql`
+    SELECT role, "count",
+           starts_before_doors_minutes AS startsBeforeDoorsMinutes, ends_after_end_minutes AS endsAfterEndMinutes
+    FROM shift_templates t WHERE t.venue_id = ${venueId} AND ${ourVenue('t')} ORDER BY role
+  `
+}
+
+export async function stampableSlotsFor(venueId: string): Promise<TemplateSlot[]> {
+  return await db.all<TemplateSlot>(stampableSlotsQuery(venueId))
+}
+
+// Marking a venue external takes its template with it, batched with the flag. The audit row is
+// written first, and only when there were slots to remove; it names slots, never a person (0011).
+export function dropExternalTemplateStatements(venueId: string, entry: AuditRow): [SQL, SQL] {
+  const external = sql`EXISTS (SELECT 1 FROM venues gone WHERE gone.id = ${venueId} AND gone.is_external = 1)`
+  return [
+    sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target},
+             json_object('slots', slots, 'reason', 'external')
+      FROM (
+        SELECT group_concat(slot, ', ') AS slots
+        FROM (SELECT role || ':' || "count" AS slot FROM shift_templates WHERE venue_id = ${venueId} ORDER BY role)
+      )
+      WHERE slots IS NOT NULL AND ${external}
+    `,
+    sql`DELETE FROM shift_templates WHERE venue_id = ${venueId} AND ${external}`,
+  ]
 }
 
 // A template is replaced whole: the slots are one thing an officer edits, and a partial save
@@ -142,7 +184,7 @@ export function barWindowsTonightQuery(venueId: string, from: number, to: number
   return sql`
     SELECT p.id AS performanceId, ${windowStart(defaults)} AS startsAt, ${windowEnd(defaults)} AS endsAt
     FROM performances p
-    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = 'BAR'
+    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = 'BAR' AND ${ourVenue('t')}
     WHERE p.venue_id = ${venueId} AND p.status <> 'CANCELLED'
       AND p.starts_at >= ${from} AND p.starts_at < ${to}
     ORDER BY p.starts_at
@@ -164,13 +206,13 @@ export function restampShiftTimesStatement(performanceId: string, defaults: Shif
     SET starts_at = (
           SELECT ${windowStart(defaults)}
           FROM performances p
-          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role AND ${ourVenue('t')}
           WHERE p.id = target.performance_id
         ),
         ends_at = (
           SELECT ${windowEnd(defaults)}
           FROM performances p
-          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role AND ${ourVenue('t')}
           WHERE p.id = target.performance_id
         )
     WHERE target.performance_id = ${performanceId}
@@ -223,13 +265,13 @@ export function backfillShiftTimesStatement(defaults: ShiftOffsets, venueId?: st
     SET starts_at = (
           SELECT ${windowStart(defaults)}
           FROM performances p
-          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role AND ${ourVenue('t')}
           WHERE p.id = target.performance_id
         ),
         ends_at = (
           SELECT ${windowEnd(defaults)}
           FROM performances p
-          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role
+          LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = target.role AND ${ourVenue('t')}
           WHERE p.id = target.performance_id
         )
     WHERE (target.starts_at IS NULL OR target.ends_at IS NULL)${atVenue}
@@ -282,7 +324,7 @@ export function cancelOrphanedShiftsStatement(performanceId: string, newVenueId:
     UPDATE shifts SET status = 'CANCELLED'
     WHERE performance_id = ${performanceId}
       AND status IN ('CLAIMED', 'CONFIRMED')
-      AND role NOT IN (SELECT role FROM shift_templates WHERE venue_id = ${newVenueId})
+      AND role NOT IN (SELECT role FROM shift_templates t WHERE t.venue_id = ${newVenueId} AND ${ourVenue('t')})
   `
 }
 
@@ -528,7 +570,7 @@ export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId
       ${confirmed ? sql`unixepoch()` : sql`NULL`}, ${confirmed ? sql`unixepoch()` : sql`NULL`},
       ${windowStart(defaults)}, ${windowEnd(defaults)}
     FROM performances p
-    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = ${input.role}
+    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = ${input.role} AND ${ourVenue('t')}
     WHERE p.id = ${input.performanceId}
   `
 }

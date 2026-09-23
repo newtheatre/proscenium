@@ -15,9 +15,17 @@ export default defineEventHandler(async (event) => {
   const description = input.description ?? null
   const roomId = input.roomId ?? null
 
+  // An external venue is staffed ad hoc, so its template goes in the same batch as the flag;
+  // both read the flag as the batch leaves it, so a venue still ours keeps its template (E-101).
+  const [templateAudit, templateDrop] = dropExternalTemplateStatements(id, auditEntry({
+    actorId: resolved.account.id,
+    action: 'shift-template.removed',
+    target: `venue:${id}`,
+  }))
+
   // The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
   // moment refuses rather than reaching the unique index (0003, 0006).
-  const updated = await db.all<{ id: string }>(sql`
+  const [updated] = await db.batch([db.all<{ id: string }>(sql`
     UPDATE venues
     SET name = ${input.name},
         address = ${address},
@@ -28,7 +36,7 @@ export default defineEventHandler(async (event) => {
     WHERE id = ${id}
       AND NOT EXISTS (SELECT 1 FROM venues WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
     RETURNING id
-  `)
+  `), db.run(templateAudit), db.run(templateDrop)])
 
   if (updated.length === 0) {
     const taken = await venueNamed(input.name, id)

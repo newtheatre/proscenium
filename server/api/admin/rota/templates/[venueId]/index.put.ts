@@ -12,6 +12,8 @@ export default defineEventHandler(async (event) => {
   if (!venue) throw noSuch('venue')
   const external = externalVenueTemplateRefusal(venue)
   if (external) throw createError({ statusCode: 409, statusMessage: external })
+  // A retired venue keeps a template it already holds, for Remove, but takes no new work (D-131).
+  if (venue.archived) throw createError({ statusCode: 409, statusMessage: 'That venue has been retired' })
 
   const input = await readValidatedBodyOrThrow(event, shiftTemplateForm)
   const refusal = templateRefusal(input.slots)
