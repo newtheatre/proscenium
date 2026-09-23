@@ -34,6 +34,11 @@ const pending = ref<(() => Promise<void>) | null>(null)
 
 const confirmingRemoval = ref(false)
 const removeFailure = ref<string | null>(null)
+// Held open while the call runs: backing out then could not stop it, only orphan its outcome.
+const removalOpen = computed({
+  get: () => confirmingRemoval.value,
+  set: (value) => { if (value || !working.value) confirmingRemoval.value = value },
+})
 
 function sayOnPage(said: string): void {
   notice.value = said
@@ -401,7 +406,7 @@ useSeoMeta({ title: 'Security' })
     </UModal>
 
     <ConfirmModal
-      v-model:open="confirmingRemoval"
+      v-model:open="removalOpen"
       name="remove-authenticator"
       title="Remove the authenticator"
       verb="Remove the authenticator"

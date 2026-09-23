@@ -133,7 +133,8 @@ const removing = ref<SignInMethod | null>(null)
 const removeFailure = ref<string | null>(null)
 const removeOpen = computed({
   get: () => removing.value !== null,
-  set: (value) => { if (!value) removing.value = null },
+  // Held open while the call runs: backing out then could not stop it, only orphan its outcome.
+  set: (value) => { if (!value && working.value === '') removing.value = null },
 })
 
 function askToRemove(method: SignInMethod): void {
