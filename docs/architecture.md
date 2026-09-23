@@ -337,6 +337,14 @@ caller resolves a term's dates from `GET /api/admin/finance/terms` before asking
 Closing a term reads its range from that same list and posts it through the ordinary close, which
 has no notion of "term" at all: a lock is a range and an optional label, whatever named it.
 
+A season (0087) is the one kind whose range the request does not carry: `SEASON` names a
+`seasons` row by id, and `resolvePeriodBounds()` reads that row's `starts_on` to `ends_on` before
+handing the range to `periodBounds()` as a term's, so the pure function still reads nothing
+itself. Every period route (the dashboard, revenue by show, the E-126 reports) resolves through
+it, and an unknown id is a 404 rather than some other range. `GET /api/admin/finance/seasons`
+feeds the picker under `finance.read` or `finance.summary`, so choosing a season needs no box
+office permission.
+
 ### SU accounting exports (I-108)
 
 A period export (`GET /api/admin/finance/export?fromDay=...&toDay=...`) is one CSV row per
@@ -1071,7 +1079,7 @@ reporting reaches through a second tap on the incident log screen rather than a 
 
 ### Cross-season report queries (E-126)
 
-Two result sets, both scoped by `periodBounds` (`server/utils/season-dashboard.ts`, I-103
+Two result sets, both scoped by `resolvePeriodBounds` (`server/utils/season-dashboard.ts`, I-103
 through I-107), reused as-is rather than a second resolver of when a year starts: the risk
 0009 and this story both depend on is three answers to that question, not the absence of a
 helper. `GET /api/admin/reports/incidents` groups `incidents` by category, severity and venue

@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
   countListedShowsQuery,
+  headlineSeasonDay,
+  headlineSeasonQuery,
   listedPerformancesQuery,
   listedPricesQuery,
   listedShowScope,
@@ -317,6 +319,73 @@ describe('the listing narrows to one venue by name (J-111)', () => {
         .toEqual(['a-test-show-a'])
       expect(read<{ slug: string }>(database, listedShowsQuery(at, 25, 0, 'The Main Hall')).map(show => show.slug))
         .toEqual(['a-test-show-a'])
+    })
+  })
+})
+
+// What the public heading names (0087): the season today falls in, else the next one to begin,
+// else nothing. A season that has finished is never named, and no name is ever made up.
+describe('the season the public heading names (0087)', () => {
+  function season(database: TestDatabase, id: string, name: string, startsOn: string, endsOn: string, archived = 0): void {
+    database.batch([['INSERT INTO seasons (id, name, starts_on, ends_on, sort, archived) VALUES (?, ?, ?, ?, 0, ?)', id, name, startsOn, endsOn, archived]])
+  }
+
+  function named(database: TestDatabase, today: string): string | null {
+    return read<{ name: string }>(database, headlineSeasonQuery(today))[0]?.name ?? null
+  }
+
+  function theatreYear(database: TestDatabase): void {
+    season(database, 'fringe-2026', 'Fringe 2026', '2026-08-01', '2026-08-25')
+    season(database, 'autumn-2026', 'Autumn 2026', '2026-09-21', '2026-12-11')
+    season(database, 'spring-2027', 'Spring 2027', '2027-01-18', '2027-03-26')
+    season(database, 'stuff-2027', 'StuFF 2027', '2027-05-10', '2027-05-16')
+  }
+
+  test('a day inside a season names that season, first and last days included', async () => {
+    await withDatabase((database) => {
+      theatreYear(database)
+      expect(named(database, '2026-09-21')).toBe('Autumn 2026')
+      expect(named(database, '2026-10-15')).toBe('Autumn 2026')
+      expect(named(database, '2026-12-11')).toBe('Autumn 2026')
+      expect(named(database, '2027-05-12')).toBe('StuFF 2027')
+    })
+  })
+
+  test('a day between seasons names the next one to begin, never the one just finished', async () => {
+    await withDatabase((database) => {
+      theatreYear(database)
+      expect(named(database, '2026-12-12')).toBe('Spring 2027')
+      expect(named(database, '2026-08-26')).toBe('Autumn 2026')
+      expect(named(database, '2027-04-01')).toBe('StuFF 2027')
+    })
+  })
+
+  test('with nothing current or to come, no season is named at all', async () => {
+    await withDatabase((database) => {
+      theatreYear(database)
+      expect(named(database, '2027-05-17')).toBeNull()
+    })
+    await withDatabase((database) => {
+      expect(named(database, '2026-10-15')).toBeNull()
+    })
+  })
+
+  // 0014: the heading turns with the show night at 04:00, not at midnight.
+  test('at 02:00 after a season\'s last night the heading still names that season', async () => {
+    await withDatabase((database) => {
+      theatreYear(database)
+      // 02:00 GMT on 12 December is 02:00 London, still the night of the 11th.
+      expect(named(database, headlineSeasonDay(new Date('2026-12-12T02:00:00Z')))).toBe('Autumn 2026')
+      // 04:00 London begins the night of the 12th, after Autumn has ended.
+      expect(named(database, headlineSeasonDay(new Date('2026-12-12T04:00:00Z')))).toBe('Spring 2027')
+    })
+  })
+
+  test('a retired season is not advertised; the next current one is', async () => {
+    await withDatabase((database) => {
+      season(database, 'autumn-2026', 'Autumn 2026', '2026-09-21', '2026-12-11', 1)
+      season(database, 'spring-2027', 'Spring 2027', '2027-01-18', '2027-03-26')
+      expect(named(database, '2026-10-15')).toBe('Spring 2027')
     })
   })
 })

@@ -7,7 +7,7 @@ const query = periodForm.and(pageQuery).and(performanceReportFilter)
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'reports.read')
   const { page, pageSize, venueId, ...period } = await getValidatedQueryOrThrow(event, query)
-  const { fromAt, toAt } = periodBounds(period)
+  const { fromAt, toAt } = await resolvePeriodBounds(period)
 
   const { items, total } = await performanceReports(fromAt, toAt, { venueId }, pageSize, offsetFor(page, pageSize))
 

@@ -2,9 +2,11 @@ import { describe, expect, test } from 'bun:test'
 import {
   ledgerEntriesClause,
   ledgerEntriesQuery,
+  financeSeasonsQuery,
   openVarianceQuery,
   periodBounds,
   revenueBySourceQuery,
+  seasonRangeQuery,
   seasonRefundsQuery,
 } from '#server/utils/season-dashboard'
 import { filterQuerySchema } from '#shared/utils/list-filters'
@@ -103,6 +105,45 @@ describe('period boundaries, Europe/London (criterion 1)', () => {
     expect(lastMinute).toBeGreaterThanOrEqual(bounds.fromAt)
     expect(lastMinute).toBeLessThan(bounds.toAt)
     expect(firstMinuteAfter).toBeGreaterThanOrEqual(bounds.toAt)
+  })
+})
+
+function season(database: TestDatabase, id: string, name: string, startsOn: string, endsOn: string, archived = 0): void {
+  database.batch([['INSERT INTO seasons (id, name, starts_on, ends_on, sort, archived) VALUES (?, ?, ?, ?, 0, ?)', id, name, startsOn, endsOn, archived]])
+}
+
+describe('a season is its own row in the seasons table (criterion 4, 0087)', () => {
+  test('a season resolves to the days its row carries, inclusive at both ends', async () => {
+    await withDatabase(async (database) => {
+      season(database, 'season-autumn', 'Autumn 2026', '2026-09-21', '2026-12-11')
+      season(database, 'season-stuff', 'StuFF 2027', '2027-05-10', '2027-05-16')
+
+      const [range] = read<{ fromDay: string, toDay: string }>(database, seasonRangeQuery('season-stuff'))
+      expect(range).toEqual({ fromDay: '2027-05-10', toDay: '2027-05-16' })
+
+      const bounds = periodBounds({ kind: 'TERM', ...range! })
+      // 23:59 BST on the last day is inside; midnight after it is not.
+      expect(Math.floor(new Date('2027-05-16T22:59:00Z').getTime() / 1000)).toBeLessThan(bounds.toAt)
+      expect(Math.floor(new Date('2027-05-16T23:00:00Z').getTime() / 1000)).toBe(bounds.toAt)
+    })
+  })
+
+  test('an id no row carries resolves to nothing, never to a guessed range', async () => {
+    await withDatabase(async (database) => {
+      expect(read(database, seasonRangeQuery('season-nobody-made'))).toEqual([])
+    })
+  })
+
+  test('the money screens list every season, retired ones too, newest first', async () => {
+    await withDatabase(async (database) => {
+      season(database, 'season-spring', 'Spring 2026', '2026-01-12', '2026-04-24', 1)
+      season(database, 'season-fringe', 'Fringe 2026', '2026-08-01', '2026-08-25')
+      season(database, 'season-autumn', 'Autumn 2026', '2026-09-21', '2026-12-11')
+
+      expect(read<{ id: string }>(database, financeSeasonsQuery()).map(row => row.id))
+        .toEqual(['season-autumn', 'season-fringe', 'season-spring'])
+      expect(read(database, financeSeasonsQuery())[0]).toEqual({ id: 'season-autumn', name: 'Autumn 2026', fromDay: '2026-09-21', toDay: '2026-12-11' })
+    })
   })
 })
 

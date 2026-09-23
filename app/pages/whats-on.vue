@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { listingFlag } from '#shared/utils/listing'
-import { saysSeason } from '#shared/utils/london'
 import { ALL_VENUES, SAYS_BOOKING_HOLDS, SAYS_PAYMENT, venueFilters, venueForFilter } from '#shared/utils/programme'
 import type { ListedShow } from '#shared/utils/programme'
 
@@ -11,7 +10,8 @@ useSeoMeta({
   description: 'Every show on at the Nottingham New Theatre, when it runs and what a ticket costs.',
 })
 
-interface Listing { items: ListedShow[], total: number, page: number, pageSize: number, pages: number }
+// `season` is the seasons row the heading names, or null when none is current or to come (0087).
+interface Listing { items: ListedShow[], total: number, page: number, pageSize: number, pages: number, season: string | null }
 
 const page = ref(1)
 
@@ -25,7 +25,7 @@ const wanted = computed(() => venueForFilter(venue.value, venues.value) ?? undef
 
 const { data, status } = await useFetch<Listing>('/api/whats-on', {
   query: { page, venue: wanted },
-  default: (): Listing => ({ items: [], total: 0, page: 1, pageSize: 25, pages: 1 }),
+  default: (): Listing => ({ items: [], total: 0, page: 1, pageSize: 25, pages: 1, season: null }),
 })
 
 watchEffect(() => {
@@ -35,7 +35,7 @@ watchEffect(() => {
 
 const filters = computed(() => venueFilters(venues.value))
 
-const season = saysSeason()
+const season = computed(() => data.value.season)
 
 watch(venue, () => {
   page.value = 1
@@ -53,8 +53,12 @@ const flagged = computed(() => data.value.items.find(listed => listingFlag(liste
       src="/images/banners/whats-on.webp"
     >
       <template #headline>
-        <p class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">
-          Season {{ season }}
+        <p
+          v-if="season"
+          class="font-mono text-xs uppercase tracking-[0.2em] text-secondary"
+          data-test="whats-on-season"
+        >
+          {{ season }}
         </p>
       </template>
       <template #title>

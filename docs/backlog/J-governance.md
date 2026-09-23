@@ -221,7 +221,8 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
      invitation to join. The footer carries the wordmark, the public pages in columns each entry
      declares for itself, and a copyright line. Both colour modes read: the chrome, the hero and
      the centenary band stay stage black while the page between them turns.
-  12. What's on opens on a band rather than a full hero: the season it is listing, the title with
+  12. What's on opens on a band rather than a full hero: the current season by its own name from
+      the seasons table (else the next to begin, else no season word at all; 0087), the title with
       "on" in gold, and one sentence saying how paying works. No figure appears in that sentence;
       the price a visitor acts on is the live cheapest price on each card.
   13. The venue filter is a row of pills whose values are slugs of the venue names, so no control

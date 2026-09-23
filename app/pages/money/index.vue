@@ -4,7 +4,7 @@ import { saysMoney } from '#shared/utils/bar'
 import { PERIOD_KINDS } from '#shared/utils/season-dashboard'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
 import { calendarYearChoices, currentYear, monthChoices, yearChoices } from '#shared/utils/year'
-import type { PeriodInput, PeriodKind, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
+import type { FinanceSeason, PeriodInput, PeriodKind, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { Period } from '#shared/utils/period-locks'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -18,11 +18,19 @@ const { data: terms } = await useAsyncData(
   () => request<{ periods: Period[] }>('/api/admin/finance/terms').then(response => response.periods),
   { default: (): Period[] => [] },
 )
+const { data: seasons } = await useAsyncData(
+  'finance-seasons',
+  () => request<{ seasons: FinanceSeason[] }>('/api/admin/finance/seasons').then(response => response.seasons),
+  { default: (): FinanceSeason[] => [] },
+)
 
-// TERM has a range rather than a formula, so it is offered only once I-107 has a term to pick;
-// the range submitted is the defined term's own, never a rule this screen computes.
-const selectableKinds = computed(() => PERIOD_KINDS.filter(one => one !== 'TERM' || terms.value.length > 0))
+// TERM and SEASON have ranges rather than a formula, so each is offered only once one exists;
+// a season is sent by id and its days are the server's to read (0087).
+const selectableKinds = computed(() => PERIOD_KINDS.filter(one =>
+  (one !== 'TERM' || terms.value.length > 0) && (one !== 'SEASON' || seasons.value.length > 0)))
 const termItems = computed(() => terms.value.map(one => ({ label: one.label, value: one.id })))
+const seasonItems = computed(() => seasons.value.map(one => ({ label: one.name, value: one.id })))
+const seasonId = ref((seasons.value.find(one => one.fromDay <= today && today <= one.toDay) ?? seasons.value[0])?.id ?? '')
 const kind = ref<PeriodKind>('YEAR')
 const termId = ref(terms.value[0]?.id ?? '')
 const day = ref(today)
@@ -43,6 +51,7 @@ const period = computed<PeriodInput>(() => {
   if (kind.value === 'WEEK') return { kind: 'WEEK', day: day.value }
   if (kind.value === 'MONTH') return { kind: 'MONTH', year: monthYear.value, month: month.value }
   if (kind.value === 'TERM' && term.value) return { kind: 'TERM', fromDay: term.value.fromDay, toDay: term.value.toDay }
+  if (kind.value === 'SEASON' && seasonId.value) return { kind: 'SEASON', seasonId: seasonId.value }
   return { kind: 'YEAR', year: year.value }
 })
 
@@ -54,6 +63,7 @@ const query = computed(() => {
     base.month = String(period.value.month)
   }
   else if (period.value.kind === 'YEAR') base.year = String(period.value.year)
+  else if (period.value.kind === 'SEASON') base.seasonId = period.value.seasonId
   else {
     base.fromDay = period.value.fromDay
     base.toDay = period.value.toDay
@@ -132,6 +142,14 @@ const figures = computed(() => (data.value
           aria-label="Term"
           data-test="period-term"
           :items="termItems"
+          value-key="value"
+        />
+        <USelect
+          v-if="kind === 'SEASON'"
+          v-model="seasonId"
+          aria-label="Season"
+          data-test="period-season"
+          :items="seasonItems"
           value-key="value"
         />
         <DateField

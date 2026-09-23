@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { CATEGORIES, SEVERITIES } from './incidents'
 import type { Category, Severity } from './incidents'
 
-// Cross-season report queries (E-126): every range comes from `periodBounds`
+// Cross-season report queries (E-126): every range comes from `resolvePeriodBounds`
 // (season-dashboard.ts), reused as-is rather than a second resolver of a period's start.
 
 export interface IncidentTrendRow {

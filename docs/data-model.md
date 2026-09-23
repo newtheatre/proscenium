@@ -353,8 +353,19 @@ table never had) and adds the append-only triggers by hand, as every table in th
 
 ### seasons
 `id` PK · `name` UNIQUE, case-insensitive UNIQUE too (`seasons_name_nocase`) · `starts_on` ·
-`ends_on` · `sort` · `archived` bool. The financial season is 1 August to 31 July. CHECK
-`ends_on` > `starts_on`.
+`ends_on` · `sort` · `archived` bool. CHECK `ends_on` > `starts_on`.
+
+**A season is one of the theatre's seasons, never the committee year (0087).** Autumn, Spring,
+StuFF or the Fringe of an academic year, named and dated by the Box Office Manager; the whole
+1 August to 31 July is a year, computed and never stored. The money dashboard's `SEASON` period
+(I-105) reads a row's own `starts_on` to `ends_on`, both inclusive, by ledger date:
+`resolvePeriodBounds()` (`server/utils/season-dashboard.ts`) looks the row up by id and 404s an
+unknown one, and `GET /api/admin/finance/seasons` lists every row, retired ones too, for
+`finance.read` or `finance.summary`. Seasons should not overlap, since a day in two seasons counts
+in both; that is guidance on the Seasons page, not a constraint. The public What's on heading
+names a season too (`headlineSeasonQuery()`, `server/utils/whats-on.ts`, carried as `season` on
+`GET /api/whats-on`): the unretired row tonight's show night (0014) falls in, else the next to
+begin, else `null` and no season word at all; a finished season is never named.
 
 **Administration (D-131).** `/box-office/seasons`, over these routes, `ticketing.read` for the
 listing and `ticketing.write` for the rest:
@@ -501,7 +512,7 @@ two routes that take no session at all:
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/whats-on` | The paged envelope of published shows with at least one future on-sale performance, each with its public performances, availability and prices. `?venue=<name>` narrows it to the shows playing that venue; the page and its count share one predicate, so they cannot disagree (J-111). |
+| `GET /api/whats-on` | The paged envelope of published shows with at least one future on-sale performance, each with its public performances, availability and prices. `?venue=<name>` narrows it to the shows playing that venue; the page and its count share one predicate, so they cannot disagree (J-111). It also carries `season`, the name the heading shows, or `null` (0087). |
 | `GET /api/shows/[slug]` | One published show. A draft show and an address nobody holds both answer 404, so the listing cannot be read backwards. |
 
 Both build every field through `publicShow()` and `publicPerformance()` in
@@ -1081,7 +1092,8 @@ of the same figures, adding only the desk's own itemised breakdown.
 `to_day >= from_day`) · `created_by` → users restrict · `created_at`. Indexed on
 `(from_day, to_day)`.
 
-**A named term, and only a term: a year needs no row here.** A year's range is computed
+**A named term, and only a term: a year needs no row here, and a season has its own table.** A
+season's range is its `seasons` row's (0087). A year's range is computed
 from `committeeYearEnd` (`shared/utils/london.ts`), never stored, the boundary E-126 also reuses
 rather than resolving its own (I-107). A term has no fixed formula, so it is named once, ahead
 of closing it: `POST /api/admin/finance/terms` defines the range, `GET` lists every one, and the
