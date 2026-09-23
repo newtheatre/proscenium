@@ -268,7 +268,15 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   3. The bumped member is notified immediately with the reason and offered the nearest equivalent free slot (same room, or a room of at least equal capacity, closest in time); accepting rebooks in one action.
   4. A bumped booking becomes status BUMPED, distinct from CANCELLED, and links to the replacement offer; it is never deleted.
   5. Every bump is audited with actor, reason, the displaced booking and the replacing booking.
-- Source: Prompt Book C-2; audit RM-1 (priority order published, never enforced).
+  6. An officer reaches any member's booking from a console list, `GET /api/admin/rooms/bookings`
+     behind `rooms.read`, declared once as a list (K-129): status, room, member, tier and the day
+     it starts as filters, search over the title, the member and the room, paged in SQL with an
+     envelope. Its columns are an allow-list: the member's name and nothing else about them, never
+     an address, the booking's notes or the reason they gave. A booking that has ended is hidden
+     until the officer asks for past ones, and a booking currently marked as a no-show says so.
+- Source: Prompt Book C-2; audit RM-1 (priority order published, never enforced). Criterion 6
+  comes from feedback of 23 September 2026 (issue 1049): the bump and the no-show routes existed
+  with no screen, and an officer could not even see another member's booking.
 
 ## C-116: No-show recording and the consequence ladder
 
