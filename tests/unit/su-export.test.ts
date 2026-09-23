@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { exportRangeForm, formatPoundsForExport, LEDGER_POSTING_PAIRS, nominalMappingForm, SU_EXPORT_ROW_CAP } from '#shared/utils/su-export'
+import { exportRangeForm, formatPoundsForExport, LEDGER_POSTING_PAIRS, nominalMappingForm, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportCsvRows, suExportForm, suExportParams } from '#shared/utils/su-export'
+import type { SuExportRow } from '#shared/utils/su-export'
 
 describe('mapping a (kind, source) pair to a nominal code (I-108 criterion 1)', () => {
   test('a known pair with a code is accepted', () => {
@@ -49,4 +50,58 @@ describe('the pounds column, formatted at export time only (criterion 2)', () =>
 
 test('the row cap is a structural bound, not a policy one (0012)', () => {
   expect(SU_EXPORT_ROW_CAP).toBeGreaterThan(0)
+})
+
+describe('choosing the period by name: a year, a season or a custom range (criterion 4, 0087)', () => {
+  test('a range with no kind is still a custom range, so an older link keeps working', () => {
+    expect(suExportForm.parse({ fromDay: '2026-09-01', toDay: '2026-09-30' })).toEqual({ kind: 'RANGE', fromDay: '2026-09-01', toDay: '2026-09-30' })
+  })
+
+  test('a custom range ending before it starts is refused on the to day', () => {
+    const parsed = suExportForm.safeParse({ kind: 'RANGE', fromDay: '2026-09-30', toDay: '2026-09-01' })
+    expect(parsed.success).toBe(false)
+    expect(parsed.error?.issues[0]?.path).toEqual(['toDay'])
+    expect(parsed.error?.issues[0]?.message).toBe('The range ends before it starts')
+  })
+
+  test('a year is named by the year it ends in, read from the query string as text', () => {
+    expect(suExportForm.parse({ kind: 'YEAR', year: '2026' })).toEqual({ kind: 'YEAR', year: 2026 })
+  })
+
+  test('a season is sent by its id, never by its days', () => {
+    expect(suExportForm.parse({ kind: 'SEASON', seasonId: 'season-1', fromDay: '2026-01-01' })).toEqual({ kind: 'SEASON', seasonId: 'season-1' })
+    expect(suExportForm.safeParse({ kind: 'SEASON', seasonId: ' ' }).success).toBe(false)
+  })
+
+  test('the whole year asked for as a season is refused rather than read as a year (0087)', () => {
+    expect(suExportForm.safeParse({ kind: 'SEASON', year: '2026' }).success).toBe(false)
+  })
+
+  test.each([
+    { kind: 'YEAR', year: 2026 },
+    { kind: 'SEASON', seasonId: 'season-1' },
+    { kind: 'RANGE', fromDay: '2026-09-01', toDay: '2026-09-30' },
+  ] as const)('the query string the download and its status share reads back as the same period ($kind)', (period) => {
+    expect(suExportForm.parse(suExportParams(period))).toEqual(period)
+  })
+})
+
+describe('the file itself (criteria 2, 3, 4)', () => {
+  const lines: SuExportRow[] = [
+    { londonDay: '2026-09-15', kind: 'WALK_UP', source: 'DESK', nominalCode: '4100', amountPence: 900 },
+    { londonDay: '2026-09-16', kind: 'BAR_ITEM', source: 'TILL', nominalCode: null, amountPence: -500 },
+  ]
+
+  test('each line is date, category, code or UNMAPPED, pence and pounds, in that order', () => {
+    const shaped = suExportCsvRows(lines)
+    expect(shaped).toEqual([
+      { date: '2026-09-15', category: 'Walk-up sale', nominalCode: '4100', amountPence: 900, amountPounds: '9.00' },
+      { date: '2026-09-16', category: 'Bar item', nominalCode: 'UNMAPPED', amountPence: -500, amountPounds: '-5.00' },
+    ])
+    expect(Object.keys(shaped[0]!)).toEqual(['date', 'category', 'nominalCode', 'amountPence', 'amountPounds'])
+  })
+
+  test('the cap refusal names the cap, the same sentence the download refuses with', () => {
+    expect(suExportCapRefusal()).toBe(`This export would return more than ${SU_EXPORT_ROW_CAP.toLocaleString('en-GB')} rows. Narrow the date range and try again.`)
+  })
 })
