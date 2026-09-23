@@ -52,3 +52,22 @@ describe('the report screen (issue 1053)', () => {
     expect(source).toContain('data-test="tile-report"')
   })
 })
+
+describe('the officer warning and the switcher read the performance on screen (0044)', () => {
+  test('authority is asked for the performance being signed off, and again on a switch', async () => {
+    const source = await Bun.file(PAGE).text()
+    expect(source).toContain('{ role: \'DUTY_MANAGER\', performanceId: asked }')
+    expect(source).toMatch(/function choose\(chosen: string\): void \{[^}]*loadAuthority\(\)/)
+  })
+
+  test('a refusal with no house to choose is shown rather than an empty switcher', async () => {
+    const source = await Bun.file(PAGE).text()
+    expect(source).toContain('v-if="ambiguous && choices.length > 0"')
+  })
+
+  test('the bypass is said once for the night, never beside a named slot', async () => {
+    const source = await Bun.file(PAGE).text()
+    expect(source).not.toContain('v-if="row.officerBypass"')
+    expect(source).toContain('data-test="staffing-officer-bypass"')
+  })
+})
