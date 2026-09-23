@@ -26,7 +26,7 @@ without the buttons, and the request queue is not in their navigation at all.
   Deciding on what the policy could not confirm on its own, and on asks for rooms we do not manage.
   ::
   ::card{icon="i-lucide-calendar-range" title="Bookings" to="/docs/spaces/bookings"}
-  Every member's room bookings in one list, searched and filtered.
+  Every member's room bookings in one list, and where one is bumped or marked as a no-show.
   ::
   ::card{icon="i-lucide-construction" title="Closures" to="/docs/spaces/closures"}
   Shutting a room, or every room, for a stated reason, and what that does to bookings.

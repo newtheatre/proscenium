@@ -6,6 +6,16 @@ export function saysTier(tier: string): string {
   return tier.charAt(0) + tier.slice(1).toLowerCase()
 }
 
+export type RowAction = 'bump' | 'record' | 'withdraw'
+
+// The one thing a row may have done to it, by the routes' own rules: only a confirmed booking is
+// bumped before it ends or marked after (C-115, C-116). The routes still decide.
+export function rowActionFor(booking: { status: string, endsAt: number, noShowId: string | null }, now: number): RowAction | null {
+  if (booking.noShowId) return 'withdraw'
+  if (booking.status !== 'CONFIRMED') return null
+  return booking.endsAt > now ? 'bump' : 'record'
+}
+
 // Every member's room bookings, as an officer reads them (K-129, C-115 criterion 6). A booking
 // that has ended is hidden unless the officer asks, the same default closures use.
 export const roomBookingsList = {
