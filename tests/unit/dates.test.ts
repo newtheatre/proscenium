@@ -126,4 +126,3 @@ describe('a date without an instant is refused rather than assumed', () => {
     expect(formatLondon(new Date('2026-07-05T20:00:00.000Z'), { timeStyle: 'short' })).toBe('21:00')
   })
 })
-

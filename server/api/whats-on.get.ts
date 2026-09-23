@@ -9,7 +9,11 @@ const listingQuery = pageQuery.extend({ venue: z.string().trim().max(120).option
 export default defineEventHandler(async (event) => {
   const { page, pageSize, venue } = await getValidatedQueryOrThrow(event, listingQuery)
   const limited = await configValue(event, 'LISTING_LIMITED_THRESHOLD_PERCENT')
-  const listing = await publicListing(limited, page, pageSize, new Date(), venue || null)
+  const now = new Date()
+  const [listing, season] = await Promise.all([
+    publicListing(limited, page, pageSize, now, venue || null),
+    headlineSeason(now),
+  ])
 
   // The cache ends at the first booking window this page describes closing, so "booking closed"
   // appears the moment it does rather than at the next refresh (D-112 criterion 4, 0045).
@@ -19,5 +23,6 @@ export default defineEventHandler(async (event) => {
     ...envelope(listing.items, listing.total, page, pageSize),
     cacheSeconds: listing.cacheSeconds,
     cacheMaxSeconds: LISTED_CACHE_MAX_SECONDS,
+    season,
   }
 })

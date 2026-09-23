@@ -46,6 +46,10 @@ left open.
   export's (D-129) whole-year filter move with them; the export's `season` filter becomes `year`.
 - **`TERM` stays beside `SEASON`.** A term is what the treasurer closes (I-107) and need not match
   a season.
+- **The public What's on heading names the current season** (amended 23 September 2026 at the IT
+  Manager's direction): the unretired `seasons` row today falls in, else the next one to begin,
+  else no season word at all. A finished season is never named and no name is ever guessed; the
+  whole-year "26/27" band is gone.
 
 ## Consequences
 

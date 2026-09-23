@@ -358,7 +358,10 @@ StuFF or the Fringe of an academic year, named and dated by the Box Office Manag
 `resolvePeriodBounds()` (`server/utils/season-dashboard.ts`) looks the row up by id and 404s an
 unknown one, and `GET /api/admin/finance/seasons` lists every row, retired ones too, for
 `finance.read` or `finance.summary`. Seasons should not overlap, since a day in two seasons counts
-in both; that is guidance on the Seasons page, not a constraint.
+in both; that is guidance on the Seasons page, not a constraint. The public What's on heading
+names a season too (`headlineSeasonQuery()`, `server/utils/whats-on.ts`, carried as `season` on
+`GET /api/whats-on`): the unretired row today falls in, else the next to begin, else `null` and no
+season word at all; a finished season is never named.
 
 **Administration (D-131).** `/box-office/seasons`, over these routes, `ticketing.read` for the
 listing and `ticketing.write` for the rest:
@@ -505,7 +508,7 @@ two routes that take no session at all:
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/whats-on` | The paged envelope of published shows with at least one future on-sale performance, each with its public performances, availability and prices. `?venue=<name>` narrows it to the shows playing that venue; the page and its count share one predicate, so they cannot disagree (J-111). |
+| `GET /api/whats-on` | The paged envelope of published shows with at least one future on-sale performance, each with its public performances, availability and prices. `?venue=<name>` narrows it to the shows playing that venue; the page and its count share one predicate, so they cannot disagree (J-111). It also carries `season`, the name the heading shows, or `null` (0087). |
 | `GET /api/shows/[slug]` | One published show. A draft show and an address nobody holds both answer 404, so the listing cannot be read backwards. |
 
 Both build every field through `publicShow()` and `publicPerformance()` in

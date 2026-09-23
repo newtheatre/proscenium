@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { warningsForListedShowsQuery } from './content-warnings'
 import { performanceSoldColumn } from './programme'
 import { publicContentWarnings, warningAssessment } from '#shared/utils/content-warnings'
+import { londonDayOf } from '#shared/utils/ledger'
 import { offsetFor } from '#shared/utils/pagination'
 import {
   listingCacheSeconds,
@@ -241,6 +242,22 @@ function assemble(
       performances: listed.get(row.id) ?? [],
     }]
   })
+}
+
+// The season the public heading names (0087): the current one, else the next to begin, else none.
+// A finished or retired season is never advertised, and nothing stands in for a missing name.
+export function headlineSeasonQuery(today: string): SQL {
+  return sql`
+    SELECT name FROM seasons
+    WHERE archived = 0 AND ends_on >= ${today}
+    ORDER BY (starts_on <= ${today}) DESC, starts_on, name COLLATE NOCASE
+    LIMIT 1
+  `
+}
+
+export async function headlineSeason(at: Date): Promise<string | null> {
+  const [row] = await db.all<{ name: string }>(headlineSeasonQuery(londonDayOf(at)))
+  return row?.name ?? null
 }
 
 // The limited threshold is passed in rather than read here: this file is imported by the test
