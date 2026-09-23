@@ -268,6 +268,9 @@ Open questions for the committee:
   2. Member-only writes (room booking, proposals, rota, tabs) check current membership at the write path, not at page load. Not yet applicable, 30 August 2026: every module named here is later work, so there is nothing to gate. `currentMembership` is the predicate they will call, and 0031 fixes the rule they must follow: money never checks confirmation, participation may.
   3. Membership lapses automatically at the year boundary with a configurable grace window; renewal prompts go out before and during the grace window. Amended 30 August 2026: it lapses on its own expiry rather than at a year boundary, and lapsing needs no sweep because current is read at query time (0009). The grace window is `MEMBERSHIP_GRACE_DAYS`; the reminder goes out `MEMBERSHIP_RENEWAL_NOTICE_DAYS` before each person's own date, once, recorded on the row.
   4. The committee can grant membership manually, recording who granted it, when, and the evidence; every grant is audited.
+     Amended 23 September 2026 (issue 1005): a student number given with the grant is written by
+     the same batch-shaped `recordStudentId` the claims route uses, in the grant's own batch, so a
+     number another account holds refuses the whole grant rather than landing after it.
   5. The committee can view and export the membership register for SU returns; the export is column allow-listed and paginated.
   6. Past years' membership states remain queryable; lapse never deletes history.
   7. Added 13 September 2026: `/account/membership` quotes the SU's annual membership fee
@@ -507,6 +510,9 @@ Open questions for the committee:
      Recording writes the student number to the account through `recordStudentId`, inserts the
      membership by the A-117 path with source `MANUAL` and the claim as its evidence, and closes
      the claim, all in one batch.
+     `recordStudentId` returns statements rather than writing, and the `users_student_id` index
+     is the one uniqueness check: two claims for one number recorded at once settle to one
+     membership (0006, 0047).
   3. Declining needs a reason, which the member sees. The decision is notified through the
      H-101 mechanism.
   4. `/account/membership` shows the current membership, its grace and expiry, and either the

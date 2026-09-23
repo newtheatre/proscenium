@@ -2,9 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import { auditEntry } from '#shared/utils/audit'
 import { erasureStatements } from '#shared/utils/erasure'
 import { endOfTerm } from '#shared/utils/membership'
-import { declineClaimStatements, recordClaimStatements } from '#shared/utils/membership-claims'
+import { declineClaimStatements, grantMembershipStatements, recordClaimStatements, recordStudentId, studentIdConstraintRefusal } from '#shared/utils/membership-claims'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { race } from '#tests/helpers/race'
+import { expectOneWinner, race } from '#tests/helpers/race'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // A-130. One open claim per person is the database's rule, recording it is at most once however
@@ -105,27 +105,32 @@ describe('one open claim per person (A-130 criterion 1)', () => {
 
 // The statements the record route runs, in the order it runs them, guarded on the claim still
 // being open at commit time: the loser of a race writes nothing at all (0006).
-function attemptRecord(database: TestDatabase, index: number): { status: number } {
+interface Attempt { claimId?: string, userId?: string, studentId?: string, held?: string | null }
+
+function attemptRecord(database: TestDatabase, index: number, attempt: Attempt = {}): { status: number, says?: string } {
+  const { claimId = 'c-1', userId = 'u1', studentId = '20123456', held = null } = attempt
   const membershipId = `m-${index}`
   const expiresOn = endOfTerm('2026-09-14', 1)
   const entries = {
-    studentId: auditEntry({ actorId: 'officer', action: 'account.student-id.recorded', target: 'user:u1', detail: { replaced: false } }),
-    granted: auditEntry({ actorId: 'officer', action: 'membership.granted', target: 'user:u1', detail: { membership: membershipId, years: 1, expiresOn } }),
-    recorded: auditEntry({ actorId: 'officer', action: 'membership.claim.recorded', target: 'claim:c-1', detail: { claim: 'c-1', membership: membershipId } }),
+    granted: auditEntry({ actorId: 'officer', action: 'membership.granted', target: `user:${userId}`, detail: { membership: membershipId, years: 1, expiresOn } }),
+    recorded: auditEntry({ actorId: 'officer', action: 'membership.claim.recorded', target: `claim:${claimId}`, detail: { claim: claimId, membership: membershipId } }),
   }
   try {
     run(database, recordClaimStatements({
-      claimId: 'c-1',
-      userId: 'u1',
-      studentId: '20123456',
+      claimId,
+      userId,
+      studentId,
+      held,
       membership: { id: membershipId, startsOn: '2026-09-14', expiresOn },
       actorId: 'officer',
       now: 1_790_000_000 + index,
       entries,
     }))
   }
-  catch {
-    return { status: 500 }
+  catch (error) {
+    // The route's own mapping: a clash on the number is a 409 that says so, anything else a defect.
+    const refusal = studentIdConstraintRefusal(error)
+    return refusal ? { status: refusal.statusCode, says: refusal.statusMessage } : { status: 500 }
   }
   return { status: rows(database, 'SELECT id FROM memberships WHERE id = ?', membershipId).length ? 200 : 409 }
 }
@@ -268,6 +273,89 @@ describe('erasure anonymises claims (A-130 criterion 6, 0011)', () => {
       const once = JSON.stringify(rows(database, `SELECT * FROM membership_claims WHERE id = 'c-1'`))
       expect(() => erase(database, 1_790_000_100)).not.toThrow()
       expect(JSON.stringify(rows(database, `SELECT * FROM membership_claims WHERE id = 'c-1'`))).toBe(once)
+    })
+  })
+})
+
+// One rule for the number, batch-shaped, used by both write paths (A-117, A-130 criterion 2): the
+// users_student_id index is the check, so a clash fails the whole batch it rides in (0006, 0047).
+describe('the student number rides in the same batch as the membership (issue 1005)', () => {
+  const grant = (database: TestDatabase, userId: string, studentId: string | undefined, held: string | null = null): { status: number, says?: string } => {
+    try {
+      run(database, grantMembershipStatements({
+        id: `m-${userId}`,
+        userId,
+        startsOn: '2026-09-14',
+        years: 1,
+        evidence: null,
+        actorId: 'officer',
+        now: 1_790_000_000,
+        studentId,
+        held,
+      }))
+      return { status: 200 }
+    }
+    catch (error) {
+      const refusal = studentIdConstraintRefusal(error)
+      return refusal ? { status: refusal.statusCode, says: refusal.statusMessage } : { status: 500 }
+    }
+  }
+
+  test('a number the account already holds writes nothing to it and nothing to the trail', () => {
+    expect(recordStudentId({ userId: 'u1', studentId: '20123456', held: '20123456', actorId: 'officer', now: 1 })).toEqual([])
+  })
+
+  test('recording one writes the membership, its entry, the number and its entry together', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(grant(database, 'u1', '20123456').status).toBe(200)
+      expect(rows(database, `SELECT id FROM memberships WHERE user_id = 'u1'`)).toHaveLength(1)
+      expect(rows<{ studentId: string }>(database, `SELECT student_id AS studentId FROM users WHERE id = 'u1'`)[0]!.studentId).toBe('20123456')
+      expect(rows(database, `SELECT id FROM audit_log WHERE action = 'account.student-id.recorded'`)).toHaveLength(1)
+      expect(rows(database, `SELECT id FROM audit_log WHERE action = 'membership.granted'`)).toHaveLength(1)
+    })
+  })
+
+  test('recording one with a number another account holds writes no membership at all', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      database.batch([[`UPDATE users SET student_id = '20123456' WHERE id = 'u2'`]])
+
+      expect(grant(database, 'u1', '20123456')).toEqual({ status: 409, says: 'Another account already holds that student number' })
+      expect(rows(database, `SELECT id FROM memberships`)).toHaveLength(0)
+      expect(rows(database, `SELECT id FROM audit_log`)).toHaveLength(0)
+    })
+  })
+
+  test('recording a claim whose number another account holds leaves the claim open and nothing written', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      database.batch([[`UPDATE users SET student_id = '20123456' WHERE id = 'u2'`]])
+      claim(database, { id: 'c-1' })
+
+      expect(attemptRecord(database, 0)).toEqual({ status: 409, says: 'Another account already holds that student number' })
+      expect(rows(database, `SELECT id FROM memberships`)).toHaveLength(0)
+      expect(rows(database, `SELECT id FROM audit_log`)).toHaveLength(0)
+      expect(rows<{ status: string }>(database, `SELECT status FROM membership_claims WHERE id = 'c-1'`)[0]!.status).toBe('OPEN')
+    })
+  })
+
+  // Two people claiming one number, recorded by two officers at once: the index lets one through.
+  test('two claims for the same number on two accounts, recorded at once, settle to one membership', async () => {
+    await withDatabase(async (database) => {
+      seed(database)
+      claim(database, { id: 'c-1', user_id: 'u1' })
+      claim(database, { id: 'c-2', user_id: 'u2' })
+
+      const answers = await race(2, async index => attemptRecord(database, index, index === 0
+        ? { claimId: 'c-1', userId: 'u1' }
+        : { claimId: 'c-2', userId: 'u2' }))
+      expectOneWinner(answers)
+
+      expect(rows(database, `SELECT id FROM memberships`)).toHaveLength(1)
+      expect(rows(database, `SELECT id FROM users WHERE student_id = '20123456'`)).toHaveLength(1)
+      expect(rows(database, `SELECT id FROM audit_log WHERE action = 'account.student-id.recorded'`)).toHaveLength(1)
+      expect(rows(database, `SELECT id FROM membership_claims WHERE status = 'OPEN'`)).toHaveLength(1)
     })
   })
 })
