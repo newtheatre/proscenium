@@ -26,7 +26,7 @@ const { data: locks, status: loading, error, refresh } = await useAsyncData(
 
 const locksFailure = computed(() => (error.value ? refusalText(error.value, 'The close history could not be read.') : null))
 
-// A term is named here and read by the season dashboard's own TERM selector (I-105 criterion 4);
+// A term is named here and read by the money dashboard's own TERM selector (I-105 criterion 4);
 // naming one neither closes it nor is required before closing it.
 const { data: terms, refresh: refreshTerms } = await useAsyncData(
   'finance-terms',
@@ -369,7 +369,7 @@ async function confirmReopen(): Promise<void> {
     <UModal
       v-model:open="termOpen"
       title="Define a term"
-      description="Names a range so the season dashboard can report on it. It neither closes the range nor is needed before closing it, and a term is never redefined: correct a mistaken range by naming a fresh term."
+      description="Names a range so the money dashboard can report on it. It neither closes the range nor is needed before closing it, and a term is never redefined: correct a mistaken range by naming a fresh term."
     >
       <template #body>
         <div class="space-y-4">

@@ -102,6 +102,8 @@ const exportUrl = computed(() => `/api/admin/finance/export?${new URLSearchParam
             data-test="export-csv"
             icon="i-lucide-download"
             :to="exportUrl"
+            external
+            target="_blank"
             :disabled="!from || !to || to < from"
           >
             Export CSV

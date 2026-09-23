@@ -6,7 +6,7 @@ import type { IncidentTrendFilter, IncidentTrendRow, PerformanceReportFilter, Pe
 import type { SQL } from 'drizzle-orm'
 
 // E-126: every query scoped by a resolved range, never one bound parameter per row it covers
-// (0001, 0003, 0006). `periodBounds` (season-dashboard.ts) is the one place a season resolves.
+// (0001, 0003, 0006). `periodBounds` (season-dashboard.ts) is the one place a period resolves.
 
 const EXPORT_LIMIT = 5000
 

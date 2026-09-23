@@ -20,6 +20,8 @@ interface Entry {
   action: AuditActionName
   target: string | null
   targetName: string | null
+  targetAt: number | null
+  targetNight: string | null
   detail: Record<string, unknown> | null
   createdAt: number
 }
@@ -151,6 +153,15 @@ function readable(key: string, value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value)
 }
 
+// The subject by its name, with when it starts or the night it belongs to where one name covers
+// many; null where nothing readable names it, and the raw target is shown instead (J-103).
+function subjectOf(entry: Entry): string | null {
+  if (entry.targetName === null) return null
+  if (entry.targetAt !== null) return `${entry.targetName} (${saysWhen(entry.targetAt)})`
+  if (entry.targetNight !== null) return `${entry.targetName} (${saysDay(entry.targetNight)})`
+  return entry.targetName
+}
+
 const columns: TableColumn<Entry>[] = [
   {
     id: 'expand',
@@ -197,7 +208,7 @@ const columns: TableColumn<Entry>[] = [
         // changed in view without losing what they said (issue 922).
         h('div', { class: 'sm:hidden text-xs text-muted' }, [
           saysWhen(row.original.createdAt),
-          row.original.targetName ?? row.original.target ?? '',
+          subjectOf(row.original) ?? row.original.target ?? '',
         ].filter(Boolean).join(' · ')),
       ])
     },
@@ -206,8 +217,8 @@ const columns: TableColumn<Entry>[] = [
     id: 'target',
     header: 'Subject',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
-    // A name where there is one, and the raw target where the entry is not about a person.
-    cell: ({ row }) => row.original.targetName
+    // A name where there is one, and the raw target where nothing readable names the subject.
+    cell: ({ row }) => subjectOf(row.original)
       ?? h('span', { class: 'font-mono text-xs text-muted' }, row.original.target ?? ''),
   },
   {
@@ -348,10 +359,10 @@ onMounted(load)
           </UBadge>
         </div>
         <p
-          v-if="logEntry.targetName ?? logEntry.target"
+          v-if="subjectOf(logEntry) ?? logEntry.target"
           class="text-muted"
         >
-          {{ logEntry.targetName ?? logEntry.target }}
+          {{ subjectOf(logEntry) ?? logEntry.target }}
         </p>
         <div
           v-if="describeDetail(logEntry.detail).length"

@@ -212,7 +212,11 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    `HIDE_BELOW_SM` class on both its header and cell, and its content moves into the primary
    column's own cell as an `sm:hidden` line, so nothing a phone reads is lost, only where it sits;
    the row's actions never move. A read-only history table with no primary column instead renders
-   as one card per row below `sm`, the table itself hidden there (issue 922).
+   as one card per row below `sm`, the table itself hidden there (issue 922). A true-or-false
+   column ("In use", "Sold") is `StatusCell`, never a pair of sentences: a tick or a cross, with
+   the words for each value as its label. The icon is hidden from a screen reader and the words
+   are read in its place; below `sm`, where a column of icons loses its header, the words stay on
+   screen beside it, so neither the icon nor its colour carries the meaning alone (K-135).
 7. **A shell's title is not a link inside a link.** `UHeader` wraps its `#title` slot in its own
    anchor, so the slot holds `SiteWordmark`, not a `NuxtLink`, and the destination is the `to`
    prop. `UHeader` does not carry its default slot into the mobile panel either, so a header with

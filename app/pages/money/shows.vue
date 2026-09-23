@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
-import { currentSeasonYear, seasonChoices } from '#shared/utils/season'
+import { currentYear, yearChoices } from '#shared/utils/year'
 import type { PassUtilisationRow, RevenueByShowReport, ShowRevenueRow } from '#shared/utils/revenue-by-show'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -9,11 +9,11 @@ definePageMeta({ layout: 'console', title: 'Revenue by show', middleware: 'conso
 
 const request = useRequestFetch()
 
-const year = ref(currentSeasonYear())
-const seasons = seasonChoices(year.value)
+const year = ref(currentYear())
+const years = yearChoices(year.value)
 
-// The season, always: a treasurer comparing shows reads them within one season at a time.
-const query = computed(() => ({ kind: 'SEASON', year: String(year.value) }))
+// The year, always: a treasurer comparing shows reads them within one year at a time (0087).
+const query = computed(() => ({ kind: 'YEAR', year: String(year.value) }))
 
 const { data, status, error } = await useAsyncData(
   'revenue-by-show',
@@ -103,9 +103,9 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
       <template #actions>
         <USelect
           v-model="year"
-          aria-label="Season"
-          data-test="season-year"
-          :items="seasons"
+          aria-label="Year"
+          data-test="period-year"
+          :items="years"
           value-key="value"
         />
       </template>
@@ -131,7 +131,7 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
       >
         <template #empty>
           <p class="py-6 text-center text-sm text-muted">
-            Nothing was taken for a show in this season.
+            Nothing was taken for a show in this year.
           </p>
         </template>
       </UTable>
@@ -151,7 +151,7 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
         >
           <template #empty>
             <p class="py-6 text-center text-sm text-muted">
-              No pass has been used in this season.
+              No pass has been used in this year.
             </p>
           </template>
         </UTable>

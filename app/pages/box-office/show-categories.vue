@@ -9,6 +9,7 @@ definePageMeta({ layout: 'console', title: 'Show categories', middleware: 'conso
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
+const StatusCell = resolveComponent('StatusCell')
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -133,7 +134,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
   {
     id: 'inUse',
     header: 'In use',
-    cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, row.original.inUse ? 'A show belongs to it' : 'Nothing yet'),
+    cell: ({ row }) => h(StatusCell, { value: row.original.inUse, yes: 'A show belongs to it', no: 'Nothing yet' }),
   },
   {
     id: 'act',

@@ -10,6 +10,7 @@ definePageMeta({ layout: 'console', title: 'Products', middleware: 'console', do
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
+const StatusCell = resolveComponent('StatusCell')
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -227,7 +228,7 @@ const columns: TableColumn<BarProduct>[] = [
     id: 'sold',
     header: 'Sold',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
-    cell: ({ row }) => (row.original.everSold ? 'Has been sold' : 'Never sold'),
+    cell: ({ row }) => h(StatusCell, { value: row.original.everSold, yes: 'Has been sold', no: 'Never sold' }),
   },
   {
     id: 'act',

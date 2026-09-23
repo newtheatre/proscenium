@@ -100,7 +100,7 @@ export const manageBarTabs = defineAbility((viewer: Viewer) => holds(viewer, 'ba
 export const viewFinanceReports = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read'))
 // Recording a daily Z reading and resolving a variance (I-104).
 export const recordZReadings = defineAbility((viewer: Viewer) => holds(viewer, 'finance.write'))
-// The season dashboard's aggregates: the treasurer's own full read, or the committee's narrower
+// The money dashboard's aggregates: the treasurer's own full read, or the committee's narrower
 // summary-only one (I-105 criterion 5).
 export const viewSeasonSummary = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read') || holds(viewer, 'finance.summary'))
 // Closing a period, and changing an SU nominal mapping, are the treasurer's own writes (I-107, I-108).

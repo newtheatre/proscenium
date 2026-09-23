@@ -2,7 +2,7 @@
 title: Documentation
 description: How each part of the theatre is run, kept by the people who run it.
 module: Governance
-updatedOn: 2026-09-22
+updatedOn: 2026-09-23
 updatedBy: Matt Adcock
 ---
 
@@ -57,7 +57,7 @@ the screens are for.
   Accounts, memberships, Fellows, and roles across the committee year.
   ::
   ::card{icon="i-lucide-coins" title="Money" to="/docs/money"}
-  The season dashboard, revenue by show, comps and discounts, reconciliation, the ledger, periods and exports.
+  The money dashboard, revenue by show, comps and discounts, reconciliation, the ledger, periods and exports.
   ::
   ::card{icon="i-lucide-send" title="Communications" to="/docs/communications"}
   Announcements, the send log and what goes out on its own.
