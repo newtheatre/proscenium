@@ -53,6 +53,24 @@ describe('the board shows the nights it was asked for (E-107 criterion 7)', () =
   })
 })
 
+describe('the board shows bar openings beside performances (E-130 criterion 7)', () => {
+  test('an opening card is marked as a bar opening', async () => {
+    const source = await read(BOARD)
+    expect(source).toContain(':data-test="`opening-${entry.openingId}`"')
+    expect(source).toContain('Bar opening')
+  })
+
+  test('an opening links to its night on the openings screen rather than acting on the board', async () => {
+    const source = await read(BOARD)
+    expect(source).toContain('openingsOnNightHref(entry.night)')
+    expect(source).toContain(':data-test="`manage-opening-${entry.openingId}`"')
+  })
+
+  test('the empty state names openings as well as performances', async () => {
+    expect(await read(BOARD)).toContain('No performance or bar opening between')
+  })
+})
+
 describe('a module is chosen by name (G-120 criterion 7)', () => {
   test('the sign-off picker names the module', async () => {
     const source = await read(RECORDS)

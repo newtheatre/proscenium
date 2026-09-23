@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { rosterPerformancesQuery, rosterShiftsQuery } from '#server/utils/rota'
+import { rosterOpeningShiftsQuery, rosterOpeningsQuery, rosterPerformancesQuery, rosterShiftsQuery } from '#server/utils/rota'
 import { daysAfter } from '#shared/utils/membership'
 import { boardWindowBounds } from '#shared/utils/rota-board'
-import { currentShowNight } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -104,6 +104,94 @@ describe('the rows the board reads are ordered by when the night starts', () => 
       fourNights(database)
       expect(found(database, daysAfter(tonight, -1), daysAfter(tonight, 30)))
         .toEqual(['performance-past', 'performance-tonight', 'performance-soon', 'performance-later'])
+    })
+  })
+})
+
+// A bar opening on the board (E-130 criterion 7, issue 1216): the same window, read by its own
+// scope, because an opening names no performance (0077).
+function barOpening(database: TestDatabase, id: string, night: string, status = 'PLANNED'): void {
+  const opensAt = Math.floor(showNightBounds(night).from.getTime() / 1000) + 18 * 3600
+  database.batch([[
+    'INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    id, 'venue-a', night, `Opening ${id}`, opensAt, opensAt + 5 * 3600, status,
+  ]])
+}
+
+const openingsFound = (database: TestDatabase, from: string, to: string): string[] =>
+  run<{ openingId: string }>(database, rosterOpeningsQuery(boardWindowBounds({ from, to })))
+    .map(row => row.openingId)
+
+describe('the board reads bar openings in the same window (E-130 criterion 7)', () => {
+  test('an opening inside the window is read and one outside it is not', async () => {
+    await withDatabase((database) => {
+      testVenue(database, { suffix: 'a' })
+      barOpening(database, 'opening-soon', daysAfter(tonight, 3))
+      barOpening(database, 'opening-later', daysAfter(tonight, 30))
+      barOpening(database, 'opening-past', daysAfter(tonight, -1))
+      expect(openingsFound(database, tonight, daysAfter(tonight, 13))).toEqual(['opening-soon'])
+    })
+  })
+
+  test('an opening carries its label, venue and night, and names no show', async () => {
+    await withDatabase((database) => {
+      testVenue(database, { suffix: 'a', name: 'The Hire Room' })
+      barOpening(database, 'opening-soon', daysAfter(tonight, 3))
+      const bounds = boardWindowBounds({ from: tonight, to: daysAfter(tonight, 13) })
+      const [row] = run<Record<string, unknown>>(database, rosterOpeningsQuery(bounds))
+      expect(row).toMatchObject({
+        openingId: 'opening-soon',
+        label: 'Opening opening-soon',
+        venueName: 'The Hire Room',
+        night: daysAfter(tonight, 3),
+      })
+      expect(row).not.toHaveProperty('showTitle')
+      expect(row).not.toHaveProperty('performanceId')
+    })
+  })
+
+  test('a cancelled opening is never on the board', async () => {
+    await withDatabase((database) => {
+      testVenue(database, { suffix: 'a' })
+      barOpening(database, 'opening-off', tonight, 'CANCELLED')
+      expect(openingsFound(database, tonight, daysAfter(tonight, 13))).toEqual([])
+    })
+  })
+
+  test('openings are read nearest first', async () => {
+    await withDatabase((database) => {
+      testVenue(database, { suffix: 'a' })
+      barOpening(database, 'opening-b', daysAfter(tonight, 5))
+      barOpening(database, 'opening-a', daysAfter(tonight, 2))
+      expect(openingsFound(database, tonight, daysAfter(tonight, 13))).toEqual(['opening-a', 'opening-b'])
+    })
+  })
+
+  test('the slots read are the uncancelled ones on openings the same window names', async () => {
+    await withDatabase((database) => {
+      testVenue(database, { suffix: 'a' })
+      barOpening(database, 'opening-soon', daysAfter(tonight, 3))
+      barOpening(database, 'opening-later', daysAfter(tonight, 30))
+      database.batch([
+        ['INSERT INTO bar_opening_shifts (id, opening_id, slot, status) VALUES (?, ?, ?, ?)', 'slot-soon-1', 'opening-soon', 1, 'OPEN'],
+        ['INSERT INTO bar_opening_shifts (id, opening_id, slot, status) VALUES (?, ?, ?, ?)', 'slot-soon-2', 'opening-soon', 2, 'CANCELLED'],
+        ['INSERT INTO bar_opening_shifts (id, opening_id, slot, status) VALUES (?, ?, ?, ?)', 'slot-later-1', 'opening-later', 1, 'OPEN'],
+      ])
+      const bounds = boardWindowBounds({ from: tonight, to: daysAfter(tonight, 13) })
+      expect(run<Record<string, unknown>>(database, rosterOpeningShiftsQuery(bounds))).toEqual([
+        { openingId: 'opening-soon', shiftId: 'slot-soon-1', slot: 1, status: 'OPEN', holderName: null },
+      ])
+    })
+  })
+
+  test('the opening reads bind a fixed number of parameters however long the window is (0006)', async () => {
+    await withDatabase((database) => {
+      for (const query of [rosterOpeningsQuery, rosterOpeningShiftsQuery]) {
+        const narrow = boundStatement(database, query(boardWindowBounds({ from: tonight, to: tonight })))
+        const wide = boundStatement(database, query(boardWindowBounds({ from: tonight, to: daysAfter(tonight, 700) })))
+        expect(wide.length).toBe(narrow.length)
+        expect(wide.length - 1).toBeLessThanOrEqual(MAX_BOUND_PARAMETERS)
+      }
     })
   })
 })
