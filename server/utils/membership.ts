@@ -3,6 +3,7 @@ import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
+import { studentIdConstraintRefusal } from '#shared/utils/membership-claims'
 import { membershipsList } from '#shared/utils/memberships-list'
 import { configValue } from './configuration'
 import { tableColumns, whereFrom } from './list-filters'
@@ -58,6 +59,20 @@ export function membershipsClause(query: ListQuery, grace: number): ListClause {
   })
   const asked = conditionsOf(membershipsList, query).some(condition => condition.key === 'filter')
   return asked ? clause : { ...clause, where: and(registerFilterPredicate('current', grace)!, clause.where) }
+}
+
+// Either membership route's statements as one batch. A number another account holds fails it on
+// the `users_student_id` index, so nothing is written and the refusal says why (0047).
+export async function batchMembershipWrites(statements: SQL[]): Promise<void> {
+  const runs = statements.map(statement => db.run(statement))
+  try {
+    await db.batch([runs[0]!, ...runs.slice(1)])
+  }
+  catch (error) {
+    const refusal = studentIdConstraintRefusal(error)
+    if (refusal) throw createError(refusal)
+    throw error
+  }
 }
 
 export interface RenewalSweep { due: number, sent: number, cap: number }
