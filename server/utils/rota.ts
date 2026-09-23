@@ -149,12 +149,13 @@ export function dropExternalTemplateStatements(venueId: string, entry: AuditRow)
 }
 
 // A template is replaced whole: the slots are one thing an officer edits, and a partial save
-// would leave a venue with a role it had already taken off the list.
+// would leave a venue with a role it had already taken off the list. None lands on an external venue.
 export function replaceTemplateStatements(venueId: string, slots: TemplateSlot[], actorId: string): [SQL, ...SQL[]] {
   const written = slots.map(slot => sql`
     INSERT INTO shift_templates (id, venue_id, role, "count", starts_before_doors_minutes, ends_after_end_minutes, updated_by, updated_at)
-    VALUES (lower(hex(randomblob(16))), ${venueId}, ${slot.role}, ${slot.count},
-            ${slot.startsBeforeDoorsMinutes ?? null}, ${slot.endsAfterEndMinutes ?? null}, ${actorId}, unixepoch())
+    SELECT lower(hex(randomblob(16))), ${venueId}, ${slot.role}, ${slot.count},
+           ${slot.startsBeforeDoorsMinutes ?? null}, ${slot.endsAfterEndMinutes ?? null}, ${actorId}, unixepoch()
+    WHERE EXISTS (SELECT 1 FROM venues WHERE id = ${venueId} AND is_external = 0)
   `)
   return [sql`DELETE FROM shift_templates WHERE venue_id = ${venueId}`, ...written]
 }
@@ -177,6 +178,26 @@ const windowEnd = (defaults: ShiftOffsets): SQL => sql`
   + (coalesce(p.duration_minutes, 0) + coalesce(p.interval_count, 0) * coalesce(p.interval_minutes, 0)) * 60
   + coalesce(t.ends_after_end_minutes, ${defaults.endAfterEndMinutes}) * 60
 `
+
+// The confirmed shifts of one night with the offsets their reminder falls back on (E-109).
+export function confirmedShiftsQuery(from: Date, to: Date): SQL {
+  return sql`
+    SELECT s.id AS shiftId, s.user_id AS userId, s.role AS role, s.confirmed_at AS confirmedAt,
+           v.name AS venueName, sh.title AS showTitle,
+           p.starts_at AS startsAt, p.doors_at AS doorsAt, p.duration_minutes AS durationMinutes,
+           p.interval_count AS intervalCount, p.interval_minutes AS intervalMinutes,
+           s.starts_at AS shiftStartsAt, s.ends_at AS shiftEndsAt,
+           t.starts_before_doors_minutes AS startsBeforeDoorsMinutes, t.ends_after_end_minutes AS endsAfterEndMinutes
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    JOIN venues v ON v.id = p.venue_id
+    JOIN shows sh ON sh.id = p.show_id
+    LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = s.role AND ${ourVenue('t')}
+    WHERE s.status = 'CONFIRMED' AND p.status <> 'CANCELLED'
+      AND p.starts_at >= ${Math.floor(from.getTime() / 1000)} AND p.starts_at < ${Math.floor(to.getTime() / 1000)}
+    ORDER BY p.starts_at, s.role, s.slot
+  `
+}
 
 // When the bar is worked at each of tonight's houses, which says who a sale belongs to on a
 // two-performance day (F-126). Computed, not read off `shifts`: an unstaffed house has a window.
