@@ -128,5 +128,5 @@ if (import.meta.main) {
   await writeJson('publish/counts.json', counts)
   console.log(`Wrote ${statements} statements over ${files.length} file(s) to ${PUBLISH_DIR}${skipLedger ? ' (ledger left to nuxt-db)' : ''}.`)
   for (const [table, n] of Object.entries(seededSkipped)) console.log(`  ${n} row(s) of ${table} left to the migrations that seed them`)
-  console.log(readdirSync(PUBLISH_DIR).join(', '))
+  console.log(readdirSync(PUBLISH_DIR).sort().join(', '))
 }
