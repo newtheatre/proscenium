@@ -169,6 +169,13 @@ describe.skipIf(skip !== null)('the role register answers who holds what (A-131 
     expect((await send('GET', `/api/admin/roles/register?role=any:${[...ROLES, 'ADMIN'].join(',')}`, null, cookie)).status).toBe(400)
   })
 
+  // Retired into the Front of House Manager (0090, A-133 criterion 2): no longer grantable anywhere.
+  test('the retired box office role cannot be granted', async () => {
+    const holder = await person('retired')
+    expect((await send('POST', '/api/admin/roles', { userId: holder.id, role: 'BOX_OFFICE' }, cookie)).status).toBe(400)
+    expect(read('SELECT 1 FROM role_grants WHERE user_id = ?', holder.id)).toBeUndefined()
+  })
+
   test('reading the register needs a permission, and a signed-out caller never reaches it', async () => {
     expect((await send('GET', '/api/admin/roles/register')).status).toBe(401)
     const bystander = await person('bystander')

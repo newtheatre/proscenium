@@ -52,7 +52,7 @@ describe('planning a role_grants merge (A-123 criterion 1, 0009)', () => {
   })
 
   test('unrelated roles on each side both move, independently of each other', () => {
-    const winnerGrants = [grant({ id: 'w-1', role: 'FOH_MANAGER', expiresAt: 100 })]
+    const winnerGrants = [grant({ id: 'w-1', role: 'TREASURER', expiresAt: 100 })]
     const loserGrants = [grant({ id: 'l-1', role: 'FOH_MANAGER', expiresAt: 100 })]
     expect(planGrantMerge(winnerGrants, loserGrants)).toEqual({ reassign: ['l-1'], extend: [], retire: [] })
   })

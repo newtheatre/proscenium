@@ -198,7 +198,7 @@ describe.skipIf(skip !== null)('the account directory (A-121)', () => {
 
     expect(emails(await directory('?holdsRole=true'))).toContain(email)
     expect(emails(await directory('?role=is:FOH_MANAGER'))).toContain(email)
-    expect(emails(await directory('?role=is:FOH_MANAGER'))).not.toContain(email)
+    expect(emails(await directory('?role=is:TREASURER'))).not.toContain(email)
   })
 
   // The A-112 banner: the same rule requiresSecondFactor applies per account, over the table.
