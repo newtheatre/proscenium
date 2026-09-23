@@ -517,6 +517,10 @@ Open questions for the committee:
   7. Nothing here sells anything: SUMS remains the system of record (0005, 0031, A-202).
   8. How many claims are waiting is on the register's toolbar row, in reach without opening a
      panel: a queue nobody can see from the screen they are on is a queue nobody works.
+  9. Added 23 September 2026 (issue 1005): the queue is filtered, searched and sorted by its own
+     declaration (`membershipClaimsList`, K-129), never the register's. Its `status` field
+     defaults to waiting and also offers recorded, declined and withdrawn, so a decided claim can
+     be found from the screen with its outcome, when and, for a decline, the reason sent.
 - Source: Pre-cutover review, 10 September 2026. The migration carries no memberships
   (`migration/identity.ts`), so at cutover every member reads as lapsed until recorded; this is
   the member-facing half of what A-201 does by upload.
