@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ENTRY_SOURCES, LINE_KINDS } from './ledger'
+import { describeKind, ENTRY_SOURCES, LINE_KINDS } from './ledger'
 import type { EntrySource, LineKind } from './ledger'
 
 // I-108. A period export categorised for the SU's own accounting, never a total this module
@@ -47,6 +47,42 @@ export const exportRangeForm = z.object({
 
 export type ExportRangeInput = z.output<typeof exportRangeForm>
 
+// The yearly return is re-runnable by name (criterion 4): a year, a season or a custom range, the
+// shared period kinds (0087). A link with no kind, or kind=RANGE, predates that and is a range.
+export const suExportForm = z.preprocess(
+  input => (input && typeof input === 'object' && (!('kind' in input) || input.kind === 'RANGE') ? { ...input, kind: 'TERM' } : input),
+  z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('TERM'), fromDay: londonDay, toDay: londonDay }),
+    z.object({ kind: z.literal('YEAR'), year: z.coerce.number().int() }),
+    z.object({ kind: z.literal('SEASON'), seasonId: z.string().trim().min(1, 'Choose a season') }),
+  ]).refine(input => input.kind !== 'TERM' || input.toDay >= input.fromDay, { path: ['toDay'], message: 'The range ends before it starts' }),
+)
+
+export type SuExportPeriod = z.output<typeof suExportForm>
+
+// The kinds the export screen offers, in its order; the dashboard's others make no SU return.
+export const SU_EXPORT_KINDS = ['YEAR', 'SEASON', 'TERM'] as const
+
+// What the screen shows before the download: the days a choice resolves to, whether they are
+// closed (so two runs match), and whether the file would pass the cap.
+export interface SuExportCoverage {
+  fromDay: string
+  toDay: string
+  rows: number
+  closed: boolean
+}
+
+const britishDigits = new Intl.NumberFormat('en-GB')
+
+export function suExportLines(rows: number): string {
+  return `${britishDigits.format(rows)} ${rows === 1 ? 'line' : 'lines'}`
+}
+
+export function suExportCapRefusal(): string {
+  return `This export would return more than ${britishDigits.format(SU_EXPORT_ROW_CAP)} `
+    + 'rows. Narrow the date range and try again.'
+}
+
 export interface NominalMapping {
   kind: LineKind
   source: EntrySource
@@ -67,4 +103,17 @@ export interface SuExportRow {
 // elsewhere: the SU's own accounting import parses this column as a number.
 export function formatPoundsForExport(pence: number): string {
   return (pence / 100).toFixed(2)
+}
+
+// The file's rows, shaped once so every run of the same lines is the same bytes (criterion 4).
+export function suExportCsvRows(rows: SuExportRow[]): Record<string, unknown>[] {
+  return rows.map(row => ({
+    date: row.londonDay,
+    category: describeKind(row.kind),
+    // The explicit unmapped line criterion 3 asks for, rather than a blank cell a spreadsheet
+    // would silently sort past.
+    nominalCode: row.nominalCode ?? 'UNMAPPED',
+    amountPence: row.amountPence,
+    amountPounds: formatPoundsForExport(row.amountPence),
+  }))
 }

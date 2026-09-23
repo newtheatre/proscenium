@@ -27,6 +27,7 @@ import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { membershipsList } from '#shared/utils/memberships-list'
 import { performancesList } from '#shared/utils/performances-list'
+import { roomBookingsList } from '#shared/utils/room-bookings-list'
 import { roomsList } from '#shared/utils/rooms-list'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
 import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
@@ -75,7 +76,7 @@ const parse = (query: Record<string, string>) => filterQuerySchema(spec).safePar
 
 // Every declaration migrated so far, shared by the cross-cutting checks below (K-129 criterion 6).
 // The rooms module's declarations (K-129).
-const roomsLists = [roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList]
+const roomsLists = [roomsList, blackoutsList, externalSpacesList, utilisationList, roomsQueueList, roomBookingsList]
 // Every migrated declaration; the cross-declaration checks below walk this list.
 const MIGRATED = [accountsList, showsList, performancesList, ...roomsLists, ...rotaLists, ...barLists, ...smallLists, trainingModulesList, ledgerEntriesList]
 
@@ -313,6 +314,7 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
     [performancesList.key]: ['external'],
     [roomsList.key]: [],
     [blackoutsList.key]: ['past'],
+    [roomBookingsList.key]: ['past', 'noShow'],
     [externalSpacesList.key]: [],
     [auditList.key]: ['module'],
     [backupDrillsList.key]: [],
@@ -323,7 +325,7 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
   }
 
   test('every declared column-less field is named in its server binding', () => {
-    const declarations: ListSpec[] = [accountsList, showsList, performancesList, roomsList, blackoutsList, externalSpacesList, ...smallLists]
+    const declarations: ListSpec[] = [accountsList, showsList, performancesList, roomsList, blackoutsList, externalSpacesList, roomBookingsList, ...smallLists]
     for (const declared of declarations) {
       const columnLess = declared.fields.filter(field => field.column === undefined).map(field => field.key)
       expect(new Set(columnLess)).toEqual(new Set(ANSWERED_BY_BINDING[declared.key]))
