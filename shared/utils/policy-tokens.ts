@@ -103,10 +103,17 @@ export interface PolicyKeyState {
   value?: unknown
 }
 
+// An address rather than a rule (J-110 criterion 6): a link, never marked unenforced.
+export const isAddressKey = (key: string): boolean => key.endsWith('_URL')
+
+// Said, not omitted: the page tells an address nobody has named from a token that failed.
+const UNSET_ADDRESS: PolicyValue = { text: '', enforced: true }
+
 // Null means the token cannot be resolved, which the page renders as a visible error rather than
 // as blank or stale text (criterion 4).
 export function policyValueFor(key: string, state: PolicyKeyState): PolicyValue | null {
-  if (!state.known || state.sensitive || !state.set) return null
+  if (!state.known || state.sensitive) return null
+  if (!state.set) return isAddressKey(key) ? UNSET_ADDRESS : null
   return { text: formatPolicyValue(key, state.value), enforced: state.enforced }
 }
 
@@ -131,13 +138,10 @@ function span(node: { test: string, key: string, css: string, text: string, titl
   }, node.text]
 }
 
-// An address rather than a rule (J-110 criterion 6): a link, never marked unenforced.
-export const isAddressKey = (key: string): boolean => key.endsWith('_URL')
-
 function nodesFor(key: string, values: PolicyValues): unknown[] {
   const value = values[key]
   if (value && isAddressKey(key)) {
-    return ['a', { 'href': value.text, 'class': VALUE_CLASS, 'data-test': 'policy-link', 'data-key': key }, value.text]
+    return value.text ? ['a', { 'href': value.text, 'class': VALUE_CLASS, 'data-test': 'policy-link', 'data-key': key }, value.text] : ['span', {}, '']
   }
   if (!value) {
     return span({
@@ -176,12 +180,14 @@ function splitText(text: string, values: PolicyValues): Node[] {
   return parts
 }
 
-// A paragraph pointing at an address nobody has set says nothing true, so it goes whole rather
-// than as a sentence with a hole or an error in it (J-110 criterion 6).
+const unsetAddress = (key: string, values: PolicyValues): boolean => isAddressKey(key) && values[key]?.text === ''
+
+// A paragraph or list item pointing at an address nobody has set says nothing true, so it goes
+// whole rather than as a sentence with a hole or an error in it (J-110 criterion 6).
 function quotesUnsetAddress(node: Node, values: PolicyValues): boolean {
-  if (typeof node === 'string') return tokensInText(node).some(key => isAddressKey(key) && !values[key])
+  if (typeof node === 'string') return tokensInText(node).some(key => unsetAddress(key, values))
   const bound = bindingKey(node)
-  if (bound) return isAddressKey(bound) && !values[bound]
+  if (bound) return unsetAddress(bound, values)
   return (node.slice(2) as Node[]).some(child => quotesUnsetAddress(child, values))
 }
 
@@ -195,7 +201,7 @@ export function resolvePolicyTree<T>(tree: T, values: PolicyValues): T {
     if (bound) return [nodesFor(bound, values)]
 
     const [tag, props, ...children] = node as [string, unknown, ...Node[]]
-    if (tag === 'p' && quotesUnsetAddress(node, values)) return []
+    if ((tag === 'p' || tag === 'li') && quotesUnsetAddress(node, values)) return []
     return [[tag, props, ...children.flatMap(walk)]]
   }
 

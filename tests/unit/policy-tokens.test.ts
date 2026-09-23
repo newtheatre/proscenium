@@ -123,6 +123,14 @@ describe('which keys a public page may quote at all', () => {
     expect(policyValueFor('NOT_A_KEY', { ...state, known: false })).toBeNull()
   })
 
+  // J-110 criterion 6: an unset address is said to be unset, so the page can tell it from a key
+  // that failed to resolve, which still renders as the visible error.
+  test('a known address nobody has set resolves as unset rather than as nothing', () => {
+    expect(policyValueFor('MEMBERSHIP_PURCHASE_URL', { ...state, set: false, value: undefined })).toEqual({ text: '', enforced: true })
+    expect(policyValueFor('NOT_A_KEY_URL', { ...state, known: false })).toBeNull()
+    expect(policyValueFor('MEMBERSHIP_PURCHASE_URL', { ...state, sensitive: true })).toBeNull()
+  })
+
   // Criterion 5: the rule is quoted and marked, rather than hidden, which is the honest state.
   test('a stated but unenforced rule resolves and says it is not enforced', () => {
     expect(policyValueFor('REFUND_UNPAID_CANCELLATION_FREE', { ...state, enforced: false, value: true }))
@@ -222,16 +230,32 @@ describe('what a page renders (criteria 2, 4, 5)', () => {
   })
 
   test('a paragraph quoting an unset address is left out whole, and its neighbours stay', () => {
+    const unset: PolicyValues = { ...values, MEMBERSHIP_PURCHASE_URL: { text: '', enforced: true } }
     const resolved = resolvePolicyTree(tree(
       ['p', {}, 'Sold by the SU.'],
       ['p', {}, 'Buy it at the SU: {{MEMBERSHIP_PURCHASE_URL}}'],
       ['p', {}, 'up to {{ROOM_MAX_BOOKING_HOURS}}'],
-    ), values)
+    ), unset)
     const rendered = JSON.stringify(resolved)
     expect(resolved.value).toHaveLength(2)
     expect(rendered).not.toContain('Buy it at the SU')
     expect(rendered).not.toContain('policy-error')
     expect(rendered).toContain('Sold by the SU.')
+  })
+
+  test('a list item quoting an unset address goes too, and the list keeps its other items', () => {
+    const unset: PolicyValues = { ...values, MEMBERSHIP_PURCHASE_URL: { text: '', enforced: true } }
+    const rendered = JSON.stringify(resolvePolicyTree(tree(['ul', {}, ['li', {}, 'Ask the SU'], ['li', {}, 'Buy at {{MEMBERSHIP_PURCHASE_URL}}']]), unset))
+    expect(rendered).toContain('Ask the SU')
+    expect(rendered).not.toContain('Buy at')
+  })
+
+  // A value that never arrived (an unknown key, a failed read) is not the committee leaving it
+  // unset: it stays the visible error of criterion 4 rather than vanishing (0012).
+  test('an address with no value at all renders as the visible error, never left out', () => {
+    const rendered = JSON.stringify(resolvePolicyTree(tree(['p', {}, 'Buy it at the SU: {{MEMBERSHIP_PURCHASE_URL}}']), {}))
+    expect(rendered).toContain('Buy it at the SU')
+    expect(rendered).toContain('policy-error')
   })
 
   test('tokens inside a nested element resolve too, and their siblings survive', () => {

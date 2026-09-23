@@ -258,7 +258,7 @@ watch(needsMembership, async (needed) => {
   if (!needed || purchaseUrl.value) return
   try {
     const { values } = await $fetch<{ values: PolicyValues }>('/api/policies/values', { query: { path: '/policies/membership' } })
-    purchaseUrl.value = values.MEMBERSHIP_PURCHASE_URL?.text ?? null
+    purchaseUrl.value = values.MEMBERSHIP_PURCHASE_URL?.text || null
   }
   catch {
     purchaseUrl.value = null

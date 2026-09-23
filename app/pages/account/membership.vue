@@ -121,7 +121,7 @@ const { data: fee } = await useAsyncData(
 )
 const feeValue = computed(() => fee.value?.values.MEMBERSHIP_FEE_PENCE ?? null)
 // The SU's own page, from the same policy page; unset, the alert simply has no link (A-130 criterion 15).
-const purchaseUrl = computed(() => fee.value?.values.MEMBERSHIP_PURCHASE_URL?.text ?? null)
+const purchaseUrl = computed(() => fee.value?.values.MEMBERSHIP_PURCHASE_URL?.text || null)
 
 useSeoMeta({ title: 'Membership' })
 </script>

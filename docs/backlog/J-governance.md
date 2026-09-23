@@ -179,9 +179,11 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   4. At runtime, an unresolvable token renders as a visible error, never as blank or stale text.
   5. A rule the committee has stated but the system does not yet enforce is marked unenforced on the page, from a flag on the configuration key, so honesty about enforcement is part of the rendering.
   6. Added 23 September 2026 (issue 1005, A-202): a key named `..._URL` is an address, not a
-     rule. It renders as a link and is never marked unenforced, and a paragraph quoting one that
-     is unset is left out whole, so a page reads correctly before the committee names the
-     address. Every other unset key still renders as criterion 4's visible error.
+     rule. It renders as a link and is never marked unenforced, and a paragraph or list item
+     quoting one that is unset is left out whole, so a page reads correctly before the committee
+     names the address. Unset is said by the values endpoint, not inferred from a missing value:
+     an address that fails to resolve, and every other unset key, still renders as criterion 4's
+     visible error.
 - Source: Decision 0012 (mechanism, amended 26 August); audit RM-1 and RM-7 (the unenforced policy document this exists to prevent); A-117 criterion 7 (the membership fee quoted this way).
 
 ## J-111: The public pages carry the committee's wording

@@ -351,14 +351,13 @@ Somebody holding `members.write` works the queue daily, from `/people/members?fi
    12). The count is what to watch until it stays near zero.
 2. Record each claim that is not plainly wrong. The check against the SU's list comes after the
    membership counts, never before it (0031): a member who paid is not refused at a desk while
-   the list is fetched. Decline only what the screen itself shows to be wrong: a claim for a term
-   the account already holds from the same purchase date, or a number another account holds (the
-   record is refused with that reason). A **Differs** badge means the number is not the one on the
-   account; an **Extends one ending** badge means recording renews a running term (A-130 criterion
-   13).
+   the list is fetched. Decline only what the screen itself shows to be wrong: a claim marked
+   **Already recorded from that date**, or a number another account holds; recording either is
+   refused with that reason. A **Differs** badge means the number is not the one on the account;
+   an **Extends one ending** badge means recording renews a running term (A-130 criterion 13).
 3. **Record** writes the number to the account, the membership with the claim as its evidence and
    closes the claim, in one click and one batch. **Decline** asks for a reason the member reads;
-   write what to put right, because a declined member claims again rather than emailing. A
+   write what to put right: a declined member claims again rather than emailing. A
    decided claim is found again by setting **Status** under **Filters** on the queue.
 4. Focus moves to the next claim after each decision, so the keyboard alone works a page.
 5. When the SU's list arrives, work **Awaiting a check** on the register by student number, not by
