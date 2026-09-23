@@ -698,8 +698,11 @@ Open questions:
      person's own, and excluded from staff search.
   5. Withdrawal deletes the profile outright after a 30-day tombstone; GDPR erasure deletes it
      immediately; a withdrawn profile cannot be reinstated by anyone but its owner.
+  6. Withdrawing asks first, in the shared confirmation: it says nothing is shown to staff from
+     that moment and the profile is deleted after the 30 days; nothing is withdrawn until the
+     patron confirms.
 - Source: Prompt Book D-6; audit PR-4; Get-In part 2 (access profiles: carry, add encryption at
-  rest)
+  rest); issue 1153 item 7 (criterion 6, withdrawing was one click)
 
 ## D-128: Access tickets and companion seats
 
