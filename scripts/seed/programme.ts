@@ -1,6 +1,7 @@
 // Where we perform, what we perform and when: two venues, three seasons and eight shows whose
 // performances land in the past, tonight and the future, and in every status a screen shows.
 
+import { daysAfter } from '../../shared/utils/membership'
 import { currentShowNight, showNightBounds, showNightOf } from '../../shared/utils/show-night'
 import { PASS_ADMISSION_TICKET_TYPE_NAME } from '../../shared/utils/ticket-types'
 import { ensure, holds, insert, insertOnly, seedId, seedReference } from './statements'
@@ -207,11 +208,6 @@ export interface Programme {
 const SEASON_MARGIN_NIGHTS = 7
 const NEXT_SEASON_NIGHTS = 42
 
-function addNights(day: string, nights: number): string {
-  const [year, month, date] = day.split('-').map(Number) as [number, number, number]
-  return new Date(Date.UTC(year, month - 1, date + nights)).toISOString().slice(0, 10)
-}
-
 // Spring is January to April, StuFF May to July, Autumn August to December: names only, so a
 // seeded season reads like a real one.
 function termName(day: string): string {
@@ -284,7 +280,7 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
   const nextFrom = termAfter(currentTo)
   const dated = [
     { key: 'current', from: currentFrom, to: currentTo, sort: 0, archived: 0 },
-    { key: 'next', from: nextFrom, to: addNights(nextFrom, NEXT_SEASON_NIGHTS), sort: 1, archived: 0 },
+    { key: 'next', from: nextFrom, to: daysAfter(nextFrom, NEXT_SEASON_NIGHTS), sort: 1, archived: 0 },
     { key: 'previous', from: previousFrom, to: previousTo, sort: 2, archived: 1 },
   ]
   const seasons = new Map<string, string>()
@@ -367,7 +363,7 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
     }
 
     for (const planned of show.performances) {
-      const night = planned.nights === 0 ? tonight : showNightOf(new Date((now + planned.nights * DAY) * 1000))
+      const night = nightIn(planned.nights)
       const venueId = venues.get(planned.venue)!
       let startsAt = curtainOf(night, planned.hoursAfterNightStart ?? CURTAIN_HOURS)
 
