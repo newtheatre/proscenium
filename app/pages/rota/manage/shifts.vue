@@ -82,7 +82,7 @@ function staffingLabel(entry: Staffed): string {
 }
 
 function hoursOf(opening: RosterOpening): string {
-  return `${saysDay(opening.startsAt)} · ${saysClock(opening.startsAt)} to ${saysClock(opening.endsAt)}`
+  return `${spanOf(opening.startsAt)} to ${saysClock(opening.endsAt)}`
 }
 
 const statusColor: Record<ShiftStatus, 'success' | 'warning' | 'neutral' | 'error'> = {
