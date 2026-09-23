@@ -25,6 +25,29 @@ export type RangedPeriod = Exclude<PeriodInput, { kind: 'SEASON' }>
 // One of the theatre's seasons as the money screens offer it: a name and its own days (0087).
 export interface FinanceSeason { id: string, name: string, fromDay: string, toDay: string }
 
+// A defined term as a period control offers it: a label and its range, nothing about who made it.
+export interface TermChoice { id: string, label: string, fromDay: string, toDay: string }
+
+// What a period control needs before it can offer TERM and SEASON (usePeriodForm).
+export interface PeriodChoices { terms: TermChoice[], seasons: FinanceSeason[] }
+
+// A period as the query string every period route parses back through `periodForm`.
+export function periodQuery(period: PeriodInput): Record<string, string> {
+  switch (period.kind) {
+    case 'DAY':
+    case 'WEEK':
+      return { kind: period.kind, day: period.day }
+    case 'MONTH':
+      return { kind: period.kind, year: String(period.year), month: String(period.month) }
+    case 'YEAR':
+      return { kind: period.kind, year: String(period.year) }
+    case 'TERM':
+      return { kind: period.kind, fromDay: period.fromDay, toDay: period.toDay }
+    case 'SEASON':
+      return { kind: period.kind, seasonId: period.seasonId }
+  }
+}
+
 export interface RevenueBySource { source: string, totalPence: number }
 
 // Every figure derived from ledger rows (criterion 2): comps and discounts are I-103's own

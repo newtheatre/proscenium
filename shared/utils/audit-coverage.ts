@@ -38,6 +38,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
     exempt: 'a dry run: nothing changes until the confirmed merge route runs',
   },
   {
+    route: 'server/api/admin/accounts/[id]/google-link.patch.ts',
+    actions: ['account.google.prelinked', 'account.google.unlinked'],
+  },
+  {
     route: 'server/api/admin/accounts/[id]/merge.post.ts',
     actions: ['account.merged'],
     via: ['server/utils/account-merge.ts'],
@@ -105,7 +109,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/auth/verify/resend.post.ts',
     exempt: 'issues a token and asks for a message; the send is recorded in notification_log',
   },
-  { route: 'server/routes/auth/google.get.ts', actions: ['account.created.google', 'session.started.google', 'session.reauthenticated'] },
+  { route: 'server/routes/auth/google.get.ts', actions: ['account.created.google', 'account.google.claimed', 'account.google.claimed.pending', 'session.started.google', 'session.reauthenticated'] },
 
   // Module C: spaces
 

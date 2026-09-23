@@ -11,6 +11,7 @@ The proposed values become the shipped defaults; all remain admin-editable after
 | --- | --- | --- | --- |
 | Reservation hold expiry | none (holds live forever) | 15 minutes before curtain, released in batches of 200 a run | Per-show override allowed |
 | Hold expiry reminder | none: no reminder existed | 60 minutes before a hold releases | D-107. Shipped as this session's proposed value rather than left unset, so the reminder is live rather than dormant; this row is what confirms it, not the code default |
+| Performance reminder | none: a paid booking heard nothing between its confirmation and the night | 24 hours before curtain | H-205, a V2 story not yet built. Proposed here so the session can confirm it before the build; `BOOKING_REMINDER_HOURS_BEFORE` ships unset, with the reminder dormant, until a session does. Links to the booking only, no calendar file. Owner: IT Manager |
 | Per-order seat cap (public) | 10 | 10 | Box office uncapped |
 | Refund policy | undocumented, ad hoc | free cancellation while unpaid; paid refunds in person, manager approval | Constraint: money moves in person only. `REFUND_PAID_REQUIRES_MANAGER` is D-116's own gate on the paid half, wired and defaulted to this row's proposed value; `REFUND_UNPAID_CANCELLATION_FREE` describes the unpaid half but is not yet read anywhere (`docs/known-issues.md`) |
 | Comp authority | tonight's duty manager or staff | unchanged | Comp request expiry 10 minutes |
@@ -97,7 +98,9 @@ the shift eligibility mapping, which ships a default of null per role, refusing 
 guessing until a session names each module (0019, E-103). Retention is the reverse case: its
 periods and caps carry values, but no session has proposed a warning cadence, so
 `RETENTION_WARNING_DAYS` and `RETENTION_FINAL_WARNING_DAYS` ship unset and the sweep refuses to
-run until the IT Manager sets them (A-126).
+run until the IT Manager sets them (A-126). The performance reminder is the third case: it has a
+proposed value but ships unset until a session confirms it, because the story it serves (H-205) is
+V2 and a figure nobody has confirmed should not start emailing every ticket holder on its own.
 
 Three rows are decisions the committee still makes and settings the system does not hold: the pass
 products and the per-room opening hours are records rather than rules, entered through the screens

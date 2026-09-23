@@ -23,6 +23,7 @@ import {
   viewMembers,
   viewPassTypes,
   viewProgramme,
+  viewReports,
   viewRooms,
   viewRota,
   viewSafety,
@@ -204,6 +205,18 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Ledger entries', icon: 'i-lucide-book-open-text', to: '/money/entries', ability: viewFinanceReports },
       { label: 'Periods', icon: 'i-lucide-lock', to: '/money/periods', ability: viewFinanceReports },
       { label: 'Exports', icon: 'i-lucide-file-down', to: '/money/exports', ability: viewFinanceReports },
+    ],
+  },
+
+  // Module E's cross-season reports: read by front of house, safety and the committee, so a
+  // group of their own rather than a corner of any one of theirs (E-126 criterion 5).
+  {
+    key: 'reports',
+    label: 'Reports',
+    icon: 'i-lucide-chart-line',
+    prefix: '/reports',
+    items: [
+      { label: 'Reports', icon: 'i-lucide-chart-no-axes-combined', to: '/reports', ability: viewReports },
     ],
   },
 
