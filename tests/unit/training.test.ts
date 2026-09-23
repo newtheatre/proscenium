@@ -27,6 +27,7 @@ import {
   frozenChanges,
   gapKey,
   isLeadLive,
+  lackingNewPrerequisites,
   leadsDepartment,
   missingPrerequisites,
   moduleForm,
@@ -36,6 +37,8 @@ import {
   saysGaps,
   saysSource,
   saysState,
+  sessionModulesForm,
+  sessionModulesPreviewQuery,
   stateOf,
   supersededIn,
 } from '#shared/utils/training'
@@ -624,5 +627,49 @@ describe('a prerequisite loop is refused in a sentence that names the path', () 
   test('one sentence, so it carries no full stop', async () => {
     const { saysCycle } = await import('#shared/utils/training')
     expect(saysCycle('A', 'B -> A')).not.toEndWith('.')
+  })
+})
+
+describe('a module change warns about who lacks what it adds (G-115 criterion 7)', () => {
+  const need = (requiresId: string) => ({ requiresId, requiresName: `Module ${requiresId}` })
+  const person = (userId: string, ...held: string[]) => ({ userId, name: `Member ${userId}`, held: new Set(held) })
+
+  test('everybody signed up who lacks a prerequisite the change adds is listed, with what', () => {
+    const lacking = lackingNewPrerequisites(
+      [need('A')],
+      [need('A'), need('B'), need('C')],
+      [person('u1'), person('u2', 'B', 'C'), person('u3', 'C')],
+    )
+    expect(lacking).toEqual([
+      { userId: 'u1', name: 'Member u1', missing: [need('B'), need('C')] },
+      { userId: 'u3', name: 'Member u3', missing: [need('B')] },
+    ])
+  })
+
+  test('a prerequisite the session already required is not new, so nobody is listed for it', () => {
+    expect(lackingNewPrerequisites([need('A')], [need('A')], [person('u1')])).toEqual([])
+  })
+
+  test('two added modules needing the same thing name it once', () => {
+    const lacking = lackingNewPrerequisites([], [need('B'), need('B')], [person('u1')])
+    expect(lacking[0]!.missing).toEqual([need('B')])
+  })
+
+  test('taking a module away adds nothing to lack', () => {
+    expect(lackingNewPrerequisites([need('A'), need('B')], [need('A')], [person('u1')])).toEqual([])
+  })
+})
+
+describe('what a session teaches is changed deliberately (G-115 criterion 2)', () => {
+  test('the release is never implied', () => {
+    expect(sessionModulesForm.parse({ moduleIds: ['A'] }).releaseFreeze).toBeUndefined()
+    expect(sessionModulesForm.safeParse({ moduleIds: [] }).success).toBe(false)
+  })
+
+  test('the preview reads the same modules from a query string, once each', () => {
+    expect(sessionModulesPreviewQuery.parse({ moduleIds: 'A, B,A,' }).moduleIds).toEqual(['A', 'B'])
+    expect(sessionModulesPreviewQuery.safeParse({ moduleIds: ',' }).success).toBe(false)
+    expect(sessionModulesPreviewQuery.safeParse({ moduleIds: Array.from({ length: 11 }, (_, i) => `M${i}`).join(',') }).success)
+      .toBe(false)
   })
 })

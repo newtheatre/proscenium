@@ -513,6 +513,47 @@ export function prerequisiteGaps(
   }))
 }
 
+// Changing what a session teaches. The release is only ever asked for, never implied: without it an
+// open register refuses the change (G-115 criterion 2, question 6).
+export const sessionModulesForm = z.object({
+  moduleIds: z.array(z.string().trim().min(1).max(32)).min(1).max(10),
+  releaseFreeze: z.boolean().optional(),
+})
+
+export type SessionModulesInput = z.output<typeof sessionModulesForm>
+
+// The same modules as a query string, for the preview a trainer reads before saving.
+export const sessionModulesPreviewQuery = z.object({
+  moduleIds: z.string().trim().min(1).max(400)
+    .transform(joined => [...new Set(joined.split(',').map(id => id.trim()).filter(Boolean))])
+    .pipe(z.array(z.string().min(1).max(32)).min(1).max(10)),
+})
+
+export interface MemberLacking {
+  userId: string
+  name: string
+  missing: PrerequisiteNeed[]
+}
+
+// Who signed up lacks a prerequisite the change adds. One the session already required is not new,
+// so it is left to sign-up's own warning; a gap here warns and never refuses (G-115 c7).
+export function lackingNewPrerequisites(
+  before: readonly PrerequisiteNeed[],
+  after: readonly PrerequisiteNeed[],
+  members: readonly { userId: string, name: string, held: ReadonlySet<string> }[],
+): MemberLacking[] {
+  const required = new Set(before.map(need => need.requiresId))
+  const added = [...new Map(after
+    .filter(need => !required.has(need.requiresId))
+    .map(need => [need.requiresId, need])).values()]
+    .sort((a, b) => a.requiresId.localeCompare(b.requiresId))
+
+  return members.flatMap((member) => {
+    const missing = missingPrerequisites(added, member.held)
+    return missing.length > 0 ? [{ userId: member.userId, name: member.name, missing }] : []
+  })
+}
+
 // One acknowledgement per gap, keyed by what is missing and for whom, so a tick cannot travel to
 // another person or another module (G-118 criterion 3).
 export function gapKey(gap: { userId: string, moduleId: string, requiresId: string }): string {

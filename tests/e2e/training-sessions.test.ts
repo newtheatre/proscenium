@@ -498,6 +498,91 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
     }
   }, CASE_TIMEOUT_MS)
 
+  // G-115 criterion 7 (issue 1062): the warning comes before the save, and does not stop it.
+  test('what a session teaches is changed on its page, after naming who lacks what it adds', async () => {
+    const needed = await addModule()
+    const taught = await addModule()
+    const added = await addModule()
+    await send('POST', `/api/admin/training/modules/${added}/prerequisites`, { requiresId: needed })
+    const { id } = await (await schedule({ moduleIds: [taught] })).json() as { id: string }
+    write(`INSERT INTO session_attendees (id, session_id, user_id, status, source, signed_up_at, created_at)
+      VALUES (?, ?, ?, 'SIGNED_UP', 'SIGNUP', 100, 100)`, `a-${suffix()}`, id, trainerId)
+
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage/sessions/${id}`, '[data-test="session-status"]')
+      await click(view, '[data-test="edit-modules"]')
+      await waitFor(view, `document.querySelector('[data-test="modules-input"]')`, 30_000)
+      await pickOptions(view, '[data-test="modules-input"]', [added])
+
+      await waitFor(view, `document.querySelector('[data-test="modules-lacking"]')?.innerText.includes(${JSON.stringify(trainer.name)})`, 30_000)
+      expect(await textOf(view, '[data-test="modules-lacking"]')).toContain(needed)
+
+      await click(view, '[data-test="modules-save"]')
+      await waitFor(view, `document.querySelector('[data-test="modules-result"]')`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ n: number }>('SELECT count(*) n FROM session_modules WHERE session_id = ?', id)?.n).toBe(2)
+  }, CASE_TIMEOUT_MS)
+
+  test('a module retired since scheduling is still offered, so it can be taken off', async () => {
+    const taught = await addModule()
+    const added = await addModule()
+    const { id } = await (await schedule({ moduleIds: [taught] })).json() as { id: string }
+    write(`UPDATE training_modules SET status = 'RETIRED' WHERE id = ?`, taught)
+
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage/sessions/${id}`, '[data-test="session-status"]')
+      await click(view, '[data-test="edit-modules"]')
+      await waitFor(view, `document.querySelector('[data-test="modules-input"]')`, 30_000)
+      await pickOptions(view, '[data-test="modules-input"]', [taught, added])
+      await click(view, '[data-test="modules-save"]')
+      await waitFor(view, `document.querySelector('[data-test="modules-result"]')`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ moduleId: string }>('SELECT module_id moduleId FROM session_modules WHERE session_id = ?', id)?.moduleId).toBe(added)
+    expect(read<{ n: number }>('SELECT count(*) n FROM session_modules WHERE session_id = ?', id)?.n).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
+  test('an open register asks for the freeze to be released, and a marked one offers nothing', async () => {
+    const taught = await addModule()
+    const added = await addModule()
+    const { id } = await (await schedule({ moduleIds: [taught] })).json() as { id: string }
+    write('UPDATE training_sessions SET register_opened_at = unixepoch() WHERE id = ?', id)
+
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage/sessions/${id}`, '[data-test="session-status"]')
+      await click(view, '[data-test="edit-modules"]')
+      await waitFor(view, `document.querySelector('[data-test="modules-input"]')`, 30_000)
+      await pickOptions(view, '[data-test="modules-input"]', [added])
+
+      // Nothing saves until the release is said out loud.
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="modules-save"]').disabled`)).toBe(true)
+      await click(view, '[data-test="release-freeze"]')
+      await click(view, '[data-test="modules-save"]')
+      await waitFor(view, `document.querySelector('[data-test="modules-result"]')`, 30_000)
+
+      write('UPDATE training_sessions SET marked_at = unixepoch() WHERE id = ?', id)
+      await visit(view, `${app.baseURL}/training/manage/sessions/${id}`, '[data-test="session-marked"]')
+      expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="edit-modules"]')`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM audit_log WHERE action = 'register.freeze.released' AND target = ?`, `session:${id}`,
+    )?.n).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
   test('a certification is absent from what the screen offers to teach', async () => {
     const view = await officerView()
     try {

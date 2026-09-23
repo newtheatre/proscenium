@@ -1,12 +1,5 @@
 import { eq, sql } from 'drizzle-orm'
-import { z } from 'zod'
-
-const form = z.object({
-  moduleIds: z.array(z.string().trim().min(1).max(32)).min(1).max(10),
-  // Question 6, answered 2 September: the session's own trainer may release the freeze, and only
-  // while the register carries no marks.
-  releaseFreeze: z.boolean().optional(),
-})
+import { sessionModulesForm } from '#shared/utils/training'
 
 // Change what a session teaches. Opening the register freezes this set, because a mark awards
 // records for exactly these modules and the room agreed to them (G-115 criterion 2).
@@ -15,7 +8,7 @@ export default defineEventHandler(async (event) => {
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Say which session you mean' })
 
   const resolved = await requireTrainer(event)
-  const input = await readValidatedBodyOrThrow(event, form)
+  const input = await readValidatedBodyOrThrow(event, sessionModulesForm)
 
   const [session] = await db.select({
     id: schema.trainingSessions.id,

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { saysDay } from '#shared/utils/when'
-import { SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus } from '#shared/utils/training'
+import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
+import { SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysGaps, saysSessionStatus } from '#shared/utils/training'
+import type { MemberLacking } from '#shared/utils/training'
 
 definePageMeta({ layout: 'console', title: 'Session', middleware: 'console', docs: '/docs/training/sessions' })
 
@@ -133,6 +135,106 @@ async function savePlaces(): Promise<void> {
   }
   catch (caught) {
     placesFailure.value = refusalText(caught)
+  }
+  finally {
+    working.value = false
+  }
+}
+
+interface Module { id: string, name: string, status: string, signoffRequired: boolean }
+
+// Once marked, the records are made and the modules with them; before that, an open register
+// is a freeze released only on purpose (G-115 criterion 2).
+const canChangeModules = computed(() => !!data.value && !cancelled.value && !marked.value)
+
+const changingModules = ref(false)
+const moduleIds = ref<string[]>([])
+const catalogue = ref<Module[]>([])
+const releaseFreeze = ref(false)
+const lacking = ref<MemberLacking[]>([])
+const previewing = ref(false)
+const previewFailure = ref<string | null>(null)
+const modulesFailure = ref<string | null>(null)
+const modulesResult = ref<string | null>(null)
+
+// What may be taught: active, and not proved by experience rather than by a session (G-112 c3).
+// What it teaches now is always offered too, so a module retired since can still be taken off.
+const teachableOptions = computed(() => {
+  const teachable = catalogue.value.filter(module => module.status === 'ACTIVE' && !module.signoffRequired)
+  const offered = new Set(teachable.map(module => module.id))
+  return [...teachable, ...(data.value?.modules ?? []).filter(module => !offered.has(module.id))]
+    .map(module => ({ label: `${module.id} ${module.name}`, value: module.id }))
+})
+
+const modulesUnchanged = computed(() => {
+  const now = new Set(data.value?.modules.map(module => module.id) ?? [])
+  return moduleIds.value.length === now.size && moduleIds.value.every(id => now.has(id))
+})
+
+const modulesSavable = computed(() => moduleIds.value.length > 0 && !modulesUnchanged.value
+  && !previewing.value && !previewFailure.value && (!registerOpen.value || releaseFreeze.value))
+
+async function startChangingModules(): Promise<void> {
+  moduleIds.value = data.value?.modules.map(module => module.id) ?? []
+  releaseFreeze.value = false
+  lacking.value = []
+  previewFailure.value = null
+  modulesFailure.value = null
+  modulesResult.value = null
+  changingModules.value = true
+  try {
+    catalogue.value = (await request<{ items: Module[] }>(
+      '/api/admin/training/modules',
+      { query: { pageSize: MAX_PAGE_SIZE } },
+    )).items
+  }
+  catch (caught) {
+    modulesFailure.value = refusalText(caught)
+  }
+}
+
+// Asked again on every pick, and only the latest answer kept, so the warning is about the set
+// that would be saved and nothing older (G-115 criterion 7).
+let asked = 0
+watch(moduleIds, async (ids) => {
+  const mine = ++asked
+  lacking.value = []
+  previewFailure.value = null
+  if (!changingModules.value || ids.length === 0 || modulesUnchanged.value) return
+  previewing.value = true
+  try {
+    const answered = await $fetch<{ lacking: MemberLacking[] }>(
+      `/api/admin/training/sessions/${route.params.id}/modules-preview`,
+      { query: { moduleIds: ids.join(',') } },
+    )
+    if (mine === asked) lacking.value = answered.lacking
+  }
+  catch (caught) {
+    if (mine === asked) previewFailure.value = refusalText(caught)
+  }
+  finally {
+    if (mine === asked) previewing.value = false
+  }
+})
+
+async function saveModules(): Promise<void> {
+  if (!modulesSavable.value) return
+  working.value = true
+  modulesFailure.value = null
+  try {
+    const answered = await $fetch<{ released: boolean }>(
+      `/api/admin/training/sessions/${route.params.id}/modules`,
+      { method: 'PUT', body: { moduleIds: moduleIds.value, ...(registerOpen.value ? { releaseFreeze: true } : {}) } },
+    )
+    const warned = lacking.value.length > 0
+      ? ` ${plural(lacking.value.length, 'person', 'people')} signed up without a prerequisite it adds.`
+      : ''
+    modulesResult.value = `${answered.released ? 'The freeze was released and what' : 'What'} it teaches is changed.${warned}`
+    changingModules.value = false
+    await refresh()
+  }
+  catch (caught) {
+    modulesFailure.value = refusalText(caught)
   }
   finally {
     working.value = false
@@ -420,6 +522,109 @@ const registerLabel = computed(() => {
               </UBadge>
             </li>
           </ul>
+
+          <UButton
+            v-if="canChangeModules && !changingModules"
+            size="xs"
+            variant="link"
+            icon="i-lucide-pencil"
+            data-test="edit-modules"
+            @click="startChangingModules"
+          >
+            Change the modules
+          </UButton>
+
+          <UAlert
+            v-if="modulesResult"
+            color="success"
+            variant="subtle"
+            icon="i-lucide-check"
+            data-test="modules-result"
+            :description="modulesResult"
+          />
+
+          <form
+            v-if="changingModules"
+            class="space-y-3 rounded-md border border-default p-3"
+            data-test="modules-form"
+            @submit.prevent="saveModules"
+          >
+            <UFormField
+              label="What it teaches"
+              description="You may teach only what you currently hold. Certifications are not taught by session."
+            >
+              <USelectMenu
+                v-model="moduleIds"
+                :items="teachableOptions"
+                value-key="value"
+                multiple
+                placeholder="Search the catalogue"
+                class="w-full"
+                data-test="modules-input"
+              />
+            </UFormField>
+
+            <UAlert
+              v-if="previewFailure"
+              color="error"
+              variant="subtle"
+              data-test="modules-refused"
+              :description="previewFailure"
+            />
+            <UAlert
+              v-else-if="lacking.length"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-triangle-alert"
+              data-test="modules-lacking"
+              title="Signed up without a prerequisite this adds"
+            >
+              <template #description>
+                <p>Saving does not take anybody off the list, so tell them before the day.</p>
+                <ul class="mt-1 list-disc pl-4">
+                  <li
+                    v-for="one in lacking"
+                    :key="one.userId"
+                  >
+                    {{ one.name }}: {{ saysGaps(one.missing) }}
+                  </li>
+                </ul>
+              </template>
+            </UAlert>
+
+            <UCheckbox
+              v-if="registerOpen"
+              v-model="releaseFreeze"
+              label="Release the freeze"
+              description="The register is open, so what this session teaches is frozen. Releasing it changes what marking the register will award."
+              data-test="release-freeze"
+            />
+
+            <UAlert
+              v-if="modulesFailure"
+              color="error"
+              variant="subtle"
+              data-test="modules-failure"
+              :description="modulesFailure"
+            />
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                type="submit"
+                :loading="working"
+                :disabled="!modulesSavable"
+                data-test="modules-save"
+              >
+                Save the modules
+              </UButton>
+              <UButton
+                color="neutral"
+                variant="ghost"
+                @click="changingModules = false"
+              >
+                Keep it as it is
+              </UButton>
+            </div>
+          </form>
 
           <template v-if="data.notes">
             <h2 class="text-sm font-semibold">
