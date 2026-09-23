@@ -49,6 +49,11 @@ const CATALOGUE = {
   'account.erased.admin': { label: 'Account erased by an officer', module: 'identity' },
   'account.erased.system': { label: 'Account erased automatically', module: 'identity' },
   'account.merged': { label: 'Merged into another account', module: 'identity' },
+  // The address is on the account, never in the detail (A-104 criterion 6, 0011).
+  'account.google.prelinked': { label: 'Workspace address set for Google sign-in', module: 'identity' },
+  'account.google.unlinked': { label: 'Workspace address for Google sign-in cleared', module: 'identity' },
+  'account.google.claimed': { label: 'Google sign-in linked by matching address', module: 'identity', self: true },
+  'account.google.claimed.pending': { label: 'Google sign-in linked by a set Workspace address', module: 'identity', self: true },
 
   'session.started': { label: 'Signed in with a password', module: 'identity', self: true },
   'session.started.google': { label: 'Signed in with Google', module: 'identity', self: true },
