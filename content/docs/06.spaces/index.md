@@ -25,7 +25,7 @@ without the buttons, and the request queue is not in their navigation at all.
   ::card{icon="i-lucide-inbox" title="Room requests" to="/docs/spaces/room-requests"}
   Deciding on what the policy could not confirm on its own, and on asks for rooms we do not manage.
   ::
-  ::card{icon="i-lucide-calendar-range" title="Bookings" to="/docs/spaces/bookings"}
+  ::card{icon="i-lucide-calendar-search" title="Bookings" to="/docs/spaces/bookings"}
   Every member's room bookings in one list, searched and filtered.
   ::
   ::card{icon="i-lucide-construction" title="Closures" to="/docs/spaces/closures"}

@@ -152,7 +152,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     prefix: '/rooms/manage',
     items: [
       { label: 'Room requests', icon: 'i-lucide-inbox', to: '/rooms/manage/requests', ability: decideRoomRequests, section: 'Every day' },
-      { label: 'Bookings', icon: 'i-lucide-calendar-range', to: '/rooms/manage/bookings', ability: viewRooms, section: 'Every day' },
+      { label: 'Bookings', icon: 'i-lucide-calendar-search', to: '/rooms/manage/bookings', ability: viewRooms, section: 'Every day' },
       { label: 'Closures', icon: 'i-lucide-construction', to: '/rooms/manage/closures', ability: viewRooms, section: 'Every day' },
       { label: 'Utilisation', icon: 'i-lucide-chart-column', to: '/rooms/manage/utilisation', ability: viewRooms, section: 'Every day' },
       { label: 'Rooms', icon: 'i-lucide-house', to: '/rooms/manage', ability: viewRooms, exact: true, section: 'Set-up' },
