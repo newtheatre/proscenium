@@ -5,7 +5,7 @@ import { conditionsOf } from '#shared/utils/list-filters'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { tableColumns, whereFrom } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { ListClause, Reference } from './list-filters'
+import type { Reference } from './list-filters'
 import type { SQL } from 'drizzle-orm'
 
 // `id` is not a guide to insertion order; `rowid` is, and is not a Drizzle column (0006).
@@ -17,7 +17,7 @@ function claimsColumn(name: string): Reference | undefined {
 // The queue through its own declaration (A-130 criterion 10): waiting is the hidden default, and
 // an erased person's claim is nobody's to answer, whatever its status.
 export function claimsClause(query: ListQuery): { where: SQL, orderBy: SQL[] } {
-  const clause: ListClause = whereFrom(membershipClaimsList, query, {
+  const clause = whereFrom(membershipClaimsList, query, {
     column: claimsColumn,
     search: [schema.users.name, schema.users.email, schema.membershipClaims.studentId],
   })

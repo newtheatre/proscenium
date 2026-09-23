@@ -63,6 +63,22 @@ function read<T>(sql: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
+// The officer signs in through the page; a step already spent is forgotten, so a second sign-in
+// inside the same window is not refused as a replay.
+async function signInOfficer(view: Bun.WebView): Promise<void> {
+  forgetSpentStep(app, officer.email)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', officer.email)
+  await fill(view, 'form input[type="password"]', password)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
+  const code = await codeForStep(secret, stepFor(new Date()) + 1)
+  for (const [index, digit] of [...code].entries()) {
+    await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
+  }
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+}
+
 const today = londonDay(new Date())
 let numbered = 20_990_100
 const nextNumber = (): string => String(numbered++)
@@ -304,17 +320,7 @@ describe.skipIf(skip !== null)('the screens (A-130 criterion 4)', () => {
 
     const view = await openSignedOutView(app.baseURL)
     try {
-      await visit(view, `${app.baseURL}/sign-in`)
-      await fill(view, 'form input[type="email"]', officer.email)
-      await fill(view, 'form input[type="password"]', password)
-      await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`)
-      const code = await codeForStep(secret, stepFor(new Date()) + 1)
-      for (const [index, digit] of [...code].entries()) {
-        await fill(view, `[data-test="mfa-challenge"] input:nth-of-type(${index + 1})`, digit)
-      }
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
-
+      await signInOfficer(view)
       await visit(view, `${app.baseURL}/people/members?filter=awaiting-record`, '[data-test="claims-table"]')
       await waitFor(view, `document.querySelector('[data-test="claim-record-${id}"]')`, 30_000)
       await click(view, `[data-test="claim-record-${id}"]`)
@@ -322,6 +328,25 @@ describe.skipIf(skip !== null)('the screens (A-130 criterion 4)', () => {
 
       expect(read<{ n: number }>(`SELECT count(*) n FROM memberships WHERE user_id = ?`, member.id)!.n).toBe(1)
       expect(read<{ status: string }>('SELECT status FROM membership_claims WHERE id = ?', id)!.status).toBe('RECORDED')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('leaving the queue drops its status, so the queue is entered again on what waits (A-130 criterion 10)', async () => {
+    const member = await registerMember(app, 'returned', password)
+    const { id } = await (await claim(member)).json() as { id: string }
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await signInOfficer(view)
+      await visit(view, `${app.baseURL}/people/members?filter=is:awaiting-record&status=is:DECLINED`, '[data-test="claims-table"]')
+      await click(view, '[data-test="toolbar-active"] button')
+      await waitFor(view, `!location.search.includes('status')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="claims-waiting"]')`, 30_000)
+      await click(view, '[data-test="claims-waiting"]')
+      await waitFor(view, `document.querySelector('[data-test="claim-record-${id}"]')`, 30_000)
     }
     finally {
       view.close()
