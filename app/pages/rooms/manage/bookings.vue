@@ -46,6 +46,8 @@ interface Listing {
   pages: number
 }
 
+interface Alternatives { nearest: Offer | null, total: number }
+
 interface StandingAnswer { count: number, standing: Standing }
 
 const request = useRequestFetch()
@@ -93,7 +95,7 @@ const refusal = ref<string | null>(null)
 // member would be offered is shown before anybody presses the button (C-115 criterion 7).
 const bumping = ref<Booking | null>(null)
 const bump = reactive<Partial<BumpInput>>({})
-const offer = ref<{ nearest: Offer | null, total: number } | null>(null)
+const offer = ref<Alternatives | null>(null)
 
 async function openBump(booking: Booking): Promise<void> {
   refusal.value = null
@@ -101,40 +103,51 @@ async function openBump(booking: Booking): Promise<void> {
   Object.assign(bump, { userId: undefined, title: '', tier: TIERS[0], purpose: undefined, reason: '' })
   bumping.value = booking
   try {
-    offer.value = await $fetch(`/api/admin/rooms/bookings/${booking.id}/alternatives`)
+    const found = await $fetch<Alternatives>(`/api/admin/rooms/bookings/${booking.id}/alternatives`)
+    if (bumping.value?.id === booking.id) offer.value = found
   }
   catch (error) {
-    refusal.value = refusalText(error)
+    // A late answer for a dialogue already closed must not land in the next one.
+    if (bumping.value?.id === booking.id) refusal.value = refusalText(error)
+  }
+}
+
+// Every row action posts once, reports in a toast and reloads the list; a dropped connection
+// leaves the outcome unknown, so the refusal says what to check.
+async function post<T>(url: string, body: object, whatToCheck: string, done: (answer: T) => void): Promise<void> {
+  working.value = true
+  refusal.value = null
+  try {
+    done(await $fetch<T>(url, { method: 'POST', body }))
+    await refresh()
+  }
+  catch (error) {
+    refusal.value = writeFailureText(error, whatToCheck)
+  }
+  finally {
+    working.value = false
   }
 }
 
 async function submitBump(): Promise<void> {
   const booking = bumping.value
   if (!booking) return
-  working.value = true
-  refusal.value = null
-  try {
-    const answer = await $fetch<{ offered: Offer | null }>(`/api/admin/rooms/bookings/${booking.id}/bump`, {
-      method: 'POST',
-      body: bump,
-    })
-    toast.add({
-      title: 'Booking bumped',
-      description: answer.offered
-        ? `${booking.member} has been told and offered ${answer.offered.room}, ${spanOf(answer.offered)}.`
-        : `${booking.member} has been told. Nothing equivalent was free to offer.`,
-      icon: 'i-lucide-check',
-      color: 'success',
-    })
-    bumping.value = null
-    await refresh()
-  }
-  catch (error) {
-    refusal.value = writeFailureText(error, 'Reload the list to see whether the booking was bumped.')
-  }
-  finally {
-    working.value = false
-  }
+  await post<{ offered: Offer | null }>(
+    `/api/admin/rooms/bookings/${booking.id}/bump`,
+    bump,
+    'Reload the list to see whether the booking was bumped.',
+    (answer) => {
+      toast.add({
+        title: 'Booking bumped',
+        description: answer.offered
+          ? `${booking.member} has been told and offered ${answer.offered.room}, ${spanOf(answer.offered)}.`
+          : `${booking.member} has been told. Nothing equivalent was free to offer.`,
+        icon: 'i-lucide-check',
+        color: 'success',
+      })
+      bumping.value = null
+    },
+  )
 }
 
 const recording = ref<Booking | null>(null)
@@ -163,45 +176,29 @@ function saysStandingOf(member: string, answer: StandingAnswer): string {
 async function record(): Promise<void> {
   const booking = recording.value
   if (!booking) return
-  working.value = true
-  refusal.value = null
-  try {
-    const answer = await $fetch<StandingAnswer>(`/api/admin/rooms/bookings/${booking.id}/no-show`, {
-      method: 'POST',
-      body: { reason: noShowReason.value },
-    })
-    toast.add({ title: 'No-show recorded', description: saysStandingOf(booking.member, answer), icon: 'i-lucide-check', color: 'success' })
-    recording.value = null
-    await refresh()
-  }
-  catch (error) {
-    refusal.value = writeFailureText(error, 'Reload the list to see whether the no-show was recorded.')
-  }
-  finally {
-    working.value = false
-  }
+  await post<StandingAnswer>(
+    `/api/admin/rooms/bookings/${booking.id}/no-show`,
+    { reason: noShowReason.value },
+    'Reload the list to see whether the no-show was recorded.',
+    (answer) => {
+      toast.add({ title: 'No-show recorded', description: saysStandingOf(booking.member, answer), icon: 'i-lucide-check', color: 'success' })
+      recording.value = null
+    },
+  )
 }
 
 async function withdraw(): Promise<void> {
   const booking = withdrawing.value
   if (!booking?.noShowId) return
-  working.value = true
-  refusal.value = null
-  try {
-    const answer = await $fetch<StandingAnswer>(`/api/admin/rooms/no-shows/${booking.noShowId}/withdraw`, {
-      method: 'POST',
-      body: { reason: withdrawal.value },
-    })
-    toast.add({ title: 'No-show withdrawn', description: saysStandingOf(booking.member, answer), icon: 'i-lucide-check', color: 'success' })
-    withdrawing.value = null
-    await refresh()
-  }
-  catch (error) {
-    refusal.value = writeFailureText(error, 'Reload the list to see whether the no-show was withdrawn.')
-  }
-  finally {
-    working.value = false
-  }
+  await post<StandingAnswer>(
+    `/api/admin/rooms/no-shows/${booking.noShowId}/withdraw`,
+    { reason: withdrawal.value },
+    'Reload the list to see whether the no-show was withdrawn.',
+    (answer) => {
+      toast.add({ title: 'No-show withdrawn', description: saysStandingOf(booking.member, answer), icon: 'i-lucide-check', color: 'success' })
+      withdrawing.value = null
+    },
+  )
 }
 
 // One action per row at most: the three are exclusive by the booking's state and time.
