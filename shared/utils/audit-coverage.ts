@@ -763,6 +763,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/finance/nominal-mappings/index.get.ts', exempt: 'reads the mapping, writing nothing' },
   { route: 'server/api/admin/finance/nominal-mappings/index.post.ts', actions: ['finance.nominal-mapping.changed'], via: ['server/utils/su-export.ts'] },
   { route: 'server/api/admin/finance/export.get.ts', actions: ['finance.exported'] },
+  { route: 'server/api/admin/finance/export/coverage.get.ts', exempt: 'counts the rows a download would cover, returning none of them' },
 
   // Module J: governance
 

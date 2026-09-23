@@ -134,6 +134,71 @@ describe.skipIf(skip !== null)('the CSV export (criteria 2, 3)', () => {
   })
 })
 
+describe.skipIf(skip !== null)('the yearly return by name: a year or a season (criterion 4, 0087)', () => {
+  // A year no other suite touches, so closing it cannot refuse another suite's own ledger writes.
+  const YEAR = 2012
+
+  beforeAll(() => {
+    if (skip) return
+    const database = new Database(app.databaseFile)
+    try {
+      database.query(`
+        INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence)
+        VALUES (?, unixepoch(), ?, 'DESK', 'CARD', ?, 700)
+      `).run('su-export-year-e1', '2011-10-10', treasurer.id)
+      database.query(`
+        INSERT INTO ledger_lines (id, entry_id, kind, amount_pence) VALUES (?, ?, 'WALK_UP', 700)
+      `).run('su-export-year-l1', 'su-export-year-e1')
+      database.query(`
+        INSERT INTO seasons (id, name, starts_on, ends_on) VALUES (?, ?, ?, ?)
+      `).run('su-export-autumn', 'Autumn 2011', '2011-09-20', '2011-12-10')
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('a year exports 1 August to 31 July, named in the file and marked open until it is closed', async () => {
+    const answered = await send('GET', `/api/admin/finance/export?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
+    expect(answered.status).toBe(200)
+    expect(answered.headers.get('content-disposition')).toContain('su-export-2011-08-01-to-2012-07-31.csv')
+    expect(answered.headers.get('x-period-status')).toBe('open')
+    expect(await answered.text()).toContain('"2011-10-10","Walk-up sale"')
+  })
+
+  test('a season exports its own row\'s days', async () => {
+    const answered = await send('GET', '/api/admin/finance/export?kind=SEASON&seasonId=su-export-autumn', undefined, treasurer.cookie)
+    expect(answered.status).toBe(200)
+    expect(answered.headers.get('content-disposition')).toContain('su-export-2011-09-20-to-2011-12-10.csv')
+  })
+
+  test('an unknown season is not found, and the whole year asked for as a season is refused', async () => {
+    expect((await send('GET', '/api/admin/finance/export?kind=SEASON&seasonId=no-such-season', undefined, treasurer.cookie)).status).toBe(404)
+    expect((await send('GET', `/api/admin/finance/export?kind=SEASON&year=${YEAR}`, undefined, treasurer.cookie)).status).toBe(400)
+  })
+
+  test('the status says what a download would cover without taking one, for the exporter only', async () => {
+    const answered = await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toEqual({ fromDay: '2011-08-01', toDay: '2012-07-31', rows: 1, closed: false })
+    expect((await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, front.cookie)).status).toBe(403)
+  })
+
+  test('once the year is closed, two runs are byte-identical and both say closed', async () => {
+    const closed = await send('POST', '/api/admin/finance/periods', { fromDay: '2011-08-01', toDay: '2012-07-31', label: '2011/12' }, treasurer.cookie)
+    expect(closed.status).toBe(200)
+
+    const first = await send('GET', `/api/admin/finance/export?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
+    const second = await send('GET', `/api/admin/finance/export?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
+    expect(first.headers.get('x-period-status')).toBe('closed')
+    expect(second.headers.get('x-period-status')).toBe('closed')
+    expect(new Uint8Array(await second.arrayBuffer())).toEqual(new Uint8Array(await first.arrayBuffer()))
+
+    const status = await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
+    expect(await status.json()).toMatchObject({ closed: true })
+  })
+})
+
 describe.skipIf(skip !== null)('exporting is audited (criterion 5)', () => {
   test('records who exported and which range', async () => {
     await send('GET', '/api/admin/finance/export?fromDay=2026-09-01&toDay=2026-09-30', undefined, treasurer.cookie)

@@ -62,3 +62,18 @@ export function suExportQuery(fromDay: string, toDay: string): SQL {
 export async function suExportRows(fromDay: string, toDay: string): Promise<SuExportRow[]> {
   return db.all<SuExportRow>(suExportQuery(fromDay, toDay))
 }
+
+// The same predicate as suExportQuery, counted: what the screen checks against the cap first.
+export function suExportCountQuery(fromDay: string, toDay: string): SQL {
+  return sql`
+    SELECT count(*) AS rows
+    FROM ledger_lines ll
+    JOIN ledger_entries le ON le.id = ll.entry_id
+    WHERE le.london_day BETWEEN ${fromDay} AND ${toDay}
+  `
+}
+
+export async function suExportRowCount(fromDay: string, toDay: string): Promise<number> {
+  const [row] = await db.all<{ rows: number }>(suExportCountQuery(fromDay, toDay))
+  return row?.rows ?? 0
+}
