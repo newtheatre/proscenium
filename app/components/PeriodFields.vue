@@ -5,7 +5,7 @@ import type { PeriodForm } from '~/composables/usePeriodForm'
 // own, so the screen reads the chosen period from the form it passed in.
 const props = defineProps<{ form: PeriodForm }>()
 
-const { selectableKinds, termItems, seasonItems, kind, termId, seasonId, day, month, monthYear, year, months, calendarYears, years } = props.form
+const { customRange, kindItems, termItems, seasonItems, kind, termId, seasonId, day, fromDay, toDay, month, monthYear, year, months, calendarYears, years } = props.form
 </script>
 
 <template>
@@ -13,16 +13,27 @@ const { selectableKinds, termItems, seasonItems, kind, termId, seasonId, day, mo
     v-model="kind"
     aria-label="Period kind"
     data-test="period-kind"
-    :items="selectableKinds"
+    :items="kindItems"
+    value-key="value"
   />
   <USelect
-    v-if="kind === 'TERM'"
+    v-if="kind === 'TERM' && !customRange"
     v-model="termId"
     aria-label="Term"
     data-test="period-term"
     :items="termItems"
     value-key="value"
   />
+  <template v-if="kind === 'TERM' && customRange">
+    <DateField
+      v-model="fromDay"
+      data-test="period-from"
+    />
+    <DateField
+      v-model="toDay"
+      data-test="period-to"
+    />
+  </template>
   <USelect
     v-if="kind === 'SEASON'"
     v-model="seasonId"

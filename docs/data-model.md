@@ -1136,8 +1136,10 @@ migration enumerates the posting table in `architecture.md`, and a change is an 
 (`finance.nominal-mapping.changed`, `server/utils/su-export.ts`'s `setNominalMapping`).
 `GET /api/admin/finance/nominal-mappings` lists it, `POST` changes one pair.
 
-**`GET /api/admin/finance/export?fromDay=...&toDay=...`** is one CSV row per ledger line in the
-range, `le.london_day BETWEEN fromDay AND toDay`, joined against this table: a line whose pair
+**`GET /api/admin/finance/export?kind=TERM&fromDay=...&toDay=...`** (or `kind=YEAR&year=...`, or
+`kind=SEASON&seasonId=...`, resolved to days exactly as the money dashboard resolves them, 0087;
+an older link with no kind or `kind=RANGE` still reads as the custom range)
+is one CSV row per ledger line in the range, `le.london_day BETWEEN fromDay AND toDay`, joined against this table: a line whose pair
 has no mapping still exports, with an explicit `UNMAPPED` nominal code rather than a dropped or
 blank row (criterion 3). Every figure is the line's own signed `amount_pence`, read straight off
 the row: nothing here computes a total that could disagree with I-106's gross, refunded and net
@@ -1146,6 +1148,9 @@ figures for the same range, because nothing here computes a total at all. Rows a
 truncated silently. The export is audited (`finance.exported`) with who, when and the range.
 An open range exports anyway, permitted rather than refused: the `x-period-status` response
 header says `closed` or `open`, read from `period_locks` the same way a single day is (I-107).
+`GET /api/admin/finance/export/coverage` takes the same query and answers `{ fromDay, toDay, rows,
+closed }` from a count over the same predicate, so the screen shows the period's state and the
+cap before anything is downloaded.
 
 ## Show night (module E)
 

@@ -349,11 +349,14 @@ The picker itself is shared: `usePeriodForm()` (`app/composables/`) holds the co
 `PeriodFields.vue` renders them, and `periodQuery()` in `shared/utils/season-dashboard.ts` is the
 one spelling of a period as a query string. Each screen passes its own loader for the terms and
 seasons, so it reads them through its own gate: `/money` through the two finance routes above,
-`/reports` through `GET /api/admin/reports/periods` under `reports.read` (E-126 criterion 5).
+`/reports` through `GET /api/admin/reports/periods` under `reports.read` (E-126 criterion 5). A
+screen may narrow the kinds offered, relabel them, and take `TERM` as two typed days rather than a
+defined term (`customRange`): `/money/exports` does all three, and `complete` withholds its
+request while the typed range ends before it starts.
 
 ### SU accounting exports (I-108)
 
-A period export (`GET /api/admin/finance/export?fromDay=...&toDay=...`) is one CSV row per
+A period export (`GET /api/admin/finance/export?kind=TERM&fromDay=...&toDay=...`) is one CSV row per
 ledger line in the range, categorised against `su_nominal_mappings`. Decision 0025 refuses a
 config key that holds a record, so the mapping from a `(kind, source)` pair to an SU nominal code
 is its own table, seeded from the posting table below and only ever `UPDATE`d, the same shape
@@ -374,7 +377,23 @@ close would make I-108 depend on a close that has its own separate warnings and 
 (I-107). `isRangeClosed()` checks the requested range against `period_locks` the same way a day
 is checked, and the response carries the answer as `x-period-status: closed|open` rather than a
 CSV column, so the file itself stays exactly the shape the SU's own import expects. A range only
-partly closed reads as open: nothing here assumes a term is closed in one row.
+partly closed, or with any day reopened after the close that covers it, reads as open: nothing
+here assumes a term is closed in one row.
+
+**The yearly return is chosen by name, not typed in (criterion 4).** The export takes
+`kind=YEAR&year=`, `kind=SEASON&seasonId=` or a custom range as `kind=TERM&fromDay=&toDay=`
+(`suExportForm`), the same query `periodQuery()` writes for every period screen, and the screen
+builds it with the shared `usePeriodForm` and `PeriodFields`. A link from before that, with
+`fromDay`/`toDay` and no kind or `kind=RANGE`, still reads as the same custom range. Every kind
+resolves through `resolvePeriodBounds()`, the money dashboard's own resolver (0087), so the
+export and the dashboard never disagree about which days a year covers.
+`GET /api/admin/finance/export/coverage` takes the same query and answers the resolved days, the
+row count and whether the range is closed, without returning or auditing any row: the screen
+shows it before the download, and disables the download over the cap with the same refusal the
+export gives. Over a closed range the file is byte-identical from run to run: the ledger trigger
+refuses a post into it (I-107), the query orders by day, instant and line id, and
+`suExportCsvRows()` shapes every run the same way. A nominal code changed between two runs is
+the one thing that changes the file, because mappings are current configuration, not history.
 
 ### The money paths
 
