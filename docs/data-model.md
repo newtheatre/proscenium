@@ -1216,8 +1216,9 @@ simultaneous claims settle to one winner and one member holds one slot on an ope
 A planned opening's staffing changes one-off after stamping without touching the template: an
 added slot takes the next number after the opening's highest, and only an `OPEN` slot on a
 `PLANNED` opening that keeps another slot is deleted, the predicate riding the `DELETE` so a
-claim landing first refuses the removal (E-130 criterion 7). The audit row names the opening and
-the slot number, since the slot's own row is gone.
+claim landing first refuses the removal (E-130 criterion 7). Both audit rows target the opening
+and carry the slot's id and its number: numbers are reused once the highest slot goes, so the id
+is what ties the entry to that slot's own `bar-opening-shift:<id>` history.
 
 ### shift_contact_preferences
 `user_id` PK → users cascade · `visible` bool default false · `updated_at`. Consent, not a fact

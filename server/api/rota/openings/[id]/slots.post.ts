@@ -15,14 +15,16 @@ export default defineEventHandler(async (event) => {
     actorId: resolved.account.id,
     action: 'bar-opening-shift.added',
     target: `bar-opening:${id}`,
-    detail: changes({ slotId: [null, slotId] }),
+    // The number is the write's to choose, so the audit statement fills it in from the row.
+    detail: changes({ slotId: [null, slotId], slot: [null, null] }),
   })
 
   // Conditional on the opening still being planned, so a cancellation landing first adds nothing.
-  const applied = await withOpeningConstraints(() =>
-    auditedWrite(db.all<{ id: string }>(addOpeningShiftStatement(slotId, id)), entry))
-  if (!applied) throw createError({ statusCode: 409, statusMessage: 'This opening has been cancelled' })
+  const [added] = await withOpeningConstraints(() => db.batch([
+    db.all<{ id: string, slot: number }>(addOpeningShiftStatement(slotId, id)),
+    db.run(addedSlotAuditStatement(entry, slotId)),
+  ]))
+  if (added.length === 0) throw createError({ statusCode: 409, statusMessage: 'This opening has been cancelled' })
 
-  const added = await openingShiftDetail(slotId)
-  return { ok: true, slotId, slot: added?.slot ?? null }
+  return { ok: true, slotId, slot: added[0]!.slot }
 })

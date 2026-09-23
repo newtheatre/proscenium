@@ -10,6 +10,7 @@ import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
 import type { ClaimScope } from './rota'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
+import type { AuditRow } from '#shared/utils/audit'
 import type { BarOpeningInput, BarOpeningStatus } from '#shared/utils/rota-openings'
 import type { ShiftStatus } from '#shared/utils/rota'
 import type { SQL } from 'drizzle-orm'
@@ -72,6 +73,18 @@ export function addOpeningShiftStatement(slotId: string, openingId: string): SQL
     FROM bar_openings o
     WHERE o.id = ${openingId} AND o.status = 'PLANNED'
     RETURNING id, slot
+  `
+}
+
+// The added slot's audit row, conditional on the insert and carrying the number the insert
+// chose, so the entry names both the slot's id and its number (0049, 0011).
+export function addedSlotAuditStatement(entry: AuditRow, slotId: string): SQL {
+  return sql`
+    INSERT INTO audit_log (id, actor_id, action, target, detail)
+    SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target},
+           json_set(${JSON.stringify(entry.detail ?? {})}, '$.changes.slot.to', s.slot)
+    FROM bar_opening_shifts s
+    WHERE s.id = ${slotId} AND changes() = 1
   `
 }
 

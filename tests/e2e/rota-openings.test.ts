@@ -233,9 +233,17 @@ describe.skipIf(skip !== null)('an opening\'s staffing changes one-off (E-130 cr
 
     const database = new Database(app.databaseFile, { readonly: true })
     try {
-      const actions = database.query('SELECT action FROM audit_log WHERE target = ? ORDER BY created_at')
-        .all(`bar-opening:${opening.openingId}`) as { action: string }[]
-      expect(actions.map(row => row.action)).toEqual(expect.arrayContaining(['bar-opening-shift.added', 'bar-opening-shift.removed']))
+      const entries = database.query('SELECT action, detail FROM audit_log WHERE target = ? ORDER BY created_at')
+        .all(`bar-opening:${opening.openingId}`) as { action: string, detail: string }[]
+      const added = entries.find(row => row.action === 'bar-opening-shift.added')!
+      const removed = entries.find(row => row.action === 'bar-opening-shift.removed')!
+      // Both name the slot by id and by number, since a number is reused once the highest goes.
+      expect(JSON.parse(added.detail).changes).toMatchObject({ slot: { from: null, to: 3 } })
+      expect(JSON.parse(added.detail).changes.slotId.to).toEqual(expect.any(String))
+      expect(JSON.parse(removed.detail).changes).toEqual({
+        slotId: { from: removing.slotId, to: null },
+        slot: { from: removing.slot, to: null },
+      })
     }
     finally {
       database.close()

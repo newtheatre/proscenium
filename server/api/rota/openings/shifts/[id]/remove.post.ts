@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
     actorId: resolved.account.id,
     action: 'bar-opening-shift.removed',
     target: `bar-opening:${held.openingId}`,
-    detail: changes({ slot: [held.slot, null] }),
+    detail: changes({ slotId: [id, null], slot: [held.slot, null] }),
   })
 
   const applied = await auditedWrite(db.all<{ id: string }>(removeOpeningShiftStatement(id)), entry)

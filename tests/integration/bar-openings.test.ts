@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   addOpeningShiftStatement,
+  addedSlotAuditStatement,
   approveOpeningShiftStatement,
   cancelOpeningShiftsStatement,
   cancelOpeningStatement,
@@ -13,6 +14,7 @@ import {
   unconfirmOpeningShiftStatement,
 } from '#server/utils/bar-openings'
 import { replaceTemplateStatements } from '#server/utils/rota'
+import { auditEntry, changes } from '#shared/utils/audit'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
@@ -306,6 +308,31 @@ describe('a planned opening\'s staffing changes one-off after stamping (E-130 cr
       expect(rows<{ count: number }>(database,
         `SELECT "count" AS count FROM shift_templates WHERE venue_id = ? AND role = 'BAR'`, venueId)[0])
         .toMatchObject({ count: 2 })
+    })
+  })
+
+  // Numbers come back once the highest slot goes, so the entry carries the id as well.
+  test('an added slot is audited with its id and the number the write chose, and only when added', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      const entryFor = (slotId: string) => auditEntry({
+        actorId: 'officer',
+        action: 'bar-opening-shift.added',
+        target: `bar-opening:${openingId}`,
+        detail: changes({ slotId: [null, slotId], slot: [null, null] }),
+      })
+      const detailsOf = (): unknown[] => rows<{ detail: string }>(database,
+        `SELECT detail FROM audit_log WHERE action = 'bar-opening-shift.added' ORDER BY rowid`)
+        .map(row => JSON.parse(row.detail))
+
+      run(database, addOpeningShiftStatement('slot-added', openingId))
+      run(database, addedSlotAuditStatement(entryFor('slot-added'), 'slot-added'))
+      expect(detailsOf()).toEqual([{ changes: { slotId: { from: null, to: 'slot-added' }, slot: { from: null, to: 3 } } }])
+
+      run(database, cancelOpeningStatement(openingId))
+      expect(run(database, addOpeningShiftStatement('slot-late', openingId))).toHaveLength(0)
+      run(database, addedSlotAuditStatement(entryFor('slot-late'), 'slot-late'))
+      expect(detailsOf()).toHaveLength(1)
     })
   })
 
