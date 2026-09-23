@@ -194,11 +194,18 @@ describe.skipIf(skip !== null)('a venue template is the front of house officer\'
     expect((await send('PUT', '/api/admin/rota/templates/venue-nobody-has', { slots: HOUSE_SLOTS })).status).toBe(404)
   })
 
-  test('an external venue is not listed, is refused a template and a stamp, and takes shifts by hand (issue 1210)', async () => {
+  test('a venue marked external loses its template, is not listed, is refused a template and a stamp, and takes shifts by hand (issue 1210)', async () => {
     const away = programme('external')
-    const database = new Database(app.databaseFile)
+    await send('PUT', `/api/admin/rota/templates/${away.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
+    const marked = await send('PUT', `/api/admin/reference-data/venues/${away.venueId}`, {
+      name: 'The Test House external', capacity: 120, isExternal: true,
+    })
+    expect(marked.status).toBe(200)
+    expect(trail('shift-template.removed', `venue:${away.venueId}`)?.detail).toMatchObject({ reason: 'external' })
+    // The template went with the flag, so nothing holds the venue open for deletion.
+    const database = new Database(app.databaseFile, { readonly: true })
     try {
-      database.run('UPDATE venues SET is_external = 1 WHERE id = ?', [away.venueId])
+      expect(database.query('SELECT 1 FROM shift_templates WHERE venue_id = ?').all(away.venueId)).toEqual([])
     }
     finally {
       database.close()
