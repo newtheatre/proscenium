@@ -389,7 +389,8 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   2. Query results page in SQL and export to CSV with the formula-injection guard.
   3. Access is limited to officers and administrators; results obey the same redaction rules as the reports themselves (access counts only, erased identities anonymised).
   4. Historical night reports imported from the old estate are included, marked with their source.
-- Source: Prompt Book E-5; audit PR-10; get-in migration (night reports import verbatim).
+  5. The queries have a screen: `/reports`, the one item of a top-level Reports console group (its holders span front of house, safety and the committee, so it belongs to none of their groups), gated by a `viewReports` ability on `reports.read`. An Incidents tab and a Performances tab each page the result, choose the range with the money dashboard's own period controls (DAY, WEEK, MONTH, TERM, SEASON, YEAR, 0087), and link to that range's CSV export. The terms and seasons the controls offer come from a route gated on `reports.read`, so reading them opens no finance permission (issue 1042, decided by the IT Manager).
+- Source: Prompt Book E-5; audit PR-10; get-in migration (night reports import verbatim); issue 1042 (criterion 5).
 
 ## E-127: Two shows, one venue, one day
 

@@ -57,6 +57,7 @@ describe('a link to a server route downloads rather than routing (I-108, D-129, 
     expect(where).toContain('pages/bar/reports.vue')
     expect(where).toContain('pages/bar/stock/order-list.vue')
     expect(where).toContain('pages/account/security.vue')
+    expect(where).toContain('pages/reports/index.vue')
   })
 
   test('every link whose target is an /api/ route is marked external', () => {
@@ -67,6 +68,8 @@ describe('a link to a server route downloads rather than routing (I-108, D-129, 
   test.each([
     ['SU export', 'I-108', 'pages/money/exports.vue', 'export-csv'],
     ['ticket sales export', 'D-129', 'pages/box-office/shows/index.vue', 'ticket-export-csv'],
+    ['incident trend export', 'E-126', 'pages/reports/index.vue', 'export-incidents'],
+    ['performance report export', 'E-126', 'pages/reports/index.vue', 'export-performances'],
   ])('the %s button is an external link (%s)', (_label, _story, file, dataTest) => {
     const button = links.find(link => link.file === file && link.tag.includes(`data-test="${dataTest}"`))
     expect(button).toBeDefined()
