@@ -408,3 +408,26 @@ describe.skipIf(skip !== null)('two officers bumping the same booking (criterion
     expect(inSlot?.n).toBe(1)
   })
 })
+
+describe.skipIf(skip !== null)('the officer finds the booking from a list (criterion 6, issue 1049)', () => {
+  test('a member without the rooms permission is refused the list', async () => {
+    const answered = await send('GET', '/api/admin/rooms/bookings', null, member.cookie)
+    expect(answered.status).toBe(403)
+  })
+
+  test('the list answers with the paging envelope and names the member only', async () => {
+    const room = await makeRoom()
+    const booking = await bookAs(room, span(58), member)
+
+    const answered = await send('GET', `/api/admin/rooms/bookings?room=is:${room}`, null, officer)
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { items: Record<string, unknown>[], page: number, pageSize: number, total: number, pages: number }
+    expect(body.page).toBe(1)
+    expect(body.total).toBe(1)
+    expect(body.pages).toBe(1)
+    expect(body.items.map(item => item.id)).toEqual([booking])
+    expect(Object.keys(body.items[0]!).sort()).toEqual([
+      'attendees', 'endsAt', 'id', 'member', 'noShowId', 'purpose', 'room', 'roomId', 'startsAt', 'status', 'tier', 'title', 'userId',
+    ])
+  })
+})
