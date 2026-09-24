@@ -203,3 +203,48 @@ describe('the restored basket offers Try SumUp again (F-124 criterion 5, F-104 c
     returned.scope.stop()
   })
 })
+
+describe('one tab restores a turned-down basket once, and only tonight\'s (F-124 criterion 5, 0014, issue 1257)', () => {
+  test('two checks landing together restore it once and never say it went to another tab', async () => {
+    const tab = setup('FAILED')
+    handOff(tab, 'attempt-twice')
+
+    // A return to the tab fires visibilitychange, focus and pageshow, each asking at once.
+    await Promise.all([tab.charge.checkAttempt(), tab.charge.checkAttempt()])
+    await settled()
+
+    expect(tab.basket.value).toHaveLength(1)
+    expect(tab.charge.returnNotice.value).toBeNull()
+    expect(tab.chargeFailure.value).toContain('The basket is back')
+    tab.scope.stop()
+  })
+
+  test('an attempt left in flight on an earlier show night is not resumed, so its basket never returns', async () => {
+    const left = setup('ABANDONED')
+    const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000
+    left.charge.sumup.remember({ id: 'attempt-left', totalPence: 1000, startedAt: twoDaysAgo, basket: { bar: [aLine()], tickets: [], walkUps: [], discountId: null } })
+    left.scope.stop()
+
+    const tonight = setup('ABANDONED')
+    await tonight.charge.resume(null)
+    await settled()
+
+    expect(tonight.basket.value).toHaveLength(0)
+    expect(tonight.charge.sumup.pending.value).toBeNull()
+    expect(deviceNightCacheStore().getItem(returnedAttemptKey('attempt-left'))).toBeNull()
+    tonight.scope.stop()
+  })
+
+  test('a kept record that will not read is pruned, and does not stop the others being pruned', async () => {
+    const tab = setup('FAILED')
+    const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000
+    deviceNightCacheStore().setItem(returnedAttemptKey('attempt-garbled'), '{not json')
+    deviceNightCacheStore().setItem(returnedAttemptKey('attempt-stale'), JSON.stringify({ returnedAt: twoDaysAgo }))
+
+    await tab.charge.resume(null)
+
+    expect(deviceNightCacheStore().getItem(returnedAttemptKey('attempt-garbled'))).toBeNull()
+    expect(deviceNightCacheStore().getItem(returnedAttemptKey('attempt-stale'))).toBeNull()
+    tab.scope.stop()
+  })
+})
