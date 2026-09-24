@@ -82,6 +82,10 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
 - Acceptance criteria:
   1. Every number the backlog calls configurable (booking windows, hold expiry, room rules and caps, refund policy, tab cap, comp authority, expiry and retention windows, nag cadences) lives in one settings surface, seeded from the Phase 0 workshop defaults; no policy number is hardcoded.
   2. Each setting displays its default, its current value, and who last changed it and when.
+     Amended 24 September 2026 (issue 1264): a key that holds people (named in the key set, never
+     guessed from its name) shows them as names, added with the person picker and removed one at a
+     time; a key that holds roles is chosen from the roles. Only a reader of the settings is told
+     the names.
   3. Values are validated per key (type, range, cross-field rules); an invalid value is refused and never stored, and an impossible date such as a 29 February year boundary is a named refusal case.
      Amended 24 September 2026 (issue 1266): a yearly boundary written as a month and a day
      (`YEAR_START`, `YEAR_END`, `ACADEMIC_YEAR_BOUNDARY`) is chosen from a calendar with no year in
@@ -96,7 +100,7 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
      `DISCOUNT_CODES_ENABLED` before D-204, is the one exception to a live input. Its definition
      names the story that builds the feature; the screen shows the switch disabled, says "Not
      built" with that story's id, and links to it, so nobody flips a switch that decides nothing.
-- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10), amended by issues 1265 and 1266.
+- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10), amended by issues 1264, 1265 and 1266.
 
 ## J-105: Blast-radius preview, typed confirmation and one-action revert
 
