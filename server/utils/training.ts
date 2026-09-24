@@ -585,7 +585,7 @@ export type AwardablePolicy = ExpiryPolicy & { kind: string, status: string, all
 // certificate cannot drift apart (G-120 criteria 1 to 3, G-121 criterion 5).
 export async function assertAwardable(
   resolved: CatalogueAuthority,
-  input: { userId?: string, moduleId: string, awardedOn: string },
+  input: { userId?: string, email?: string, moduleId: string, awardedOn: string },
   refusals: { retired: string, brief: string },
 ): Promise<AwardablePolicy> {
   const module = await moduleById(input.moduleId)
@@ -598,6 +598,8 @@ export async function assertAwardable(
     if (!mayRecordByAddress(resolved.permissions, resolved.leads, module.department, new Date())) {
       throw createError({ statusCode: 403, statusMessage: 'You do not have permission to add somebody' })
     }
+    // Before the prerequisites, which a held address would be weighed against wrongly as nobody's.
+    if (input.email !== undefined) await assertNobodyHolds(input.email)
   }
   else {
     const account = await findById(input.userId)

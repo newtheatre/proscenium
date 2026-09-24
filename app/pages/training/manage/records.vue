@@ -52,7 +52,9 @@ const byAddress = ref(false)
 const address = ref('')
 const name = ref('')
 
+// Nobody stays chosen behind the address, or an award would leave from their history for it.
 function recordByAddress(): void {
+  person.value = undefined
   address.value = nobody.value?.includes('@') ? nobody.value : ''
   byAddress.value = true
 }

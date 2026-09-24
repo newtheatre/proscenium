@@ -18,14 +18,13 @@ export async function assertNobodyHolds(email: string): Promise<void> {
 }
 
 // The account, the record and every entry in one batch; nothing is sent to the address (0091).
+// The caller has run assertAwardable, which refuses a held address; the batch settles any race.
 export async function writeRecordByAddress(
   newcomer: { email: string, name: string },
   actorId: string,
   record: RecordByAddress['record'],
   entriesFor: (target: string) => AuditRow[],
 ): Promise<string> {
-  await assertNobodyHolds(newcomer.email)
-
   const userId = newId()
   const target = `user:${userId}`
   const statements = recordByAddressStatements({
