@@ -147,6 +147,12 @@ const basketItemCount = computed(() => basket.value.reduce((sum, line) => sum + 
   + ticketLines.value.length
   + walkUpLines.value.reduce((sum, line) => sum + line.quantity, 0))
 
+const route = useRoute()
+// Read once, as the claim is taken on mount; dropped from the address so a reload asks nothing.
+onMounted(() => {
+  if (route.query.attempt !== undefined) void navigateTo({ path: route.path, query: { ...route.query, attempt: undefined } }, { replace: true })
+})
+
 const charging = ref(false)
 const chargeFailure = ref<string | null>(null)
 const charged = ref<ChargedReceipt | null>(null)
@@ -167,11 +173,14 @@ const {
   smpTxCodeTyped,
   abandonNote,
   openAttempts,
+  retryOffered,
+  returnNotice,
   startWatching,
   checkAttempt,
   resolveAttempt,
 } = useSumUpCharge({
   request: (path, options) => $fetch(path, options),
+  returnedAttemptId: typeof route.query.attempt === 'string' ? route.query.attempt : null,
   venueId,
   sumupEnabled,
   selectedTabHolderId,
@@ -505,6 +514,16 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           :description="refusalRecordFailure"
         />
 
+        <UAlert
+          v-if="returnNotice && !charged"
+          data-test="sumup-restored-elsewhere"
+          color="info"
+          variant="subtle"
+          :description="returnNotice"
+          close
+          @update:open="returnNotice = null"
+        />
+
         <TillSumUpWaiting
           v-if="!charged"
           v-model:smp-tx-code-typed="smpTxCodeTyped"
@@ -619,6 +638,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               :tab-holders="tabHolders.data.value?.holders ?? []"
               :has-ticket-money="hasTicketMoney"
               :charge-failure="chargeFailure"
+              :retry-sumup="retryOffered && sumupAvailable && !sumup.pending.value && !charging"
               :price-failure="priceFailure"
               :priced="priced"
               :grand-total-pence="grandTotalPence"
@@ -626,6 +646,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               :tickets-pence="ticketsPence"
               :walk-ups-pence="walkUpsPence"
               @open-allergens="allergenOpen = $event"
+              @retry-sumup="() => chargeOnSumUp()"
             />
           </div>
         </template>
