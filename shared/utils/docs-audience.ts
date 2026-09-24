@@ -15,12 +15,12 @@ export function readsCommitteeDocs(viewer: { permissions: readonly string[], hol
   return viewer.holdsRole || viewer.permissions.length > 0
 }
 
-// A section whose every page is hidden goes too, rather than sitting in the tree as an empty heading.
+// A section inherits its index page's audience, so it is judged by its pages, never by its own
+// field; one whose every page is hidden goes too, rather than sitting as an empty heading.
 export function visibleTree<T extends DocsNavItem>(items: readonly T[], committee: boolean): T[] {
   if (committee) return [...items]
   return items.flatMap((item) => {
-    if (item.audience === 'committee') return []
-    if (!item.children) return [item]
+    if (!item.children) return item.audience === 'committee' ? [] : [item]
     const children = visibleTree(item.children, false)
     return children.length > 0 ? [{ ...item, children }] : []
   })

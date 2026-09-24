@@ -75,6 +75,14 @@ describe('the tree a viewer sees (criterion 8)', () => {
     expect(seen[2]!.children!.map(item => item.title)).toEqual(['Reporting a problem'])
   })
 
+  test('a section takes its index page\'s audience, and still shows a member its member pages', () => {
+    const section = [{ title: 'System', path: '/docs/system', audience: 'committee', children: [
+      { title: 'Overview', path: '/docs/system', audience: 'committee' },
+      { title: 'Reporting a problem', path: '/docs/system/reporting', audience: 'member' },
+    ] }]
+    expect(visibleTree(section, false)[0]!.children!.map(item => item.title)).toEqual(['Reporting a problem'])
+  })
+
   test('the committee sees everything', () => {
     expect(visibleTree(tree, true)).toEqual(tree)
   })
@@ -94,5 +102,15 @@ describe('the chrome is told, and the layout filters by it', () => {
     expect(layout).toContain('visibleTree(')
     expect(layout).toContain('committeePaths(')
     expect(layout).toContain('readsCommitteeDocs(')
+  })
+
+  test('the headline is read from the whole tree, so a committee page reached by link keeps it', async () => {
+    expect(await Bun.file('app/layouts/docs.vue').text()).toContain('provide(\'navigation\', everything)')
+  })
+
+  test('prev and next skip committee pages for a member, as the sidebar does', async () => {
+    const page = await Bun.file('app/pages/docs/[...slug].vue').text()
+    expect(page).toContain('readsCommitteeDocs(')
+    expect(page).toContain('.where(\'audience\', \'<>\', \'committee\')')
   })
 })

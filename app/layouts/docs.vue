@@ -12,7 +12,8 @@ const { data: fetched } = await useAsyncData('docs:navigation', () => queryColle
 const everything = computed<ContentNavigationItem[]>(() => fetched.value?.[0]?.children ?? fetched.value ?? [])
 // Navigation only: a committee page stays readable by any session that follows a link to it (0093).
 const navigation = computed(() => visibleTree(everything.value, committee.value))
-provide('navigation', navigation)
+// The page reads its section headline from the whole tree, so a page reached by link keeps it.
+provide('navigation', everything)
 
 // The search index is the whole collection, so it is loaded once, in the browser, when asked for.
 const { data: allSections } = useLazyAsyncData('docs:search', () => queryCollectionSearchSections('docs'), { server: false })

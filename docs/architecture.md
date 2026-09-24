@@ -681,8 +681,9 @@ rule once, for the tests and the check. Every page carries `title`, `description
 `audience`, `updatedOn` and `updatedBy`. `audience` is `member` or `committee` (0093): the docs
 layout passes the tree through `visibleTree()` and drops committee pages from search with
 `committeePaths()` unless `readsCommitteeDocs()` holds, which is any live role grant (the session
-answer's `holdsRole`) or any standing permission. It filters navigation only; the collection stays
-readable by any session. `docs/operator-documentation.md` is the runbook for whoever edits
+answer's `holdsRole`) or any standing permission; the page's prev and next skip committee pages
+on the same test, and its section headline reads the whole tree. It filters navigation only; the
+collection stays readable by any session. `docs/operator-documentation.md` is the runbook for whoever edits
 a page: the tree's naming rules, the shape of a page, the words, the pictures and the checks.
 
 `app/layouts/docs.vue` is the reading surface: the member shell's header with a search button,
