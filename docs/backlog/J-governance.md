@@ -82,6 +82,10 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
 - Acceptance criteria:
   1. Every number the backlog calls configurable (booking windows, hold expiry, room rules and caps, refund policy, tab cap, comp authority, expiry and retention windows, nag cadences) lives in one settings surface, seeded from the Phase 0 workshop defaults; no policy number is hardcoded.
   2. Each setting displays its default, its current value, and who last changed it and when.
+     Amended 24 September 2026 (issue 1264): a key that holds people (named in the key set, never
+     guessed from its name) shows them as names, added with the person picker and removed one at a
+     time; a key that holds roles is chosen from the roles. Only a reader of the settings is told
+     the names.
   3. Values are validated per key (type, range, cross-field rules); an invalid value is refused and never stored, and an impossible date such as a 29 February year boundary is a named refusal case.
      Amended 24 September 2026 (issue 1266): a yearly boundary written as a month and a day
      (`YEAR_START`, `YEAR_END`, `ACADEMIC_YEAR_BOUNDARY`) is chosen from a calendar with no year in

@@ -18,6 +18,15 @@ Open questions:
   (decision 0069). The typed cross-check stays as the laptop's flow and the fallback.
 - Who qualifies as an authorised tab holder in the unified system (committee only, as today, or a
   treasurer-approved list), and what is the default hard cap? The old estate's £20 was a soft nag.
+  Answered 24 September 2026 by the IT Manager (issue 1264): people and roles. A holder is anybody
+  named in `BAR_AUTHORISED_TAB_HOLDERS`, or anybody holding a live grant of a role named in
+  `BAR_AUTHORISED_TAB_ROLES`. A role grant lapses at the committee year end (0009), so credit by
+  role lapses with it and is checked at the next charge. Naming a role widens who is extended
+  credit to everybody who holds it, now and later in the year, which the settings screen says.
+  The roles are a second key rather than a reshaped first one, because a key holds a list of
+  scalars and never records (0025), and because role names are not personal data: the roles key
+  is audited with its values while the people key stays hashed (0024). Both start empty. The
+  default hard cap is `BAR_TAB_CAP_PENCE`'s proposed value until the workshop confirms it.
 - Answered 15 September 2026: the imported stock-movement history is informational and never the
   balance, the most recent applied stocktake is, and no documented data-damage repair runs as a
   repair: damage is written off explicitly by a dated movement. A production export found nothing
@@ -198,7 +207,12 @@ Open questions:
 - Depends on: F-103, F-105, A-2 (membership state)
 - Acceptance criteria:
   1. Tab tender is offered only for authorised holders (the authorised set is configuration,
-     settled in Phase 0); authorisation is checked at the write path on every charge.
+     settled in Phase 0); authorisation is checked at the write path on every charge. Amended 24
+     September 2026 (issue 1264): the authorised set is the people named in
+     `BAR_AUTHORISED_TAB_HOLDERS` together with everybody holding a live grant of a role named in
+     `BAR_AUTHORISED_TAB_ROLES`. A lapsed or revoked grant stops the next charge, and a disabled
+     or anonymised account is never a holder. The grants are matched by a subquery in the query
+     that authorises the charge, never expanded to a list of ids (0006).
   2. Only bar lines may ride on a tab; ticket money can never be charged to one, structurally
      rather than procedurally.
   3. A configurable hard cap applies per holder; a charge that would take the outstanding balance

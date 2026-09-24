@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysDayLong, saysMonthDay } from '#shared/utils/when'
 import { isDayOfYearKey } from '#shared/utils/config-rules'
+import { holdsPeople, holdsRoles } from '#shared/utils/config'
 import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
 import { confirmationOptions } from '#shared/utils/blast-radius'
 import type { BlastRadiusPreview } from '#shared/utils/blast-radius'
@@ -37,6 +38,7 @@ interface Setting {
   enforced: boolean
   sensitive: boolean
   plannedFor: { story: string, issue: number } | null
+  people: { id: string, name: string | null }[] | null
   wideBlastRadius: boolean
   updatedAt: number | null
   updatedBy: { id: string, name: string } | null
@@ -97,11 +99,13 @@ const storyLink = (issue: number): string => `https://github.com/newtheatre/pros
 
 // Money is entered in pounds and stored in pence, everywhere (0004, 0032). The key says which
 // keys those are, because the schema only knows it is an integer.
-function kind(setting: Setting): 'boolean' | 'money' | 'dayOfYear' | 'number' | 'list' | 'text' {
+function kind(setting: Setting): 'boolean' | 'money' | 'dayOfYear' | 'people' | 'roles' | 'number' | 'list' | 'text' {
   const value = standing(setting)
   if (typeof value === 'boolean') return 'boolean'
   if (setting.key.endsWith('_PENCE')) return 'money'
   if (isDayOfYearKey(setting.key)) return 'dayOfYear'
+  if (holdsPeople(setting.key)) return 'people'
+  if (holdsRoles(setting.key)) return 'roles'
   if (typeof value === 'number') return 'number'
   if (Array.isArray(value) || Array.isArray(setting.default)) return 'list'
   return 'text'
@@ -438,6 +442,32 @@ onMounted(async () => {
                 </UButton>
               </template>
 
+              <template v-else-if="kind(setting) === 'people' || kind(setting) === 'roles'">
+                <SettingsPeopleField
+                  v-if="kind(setting) === 'people'"
+                  v-model="lists[setting.key]"
+                  :name="setting.key"
+                  :label="setting.describes"
+                  :people="setting.people ?? []"
+                />
+                <SettingsRolesField
+                  v-else
+                  v-model="lists[setting.key]"
+                  :name="setting.key"
+                  :label="setting.describes"
+                />
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  :loading="saving === setting.key"
+                  :aria-label="`Save ${setting.describes}`"
+                  :data-test="`save-${setting.key}`"
+                  @click="attemptSave(setting, lists[setting.key] ?? [])"
+                >
+                  Save
+                </UButton>
+              </template>
+
               <template v-else-if="kind(setting) === 'list'">
                 <UInputTags
                   v-model="lists[setting.key]"
@@ -497,6 +527,7 @@ onMounted(async () => {
 
             <p class="mt-2 text-xs text-muted">
               <span v-if="setting.hasDefault && kind(setting) === 'dayOfYear'">Ships as {{ saysMonthDay(String(setting.default)) }}. </span>
+              <span v-else-if="setting.hasDefault && (kind(setting) === 'people' || kind(setting) === 'roles')">Ships naming {{ (setting.default as unknown[]).length ? (setting.default as string[]).join(', ') : 'nobody' }}. </span>
               <span v-else-if="setting.hasDefault">Ships as <span class="font-mono">{{ asText(setting.default) }}</span>. </span>
               <span v-if="setting.updatedBy && setting.updatedAt">
                 Changed by {{ setting.updatedBy.name }} on
