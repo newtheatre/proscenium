@@ -3,6 +3,7 @@
 // provenance, a picture nothing shows, or a link to nowhere is drift, and drift is a defect.
 
 import { join } from 'node:path'
+import { DOCS_AUDIENCES } from '#shared/utils/docs-audience'
 import { DOCS_ROOT, HELP_ROOT, contentPathOf } from '#shared/utils/docs-paths'
 
 const IMAGES = 'public/images/docs'
@@ -51,6 +52,9 @@ for (const where of everyPage) {
     if (!fields[key]) problems.push(`${where}  front matter has no ${key}`)
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fields.updatedOn ?? '')) problems.push(`${where}  updatedOn is not an ISO date`)
+  // Every page says who it is for (0093): public in help, member or committee in the operator tree.
+  const allowed: readonly string[] = where.startsWith(`${HELP_ROOT}/`) ? ['public'] : DOCS_AUDIENCES
+  if (!allowed.includes(fields.audience ?? '')) problems.push(`${where}  audience is not one of ${allowed.join(', ')}`)
 
   source.split('\n').forEach((line, index) => {
     for (const match of line.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)|<img[^>]+src="([^"]+)"/g)) {
@@ -80,7 +84,7 @@ for (const folder of new Set(pages.filter(file => file.includes('/')).map(file =
 if (problems.length) {
   console.error('check-docs: the operator documentation has drifted from its own conventions.\n')
   for (const problem of problems) console.error(`  ${problem}`)
-  console.error('\nEvery page carries title, description, module, updatedOn and updatedBy; every')
+  console.error('\nEvery page carries title, description, module, audience, updatedOn and updatedBy; every')
   console.error(`picture it shows lives under ${IMAGES} and is shown by some page; every /docs or /help link`)
   console.error('lands on a page; every section folder has a .navigation.yml with a title (0076).')
   process.exit(1)

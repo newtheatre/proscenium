@@ -2,6 +2,7 @@
 title: Tonight
 description: The phone screens a show night runs on, who they open for, and the hub they all start from.
 module: Show night
+audience: member
 updatedOn: 2026-09-23
 updatedBy: Matt Adcock
 navigation:

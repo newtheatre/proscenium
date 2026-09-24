@@ -2,6 +2,7 @@
 title: System
 description: The console overview, the settings, the audit trail, backups and restore, and how this documentation is kept.
 module: Platform
+audience: committee
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:

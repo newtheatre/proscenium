@@ -305,7 +305,8 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     const key = new URL(answer.launchUrl.replace('sumupmerchant://', 'https://')).searchParams.get('callback')!.split('/pay/return/')[1]!
     const completed = await send('POST', `/api/till/payments/${answer.id}/complete`, { key, smpStatus: 'success', smpTxCode: 'TX123', foreignTxId: answer.id }, '')
     expect(completed.status).toBe(200)
-    expect((await completed.json() as { status: string }).status).toBe('SUCCEEDED')
+    // The venue rides the answer, so the return page's way back opens this bar (issue 1257).
+    expect(await completed.json() as { status: string, venueId: string }).toMatchObject({ status: 'SUCCEEDED', venueId })
     expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', booking.id)!.status).toBe('COLLECTED')
     expect(query<{ n: number }>('SELECT count(*) AS n FROM ledger_entries')!.n).toBe(before + 1)
     expect(query<{ code: string }>('SELECT smp_tx_code AS code FROM sumup_attempts WHERE id = ?', answer.id)!.code).toBe('TX123')
@@ -357,7 +358,7 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
 
     const failed = await (await send('POST', '/api/till/payments', { venueId, lines: [], tickets: [{ reservationId: failing.id }], expectedTotalPence: 900 }, barManager.cookie)).json() as AttemptAnswer
     const answeredFailed = await send('POST', `/api/till/payments/${failed.id}/complete`, { smpStatus: 'failed', smpFailureCause: 'transaction-failed' }, barManager.cookie)
-    expect((await answeredFailed.json() as { status: string }).status).toBe('FAILED')
+    expect(await answeredFailed.json() as { status: string, venueId: string }).toMatchObject({ status: 'FAILED', venueId })
     expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', failing.id)!.status).toBe('PENDING')
 
     const started = await (await send('POST', '/api/till/payments', { venueId, lines: [], tickets: [{ reservationId: contested.id }], expectedTotalPence: 900 }, barManager.cookie)).json() as AttemptAnswer

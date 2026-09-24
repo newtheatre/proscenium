@@ -2,14 +2,16 @@
 title: Documentation
 description: How each part of the theatre is run, kept by the people who run it.
 module: Governance
-updatedOn: 2026-09-23
+audience: member
+updatedOn: 2026-09-24
 updatedBy: Matt Adcock
 ---
 
 This is the operator documentation for the theatre's screens: one page for every screen,
 written for somebody who joined the committee last week and has to run their area without a
 predecessor's folder. It is signed in only, and nothing here needs a standing permission to
-read. The person on a shift tonight needs the page for the screen in front of them more than
+read. The sidebar shows the console's pages to the committee, and everybody's own pages to
+everybody. The person on a shift tonight needs the page for the screen in front of them more than
 anybody does.
 
 Every page says when it was last updated and by whom. If a page and a screen disagree, the

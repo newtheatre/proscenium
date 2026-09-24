@@ -1,4 +1,7 @@
 import { listFailureFrom } from './useListFailure'
+import { deviceNightCacheStore } from './useNightCache'
+import { currentShowNight } from '#shared/utils/show-night'
+import { recallTillVenue, rememberTillVenue, rememberedBarAnswers } from '#shared/utils/till'
 import type { ListFailure } from './useListFailure'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
 import type { TillSession, TillVenueOption } from '#shared/utils/till'
@@ -10,7 +13,12 @@ export function useTillSession() {
   const route = useRoute()
   // Optional: names which venue when more than one runs tonight, which the route already resolves
   // unaided on the (typical) night only one does. Multi-venue bars are their own story (F-202).
-  const requestedVenueId = computed(() => (typeof route.query.venueId === 'string' ? route.query.venueId : undefined))
+  const queriedVenueId = computed(() => (typeof route.query.venueId === 'string' ? route.query.venueId : undefined))
+  // The bar this device opened tonight, read on mount, answers the guard's "which bar?" so the SumUp
+  // app's return on a bare link does not ask again (issue 1257); `usingDevice` says it did.
+  const deviceVenueId = ref<string | undefined>(undefined)
+  const usingDevice = ref(false)
+  const requestedVenueId = computed(() => queriedVenueId.value ?? (usingDevice.value ? deviceVenueId.value : undefined))
   const syncedAt = ref<Date | null>(null)
   // Carries the enrol path a console list already reads the same way (0040, issue 897).
   const failure = ref<ListFailure | null>(null)
@@ -22,6 +30,7 @@ export function useTillSession() {
   async function load(): Promise<void> {
     busy.value = true
     failure.value = null
+    let askAgain = false
     try {
       const status = await request<{ night: string, venueId: string, session: TillSession | null, sumupEnabled: boolean }>('/api/till', {
         query: { venueId: requestedVenueId.value },
@@ -30,8 +39,20 @@ export function useTillSession() {
       venueId.value = status.venueId
       sumupEnabled.value = status.sumupEnabled
       syncedAt.value = new Date()
+      rememberTillVenue(deviceNightCacheStore(), status.night, status.venueId)
     }
     catch (refused) {
+      if (!usingDevice.value && rememberedBarAnswers(refusalStatus(refused), queriedVenueId.value, deviceVenueId.value)) {
+        usingDevice.value = true
+        askAgain = true
+        return
+      }
+      // A remembered bar that no longer answers is dropped, and the till asks as if it had none.
+      if (usingDevice.value) {
+        forgetDeviceVenue()
+        askAgain = true
+        return
+      }
       failure.value = listFailureFrom(refused)
       // A recognised refusal is still a completed sync, so NightStale is not left saying "not yet
       // synced" forever (matching /tonight/index.vue's own shape).
@@ -45,7 +66,20 @@ export function useTillSession() {
     }
     finally {
       busy.value = false
+      if (askAgain) await load()
     }
+  }
+
+  function forgetDeviceVenue(): void {
+    deviceVenueId.value = undefined
+    usingDevice.value = false
+  }
+
+  // The way out of a remembered bar: the picker, exactly as if the device had never chosen.
+  async function changeVenue(): Promise<void> {
+    forgetDeviceVenue()
+    session.value = null
+    await loadVenues()
   }
 
   // The venues this caller may open a session at, read only when the guard asks for one. The
@@ -87,6 +121,7 @@ export function useTillSession() {
       })
       session.value = opened.session
       syncedAt.value = new Date()
+      rememberTillVenue(deviceNightCacheStore(), opened.session.night, opened.session.venueId)
     }
     catch (refused) {
       failure.value = listFailureFrom(refused)
@@ -173,10 +208,15 @@ export function useTillSession() {
     }
   }
 
-  onMounted(load)
+  onMounted(() => {
+    deviceVenueId.value = recallTillVenue(deviceNightCacheStore(), currentShowNight()) ?? undefined
+    return load()
+  })
 
   return {
     requestedVenueId,
+    usingDevice,
+    changeVenue,
     syncedAt,
     failure,
     busy,

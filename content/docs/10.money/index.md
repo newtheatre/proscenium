@@ -2,6 +2,7 @@
 title: Money
 description: The money dashboard, the reports built on the ledger, daily reconciliation, period close and the SU export.
 module: Finance
+audience: committee
 updatedOn: 2026-09-23
 updatedBy: Matt Adcock
 navigation:

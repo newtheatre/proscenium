@@ -584,13 +584,23 @@ Open questions:
      till was open in); the outcome is otherwise accepted from anyone holding bar authority
      tonight. The outcome is a claim, exactly as trustworthy as a tap on "charged" today, and the
      SumUp transaction code it carries is recorded so a fabricated one shows at reconciliation.
+     The answer names the attempt's venue, so the return page's way back opens the till at that
+     bar in whichever browser the app returned to, and the till remembers tonight's bar on the
+     device for the show night (0014), so a bare link to it does not ask again. The memory answers
+     only the question the server would otherwise ask (which bar?), and "Change bar" forgets it.
   4. A success re-runs the whole cross-check against the database as it stands and posts the sale
      as F-122 and F-123 describe. If the basket can no longer be sold (the booking was collected
      at the desk meanwhile, the house filled), the attempt is marked mismatched with the reason,
      nothing is written, and staff are told the reader has money the ledger does not.
-  5. A failure or cancellation reported by the app restores the basket. An attempt with no answer
-     shows "did it go through?" on the till with three answers: it did (optionally with the code
-     from the SumUp app), it did not, check again. An unanswered attempt is abandoned by a sweep
+  5. A failure or cancellation reported by the app restores the basket in the tab the operator
+     returns to, which on Android is often a new one: the phone keeps the basket against the
+     attempt until the show night ends, a tab in the background waits until it is looked at, and
+     the first tab to restore it claims it, so any other tab says it was restored in another tab
+     rather than restoring it twice. The restored basket offers **Try SumUp again**, which is the
+     ordinary charge: a new attempt with the full expected-total cross-check (F-104 criterion 3),
+     never a replay of the old one. An attempt with no answer shows "did it go through?" on the
+     till with three answers: it did (optionally with the code from the SumUp app), it did not,
+     check again. An unanswered attempt is abandoned by a sweep
      after `SUMUP_ATTEMPT_TIMEOUT_MINUTES`; a stuck completion is marked mismatched after ten
      minutes. Every transition is a conditional write, so two answers cannot both land.
   6. The till lists tonight's open attempts so the laptop can resolve one a phone left behind;
@@ -605,8 +615,9 @@ Open questions:
      so a race lost between the hand-off and the answer still lands as criterion 4's mismatch.
 - Source: SumUp Payment Switch (developer.sumup.com/terminal-payments/payment-switch, and the
   sumup-android-url-scheme and sumup-ios-url-scheme references); decision 0069; Matt's
-  direction, 13 September 2026; issue 1258 (a stock-out found only after the reader took the
-  money), with the IT Manager's direction to check and grey out rather than hold stock.
+  direction, 13 September 2026; issue 1257 (a cancelled charge on Android returned in a new tab);
+  issue 1258 (a stock-out found only after the reader took the money), with the IT Manager's
+  direction to check and grey out rather than hold stock.
 
 ## F-125: The till opens at a venue with nothing running
 

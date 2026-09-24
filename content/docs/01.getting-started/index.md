@@ -2,6 +2,7 @@
 title: Getting started
 description: Signing in, your own account, what a role lets you do, and where everything lives.
 module: Governance
+audience: member
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:
