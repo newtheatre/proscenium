@@ -353,6 +353,11 @@ describe('the rewritten bodies and subjects (item 7)', () => {
       .toBe('The site health check has been failing since Friday 2 October 2026 at 06:00')
     expect(render('health-alert', EVERYTHING).html).not.toContain('<code>')
 
+    const holidays = render('bank-holidays-sync-failed', { ...EVERYTHING, since: '17 September 2026 at 06:00' })
+    expect(holidays.subject).toBe('The bank holiday list has not updated from gov.uk since 17 September 2026 at 06:00')
+    expect(holidays.text).toContain('Sync now')
+    expect(holidays.html).not.toContain('BANK_HOLIDAYS')
+
     const dry = render('retention-digest', { ...EVERYTHING, armed: false })
     expect(dry.html).toContain('Retention is still in rehearsal mode: nothing was anonymised')
     expect(dry.html).not.toContain('dry-run')

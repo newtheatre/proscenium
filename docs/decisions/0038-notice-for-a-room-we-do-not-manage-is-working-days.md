@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-01
+- Superseded in part by 0091: the bank holiday list is synced from gov.uk and never edited by hand
 
 ## Context
 

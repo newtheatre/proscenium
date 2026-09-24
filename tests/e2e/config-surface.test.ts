@@ -62,7 +62,7 @@ function unusedCode(): Promise<string> {
   return codeForStep(secret, stepFor(new Date()))
 }
 
-interface Setting { key: string, value: unknown, set: boolean, enforced: boolean, default: unknown, updatedBy: { name: string } | null }
+interface Setting { key: string, value: unknown, set: boolean, enforced: boolean, synced: boolean, default: unknown, updatedBy: { name: string } | null }
 
 async function settings(): Promise<Setting[]> {
   const answer = await (await send('GET', '/api/admin/config', null, cookie)).json() as { settings: Setting[] }
@@ -103,6 +103,8 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
     expect(known.enforced).toBe(true)
     expect(listed.find(setting => setting.key === 'BAR_TAB_CAP_PENCE')!.enforced).toBe(true)
     expect(listed.find(setting => setting.key === 'DISCOUNT_CODES_ENABLED')!.enforced).toBe(false)
+    expect(listed.find(setting => setting.key === 'BANK_HOLIDAYS')!.synced).toBe(true)
+    expect(listed.find(setting => setting.key === 'PASSWORD_MIN_LENGTH')!.synced).toBe(false)
   })
 
   test('a change is stored, shows who made it, and takes effect at the write path', async () => {
@@ -210,6 +212,14 @@ describe.skipIf(skip !== null)('the settings screen', () => {
         `document.querySelector('input[data-test="input-BAR_TAB_CAP_PENCE"]')?.value ?? ''`)
       // 2500 pence is what this suite set it to, and £25.00 is what that should read as.
       expect(shown).toBe('£25.00')
+
+      // Read-only with its last sync and Sync now, never an input: the list is gov.uk's (0091).
+      await fill(view, 'input[data-test="config-search"]', 'bank holidays')
+      await waitFor(view, 'document.querySelector(\'[data-test="bank-holiday-sync-status"]\')')
+      expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="input-BANK_HOLIDAYS"]\'))')).toBe(false)
+      expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="revert-BANK_HOLIDAYS"]\'))')).toBe(false)
+      expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="bank-holiday-sync-now"]\'))')).toBe(true)
+      expect(await textOf(view)).toContain('gov.uk')
 
       await fill(view, 'input[data-test="config-search"]', 'cancel an unpaid booking')
       await waitFor(view, 'document.querySelector(\'[data-test="toggle-REFUND_UNPAID_CANCELLATION_FREE"]\')')

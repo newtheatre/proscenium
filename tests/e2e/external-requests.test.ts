@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
+import { overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -182,9 +183,8 @@ describe.skipIf(skip !== null)('asking, with an optional preference (criterion 1
   // A calendar that has run out must refuse rather than count a bank holiday as a working day,
   // which would grant less notice than the rule asks for (C-121, 0038).
   test('a date past the end of the bank holiday list is refused, not guessed at', async () => {
-    // Asserted, not assumed: a setup call that silently fails turns this into a test of the
-    // default list, which passes for the wrong reason.
-    expect((await send('PUT', '/api/admin/config/BANK_HOLIDAYS', { value: ['2026-09-02'] }, officer)).status).toBe(200)
+    // Written straight to the database: the list is gov.uk's, and no route writes it by hand (0091).
+    overrideConfig(app, 'BANK_HOLIDAYS', ['2026-09-02'])
     try {
       const answered = await send('POST', '/api/rooms/external-requests',
         { title: 'Beyond the calendar', purpose: 'REHEARSAL', ...span(40) }, member.cookie)
@@ -197,8 +197,18 @@ describe.skipIf(skip !== null)('asking, with an optional preference (criterion 1
     finally {
       // Restored to something that reaches well past every other span here, and holds no date
       // near them, so the rest of the suite is judged exactly as the default would judge it.
-      await send('PUT', '/api/admin/config/BANK_HOLIDAYS', { value: ['2029-12-25'] }, officer)
+      overrideConfig(app, 'BANK_HOLIDAYS', ['2029-12-25'])
     }
+  })
+
+  // C-121 criterion 4 as amended: a save and a revert are one write path, and both refuse it.
+  test('the bank holiday list cannot be edited or reverted by hand (0091)', async () => {
+    const saved = await send('PUT', '/api/admin/config/BANK_HOLIDAYS', { value: ['2026-09-02'] }, officer)
+    expect(saved.status).toBe(409)
+    expect((await saved.json() as { statusMessage: string }).statusMessage).toContain('gov.uk')
+    const reverted = await send('POST', '/api/admin/config/BANK_HOLIDAYS/revert', {}, officer)
+    expect(reverted.status).toBe(409)
+    expect((await reverted.json() as { statusMessage: string }).statusMessage).toContain('gov.uk')
   })
 
   test('a lapsed membership cannot ask', async () => {
