@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { showNightOf } from '#shared/utils/show-night'
-import { saysClock, saysDay, saysDayLong, saysWhen, saysWhenLong } from '#shared/utils/when'
+import { saysClock, saysDay, saysDayLong, saysMonthDay, saysWhen, saysWhenLong } from '#shared/utils/when'
 
 // A fixed "today" so the year rule is judged against a known committee year rather than the
 // clock the suite happens to run on (0009).
@@ -103,5 +103,19 @@ describe('midnight and the show-night boundary read as the right day (0014)', ()
     const at = seconds('2026-10-15T03:00:00Z')
     expect(saysWhen(at, { now: NOW })).toBe('Thu 15 Oct, 04:00')
     expect(saysDay(showNightOf(new Date(at * 1000)), { now: NOW })).toBe('Thu 15 Oct')
+  })
+})
+
+// A yearly boundary has no year, so it reads as a day and a month and never as MM-DD (issue 1266).
+describe('a day of the year reads as a day and a month', () => {
+  test('a boundary is said the way a person says it', () => {
+    expect(saysMonthDay('08-01')).toBe('1 August')
+    expect(saysMonthDay('07-31')).toBe('31 July')
+    expect(saysMonthDay('02-28')).toBe('28 February')
+  })
+
+  test('something that is not a day of the year is left as it was', () => {
+    expect(saysMonthDay('02-29')).toBe('02-29')
+    expect(saysMonthDay('')).toBe('')
   })
 })

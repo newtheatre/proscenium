@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, hasDefault, isSensitive } from '#shared/utils/config'
 import { configChangeDetail } from '#shared/utils/config-audit'
-import { configProblem } from '#shared/utils/config-rules'
+import { DAY_OF_YEAR_KEYS, configProblem } from '#shared/utils/config-rules'
 import { isRecordable } from '#shared/utils/audit'
 import type { ConfigKey } from '#shared/utils/config'
 
@@ -96,5 +96,14 @@ describe('which settings the system actually enforces', () => {
     }
 
     expect([...read].sort()).toEqual([...ENFORCED_KEYS].sort())
+  })
+})
+
+// The screen picks a day of the year for exactly these keys, so a new MM-DD key that is missed
+// here would be typed by hand and judged by nothing (issue 1266).
+describe('the keys that hold a day of the year', () => {
+  test('every key shipping a month and a day is one', () => {
+    const monthDay = CONFIG_KEY_NAMES.filter(key => /^\d{2}-\d{2}$/.test(String(shipped(key))))
+    expect([...DAY_OF_YEAR_KEYS].sort()).toEqual(monthDay.sort())
   })
 })
