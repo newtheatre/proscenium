@@ -1,6 +1,6 @@
 // The two reader-facing date shapes (copy-style §9): short in a list, long in prose. Every one
 // is Europe/London by construction (0014), and the separators are literal so no locale moves them.
-import { committeeYearOf, formatLondon, startOfLondonDay } from './london'
+import { committeeYearOf, formatLondon, isMonthDay, startOfLondonDay } from './london'
 
 // A number is epoch seconds, the wire convention throughout, or milliseconds above the line below.
 // A bare YYYY-MM-DD is a London day, not the UTC midnight `new Date` would take it for.
@@ -48,6 +48,13 @@ export function saysClock(value: When): string {
 // the day below is any day the month is sure to have.
 export function saysMonth(month: number): string {
   return formatLondon(new Date(Date.UTC(2001, month - 1, 15)), { month: 'long' })
+}
+
+// A recurring MM-DD boundary as a person says it, "1 August"; anything else is returned untouched.
+export function saysMonthDay(value: string): string {
+  if (!isMonthDay(value)) return value
+  const [month, day] = value.split('-').map(Number)
+  return `${day} ${saysMonth(month!)}`
 }
 
 export function saysDay(value: When, options: WhenOptions = {}): string {

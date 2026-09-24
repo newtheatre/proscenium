@@ -19,6 +19,15 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 2. Which training modules gate which shift roles at launch (duty manager, door, bar), and is any
    time-boxed officer override permitted on a safety-gated role, as stage-door's 90-day eligibility
    overrides once allowed? The catalogue mapping is committee work.
+   Put to the committee 24 September 2026 (issue #1263): the duty manager module currently needs
+   Committee & Governance first, so no member can take a duty manager shift without a committee
+   module. Recommendation: withdraw Committee & Governance from the duty manager module's
+   prerequisites, and make it a committee-only module worth 12 months from award. Both are
+   catalogue and settings changes an officer makes in the console (**Needs first** and **How long
+   it is worth** on the module, and `SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE`), not code. The
+   catalogue has no switch that limits who may sign up to a module, so "committee-only" means
+   the committee's own sessions teach it; a hard restriction would be a new module G story.
+   Recorded in `../workshops.md`, session 2.
 3. Who holds the safety officer function that incident severity routing targets? The Prompt Book
    names no such committee role; it needs a mapping in the role vocabulary table.
 4. What are the retention periods for frozen night reports and the Challenge 25 register? Both are

@@ -539,7 +539,10 @@ cost basis starts at its next delivery.
 
 **Count everything.** An item nobody counts stays at nought, and the first sale of it is refused
 outright by the trigger that keeps on-hand from going negative. The stocktake screen lists what is
-uncounted before it is applied; read that list.
+uncounted before it is applied; read that list. Applying that first stocktake is also what turns
+the till's **Out of stock** label into a greyed-out button: the till reads "a stocktake has been
+applied" as any row in `stocktakes` with status `APPLIED`, and before one exists it labels a size
+with nothing on hand but leaves it pressable (F-128 criterion 8).
 
 ## The health check
 
@@ -739,6 +742,24 @@ on quietly, and row counts and money totals are exactly what the drill below rec
 reaches the trail rather than only a cron log nobody reads. To run it by hand,
 `POST /_nitro/tasks/backup`.
 
+**The restore drill itself is a manual exercise**, run by the IT Manager. Time Travel restores a
+database in place (`wrangler d1 time-travel restore <database> --bookmark` names the database it
+overwrites, and `d1 export` has no bookmark option), so production's history cannot be poured into
+a second database and the drill works from an export instead: `wrangler d1 export unified --remote
+--output drill.sql`, `d1 create unified-drill`, `d1 execute unified-drill --remote --file=drill.sql`,
+reconcile its row counts and `sum(total_pence)` against that week's manifest, then exercise Time
+Travel on `unified-drill` itself (take its bookmark, delete a row, restore, check the row is back).
+Record the outcome at `/admin/backups` (`backups.write`): the date, the outcome, minutes to restore,
+and whether row counts and money totals reconciled. A failed drill is still recorded, not omitted;
+the finding is the point of it. Delete `unified-drill` and `drill.sql` once it is recorded: both are
+full copies of personal data outside the erasure path (0011).
+
+The same screen (`backups.read`) shows the last drill that **passed** and flags it overdue once
+`BACKUP_DRILL_INTERVAL_DAYS` (proposed 120, `docs/workshops.md`) has elapsed since. A drill that
+failed does not clear the flag: it is not evidence the backup restores. No drill ever recorded
+reads as overdue from the first deploy, which is what puts the first one before the December break
+without a separate rule for it (K-108 criterion 4).
+
 ### bank-holidays:sync (05:00 Monday) (C-121, 0092)
 
 Copies the England and Wales bank holidays from `https://www.gov.uk/bank-holidays.json` into
@@ -759,24 +780,6 @@ streak. To run it by hand, press **Sync now** on the Settings card (`config.writ
 environment**, which otherwise reads as `never` synced until the Monday after. Workers fetch
 public hosts by default, so no Cloudflare setting is needed; if egress is ever restricted,
 allow `www.gov.uk`.
-
-**The restore drill itself is a manual exercise**, run by the IT Manager. Time Travel restores a
-database in place (`wrangler d1 time-travel restore <database> --bookmark` names the database it
-overwrites, and `d1 export` has no bookmark option), so production's history cannot be poured into
-a second database and the drill works from an export instead: `wrangler d1 export unified --remote
---output drill.sql`, `d1 create unified-drill`, `d1 execute unified-drill --remote --file=drill.sql`,
-reconcile its row counts and `sum(total_pence)` against that week's manifest, then exercise Time
-Travel on `unified-drill` itself (take its bookmark, delete a row, restore, check the row is back).
-Record the outcome at `/admin/backups` (`backups.write`): the date, the outcome, minutes to restore,
-and whether row counts and money totals reconciled. A failed drill is still recorded, not omitted;
-the finding is the point of it. Delete `unified-drill` and `drill.sql` once it is recorded: both are
-full copies of personal data outside the erasure path (0011).
-
-The same screen (`backups.read`) shows the last drill that **passed** and flags it overdue once
-`BACKUP_DRILL_INTERVAL_DAYS` (proposed 120, `docs/workshops.md`) has elapsed since. A drill that
-failed does not clear the flag: it is not evidence the backup restores. No drill ever recorded
-reads as overdue from the first deploy, which is what puts the first one before the December break
-without a separate rule for it (K-108 criterion 4).
 
 ## Calling a session off, and correcting one that ran
 

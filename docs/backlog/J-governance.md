@@ -82,12 +82,26 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
 - Acceptance criteria:
   1. Every number the backlog calls configurable (booking windows, hold expiry, room rules and caps, refund policy, tab cap, comp authority, expiry and retention windows, nag cadences) lives in one settings surface, seeded from the Phase 0 workshop defaults; no policy number is hardcoded.
   2. Each setting displays its default, its current value, and who last changed it and when.
+     Amended 24 September 2026 (issue 1264): a key that holds people (named in the key set, never
+     guessed from its name) shows them as names, added with the person picker and removed one at a
+     time; a key that holds roles is chosen from the roles. Only a reader of the settings is told
+     the names.
   3. Values are validated per key (type, range, cross-field rules); an invalid value is refused and never stored, and an impossible date such as a 29 February year boundary is a named refusal case.
+     Amended 24 September 2026 (issue 1266): a yearly boundary written as a month and a day
+     (`YEAR_START`, `YEAR_END`, `ACADEMIC_YEAR_BOUNDARY`) is chosen from a calendar with no year in
+     it, drawn from a fixed common year so 29 February is never offered, and reads as "1 August"
+     rather than `08-01`. The holiday list gets no picker: it is kept from the published list
+     (issue 1267).
   4. Enforcement reads the setting at the write path, so the published policy and the enforced policy are the same document; a changed value takes effect without a deploy.
   5. Every change writes an audit entry with the from and to values.
   6. A setting nothing reads says what is true of it, that nothing enforces it, rather than
-     apologising or pointing at a future. Nothing on the surface says "yet".
-- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10).
+     apologising or pointing at a future. Nothing on the surface says "yet". Amended 24 September
+     2026 (issue 1265): a capability switch whose feature is not built, such as
+     `DISCOUNT_CODES_ENABLED` before D-204, is not offered as a live input, and is the one place
+     the surface points at a future. Its definition names the story that builds the feature; the
+     screen shows the switch disabled, says "Not built" with that story's id, and links to it, so
+     nobody flips a switch that decides nothing.
+- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10), amended by issue 1265.
 
 ## J-105: Blast-radius preview, typed confirmation and one-action revert
 
@@ -164,7 +178,10 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   3. Each page shows when it was last updated and by whom; edits to published pages are audited.
   4. A report-drift action on every page files a defect visible to the IT Manager, and documentation drift is triaged as a defect, not a chore.
   5. Behaviour changes update the matching page in the same change, enforced by the review checklist in the engineering standards.
-- Source: Prompt Book K-1 (operator documentation in-app, drift is a defect), P7; audit RM-7 (documentation selling a product the code does not contain)
+  6. Amended 24 September 2026 (0093): a signed-out visitor reads public help at `/help`, a separate collection whose pages say whether an account is needed, how to create one and how to sign in, linked from the public shell. Its dump and query route answer without a session; the operator collection's still refuse one.
+  7. Amended 24 September 2026 (0093): every documentation page names its audience in front matter (`public` in the help collection; `member` or `committee` in the operator one), and `bun run check docs` fails a page with none.
+  8. Amended 24 September 2026 (0093): the operator tree and its search show committee pages only to a viewer holding a live role grant or a standing permission; every signed-in viewer sees the member pages. This is navigation, not a guard: the collection stays readable by any session.
+- Source: Prompt Book K-1 (operator documentation in-app, drift is a defect), P7; audit RM-7 (documentation selling a product the code does not contain); feedback report 2b1c50b872924042b4d99014e059cfd0 (issue #1263, criteria 6 to 8)
 
 ## J-110: Policy pages quote the live configuration
 

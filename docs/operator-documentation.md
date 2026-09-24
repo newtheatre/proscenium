@@ -30,6 +30,14 @@ address, as is `.md`; `index.md` is the section's own page. Links between pages 
 form, `/docs/system/settings`. Every section folder carries a `.navigation.yml` naming the
 section's title and icon.
 
+**Public help is not here.** A page for somebody with no account (whether they need one,
+creating one, signing in) goes under `content/help/`, served at `/help` without a session. It is
+a separate collection by decision 0093: the operator collection's dump is gated whole, so a
+visitor's page cannot sit inside it. Help pages carry the same front matter plus
+`audience: public`, link only to other `/help` pages and public screens, never to `/docs`, and
+are written in the public shell's words (`docs/copy-style.md`; `tests/unit/public-copy.test.ts`
+sweeps them).
+
 A section, a page title and the address all say what the screen says: the section is named as
 `shared/utils/site-nav.ts` names its group or shell, the title is the screen's own name, and the
 address is the title in lower case with hyphens. No two pages share a title.

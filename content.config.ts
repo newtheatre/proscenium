@@ -3,11 +3,11 @@ import { z } from 'zod'
 
 export default defineContentConfig({
   collections: {
-    // One page collection for every markdown-backed public route (D-103, J-110). `docs/` is
-    // excluded: operator documentation, signed-in only, is the separate collection below (J-109).
+    // One page collection for every markdown-backed public route (D-103, J-110). `docs/` and
+    // `help/` are excluded: each is its own collection below (J-109, 0093).
     content: defineCollection({
       type: 'page',
-      source: { include: '**/*.md', exclude: ['docs/**'] },
+      source: { include: '**/*.md', exclude: ['docs/**', 'help/**'] },
       schema: z.object({
         // Set while the committee has not yet supplied the real copy (D-103). The page renders
         // its content-editor's placeholder banner while this is true.
@@ -44,6 +44,18 @@ export default defineContentConfig({
         // automatically (0051). ISO date, read as a plain string rather than parsed.
         updatedOn: z.string(),
         updatedBy: z.string(),
+      }),
+    }),
+    // Public help, read signed out: its own collection so its dump holds nothing but these pages.
+    // Never a filter over `docs`, whose dump would then be anonymous too (0093).
+    help: defineCollection({
+      type: 'page',
+      source: 'help/**',
+      schema: z.object({
+        module: z.string(),
+        updatedOn: z.string(),
+        updatedBy: z.string(),
+        audience: z.literal('public'),
       }),
     }),
   },

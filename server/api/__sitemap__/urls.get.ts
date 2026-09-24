@@ -11,8 +11,9 @@ interface ContentPage { path: string, placeholder: boolean }
 export default defineEventHandler(async (event) => {
   const at = Math.floor(Date.now() / 1000)
 
-  const [pages, shows, modules] = await Promise.all([
+  const [pages, help, shows, modules] = await Promise.all([
     queryCollection(event, 'content').select('path', 'placeholder').all() as Promise<ContentPage[]>,
+    queryCollection(event, 'help').select('path').all(),
     db.all<ListedShow>(sql`
       SELECT s.slug AS slug, s.updated_at AS updatedAt FROM shows s
       WHERE ${listedShowPredicate(at)}
@@ -32,6 +33,7 @@ export default defineEventHandler(async (event) => {
   add('/')
   for (const entry of PUBLIC_NAV) add(entry.to)
   for (const page of pages) add(page.path)
+  for (const page of help) add(page.path)
   for (const show of shows) add(`/shows/${show.slug}`, new Date(show.updatedAt * 1000).toISOString())
   for (const module of modules) add(`/training/modules/${module.id}`)
 

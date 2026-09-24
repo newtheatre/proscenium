@@ -62,7 +62,7 @@ function unusedCode(): Promise<string> {
   return codeForStep(secret, stepFor(new Date()))
 }
 
-interface Setting { key: string, value: unknown, set: boolean, enforced: boolean, synced: boolean, default: unknown, updatedBy: { name: string } | null }
+interface Setting { key: string, value: unknown, set: boolean, enforced: boolean, synced: boolean, default: unknown, plannedFor: { story: string, issue: number } | null, people: { id: string, name: string }[] | null, updatedBy: { name: string } | null }
 
 async function settings(): Promise<Setting[]> {
   const answer = await (await send('GET', '/api/admin/config', null, cookie)).json() as { settings: Setting[] }
@@ -107,6 +107,11 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
     expect(listed.find(setting => setting.key === 'PASSWORD_MIN_LENGTH')!.synced).toBe(false)
   })
 
+  test('a switch for a feature not built names the story that builds it (issue 1265)', async () => {
+    expect((await settingFor('DISCOUNT_CODES_ENABLED')).plannedFor).toEqual({ story: 'D-204', issue: 436 })
+    expect((await settingFor('BAR_TAB_CAP_PENCE')).plannedFor).toBeNull()
+  })
+
   test('a change is stored, shows who made it, and takes effect at the write path', async () => {
     const raised = CONFIG_KEYS.PASSWORD_MIN_LENGTH.default + 5
     try {
@@ -148,6 +153,33 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
     }
     finally {
       clearOverride('NIGHT_REPORT_RECIPIENTS')
+    }
+  })
+
+  // Ids mean nothing to a reader, so a key holding people comes back named (issue 1264). The
+  // audit is still a hash: the names are for the screen and never for the trail (0024).
+  test('a key holding people is read back with their names', async () => {
+    const [someone] = await (await send('GET', `/api/admin/accounts?search=${encodeURIComponent(bystander.email)}`, null, cookie)).json()
+      .then(answer => (answer as { items: { id: string }[] }).items)
+    try {
+      expect((await send('PUT', '/api/admin/config/BAR_AUTHORISED_TAB_HOLDERS', { value: [someone!.id] }, cookie)).status).toBe(200)
+      expect((await settingFor('BAR_AUTHORISED_TAB_HOLDERS')).people).toEqual([{ id: someone!.id, name: bystander.name }])
+      expect(auditFor('BAR_AUTHORISED_TAB_HOLDERS')!.detail).not.toContain(bystander.name)
+      expect((await settingFor('BAR_TAB_CAP_PENCE')).people).toBeNull()
+    }
+    finally {
+      clearOverride('BAR_AUTHORISED_TAB_HOLDERS')
+    }
+  })
+
+  test('a key holding roles takes only roles, and is audited with them', async () => {
+    try {
+      expect((await send('PUT', '/api/admin/config/BAR_AUTHORISED_TAB_ROLES', { value: ['NOT_A_ROLE'] }, cookie)).status).toBe(400)
+      expect((await send('PUT', '/api/admin/config/BAR_AUTHORISED_TAB_ROLES', { value: ['COMMITTEE'] }, cookie)).status).toBe(200)
+      expect(JSON.parse(auditFor('BAR_AUTHORISED_TAB_ROLES')!.detail)).toMatchObject({ changes: { value: { from: [], to: ['COMMITTEE'] } } })
+    }
+    finally {
+      clearOverride('BAR_AUTHORISED_TAB_ROLES')
     }
   })
 
@@ -201,7 +233,13 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       // Fifty keys, found by searching for what the key decides rather than its name (0032).
       await fill(view, 'input[data-test="config-search"]', 'discount codes')
       await waitFor(view, 'document.querySelector(\'[data-test="setting-DISCOUNT_CODES_ENABLED"]\')')
-      expect(await textOf(view)).toContain('Not enforced yet')
+
+      // Not a live switch: it is disabled, and the card names and links the story (issue 1265).
+      expect(await textOf(view)).toContain('Not built (D-204)')
+      expect(await view.evaluate<boolean>(
+        `document.querySelector('[data-test="toggle-DISCOUNT_CODES_ENABLED"]')?.hasAttribute('disabled') ?? false`)).toBe(true)
+      expect(await view.evaluate<string>(
+        `document.querySelector('[data-test="planned-DISCOUNT_CODES_ENABLED"]')?.getAttribute('href') ?? ''`)).toContain('/issues/436')
 
       await fill(view, 'input[data-test="config-search"]', 'bar tab')
       await waitFor(view, 'document.querySelector(\'[data-test="setting-BAR_TAB_CAP_PENCE"]\')')
@@ -212,6 +250,34 @@ describe.skipIf(skip !== null)('the settings screen', () => {
         `document.querySelector('input[data-test="input-BAR_TAB_CAP_PENCE"]')?.value ?? ''`)
       // 2500 pence is what this suite set it to, and £25.00 is what that should read as.
       expect(shown).toBe('£25.00')
+
+      // A yearly boundary is picked from a calendar with no year in it, and reads as a day and a
+      // month (issue 1266). The reference year is a common one, so 29 February is never offered.
+      await fill(view, 'input[data-test="config-search"]', 'the year opens')
+      await waitFor(view, 'document.querySelector(\'[data-test="input-YEAR_START"]\')')
+      expect(await textOf(view, '[data-test="input-YEAR_START"]')).toContain('1 August')
+      await click(view, '[data-test="input-YEAR_START"]')
+      await waitFor(view, 'document.querySelector(\'[data-reka-calendar-cell-trigger][data-value$="-08-02"]:not([data-outside-view])\')')
+      expect(await textOf(view, '[data-test="calendar-YEAR_START"] [data-slot="heading"]')).toMatch(/^\s*August\s*$/)
+
+      // February is shown before 29 February is looked for, or its absence would prove nothing.
+      for (let back = 0; back < 6; back++) await click(view, '[data-test="calendar-YEAR_START"] button[aria-label="Previous month"]')
+      await waitFor(view, 'document.querySelector(\'[data-reka-calendar-cell-trigger][data-value$="-02-28"]:not([data-outside-view])\')')
+      expect(await view.evaluate<boolean>(
+        `Boolean(document.querySelector('[data-reka-calendar-cell-trigger][data-value$="-02-29"]'))`)).toBe(false)
+      for (let on = 0; on < 6; on++) await click(view, '[data-test="calendar-YEAR_START"] button[aria-label="Next month"]')
+      await waitFor(view, 'document.querySelector(\'[data-reka-calendar-cell-trigger][data-value$="-08-02"]:not([data-outside-view])\')')
+      await click(view, '[data-reka-calendar-cell-trigger][data-value$="-08-02"]:not([data-outside-view])')
+      await waitFor(view, 'document.querySelector(\'[data-test="input-YEAR_START"]\')?.innerText.includes("2 August")')
+      await click(view, '[data-test="save-YEAR_START"]')
+      await waitFor(view, 'document.body.innerText.includes("Changed by")')
+      expect((await settingFor('YEAR_START')).value).toBe('08-02')
+
+      // People are chosen and shown by name, never typed as ids (issue 1264).
+      await fill(view, 'input[data-test="config-search"]', 'charge purchases to a tab')
+      await waitFor(view, 'document.querySelector(\'[data-test="setting-BAR_AUTHORISED_TAB_HOLDERS"] [data-test="person-picker"]\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="setting-BAR_AUTHORISED_TAB_ROLES"] [data-test="input-BAR_AUTHORISED_TAB_ROLES"]\')')
+      expect(await textOf(view, '[data-test="setting-BAR_AUTHORISED_TAB_ROLES"]')).toContain('credit')
 
       // Read-only with its last sync and Sync now, never an input: the list is gov.uk's (0092).
       await fill(view, 'input[data-test="config-search"]', 'bank holidays')
@@ -230,6 +296,7 @@ describe.skipIf(skip !== null)('the settings screen', () => {
     }
     finally {
       clearOverride('REFUND_UNPAID_CANCELLATION_FREE')
+      clearOverride('YEAR_START')
       view.close()
     }
   }, CASE_TIMEOUT_MS)

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { saysDayLong } from '#shared/utils/when'
+import { saysDayLong, saysMonthDay } from '#shared/utils/when'
+import { isDayOfYearKey } from '#shared/utils/config-rules'
+import { holdsPeople, holdsRoles } from '#shared/utils/config'
 import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
 import { confirmationOptions } from '#shared/utils/blast-radius'
 import type { BlastRadiusPreview } from '#shared/utils/blast-radius'
@@ -35,6 +37,8 @@ interface Setting {
   set: boolean
   enforced: boolean
   sensitive: boolean
+  plannedFor: { story: string, issue: number } | null
+  people: { id: string, name: string | null }[] | null
   wideBlastRadius: boolean
   synced: boolean
   updatedAt: number | null
@@ -92,12 +96,17 @@ function asText(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value)
 }
 
+const storyLink = (issue: number): string => `https://github.com/newtheatre/proscenium/issues/${issue}`
+
 // Money is entered in pounds and stored in pence, everywhere (0004, 0032). The key says which
 // keys those are, because the schema only knows it is an integer.
-function kind(setting: Setting): 'boolean' | 'money' | 'number' | 'list' | 'text' {
+function kind(setting: Setting): 'boolean' | 'money' | 'dayOfYear' | 'people' | 'roles' | 'number' | 'list' | 'text' {
   const value = standing(setting)
   if (typeof value === 'boolean') return 'boolean'
   if (setting.key.endsWith('_PENCE')) return 'money'
+  if (isDayOfYearKey(setting.key)) return 'dayOfYear'
+  if (holdsPeople(setting.key)) return 'people'
+  if (holdsRoles(setting.key)) return 'roles'
   if (typeof value === 'number') return 'number'
   if (Array.isArray(value) || Array.isArray(setting.default)) return 'list'
   return 'text'
@@ -328,8 +337,21 @@ onMounted(async () => {
                 >
                   Wide blast radius
                 </UBadge>
+                <UButton
+                  v-if="setting.plannedFor"
+                  :to="storyLink(setting.plannedFor.issue)"
+                  target="_blank"
+                  color="neutral"
+                  variant="subtle"
+                  size="xs"
+                  trailing-icon="i-lucide-external-link"
+                  :data-test="`planned-${setting.key}`"
+                  title="Nothing reads this switch: the feature it turns on is not built. The link opens the story that builds it."
+                >
+                  Not built ({{ setting.plannedFor.story }})
+                </UButton>
                 <UBadge
-                  v-if="!setting.enforced"
+                  v-else-if="!setting.enforced"
                   color="neutral"
                   variant="subtle"
                   size="sm"
@@ -357,6 +379,7 @@ onMounted(async () => {
                 v-if="kind(setting) === 'boolean'"
                 :model-value="standing(setting) === true"
                 :aria-label="setting.describes"
+                :disabled="setting.plannedFor !== null"
                 :loading="saving === setting.key"
                 :data-test="`toggle-${setting.key}`"
                 @update:model-value="attemptSave(setting, $event)"
@@ -366,7 +389,7 @@ onMounted(async () => {
                 <UInputNumber
                   :model-value="pounds(numbers[setting.key])"
                   :min="0"
-                  :step="0.5"
+                  :step="0.01"
                   :format-options="{ style: 'currency', currency: 'GBP' }"
                   :aria-label="setting.describes"
                   class="w-48"
@@ -380,6 +403,24 @@ onMounted(async () => {
                   :aria-label="`Save ${setting.describes}`"
                   :data-test="`save-${setting.key}`"
                   @click="attemptSave(setting, numbers[setting.key])"
+                >
+                  Save
+                </UButton>
+              </template>
+
+              <template v-else-if="kind(setting) === 'dayOfYear'">
+                <SettingsDayOfYearField
+                  v-model="drafts[setting.key]"
+                  :name="setting.key"
+                  :label="setting.describes"
+                />
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  :loading="saving === setting.key"
+                  :aria-label="`Save ${setting.describes}`"
+                  :data-test="`save-${setting.key}`"
+                  @click="attemptSave(setting, drafts[setting.key])"
                 >
                   Save
                 </UButton>
@@ -400,6 +441,32 @@ onMounted(async () => {
                   :aria-label="`Save ${setting.describes}`"
                   :data-test="`save-${setting.key}`"
                   @click="attemptSave(setting, numbers[setting.key])"
+                >
+                  Save
+                </UButton>
+              </template>
+
+              <template v-else-if="kind(setting) === 'people' || kind(setting) === 'roles'">
+                <SettingsPeopleField
+                  v-if="kind(setting) === 'people'"
+                  v-model="lists[setting.key]"
+                  :name="setting.key"
+                  :label="setting.describes"
+                  :people="setting.people ?? []"
+                />
+                <SettingsRolesField
+                  v-else
+                  v-model="lists[setting.key]"
+                  :name="setting.key"
+                  :label="setting.describes"
+                />
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  :loading="saving === setting.key"
+                  :aria-label="`Save ${setting.describes}`"
+                  :data-test="`save-${setting.key}`"
+                  @click="attemptSave(setting, lists[setting.key] ?? [])"
                 >
                   Save
                 </UButton>
@@ -461,7 +528,7 @@ onMounted(async () => {
                 class="text-sm text-muted"
               >{{ notices[setting.key] }}</span>
             </div>
-            <BankHolidaySync
+            <SettingsBankHolidaySync
               v-else
               class="mt-3"
               :dates="(standing(setting) as string[] | null) ?? []"
@@ -472,7 +539,9 @@ onMounted(async () => {
               v-if="!setting.synced"
               class="mt-2 text-xs text-muted"
             >
-              <span v-if="setting.hasDefault">Ships as <span class="font-mono">{{ asText(setting.default) }}</span>. </span>
+              <span v-if="setting.hasDefault && kind(setting) === 'dayOfYear'">Ships as {{ saysMonthDay(String(setting.default)) }}. </span>
+              <span v-else-if="setting.hasDefault && (kind(setting) === 'people' || kind(setting) === 'roles')">Ships naming {{ (setting.default as unknown[]).length ? (setting.default as string[]).join(', ') : 'nobody' }}. </span>
+              <span v-else-if="setting.hasDefault">Ships as <span class="font-mono">{{ asText(setting.default) }}</span>. </span>
               <span v-if="setting.updatedBy && setting.updatedAt">
                 Changed by {{ setting.updatedBy.name }} on
                 {{ saysDayLong(setting.updatedAt) }}.

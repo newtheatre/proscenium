@@ -8,7 +8,7 @@ import { expectOneWinner, race } from '#tests/helpers/race'
 // A `Promise.all` of HTTP requests does not reliably prove a SQL-level race in this harness, so
 // this runs directly against the database; `tests/e2e/till-charge.test.ts` is supplementary.
 describe('contended invariants (K-105)', () => {
-  // F-105 criterion 5. The predicate rides the INSERT, as a trigger (0070) rather than an
+  // F-105 criterion 5. The predicate rides the INSERT, as a trigger (0006) rather than an
   // application read-then-write, so on-hand is never read before the write that changes it.
   test('a sale\'s payment, lines and stock movements commit atomically', async () => {
     const database = await createTestDatabase()

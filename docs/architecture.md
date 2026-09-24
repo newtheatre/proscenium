@@ -711,7 +711,17 @@ preset also emits the dump as the static asset `/dump.docs.sql`, which Workers A
 before the worker runs. `server/middleware/docs-content.ts` requires a session on all three paths,
 and `nuxt.config.ts` sets `assets.run_worker_first` for them; `tests/unit/docs-content-gate.test.ts`
 reads the built `wrangler.json` to prove the rule survived the build. The public collection is
-untouched. First client-side navigation inside `/docs` loads Nuxt Content's WASM SQLite and the
+untouched. The predicate lives once, as `needsSession()` in `shared/utils/docs-paths.ts`.
+
+**Public help is a third collection, never a filter over this one (0093).** `help`, sourced from
+`content/help/` and excluded from the public collection's glob, holds the pages a visitor reads
+signed out: whether an account is needed, creating one, signing in. `app/pages/help/[...slug].vue`
+renders them in the public shell with no middleware, the footer links `/help` from `PUBLIC_NAV`,
+`/api/policies/values` answers for a help path without a session, and the sitemap lists them.
+Its dump and query route stay open: filtering `docs` by audience instead would have to open its
+dump, which holds every operator page. `bun run check docs` holds help pages to the same
+provenance and links, and `tests/unit/public-copy.test.ts` sweeps their prose with the policy
+pages. First client-side navigation inside `/docs` loads Nuxt Content's WASM SQLite and the
 docs dump, prose only; if that grows too heavy for a phone, server routes behind `requireAccount`
 replace the client database without touching a page.
 
@@ -772,8 +782,9 @@ bypass what a save must satisfy.
 
 **A synced key is never written by a person** (0092). `synced: true` on its `CONFIG_KEYS` entry
 (today only `BANK_HOLIDAYS`) makes `refuseSynced()` 409 both a save and a revert before anything is
-read, and `GET /api/admin/config` reports `synced` so the screen renders `BankHolidaySync.vue`
-(read-only dates, last sync, last failure, **Sync now**) instead of an input. The only writer is
+read, and `GET /api/admin/config` reports `synced` so the screen renders
+`settings/BankHolidaySync.vue` (read-only dates, last sync, last failure, **Sync now**) instead of
+an input. The only writer is
 `syncBankHolidays()` (`server/utils/bank-holidays.ts`), behind the weekly task and `POST
 /api/admin/bank-holidays/sync`; its statements are pure in `bank-holiday-statements.ts` so the
 integration suite runs them, and the fetch, the zod parse and the merge are pure in

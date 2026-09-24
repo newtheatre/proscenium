@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { londonParts } from '#shared/utils/london'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillDate, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, openSignedOutView, pickOption, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-121: competence earned elsewhere counts, without our pretending we assessed it.
@@ -344,8 +344,9 @@ describe.skipIf(skip !== null)('the officer screen (G-121)', () => {
       await pickPerson(view, '[data-test="person-picker"]', member.email, member.name)
       await waitFor(view, `document.querySelector('[data-test="record-external"]')`, 30_000)
       await click(view, '[data-test="record-external"]')
-      await waitFor(view, `document.querySelector('[data-test="external-${module}"]')`)
-      await click(view, `[data-test="external-${module}"]`)
+      // One searchable menu, never a button per module (G-120 criterion 7, issue 1259).
+      await pickOption(view, '[data-test="external-module"]', `${module} Rigging a lantern`)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test^="external-EXT-"]'))`)).toBe(false)
       await fillDate(view, '[data-test="external-expiry"]', daysFrom(400))
       await fill(view, '[data-test="external-evidence"]', 'IPAF 3a, certificate 44821')
       await click(view, '[data-test="external-submit"]')
