@@ -28,6 +28,7 @@ export default defineEventHandler(async (event) => {
     event,
   })
 
-  // The figure the app was asked for, so a replayed answer can still say what was recorded.
-  return { ok: true, id, totalPence: row.expectedTotalPence, ...outcome }
+  // The figure the app was asked for, so a replayed answer can still say what was recorded; the
+  // venue, so the way back opens this bar in a tab that never had it (issue 1257).
+  return { ok: true, id, venueId: row.venueId, totalPence: row.expectedTotalPence, ...outcome }
 })

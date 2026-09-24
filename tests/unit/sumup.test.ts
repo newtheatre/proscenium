@@ -11,6 +11,8 @@ import {
   resolveAttemptForm,
   sumupLaunchUrl,
   sumupReturnForm,
+  sumupReturnWords,
+  tillReturnPath,
 } from '#shared/utils/sumup'
 
 // F-124's pure half: the URL the SumUp app is opened with, what it sends back, and which
@@ -132,5 +134,47 @@ describe('the SumUp app lives on a handheld (criterion 1)', () => {
     expect(isHandheldUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/128 Mobile Safari/537.36')).toBe(true)
     expect(isHandheldUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1')).toBe(true)
     expect(isHandheldUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128 Safari/537.36')).toBe(false)
+  })
+})
+
+describe('the way back from the SumUp app opens the till at the attempt\'s own bar (criterion 3, issue 1257)', () => {
+  test('the venue and the attempt ride the link, so a fresh tab is not asked which bar', () => {
+    const path = tillReturnPath('venue-1', 'attempt-1')
+    const url = new URL(path, 'https://example.test')
+    expect(url.pathname).toBe('/tonight/till')
+    expect(url.searchParams.get('venueId')).toBe('venue-1')
+    expect(url.searchParams.get('attempt')).toBe('attempt-1')
+  })
+
+  test('with nothing known the link is the bare till, which falls back on the device\'s bar', () => {
+    expect(tillReturnPath(null, null)).toBe('/tonight/till')
+    expect(new URL(tillReturnPath(null, 'attempt-1'), 'https://example.test').searchParams.get('venueId')).toBeNull()
+  })
+})
+
+describe('the return page says what happened and nothing it cannot know (criterion 5, issue 1257)', () => {
+  test('a failure does not claim the basket is already back: another tab may hold it', () => {
+    const words = sumupReturnWords({ status: 'FAILED', totalPence: 450, receiptTotalPence: null, error: null })
+    expect(words.headline).toBe('Not taken')
+    expect(words.detail).toContain('nothing was recorded')
+    expect(words.detail).not.toContain('The basket is back')
+  })
+
+  test('an abandonment says nothing was recorded and what to do if the reader took the money', () => {
+    const words = sumupReturnWords({ status: 'ABANDONED', totalPence: 450, receiptTotalPence: null, error: null })
+    expect(words.detail).toContain('nothing was recorded')
+    expect(words.detail).toContain('ring it up again')
+    expect(words.detail).not.toContain('The basket is back')
+  })
+
+  test('a success quotes the recorded figure', () => {
+    expect(sumupReturnWords({ status: 'SUCCEEDED', totalPence: 450, receiptTotalPence: 500, error: null }).headline).toBe('Recorded: £5.00')
+    expect(sumupReturnWords({ status: 'SUCCEEDED', totalPence: 450, receiptTotalPence: null, error: null }).headline).toBe('Recorded: £4.50')
+  })
+
+  test('a mismatch carries the reason and tells the duty manager', () => {
+    const words = sumupReturnWords({ status: 'MISMATCH', totalPence: 450, receiptTotalPence: null, error: 'That booking was collected at the desk.' })
+    expect(words.detail).toContain('That booking was collected at the desk.')
+    expect(words.detail).toContain('duty manager')
   })
 })

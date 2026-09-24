@@ -1,5 +1,6 @@
 import { saysMoney } from './bar'
 import { z } from 'zod'
+import type { NightCacheStore } from './night-cache'
 
 // The till's own session (F-102): the one accountable window that every sale, tab charge and comp
 // hangs off. One per venue per night, opened once and closed once.
@@ -48,4 +49,31 @@ export function saysChargeOnReader(totalPence: number | null, onTab: boolean): s
 
 export function saysChargeOnSumUp(totalPence: number | null): string {
   return totalPence === null ? 'Charge on SumUp' : `Charge ${saysMoney(totalPence)} on SumUp`
+}
+
+// The bar this device opened tonight, so a bare link to the till (the SumUp app's return in a
+// fresh tab, issue 1257) opens there rather than asking again. Kept for its show night only (0014).
+export const TILL_VENUE_DEVICE_KEY = 'nnt-till-venue'
+
+export function rememberTillVenue(store: Pick<NightCacheStore, 'setItem'>, night: string, venueId: string): void {
+  try {
+    store.setItem(TILL_VENUE_DEVICE_KEY, JSON.stringify({ night, venueId }))
+  }
+  catch { /* a device that keeps nothing asks which bar again */ }
+}
+
+export function recallTillVenue(store: Pick<NightCacheStore, 'getItem'>, night: string): string | null {
+  try {
+    const held = JSON.parse(store.getItem(TILL_VENUE_DEVICE_KEY) ?? 'null') as { night?: unknown, venueId?: unknown } | null
+    return held?.night === night && typeof held.venueId === 'string' ? held.venueId : null
+  }
+  catch {
+    return null
+  }
+}
+
+// Only the guard's own question (400, no bar named) is answered from the device; a night the
+// server resolves unaided opens where it says, so a stale memory cannot pick the wrong bar.
+export function rememberedBarAnswers(refusal: number | undefined, queried: string | undefined, remembered: string | undefined): boolean {
+  return refusal === 400 && !queried && Boolean(remembered)
 }

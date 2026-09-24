@@ -1,3 +1,4 @@
+import { saysMoney } from './bar'
 import { z } from 'zod'
 
 // The hand-off of a basket to the SumUp app and what comes back (F-124, 0069). Pure: the URL the
@@ -156,5 +157,33 @@ export function saysAttemptStatus(status: SumupAttemptStatus): string {
     case 'FAILED': return 'Not taken'
     case 'ABANDONED': return 'Abandoned'
     case 'MISMATCH': return 'Taken on the reader, not recorded'
+  }
+}
+
+// Where the return page's way back goes: the attempt's own bar, and the attempt, because the app
+// may return in a fresh tab that holds neither (issue 1257).
+export function tillReturnPath(venueId: string | null, attemptId: string | null): string {
+  const query = new URLSearchParams()
+  if (venueId) query.set('venueId', venueId)
+  if (attemptId) query.set('attempt', attemptId)
+  const search = query.toString()
+  return search ? `/tonight/till?${search}` : '/tonight/till'
+}
+
+export interface SumupReturnAnswer {
+  status: SumupAttemptStatus
+  totalPence: number
+  receiptTotalPence: number | null
+  error: string | null
+}
+
+// The return page runs in whichever tab the app opened, so it never says where the basket is now.
+export function sumupReturnWords(answer: SumupReturnAnswer): { headline: string, detail: string } {
+  switch (answer.status) {
+    case 'SUCCEEDED': return { headline: `Recorded: ${saysMoney(answer.receiptTotalPence ?? answer.totalPence)}`, detail: 'The till has it. Close this page.' }
+    case 'FAILED': return { headline: 'Not taken', detail: 'SumUp says the payment did not go through, so nothing was recorded. The till brings the basket back on this phone.' }
+    case 'ABANDONED': return { headline: 'Already given up on', detail: 'This hand-off was given up on before SumUp answered, so nothing was recorded. If the reader took the money, ring it up again on the till.' }
+    case 'MISMATCH': return { headline: 'Taken on the reader, not recorded', detail: `${answer.error ?? 'The sale was not recorded.'} Tell the duty manager: the reader took this money and the till has no record of it.` }
+    default: return { headline: saysAttemptStatus(answer.status), detail: 'The till is recording it.' }
   }
 }
