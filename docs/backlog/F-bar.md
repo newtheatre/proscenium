@@ -7,7 +7,7 @@ computes, cross-checks and records; it never initiates an online charge and neve
 data. Every sale, tab charge, comp and settlement posts to the unified ledger in integer pence, and
 on-hand stock is always the sum of movements, never a stored figure.
 
-Counts: 33 stories (28 MVP, 3 V2, 1 Later, 1 resolved won't-build).
+Counts: 34 stories (28 MVP, 4 V2, 1 Later, 1 resolved won't-build).
 
 Open questions:
 
@@ -18,6 +18,15 @@ Open questions:
   (decision 0069). The typed cross-check stays as the laptop's flow and the fallback.
 - Who qualifies as an authorised tab holder in the unified system (committee only, as today, or a
   treasurer-approved list), and what is the default hard cap? The old estate's £20 was a soft nag.
+  Answered 24 September 2026 by the IT Manager (issue 1264): people and roles. A holder is anybody
+  named in `BAR_AUTHORISED_TAB_HOLDERS`, or anybody holding a live grant of a role named in
+  `BAR_AUTHORISED_TAB_ROLES`. A role grant lapses at the committee year end (0009), so credit by
+  role lapses with it and is checked at the next charge. Naming a role widens who is extended
+  credit to everybody who holds it, now and later in the year, which the settings screen says.
+  The roles are a second key rather than a reshaped first one, because a key holds a list of
+  scalars and never records (0025), and because role names are not personal data: the roles key
+  is audited with its values while the people key stays hashed (0024). Both start empty. The
+  default hard cap is `BAR_TAB_CAP_PENCE`'s proposed value until the workshop confirms it.
 - Answered 15 September 2026: the imported stock-movement history is informational and never the
   balance, the most recent applied stocktake is, and no documented data-damage repair runs as a
   repair: damage is written off explicitly by a dated movement. A production export found nothing
@@ -198,7 +207,12 @@ Open questions:
 - Depends on: F-103, F-105, A-2 (membership state)
 - Acceptance criteria:
   1. Tab tender is offered only for authorised holders (the authorised set is configuration,
-     settled in Phase 0); authorisation is checked at the write path on every charge.
+     settled in Phase 0); authorisation is checked at the write path on every charge. Amended 24
+     September 2026 (issue 1264): the authorised set is the people named in
+     `BAR_AUTHORISED_TAB_HOLDERS` together with everybody holding a live grant of a role named in
+     `BAR_AUTHORISED_TAB_ROLES`. A lapsed or revoked grant stops the next charge, and a disabled
+     or anonymised account is never a holder. The grants are matched by a subquery in the query
+     that authorises the charge, never expanded to a list of ids (0006).
   2. Only bar lines may ride on a tab; ticket money can never be charged to one, structurally
      rather than procedurally.
   3. A configurable hard cap applies per holder; a charge that would take the outstanding balance
@@ -791,6 +805,55 @@ Open questions:
      consecutive stocktakes) to the bar manager; the system notices, a human decides.
   4. All analytics derive from the existing movement ledger; no new write path is introduced.
 - Source: Prompt Book F-2, P6; audit PR-12.
+
+## F-205: Passes on the till
+
+- Role: Bar staff
+- Phase: V2
+- Story: As tonight's bar staff, I want to sell a season pass from the till so that somebody who
+  decides at the interval to come back for the rest of the season pays at the counter, on the
+  same reader as their drink, without a trip to the box office desk.
+- Depends on: D-123, D-124, F-122, F-124, I-108
+- Context: D-124 sells a pass at the desk only. The till is the one money-taking point on a show
+  night (F-122), so a pass sold there follows the till's ticket sales rather than the desk's: it
+  is the show-night counter's sale, on the till's own session and reconciliation. The till still
+  never edits a pass; suspension, refunds and transfers stay on the desk.
+- Acceptance criteria:
+  1. The Tickets tab offers a pass product (D-123) whose sales window is open tonight, at its
+     configured price points in integer pence, read out through the shared money wording.
+  2. A pass is sold only to a buyer with an account, found by exact email address or from the
+     product's pending online requests (D-124 criterion 3); bar authority is a shift, not a
+     ticketing permission (0009), so the till never lists or searches accounts by name. A pending
+     request shows beside its buyer for one-tap fulfilment in the same batch. A buyer with no
+     account is refused before anything reaches the basket, since a pass has to resolve to
+     somebody's account to be worth anything.
+  3. The product cap is the insert's own predicate at payment (`passCapAllows`, decision 0001),
+     exactly as the desk's issue path writes it: requests may exceed the cap, issues may not, and a
+     sale that loses the race is refused 409 with nothing written and nothing charged. A racing
+     test pins it across the till and the desk together.
+  4. A handed-off sale's `sumup_attempts` row carries the pass line in its basket exactly as
+     priced (F-124 criterion 2); nothing is issued and nothing posts until the attempt succeeds,
+     and a success re-runs the cap and the cross-check, marking the attempt mismatched with the
+     reason when the cap has filled meanwhile (F-124 criterion 4). A request being fulfilled must
+     still be pending on success: the request's move to fulfilled is a conditional write in the
+     same batch as the issue, and a request the desk fulfilled meanwhile marks the attempt
+     mismatched with nothing issued. A request inside an open attempt cannot be fulfilled again,
+     at the till or the desk, until the attempt is resolved (F-124 criterion 7).
+  5. The sale posts on the till's own ledger entry, source `TILL` and tender `CARD`, as the till's
+     ticket sales do (F-122, F-123), never under the desk's source. The pass is one `PASS_SALE`
+     line beside any bar and ticket lines, in the same batch as the pass's issue and its audit
+     row, naming its issuer (D-124 criterion 1). The `(PASS_SALE, TILL)` pair joins
+     `LEDGER_POSTING_PAIRS` and `docs/architecture.md`'s posting table, and a migration seeds it
+     unmapped in `su_nominal_mappings` so the treasurer can map it (I-108). The pass money appears
+     in the till's reconciliation inside the figure the reader is expected to show (F-118). A tab
+     tender refuses a basket holding a pass line.
+  6. The expected-total cross-check (F-104) covers the whole basket including the pass line; a
+     mismatch refuses quoting both figures. A discount applies to the bar subtotal only, never to
+     a pass line.
+  7. The holder receives the pass by email with its QR, as a desk-issued pass is (D-124
+     criterion 5).
+- Source: Feedback report 3cfb3c44878d46ffa07a8fddb279b156 (issue #1261, 23 September 2026);
+  accepted as V2 by Matt, 24 September 2026.
 
 ## F-301: Interval pre-orders
 

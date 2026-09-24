@@ -176,6 +176,51 @@ describe.skipIf(skip !== null)('a tab tender is offered only for authorised hold
   })
 })
 
+// Issue 1264: a live grant of a named role authorises, and lapses with the grant (0009).
+function grantRole(userId: string, role: string, expiresAt: number): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query('INSERT OR REPLACE INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)')
+      .run(`grant-${userId}-${role}`, userId, role, expiresAt)
+  }
+  finally {
+    database.close()
+  }
+}
+
+const authoriseRoles = (roles: string[]): Promise<Response> => send('PUT', '/api/admin/config/BAR_AUTHORISED_TAB_ROLES', { value: roles })
+
+describe.skipIf(skip !== null)('a holder of a named role may run up a tab while the grant lasts (issue 1264)', () => {
+  test('a role holder is charged, a lapsed grant is refused, and a non-holder is refused', async () => {
+    const { venueId, performanceId } = programme(`tabs-role-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId, performanceId)
+    const holder = await aMember()
+    const lapsed = await aMember()
+    const outsider = await aMember()
+    const now = Math.floor(Date.now() / 1000)
+    grantRole(holder.id, 'COMMITTEE', now + 86_400)
+    grantRole(lapsed.id, 'COMMITTEE', now - 60)
+    await authorise([])
+    expect((await authoriseRoles(['COMMITTEE'])).status).toBe(200)
+
+    try {
+      const charged = await charge(venueId, [{ variantId, qty: 1 }], 500, holder.id)
+      expect(charged.status).toBe(200)
+      expect(latestLedgerEntry()).toMatchObject({ tender: 'TAB', tab_debtor_id: holder.id })
+
+      for (const refused of [lapsed, outsider]) {
+        const answered = await charge(venueId, [{ variantId, qty: 1 }], 500, refused.id)
+        expect(answered.status).toBe(409)
+        expect(await message(answered)).toContain('authorised')
+      }
+    }
+    finally {
+      await authoriseRoles([])
+    }
+  })
+})
+
 describe.skipIf(skip !== null)('a cap applies per holder, refused quoting balance, charge and cap (criteria 3, 4)', () => {
   test('a charge within the cap succeeds, and the balance accumulates', async () => {
     const { venueId, performanceId } = programme(`tabs-within-cap-${crypto.randomUUID().slice(0, 6)}`)
