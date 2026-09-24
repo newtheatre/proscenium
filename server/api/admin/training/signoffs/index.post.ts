@@ -1,4 +1,4 @@
-import { expiryFor, expiryProblem, signOffForm } from '#shared/utils/training'
+import { expiryFor, expiryProblem, recordedFor, signOffForm } from '#shared/utils/training'
 
 // Sign off a module for somebody: competence proven outside a session, on the department's terms.
 // The first thing in the system that awards a record, and it awards exactly one (G-120).
@@ -35,10 +35,33 @@ export default defineEventHandler(async (event) => {
     : input.expiresOn
 
   const id = newId()
+  const detail = { module: input.moduleId, awardedOn: input.awardedOn, expiresOn }
+
+  // Criterion 1 of G-130: nobody the picker could find, so the account is made in the same batch.
+  const newcomer = recordedFor(input)
+  if (newcomer) {
+    const userId = await writeRecordByAddress(newcomer, resolved.account.id, {
+      id,
+      moduleId: input.moduleId,
+      awardedOn: input.awardedOn,
+      expiresOn,
+      expiryOverridden: input.expiresOn !== undefined,
+      source: 'SIGNOFF',
+      evidenceRef: input.evidenceRef,
+    }, target => [
+      auditEntry({ actorId: resolved.account.id, action: 'record.signed-off', target, detail: { ...detail, byAddress: true } }),
+      ...(unbounded
+        ? [auditEntry({ actorId: resolved.account.id, action: 'record.signoff.unbounded', target, detail: { module: input.moduleId } })]
+        : []),
+    ])
+    return { ok: true, id, expiresOn, userId }
+  }
+
+  const userId = input.userId!
   await db.batch([
     db.insert(schema.trainingRecords).values({
       id,
-      userId: input.userId,
+      userId,
       moduleId: input.moduleId,
       awardedOn: input.awardedOn,
       expiresOn,
@@ -50,18 +73,18 @@ export default defineEventHandler(async (event) => {
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'record.signed-off',
-      target: `user:${input.userId}`,
-      detail: { module: input.moduleId, awardedOn: input.awardedOn, expiresOn },
+      target: `user:${userId}`,
+      detail,
     })),
     ...(unbounded
       ? [db.insert(schema.auditLog).values(auditEntry({
           actorId: resolved.account.id,
           action: 'record.signoff.unbounded',
-          target: `user:${input.userId}`,
+          target: `user:${userId}`,
           detail: { module: input.moduleId },
         }))]
       : []),
   ])
 
-  return { ok: true, id, expiresOn }
+  return { ok: true, id, expiresOn, userId }
 })

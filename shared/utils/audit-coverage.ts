@@ -660,7 +660,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
 
   {
     route: 'server/api/admin/training/external-certificates/index.post.ts',
-    actions: ['record.external-certificate'],
+    actions: ['record.external-certificate', 'account.created.console'],
+    via: ['server/utils/training-by-address.ts'],
   },
   { route: 'server/api/admin/training/departments/index.get.ts', exempt: 'reads the department vocabulary' },
   { route: 'server/api/admin/training/departments/index.post.ts', actions: ['department.created'] },
@@ -706,7 +707,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/training/prerequisites/[id].delete.ts', actions: ['prerequisite.removed'] },
   {
     route: 'server/api/admin/training/signoffs/index.post.ts',
-    actions: ['record.signed-off', 'record.signoff.unbounded'],
+    actions: ['record.signed-off', 'record.signoff.unbounded', 'account.created.console'],
+    via: ['server/utils/training-by-address.ts'],
   },
   { route: 'server/api/admin/training/records/[id]/revoke.post.ts', actions: ['record.revoked'] },
   { route: 'server/api/admin/training/sessions/index.post.ts', actions: ['session.scheduled'] },

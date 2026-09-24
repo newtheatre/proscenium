@@ -1,4 +1,4 @@
-import { externalCertificateForm, externalExpiryProblem } from '#shared/utils/training'
+import { externalCertificateForm, externalExpiryProblem, recordedFor } from '#shared/utils/training'
 
 // Record a certificate somebody earned elsewhere, against a module that accepts them (G-121).
 // Everything a sign-off refuses, this refuses too; what it adds is that we assessed nothing.
@@ -25,10 +25,30 @@ export default defineEventHandler(async (event) => {
   if (problem) throw createError({ statusCode: 422, statusMessage: problem })
 
   const id = newId()
+  const detail = { module: input.moduleId, awardedOn: input.awardedOn, expiresOn: input.expiresOn }
+
+  // Nobody the picker could find, so the account is made in the same batch (G-130, 0091).
+  const newcomer = recordedFor(input)
+  if (newcomer) {
+    const userId = await writeRecordByAddress(newcomer, resolved.account.id, {
+      id,
+      moduleId: input.moduleId,
+      awardedOn: input.awardedOn,
+      expiresOn: input.expiresOn,
+      expiryOverridden: true,
+      source: 'EXTERNAL',
+      evidenceRef: input.evidenceRef,
+    }, target => [
+      auditEntry({ actorId: resolved.account.id, action: 'record.external-certificate', target, detail: { ...detail, byAddress: true } }),
+    ])
+    return { ok: true, id, expiresOn: input.expiresOn, userId }
+  }
+
+  const userId = input.userId!
   await db.batch([
     db.insert(schema.trainingRecords).values({
       id,
-      userId: input.userId,
+      userId,
       moduleId: input.moduleId,
       awardedOn: input.awardedOn,
       expiresOn: input.expiresOn,
@@ -41,10 +61,10 @@ export default defineEventHandler(async (event) => {
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'record.external-certificate',
-      target: `user:${input.userId}`,
-      detail: { module: input.moduleId, awardedOn: input.awardedOn, expiresOn: input.expiresOn },
+      target: `user:${userId}`,
+      detail,
     })),
   ])
 
-  return { ok: true, id, expiresOn: input.expiresOn }
+  return { ok: true, id, expiresOn: input.expiresOn, userId }
 })

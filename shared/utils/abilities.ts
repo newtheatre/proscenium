@@ -56,6 +56,10 @@ export const recordBackupDrills = defineAbility((viewer: Viewer) => holds(viewer
 // too or it would hide a screen they can open (requireCatalogueReader, G-110).
 export const viewTrainingCatalogue = defineAbility((viewer: Viewer) => holds(viewer, 'training.read') || viewer.leadsDepartment)
 
+// Offering the records screen's address fallback: the route still checks the module's own
+// department for a lead, which the viewer cannot carry (mayRecordByAddress, 0091).
+export const recordTrainingByAddress = defineAbility((viewer: Viewer) => holds(viewer, 'training.by-address') || viewer.leadsDepartment)
+
 // Running a session derives from a current trainer certification (requireTrainer, G-111).
 export const runTrainingSessions = defineAbility((viewer: Viewer) => holds(viewer, 'training.write') || viewer.isTrainer)
 
@@ -184,6 +188,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   recordBackupDrills: 'backups.write',
   viewTrainingCatalogue: 'training.read',
   runTrainingSessions: 'training.write',
+  recordTrainingByAddress: 'training.by-address',
   viewTicketTypes: 'ticketing.read',
   viewProgramme: 'ticketing.read',
   viewPassTypes: 'ticketing.read',

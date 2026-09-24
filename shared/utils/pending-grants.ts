@@ -34,25 +34,32 @@ export interface PendingGrant {
 // second account for it would take the grant away from the person it was meant for.
 export const PRE_LINKED = 'That address is waiting to be linked to an existing account. Find that account with the search instead.'
 
-function entry(row: AuditRow, made: SQL): SQL {
+export function entryIfMade(row: AuditRow, made: SQL): SQL {
   return sql`insert into audit_log (id, actor_id, action, target, detail)
     select ${row.id}, ${row.actorId}, ${row.action}, ${row.target}, ${row.detail === null ? null : JSON.stringify(row.detail)}
     where exists ${made}`
 }
 
+export const madeAccount = (userId: string): SQL => sql`(select 1 from users where id = ${userId})`
+
+// A shadow account for an address, written only while no row is pre-linked to it (0003, 0088).
+export function shadowAccountInsert(userId: string, email: string, name: string): SQL {
+  return sql`insert into users (id, email, name)
+    select ${userId}, ${email}, ${name}
+    where not exists (select 1 from users where pending_google_email = ${email})`
+}
+
 // The account, its grant and both trail entries, in the order the route batches them. The account
 // is written only while no row is pre-linked to the address, and the rest only if it was (0003).
 export function pendingGrantStatements(input: PendingGrant): SQL[] {
-  const made = sql`(select 1 from users where id = ${input.userId})`
+  const made = madeAccount(input.userId)
   return [
-    sql`insert into users (id, email, name)
-      select ${input.userId}, ${input.email}, ${input.name}
-      where not exists (select 1 from users where pending_google_email = ${input.email})`,
-    entry(input.entries.created, made),
+    shadowAccountInsert(input.userId, input.email, input.name),
+    entryIfMade(input.entries.created, made),
     sql`insert into role_grants (id, user_id, role, expires_at, granted_by, note)
       select ${input.grantId}, ${input.userId}, ${input.role}, ${input.expiresAt}, ${input.actorId}, ${input.note}
       where exists ${made}`,
-    entry(input.entries.granted, made),
+    entryIfMade(input.entries.granted, made),
   ]
 }
 

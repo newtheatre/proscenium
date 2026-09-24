@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, not, or, sql } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
-import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, missingPrerequisites, saysGaps } from '#shared/utils/training'
+import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, mayRecordByAddress, missingPrerequisites, saysGaps } from '#shared/utils/training'
 import type { AcademicYear, ExpiryMode, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
 import type { Authority } from '#server/utils/authorise'
 import type { SQL, SQLWrapper } from 'drizzle-orm'
@@ -585,7 +585,7 @@ export type AwardablePolicy = ExpiryPolicy & { kind: string, status: string, all
 // certificate cannot drift apart (G-120 criteria 1 to 3, G-121 criterion 5).
 export async function assertAwardable(
   resolved: CatalogueAuthority,
-  input: { userId: string, moduleId: string, awardedOn: string },
+  input: { userId?: string, moduleId: string, awardedOn: string },
   refusals: { retired: string, brief: string },
 ): Promise<AwardablePolicy> {
   const module = await moduleById(input.moduleId)
@@ -593,10 +593,18 @@ export async function assertAwardable(
 
   assertStewards(resolved, module.department)
 
-  const account = await findById(input.userId)
-  if (!account) throw noSuch('account')
-  if (account.anonymisedAt !== null) {
-    throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
+  // No account means one is made by address, which is a standing of its own (G-130, 0091).
+  if (input.userId === undefined) {
+    if (!mayRecordByAddress(resolved.permissions, resolved.leads, module.department, new Date())) {
+      throw createError({ statusCode: 403, statusMessage: 'You do not have permission to add somebody' })
+    }
+  }
+  else {
+    const account = await findById(input.userId)
+    if (!account) throw noSuch('account')
+    if (account.anonymisedAt !== null) {
+      throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
+    }
   }
 
   const policy = await modulePolicy(input.moduleId)
@@ -613,7 +621,7 @@ export async function assertAwardable(
   // Expiring counts as held, and the refusal names the gaps. No acknowledgement path exists for
   // any kind, which the criterion demands of a certification.
   const needed = (await prerequisitesOf([input.moduleId])).get(input.moduleId) ?? []
-  const held = await modulesHeldBy(input.userId, today)
+  const held = input.userId === undefined ? new Set<string>() : await modulesHeldBy(input.userId, today)
   const gaps = missingPrerequisites(needed, held)
   if (gaps.length > 0) {
     throw createError({ statusCode: 422, statusMessage: `You do not yet hold ${saysGaps(gaps)}, which this module needs first` })
