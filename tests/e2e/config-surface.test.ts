@@ -256,9 +256,15 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       expect(await textOf(view, '[data-test="input-YEAR_START"]')).toContain('1 August')
       await click(view, '[data-test="input-YEAR_START"]')
       await waitFor(view, 'document.querySelector(\'[data-reka-calendar-cell-trigger][data-value$="-08-02"]:not([data-outside-view])\')')
-      expect(await textOf(view, '[data-test="calendar-YEAR_START"]')).not.toMatch(/\d{4}/)
+      expect(await textOf(view, '[data-test="calendar-YEAR_START"] [data-slot="heading"]')).toMatch(/^\s*August\s*$/)
+
+      // February is shown before 29 February is looked for, or its absence would prove nothing.
+      for (let back = 0; back < 6; back++) await click(view, '[data-test="calendar-YEAR_START"] button[aria-label="Previous month"]')
+      await waitFor(view, 'document.querySelector(\'[data-reka-calendar-cell-trigger][data-value$="-02-28"]:not([data-outside-view])\')')
       expect(await view.evaluate<boolean>(
         `Boolean(document.querySelector('[data-reka-calendar-cell-trigger][data-value$="-02-29"]'))`)).toBe(false)
+      for (let on = 0; on < 6; on++) await click(view, '[data-test="calendar-YEAR_START"] button[aria-label="Next month"]')
+      await waitFor(view, 'document.querySelector(\'[data-reka-calendar-cell-trigger][data-value$="-08-02"]:not([data-outside-view])\')')
       await click(view, '[data-reka-calendar-cell-trigger][data-value$="-08-02"]:not([data-outside-view])')
       await waitFor(view, 'document.querySelector(\'[data-test="input-YEAR_START"]\')?.innerText.includes("2 August")')
       await click(view, '[data-test="save-YEAR_START"]')
