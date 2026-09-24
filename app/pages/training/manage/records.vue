@@ -72,8 +72,14 @@ const signable = computed(() => catalogue.value.items.filter(module =>
 // Accepting outside evidence is the module's own choice, made in the catalogue (G-121 c1).
 const external = computed(() => signable.value.filter(module => module.allowsExternal))
 
+// The id sits beside the name as a reference, never in place of it (G-120 criterion 7).
+const optionsOf = (modules: Module[]): { label: string, value: string }[] =>
+  modules.map(module => ({ label: `${module.id} ${module.name}`, value: module.id }))
+const signableOptions = computed(() => optionsOf(signable.value))
+const externalOptions = computed(() => optionsOf(external.value))
+
 const signing = ref(false)
-const chosen = ref<string | null>(null)
+const chosen = ref<string | undefined>(undefined)
 const revoking = ref<Record | null>(null)
 const reason = ref('')
 
@@ -130,7 +136,7 @@ async function signOff(): Promise<void> {
     })
     toast.add({ title: 'Signed off', icon: 'i-lucide-check', color: 'success' })
     signing.value = false
-    chosen.value = null
+    chosen.value = undefined
     await refresh()
   }
   catch (error) {
@@ -354,20 +360,19 @@ watch(modalOpen, (nowOpen) => {
           variant="subtle"
           :description="failure"
         />
-        <div class="flex flex-wrap gap-1">
-          <UButton
-            v-for="module in signable"
-            :key="module.id"
-            size="sm"
-            :color="chosen === module.id ? 'primary' : 'neutral'"
-            :variant="chosen === module.id ? 'solid' : 'outline'"
-            :aria-pressed="chosen === module.id"
-            :data-test="`sign-${module.id}`"
-            @click="chosen = module.id"
-          >
-            {{ module.name }}
-          </UButton>
-        </div>
+        <UFormField
+          label="Which module"
+          description="Briefs and retired modules are not offered."
+        >
+          <USelectMenu
+            v-model="chosen"
+            :items="signableOptions"
+            value-key="value"
+            placeholder="Search the catalogue"
+            class="w-full"
+            data-test="sign-module"
+          />
+        </UFormField>
       </template>
 
       <template #footer>
@@ -408,20 +413,14 @@ watch(modalOpen, (nowOpen) => {
             label="Which module"
             description="Only modules whose department has said they accept outside evidence."
           >
-            <div class="flex flex-wrap gap-1">
-              <UButton
-                v-for="module in external"
-                :key="module.id"
-                size="sm"
-                :color="certificate.moduleId === module.id ? 'primary' : 'neutral'"
-                :variant="certificate.moduleId === module.id ? 'solid' : 'outline'"
-                :aria-pressed="certificate.moduleId === module.id"
-                :data-test="`external-${module.id}`"
-                @click="certificate.moduleId = module.id"
-              >
-                {{ module.name }}
-              </UButton>
-            </div>
+            <USelectMenu
+              v-model="certificate.moduleId"
+              :items="externalOptions"
+              value-key="value"
+              placeholder="Search the catalogue"
+              class="w-full"
+              data-test="external-module"
+            />
           </UFormField>
 
           <UFormField
