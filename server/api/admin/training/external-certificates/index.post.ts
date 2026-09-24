@@ -1,4 +1,5 @@
 import { externalCertificateForm, externalExpiryProblem, recordedFor } from '#shared/utils/training'
+import type { AuditRow } from '#shared/utils/audit'
 
 // Record a certificate somebody earned elsewhere, against a module that accepts them (G-121).
 // Everything a sign-off refuses, this refuses too; what it adds is that we assessed nothing.
@@ -24,47 +25,35 @@ export default defineEventHandler(async (event) => {
   const problem = externalExpiryProblem(input.awardedOn, input.expiresOn)
   if (problem) throw createError({ statusCode: 422, statusMessage: problem })
 
-  const id = newId()
-  const detail = { module: input.moduleId, awardedOn: input.awardedOn, expiresOn: input.expiresOn }
+  const actorId = resolved.account.id
+  const record = {
+    id: newId(),
+    moduleId: input.moduleId,
+    awardedOn: input.awardedOn,
+    expiresOn: input.expiresOn,
+    expiryOverridden: true,
+    source: 'EXTERNAL' as const,
+    evidenceRef: input.evidenceRef,
+  }
+  // The reference is a thing written about them, so it stays off the trail (0011).
+  const entry = (target: string, byAddress: boolean): AuditRow => auditEntry({
+    actorId,
+    action: 'record.external-certificate',
+    target,
+    detail: { module: input.moduleId, awardedOn: input.awardedOn, expiresOn: input.expiresOn, ...(byAddress ? { byAddress } : {}) },
+  })
 
   // Nobody the picker could find, so the account is made in the same batch (G-130, 0091).
   const newcomer = recordedFor(input)
-  if (newcomer) {
-    const userId = await writeRecordByAddress(newcomer, resolved.account.id, {
-      id,
-      moduleId: input.moduleId,
-      awardedOn: input.awardedOn,
-      expiresOn: input.expiresOn,
-      expiryOverridden: true,
-      source: 'EXTERNAL',
-      evidenceRef: input.evidenceRef,
-    }, target => [
-      auditEntry({ actorId: resolved.account.id, action: 'record.external-certificate', target, detail: { ...detail, byAddress: true } }),
+  const userId = newcomer
+    ? await writeRecordByAddress(newcomer, actorId, record, target => [entry(target, true)])
+    : input.userId!
+  if (!newcomer) {
+    await db.batch([
+      db.insert(schema.trainingRecords).values({ ...record, userId, grantedBy: actorId }),
+      db.insert(schema.auditLog).values(entry(`user:${userId}`, false)),
     ])
-    return { ok: true, id, expiresOn: input.expiresOn, userId }
   }
 
-  const userId = input.userId!
-  await db.batch([
-    db.insert(schema.trainingRecords).values({
-      id,
-      userId,
-      moduleId: input.moduleId,
-      awardedOn: input.awardedOn,
-      expiresOn: input.expiresOn,
-      expiryOverridden: true,
-      source: 'EXTERNAL',
-      grantedBy: resolved.account.id,
-      evidenceRef: input.evidenceRef,
-    }),
-    // The reference is a thing written about them, so it stays off the trail (0011).
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'record.external-certificate',
-      target: `user:${userId}`,
-      detail,
-    })),
-  ])
-
-  return { ok: true, id, expiresOn: input.expiresOn, userId }
+  return { ok: true, id: record.id, expiresOn: input.expiresOn, userId }
 })

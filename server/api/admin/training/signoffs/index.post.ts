@@ -1,4 +1,5 @@
 import { expiryFor, expiryProblem, recordedFor, signOffForm } from '#shared/utils/training'
+import type { AuditRow } from '#shared/utils/audit'
 
 // Sign off a module for somebody: competence proven outside a session, on the department's terms.
 // The first thing in the system that awards a record, and it awards exactly one (G-120).
@@ -34,57 +35,37 @@ export default defineEventHandler(async (event) => {
     ? expiryFor(policy, input.awardedOn, await academicYear(event))
     : input.expiresOn
 
-  const id = newId()
-  const detail = { module: input.moduleId, awardedOn: input.awardedOn, expiresOn }
+  const actorId = resolved.account.id
+  const record = {
+    id: newId(),
+    moduleId: input.moduleId,
+    awardedOn: input.awardedOn,
+    expiresOn,
+    expiryOverridden: input.expiresOn !== undefined,
+    source: 'SIGNOFF' as const,
+    evidenceRef: input.evidenceRef,
+  }
+  const entries = (target: string, byAddress: boolean): AuditRow[] => [
+    auditEntry({
+      actorId,
+      action: 'record.signed-off',
+      target,
+      detail: { module: input.moduleId, awardedOn: input.awardedOn, expiresOn, ...(byAddress ? { byAddress } : {}) },
+    }),
+    ...(unbounded ? [auditEntry({ actorId, action: 'record.signoff.unbounded', target, detail: { module: input.moduleId } })] : []),
+  ]
 
   // Criterion 1 of G-130: nobody the picker could find, so the account is made in the same batch.
   const newcomer = recordedFor(input)
-  if (newcomer) {
-    const userId = await writeRecordByAddress(newcomer, resolved.account.id, {
-      id,
-      moduleId: input.moduleId,
-      awardedOn: input.awardedOn,
-      expiresOn,
-      expiryOverridden: input.expiresOn !== undefined,
-      source: 'SIGNOFF',
-      evidenceRef: input.evidenceRef,
-    }, target => [
-      auditEntry({ actorId: resolved.account.id, action: 'record.signed-off', target, detail: { ...detail, byAddress: true } }),
-      ...(unbounded
-        ? [auditEntry({ actorId: resolved.account.id, action: 'record.signoff.unbounded', target, detail: { module: input.moduleId } })]
-        : []),
+  const userId = newcomer
+    ? await writeRecordByAddress(newcomer, actorId, record, target => entries(target, true))
+    : input.userId!
+  if (!newcomer) {
+    await db.batch([
+      db.insert(schema.trainingRecords).values({ ...record, userId, grantedBy: actorId }),
+      ...entries(`user:${userId}`, false).map(row => db.insert(schema.auditLog).values(row)),
     ])
-    return { ok: true, id, expiresOn, userId }
   }
 
-  const userId = input.userId!
-  await db.batch([
-    db.insert(schema.trainingRecords).values({
-      id,
-      userId,
-      moduleId: input.moduleId,
-      awardedOn: input.awardedOn,
-      expiresOn,
-      expiryOverridden: input.expiresOn !== undefined,
-      source: 'SIGNOFF',
-      grantedBy: resolved.account.id,
-      evidenceRef: input.evidenceRef,
-    }),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'record.signed-off',
-      target: `user:${userId}`,
-      detail,
-    })),
-    ...(unbounded
-      ? [db.insert(schema.auditLog).values(auditEntry({
-          actorId: resolved.account.id,
-          action: 'record.signoff.unbounded',
-          target: `user:${userId}`,
-          detail: { module: input.moduleId },
-        }))]
-      : []),
-  ])
-
-  return { ok: true, id, expiresOn, userId }
+  return { ok: true, id: record.id, expiresOn, userId }
 })
