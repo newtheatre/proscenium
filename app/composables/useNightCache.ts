@@ -68,12 +68,12 @@ export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: (
 
   async function refresh(): Promise<void> {
     const asked = toValue(key)
-    const newest = ask()
+    const request = ask()
     pending.value = true
     try {
       const answer = await loader()
-      // A newer request is in flight or has answered: this one may not touch screen or device.
-      if (!newest()) return
+      // A newer request has already answered: this older one may not touch screen or device.
+      if (!request.answers()) return
       const entry = await refreshNightCache<T>(store, asked, () => Promise.resolve(answer))
       // The screen can move venue under a slow load, and that answer is no longer its night.
       if (asked !== toValue(key)) return
@@ -87,13 +87,13 @@ export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: (
       // A malformed key is a programming error, not the offline case this cache exists for:
       // it must not vanish into a stale-looking screen the way a real loader failure should.
       if (thrown instanceof MalformedNightCacheKeyError) throw thrown
-      if (!newest() || asked !== toValue(key)) return
+      if (!request.answers() || asked !== toValue(key)) return
       // What the screen is showing stays put: a failed load is a stale screen, never a blank one.
       error.value = thrown instanceof Error ? thrown : new Error(String(thrown))
       live.value = false
     }
     finally {
-      if (newest()) pending.value = false
+      if (request.newest()) pending.value = false
     }
   }
 

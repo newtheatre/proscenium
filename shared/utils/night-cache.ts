@@ -173,13 +173,26 @@ export async function refreshNightCache<T>(store: NightCacheStore, key: NightCac
   return stored ?? { key, night: nightCacheKeyParts(key)!.night, cachedAt: at.getTime(), data }
 }
 
-// Each call starts a request and hands back whether it is still the newest one asked, because
-// the slowest answer is not the freshest: a read from before a sale can land after one from after.
-export function newestRequest(): () => () => boolean {
-  let latest = 0
+export interface NightRequest {
+  newest: () => boolean
+  answers: () => boolean
+}
+
+// Each call starts a request. `answers` is refused once a newer request has answered, because the
+// slowest answer is not the freshest: a read from before a sale can land after one from after.
+export function newestRequest(): () => NightRequest {
+  let asked = 0
+  let answered = 0
   return () => {
-    const mine = ++latest
-    return () => mine === latest
+    const mine = ++asked
+    return {
+      newest: () => mine === asked,
+      answers: () => {
+        if (mine < answered) return false
+        answered = mine
+        return true
+      },
+    }
   }
 }
 
