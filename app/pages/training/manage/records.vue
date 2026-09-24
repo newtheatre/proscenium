@@ -114,7 +114,6 @@ async function recordCertificate(): Promise<void> {
     })
     toast.add({ title: 'Recorded', icon: 'i-lucide-award', color: 'success' })
     recording.value = false
-    Object.assign(certificate, blank())
     await refresh()
   }
   catch (error) {
@@ -136,7 +135,6 @@ async function signOff(): Promise<void> {
     })
     toast.add({ title: 'Signed off', icon: 'i-lucide-check', color: 'success' })
     signing.value = false
-    chosen.value = undefined
     await refresh()
   }
   catch (error) {
@@ -255,8 +253,12 @@ const columns: TableColumn<Record>[] = [
 // is shown wherever the action was taken.
 const modalOpen = computed(() => signing.value || recording.value || revoking.value !== null)
 
+// A choice abandoned by closing is cleared, so it never waits for the next person chosen.
 watch(modalOpen, (nowOpen) => {
-  if (!nowOpen) failure.value = null
+  if (nowOpen) return
+  failure.value = null
+  chosen.value = undefined
+  Object.assign(certificate, blank())
 })
 </script>
 
