@@ -6,6 +6,7 @@ import {
   MalformedNightCacheKeyError,
   NIGHT_CACHE_PREFIX,
   memoryNightCacheStore,
+  newestRequest,
   nightCacheKey,
   nightCacheKeyParts,
   pruneNightCache,
@@ -326,6 +327,72 @@ describe('what a screen holding one of these sees (criteria 2 and 3)', () => {
     })
   })
 
+  // Criterion 5: the till asks on focus and after a sale, and the pre-sale read can answer last.
+  test('an older answer arriving after a newer one is dropped, on screen and on the device', async () => {
+    await inScope(async () => {
+      const store = memoryNightCacheStore()
+      const answers: Array<(value: { stock: number }) => void> = []
+      const cache = useNightCache<{ stock: number }>(key, () => new Promise((resolve) => {
+        answers.push(resolve)
+      }), { store, immediate: false })
+
+      const older = cache.refresh()
+      const newer = cache.refresh()
+      answers[1]!({ stock: 4 })
+      await newer
+      answers[0]!({ stock: 5 })
+      await older
+
+      expect(cache.data.value).toEqual({ stock: 4 })
+      expect(cache.live.value).toBe(true)
+      expect(readNightCache(store, key)?.data).toEqual({ stock: 4 })
+    })
+  })
+
+  test('an older failure arriving after a newer success leaves the screen live', async () => {
+    await inScope(async () => {
+      const store = memoryNightCacheStore()
+      const settle: Array<{ resolve: (value: { stock: number }) => void, reject: (reason: Error) => void }> = []
+      const cache = useNightCache<{ stock: number }>(key, () => new Promise((resolve, reject) => {
+        settle.push({ resolve, reject })
+      }), { store, immediate: false })
+
+      const older = cache.refresh()
+      const newer = cache.refresh()
+      settle[1]!.resolve({ stock: 4 })
+      await newer
+      settle[0]!.reject(new Error('offline'))
+      await older
+
+      expect(cache.data.value).toEqual({ stock: 4 })
+      expect(cache.error.value).toBeNull()
+      expect(cache.live.value).toBe(true)
+      expect(cache.pending.value).toBe(false)
+    })
+  })
+
+  test('an older answer landing first leaves the screen pending on the newer one', async () => {
+    await inScope(async () => {
+      const store = memoryNightCacheStore()
+      const answers: Array<(value: { stock: number }) => void> = []
+      const cache = useNightCache<{ stock: number }>(key, () => new Promise((resolve) => {
+        answers.push(resolve)
+      }), { store, immediate: false })
+
+      const older = cache.refresh()
+      const newer = cache.refresh()
+      answers[0]!({ stock: 5 })
+      await older
+      expect(cache.pending.value).toBe(true)
+      expect(cache.data.value).toBeNull()
+
+      answers[1]!({ stock: 4 })
+      await newer
+      expect(cache.pending.value).toBe(false)
+      expect(cache.data.value).toEqual({ stock: 4 })
+    })
+  })
+
   // Criterion 3: cached from the start of the shift, not from the first visit to the screen.
   test('one screen caches what another will need, and a failure to is not the first screen s problem', async () => {
     const store = memoryNightCacheStore()
@@ -342,6 +409,25 @@ describe('what a screen holding one of these sees (criteria 2 and 3)', () => {
     const store = memoryNightCacheStore()
     const bad = 'nuxt-colour-mode' as NightCacheKey
     await expect(primeNightCache(bad, () => ({ assemblyPoint: 'The car park' }), store)).rejects.toThrow(MalformedNightCacheKeyError)
+  })
+})
+
+describe('only the newest request is answered (criterion 5)', () => {
+  test('an older request is superseded the moment a newer one is made', () => {
+    const ask = newestRequest()
+    const older = ask()
+    expect(older()).toBe(true)
+    const newer = ask()
+    expect(older()).toBe(false)
+    expect(newer()).toBe(true)
+  })
+
+  test('two sequences never supersede each other', () => {
+    const one = newestRequest()
+    const other = newestRequest()
+    const mine = one()
+    other()
+    expect(mine()).toBe(true)
   })
 })
 
