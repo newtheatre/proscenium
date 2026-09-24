@@ -43,7 +43,8 @@ function sell(database: TestDatabase, lines: Array<{ depletion: Array<{ itemId: 
   ] as [string, ...unknown[]])))
 }
 
-const can = (itemId: string, qty = 1) => ({ depletion: [{ itemId, qty }], qty })
+// One can per serving: `qty` is how many the line sells, never how much one serving pours.
+const can = (itemId: string, qty = 1) => ({ depletion: [{ itemId, qty: 1 }], qty })
 
 describe('on-hand is read for the basket\'s own items only (F-124 criterion 8, 0003)', () => {
   test('each item reads the sum of its movements', async () => {
