@@ -195,6 +195,32 @@ describe.skipIf(skip !== null)('who may make the account (criterion 4)', () => {
   })
 })
 
+describe.skipIf(skip !== null)('a lead finds people with no accounts.read (G-130 criterion 1)', () => {
+  const search = (term: string, as: string): Promise<Response> =>
+    send('GET', `/api/admin/training/people?search=${encodeURIComponent(term)}`, undefined, as)
+
+  test('by address or name, answered with an id and a name and nothing more', async () => {
+    const lead = await adminSession(app, { roles: [] })
+    const theirs = `ADS${suffix()}`
+    await send('POST', '/api/admin/training/departments', { code: theirs, name: 'Searchers' })
+    await send('POST', `/api/admin/training/departments/${theirs}/leads`, { userId: lead.id })
+    expect((await send('GET', `/api/admin/accounts?search=${encodeURIComponent(member.email)}`, undefined, lead.cookie)).status).toBe(403)
+
+    for (const term of [member.email, member.name]) {
+      const found = await search(term, lead.cookie)
+      expect(found.status).toBe(200)
+      const { items } = await found.json() as { items: Record<string, unknown>[] }
+      expect(items.map(item => item.name)).toContain(member.name)
+      expect(items.every(item => Object.keys(item).sort().join(',') === 'id,name')).toBe(true)
+    }
+  })
+
+  test('somebody with no training standing is refused', async () => {
+    const stranger = await adminSession(app, { roles: [] })
+    expect((await search(member.name, stranger.cookie)).status).toBe(403)
+  })
+})
+
 describe.skipIf(skip !== null)('the records screen (G-130 criteria 1 and 7)', () => {
   test('offers the address only once the search has found nobody', async () => {
     const person = newcomer('screen-new')
