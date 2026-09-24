@@ -97,7 +97,7 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
      the surface points at a future. Its definition names the story that builds the feature; the
      screen shows the switch disabled, says "Not built" with that story's id, and links to it, so
      nobody flips a switch that decides nothing.
-- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10), amended by issues 1265 and 1266.
+- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10), amended by issue 1265.
 
 ## J-105: Blast-radius preview, typed confirmation and one-action revert
 
@@ -142,7 +142,7 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   6. The screen says where a restore happens and who does one. Restoring is not a screen, so the
      screen that records drills says so and links to the procedure rather than leaving a reader
      to look for a button that does not exist.
-- Source: Prompt Book K-1 (tested restore each term), P7; audit EW-3 (Time Travel restore points, weekly exports); Get-In part 6 (one blast radius). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10), amended by issues 1265 and 1266.
+- Source: Prompt Book K-1 (tested restore each term), P7; audit EW-3 (Time Travel restore points, weekly exports); Get-In part 6 (one blast radius). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10).
 
 ## J-108: The audit archive import (superseded)
 
