@@ -86,8 +86,13 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   4. Enforcement reads the setting at the write path, so the published policy and the enforced policy are the same document; a changed value takes effect without a deploy.
   5. Every change writes an audit entry with the from and to values.
   6. A setting nothing reads says what is true of it, that nothing enforces it, rather than
-     apologising or pointing at a future. Nothing on the surface says "yet".
-- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10).
+     apologising or pointing at a future. Nothing on the surface says "yet". Amended 24 September
+     2026 (issue 1265): a capability switch whose feature is not built, such as
+     `DISCOUNT_CODES_ENABLED` before D-204, is not offered as a live input, and is the one place
+     the surface points at a future. Its definition names the story that builds the feature; the
+     screen shows the switch disabled, says "Not built" with that story's id, and links to it, so
+     nobody flips a switch that decides nothing.
+- Source: Prompt Book J-3, P5; audit TR-7 (per-key validation, 02-29 refusal), RM-1 (the unenforced-policy failure this design prevents). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10), amended by issue 1265.
 
 ## J-105: Blast-radius preview, typed confirmation and one-action revert
 

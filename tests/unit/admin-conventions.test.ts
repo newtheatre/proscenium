@@ -70,6 +70,23 @@ describe('an input is the component for its value (0032)', () => {
   })
 })
 
+// The catalogue runs to dozens of modules, so choosing one is a searchable menu (G-120 criterion 7).
+describe('a module is chosen from a searchable menu, never a wall of buttons (0032, issue 1259)', () => {
+  test('no console screen renders a button for every module it offers', async () => {
+    expect(await offenders(source => openingTags(source, 'UButton').some(tag => /v-for="module in/.test(tag)))).toEqual([])
+  })
+
+  test('the sign-off and certificate pickers are single searchable menus', async () => {
+    const menus = openingTags(await Bun.file('app/pages/training/manage/records.vue').text(), 'USelectMenu')
+    for (const name of ['sign-module', 'external-module']) {
+      const menu = menus.find(tag => tag.includes(`data-test="${name}"`)) ?? ''
+      expect(menu).toContain('value-key="value"')
+      expect(menu).toContain('placeholder="Search the catalogue"')
+      expect(menu).not.toMatch(/\bmultiple\b/)
+    }
+  })
+})
+
 describe('a person is chosen, never typed (0032)', () => {
   // The tell is a field asking for an account: nothing on an admin screen should want an id typed
   // into it, and the picker is what a screen uses instead.
@@ -267,6 +284,24 @@ describe('a figure read off the card reader is typed as pounds and pence', () =>
   test('what is typed round-trips to what the screen shows beside it', () => {
     expect(saysMoney(penceFromPounds('123.45')!)).toBe('\u00a3123.45')
     expect(saysMoney(penceFromPounds('1,234.50')!)).toBe('\u00a31234.50')
+  })
+})
+
+// Money is any whole number of pence, and the input snaps what is typed to its step, so a step
+// coarser than a penny silently rounds a price or a Z reading (issue 1260, 0004, F-121).
+const POUNDS_INPUT = /currency:\s*'GBP'|(?:v-model|:model-value)="[^"]*pounds/i
+
+describe('an amount of money is typed to the penny', () => {
+  test('every pounds input in the application steps by a penny', async () => {
+    const inputs: { path: string, tag: string }[] = []
+    for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app', onlyFiles: true })) {
+      const path = join('app', entry).replaceAll('\\', '/')
+      for (const tag of openingTags(await Bun.file(path).text(), 'UInputNumber')) {
+        if (POUNDS_INPUT.test(tag)) inputs.push({ path, tag })
+      }
+    }
+    expect(inputs.length).toBeGreaterThan(0)
+    expect(inputs.filter(input => !/:step="0\.01"/.test(input.tag)).map(input => input.path)).toEqual([])
   })
 })
 

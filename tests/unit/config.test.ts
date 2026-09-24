@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { ConfigKey } from '#shared/utils/config'
-import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, hasDefault, isConfigKey, isEnforced } from '#shared/utils/config'
+import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, hasDefault, isConfigKey, isEnforced, plannedFor } from '#shared/utils/config'
 import { PERMISSION_MAP, ROLES, isRole } from '#shared/utils/roles'
 import type { Permission } from '#shared/utils/roles'
 
@@ -111,5 +111,28 @@ describe('the membership purchase address (issue 1005)', () => {
     expect(schema.safeParse('http://su.example.invalid/shop').success).toBe(false)
     expect(schema.safeParse('ftp://su.example.invalid/shop').success).toBe(false)
     expect(schema.safeParse('not a url').success).toBe(false)
+  })
+})
+
+// A switch for a feature nobody has built decides nothing, so the screen names the story instead
+// of offering it as live (J-104 criterion 6, issue 1265).
+describe('capability switches for features not built', () => {
+  test('discount codes name the story that builds them', () => {
+    expect(plannedFor('DISCOUNT_CODES_ENABLED')).toEqual({ story: 'D-204', issue: 436 })
+  })
+
+  test('a key something enforces is built, so it names no story', () => {
+    expect(ENFORCED_KEYS.filter(key => plannedFor(key) !== null)).toEqual([])
+    expect(plannedFor('BAR_TAB_CAP_PENCE')).toBeNull()
+  })
+
+  test('every story a key waits on is one the backlog has', async () => {
+    let backlog = ''
+    for await (const file of new Bun.Glob('docs/backlog/*.md').scan('.')) backlog += await Bun.file(file).text()
+
+    const missing = CONFIG_KEY_NAMES
+      .map(key => plannedFor(key)?.story)
+      .filter((story): story is string => Boolean(story) && !backlog.includes(`## ${story}:`))
+    expect(missing).toEqual([])
   })
 })

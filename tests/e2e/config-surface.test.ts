@@ -62,7 +62,7 @@ function unusedCode(): Promise<string> {
   return codeForStep(secret, stepFor(new Date()))
 }
 
-interface Setting { key: string, value: unknown, set: boolean, enforced: boolean, default: unknown, updatedBy: { name: string } | null }
+interface Setting { key: string, value: unknown, set: boolean, enforced: boolean, default: unknown, plannedFor: { story: string, issue: number } | null, updatedBy: { name: string } | null }
 
 async function settings(): Promise<Setting[]> {
   const answer = await (await send('GET', '/api/admin/config', null, cookie)).json() as { settings: Setting[] }
@@ -103,6 +103,11 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
     expect(known.enforced).toBe(true)
     expect(listed.find(setting => setting.key === 'BAR_TAB_CAP_PENCE')!.enforced).toBe(true)
     expect(listed.find(setting => setting.key === 'DISCOUNT_CODES_ENABLED')!.enforced).toBe(false)
+  })
+
+  test('a switch for a feature not built names the story that builds it (issue 1265)', async () => {
+    expect((await settingFor('DISCOUNT_CODES_ENABLED')).plannedFor).toEqual({ story: 'D-204', issue: 436 })
+    expect((await settingFor('BAR_TAB_CAP_PENCE')).plannedFor).toBeNull()
   })
 
   test('a change is stored, shows who made it, and takes effect at the write path', async () => {
@@ -199,7 +204,13 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       // Fifty keys, found by searching for what the key decides rather than its name (0032).
       await fill(view, 'input[data-test="config-search"]', 'discount codes')
       await waitFor(view, 'document.querySelector(\'[data-test="setting-DISCOUNT_CODES_ENABLED"]\')')
-      expect(await textOf(view)).toContain('Not enforced yet')
+
+      // Not a live switch: it is disabled, and the card names and links the story (issue 1265).
+      expect(await textOf(view)).toContain('Not built (D-204)')
+      expect(await view.evaluate<boolean>(
+        `document.querySelector('[data-test="toggle-DISCOUNT_CODES_ENABLED"]')?.hasAttribute('disabled') ?? false`)).toBe(true)
+      expect(await view.evaluate<string>(
+        `document.querySelector('[data-test="planned-DISCOUNT_CODES_ENABLED"]')?.getAttribute('href') ?? ''`)).toContain('/issues/436')
 
       await fill(view, 'input[data-test="config-search"]', 'bar tab')
       await waitFor(view, 'document.querySelector(\'[data-test="setting-BAR_TAB_CAP_PENCE"]\')')

@@ -43,7 +43,7 @@ export function readPouredBy(value: string | null): PouredBy[] {
 
 // The tightest component decides, and a choice is as good as its best-stocked option, since the
 // customer picks one. A size that depletes nothing answers null rather than nought (F-128).
-export function servingsAvailableQuery(productId: string): SQL {
+function servingsQuery(products: SQL): SQL {
   const poured = sql`(SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = c.item_id) / c.qty`
   const chosen = sql`(
     SELECT max((SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = g.item_id) / g.qty)
@@ -56,9 +56,31 @@ export function servingsAvailableQuery(productId: string): SQL {
              FROM variant_components c WHERE c.variant_id = v.id
            ) AS servings
     FROM product_variants v
-    WHERE v.product_id = ${productId} AND v.status = 'ACTIVE'
+    WHERE v.product_id IN (${products}) AND v.status = 'ACTIVE'
     ORDER BY v.sort, v.label COLLATE NOCASE
   `
+}
+
+export function servingsAvailableQuery(productId: string): SQL {
+  return servingsQuery(sql`SELECT ${productId}`)
+}
+
+// Every size on the till in one read, scoped by subquery so it binds nothing per product (0006).
+export function tillServingsQuery(): SQL {
+  return servingsQuery(sql`SELECT id FROM bar_products WHERE status = 'ACTIVE'`)
+}
+
+export async function tillServings(): Promise<Map<string, number | null>> {
+  const found = await db.all<{ variantId: string, servings: number | null }>(tillServingsQuery())
+  return new Map(found.map(row => [row.variantId, row.servings === null ? null : Number(row.servings)]))
+}
+
+// Until a stocktake is applied every item reads nought, so on-hand is not yet a balance (0080).
+export const STOCK_COUNTED_QUERY = sql`SELECT EXISTS (SELECT 1 FROM stocktakes WHERE status = 'APPLIED') AS counted`
+
+export async function stockCounted(): Promise<boolean> {
+  const [row] = await db.all<{ counted: number }>(STOCK_COUNTED_QUERY)
+  return Number(row?.counted) === 1
 }
 
 export interface ServingsAvailable {

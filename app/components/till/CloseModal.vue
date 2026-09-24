@@ -97,7 +97,7 @@ const needsVarianceNote = computed(() => hasReading.value && props.variancePrevi
           <UInputNumber
             v-model="actualZPounds"
             :min="0"
-            :step="0.5"
+            :step="0.01"
             :format-options="{ style: 'currency', currency: 'GBP' }"
             data-test="actual-z-input"
           />
