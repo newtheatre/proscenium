@@ -1,7 +1,6 @@
-# 0091: Bank holidays are synced from gov.uk and never typed, and a failed sync warns
+# 0092: Bank holidays are synced from gov.uk and never typed, and a failed sync warns
 
-- Status: Proposed. The direction ("only sync, no manual entry, warn if it fails") was decided by
-  the IT Manager on 24 September 2026 in issue 1267; the mechanics below await acceptance.
+- Status: Accepted (IT Manager, 24 September 2026)
 - Date: 2026-09-24
 - Supersedes in part: 0038 (the list's source and who may edit it; everything else stands)
 

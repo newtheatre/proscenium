@@ -573,7 +573,7 @@ decide (principle P6): no task ever awards a record, approves a request or takes
 
 `sessions:sweep` is the one remaining stub, reporting the story it is waiting for and doing
 nothing else; the rest do their work, `holds:release` from D-106 and D-107, `backup` from K-108
-and J-107, `bank-holidays:sync` from C-121 (0091), `health:watch` from J-106, `retention:sweep` from K-111 (which is A-126, built
+and J-107, `bank-holidays:sync` from C-121 (0092), `health:watch` from J-106, `retention:sweep` from K-111 (which is A-126, built
 without naming it), and `nights:close` from E-125.
 
 | Cron (UTC) | Task | Does |
@@ -595,7 +595,7 @@ without naming it), and `nights:close` from E-125.
 | `0 4 * * *` | `daily:sweeps` | Comp expiry tidy, backstage free-text purge, withdrawn access profiles, lapsed rate limits, lapsed MFA attempts, unclaimed sign-in tokens, the send-log prune at `NOTIFICATION_LOG_RETENTION_MONTHS` (H-105 criterion 5, and retries are `notifications:retry`'s rather than this task's), the digest entries a pruned send left behind (H-104, 0061), unverified account expiry (0026), the membership notices (the renewal reminder, A-117, and while any membership claim waits, one `membership.claims.waiting` a day to each live holder of `members.write`, claimed per person per London day, A-130 criterion 12), and the role-lapse work: one warning per holder covering every grant of theirs inside `ROLE_LAPSE_NOTICE_DAYS`, claimed per grant and expiry so moving a date re-arms it; a monthly digest to administrators on the first, carrying what is lapsing, what lapsed inside the prune window and every permanent grant; and the tidying of grants lapsed longer ago than `ROLE_GRANT_PRUNE_DAYS`. Both the warning and the tidy write the trail with no actor, which is what attributes them to system (A-119, 0009). |
 | `0 4 * * *` | `waiting-list:purge` | Deletes every waiting-list entry for a performance once its whole show night has ended (D-113 criterion 4, 0014), scoped per performance rather than per entry (`WAITING_LIST_PURGE_BATCH_CAP`). |
 | `0 5 * * 1` | `backup` | A row-count and ledger-total manifest to R2 (the `BLOB` binding), independent of D1. A failure audits `backup.export-failed` rather than only logging. Point-in-time restore is D1 Time Travel, already automatic; the restore drill and its cadence are administered at `/admin/backups` (K-108, J-107). |
-| `0 5 * * 1` | `bank-holidays:sync` | Copies the England and Wales dates from `https://www.gov.uk/bank-holidays.json` (ten second timeout, zod-validated, the Worker's only third-party call) into `BANK_HOLIDAYS`, which the settings write path refuses by hand. A valid feed replaces the list from its first date on, audited with no actor; any failure leaves the list untouched and audits `bank-holidays.sync-failed` with one word from a fixed vocabulary. `/api/health` and the Settings card report a failed or stale sync, and a streak six days old notifies every live `ADMIN` once. Also run by **Sync now** on the Settings card (C-121, 0091). |
+| `0 5 * * 1` | `bank-holidays:sync` | Copies the England and Wales dates from `https://www.gov.uk/bank-holidays.json` (ten second timeout, zod-validated, the Worker's only third-party call) into `BANK_HOLIDAYS`, which the settings write path refuses by hand. A valid feed replaces the list from its first date on, audited with no actor; any failure leaves the list untouched and audits `bank-holidays.sync-failed` with one word from a fixed vocabulary. `/api/health` and the Settings card report a failed or stale sync, and a streak six days old notifies every live `ADMIN` once. Also run by **Sync now** on the Settings card (C-121, 0092). |
 | `0 4 1 * *` | `retention:sweep` | Two independent warnings (window and final) for an account approaching its inactivity threshold, a sign-in re-arming the claim by carrying `lastLoginAt` in its key; exempts a current member, a live role holder and an unsettled tab debtor; warns neither an unverified address nor an unclaimed guest, which are anonymised on their own clock without ever being written to; anonymises what is past its threshold, reusing `eraseAccount()`. Warnings and anonymisations carry a cap each (`RETENTION_WARNING_CAP`, `RETENTION_SWEEP_CAP`), and a run that hits one reports the figure in the digest rather than deferring the surplus. The digest always sends, dry-run or armed, since it is what the IT Manager reviews before arming (0011, A-126, K-111). |
 
 ## Notifications
@@ -770,7 +770,7 @@ guessing. A save and a revert are one write path, `writeConfigValue()`
 (`server/utils/config-write.ts`): both run the digest gate and the pair rules, so a revert cannot
 bypass what a save must satisfy.
 
-**A synced key is never written by a person** (0091). `synced: true` on its `CONFIG_KEYS` entry
+**A synced key is never written by a person** (0092). `synced: true` on its `CONFIG_KEYS` entry
 (today only `BANK_HOLIDAYS`) makes `refuseSynced()` 409 both a save and a revert before anything is
 read, and `GET /api/admin/config` reports `synced` so the screen renders `BankHolidaySync.vue`
 (read-only dates, last sync, last failure, **Sync now**) instead of an input. The only writer is

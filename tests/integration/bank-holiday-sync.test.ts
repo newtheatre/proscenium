@@ -10,7 +10,7 @@ import type { SyncHistoryRow } from '#server/utils/bank-holiday-statements'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// C-121 criteria 7 and 8, decision 0091, against the real migrations: the sync's own statements,
+// C-121 criteria 7 and 8, decision 0092, against the real migrations: the sync's own statements,
 // run the way D1 runs a batch. The fetch and the task around them are server/utils/bank-holidays.ts.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {

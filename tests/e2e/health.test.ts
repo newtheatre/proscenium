@@ -89,7 +89,7 @@ describe.skipIf(skip !== null)('the health endpoint (J-106, K-107)', () => {
     expect(['ok', 'missing']).toContain(body.sessionKey)
   })
 
-  // C-121 criterion 8, 0091: the sync is reported beside the coverage, and neither fails `ok`,
+  // C-121 criterion 8, 0092: the sync is reported beside the coverage, and neither fails `ok`,
   // because gov.uk being down is not this site being down.
   test('a failed bank holiday sync is reported, naming why, without failing the check', async () => {
     const database = new Database(app.databaseFile)

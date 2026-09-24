@@ -39,9 +39,9 @@ describe('currentValue reads an override, or the default it ships with', () => {
   })
 })
 
-// C-121 criterion 4, 0091: the list is gov.uk's, so a save and a revert, which share this path,
+// C-121 criterion 4, 0092: the list is gov.uk's, so a save and a revert, which share this path,
 // are both refused before anything is read or written.
-describe('a synced key is refused by the write path (0091)', () => {
+describe('a synced key is refused by the write path (0092)', () => {
   test('BANK_HOLIDAYS cannot be written by a person, whatever the value', async () => {
     const event = { context: {} } as unknown as H3Event
     const refused = await writeConfigValue(event, 'u-officer', 'BANK_HOLIDAYS', ['2026-12-25']).catch(error => error as { statusCode: number, statusMessage: string })

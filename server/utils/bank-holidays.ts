@@ -29,7 +29,7 @@ export type SyncOutcome
     | (SyncFailed & { alerted: number })
 
 // Replaces the list only on a valid response; any failure leaves it exactly as it was and is
-// recorded instead (C-121 criterion 7, 0091). `actorId` is who asked, null for the cron.
+// recorded instead (C-121 criterion 7, 0092). `actorId` is who asked, null for the cron.
 export async function syncBankHolidays(
   event: H3Event | undefined,
   actorId: string | null,

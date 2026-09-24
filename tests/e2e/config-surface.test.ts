@@ -213,7 +213,7 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       // 2500 pence is what this suite set it to, and £25.00 is what that should read as.
       expect(shown).toBe('£25.00')
 
-      // Read-only with its last sync and Sync now, never an input: the list is gov.uk's (0091).
+      // Read-only with its last sync and Sync now, never an input: the list is gov.uk's (0092).
       await fill(view, 'input[data-test="config-search"]', 'bank holidays')
       await waitFor(view, 'document.querySelector(\'[data-test="bank-holiday-sync-status"]\')')
       expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="input-BANK_HOLIDAYS"]\'))')).toBe(false)

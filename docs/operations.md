@@ -554,7 +554,7 @@ A 503 naming migrations means the deploy won the race. Run the migrate workflow 
 Both answers also carry `bankHolidays`, which never changes the status code: `ok` and `coveredTo`
 say whether the holiday list reaches as far ahead as room requests are judged (C-121, 0038), and
 `sync` says how the weekly copy from gov.uk last went (`synced`, `failed` with the reason, `stale`
-after eight days without a success, or `never`; 0091). A failed sync leaves the list as it was;
+after eight days without a success, or `never`; 0092). A failed sync leaves the list as it was;
 see `### bank-holidays:sync` below.
 
 **No GitHub runner can reach it** (J-106 criterion 3, issue 1014): Bot Fight Mode on
@@ -739,7 +739,7 @@ on quietly, and row counts and money totals are exactly what the drill below rec
 reaches the trail rather than only a cron log nobody reads. To run it by hand,
 `POST /_nitro/tasks/backup`.
 
-### bank-holidays:sync (05:00 Monday) (C-121, 0091)
+### bank-holidays:sync (05:00 Monday) (C-121, 0092)
 
 Copies the England and Wales bank holidays from `https://www.gov.uk/bank-holidays.json` into
 `BANK_HOLIDAYS`, which nobody edits by hand: the settings write path refuses it. This is the

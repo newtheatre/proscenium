@@ -1,12 +1,12 @@
 import { z } from 'zod'
 
-// Bank holidays are copied from gov.uk by a weekly task and never typed (C-121, 0091). The
+// Bank holidays are copied from gov.uk by a weekly task and never typed (C-121, 0092). The
 // fetch, its validation and the merge live here, pure, so every refusal is proved without a network.
 
 export const GOV_UK_BANK_HOLIDAYS_URL = 'https://www.gov.uk/bank-holidays.json'
 export const GOV_UK_DIVISION = 'england-and-wales'
 
-// Tied to the weekly cron in nuxt.config.ts rather than to any committee rule (0091).
+// Tied to the weekly cron in nuxt.config.ts rather than to any committee rule (0092).
 export const SYNC_TIMEOUT_MS = 10_000
 export const SYNC_MAX_BYTES = 512 * 1024
 export const SYNC_STALE_AFTER_DAYS = 8
@@ -127,7 +127,7 @@ export function syncStanding(history: SyncHistory, nowSeconds: number): SyncStan
 }
 
 // A streak starts at its first failure after the last success; one old enough has outlived a
-// second weekly run, which is "stays failing" (0091).
+// second weekly run, which is "stays failing" (0092).
 export function syncAlertDue(streakStartedAt: number | null, nowSeconds: number): boolean {
   return streakStartedAt !== null && nowSeconds - streakStartedAt >= SYNC_ALERT_AFTER_DAYS * 86_400
 }

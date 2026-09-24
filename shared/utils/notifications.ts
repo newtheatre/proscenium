@@ -567,7 +567,7 @@ export const MESSAGE_TYPES = {
     template: 'health-alert',
   },
 
-  // No topic, for the same reason: a list nobody refreshes ends in refused room requests (0091).
+  // No topic, for the same reason: a list nobody refreshes ends in refused room requests (0092).
   'bank-holidays.sync-failed': {
     topic: null,
     channels: ['EMAIL', 'INBOX'],

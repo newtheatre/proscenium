@@ -5,7 +5,7 @@ import { londonDate } from '#shared/utils/working-days'
 import type { SyncStanding } from '#shared/utils/bank-holidays'
 
 // The bank holiday card's body: the list read-only, when gov.uk last supplied it and why it last
-// failed, and Sync now. Nobody types these dates (C-121 criteria 4 and 8, 0091).
+// failed, and Sync now. Nobody types these dates (C-121 criteria 4 and 8, 0092).
 const props = defineProps<{ dates: string[] }>()
 const emit = defineEmits<{ synced: [] }>()
 

@@ -51,7 +51,7 @@ export async function healthStatus(event?: H3Event): Promise<HealthStatus> {
 }
 
 // Reported, never what fails the check: a calendar running out, or gov.uk not answering, is said
-// before anybody is refused (C-121, 0038, 0091), so neither is part of `ok` above.
+// before anybody is refused (C-121, 0038, 0092), so neither is part of `ok` above.
 async function holidayCoverage(event?: H3Event): Promise<HolidayHealth> {
   let sync: SyncStanding | null = null
   try {

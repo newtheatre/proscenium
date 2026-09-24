@@ -183,7 +183,7 @@ describe.skipIf(skip !== null)('asking, with an optional preference (criterion 1
   // A calendar that has run out must refuse rather than count a bank holiday as a working day,
   // which would grant less notice than the rule asks for (C-121, 0038).
   test('a date past the end of the bank holiday list is refused, not guessed at', async () => {
-    // Written straight to the database: the list is gov.uk's, and no route writes it by hand (0091).
+    // Written straight to the database: the list is gov.uk's, and no route writes it by hand (0092).
     overrideConfig(app, 'BANK_HOLIDAYS', ['2026-09-02'])
     try {
       const answered = await send('POST', '/api/rooms/external-requests',
@@ -202,7 +202,7 @@ describe.skipIf(skip !== null)('asking, with an optional preference (criterion 1
   })
 
   // C-121 criterion 4 as amended: a save and a revert are one write path, and both refuse it.
-  test('the bank holiday list cannot be edited or reverted by hand (0091)', async () => {
+  test('the bank holiday list cannot be edited or reverted by hand (0092)', async () => {
     const saved = await send('PUT', '/api/admin/config/BANK_HOLIDAYS', { value: ['2026-09-02'] }, officer)
     expect(saved.status).toBe(409)
     expect((await saved.json() as { statusMessage: string }).statusMessage).toContain('gov.uk')

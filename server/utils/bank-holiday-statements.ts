@@ -5,11 +5,11 @@ import type { SyncFailed, SyncFailure } from '#shared/utils/bank-holidays'
 import type { SQL } from 'drizzle-orm'
 
 // The bank holiday sync's writes and reads as pure statements, so the integration suite runs the
-// same SQL the task does (C-121 criteria 7 and 8, 0091). The task itself is bank-holidays.ts.
+// same SQL the task does (C-121 criteria 7 and 8, 0092). The task itself is bank-holidays.ts.
 
 const KEY = 'BANK_HOLIDAYS'
 
-// No actor on either statement: the dates are gov.uk's, not whoever asked for the run (0091). The
+// No actor on either statement: the dates are gov.uk's, not whoever asked for the run (0092). The
 // audit row is conditional on the stored value, so two overlapping runs audit one change once (0003).
 export function listChangeStatements(dates: readonly string[], change: AuditDetail, nowSeconds: number): SQL[] {
   const value = JSON.stringify(dates)

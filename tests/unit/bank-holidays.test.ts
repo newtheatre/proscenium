@@ -15,7 +15,7 @@ import {
 } from '#shared/utils/bank-holidays'
 import { CONFIG_KEYS, isSynced } from '#shared/utils/config'
 
-// C-121 criteria 7 to 9 and decision 0091: the list is copied from gov.uk, validated before it is
+// C-121 criteria 7 to 9 and decision 0092: the list is copied from gov.uk, validated before it is
 // written, and a failure is one word from a fixed vocabulary. The network is always a stand-in.
 
 const TODAY = '2026-09-24'
@@ -79,7 +79,7 @@ describe('the merge: gov.uk is authoritative from its first date on (criterion 7
       .toEqual(['2018-12-25', '2019-01-01', '2026-12-25', '2027-01-01'])
   })
 
-  test('a stored date past the feed\'s end is dropped: the list is gov.uk\'s and nobody else\'s (0091)', () => {
+  test('a stored date past the feed\'s end is dropped: the list is gov.uk\'s and nobody else\'s (0092)', () => {
     expect(mergeHolidays(['2026-12-25', '2029-12-25'], ['2026-12-25', '2028-12-26'])).toEqual(['2026-12-25', '2028-12-26'])
   })
 
@@ -105,7 +105,7 @@ function throwing(error: unknown): typeof fetch {
   }) as unknown as typeof fetch
 }
 
-describe('the outbound call and every way it fails (criterion 7, 0091)', () => {
+describe('the outbound call and every way it fails (criterion 7, 0092)', () => {
   test('it asks gov.uk once, by GET, with a timeout and without following a redirect', async () => {
     const { fetcher, calls } = answering(JSON.stringify(feed(PUBLISHED)))
     expect(await fetchGovUkHolidays(fetcher, TODAY)).toEqual({ ok: true, dates: PUBLISHED })

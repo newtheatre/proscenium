@@ -20,7 +20,7 @@ interface ConfigKeyDefinition {
   // A value that can hold personal data. Its changes are audited as a hash rather than as the
   // value, because audit detail carries identifiers and never people (0011, 0024).
   sensitive?: true
-  // Written only by a sync from an outside source; the settings write path refuses it (0091).
+  // Written only by a sync from an outside source; the settings write path refuses it (0092).
   synced?: true
 }
 

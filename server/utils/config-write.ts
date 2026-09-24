@@ -20,7 +20,7 @@ export function currentValue(key: ConfigKey, overrides: Map<string, unknown>): u
   return hasDefault(key) ? (CONFIG_KEYS[key] as { default: unknown }).default : undefined
 }
 
-// A second writer would be overwritten by the next sync without a word, so there is none (0091).
+// A second writer would be overwritten by the next sync without a word, so there is none (0092).
 export function refuseSynced(key: ConfigKey): void {
   if (!isSynced(key)) return
   throw createError({
