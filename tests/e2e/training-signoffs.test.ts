@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { londonParts } from '#shared/utils/london'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, menuOptions, openSignedOutView, openView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, menuOptions, openSignedOutView, openView, pickOption, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-120 and G-122: the first thing that awards a record, and the only thing that takes one away.
@@ -386,7 +386,8 @@ describe.skipIf(skip !== null)('the officer screen (G-120, G-122)', () => {
     await signOff({ userId: member.id, moduleId: await addModule({ name: 'Rigging a lantern' }), awardedOn: today() })
     // Past one page of the list: a chip wall built from the first page alone would hide the rest
     // (issue 1146). The suite has added a handful already; this takes the department well past 25.
-    for (let n = 0; n < 26; n += 1) await addModule({ name: `Catalogue filler ${n}` })
+    const fillers: string[] = []
+    for (let n = 0; n < 26; n += 1) fillers.push(await addModule({ name: `Catalogue filler ${n}` }))
 
     forgetSpentStep(app, officer.email)
     const view = await openSignedOutView(app.baseURL)
@@ -415,6 +416,16 @@ describe.skipIf(skip !== null)('the officer screen (G-120, G-122)', () => {
       expect(offered.filter(option => option.startsWith('SGN-')).length).toBeGreaterThan(25)
       expect(offered).toContainEqual(expect.stringContaining('Catalogue filler 25'))
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test^="sign-SGN-"]'))`)).toBe(false)
+
+      // A choice abandoned by closing the modal is not waiting for the next person signed off.
+      await pickOption(view, '[data-test="sign-module"]', `${fillers[3]} Catalogue filler 3`)
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="sign-off-submit"]').disabled`)).toBe(false)
+      await view.evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find(one => one.innerText.trim() === 'Back').click()`)
+      await waitFor(view, `!document.querySelector('[data-test="sign-module"]')`)
+      await click(view, '[data-test="sign-off"]')
+      await waitFor(view, `document.querySelector('[data-test="sign-module"]')`)
+      expect(await textOf(view, '[data-test="sign-module"]')).toContain('Search the catalogue')
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="sign-off-submit"]').disabled`)).toBe(true)
     }
     finally {
       view.close()
