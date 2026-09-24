@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { londonParts } from '#shared/utils/london'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-130 and 0091: a sign-off or a certificate for somebody the picker could not find.
@@ -143,6 +143,15 @@ describe.skipIf(skip !== null)('a sign-off by address (G-130 criteria 2 and 3)',
     expect(await said(refused)).toContain(gate)
     expect(read('SELECT id FROM users WHERE email = ?', person.email)).toBeUndefined()
   })
+
+  test('an address with an account is sent to the search before any prerequisite is weighed', async () => {
+    const gate = await addModule()
+    const advanced = await addModule()
+    await send('POST', `/api/admin/training/modules/${advanced}/prerequisites`, { requiresId: gate })
+    const refused = await send('POST', '/api/admin/training/signoffs', { email: member.email, name: 'Anyone', moduleId: advanced, awardedOn: today() })
+    expect(refused.status).toBe(409)
+    expect(await said(refused)).toContain('search')
+  })
 })
 
 describe.skipIf(skip !== null)('an external certificate by address (G-130 criterion 2)', () => {
@@ -207,11 +216,17 @@ describe.skipIf(skip !== null)('the records screen (G-130 criteria 1 and 7)', ()
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="records-nobody-found"]'))`)).toBe(false)
 
+      // Somebody chosen first must not stay on screen behind the address, or an award meant for
+      // the page they are looking at would go to the address instead.
+      await pickPerson(view, '[data-test="person-picker"]', member.email, member.name)
+      await waitFor(view, `document.querySelector('[data-test="sign-off"]')`, 30_000)
+
       await click(view, '[data-test="person-picker"] input')
       await fill(view, '[data-test="person-picker"] input', person.email)
       await waitFor(view, `document.querySelector('[data-test="records-nobody-found"]')`, 20_000)
       await click(view, '[data-test="records-nobody-found"]')
       await waitFor(view, `document.querySelector('[data-test="records-by-address"]')`)
+      expect(await view.evaluate<number>(`document.querySelectorAll('[data-test="sign-off"]').length`)).toBe(1)
       await fill(view, '[data-test="records-email"] input', person.email)
       await fill(view, '[data-test="records-name"] input', person.name)
       await waitFor(view, `!document.querySelector('[data-test="sign-off"]')?.disabled`)
