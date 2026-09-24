@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { placesFrom, signUpOrderStatement, signUpStatement, walkInRejoinStatement, walkInStatement, withdrawStatement } from '#shared/utils/training-signup'
 import type { SignUpOrder } from '#shared/utils/training-signup'
+import { auditEntry } from '#shared/utils/audit'
+import { preLinkStatement } from '#shared/utils/google-prelink'
+import { pendingGrantConstraintRefusal } from '#shared/utils/pending-grants'
+import { walkInAccountStatements } from '#shared/utils/pending-records'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { expectOneWinner, race } from '#tests/helpers/race'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // A walk-in is somebody the trainer put on the register at the door. It is the same row a sign-up
@@ -107,6 +112,64 @@ describe('a walk-in joins the register as a walk-in (G-117 criterion 5)', () => 
 
       expect(places.find(place => place.userId === 'u-one')?.placed).toBe(true)
       expect(places.find(place => place.userId === 'u-two')?.placed).toBe(false)
+    })
+  })
+})
+
+// What the lookup runs once its own checks have passed: the batch, then reading back whether the
+// account was written, since a predicate that refused raises nothing (0003).
+function mint(database: TestDatabase, index: number, email: string): { status: number } {
+  const id = `walk-in-${index}`
+  const created = auditEntry({ actorId: 'u-trainer', action: 'account.created.console', target: `user:${id}` })
+  try {
+    database.batch(walkInAccountStatements(id, email, email, created).map(statement => boundStatement(database, statement)))
+  }
+  catch (error) {
+    return { status: pendingGrantConstraintRefusal(error)?.statusCode ?? 500 }
+  }
+  return { status: rows(database, 'SELECT id FROM users WHERE id = ?', id).length ? 200 : 409 }
+}
+
+// Pre-link the address to another member's account, as A-104 criterion 6's route writes it.
+function preLink(database: TestDatabase, email: string): { status: number } {
+  database.batch([boundStatement(database, preLinkStatement('u-jo', email))])
+  const [row] = rows<{ pending: string | null }>(database, `SELECT pending_google_email AS pending FROM users WHERE id = 'u-jo'`)
+  return { status: row?.pending === email ? 200 : 409 }
+}
+
+describe('a walk-in by address mints a shadow account only while nobody is pre-linked to it (criteria 2 and 9)', () => {
+  const WORKSPACE = 'walk.in@newtheatre.org.uk'
+
+  test('a fresh address makes the account and its creation entry', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(mint(database, 0, 'fresher@example.test').status).toBe(200)
+      expect(rows(database, `SELECT email, name, password FROM users WHERE id = 'walk-in-0'`))
+        .toEqual([{ email: 'fresher@example.test', name: 'fresher@example.test', password: null }])
+      expect(rows(database, `SELECT action FROM audit_log WHERE target = 'user:walk-in-0'`))
+        .toEqual([{ action: 'account.created.console' }])
+    })
+  })
+
+  test('a pre-link landing after the check and before the write leaves no account and no entry', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      member(database, 'u-jo')
+      // The route's up-front check has already found nobody; the pre-link lands only now.
+      expect(preLink(database, WORKSPACE).status).toBe(200)
+      expect(mint(database, 0, WORKSPACE).status).toBe(409)
+      expect(rows(database, 'SELECT id FROM users WHERE email = ?', WORKSPACE)).toHaveLength(0)
+      expect(rows(database, `SELECT id FROM audit_log WHERE target = 'user:walk-in-0'`)).toHaveLength(0)
+    })
+  })
+
+  test('a pre-link and a walk-in racing for one address leave it leading to one account', async () => {
+    await withDatabase(async (database) => {
+      seed(database)
+      member(database, 'u-jo')
+      const answers = await race(2, async index => index === 0 ? preLink(database, WORKSPACE) : mint(database, 1, WORKSPACE))
+      expectOneWinner(answers)
+      expect(rows(database, 'SELECT id FROM users WHERE email = ? OR pending_google_email = ?', WORKSPACE, WORKSPACE)).toHaveLength(1)
     })
   })
 })

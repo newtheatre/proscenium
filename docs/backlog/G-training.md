@@ -291,6 +291,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   6. Amended 2 September 2026: the same door exists when logging a session that already happened (G-118). Teaching off-system is often taught to people who have not signed in, and a story scoped to the register alone would leave the retrospective log unable to name them.
   7. Amended 2 September 2026: a walk-in joins at the back of the sign-up order, so nobody who signed up in advance loses a place to somebody added at the door.
   8. Amended 2 September 2026: an erased account is refused outright, in both surfaces. Attaching training to a tombstone would write a person back onto the row their erasure emptied (0011).
+  9. Amended 24 September 2026 (issue 1284): an address that an account is pre-linked to for Google sign-in mints nothing and is refused with the instruction to choose that account (A-104, 0091). The shadow account's insert carries that condition as its predicate, so a pre-link that lands after the check and before the write is refused the same way and leaves no account and no audit entry (0003).
 - Source: Prompt Book G-2; audit TR-5
 
 ## G-118: Retrospective delivery logging with dry-run
