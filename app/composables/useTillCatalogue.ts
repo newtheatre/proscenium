@@ -22,6 +22,14 @@ export function useTillCatalogue(session: Ref<TillSession | null>, venueId: Ref<
     if (session.value && venueId.value) void catalogue.refresh()
   })
 
+  // The grid's stock labels trail the shelf from the moment they load, so coming back to the till
+  // (from the SumUp app, say) reads them again (F-128 criterion 8).
+  function onReturn(): void {
+    if (document.visibilityState === 'visible' && session.value && venueId.value) void catalogue.refresh()
+  }
+  onMounted(() => document.addEventListener('visibilitychange', onReturn))
+  onBeforeUnmount(() => document.removeEventListener('visibilitychange', onReturn))
+
   const categories = computed(() => catalogue.data.value?.categories ?? [])
   const products = computed(() => catalogue.data.value?.products ?? [])
   const productsIn = (categoryId: string): SaleProduct[] => products.value.filter(product => product.categoryId === categoryId)
