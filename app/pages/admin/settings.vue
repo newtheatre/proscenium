@@ -381,7 +381,7 @@ onMounted(async () => {
                 <UInputNumber
                   :model-value="pounds(numbers[setting.key])"
                   :min="0"
-                  :step="0.5"
+                  :step="0.01"
                   :format-options="{ style: 'currency', currency: 'GBP' }"
                   :aria-label="setting.describes"
                   class="w-48"

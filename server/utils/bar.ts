@@ -239,6 +239,15 @@ export function onHandOf(itemId: string): SQL {
   return sql`SELECT coalesce(sum(qty), 0) AS onHand FROM stock_movements WHERE item_id = ${itemId}`
 }
 
+// Scoped to the items a basket pours, never the catalogue: the caller chunks the list (0003, 0006).
+export function onHandOfItems(itemIds: string[]): SQL {
+  return sql`
+    SELECT item_id AS itemId, coalesce(sum(qty), 0) AS onHand FROM stock_movements
+    WHERE item_id IN (${sql.join(itemIds.map(id => sql`${id}`), sql`, `)})
+    GROUP BY item_id
+  `
+}
+
 export async function onHand(itemId: string): Promise<number> {
   const [row] = await db.all<{ onHand: number }>(onHandOf(itemId))
   return Number(row?.onHand ?? 0)

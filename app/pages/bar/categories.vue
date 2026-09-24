@@ -433,7 +433,7 @@ const columns: TableColumn<BarCategory>[] = [
               <UInputNumber
                 v-model="pounds"
                 :min="0"
-                :step="0.1"
+                :step="0.01"
                 :format-options="{ style: 'currency', currency: 'GBP' }"
                 class="w-full"
                 data-test="category-price-amount"

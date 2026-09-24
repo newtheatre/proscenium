@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
-import { categoriesShown } from '#shared/utils/sale'
+import { categoriesShown, productBlocked, productOutOfStock, sizeBlocked, sizeOutOfStock } from '#shared/utils/sale'
 import { plural } from '#shared/utils/text'
 import type { SaleCategory, SaleChoice, SaleProduct, SaleVariant } from '#shared/utils/sale'
 
@@ -28,6 +28,9 @@ const emit = defineEmits<{
 const nonEmptyCategories = computed(() => props.categories.filter(category => props.productsIn(category.id).length))
 const chosenCategoryId = ref<string | null>(null)
 const shownCategories = computed(() => categoriesShown(nonEmptyCategories.value, chosenCategoryId.value))
+
+// Stock is read with the catalogue and can trail the shelf; the charge is what checks it for real.
+const STOCK_AS_LOADED = 'Stock as it stood when the till last loaded; every charge checks it again.'
 
 // What the tile says under the name, so a tile costing a second tap says so before it is tapped.
 function priceLine(product: SaleProduct): string {
@@ -90,6 +93,7 @@ function priceLine(product: SaleProduct): string {
             color="neutral"
             variant="ghost"
             class="min-h-12 grow justify-start p-1 text-left"
+            :disabled="productBlocked(product)"
             :data-test="`product-${product.id}`"
             @click="tapProduct(product)"
           >
@@ -106,6 +110,16 @@ function priceLine(product: SaleProduct): string {
                 icon="i-lucide-id-card"
                 label="Check ID"
                 :data-test="`restricted-mark-${product.id}`"
+              />
+              <!-- Advice read when the catalogue loaded, not a live count (F-128 criterion 8). -->
+              <UBadge
+                v-if="productOutOfStock(product)"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+                icon="i-lucide-package-x"
+                label="Out of stock"
+                :data-test="`out-of-stock-${product.id}`"
               />
             </span>
           </UButton>
@@ -143,12 +157,26 @@ function priceLine(product: SaleProduct): string {
             color="neutral"
             variant="subtle"
             class="min-h-12"
+            :disabled="sizeBlocked(variant)"
             :data-test="`variant-${variant.id}`"
             @click="tapVariant(sizing!.name, variant)"
           >
-            {{ variant.label }} {{ saysMoney(variant.pricePence) }}
+            <span class="flex flex-col items-start">
+              <span>{{ variant.label }} {{ saysMoney(variant.pricePence) }}</span>
+              <span
+                v-if="sizeOutOfStock(variant)"
+                class="text-xs text-muted"
+                :data-test="`variant-out-of-stock-${variant.id}`"
+              >Out of stock</span>
+            </span>
           </UButton>
         </div>
+        <p
+          v-if="sizing?.variants.some(sizeOutOfStock)"
+          class="mt-2 text-xs text-muted"
+        >
+          {{ STOCK_AS_LOADED }}
+        </p>
         <div class="mt-2 flex justify-end">
           <UButton
             color="neutral"
