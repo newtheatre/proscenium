@@ -20,6 +20,9 @@ interface ConfigKeyDefinition {
   // A value that can hold personal data. Its changes are audited as a hash rather than as the
   // value, because audit detail carries identifiers and never people (0011, 0024).
   sensitive?: true
+  // A switch for a feature not built: the screen disables it and links the story instead of
+  // offering a choice that decides nothing (J-104 criterion 6).
+  plannedFor?: { story: string, issue: number }
 }
 
 export const CONFIG_KEYS = {
@@ -170,6 +173,7 @@ export const CONFIG_KEYS = {
     default: false,
     workshop: 'money-and-box-office',
     describes: 'Discount codes exist as a capability and stay off until the committee wants them.',
+    plannedFor: { story: 'D-204', issue: 436 },
   },
   // Module J: governance
 
@@ -868,4 +872,9 @@ export function isSensitive(key: ConfigKey): boolean {
 // feature that needs it waits on its workshop (0019).
 export function hasDefault(key: ConfigKey): boolean {
   return 'default' in CONFIG_KEYS[key]
+}
+
+export function plannedFor(key: ConfigKey): { story: string, issue: number } | null {
+  const definition = CONFIG_KEYS[key]
+  return 'plannedFor' in definition ? definition.plannedFor : null
 }

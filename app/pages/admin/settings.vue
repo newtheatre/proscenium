@@ -35,6 +35,7 @@ interface Setting {
   set: boolean
   enforced: boolean
   sensitive: boolean
+  plannedFor: { story: string, issue: number } | null
   wideBlastRadius: boolean
   updatedAt: number | null
   updatedBy: { id: string, name: string } | null
@@ -90,6 +91,8 @@ function asText(value: unknown): string {
   if (value === null || value === undefined) return ''
   return typeof value === 'string' ? value : JSON.stringify(value)
 }
+
+const storyLink = (issue: number): string => `https://github.com/newtheatre/proscenium/issues/${issue}`
 
 // Money is entered in pounds and stored in pence, everywhere (0004, 0032). The key says which
 // keys those are, because the schema only knows it is an integer.
@@ -327,8 +330,21 @@ onMounted(async () => {
                 >
                   Wide blast radius
                 </UBadge>
+                <UButton
+                  v-if="setting.plannedFor"
+                  :to="storyLink(setting.plannedFor.issue)"
+                  target="_blank"
+                  color="neutral"
+                  variant="subtle"
+                  size="xs"
+                  trailing-icon="i-lucide-external-link"
+                  :data-test="`planned-${setting.key}`"
+                  title="Nothing reads this switch: the feature it turns on is not built. The link opens the story that builds it."
+                >
+                  Not built ({{ setting.plannedFor.story }})
+                </UButton>
                 <UBadge
-                  v-if="!setting.enforced"
+                  v-else-if="!setting.enforced"
                   color="neutral"
                   variant="subtle"
                   size="sm"
@@ -353,6 +369,7 @@ onMounted(async () => {
                 v-if="kind(setting) === 'boolean'"
                 :model-value="standing(setting) === true"
                 :aria-label="setting.describes"
+                :disabled="setting.plannedFor !== null"
                 :loading="saving === setting.key"
                 :data-test="`toggle-${setting.key}`"
                 @update:model-value="attemptSave(setting, $event)"
