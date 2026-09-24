@@ -1,4 +1,7 @@
 import { listFailureFrom } from './useListFailure'
+import { deviceNightCacheStore } from './useNightCache'
+import { currentShowNight } from '#shared/utils/show-night'
+import { recallTillVenue, rememberTillVenue } from '#shared/utils/till'
 import type { ListFailure } from './useListFailure'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
 import type { TillSession, TillVenueOption } from '#shared/utils/till'
@@ -10,7 +13,11 @@ export function useTillSession() {
   const route = useRoute()
   // Optional: names which venue when more than one runs tonight, which the route already resolves
   // unaided on the (typical) night only one does. Multi-venue bars are their own story (F-202).
-  const requestedVenueId = computed(() => (typeof route.query.venueId === 'string' ? route.query.venueId : undefined))
+  const queriedVenueId = computed(() => (typeof route.query.venueId === 'string' ? route.query.venueId : undefined))
+  // Failing the query, the bar this device opened tonight: the SumUp app can return in a fresh tab
+  // on a bare link (issue 1257). Read on mount, since the server has no device to ask.
+  const deviceVenueId = ref<string | undefined>(undefined)
+  const requestedVenueId = computed(() => queriedVenueId.value ?? deviceVenueId.value)
   const syncedAt = ref<Date | null>(null)
   // Carries the enrol path a console list already reads the same way (0040, issue 897).
   const failure = ref<ListFailure | null>(null)
@@ -22,6 +29,7 @@ export function useTillSession() {
   async function load(): Promise<void> {
     busy.value = true
     failure.value = null
+    let askAgain = false
     try {
       const status = await request<{ night: string, venueId: string, session: TillSession | null, sumupEnabled: boolean }>('/api/till', {
         query: { venueId: requestedVenueId.value },
@@ -30,8 +38,15 @@ export function useTillSession() {
       venueId.value = status.venueId
       sumupEnabled.value = status.sumupEnabled
       syncedAt.value = new Date()
+      rememberTillVenue(deviceNightCacheStore(), status.night, status.venueId)
     }
     catch (refused) {
+      // A remembered bar that no longer answers is dropped, and the till asks as if it had none.
+      if (!queriedVenueId.value && deviceVenueId.value) {
+        deviceVenueId.value = undefined
+        askAgain = true
+        return
+      }
       failure.value = listFailureFrom(refused)
       // A recognised refusal is still a completed sync, so NightStale is not left saying "not yet
       // synced" forever (matching /tonight/index.vue's own shape).
@@ -45,6 +60,7 @@ export function useTillSession() {
     }
     finally {
       busy.value = false
+      if (askAgain) await load()
     }
   }
 
@@ -87,6 +103,7 @@ export function useTillSession() {
       })
       session.value = opened.session
       syncedAt.value = new Date()
+      rememberTillVenue(deviceNightCacheStore(), opened.session.night, opened.session.venueId)
     }
     catch (refused) {
       failure.value = listFailureFrom(refused)
@@ -173,7 +190,10 @@ export function useTillSession() {
     }
   }
 
-  onMounted(load)
+  onMounted(() => {
+    deviceVenueId.value = recallTillVenue(deviceNightCacheStore(), currentShowNight()) ?? undefined
+    return load()
+  })
 
   return {
     requestedVenueId,

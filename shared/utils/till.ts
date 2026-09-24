@@ -49,3 +49,29 @@ export function saysChargeOnReader(totalPence: number | null, onTab: boolean): s
 export function saysChargeOnSumUp(totalPence: number | null): string {
   return totalPence === null ? 'Charge on SumUp' : `Charge ${saysMoney(totalPence)} on SumUp`
 }
+
+// The bar this device opened tonight, so a bare link to the till (the SumUp app's return in a
+// fresh tab, issue 1257) opens there rather than asking again. Kept for its show night only (0014).
+export const TILL_VENUE_DEVICE_KEY = 'nnt-till-venue'
+
+interface DeviceStore {
+  getItem: (key: string) => string | null
+  setItem: (key: string, value: string) => void
+}
+
+export function rememberTillVenue(store: Pick<DeviceStore, 'setItem'>, night: string, venueId: string): void {
+  try {
+    store.setItem(TILL_VENUE_DEVICE_KEY, JSON.stringify({ night, venueId }))
+  }
+  catch { /* a device that keeps nothing asks which bar again */ }
+}
+
+export function recallTillVenue(store: Pick<DeviceStore, 'getItem'>, night: string): string | null {
+  try {
+    const held = JSON.parse(store.getItem(TILL_VENUE_DEVICE_KEY) ?? 'null') as { night?: unknown, venueId?: unknown } | null
+    return held?.night === night && typeof held.venueId === 'string' ? held.venueId : null
+  }
+  catch {
+    return null
+  }
+}
