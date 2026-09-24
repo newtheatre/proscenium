@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { HELP_ROOT } from '#shared/utils/docs-paths'
 
 // K-128 criterion 2, issue 1152 item 8: the public shell's words, swept once and held here. The
 // member shell's words are swept and held beside it, in tests/unit/member-copy.test.ts.
@@ -44,12 +45,10 @@ function publicFiles(): string[] {
   return [...found, ...SHARED_PUBLIC].sort()
 }
 
-// Public help is read by the same visitor as a policy page, so it is held to the same words (0093).
-const HELP = 'content/help'
-
 function policyFiles(): string[] {
   const policies = [...new Bun.Glob('*.md').scanSync({ cwd: POLICIES, onlyFiles: true })].map(path => `${POLICIES}/${path}`)
-  const help = [...new Bun.Glob('**/*.md').scanSync({ cwd: HELP, onlyFiles: true })].map(path => `${HELP}/${path}`)
+  // Public help is read by the same visitor as a policy page, so it is held to the same words (0093).
+  const help = [...new Bun.Glob('**/*.md').scanSync({ cwd: HELP_ROOT, onlyFiles: true })].map(path => `${HELP_ROOT}/${path}`)
   return [...policies, ...help].sort()
 }
 
