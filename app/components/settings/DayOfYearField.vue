@@ -3,8 +3,8 @@ import { CalendarDate } from '@internationalized/date'
 import { isMonthDay } from '#shared/utils/london'
 import { saysMonth, saysMonthDay } from '#shared/utils/when'
 
-// A yearly boundary has no year, so the calendar draws a common one and never names it: 29
-// February is not offered because it is not in every year (J-104 criterion 3, audit TR-7).
+// A yearly boundary has no year, so the calendar draws a common one and never shows it (Reka's
+// screen-reader labels still say it): 29 February is not in every year (J-104 criterion 3).
 const COMMON_YEAR = 2001
 
 const model = defineModel<string>({ default: '' })
