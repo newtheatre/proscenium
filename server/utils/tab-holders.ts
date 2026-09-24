@@ -14,6 +14,7 @@ export function authorisedTabHoldersQuery(ids: readonly string[], roles: readonl
   return sql`
     SELECT u.id, u.name FROM users u
     WHERE u.anonymised_at IS NULL
+      AND u.disabled = 0
       ${only === undefined ? sql`` : sql`AND u.id = ${only}`}
       AND (
         u.id IN (SELECT value FROM json_each(${JSON.stringify(ids)}))

@@ -210,8 +210,9 @@ Open questions:
      settled in Phase 0); authorisation is checked at the write path on every charge. Amended 24
      September 2026 (issue 1264): the authorised set is the people named in
      `BAR_AUTHORISED_TAB_HOLDERS` together with everybody holding a live grant of a role named in
-     `BAR_AUTHORISED_TAB_ROLES`. A lapsed or revoked grant stops the next charge. The grants are
-     matched by a subquery on the charge's own statement, never expanded to a list of ids (0006).
+     `BAR_AUTHORISED_TAB_ROLES`. A lapsed or revoked grant stops the next charge, and a disabled
+     or anonymised account is never a holder. The grants are matched by a subquery in the query
+     that authorises the charge, never expanded to a list of ids (0006).
   2. Only bar lines may ride on a tab; ticket money can never be charged to one, structurally
      rather than procedurally.
   3. A configurable hard cap applies per holder; a charge that would take the outstanding balance
