@@ -570,6 +570,9 @@ Open questions:
      till was open in); the outcome is otherwise accepted from anyone holding bar authority
      tonight. The outcome is a claim, exactly as trustworthy as a tap on "charged" today, and the
      SumUp transaction code it carries is recorded so a fabricated one shows at reconciliation.
+     The answer names the attempt's venue, so the return page's way back opens the till at that
+     bar in whichever browser the app returned to, and the till remembers tonight's bar on the
+     device for the show night (0014), so a bare link to it does not ask again.
   4. A success re-runs the whole cross-check against the database as it stands and posts the sale
      as F-122 and F-123 describe. If the basket can no longer be sold (the booking was collected
      at the desk meanwhile, the house filled), the attempt is marked mismatched with the reason,
@@ -586,7 +589,7 @@ Open questions:
      resolved, so the phone and the laptop cannot both record one customer.
 - Source: SumUp Payment Switch (developer.sumup.com/terminal-payments/payment-switch, and the
   sumup-android-url-scheme and sumup-ios-url-scheme references); decision 0069; Matt's
-  direction, 13 September 2026.
+  direction, 13 September 2026; issue 1257 (a cancelled charge on Android returned in a new tab).
 
 ## F-125: The till opens at a venue with nothing running
 

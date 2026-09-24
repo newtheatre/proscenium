@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { isOpen, requireOpenSession } from '#server/utils/till'
 import { closeTillSessionForm } from '#shared/utils/reconciliation'
-import { tillScopeForm } from '#shared/utils/till'
+import { TILL_VENUE_DEVICE_KEY, recallTillVenue, rememberTillVenue, tillScopeForm } from '#shared/utils/till'
 import type { TillSession } from '#shared/utils/till'
 
 // F-102's write-path rules over a session object, with no database beneath them: the schema's
@@ -78,5 +78,53 @@ describe('closing names which session and what the reader read (F-118 criterion 
 
   test('a negative reading is refused: the reader never shows less than nothing', () => {
     expect(closeTillSessionForm.safeParse({ id: 'till-1', actualZPence: -1 }).success).toBe(false)
+  })
+})
+
+function aStore() {
+  const held = new Map<string, string>()
+  return {
+    getItem: (key: string) => held.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      held.set(key, value)
+    },
+  }
+}
+
+describe('the device remembers tonight\'s bar, and only tonight\'s (F-124 criterion 3, 0014, issue 1257)', () => {
+  test('a bar remembered tonight is recalled tonight', () => {
+    const store = aStore()
+    rememberTillVenue(store, '2026-09-24', 'venue-1')
+    expect(recallTillVenue(store, '2026-09-24')).toBe('venue-1')
+  })
+
+  test('the next show night asks again rather than opening last night\'s bar', () => {
+    const store = aStore()
+    rememberTillVenue(store, '2026-09-24', 'venue-1')
+    expect(recallTillVenue(store, '2026-09-25')).toBeNull()
+  })
+
+  test('a later choice replaces the earlier one', () => {
+    const store = aStore()
+    rememberTillVenue(store, '2026-09-24', 'venue-1')
+    rememberTillVenue(store, '2026-09-24', 'venue-2')
+    expect(recallTillVenue(store, '2026-09-24')).toBe('venue-2')
+  })
+
+  test('something unreadable under the key is nothing remembered, not a throw', () => {
+    const store = aStore()
+    store.setItem(TILL_VENUE_DEVICE_KEY, 'not json')
+    expect(recallTillVenue(store, '2026-09-24')).toBeNull()
+    store.setItem(TILL_VENUE_DEVICE_KEY, JSON.stringify({ night: '2026-09-24', venueId: 7 }))
+    expect(recallTillVenue(store, '2026-09-24')).toBeNull()
+  })
+
+  test('a device that refuses storage still opens the till', () => {
+    const refusing = {
+      getItem: () => { throw new Error('denied') },
+      setItem: () => { throw new Error('denied') },
+    }
+    expect(() => rememberTillVenue(refusing, '2026-09-24', 'venue-1')).not.toThrow()
+    expect(recallTillVenue(refusing, '2026-09-24')).toBeNull()
   })
 })
