@@ -3,6 +3,7 @@ import {
   MalformedNightCacheKeyError,
   NIGHT_CACHE_PREFIX,
   memoryNightCacheStore,
+  newestRequest,
   pruneNightCache,
   readNightCache,
   refreshNightCache,
@@ -54,6 +55,7 @@ export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: (
   const pending = ref(false)
   const error = ref<Error | null>(null)
   const live = ref(false)
+  const ask = newestRequest()
 
   // What the device holds, with no round trip. A screen shows this before it asks for anything,
   // which is what makes an offline open a full render rather than a spinner.
@@ -66,9 +68,13 @@ export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: (
 
   async function refresh(): Promise<void> {
     const asked = toValue(key)
+    const newest = ask()
     pending.value = true
     try {
-      const entry = await refreshNightCache<T>(store, asked, loader)
+      const answer = await loader()
+      // A newer request is in flight or has answered: this one may not touch screen or device.
+      if (!newest()) return
+      const entry = await refreshNightCache<T>(store, asked, () => Promise.resolve(answer))
       // The screen can move venue under a slow load, and that answer is no longer its night.
       if (asked !== toValue(key)) return
       data.value = entry.data
@@ -81,13 +87,13 @@ export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: (
       // A malformed key is a programming error, not the offline case this cache exists for:
       // it must not vanish into a stale-looking screen the way a real loader failure should.
       if (thrown instanceof MalformedNightCacheKeyError) throw thrown
-      if (asked !== toValue(key)) return
+      if (!newest() || asked !== toValue(key)) return
       // What the screen is showing stays put: a failed load is a stale screen, never a blank one.
       error.value = thrown instanceof Error ? thrown : new Error(String(thrown))
       live.value = false
     }
     finally {
-      if (asked === toValue(key)) pending.value = false
+      if (newest()) pending.value = false
     }
   }
 

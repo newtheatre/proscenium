@@ -173,6 +173,16 @@ export async function refreshNightCache<T>(store: NightCacheStore, key: NightCac
   return stored ?? { key, night: nightCacheKeyParts(key)!.night, cachedAt: at.getTime(), data }
 }
 
+// Each call starts a request and hands back whether it is still the newest one asked, because
+// the slowest answer is not the freshest: a read from before a sale can land after one from after.
+export function newestRequest(): () => () => boolean {
+  let latest = 0
+  return () => {
+    const mine = ++latest
+    return () => mine === latest
+  }
+}
+
 // The fallback when a device refuses storage, and what a test caches into. It lives as long as
 // the tab, so a screen still holds its night while the app is open.
 export function memoryNightCacheStore(): NightCacheStore {
