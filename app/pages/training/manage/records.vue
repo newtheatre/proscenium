@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { can, recordTrainingByAddress } from '#shared/utils/abilities'
+import { can, recordTrainingByAddress, viewAccounts } from '#shared/utils/abilities'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { EVIDENCE_REF_LIMIT, REVOKE_REASON_LIMIT, saysKind, saysSource } from '#shared/utils/training'
 import { saysDay } from '#shared/utils/when'
@@ -46,6 +46,8 @@ const saving = ref(false)
 
 // The address is only ever the fallback once the picker has found nobody (G-130, 0091).
 const byAddressAllowed = can(useViewer().value, recordTrainingByAddress)
+// A lead holds no accounts.read, so their picker asks a route that answers ids and names only.
+const pickerEndpoint = can(useViewer().value, viewAccounts) ? undefined : '/api/admin/training/people'
 const picker = ref<{ preset: (person: { id: string, name: string, email: string }) => void } | null>(null)
 const nobody = ref<string | null>(null)
 const byAddress = ref(false)
@@ -328,6 +330,7 @@ watch(modalOpen, (nowOpen) => {
         v-show="!byAddress"
         ref="picker"
         v-model="person"
+        :endpoint="pickerEndpoint"
         class="w-full sm:w-96"
         @nobody="term => nobody = term"
       />

@@ -2349,6 +2349,8 @@ everybody already on it, so a walk-in never takes a place from somebody who sign
 An address with no account resolves through `POST /api/admin/training/attendees/lookup`, which
 mints the claimable password-less account A-116 describes and refuses an anonymised one outright:
 attaching training to a tombstone would write a person back onto the row erasure emptied (0011).
+An address an account is pre-linked to for Google (A-104) is refused up front, with the same check
+a record by address makes (0091).
 The same lookup serves the retrospective log, because teaching off-system is often taught to people
 who have not signed in.
 
@@ -2521,6 +2523,9 @@ account having been written; the unique address settles two recorders racing (00
 an account holds or is pre-linked to is refused with the instruction to choose that account.
 Making the account needs `training.by-address` or a live lead of the module's department, never
 `accounts.create`, and nothing is sent to the address: A-116's claim is what hands it over.
+A lead holds no `accounts.read`, so the records screen's picker asks
+`GET /api/admin/training/people?search=` in its place, which answers an id and a name and nothing
+more, to `training.write` or a live lead appointment.
 
 A **retrospective delivery log** (G-118) is the third, at `POST /api/admin/training/deliveries`,
 with its dry-run at `POST /api/admin/training/deliveries/preview`. It writes one record per

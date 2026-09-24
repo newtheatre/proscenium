@@ -56,8 +56,12 @@ because the CHECK on `users` refuses it a password (0008).
 - A prerequisite is checked against what the new account holds, which is nothing, so a module
   with prerequisites cannot be the first thing recorded by address; the prerequisite is recorded
   first and the rest against the account it made.
-- The register's walk-in lookup (`attendees/lookup`) predates this and does not refuse a
-  pre-linked address. Bringing it under the same predicate is its own change.
+- A department lead holds no `accounts.read`, so the records screen's picker could not search
+  for them, and the address fallback behind it never appeared. The picker asks a training route
+  instead, which answers an id and a name and nothing more, to whoever may award a record.
+- The register's walk-in lookup (`attendees/lookup`) refuses a pre-linked address with the same
+  check, up front. Its account insert does not yet carry the predicate, so a pre-link landing
+  between the check and the write is not caught there.
 
 ## Options considered
 

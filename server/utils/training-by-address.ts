@@ -7,13 +7,18 @@ import type { RecordByAddress } from '#shared/utils/pending-records'
 // The picker is the way to anybody with an account, pre-linked ones included (K-123, A-104, 0091).
 export async function assertNobodyHolds(email: string): Promise<void> {
   if (await findByEmail(email)) throw createError({ statusCode: 409, statusMessage: CHOOSE_INSTEAD })
+  await assertNotPreLinked(email)
+  if (undeliverableReason({ email, anonymisedAt: null })) {
+    throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
+  }
+}
+
+// Google signs the pre-linked account in first at this address, so a second one would lose it (A-104).
+export async function assertNotPreLinked(email: string): Promise<void> {
   const [preLinked] = await db.select({ name: schema.users.name }).from(schema.users)
     .where(eq(schema.users.pendingGoogleEmail, email)).limit(1)
   if (preLinked) {
     throw createError({ statusCode: 409, statusMessage: `That address is waiting to be linked to ${preLinked.name}'s account. Choose them with the search instead.` })
-  }
-  if (undeliverableReason({ email, anonymisedAt: null })) {
-    throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
   }
 }
 
