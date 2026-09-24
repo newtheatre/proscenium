@@ -16,6 +16,7 @@ function aVariant(over: Partial<SaleVariant> = {}): SaleVariant {
     pricePence: 500,
     priceSource: 'variant',
     choice: null,
+    stock: null,
     ...over,
   }
 }
