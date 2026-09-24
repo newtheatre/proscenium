@@ -88,6 +88,7 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'digest.rooms': 'ROOMS',
   'digest.announcements': 'ANNOUNCEMENTS',
   'health.alert': 'ACCOUNTS',
+  'bank-holidays.sync-failed': 'ACCOUNTS',
   'retention.warning.window': 'ACCOUNTS',
   'retention.warning.final': 'ACCOUNTS',
   'retention.digest': 'ACCOUNTS',

@@ -790,6 +790,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/config/[key].put.ts', actions: ['config.changed'], via: ['server/utils/config-write.ts'] },
   { route: 'server/api/admin/config/[key]/blast-radius.get.ts', exempt: 'reads a live count; nothing is written' },
   { route: 'server/api/admin/config/[key]/revert.post.ts', actions: ['config.changed'], via: ['server/utils/config-write.ts'] },
+  { route: 'server/api/admin/bank-holidays/sync.post.ts', actions: ['bank-holidays.synced', 'bank-holidays.sync-failed', 'config.changed'], via: ['server/utils/bank-holiday-statements.ts'] },
   { route: 'server/api/docs/report-drift.post.ts', actions: ['docs.drift-reported'] },
   { route: 'server/api/feedback/index.post.ts', actions: ['feedback.submitted'] },
 

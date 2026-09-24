@@ -88,6 +88,32 @@ describe.skipIf(skip !== null)('the health endpoint (J-106, K-107)', () => {
     // the public internet, since the route is deliberately unauthenticated.
     expect(['ok', 'missing']).toContain(body.sessionKey)
   })
+
+  // C-121 criterion 8, 0092: the sync is reported beside the coverage, and neither fails `ok`,
+  // because gov.uk being down is not this site being down.
+  test('a failed bank holiday sync is reported, naming why, without failing the check', async () => {
+    const database = new Database(app.databaseFile)
+    try {
+      database.query(`INSERT INTO audit_log (id, actor_id, action, target, detail, created_at)
+        VALUES (?, NULL, 'bank-holidays.sync-failed', NULL, ?, unixepoch())`)
+        .run(crypto.randomUUID().replaceAll('-', ''), JSON.stringify({ failure: 'timeout' }))
+    }
+    finally {
+      database.close()
+    }
+
+    const response = await fetch(`${app.baseURL}/api/health`)
+    const body = await response.json() as {
+      ok: boolean
+      bankHolidays: { ok: boolean, coveredTo: string | null, sync: { ok: boolean, status: string, failure: string | null, syncedAt: number | null, failedAt: number | null } }
+    }
+
+    expect(response.status).toBe(200)
+    expect(body.ok).toBe(true)
+    expect(body.bankHolidays.coveredTo).not.toBeNull()
+    expect(body.bankHolidays.sync).toMatchObject({ ok: false, status: 'failed', failure: 'timeout' })
+    expect(typeof body.bankHolidays.sync.failedAt).toBe('number')
+  })
 })
 
 interface WatchResult { outcome: string }

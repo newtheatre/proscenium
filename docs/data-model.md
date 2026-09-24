@@ -2073,7 +2073,8 @@ sends one message covering our rooms and theirs together.
 
 **Notice is counted in working days**, defaulting to three, from the member's ask rather than from
 the day the form goes in: a request waiting in the queue eats its own slack. Saturdays, Sundays and
-any date in `BANK_HOLIDAYS` do not count, and **the booking's own date is never judged**, only the
+any date in `BANK_HOLIDAYS` (copied weekly from gov.uk by `bank-holidays:sync`, never edited by
+hand, decision 0092) do not count, and **the booking's own date is never judged**, only the
 gap before it, so a Saturday get-in is ordinary. Where the holiday list does not reach the date
 being judged the request is **refused** rather than counted, because a list read as "no holidays"
 grants less notice than the rule requires; `/api/health` and the settings screen both report

@@ -376,10 +376,13 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   1. Notice for a room we do not manage is counted in **working days**: Saturdays, Sundays and bank holidays do not count. The number is configuration, defaulting to three.
   2. The count runs from **the member's ask**, not from the day the form goes in. A request waiting in the queue eats its own slack, and the officer's screen shows the date the form has to go in by.
   3. **The booking's own date is never judged.** A Saturday get-in, a Sunday rehearsal and a bank holiday meeting are all ordinary; only the gap before the booking is counted.
-  4. Bank holidays are a configured list of dates, editable by the committee, defaulting to the published England and Wales dates.
+  4. Bank holidays are a configured list of dates, editable by the committee, defaulting to the published England and Wales dates. Amended 24 September 2026 (issue 1267): the list is copied from gov.uk's published England and Wales dates by a weekly sync and is never edited by hand; the settings write path refuses a manual change (0092).
   5. A request is **refused** when the list does not cover the period being counted, naming the last date it does cover. A list that has run out must never be read as "no holidays", because that silently grants less notice than the rule requires.
   6. Coverage running short is visible before anybody is refused: `/api/health` reports it, and the settings screen shows the last covered date beside the list.
-- Source: the Theatre Manager's account of the Students' Union's form; decision 0038.
+  7. Added 24 September 2026 (issue 1267, 0092): the sync fetches `https://www.gov.uk/bank-holidays.json` with a ten second timeout, validates it, and replaces the list only on a valid response, keeping stored dates older than the feed's first. A failure leaves the list untouched and is recorded, with no response text, as one word from a fixed vocabulary.
+  8. Added 24 September 2026 (issue 1267, 0092): a failed or stale sync is visible. `/api/health` reports the sync as synced, failed, stale (no success for eight days) or never, beside the coverage it already reports; the settings card shows the list read-only with the last successful sync, any failure, and a Sync now action.
+  9. Added 24 September 2026 (issue 1267, 0092): a sync still failing six days after its streak began tells the IT Manager through the notification centre, once per person per streak.
+- Source: the Theatre Manager's account of the Students' Union's form; decisions 0038 and 0092.
 
 ## C-122: One queue, whoever manages the room
 
