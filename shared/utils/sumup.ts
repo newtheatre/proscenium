@@ -181,7 +181,7 @@ export interface SumupReturnAnswer {
 export function sumupReturnWords(answer: SumupReturnAnswer): { headline: string, detail: string } {
   switch (answer.status) {
     case 'SUCCEEDED': return { headline: `Recorded: ${saysMoney(answer.receiptTotalPence ?? answer.totalPence)}`, detail: 'The till has it. Close this page.' }
-    case 'FAILED': return { headline: 'Not taken', detail: 'SumUp says the payment did not go through, so nothing was recorded. The till brings the basket back on this phone.' }
+    case 'FAILED': return { headline: 'Not taken', detail: 'SumUp says the payment did not go through, so nothing was recorded. Back to the till brings the basket back, ready to try again.' }
     case 'ABANDONED': return { headline: 'Already given up on', detail: 'This hand-off was given up on before SumUp answered, so nothing was recorded. If the reader took the money, ring it up again on the till.' }
     case 'MISMATCH': return { headline: 'Taken on the reader, not recorded', detail: `${answer.error ?? 'The sale was not recorded.'} Tell the duty manager: the reader took this money and the till has no record of it.` }
     default: return { headline: saysAttemptStatus(answer.status), detail: 'The till is recording it.' }

@@ -22,6 +22,8 @@ const props = defineProps<{
   tabHolders: TabHolder[]
   hasTicketMoney: boolean
   chargeFailure: string | null
+  // Only on a basket SumUp turned down; the retry is a new hand-off through the ordinary charge.
+  retrySumup?: boolean
   priceFailure: string | null
   priced: PricedBasket | null
   grandTotalPence: number | null
@@ -32,6 +34,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   openAllergens: [{ name: string, state: SaleProduct['allergenState'], note: string | null }]
+  retrySumup: []
 }>()
 
 const selectedDiscountId = defineModel<string | null>('selectedDiscountId', { required: true })
@@ -198,7 +201,20 @@ function productFor(line: BasketLine): SaleProduct | undefined {
       color="error"
       variant="subtle"
       :description="chargeFailure"
-    />
+    >
+      <template
+        v-if="retrySumup"
+        #actions
+      >
+        <UButton
+          class="min-h-12"
+          data-test="charge-failure-retry-sumup"
+          @click="emit('retrySumup')"
+        >
+          Try SumUp again
+        </UButton>
+      </template>
+    </UAlert>
     <UAlert
       v-if="priceFailure"
       data-test="price-failure"

@@ -1,4 +1,4 @@
-import { computed, getCurrentInstance, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { usePendingPoll } from './usePendingPoll'
 import { useSumUp } from './useSumUp'
 import { refusalText } from '../utils/refusal'
@@ -7,6 +7,7 @@ import type { PricedLine, SaleReceipt, TillBooking } from '#shared/utils/sale'
 import type { SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
 import type { TillSession } from '#shared/utils/till'
 import type { BasketLine, WalkUpLine } from './useTillBasket'
+import type { PendingAttempt } from './useSumUp'
 
 // The screen-side half of a SumUp hand-off (F-124): the attempt lifecycle, the poll, the
 // visibility listeners and what happens once an answer lands. `useSumUp` holds the device state.
@@ -42,10 +43,16 @@ export interface SumUpChargeDeps {
   // The one place that knows what a fresh sale's discount and tab holder are (none), so this
   // does not keep its own copy of that rule (useTillBasket.ts).
   resetSelections: () => void
+  // The attempt the return page linked back with, which a fresh tab has nothing else to go on for.
+  returnedAttemptId?: string | null
+  isVisible?: () => boolean
 }
+
+const RESTORED_ELSEWHERE = 'SumUp did not take that payment, and its basket was restored in another tab on this phone. Carry on in that tab.'
 
 export function useSumUpCharge(deps: SumUpChargeDeps) {
   const { request, venueId, sumupEnabled, selectedTabHolderId, session, basket, ticketLines, walkUpLines, selectedDiscountId, charged, chargeFailure, resetSelections } = deps
+  const isVisible = deps.isVisible ?? (() => typeof document === 'undefined' || document.visibilityState !== 'hidden')
 
   const sumup = useSumUp<SumUpSnapshot>()
   const sumupAvailable = computed(() => sumupEnabled.value && sumup.handheld.value && selectedTabHolderId.value === null)
@@ -88,23 +95,73 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     }
     else if (status === 'FAILED' || status === 'ABANDONED') {
       stopWatching()
-      basket.value = pending.basket.bar
-      ticketLines.value = pending.basket.tickets
-      walkUpLines.value = pending.basket.walkUps
-      selectedDiscountId.value = pending.basket.discountId
-      // After the restore has flushed: the till clears this on any basket edit, and the restore
-      // itself is one (issue 1144).
-      void nextTick(() => {
-        chargeFailure.value = status === 'FAILED' ? 'The SumUp app reported the payment did not go through. The basket is back.' : 'That hand-off was abandoned. The basket is back; if the reader did take the money, ring it up again.'
-      })
-      sumup.forget()
+      sumup.markReturned(pending, status)
       waiting.value = null
       void refreshOpenAttempts()
+      takeReturned(pending.id, { ...pending, status })
     }
     else if (status === 'MISMATCH') {
       stopWatching()
       void refreshOpenAttempts()
     }
+  }
+
+  // A restored basket's retry is the ordinary charge, cross-check and all (F-104 criterion 3); the
+  // notice is for a tab that lost the claim to another (F-124 criterion 5).
+  const retryOffered = ref(false)
+  const returnNotice = ref<string | null>(null)
+  watch(chargeFailure, (message) => {
+    if (message === null) retryOffered.value = false
+  })
+
+  type Fallback = PendingAttempt<SumUpSnapshot> & { status: 'FAILED' | 'ABANDONED' }
+  let deferred: { id: string, fallback: Fallback | null } | null = null
+
+  // First tab to take it claims it (issue 1257); a tab in the background waits until it is looked
+  // at, so the one the operator is in wins. The fallback is a device that kept nothing.
+  function takeReturned(id: string, fallback: Fallback | null = null): void {
+    if (!isVisible()) {
+      deferred = { id, fallback }
+      return
+    }
+    deferred = null
+    const claim = sumup.claimReturned(id)
+    const restoring = claim.outcome === 'restored' ? claim.attempt : claim.outcome === 'none' ? fallback : null
+    if (restoring) {
+      returnNotice.value = null
+      basket.value = restoring.basket.bar
+      ticketLines.value = restoring.basket.tickets
+      walkUpLines.value = restoring.basket.walkUps
+      selectedDiscountId.value = restoring.basket.discountId
+      // After the restore has flushed: the till clears this on any basket edit, and the restore
+      // itself is one (issue 1144).
+      void nextTick(() => {
+        chargeFailure.value = restoring.status === 'FAILED' ? 'The SumUp app reported the payment did not go through. The basket is back.' : 'That hand-off was abandoned. The basket is back; if the reader did take the money, ring it up again.'
+        retryOffered.value = true
+      })
+    }
+    else if (claim.outcome === 'elsewhere') {
+      basket.value = []
+      ticketLines.value = []
+      walkUpLines.value = []
+      resetSelections()
+      returnNotice.value = RESTORED_ELSEWHERE
+    }
+  }
+
+  function returnToTab(): void {
+    if (deferred && isVisible()) takeReturned(deferred.id, deferred.fallback)
+  }
+
+  // On opening: an attempt still in flight is asked after; one the return page named is taken.
+  async function resume(returnedAttemptId: string | null): Promise<void> {
+    sumup.pruneReturned()
+    const pending = sumup.recall()
+    if (pending) {
+      startWatching()
+      await checkAttempt()
+    }
+    if (returnedAttemptId && pending?.id !== returnedAttemptId) takeReturned(returnedAttemptId)
   }
 
   // The short timer for a minute and a half, after which the "did it go through?" answers stay
@@ -120,10 +177,11 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
   // Inside a component only: the unit test drives this with no instance, as useNightCache is.
   if (getCurrentInstance()) {
     onMounted(() => {
-      if (sumup.recall()) {
-        void checkAttempt()
-        startWatching()
-      }
+      document.addEventListener('visibilitychange', returnToTab)
+      void resume(deps.returnedAttemptId ?? null)
+    })
+    onBeforeUnmount(() => {
+      document.removeEventListener('visibilitychange', returnToTab)
     })
   }
 
@@ -181,8 +239,12 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     smpTxCodeTyped,
     abandonNote,
     openAttempts,
+    retryOffered,
+    returnNotice,
     checkAttempt,
     startWatching,
     resolveAttempt,
+    resume,
+    returnToTab,
   }
 }
