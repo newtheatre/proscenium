@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { ConfigKey } from '#shared/utils/config'
-import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, hasDefault, isConfigKey, isEnforced } from '#shared/utils/config'
+import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, PEOPLE_KEYS, ROLE_KEYS, hasDefault, isConfigKey, isEnforced, isSensitive, plannedFor } from '#shared/utils/config'
 import { PERMISSION_MAP, ROLES, isRole } from '#shared/utils/roles'
 import type { Permission } from '#shared/utils/roles'
 
@@ -31,8 +31,8 @@ describe('configuration surface (0012, 0019)', () => {
     expect(CONFIG_KEYS.BAR_TAB_CAP_PENCE.default).toBe(2000)
   })
 
-  // The till's holder picker binds one parameter per id, so the list's own length is what keeps
-  // that query inside D1's limit (0003). Committee-sized by nature is a habit, not a rule.
+  // Committee-sized by nature is a habit, not a rule: the list is held at the parameter bound so
+  // no caller binding one parameter per id can pass D1's limit (0003).
   test('the tab allow-list is bounded at the parameter limit', () => {
     const ids = (count: number): string[] => Array.from({ length: count }, (_, index) => `user-${index}`)
     const schema = CONFIG_KEYS.BAR_AUTHORISED_TAB_HOLDERS.schema
@@ -111,5 +111,62 @@ describe('the membership purchase address (issue 1005)', () => {
     expect(schema.safeParse('http://su.example.invalid/shop').success).toBe(false)
     expect(schema.safeParse('ftp://su.example.invalid/shop').success).toBe(false)
     expect(schema.safeParse('not a url').success).toBe(false)
+  })
+})
+
+// A switch for a feature nobody has built decides nothing, so the screen names the story instead
+// of offering it as live (J-104 criterion 6, issue 1265).
+describe('capability switches for features not built', () => {
+  test('discount codes name the story that builds them', () => {
+    expect(plannedFor('DISCOUNT_CODES_ENABLED')).toEqual({ story: 'D-204', issue: 436 })
+  })
+
+  test('a key something enforces is built, so it names no story', () => {
+    expect(ENFORCED_KEYS.filter(key => plannedFor(key) !== null)).toEqual([])
+    expect(plannedFor('BAR_TAB_CAP_PENCE')).toBeNull()
+  })
+
+  test('every story a key waits on is one the backlog has', async () => {
+    let backlog = ''
+    for await (const file of new Bun.Glob('docs/backlog/*.md').scan('.')) backlog += await Bun.file(file).text()
+
+    const missing = CONFIG_KEY_NAMES
+      .map(key => plannedFor(key)?.story)
+      .filter((story): story is string => Boolean(story) && !backlog.includes(`## ${story}:`))
+    expect(missing).toEqual([])
+  })
+})
+
+// Issue 1264: people and roles, as two keys, because a key holds scalars and never records (0025).
+describe('who may run up a tab', () => {
+  test('the roles are a list of roles that exist, starting empty', () => {
+    const schema = CONFIG_KEYS.BAR_AUTHORISED_TAB_ROLES.schema
+    expect(CONFIG_KEYS.BAR_AUTHORISED_TAB_ROLES.default).toEqual([])
+    expect(schema.safeParse(['COMMITTEE', 'TREASURER']).success).toBe(true)
+    expect(schema.safeParse(['NOT_A_ROLE']).success).toBe(false)
+  })
+
+  test('both keys are read at the charge', () => {
+    expect(isEnforced('BAR_AUTHORISED_TAB_HOLDERS')).toBe(true)
+    expect(isEnforced('BAR_AUTHORISED_TAB_ROLES')).toBe(true)
+  })
+
+  // A role name identifies nobody, so its changes are audited with their values (0024).
+  test('the people are sensitive and the roles are not', () => {
+    expect(isSensitive('BAR_AUTHORISED_TAB_HOLDERS')).toBe(true)
+    expect(isSensitive('BAR_AUTHORISED_TAB_ROLES')).toBe(false)
+  })
+
+  // Which keys hold people or roles is said, never guessed from a key's name.
+  test('the screen is told which keys hold people and which hold roles', () => {
+    expect([...PEOPLE_KEYS]).toEqual(['BAR_AUTHORISED_TAB_HOLDERS'])
+    expect([...ROLE_KEYS]).toEqual(['BAR_AUTHORISED_TAB_ROLES'])
+    expect(PEOPLE_KEYS.filter(key => !isSensitive(key))).toEqual([])
+  })
+
+  // Naming a role extends credit to everybody holding it, so the setting says so (issue 1264).
+  test('the settings text says a role widens who is given credit', () => {
+    expect(CONFIG_KEYS.BAR_AUTHORISED_TAB_ROLES.describes).toContain('credit')
+    expect(CONFIG_KEYS.BAR_AUTHORISED_TAB_ROLES.describes).toContain('everybody')
   })
 })

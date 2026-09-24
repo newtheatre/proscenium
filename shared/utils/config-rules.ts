@@ -7,7 +7,11 @@ import type { ConfigKey } from './config'
 
 // A boundary written as MM-DD has to exist in every year, so February stops at the 28th: 29
 // February is a boundary that is absent three years in four (audit TR-7).
-const DAY_OF_YEAR_KEYS = ['YEAR_START', 'YEAR_END', 'ACADEMIC_YEAR_BOUNDARY'] as const
+export const DAY_OF_YEAR_KEYS = ['YEAR_START', 'YEAR_END', 'ACADEMIC_YEAR_BOUNDARY'] as const
+
+export function isDayOfYearKey(key: string): boolean {
+  return (DAY_OF_YEAR_KEYS as readonly string[]).includes(key)
+}
 
 // The verdict is isMonthDay's, so a boundary means the same here as it does to the code that
 // computes an expiry from one; what this adds is a refusal naming the rule (G-123 criterion 5).
@@ -71,7 +75,7 @@ export function configProblem(key: ConfigKey, value: unknown, lookup: ConfigLook
   const parsed = CONFIG_KEYS[key].schema.safeParse(value)
   if (!parsed.success) return `That is not a valid value for ${key}`
 
-  if ((DAY_OF_YEAR_KEYS as readonly string[]).includes(key)) {
+  if (isDayOfYearKey(key)) {
     const problem = dayOfYearProblem(value as string)
     if (problem) return problem
   }

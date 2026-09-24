@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { NOTIFICATION_TOPICS } from './notifications'
 import { MODULE_ID } from './training'
+import { ROLES } from './roles'
 import type { NotificationTopic } from './senders'
 
 // Every operational rule with a number in it is a validated key enforced at the write path
@@ -20,6 +21,9 @@ interface ConfigKeyDefinition {
   // A value that can hold personal data. Its changes are audited as a hash rather than as the
   // value, because audit detail carries identifiers and never people (0011, 0024).
   sensitive?: true
+  // A switch for a feature not built: the screen disables it and links the story instead of
+  // offering a choice that decides nothing (J-104 criterion 6).
+  plannedFor?: { story: string, issue: number }
 }
 
 export const CONFIG_KEYS = {
@@ -150,17 +154,25 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'The most a bar discount may take off, as a percentage. A discount above it is refused, on creation and on edit.',
   },
-  // Empty is the honest starting state, not a guess: who qualifies is still open (F-bar.md), so
-  // nobody is authorised until a committee decision adds them (F-108 criterion 1).
+  // Empty is the honest starting state, not a guess: nobody is authorised until the committee
+  // names people or roles (F-108 criterion 1, F-bar.md's answer of 24 September 2026).
   BAR_AUTHORISED_TAB_HOLDERS: {
-    // Bounded at the D1 parameter limit, because the till's holder picker binds one parameter per
-    // id: "committee-sized by nature" is a habit, and this key is edited from a screen (0003).
+    // Held at the D1 parameter bound so no caller binding one parameter per id can pass it:
+    // "committee-sized by nature" is a habit, and this key is edited from a screen (0003).
     schema: z.array(z.string().trim().min(1, 'Say which person you mean'))
       .max(90, 'A tab allow-list holds at most ninety people'),
     default: [],
     workshop: 'money-and-box-office',
     sensitive: true,
-    describes: 'User ids currently authorised to charge purchases to a tab, checked live on every charge.',
+    describes: 'People authorised to charge purchases to a tab, checked live on every charge. Each one named here is extended credit up to the tab cap.',
+  },
+  // A second key, not a reshaped first: a key holds scalars, never records (0025), and a role
+  // names nobody, so this one is audited with its values while the people stay hashed (0024).
+  BAR_AUTHORISED_TAB_ROLES: {
+    schema: z.array(z.enum(ROLES)),
+    default: [],
+    workshop: 'money-and-box-office',
+    describes: 'Roles whose holders may charge purchases to a tab while their grant lasts, checked live on every charge. Naming a role extends credit up to the tab cap to everybody who holds it, including anyone granted it later in the year.',
   },
 
   // Module I: finance
@@ -170,6 +182,7 @@ export const CONFIG_KEYS = {
     default: false,
     workshop: 'money-and-box-office',
     describes: 'Discount codes exist as a capability and stay off until the committee wants them.',
+    plannedFor: { story: 'D-204', issue: 436 },
   },
   // Module J: governance
 
@@ -792,6 +805,7 @@ export const ENFORCED_KEYS = [
   'BAR_TAB_CAP_PENCE',
   'BAR_TAB_CAP_MANAGER_OVERRIDE',
   'BAR_AUTHORISED_TAB_HOLDERS',
+  'BAR_AUTHORISED_TAB_ROLES',
   'COMP_REQUEST_EXPIRY_MINUTES',
   'SUMUP_ATTEMPT_TIMEOUT_MINUTES',
   'ROOM_NO_SHOW_WINDOW_DAYS',
@@ -868,4 +882,22 @@ export function isSensitive(key: ConfigKey): boolean {
 // feature that needs it waits on its workshop (0019).
 export function hasDefault(key: ConfigKey): boolean {
   return 'default' in CONFIG_KEYS[key]
+}
+
+export function plannedFor(key: ConfigKey): { story: string, issue: number } | null {
+  const definition = CONFIG_KEYS[key]
+  return 'plannedFor' in definition ? definition.plannedFor : null
+}
+
+// Said rather than guessed from a key's name: the screen picks people and roles for exactly these,
+// and the settings list names the people (J-104 criterion 2).
+export const PEOPLE_KEYS = ['BAR_AUTHORISED_TAB_HOLDERS'] as const satisfies readonly ConfigKey[]
+export const ROLE_KEYS = ['BAR_AUTHORISED_TAB_ROLES'] as const satisfies readonly ConfigKey[]
+
+export function holdsPeople(key: string): boolean {
+  return (PEOPLE_KEYS as readonly string[]).includes(key)
+}
+
+export function holdsRoles(key: string): boolean {
+  return (ROLE_KEYS as readonly string[]).includes(key)
 }
