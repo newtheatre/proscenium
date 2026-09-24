@@ -73,6 +73,23 @@ describe.skipIf(skip !== null)('the docs collection is not readable anonymously 
   test('the public collection is untouched', async () => {
     expect((await request(app, 'GET', '/__nuxt_content/content/sql_dump.txt', undefined, undefined)).status).toBe(200)
   })
+
+  test('a visitor with no session is sent to sign in rather than shown a page', async () => {
+    const answered = await request(app, 'GET', '/docs/getting-started/signing-in', undefined, undefined)
+    expect(new URL(answered.url).pathname).toBe('/sign-in')
+  })
+})
+
+describe.skipIf(skip !== null)('public help is readable signed out (J-109 criterion 6, 0093)', () => {
+  test('the help pages answer a visitor with no session', async () => {
+    for (const path of ['/help', '/help/do-i-need-an-account', '/help/creating-an-account', '/help/signing-in']) {
+      expect(`${path} ${(await request(app, 'GET', path, undefined, undefined)).status}`).toBe(`${path} 200`)
+    }
+  })
+
+  test('its dump and query route answer a visitor too, so client-side navigation works signed out', async () => {
+    expect((await request(app, 'GET', '/__nuxt_content/help/sql_dump.txt', undefined, undefined)).status).toBe(200)
+  })
 })
 
 describe.skipIf(skip !== null)('reporting drift (criterion 4)', () => {

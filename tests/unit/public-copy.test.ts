@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { HELP_ROOT } from '#shared/utils/docs-paths'
 
 // K-128 criterion 2, issue 1152 item 8: the public shell's words, swept once and held here. The
 // member shell's words are swept and held beside it, in tests/unit/member-copy.test.ts.
@@ -9,6 +10,7 @@ const PUBLIC_GLOBS = [
   'app/error.vue',
   'app/pages/[...slug].vue',
   'app/pages/get-involved.vue',
+  'app/pages/help/[...slug].vue',
   'app/pages/index.vue',
   'app/pages/magic.vue',
   'app/pages/register.vue',
@@ -44,8 +46,10 @@ function publicFiles(): string[] {
 }
 
 function policyFiles(): string[] {
-  const glob = new Bun.Glob('*.md')
-  return [...glob.scanSync({ cwd: POLICIES, onlyFiles: true })].map(path => `${POLICIES}/${path}`).sort()
+  const policies = [...new Bun.Glob('*.md').scanSync({ cwd: POLICIES, onlyFiles: true })].map(path => `${POLICIES}/${path}`)
+  // Public help is read by the same visitor as a policy page, so it is held to the same words (0093).
+  const help = [...new Bun.Glob('**/*.md').scanSync({ cwd: HELP_ROOT, onlyFiles: true })].map(path => `${HELP_ROOT}/${path}`)
+  return [...policies, ...help].sort()
 }
 
 // A comment carries a constraint for the next developer, not copy for a reader, so the sweep

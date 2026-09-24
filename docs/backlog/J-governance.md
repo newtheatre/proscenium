@@ -178,7 +178,10 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   3. Each page shows when it was last updated and by whom; edits to published pages are audited.
   4. A report-drift action on every page files a defect visible to the IT Manager, and documentation drift is triaged as a defect, not a chore.
   5. Behaviour changes update the matching page in the same change, enforced by the review checklist in the engineering standards.
-- Source: Prompt Book K-1 (operator documentation in-app, drift is a defect), P7; audit RM-7 (documentation selling a product the code does not contain)
+  6. Amended 24 September 2026 (0093): a signed-out visitor reads public help at `/help`, a separate collection whose pages say whether an account is needed, how to create one and how to sign in, linked from the public shell. Its dump and query route answer without a session; the operator collection's still refuse one.
+  7. Amended 24 September 2026 (0093): every documentation page names its audience in front matter (`public` in the help collection; `member` or `committee` in the operator one), and `bun run check docs` fails a page with none.
+  8. Amended 24 September 2026 (0093): the operator tree and its search show committee pages only to a viewer holding a live role grant or a standing permission; every signed-in viewer sees the member pages. This is navigation, not a guard: the collection stays readable by any session.
+- Source: Prompt Book K-1 (operator documentation in-app, drift is a defect), P7; audit RM-7 (documentation selling a product the code does not contain); feedback report 2b1c50b872924042b4d99014e059cfd0 (issue #1263, criteria 6 to 8)
 
 ## J-110: Policy pages quote the live configuration
 
