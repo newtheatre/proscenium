@@ -1,15 +1,27 @@
 <script setup lang="ts">
+import { committeePaths, readsCommitteeDocs, visibleTree } from '#shared/utils/docs-audience'
 import type { ContentNavigationItem } from '@nuxt/content'
 
 // Reading, not work: the member shell's chrome with a tree beside the page (0076). The tree is
 // fetched here rather than in app.vue, since only these routes may read the docs collection.
-const { data: fetched } = await useAsyncData('docs:navigation', () => queryCollectionNavigation('docs', ['description']))
+const { account } = useAccount()
+const committee = computed(() => readsCommitteeDocs(account.value))
+
+const { data: fetched } = await useAsyncData('docs:navigation', () => queryCollectionNavigation('docs', ['description', 'audience']))
 // The collection's folder is the root of the tree; the sections are what the reader wants.
-const navigation = computed<ContentNavigationItem[]>(() => fetched.value?.[0]?.children ?? fetched.value ?? [])
-provide('navigation', navigation)
+const everything = computed<ContentNavigationItem[]>(() => fetched.value?.[0]?.children ?? fetched.value ?? [])
+// Navigation only: a committee page stays readable by any session that follows a link to it (0093).
+const navigation = computed(() => visibleTree(everything.value, committee.value))
+// The page reads its section headline from the whole tree, so a page reached by link keeps it.
+provide('navigation', everything)
 
 // The search index is the whole collection, so it is loaded once, in the browser, when asked for.
-const { data: sections } = useLazyAsyncData('docs:search', () => queryCollectionSearchSections('docs'), { server: false })
+const { data: allSections } = useLazyAsyncData('docs:search', () => queryCollectionSearchSections('docs'), { server: false })
+const sections = computed(() => {
+  if (committee.value) return allSections.value
+  const hidden = committeePaths(everything.value)
+  return allSections.value?.filter(section => !hidden.has(section.id.split('#')[0]!))
+})
 </script>
 
 <template>

@@ -53,6 +53,7 @@ Every page opens with the same block, in this order:
 title: Settings
 description: One sentence saying what the page is for, ending with a full stop.
 module: Platform
+audience: committee
 updatedOn: 2026-09-15
 updatedBy: Matt Adcock
 navigation:
@@ -62,6 +63,12 @@ navigation:
 
 There is no in-app editor, so `updatedOn` and `updatedBy` are set by hand by whoever edits the
 page, in the same commit. `module` is the area of the backlog the screen belongs to.
+
+`audience` says who the page is for (0093): `member` for a page about somebody's own screens, a
+show-night screen, or a screen reached by a trainer or a department lead, and `committee` for a
+console screen reached by a standing role. The sidebar and search show committee pages only to a
+viewer holding a live role; that is navigation, not access, so a help link on a screen opens its
+page for anybody signed in. A page with no audience fails `bun run check docs`.
 
 ## The shape of a page
 

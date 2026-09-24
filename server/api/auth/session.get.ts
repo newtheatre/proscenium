@@ -16,6 +16,8 @@ export default defineEventHandler(async (event) => {
     signedIn: true as const,
     user: { id: account.id, name: account.name, email: account.email, verified: account.verified },
     permissions: [...permissionsFor(grants, new Date())].sort(),
+    // A role may carry no permission at all; the docs tree still counts it as committee (0093).
+    holdsRole: grants.length > 0,
     // Derived authority, so none of it can come from a grant (0009).
     onShiftTonight: onShift,
     leadsDepartment: (await liveLeads(account.id)).length > 0,
