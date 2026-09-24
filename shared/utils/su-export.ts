@@ -7,12 +7,15 @@ import type { EntrySource, LineKind } from './ledger'
 
 const londonDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A day is YYYY-MM-DD')
 
-// The (kind, source) pairs a ledger line can actually carry, architecture.md's own posting
-// table. Seeds `su_nominal_mappings` and is what a mapping change is validated against.
+// The (kind, source) pairs a ledger line can actually carry, architecture.md's own posting table;
+// a pair added here needs a migration seeding its `su_nominal_mappings` row (issue #1283).
 export const LEDGER_POSTING_PAIRS: readonly { kind: LineKind, source: EntrySource }[] = [
   { kind: 'TICKET_COLLECTION', source: 'DESK' },
+  { kind: 'TICKET_COLLECTION', source: 'TILL' },
   { kind: 'WALK_UP', source: 'DESK' },
+  { kind: 'WALK_UP', source: 'TILL' },
   { kind: 'PASS_SALE', source: 'DESK' },
+  { kind: 'PASS_SALE', source: 'SYSTEM' },
   { kind: 'PASS_ADMISSION', source: 'DESK' },
   { kind: 'PASS_ADMISSION', source: 'SELF_SERVE' },
   { kind: 'BAR_ITEM', source: 'TILL' },
