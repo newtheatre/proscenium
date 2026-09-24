@@ -30,7 +30,7 @@ const chosenCategoryId = ref<string | null>(null)
 const shownCategories = computed(() => categoriesShown(nonEmptyCategories.value, chosenCategoryId.value))
 
 // Stock is read with the catalogue and can trail the shelf; the charge is what checks it for real.
-const STOCK_AS_LOADED = 'Stock as it stood when the till last loaded; every charge checks it again.'
+const STOCK_AS_LOADED = 'Stock as the till last read it; every charge checks it again.'
 
 // What the tile says under the name, so a tile costing a second tap says so before it is tapped.
 function priceLine(product: SaleProduct): string {
@@ -198,18 +198,33 @@ function priceLine(product: SaleProduct): string {
     >
       <template #body>
         <div class="grid grid-cols-2 gap-2">
+          <!-- An option reads its own stock as a size does (F-128 criterion 9). -->
           <UButton
             v-for="option in choosing?.choice.options ?? []"
             :key="option.id"
             color="neutral"
             variant="subtle"
             class="min-h-12"
+            :disabled="sizeBlocked(option)"
             :data-test="`choice-option-${option.id}`"
             @click="chooseOption(option.id, option.itemName)"
           >
-            {{ option.itemName }}
+            <span class="flex flex-col items-start">
+              <span>{{ option.itemName }}</span>
+              <span
+                v-if="sizeOutOfStock(option)"
+                class="text-xs text-muted"
+                :data-test="`choice-option-out-of-stock-${option.id}`"
+              >Out of stock</span>
+            </span>
           </UButton>
         </div>
+        <p
+          v-if="choosing?.choice.options.some(sizeOutOfStock)"
+          class="mt-2 text-xs text-muted"
+        >
+          {{ STOCK_AS_LOADED }}
+        </p>
       </template>
     </UModal>
   </div>

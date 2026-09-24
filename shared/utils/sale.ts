@@ -108,6 +108,8 @@ export interface WalkUpOption {
 export interface SaleChoiceOption {
   id: string
   itemName: string
+  // The till catalogue's alone (F-128 criterion 9); the sale path reads no stock and leaves it off.
+  stock?: VariantStock | null
 }
 
 export interface SaleChoice {
@@ -141,11 +143,25 @@ export function variantStock(servingsLeft: number | null, stockCounted: boolean)
   return { servingsLeft, blocks: stockCounted && servingsLeft <= 0 }
 }
 
-// Optional chaining because a catalogue cached before sizes carried stock has no field at all.
-export const sizeOutOfStock = (variant: Pick<SaleVariant, 'stock'>): boolean => (variant.stock?.servingsLeft ?? 1) <= 0
-export const sizeBlocked = (variant: Pick<SaleVariant, 'stock'>): boolean => variant.stock?.blocks === true
+// Each option as if it were the only one offered, which is what picking it pours (criterion 9).
+export function choiceWithStock(choice: SaleChoice | null, servingsOf: ReadonlyMap<string, number> | undefined, stockCounted: boolean): SaleChoice | null {
+  if (!choice) return null
+  return { ...choice, options: choice.options.map(option => ({ ...option, stock: variantStock(servingsOf?.get(option.id) ?? null, stockCounted) })) }
+}
+
+// A size or a choice option alike. Optional chaining because a catalogue cached before either
+// carried stock has no field at all.
+type Stocked = { stock?: VariantStock | null }
+export const sizeOutOfStock = (variant: Stocked): boolean => (variant.stock?.servingsLeft ?? 1) <= 0
+export const sizeBlocked = (variant: Stocked): boolean => variant.stock?.blocks === true
 export const productOutOfStock = (product: Pick<SaleProduct, 'variants'>): boolean => product.variants.every(sizeOutOfStock)
 export const productBlocked = (product: Pick<SaleProduct, 'variants'>): boolean => product.variants.every(sizeBlocked)
+
+// Each receipt the till can show, in a fixed order: one appearing where there was none is a sale
+// just completed, whichever path took it, and the grid's stock is read again (criterion 9).
+export function saleJustCompleted(receipts: readonly unknown[], before: readonly unknown[]): boolean {
+  return receipts.some((receipt, at) => receipt != null && before[at] == null)
+}
 
 export interface SaleProduct {
   id: string
