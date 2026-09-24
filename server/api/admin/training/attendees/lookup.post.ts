@@ -26,6 +26,8 @@ export default defineEventHandler(async (event) => {
     return { id: held.id, name: held.name, created: false }
   }
 
+  // An address already spoken for by a pre-link is that account's, found with the search (0091).
+  await assertNotPreLinked(email)
   if (undeliverableReason({ email, anonymisedAt: null })) {
     throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
   }

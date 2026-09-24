@@ -660,7 +660,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
 
   {
     route: 'server/api/admin/training/external-certificates/index.post.ts',
-    actions: ['record.external-certificate'],
+    actions: ['record.external-certificate', 'account.created.console'],
+    via: ['server/utils/training-by-address.ts'],
   },
   { route: 'server/api/admin/training/departments/index.get.ts', exempt: 'reads the department vocabulary' },
   { route: 'server/api/admin/training/departments/index.post.ts', actions: ['department.created'] },
@@ -671,6 +672,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/training/modules/index.post.ts', actions: ['module.created'] },
   { route: 'server/api/admin/training/modules/[id]/index.put.ts', actions: ['module.updated'] },
   { route: 'server/api/admin/training/records/index.get.ts', exempt: 'reads one person\'s training history' },
+  { route: 'server/api/admin/training/people.get.ts', exempt: 'reads ids and names for the records screen\'s picker' },
   { route: 'server/api/training/records.get.ts', exempt: 'reads your own training records' },
   { route: 'server/api/training/modules.get.ts', exempt: 'reads the member-facing catalogue' },
   { route: 'server/api/training/next.get.ts', exempt: 'reads what you could take next, all from your own records' },
@@ -706,7 +708,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/training/prerequisites/[id].delete.ts', actions: ['prerequisite.removed'] },
   {
     route: 'server/api/admin/training/signoffs/index.post.ts',
-    actions: ['record.signed-off', 'record.signoff.unbounded'],
+    actions: ['record.signed-off', 'record.signoff.unbounded', 'account.created.console'],
+    via: ['server/utils/training-by-address.ts'],
   },
   { route: 'server/api/admin/training/records/[id]/revoke.post.ts', actions: ['record.revoked'] },
   { route: 'server/api/admin/training/sessions/index.post.ts', actions: ['session.scheduled'] },

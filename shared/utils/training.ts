@@ -208,6 +208,12 @@ export function leadsDepartment(leads: LeadAssignment[], department: string, now
   return leads.some(lead => lead.department === department && isLeadLive(lead, now))
 }
 
+// Making the account a record by address sits on: the narrow permission, or a live lead of the
+// module's own department, derived at the request (G-130 criterion 4, 0037, 0091).
+export function mayRecordByAddress(permissions: ReadonlySet<string>, leads: LeadAssignment[], department: string, now: Date): boolean {
+  return permissions.has('training.by-address') || leadsDepartment(leads, department, now)
+}
+
 // Blank is no answer rather than an empty answer, the way a profile field is.
 const text = (max: number) => z.string().trim().max(max).nullish()
   .transform(value => (value ?? '').trim() || null)
@@ -371,22 +377,45 @@ export function expiryProblem(
   return null
 }
 
+// A person is chosen; an address and a name only when the picker found nobody (G-130, 0091).
+const subject = {
+  userId: z.string().trim().min(1, 'Say which person you mean').max(64).optional(),
+  // Lowercased here because the CHECK on users refuses anything else, and the unique index
+  // compares the stored form.
+  email: z.string().trim().toLowerCase().email('That is not an email address').max(320).optional(),
+  name: z.string().trim().min(1, 'Give their name').max(200).optional(),
+}
+
+function oneSubject(input: { userId?: string, email?: string, name?: string }, context: z.RefinementCtx): void {
+  if ((input.userId === undefined) === (input.email === undefined)) {
+    context.addIssue({ code: 'custom', message: 'Choose somebody, or give an address', path: ['userId'] })
+  }
+  if (input.email !== undefined && input.name === undefined) {
+    context.addIssue({ code: 'custom', message: 'Give their name', path: ['name'] })
+  }
+}
+
+// The newcomer an award by address makes an account for, or null when somebody was chosen.
+export function recordedFor(input: { userId?: string, email?: string, name?: string }): { email: string, name: string } | null {
+  return input.email === undefined || input.name === undefined ? null : { email: input.email, name: input.name }
+}
+
 export const signOffForm = z.object({
-  userId: z.string().trim().min(1, 'Say which person you mean').max(64),
+  ...subject,
   moduleId: z.string().trim().min(1, 'Say which module you mean').max(32),
   awardedOn: z.string().regex(CIVIL_DATE, 'An award date reads as YYYY-MM-DD'),
   // Absent takes the module's policy. A date overrides it; null is the break-glass never, and
   // needs a permission the screen never offers (G-120 criterion 5).
   expiresOn: z.string().regex(CIVIL_DATE, 'An expiry reads as YYYY-MM-DD').nullish(),
   evidenceRef: z.string().trim().max(500).nullish().transform(value => (value ?? '').trim() || null),
-})
+}).superRefine(oneSubject)
 
 export type SignOffInput = z.output<typeof signOffForm>
 
 export const EVIDENCE_REF_LIMIT = 500
 
 export const externalCertificateForm = z.object({
-  userId: z.string().trim().min(1, 'Say which person you mean').max(64),
+  ...subject,
   moduleId: z.string().trim().min(1, 'Say which module you mean').max(32),
   awardedOn: z.string().regex(CIVIL_DATE, 'An award date reads as YYYY-MM-DD'),
   // Always explicit and never null: a certificate carries the issuer's term, and the module's
@@ -394,7 +423,7 @@ export const externalCertificateForm = z.object({
   expiresOn: z.string().regex(CIVIL_DATE, 'An expiry reads as YYYY-MM-DD'),
   // Mandatory: it is the whole of what we trust in place of having assessed it (criterion 2).
   evidenceRef: z.string().trim().min(1, 'Say what the evidence is').max(EVIDENCE_REF_LIMIT),
-})
+}).superRefine(oneSubject)
 
 export type ExternalCertificateInput = z.output<typeof externalCertificateForm>
 
