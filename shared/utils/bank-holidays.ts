@@ -106,23 +106,18 @@ function readFailure(error: unknown): SyncFailure {
 async function readCapped(response: Response): Promise<string | null> {
   if (!response.body) return ''
   const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
+  const decoder = new TextDecoder()
   let size = 0
+  let text = ''
   for (let read = await reader.read(); !read.done; read = await reader.read()) {
     size += read.value.byteLength
     if (size > SYNC_MAX_BYTES) {
       await reader.cancel().catch(() => {})
       return null
     }
-    chunks.push(read.value)
+    text += decoder.decode(read.value, { stream: true })
   }
-  const bytes = new Uint8Array(size)
-  let at = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, at)
-    at += chunk.byteLength
-  }
-  return new TextDecoder().decode(bytes)
+  return text + decoder.decode()
 }
 
 export interface SyncHistory {
