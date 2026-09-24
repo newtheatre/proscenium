@@ -746,10 +746,17 @@ Open questions:
      label is advice, because the catalogue is held on the device and can trail the shelf: the
      trigger on the sale's write stays what holds (F-105 criterion 5), and the till reads the
      catalogue again whenever it comes back to the screen.
+  9. Added 24 September 2026 (issue 1285): the till reads the catalogue again after every
+     completed sale (on the reader, on a tab, through the SumUp app or as a comp), so a sale that
+     empties a size greys it out without anyone reloading the page. The same one query also
+     carries, per option of a size with a choice, the servings that option supports alongside
+     the size's fixed components, still binding no parameter per product or option (0006). An
+     option with none left reads "Out of stock" in the choice step and, once a stocktake has been
+     applied, is disabled, exactly as criterion 8 treats a size.
 - Source: bar review, 15 September 2026 (known issues: the retirement guard reads on-hand before
   the write, and the empty-recipe gap); Matt's direction, 15 September 2026 (every sellable thing
   depletes something); issue 1258, with the IT Manager's direction to grey out rather than hold
-  stock.
+  stock; issue 1285.
 
 ## F-201: Reader-initiated checkout
 
