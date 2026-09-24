@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
+import { saleJustCompleted } from '#shared/utils/sale'
 import { saysChargeOnReader, saysChargeOnSumUp } from '#shared/utils/till'
 import { saysClock } from '#shared/utils/when'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
@@ -260,6 +261,12 @@ function giveComp(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.value): 
   ageCheckStep.value = 'closed'
   void giveCompRequest(ageCheck)
 }
+
+// Reader, tab and SumUp all land in `charged`, a comp in its own receipt; the grid's stock labels
+// are read again once either appears, so a size the sale emptied greys out (F-128 criterion 9).
+watch([charged, compGiven], (receipts, before) => {
+  if (saleJustCompleted(receipts, before) && session.value && venueId.value) void catalogue.refresh()
+})
 
 function nextSaleFromComp(): void {
   resetComp()

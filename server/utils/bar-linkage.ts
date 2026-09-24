@@ -41,12 +41,18 @@ export function readPouredBy(value: string | null): PouredBy[] {
   return Array.isArray(parsed) ? parsed : []
 }
 
+// Servings one recipe row supports: its item's on-hand over the quantity a serving takes.
+function servingsOfRow(alias: 'c' | 'g' | 'o'): SQL {
+  const row = sql.raw(alias)
+  return sql`(SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = ${row}.item_id) / ${row}.qty`
+}
+const poured = servingsOfRow('c')
+
 // The tightest component decides, and a choice is as good as its best-stocked option, since the
 // customer picks one. A size that depletes nothing answers null rather than nought (F-128).
 function servingsQuery(products: SQL): SQL {
-  const poured = sql`(SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = c.item_id) / c.qty`
   const chosen = sql`(
-    SELECT max((SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = g.item_id) / g.qty)
+    SELECT max(${servingsOfRow('g')})
     FROM choice_group_items g WHERE g.choice_group_id = c.choice_group_id
   )`
   return sql`
@@ -65,14 +71,62 @@ export function servingsAvailableQuery(productId: string): SQL {
   return servingsQuery(sql`SELECT ${productId}`)
 }
 
-// Every size on the till in one read, scoped by subquery so it binds nothing per product (0006).
-export function tillServingsQuery(): SQL {
-  return servingsQuery(sql`SELECT id FROM bar_products WHERE status = 'ACTIVE'`)
+// One option of a size's choice: its own item held to the size's fixed components, which is what
+// picking it pours, so the best option's figure is the size's own (F-128 criterion 9).
+function optionServingsQuery(products: SQL): SQL {
+  const own = servingsOfRow('o')
+  const fixed = sql`(SELECT min(${poured}) FROM variant_components c WHERE c.variant_id = v.id AND c.item_id IS NOT NULL)`
+  return sql`
+    SELECT v.id AS variantId, o.id AS optionId, min(${own}, coalesce(${fixed}, ${own})) AS servings
+    FROM product_variants v
+    JOIN variant_components k ON k.variant_id = v.id AND k.choice_group_id IS NOT NULL
+    JOIN choice_group_items o ON o.choice_group_id = k.choice_group_id
+    WHERE v.product_id IN (${products}) AND v.status = 'ACTIVE'
+  `
 }
 
-export async function tillServings(): Promise<Map<string, number | null>> {
-  const found = await db.all<{ variantId: string, servings: number | null }>(tillServingsQuery())
-  return new Map(found.map(row => [row.variantId, row.servings === null ? null : Number(row.servings)]))
+// Every size and every choice option on the till in one read, scoped by subquery so it binds
+// nothing per product or option (0006); a size's own row has no option.
+export function tillServingsQuery(): SQL {
+  const products = sql`SELECT id FROM bar_products WHERE status = 'ACTIVE'`
+  return sql`
+    SELECT variantId, NULL AS optionId, servings FROM (${servingsQuery(products)})
+    UNION ALL
+    ${optionServingsQuery(products)}
+  `
+}
+
+export interface TillServingsRow {
+  variantId: string
+  optionId: string | null
+  servings: number | null
+}
+
+export interface TillServings {
+  sizes: Map<string, number | null>
+  // Keyed by size, then by the option row's id: one option reads differently under each size.
+  options: Map<string, Map<string, number>>
+}
+
+export function readTillServings(found: TillServingsRow[]): TillServings {
+  const sizes = new Map<string, number | null>()
+  const options = new Map<string, Map<string, number>>()
+  for (const row of found) {
+    const servings = row.servings === null ? null : Number(row.servings)
+    if (row.optionId === null) {
+      sizes.set(row.variantId, servings)
+      continue
+    }
+    if (servings === null) continue
+    const ofSize = options.get(row.variantId) ?? new Map<string, number>()
+    ofSize.set(row.optionId, servings)
+    options.set(row.variantId, ofSize)
+  }
+  return { sizes, options }
+}
+
+export async function tillServings(): Promise<TillServings> {
+  return readTillServings(await db.all<TillServingsRow>(tillServingsQuery()))
 }
 
 // Until a stocktake is applied every item reads nought, so on-hand is not yet a balance (0080).

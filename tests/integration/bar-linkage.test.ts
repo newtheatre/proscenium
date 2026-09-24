@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { STOCK_COUNTED_QUERY, pouredByColumn, readPouredBy, retireItemStatements, servingsAvailableQuery, tillServingsQuery } from '#server/utils/bar-linkage'
+import { STOCK_COUNTED_QUERY, pouredByColumn, readPouredBy, readTillServings, retireItemStatements, servingsAvailableQuery, tillServingsQuery } from '#server/utils/bar-linkage'
+import type { TillServings, TillServingsRow } from '#server/utils/bar-linkage'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -242,11 +243,14 @@ describe('retiring a stocked item the bar still pours (F-128 criteria 5 and 6)',
   })
 })
 
+function tillRead(database: TestDatabase): TillServings {
+  const [statement, ...parameters] = boundStatement(database, tillServingsQuery())
+  return readTillServings(rows<TillServingsRow>(database, statement, ...parameters))
+}
+
 describe('the till reads every size\'s servings in one query (F-128 criterion 8)', () => {
   function tillServings(database: TestDatabase): Map<string, number | null> {
-    const [statement, ...parameters] = boundStatement(database, tillServingsQuery())
-    return new Map(rows<{ variantId: string, servings: number | null }>(database, statement, ...parameters)
-      .map(row => [row.variantId, row.servings]))
+    return tillRead(database).sizes
   }
 
   test('every active size reads what its own product page reads', async () => {
@@ -279,6 +283,55 @@ describe('the till reads every size\'s servings in one query (F-128 criterion 8)
   test('the read binds no parameter at all, however large the catalogue', async () => {
     await withDatabase((database) => {
       bar(database)
+      const [, ...parameters] = boundStatement(database, tillServingsQuery())
+      expect(parameters).toEqual([])
+    })
+  })
+})
+
+// The double offers a mixer: tonic, and a soda added here with none delivered.
+describe('the same read carries each option of a choice (F-128 criterion 9)', () => {
+  function withSoda(database: TestDatabase): void {
+    bar(database)
+    insert(database, 'bar_items', { id: 'item-soda', name: 'Soda', unit: 'ML', container_ml: 200 })
+    insert(database, 'choice_group_items', { id: 'gi-2', choice_group_id: 'group-mixers', item_id: 'item-soda', qty: 200, sort: 1 })
+  }
+
+  test('an empty option reads nought while the size still reads its best-stocked option', async () => {
+    await withDatabase((database) => {
+      withSoda(database)
+      delivery(database, 'item-gin', 700)
+      delivery(database, 'item-tonic', 400)
+      const till = tillRead(database)
+      expect(till.sizes.get('var-double')).toBe(2)
+      expect(till.options.get('var-double')?.get('gi-1')).toBe(2)
+      expect(till.options.get('var-double')?.get('gi-2')).toBe(0)
+    })
+  })
+
+  test('an option is held to the size\'s fixed components as well as its own item', async () => {
+    await withDatabase((database) => {
+      withSoda(database)
+      delivery(database, 'item-gin', 60)
+      delivery(database, 'item-tonic', 400)
+      expect(tillRead(database).options.get('var-double')?.get('gi-1')).toBe(1)
+    })
+  })
+
+  test('a size with no choice, or not on the till, has no options read', async () => {
+    await withDatabase((database) => {
+      withSoda(database)
+      database.batch([[`UPDATE bar_products SET status = 'HIDDEN' WHERE id = ?`, 'prod-gin']])
+      const till = tillRead(database)
+      expect([...till.options.keys()]).toEqual([])
+      expect([...till.sizes.keys()].sort()).toEqual(['var-crisps', 'var-negroni'])
+    })
+  })
+
+  // 0006 from the second direction again: the options widen the read without binding anything.
+  test('the read still binds no parameter, however many options there are', async () => {
+    await withDatabase((database) => {
+      withSoda(database)
       const [, ...parameters] = boundStatement(database, tillServingsQuery())
       expect(parameters).toEqual([])
     })

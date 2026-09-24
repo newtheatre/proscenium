@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { productBlocked, productOutOfStock, sizeBlocked, sizeOutOfStock, variantStock } from '#shared/utils/sale'
-import type { SaleProduct, SaleVariant } from '#shared/utils/sale'
+import { choiceWithStock, productBlocked, productOutOfStock, saleJustCompleted, sizeBlocked, sizeOutOfStock, variantStock } from '#shared/utils/sale'
+import type { SaleChoice, SaleProduct, SaleVariant } from '#shared/utils/sale'
 
 // F-128 criterion 8: what the grid and the size sheet read off each size's servings, and when that
 // stops the button rather than only labelling it (0080).
@@ -58,5 +58,64 @@ describe('a product tile reads out only when every size is', () => {
     const uncounted = aProduct([aVariant('half', variantStock(0, false)), aVariant('pint', variantStock(0, false))])
     expect(productOutOfStock(uncounted)).toBe(true)
     expect(productBlocked(uncounted)).toBe(false)
+  })
+})
+
+// F-128 criterion 9: an option of a size's choice carries its own servings, read as a size's are.
+describe('an option in the choice step reads its own stock', () => {
+  const mixers: SaleChoice = { id: 'g', name: 'Mixer', options: [{ id: 'tonic', itemName: 'Tonic' }, { id: 'soda', itemName: 'Soda' }] }
+
+  test('an empty option is out, and stops its button once the stock is counted', () => {
+    const choice = choiceWithStock(mixers, new Map([['tonic', 0], ['soda', 4]]), true)!
+    const [tonic, soda] = choice.options
+    expect(tonic!.stock).toEqual({ servingsLeft: 0, blocks: true })
+    expect(sizeOutOfStock(tonic!)).toBe(true)
+    expect(sizeBlocked(tonic!)).toBe(true)
+    expect(sizeOutOfStock(soda!)).toBe(false)
+    expect(sizeBlocked(soda!)).toBe(false)
+  })
+
+  test('before the cutover count an empty option is only labelled', () => {
+    const [tonic] = choiceWithStock(mixers, new Map([['tonic', 0]]), false)!.options
+    expect(sizeOutOfStock(tonic!)).toBe(true)
+    expect(sizeBlocked(tonic!)).toBe(false)
+  })
+
+  test('an option the read did not answer for reads as in stock', () => {
+    const [tonic] = choiceWithStock(mixers, undefined, true)!.options
+    expect(tonic!.stock).toBe(null)
+    expect(sizeOutOfStock(tonic!)).toBe(false)
+  })
+
+  test('a size with no choice stays without one', () => {
+    expect(choiceWithStock(null, new Map(), true)).toBe(null)
+  })
+
+  // A phone may still hold a catalogue cached before options carried stock.
+  test('an option cached with no stock field reads as in stock', () => {
+    expect(sizeOutOfStock(mixers.options[0]!)).toBe(false)
+    expect(sizeBlocked(mixers.options[0]!)).toBe(false)
+  })
+})
+
+// F-128 criterion 9: the till reads the catalogue again when a receipt appears, on any path.
+describe('a completed sale is what refreshes the till\'s stock', () => {
+  const receipt = { totalPence: 500 }
+
+  test('a receipt appearing where there was none is a completed sale', () => {
+    expect(saleJustCompleted([receipt, null], [null, null])).toBe(true)
+    expect(saleJustCompleted([null, receipt], [null, null])).toBe(true)
+  })
+
+  test('the next sale clearing a receipt is not one', () => {
+    expect(saleJustCompleted([null, null], [receipt, null])).toBe(false)
+  })
+
+  test('a receipt already on screen is not counted twice', () => {
+    expect(saleJustCompleted([receipt, null], [receipt, null])).toBe(false)
+  })
+
+  test('nothing having happened is not one', () => {
+    expect(saleJustCompleted([null, null], [null, null])).toBe(false)
   })
 })
