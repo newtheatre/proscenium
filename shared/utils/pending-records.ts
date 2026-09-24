@@ -37,3 +37,9 @@ export function recordByAddressStatements(input: RecordByAddress): SQL[] {
     ...input.entries.map(row => entryIfMade(row, made)),
   ]
 }
+
+// A register walk-in's account alone, written only while nobody is pre-linked to the address and
+// its entry only if it was, as Add someone writes one (G-117 criterion 9, 0003).
+export function walkInAccountStatements(userId: string, email: string, name: string, created: AuditRow): SQL[] {
+  return [shadowAccountInsert(userId, email, name), entryIfMade(created, madeAccount(userId))]
+}

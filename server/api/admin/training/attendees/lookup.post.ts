@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { normaliseEmail } from '#shared/utils/auth'
+import { PRE_LINKED, pendingGrantConstraintRefusal } from '#shared/utils/pending-grants'
+import { walkInAccountStatements } from '#shared/utils/pending-records'
 
 const body = z.object({
   email: z.string().email().max(320),
@@ -35,7 +37,22 @@ export default defineEventHandler(async (event) => {
   // Their own name if the trainer knows it, and the address if not: a guess would be theirs to
   // correct later, and the address is at least what was written down.
   const name = input.name?.trim() || email
-  const id = await createAccount({ email, name, passwordHash: null, actorId: resolved.account.id })
+  const id = newId()
+  const created = auditEntry({ actorId: resolved.account.id, action: 'account.created.console', target: `user:${id}` })
+  const statements = walkInAccountStatements(id, email, name, created).map(statement => db.run(statement))
+  try {
+    await db.batch([statements[0]!, statements[1]!])
+  }
+  catch (error) {
+    const refusal = pendingGrantConstraintRefusal(error)
+    if (refusal) throw createError(refusal)
+    throw error
+  }
+  // The insert's own predicate refused it: a pre-link landed between the check and the write.
+  if (!await findById(id)) {
+    await assertNotPreLinked(email)
+    throw createError({ statusCode: 409, statusMessage: PRE_LINKED })
+  }
 
   return { id, name, created: true }
 })
