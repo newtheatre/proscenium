@@ -362,6 +362,13 @@ config key that holds a record, so the mapping from a `(kind, source)` pair to a
 is its own table, seeded from the posting table below and only ever `UPDATE`d, the same shape
 `incident_severity_config` already uses: nothing here creates or removes a pair, only changes
 what one maps to, and every change is audited with the from and to values (`finance.nominal-mapping.changed`).
+Every `(Source, Kind)` combination a row of the posting table names is one pair in
+`LEDGER_POSTING_PAIRS` (`shared/utils/su-export.ts`), and a migration seeds each unmapped. A unit
+test holds the three together: it reads the table, and it walks every file in `server/` and
+`migration/` that posts to the ledger, so a pair the code posts under with no mapping row fails
+CI rather than exporting as `UNMAPPED` with no way to map it (issue #1283). A new money path
+therefore adds its pair to the list and a migration seeding it, in the same pull request as its
+row below.
 
 Nothing in the export is a computed total. Each row carries a ledger line's own signed
 `amount_pence`, exactly as `ledger_lines` stores it; a refund line is already negative at the
@@ -400,8 +407,8 @@ the one thing that changes the file, because mappings are current configuration,
 The triple every path posts under. A module adding a money path adds a row here in the same pull
 request; a unit test reads this table, so a kind in the code and not in a row is drift. `source`
 and `tender` are database CHECKs and cannot be widened; `kind` is the enum in
-`shared/utils/ledger.ts` (0033). `SYSTEM` is reserved for an entry no person took: no MVP path
-posts one.
+`shared/utils/ledger.ts` (0033). `SYSTEM` is reserved for an entry no person took: the Fellowship award (D-130) is the one path
+that posts one.
 
 **Every row below carries the financial day for calendar grouping, never the show night.**
 `london_day` is the plain London calendar day of `happened_at`, written by `londonDayOf` in

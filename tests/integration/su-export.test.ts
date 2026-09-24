@@ -4,7 +4,7 @@ import { toCsv } from '#server/utils/csv'
 import { periodBounds, seasonRangeQuery } from '#server/utils/season-dashboard'
 import { rangeClosedQuery } from '#server/utils/period-locks'
 import { nominalMappingsQuery, suExportCountQuery, suExportQuery } from '#server/utils/su-export'
-import { suExportCsvRows } from '#shared/utils/su-export'
+import { LEDGER_POSTING_PAIRS, suExportCsvRows } from '#shared/utils/su-export'
 import type { SuExportRow } from '#shared/utils/su-export'
 import { createTestDatabase, boundStatement, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -89,9 +89,22 @@ describe('the nominal mapping seed (I-108 criterion 1)', () => {
   test('every posting pair is seeded, unmapped', async () => {
     await withDatabase((database) => {
       const seeded = read<{ kind: string, source: string, nominalCode: string | null }>(database, nominalMappingsQuery())
-      expect(seeded.length).toBe(9)
+      expect(seeded.length).toBe(LEDGER_POSTING_PAIRS.length)
       expect(seeded.every(row => row.nominalCode === null)).toBe(true)
-      expect(seeded).toContainEqual(expect.objectContaining({ kind: 'TICKET_COLLECTION', source: 'DESK' }))
+      for (const pair of LEDGER_POSTING_PAIRS) {
+        expect(seeded).toContainEqual(expect.objectContaining({ kind: pair.kind, source: pair.source }))
+      }
+    })
+  })
+
+  test('a till walk-up line can be mapped, and exports under its code (issue #1283)', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      mapNominal(database, 'WALK_UP', 'TILL', '4120')
+      line(database, entry(database, '2026-09-10', 'TILL'), 'WALK_UP', 1200)
+
+      const [row] = read<SuExportRow>(database, suExportQuery('2026-09-01', '2026-09-30'))
+      expect(row).toMatchObject({ kind: 'WALK_UP', source: 'TILL', nominalCode: '4120', amountPence: 1200 })
     })
   })
 })

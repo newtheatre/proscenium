@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { exportRangeForm, formatPoundsForExport, LEDGER_POSTING_PAIRS, nominalMappingForm, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportCsvRows, suExportForm, suExportLines } from '#shared/utils/su-export'
 import { periodQuery } from '#shared/utils/season-dashboard'
+import { ENTRY_SOURCES, isLineKind } from '#shared/utils/ledger'
 import type { SuExportRow } from '#shared/utils/su-export'
 
 describe('mapping a (kind, source) pair to a nominal code (I-108 criterion 1)', () => {
@@ -21,6 +22,75 @@ describe('mapping a (kind, source) pair to a nominal code (I-108 criterion 1)', 
     for (const pair of LEDGER_POSTING_PAIRS) {
       expect(nominalMappingForm.safeParse({ ...pair, nominalCode: '4100' }).success).toBe(true)
     }
+  })
+})
+
+// Issue #1283: a pair posted with no row exports UNMAPPED forever, since a mapping is only ever
+// updated. A file's every ledger source is paired with its every line kind, erring towards a row.
+describe('every pair the code posts under has a mapping row (I-108 criterion 1)', () => {
+  const listed = new Set(LEDGER_POSTING_PAIRS.map(pair => `${pair.kind}/${pair.source}`))
+  const literals = (text: string): string[] => [...text.matchAll(/'([A-Z_]+)'/g)].map(match => match[1]!)
+
+  async function postingFiles(): Promise<{ file: string, text: string }[]> {
+    const found: { file: string, text: string }[] = []
+    for (const dir of ['server', 'migration']) {
+      for (const entry of new Bun.Glob('**/*.ts').scanSync({ cwd: dir, onlyFiles: true })) {
+        const text = await Bun.file(`${dir}/${entry}`).text()
+        if (/\bpostEntry\(\{|INTO ledger_entries/.test(text)) found.push({ file: `${dir}/${entry}`, text })
+      }
+    }
+    return found
+  }
+
+  function pairsIn(text: string): { sources: string[], kinds: string[] } {
+    const sources = [...text.matchAll(/\bsource:([^,\n]+)/g)].flatMap(match => literals(match[1]!))
+      .filter(source => (ENTRY_SOURCES as readonly string[]).includes(source))
+    const kinds = [...text.matchAll(/\bkind:\s*'([A-Z_]+)'/g)].map(match => match[1]!).filter(isLineKind)
+    return { sources: [...new Set(sources)], kinds: [...new Set(kinds)] }
+  }
+
+  test('the scan finds the posting sites, and reads a source and a kind in each', async () => {
+    const files = await postingFiles()
+    expect(files.map(one => one.file)).toContain('server/utils/sale.ts')
+    expect(files.map(one => one.file)).toContain('server/utils/fellowship-pass.ts')
+    expect(files.map(one => one.file)).toContain('migration/money.ts')
+    for (const { file, text } of files) {
+      const { sources, kinds } = pairsIn(text)
+      expect(`${file}: ${sources.length > 0 && kinds.length > 0}`).toBe(`${file}: true`)
+    }
+  })
+
+  test('every (kind, source) a posting site writes is in LEDGER_POSTING_PAIRS', async () => {
+    const missing: string[] = []
+    for (const { file, text } of await postingFiles()) {
+      const { sources, kinds } = pairsIn(text)
+      for (const kind of kinds) {
+        for (const source of sources) {
+          if (!listed.has(`${kind}/${source}`)) missing.push(`${kind}/${source} (${file})`)
+        }
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
+  test('the till\'s ticket lines and the Fellowship award are mappable (issue #1283)', () => {
+    for (const pair of ['TICKET_COLLECTION/TILL', 'WALK_UP/TILL', 'PASS_SALE/SYSTEM']) {
+      expect(`${pair}: ${listed.has(pair)}`).toBe(`${pair}: true`)
+    }
+  })
+
+  test('the list is exactly the pairs architecture.md\'s posting table names', async () => {
+    const doc = await Bun.file('docs/architecture.md').text()
+    const section = doc.split('\n### The money paths\n')[1]?.split('\n## ')[0] ?? ''
+    const documented = new Set<string>()
+    for (const row of section.split('\n').filter(one => one.startsWith('| ') && !one.startsWith('| Money path') && !one.startsWith('| ---'))) {
+      const cells = row.split('|').slice(1, -1).map(cell => cell.trim())
+      const tokens = (cell: string): string[] => [...cell.matchAll(/`([A-Z_]+)`/g)].map(match => match[1]!)
+      for (const kind of tokens(cells[5]!)) {
+        for (const source of tokens(cells[3]!)) documented.add(`${kind}/${source}`)
+      }
+    }
+    expect([...listed].sort()).toEqual([...documented].sort())
   })
 })
 

@@ -143,12 +143,12 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
 - Story: As the treasurer, I want period exports mapped to the SU's accounting categories so that the union's oversight costs one download.
 - Depends on: I-101, I-107
 - Acceptance criteria:
-  1. Category mappings are configurable: each ledger entry type and source maps to an SU nominal code, managed in the configuration surface (J-104) and audited on change.
+  1. Category mappings are configurable: each ledger entry type and source maps to an SU nominal code, managed in the configuration surface (J-104) and audited on change. Every (type, source) pair the code posts under has a mapping row, seeded unmapped, from the moment it can post (the till's ticket collections and walk-ups, and the Fellowship award's zero-value pass under `SYSTEM`, included); a pair posted anywhere in the application or the import with no row fails a unit test, so a new money path cannot ship lines the treasurer can never map.
   2. A period export produces CSV with date, category, nominal code and amounts in pence (a pounds column is formatted at export time only); output guards CSV formula injection.
   3. Entries whose type has no mapping appear on an explicit unmapped line; the export never drops or hides a row.
   4. The yearly SU return is a saved report, re-runnable identically for any year (1 August to 31 July) or season (a `seasons` row, decision 0087), and the screen shows whether the chosen period is closed, so a treasurer knows before taking it whether two runs will match.
   5. Every export is audited: who, when, which period.
-- Source: Prompt Book I-3; audit PR-7 (export caps and formula-injection guard)
+- Source: Prompt Book I-3; audit PR-7 (export caps and formula-injection guard); issue #1283 (pairs posted by F-122, F-123 and D-130 missing from the mapping list, 24 September 2026)
 
 ## I-109: Historical money imports as opening ledger history
 
