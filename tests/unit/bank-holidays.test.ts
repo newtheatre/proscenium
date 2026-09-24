@@ -69,9 +69,10 @@ describe('the feed is read only when it is what gov.uk publishes (criterion 7)',
 
 describe('the merge: gov.uk is authoritative from its first date on (criterion 7)', () => {
   test('a date the feed moved is corrected, not kept beside its replacement', () => {
-    const stored = ['2027-05-31', '2027-12-27']
-    const fetched = ['2027-06-03', '2027-12-27']
-    expect(mergeHolidays(stored, fetched)).toEqual(['2027-06-03', '2027-12-27'])
+    // The moved date must fall on or after the feed's first; one before it is an old year and kept.
+    const stored = ['2027-01-01', '2027-05-31', '2027-12-27']
+    const fetched = ['2027-01-01', '2027-06-03', '2027-12-27']
+    expect(mergeHolidays(stored, fetched)).toEqual(['2027-01-01', '2027-06-03', '2027-12-27'])
   })
 
   test('stored dates older than the feed\'s first are kept, because gov.uk drops old years', () => {

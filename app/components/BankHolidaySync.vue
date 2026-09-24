@@ -21,7 +21,7 @@ const upcoming = computed(() => {
 const says = computed(() => {
   const sync = standing.value
   if (!sync) return null
-  const last = sync.syncedAt ? `Last copied from gov.uk on ${saysWhenLong(sync.syncedAt)}.` : 'Not yet copied from gov.uk: these are the dates the system shipped with.'
+  const last = sync.syncedAt ? `Last copied from gov.uk on ${saysWhenLong(sync.syncedAt)}.` : 'Not yet copied from gov.uk: these are the dates this site started with.'
   if (sync.status === 'failed' && sync.failedAt) {
     const why = sync.failure ? SYNC_FAILURE_TEXT[sync.failure] : 'it failed'
     return { color: 'error' as const, text: `The last copy, on ${saysWhenLong(sync.failedAt)}, failed: ${why}. The list below still stands. ${last}` }
