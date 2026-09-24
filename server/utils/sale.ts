@@ -4,8 +4,9 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
 import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, onHandOfItems, resolvedPriceColumns } from '#server/utils/bar'
+import { stockCounted, tillServings } from '#server/utils/bar-linkage'
 import { chunked } from '#shared/utils/approvals'
-import { NOT_ENOUGH_STOCK, stockShortOf } from '#shared/utils/sale'
+import { NOT_ENOUGH_STOCK, stockShortOf, variantStock } from '#shared/utils/sale'
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { discountedPence } from '#shared/utils/discounts'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
@@ -91,7 +92,7 @@ export interface Depletion {
 
 // The public `SaleVariant` shape plus what only the write path reads: F-121's `price_ref`,
 // F-113's recipe, F-106's `ageRestricted` gate (the owning product's flag, not this size's own).
-interface ResolvedVariant extends SaleVariant {
+interface ResolvedVariant extends Omit<SaleVariant, 'stock'> {
   productId: string
   priceRowId: string
   ageRestricted: boolean
@@ -183,6 +184,8 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
   `)
 
   const variants = [...(await activeVariantsWithChoices(on)).variants.values()]
+  // Read here and never on the sale path, which the trigger guards on the write (F-128 criterion 8).
+  const [servings, counted] = await Promise.all([tillServings(), stockCounted()])
   const products: SaleProduct[] = productRows
     .map(row => ({
       id: row.id,
@@ -194,7 +197,8 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
       variants: variants.filter(variant => variant.productId === row.id)
         // Only what the screen needs: the write-path fields (price row, recipe, the product's own
         // age-restricted flag, already carried on the product itself) stay internal.
-        .map(({ productId: _productId, priceRowId: _priceRowId, ageRestricted: _ageRestricted, recipe: _recipe, ...variant }) => variant),
+        .map(({ productId: _productId, priceRowId: _priceRowId, ageRestricted: _ageRestricted, recipe: _recipe, ...variant }) =>
+          ({ ...variant, stock: variantStock(servings.get(variant.id) ?? null, counted) })),
     }))
     .filter(product => product.variants.length > 0)
 

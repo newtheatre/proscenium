@@ -116,6 +116,13 @@ export interface SaleChoice {
   options: SaleChoiceOption[]
 }
 
+// What on-hand supports of a size, as the catalogue was read: advice, since the device may hold
+// it for hours; `blocks` only once a stocktake has made on-hand a balance (F-128 criterion 8, 0080).
+export interface VariantStock {
+  servingsLeft: number
+  blocks: boolean
+}
+
 // Only what the till may sell right now: `ACTIVE`, and priced (0017, F-121). A product surfaced
 // here always has at least one such size, which is what fixes the pre-F-112 activation gap.
 export interface SaleVariant {
@@ -125,7 +132,20 @@ export interface SaleVariant {
   pricePence: number
   priceSource: Exclude<BarPriceSource, null>
   choice: SaleChoice | null
+  // Null for a size that depletes nothing, which has nothing to run out of.
+  stock: VariantStock | null
 }
+
+export function variantStock(servingsLeft: number | null, stockCounted: boolean): VariantStock | null {
+  if (servingsLeft === null) return null
+  return { servingsLeft, blocks: stockCounted && servingsLeft <= 0 }
+}
+
+// Optional chaining because a catalogue cached before sizes carried stock has no field at all.
+export const sizeOutOfStock = (variant: Pick<SaleVariant, 'stock'>): boolean => (variant.stock?.servingsLeft ?? 1) <= 0
+export const sizeBlocked = (variant: Pick<SaleVariant, 'stock'>): boolean => variant.stock?.blocks === true
+export const productOutOfStock = (product: Pick<SaleProduct, 'variants'>): boolean => product.variants.every(sizeOutOfStock)
+export const productBlocked = (product: Pick<SaleProduct, 'variants'>): boolean => product.variants.every(sizeBlocked)
 
 export interface SaleProduct {
   id: string
