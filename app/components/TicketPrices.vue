@@ -198,7 +198,7 @@ async function save(): Promise<void> {
               <UInputNumber
                 :model-value="poundsFor(item.ticketTypeId)"
                 :min="0"
-                :step="0.5"
+                :step="0.01"
                 :format-options="{ style: 'currency', currency: 'GBP' }"
                 placeholder="Inherit"
                 class="w-40"
