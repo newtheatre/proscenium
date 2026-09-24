@@ -6,7 +6,7 @@ import { ROLES, saysRole } from '#shared/utils/roles'
 const model = defineModel<string[]>({ default: () => [] })
 const props = defineProps<{ name: string, label: string }>()
 
-const items = ROLES.map(role => ({ label: saysRole(role), value: role }))
+const items: { label: string, value: string }[] = ROLES.map(role => ({ label: saysRole(role), value: role }))
 </script>
 
 <template>
