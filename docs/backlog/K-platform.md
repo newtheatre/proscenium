@@ -92,6 +92,10 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
      card, closing the old estate's offline-first-load gap.
   4. Cached data is honestly labelled with its sync time (for example "last synced 19:12"); no
      cached screen presents itself as live.
+  5. When a screen asks again before an earlier load has answered, an answer or failure that
+     lands after a newer request's has answered is dropped from the screen and the device, so a
+     read taken before a sale can never replace one taken after it (#1289). An older answer that
+     lands first is still shown, so a newer request failing never blanks the screen.
 - Source: Prompt Book K-1 (resilience), E-2; audit PR-9 (emergency card mirrors to localStorage
   but not on a cold load); Get-In part 6 (one database is one blast radius)
 

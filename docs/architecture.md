@@ -1743,6 +1743,7 @@ answered, and `cache.error` is the failure that left the screen stale rather tha
 | A key names a venue or a performance, or says `wholeNight` in as many words. | Two venues run one night and one venue runs a matinee and an evening, so a key of the night alone serves a duty manager the other house's screen. Forgetting throws; meaning it is spelled differently. |
 | The key is stamped inside the entry as well as outside it. | An entry copied or renamed under another key reads as nothing cached rather than as another venue's night. |
 | A failed load never overwrites what the screen is showing. | A dropped connection is a stale screen, never a blank one (criterion 2). |
+| An answer or failure landing after a newer request's has answered is dropped; one landing first is kept. | A screen asks again on focus, after a sale and on a session change, and the slowest answer is not the freshest: a read taken before a sale must not replace one taken after it, yet a newer request that fails must not blank one that answered (criteria 2 and 5). |
 | A successful load sweeps every other night's entries. | A night ends at 04:00 and takes its cache with it; nothing else on the device is touched. |
 | Unreadable, foreign-version or foreign-key entries read as nothing cached. | A screen that throws on an entry an older build wrote is worse than one that reloads. |
 | `primeNightCache(key, load)` caches what another screen will need. | The emergency card is cached from the start of the shift rather than from the first visit to it (criterion 3, E-113 criterion 2). |
