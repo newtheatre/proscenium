@@ -3,7 +3,9 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, resolvedPriceColumns } from '#server/utils/bar'
+import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, onHandOfItems, resolvedPriceColumns } from '#server/utils/bar'
+import { chunked } from '#shared/utils/approvals'
+import { NOT_ENOUGH_STOCK, stockShortOf } from '#shared/utils/sale'
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { discountedPence } from '#shared/utils/discounts'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
@@ -575,11 +577,23 @@ async function prepareSale(
   }
 }
 
-// The cross-check alone, for a basket about to be handed to the SumUp app (F-124 criterion 2):
+// Advisory: the trigger on the write still holds, so a race lost after this read lands as a
+// mismatch (F-124 criteria 4, 8); this spares the reader a charge already bound to fail.
+async function refuseShortBasket(lines: ResolvedLine[]): Promise<void> {
+  const itemIds = [...new Set(lines.flatMap(line => line.depletion.map(ingredient => ingredient.itemId)))]
+  const onHand = new Map<string, number>()
+  for (const batch of chunked(itemIds)) {
+    for (const row of await db.all<{ itemId: string, onHand: number }>(onHandOfItems(batch))) onHand.set(row.itemId, Number(row.onHand))
+  }
+  if (stockShortOf(lines, onHand).length > 0) throw createError({ statusCode: 409, statusMessage: NOT_ENOUGH_STOCK })
+}
+
+// The cross-check alone, for a basket about to be handed to the SumUp app (F-124 criteria 2, 8):
 // refused here means the app is never opened for it.
 export async function priceSaleForAttempt(input: SaleInput, on: string, context: SaleContext): Promise<PricedAttempt> {
   const prepared = await prepareSale(input.lines, on, input.expectedTotalPence, input.ageCheck, input.discountId, context,
     { tickets: input.tickets, walkUps: input.walkUps, walkUpGuest: input.walkUpGuest })
+  await refuseShortBasket(prepared.soldResolved)
   return { soldTotalPence: prepared.soldTotalPence, performanceId: prepared.performanceId }
 }
 
@@ -769,7 +783,7 @@ export async function commitSale(
     // The trigger's predicate is what refuses an oversell (0070); a read-then-check here would
     // race the same way on-hand always must not (F-105 criterion 5), so this catches its abort.
     if (error instanceof Error && error.message.includes('stock_movements_sale_exceeds_on_hand')) {
-      throw createError({ statusCode: 409, statusMessage: 'Not enough left in stock for this sale: nothing has been charged.' })
+      throw createError({ statusCode: 409, statusMessage: NOT_ENOUGH_STOCK })
     }
     if (error instanceof Error) {
       const refusal = ageCheckConstraintRefusal(error)
