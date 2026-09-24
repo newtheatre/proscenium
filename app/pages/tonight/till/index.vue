@@ -24,6 +24,8 @@ const {
   venuesFailure,
   needsVenue,
   chooseVenue,
+  usingDevice,
+  changeVenue,
   open,
   closeModalOpen,
   reconciliation,
@@ -145,6 +147,12 @@ const basketItemCount = computed(() => basket.value.reduce((sum, line) => sum + 
   + ticketLines.value.length
   + walkUpLines.value.reduce((sum, line) => sum + line.quantity, 0))
 
+const route = useRoute()
+// Read once, as the claim is taken on mount; dropped from the address so a reload asks nothing.
+onMounted(() => {
+  if (route.query.attempt !== undefined) void navigateTo({ path: route.path, query: { ...route.query, attempt: undefined } }, { replace: true })
+})
+
 const charging = ref(false)
 const chargeFailure = ref<string | null>(null)
 const charged = ref<ChargedReceipt | null>(null)
@@ -165,11 +173,14 @@ const {
   smpTxCodeTyped,
   abandonNote,
   openAttempts,
+  retryOffered,
+  returnNotice,
   startWatching,
   checkAttempt,
   resolveAttempt,
 } = useSumUpCharge({
   request: (path, options) => $fetch(path, options),
+  returnedAttemptId: typeof route.query.attempt === 'string' ? route.query.attempt : null,
   venueId,
   sumupEnabled,
   selectedTabHolderId,
@@ -453,7 +464,10 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           <!-- Not a per-sale action, so it lives here rather than under the thumb (K-102
                criterion 2). -->
           <UDropdownMenu
-            :items="[[{ label: 'Close till', icon: 'i-lucide-lock', onSelect: openCloseModal }]]"
+            :items="[[
+              { label: 'Close till', icon: 'i-lucide-lock', onSelect: openCloseModal },
+              ...(usingDevice ? [{ label: 'Change bar', icon: 'i-lucide-map-pin', onSelect: changeVenue }] : []),
+            ]]"
           >
             <UButton
               icon="i-lucide-ellipsis-vertical"
@@ -498,6 +512,16 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           color="error"
           variant="subtle"
           :description="refusalRecordFailure"
+        />
+
+        <UAlert
+          v-if="returnNotice && !charged"
+          data-test="sumup-restored-elsewhere"
+          color="info"
+          variant="subtle"
+          :description="returnNotice"
+          close
+          @update:open="returnNotice = null"
         />
 
         <TillSumUpWaiting
@@ -614,6 +638,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               :tab-holders="tabHolders.data.value?.holders ?? []"
               :has-ticket-money="hasTicketMoney"
               :charge-failure="chargeFailure"
+              :retry-sumup="retryOffered && sumupAvailable && !sumup.pending.value && !charging"
               :price-failure="priceFailure"
               :priced="priced"
               :grand-total-pence="grandTotalPence"
@@ -621,6 +646,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               :tickets-pence="ticketsPence"
               :walk-ups-pence="walkUpsPence"
               @open-allergens="allergenOpen = $event"
+              @retry-sumup="() => chargeOnSumUp()"
             />
           </div>
         </template>
@@ -728,12 +754,25 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         </div>
       </div>
 
-      <p
+      <div
         v-else
-        data-test="till-closed"
+        class="space-y-3"
       >
-        The till is not open yet.
-      </p>
+        <p data-test="till-closed">
+          The till is not open yet.
+        </p>
+        <!-- The bar came from this phone's memory of tonight, so the way to another one is here. -->
+        <UButton
+          v-if="usingDevice"
+          data-test="till-change-venue"
+          color="neutral"
+          variant="subtle"
+          class="min-h-12"
+          icon="i-lucide-map-pin"
+          label="Change bar"
+          @click="changeVenue"
+        />
+      </div>
 
       <template #actions>
         <!-- One row, not three: the count, the comp chip and the total share it, because every

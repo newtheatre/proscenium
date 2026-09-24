@@ -2,6 +2,7 @@
 title: Box office
 description: The desk, passes, the programme and its reference data, and access profile verification.
 module: Ticketing
+audience: committee
 updatedOn: 2026-09-23
 updatedBy: Matt Adcock
 navigation:

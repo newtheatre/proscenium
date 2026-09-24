@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { findPageHeadline } from '@nuxt/content/utils'
 import type { ContentNavigationItem } from '@nuxt/content'
+import { readsCommitteeDocs } from '#shared/utils/docs-audience'
 import { resolvePolicyTree, tokensInTree } from '#shared/utils/policy-tokens'
 import { saysDay } from '#shared/utils/when'
 import type { PolicyValues } from '#shared/utils/policy-tokens'
@@ -21,10 +22,17 @@ if (!page.value) {
   throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
 }
 
+const { account } = useAccount()
+const committee = readsCommitteeDocs(account.value)
+
 // A folder's navigation entry is a row in the collection too, and must never become a neighbour.
+// Prev and next follow the sidebar, so a member is never walked into a console page (0093).
 const { data: surround } = await useAsyncData(
-  `docs:${route.path}:surround`,
-  () => queryCollectionItemSurroundings('docs', route.path, { fields: ['description'] }).where('extension', '=', 'md'),
+  `docs:${route.path}:surround:${committee}`,
+  () => {
+    const query = queryCollectionItemSurroundings('docs', route.path, { fields: ['description'] }).where('extension', '=', 'md')
+    return committee ? query : query.where('audience', '<>', 'committee')
+  },
 )
 
 // Live values, the same way the policy pages quote them, so a threshold named here is the one

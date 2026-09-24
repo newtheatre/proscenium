@@ -2,6 +2,7 @@
 title: My NNT
 description: What a signed-in member can do for themselves, and what a visitor can do without signing in at all.
 module: Identity
+audience: member
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:

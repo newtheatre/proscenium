@@ -2,6 +2,7 @@
 title: Communications
 description: Sending an announcement to an audience, and reading what went out and what could not.
 module: Communications
+audience: committee
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:

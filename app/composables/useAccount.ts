@@ -7,6 +7,8 @@ export interface AccountSnapshot {
   // What the chrome filters itself by. Empty for a signed-out caller, and never the guard: the
   // server refuses on its own account (0009).
   permissions: Permission[]
+  // Any live role grant, including one with no permission: the docs tree reads it (0093).
+  holdsRole: boolean
   onShiftTonight: boolean
   leadsDepartment: boolean
   isTrainer: boolean
@@ -21,6 +23,7 @@ export function useAccount(): { account: Ref<AccountSnapshot>, refresh: () => Pr
   const account = useState<AccountSnapshot>('nnt-account', () => ({
     signedIn: false,
     permissions: [],
+    holdsRole: false,
     onShiftTonight: false,
     leadsDepartment: false,
     isTrainer: false,
@@ -34,6 +37,7 @@ export function useAccount(): { account: Ref<AccountSnapshot>, refresh: () => Pr
     const answer = await request('/api/auth/session')
     account.value = {
       permissions: [],
+      holdsRole: false,
       onShiftTonight: false,
       leadsDepartment: false,
       isTrainer: false,
