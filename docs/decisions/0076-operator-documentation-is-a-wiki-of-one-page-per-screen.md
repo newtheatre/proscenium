@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-15
+- Superseded in part by 0093: a public tier sits beside the gated collection, and every page names its audience.
 
 ## Context
 

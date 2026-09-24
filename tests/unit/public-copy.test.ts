@@ -9,6 +9,7 @@ const PUBLIC_GLOBS = [
   'app/error.vue',
   'app/pages/[...slug].vue',
   'app/pages/get-involved.vue',
+  'app/pages/help/[...slug].vue',
   'app/pages/index.vue',
   'app/pages/magic.vue',
   'app/pages/register.vue',
@@ -43,9 +44,13 @@ function publicFiles(): string[] {
   return [...found, ...SHARED_PUBLIC].sort()
 }
 
+// Public help is read by the same visitor as a policy page, so it is held to the same words (0093).
+const HELP = 'content/help'
+
 function policyFiles(): string[] {
-  const glob = new Bun.Glob('*.md')
-  return [...glob.scanSync({ cwd: POLICIES, onlyFiles: true })].map(path => `${POLICIES}/${path}`).sort()
+  const policies = [...new Bun.Glob('*.md').scanSync({ cwd: POLICIES, onlyFiles: true })].map(path => `${POLICIES}/${path}`)
+  const help = [...new Bun.Glob('**/*.md').scanSync({ cwd: HELP, onlyFiles: true })].map(path => `${HELP}/${path}`)
+  return [...policies, ...help].sort()
 }
 
 // A comment carries a constraint for the next developer, not copy for a reader, so the sweep
