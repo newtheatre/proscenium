@@ -41,13 +41,18 @@ export function readPouredBy(value: string | null): PouredBy[] {
   return Array.isArray(parsed) ? parsed : []
 }
 
-const poured = sql`(SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = c.item_id) / c.qty`
+// Servings one recipe row supports: its item's on-hand over the quantity a serving takes.
+function servingsOfRow(alias: 'c' | 'g' | 'o'): SQL {
+  const row = sql.raw(alias)
+  return sql`(SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = ${row}.item_id) / ${row}.qty`
+}
+const poured = servingsOfRow('c')
 
 // The tightest component decides, and a choice is as good as its best-stocked option, since the
 // customer picks one. A size that depletes nothing answers null rather than nought (F-128).
 function servingsQuery(products: SQL): SQL {
   const chosen = sql`(
-    SELECT max((SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = g.item_id) / g.qty)
+    SELECT max(${servingsOfRow('g')})
     FROM choice_group_items g WHERE g.choice_group_id = c.choice_group_id
   )`
   return sql`
@@ -69,7 +74,7 @@ export function servingsAvailableQuery(productId: string): SQL {
 // One option of a size's choice: its own item held to the size's fixed components, which is what
 // picking it pours, so the best option's figure is the size's own (F-128 criterion 9).
 function optionServingsQuery(products: SQL): SQL {
-  const own = sql`(SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = o.item_id) / o.qty`
+  const own = servingsOfRow('o')
   const fixed = sql`(SELECT min(${poured}) FROM variant_components c WHERE c.variant_id = v.id AND c.item_id IS NOT NULL)`
   return sql`
     SELECT v.id AS variantId, o.id AS optionId, min(${own}, coalesce(${fixed}, ${own})) AS servings
