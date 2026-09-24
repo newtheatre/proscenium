@@ -780,7 +780,7 @@ export async function commitSale(
     await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   }
   catch (error) {
-    // The trigger's predicate is what refuses an oversell (0070); a read-then-check here would
+    // The trigger's predicate is what refuses an oversell (0006); a read-then-check here would
     // race the same way on-hand always must not (F-105 criterion 5), so this catches its abort.
     if (error instanceof Error && error.message.includes('stock_movements_sale_exceeds_on_hand')) {
       throw createError({ statusCode: 409, statusMessage: NOT_ENOUGH_STOCK })
