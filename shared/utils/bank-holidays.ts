@@ -69,8 +69,7 @@ export async function fetchGovUkHolidays(fetcher: typeof fetch, today: string): 
     })
   }
   catch (error) {
-    const name = (error as { name?: string } | null)?.name
-    return { ok: false, failure: name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network' }
+    return { ok: false, failure: readFailure(error) }
   }
 
   if (response.status !== 200) return { ok: false, failure: 'http', status: response.status }
@@ -78,15 +77,14 @@ export async function fetchGovUkHolidays(fetcher: typeof fetch, today: string): 
   const declared = Number(response.headers.get('content-length') ?? 0)
   if (declared > SYNC_MAX_BYTES) return { ok: false, failure: 'too-large' }
 
-  let text: string
+  let text: string | null
   try {
-    text = await response.text()
+    text = await readCapped(response)
   }
   catch (error) {
-    const name = (error as { name?: string } | null)?.name
-    return { ok: false, failure: name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network' }
+    return { ok: false, failure: readFailure(error) }
   }
-  if (text.length > SYNC_MAX_BYTES) return { ok: false, failure: 'too-large' }
+  if (text === null) return { ok: false, failure: 'too-large' }
 
   let body: unknown
   try {
@@ -97,6 +95,34 @@ export async function fetchGovUkHolidays(fetcher: typeof fetch, today: string): 
   }
 
   return parseGovUkFeed(body, today)
+}
+
+function readFailure(error: unknown): SyncFailure {
+  const name = (error as { name?: string } | null)?.name
+  return name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network'
+}
+
+// Null once the body passes the cap, counted in bytes and stopped there, whatever it declared.
+async function readCapped(response: Response): Promise<string | null> {
+  if (!response.body) return ''
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (let read = await reader.read(); !read.done; read = await reader.read()) {
+    size += read.value.byteLength
+    if (size > SYNC_MAX_BYTES) {
+      await reader.cancel().catch(() => {})
+      return null
+    }
+    chunks.push(read.value)
+  }
+  const bytes = new Uint8Array(size)
+  let at = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, at)
+    at += chunk.byteLength
+  }
+  return new TextDecoder().decode(bytes)
 }
 
 export interface SyncHistory {

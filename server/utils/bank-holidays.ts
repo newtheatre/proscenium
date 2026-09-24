@@ -65,8 +65,15 @@ export async function syncBankHolidays(
 
 async function failed(event: H3Event | undefined, actorId: string | null, failure: SyncFailed, now: Date): Promise<SyncOutcome> {
   console.warn(`[bank-holidays] sync failed: ${failure.failure}${failure.status ? ` ${failure.status}` : ''}`)
-  await db.run(syncFailedStatement(actorId, failure, Math.floor(now.getTime() / 1000)))
-  return { ...failure, alerted: await alertIfSustained(event, now) }
+  // The database may be why it failed; the answer is still an outcome, never a throw.
+  try {
+    await db.run(syncFailedStatement(actorId, failure, Math.floor(now.getTime() / 1000)))
+    return { ...failure, alerted: await alertIfSustained(event, now) }
+  }
+  catch (error) {
+    console.error('[bank-holidays] could not record or report the failed sync:', error)
+    return { ...failure, alerted: 0 }
+  }
 }
 
 // Once per person per failure streak, claimed like any other send (0048); a success ends the
