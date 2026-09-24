@@ -709,11 +709,22 @@ Open questions:
      retirement carries the on-hand sum as a subquery in its own UPDATE's predicate, and the hides
      scope to the dependent products by subquery over the components, never by an id list read
      first (0006), so a delivery or a recipe change landing in the window cannot slip past.
-  7. Both views derive from the existing components: no link is stored in either direction, and
-     the till's catalogue contract is untouched.
+  7. Both views derive from the existing components: no link is stored in either direction.
+     Amended 24 September 2026 (issue 1258): the till's catalogue is no longer untouched, since it
+     carries criterion 8's servings, derived the same way and stored nowhere either.
+  8. Added 24 September 2026 (issue 1258): the till's catalogue carries, per size, the servings
+     the current on-hand supports, read as criterion 4 reads them in one query over every active
+     product that binds no parameter per product (0006). A size with none left reads "Out of
+     stock" in the size sheet, and a product whose every size is out reads it on its tile. Once
+     any stocktake has been applied the button is disabled too; before then, the cutover count
+     has not set a trusted balance (0080), so the label shows and the button stays live. The
+     label is advice, because the catalogue is held on the device and can trail the shelf: the
+     trigger on the sale's write stays what holds (F-105 criterion 5), and the till reads the
+     catalogue again whenever it comes back to the screen.
 - Source: bar review, 15 September 2026 (known issues: the retirement guard reads on-hand before
   the write, and the empty-recipe gap); Matt's direction, 15 September 2026 (every sellable thing
-  depletes something).
+  depletes something); issue 1258, with the IT Manager's direction to grey out rather than hold
+  stock.
 
 ## F-201: Reader-initiated checkout
 
