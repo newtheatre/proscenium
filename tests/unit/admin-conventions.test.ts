@@ -70,6 +70,23 @@ describe('an input is the component for its value (0032)', () => {
   })
 })
 
+// The catalogue runs to dozens of modules, so choosing one is a searchable menu (G-120 criterion 7).
+describe('a module is chosen from a searchable menu, never a wall of buttons (0032, issue 1259)', () => {
+  test('no console screen renders a button for every module it offers', async () => {
+    expect(await offenders(source => openingTags(source, 'UButton').some(tag => /v-for="module in/.test(tag)))).toEqual([])
+  })
+
+  test('the sign-off and certificate pickers are single searchable menus', async () => {
+    const menus = openingTags(await Bun.file('app/pages/training/manage/records.vue').text(), 'USelectMenu')
+    for (const name of ['sign-module', 'external-module']) {
+      const menu = menus.find(tag => tag.includes(`data-test="${name}"`)) ?? ''
+      expect(menu).toContain('value-key="value"')
+      expect(menu).toContain('placeholder="Search the catalogue"')
+      expect(menu).not.toMatch(/\bmultiple\b/)
+    }
+  })
+})
+
 describe('a person is chosen, never typed (0032)', () => {
   // The tell is a field asking for an account: nothing on an admin screen should want an id typed
   // into it, and the picker is what a screen uses instead.

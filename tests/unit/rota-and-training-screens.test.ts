@@ -74,7 +74,8 @@ describe('the board shows bar openings beside performances (E-130 criterion 8)',
 describe('a module is chosen by name (G-120 criterion 7)', () => {
   test('the sign-off picker names the module', async () => {
     const source = await read(RECORDS)
-    expect(source).toContain('{{ module.name }}')
+    expect(source).toMatch(/label: `\$\{module\.id\} \$\{module\.name\}`/)
+    expect(source).toContain(':items="signableOptions"')
   })
 
   test('no picker on the records screen is a bare id', async () => {
