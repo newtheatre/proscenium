@@ -678,7 +678,11 @@ per section (`04.box-office/`), each with a `.navigation.yml` naming it and an `
 and pages `<n>.<slug>.md` inside; Nuxt Content's own rules give the URL, dropping the ordering
 prefix and the index file (`/docs/box-office/desk`). `shared/utils/docs-paths.ts` holds that
 rule once, for the tests and the check. Every page carries `title`, `description`, `module`,
-`updatedOn` and `updatedBy`. `docs/operator-documentation.md` is the runbook for whoever edits
+`audience`, `updatedOn` and `updatedBy`. `audience` is `member` or `committee` (0093): the docs
+layout passes the tree through `visibleTree()` and drops committee pages from search with
+`committeePaths()` unless `readsCommitteeDocs()` holds, which is any live role grant (the session
+answer's `holdsRole`) or any standing permission. It filters navigation only; the collection stays
+readable by any session. `docs/operator-documentation.md` is the runbook for whoever edits
 a page: the tree's naming rules, the shape of a page, the words, the pictures and the checks.
 
 `app/layouts/docs.vue` is the reading surface: the member shell's header with a search button,

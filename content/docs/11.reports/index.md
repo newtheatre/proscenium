@@ -2,6 +2,7 @@
 title: Reports
 description: Incident trends and each performance's attendance and staffing across any period, with a CSV export of each.
 module: Show night
+audience: committee
 updatedOn: 2026-09-23
 updatedBy: Matt Adcock
 navigation:

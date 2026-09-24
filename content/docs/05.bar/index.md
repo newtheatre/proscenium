@@ -2,6 +2,7 @@
 title: Bar
 description: The catalogue the till sells from, the stock register behind it, and the reports read from the ledger.
 module: Bar
+audience: committee
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:

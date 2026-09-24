@@ -2,6 +2,7 @@
 title: People
 description: Every account the theatre holds, the membership register, the roll of Fellows and the roles that run out each committee year.
 module: Identity
+audience: committee
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:

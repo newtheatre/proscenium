@@ -2,6 +2,7 @@
 title: Training
 description: The catalogue of modules, the departments that own them, what people hold, what they are asking for, and the sessions that teach it.
 module: Training
+audience: member
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:

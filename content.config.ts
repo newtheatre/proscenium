@@ -44,6 +44,8 @@ export default defineContentConfig({
         // automatically (0051). ISO date, read as a plain string rather than parsed.
         updatedOn: z.string(),
         updatedBy: z.string(),
+        // DOCS_AUDIENCES in shared/utils/docs-audience.ts; the tree reads it, access never does (0093).
+        audience: z.enum(['member', 'committee']),
       }),
     }),
     // Public help, read signed out: its own collection so its dump holds nothing but these pages.

@@ -2,6 +2,7 @@
 title: Rota
 description: Setting a show night up from the console, from the venue's staffing to the wings device.
 module: Show night
+audience: committee
 updatedOn: 2026-09-22
 updatedBy: Matt Adcock
 navigation:

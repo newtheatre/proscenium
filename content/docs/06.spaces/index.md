@@ -2,6 +2,7 @@
 title: Spaces
 description: The rooms we control, the request queue, every booking, closures, the rooms we do not manage and the utilisation report.
 module: Spaces
+audience: committee
 updatedOn: 2026-09-23
 updatedBy: Matt Adcock
 navigation:
