@@ -782,7 +782,7 @@ Open questions:
 - Story: As tonight's bar staff, I want to sell a season pass from the till so that somebody who
   decides at the interval to come back for the rest of the season pays at the counter, on the
   same reader as their drink, without a trip to the box office desk.
-- Depends on: D-123, D-124, F-122, F-124
+- Depends on: D-123, D-124, F-122, F-124, I-108
 - Context: D-124 sells a pass at the desk only. The till is the one money-taking point on a show
   night (F-122), so a pass sold there follows the till's ticket sales rather than the desk's: it
   is the show-night counter's sale, on the till's own session and reconciliation. The till still
@@ -790,10 +790,12 @@ Open questions:
 - Acceptance criteria:
   1. The Tickets tab offers a pass product (D-123) whose sales window is open tonight, at its
      configured price points in integer pence, read out through the shared money wording.
-  2. A pass is sold only to a buyer with an account, found by search by name or email as the desk
-     finds one; a pending online request (D-124 criterion 3) shows beside the buyer for one-tap
-     fulfilment in the same batch. A buyer with no account is refused before anything reaches the
-     basket, since a pass has to resolve to somebody's account to be worth anything.
+  2. A pass is sold only to a buyer with an account, found by exact email address or from the
+     product's pending online requests (D-124 criterion 3); bar authority is a shift, not a
+     ticketing permission (0009), so the till never lists or searches accounts by name. A pending
+     request shows beside its buyer for one-tap fulfilment in the same batch. A buyer with no
+     account is refused before anything reaches the basket, since a pass has to resolve to
+     somebody's account to be worth anything.
   3. The product cap is the insert's own predicate at payment (`passCapAllows`, decision 0001),
      exactly as the desk's issue path writes it: requests may exceed the cap, issues may not, and a
      sale that loses the race is refused 409 with nothing written and nothing charged. A racing
@@ -801,15 +803,19 @@ Open questions:
   4. A handed-off sale's `sumup_attempts` row carries the pass line in its basket exactly as
      priced (F-124 criterion 2); nothing is issued and nothing posts until the attempt succeeds,
      and a success re-runs the cap and the cross-check, marking the attempt mismatched with the
-     reason when the cap has filled meanwhile (F-124 criterion 4).
-  5. The sale posts under the source the till's ticket sales use (F-122, F-123), never the desk's:
-     `DOOR` is the source a till walk-up's reservation is written with, and a pass has no
-     reservation, so the pass sale rides the till's own ledger entry, source `TILL` and tender
-     `CARD`, carrying the pass as one `PASS_SALE` line beside any bar and ticket lines, in the same batch as the pass's issue and its audit
-     row, naming its issuer (D-124 criterion 1). The posting pair joins `LEDGER_POSTING_PAIRS`
-     and `docs/architecture.md`'s posting table, and the pass money appears in the till's
-     reconciliation inside the figure the reader is expected to show (F-118). A tab tender
-     refuses a basket holding a pass line.
+     reason when the cap has filled meanwhile (F-124 criterion 4). A request being fulfilled must
+     still be pending on success: the request's move to fulfilled is a conditional write in the
+     same batch as the issue, and a request the desk fulfilled meanwhile marks the attempt
+     mismatched with nothing issued. A request inside an open attempt cannot be fulfilled again,
+     at the till or the desk, until the attempt is resolved (F-124 criterion 7).
+  5. The sale posts on the till's own ledger entry, source `TILL` and tender `CARD`, as the till's
+     ticket sales do (F-122, F-123), never under the desk's source. The pass is one `PASS_SALE`
+     line beside any bar and ticket lines, in the same batch as the pass's issue and its audit
+     row, naming its issuer (D-124 criterion 1). The `(PASS_SALE, TILL)` pair joins
+     `LEDGER_POSTING_PAIRS` and `docs/architecture.md`'s posting table, and a migration seeds it
+     unmapped in `su_nominal_mappings` so the treasurer can map it (I-108). The pass money appears
+     in the till's reconciliation inside the figure the reader is expected to show (F-118). A tab
+     tender refuses a basket holding a pass line.
   6. The expected-total cross-check (F-104) covers the whole basket including the pass line; a
      mismatch refuses quoting both figures. A discount applies to the bar subtotal only, never to
      a pass line.
