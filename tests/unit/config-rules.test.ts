@@ -104,6 +104,6 @@ describe('which settings the system actually enforces', () => {
 describe('the keys that hold a day of the year', () => {
   test('every key shipping a month and a day is one', () => {
     const monthDay = CONFIG_KEY_NAMES.filter(key => /^\d{2}-\d{2}$/.test(String(shipped(key))))
-    expect([...DAY_OF_YEAR_KEYS].sort()).toEqual(monthDay.sort())
+    expect<string[]>([...DAY_OF_YEAR_KEYS].sort()).toEqual(monthDay.sort())
   })
 })
