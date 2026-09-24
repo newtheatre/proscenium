@@ -74,6 +74,13 @@ describe('who a charge to a tab is refused for (F-108 criterion 1, issue 1264)',
     expect(holders(database, ['u-named'], ['COMMITTEE'])).toEqual(['u-permanent'])
   }))
 
+  // A disabled account keeps its grants, so the grant alone must not reopen its credit.
+  test('a disabled account is never a holder, however it qualified', () => withDatabase((database) => {
+    people(database)
+    database.batch([['UPDATE users SET disabled = 1 WHERE id IN (?, ?)', 'u-named', 'u-committee']])
+    expect(holders(database, ['u-named'], ['COMMITTEE'])).toEqual(['u-permanent'])
+  }))
+
   test('the till lists both kinds together, once each and by name', () => withDatabase((database) => {
     people(database)
     expect(holders(database, ['u-named', 'u-committee'], ['COMMITTEE'])).toEqual(['u-committee', 'u-named', 'u-permanent'])
