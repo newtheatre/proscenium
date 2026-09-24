@@ -336,8 +336,11 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   6. A sign-off is an append-only record like any other: renewal is a newer record superseding the old, and correction is revoke plus re-grant.
   7. Every control that picks a module names it. A published module id may sit beside the name as
      a reference, never in place of it, on the records screen as anywhere else (K-123 criterion 1).
+     The sign-off and certificate pickers choose one module from a searchable menu, never a row of
+     buttons, because the catalogue is a long list (0032).
 - Source: Prompt Book G-3; audit TR-6; issue 1151 item 10 (criterion 7, the sign-off and
-  certificate pickers offered rows of bare ids)
+  certificate pickers offered rows of bare ids); issue 1259 (criterion 7, the same pickers as a
+  wall of buttons)
 
 ## G-121: External certificates
 

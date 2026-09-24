@@ -3,7 +3,10 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, resolvedPriceColumns } from '#server/utils/bar'
+import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, onHandOfItems, resolvedPriceColumns } from '#server/utils/bar'
+import { stockCounted, tillServings } from '#server/utils/bar-linkage'
+import { chunked } from '#shared/utils/approvals'
+import { NOT_ENOUGH_STOCK, stockShortOf, variantStock } from '#shared/utils/sale'
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { discountedPence } from '#shared/utils/discounts'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
@@ -89,7 +92,7 @@ export interface Depletion {
 
 // The public `SaleVariant` shape plus what only the write path reads: F-121's `price_ref`,
 // F-113's recipe, F-106's `ageRestricted` gate (the owning product's flag, not this size's own).
-interface ResolvedVariant extends SaleVariant {
+interface ResolvedVariant extends Omit<SaleVariant, 'stock'> {
   productId: string
   priceRowId: string
   ageRestricted: boolean
@@ -181,6 +184,8 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
   `)
 
   const variants = [...(await activeVariantsWithChoices(on)).variants.values()]
+  // Read here and never on the sale path, which the trigger guards on the write (F-128 criterion 8).
+  const [servings, counted] = await Promise.all([tillServings(), stockCounted()])
   const products: SaleProduct[] = productRows
     .map(row => ({
       id: row.id,
@@ -192,7 +197,8 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
       variants: variants.filter(variant => variant.productId === row.id)
         // Only what the screen needs: the write-path fields (price row, recipe, the product's own
         // age-restricted flag, already carried on the product itself) stay internal.
-        .map(({ productId: _productId, priceRowId: _priceRowId, ageRestricted: _ageRestricted, recipe: _recipe, ...variant }) => variant),
+        .map(({ productId: _productId, priceRowId: _priceRowId, ageRestricted: _ageRestricted, recipe: _recipe, ...variant }) =>
+          ({ ...variant, stock: variantStock(servings.get(variant.id) ?? null, counted) })),
     }))
     .filter(product => product.variants.length > 0)
 
@@ -575,11 +581,23 @@ async function prepareSale(
   }
 }
 
-// The cross-check alone, for a basket about to be handed to the SumUp app (F-124 criterion 2):
+// Advisory: the trigger on the write still holds, so a race lost after this read lands as a
+// mismatch (F-124 criteria 4, 8); this spares the reader a charge already bound to fail.
+async function refuseShortBasket(lines: ResolvedLine[]): Promise<void> {
+  const itemIds = [...new Set(lines.flatMap(line => line.depletion.map(ingredient => ingredient.itemId)))]
+  const onHand = new Map<string, number>()
+  for (const batch of chunked(itemIds)) {
+    for (const row of await db.all<{ itemId: string, onHand: number }>(onHandOfItems(batch))) onHand.set(row.itemId, Number(row.onHand))
+  }
+  if (stockShortOf(lines, onHand).length > 0) throw createError({ statusCode: 409, statusMessage: NOT_ENOUGH_STOCK })
+}
+
+// The cross-check alone, for a basket about to be handed to the SumUp app (F-124 criteria 2, 8):
 // refused here means the app is never opened for it.
 export async function priceSaleForAttempt(input: SaleInput, on: string, context: SaleContext): Promise<PricedAttempt> {
   const prepared = await prepareSale(input.lines, on, input.expectedTotalPence, input.ageCheck, input.discountId, context,
     { tickets: input.tickets, walkUps: input.walkUps, walkUpGuest: input.walkUpGuest })
+  await refuseShortBasket(prepared.soldResolved)
   return { soldTotalPence: prepared.soldTotalPence, performanceId: prepared.performanceId }
 }
 
@@ -766,10 +784,10 @@ export async function commitSale(
     await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   }
   catch (error) {
-    // The trigger's predicate is what refuses an oversell (0070); a read-then-check here would
+    // The trigger's predicate is what refuses an oversell (0006); a read-then-check here would
     // race the same way on-hand always must not (F-105 criterion 5), so this catches its abort.
     if (error instanceof Error && error.message.includes('stock_movements_sale_exceeds_on_hand')) {
-      throw createError({ statusCode: 409, statusMessage: 'Not enough left in stock for this sale: nothing has been charged.' })
+      throw createError({ statusCode: 409, statusMessage: NOT_ENOUGH_STOCK })
     }
     if (error instanceof Error) {
       const refusal = ageCheckConstraintRefusal(error)

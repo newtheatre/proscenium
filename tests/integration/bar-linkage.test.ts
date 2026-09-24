@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { pouredByColumn, readPouredBy, retireItemStatements, servingsAvailableQuery } from '#server/utils/bar-linkage'
+import { STOCK_COUNTED_QUERY, pouredByColumn, readPouredBy, retireItemStatements, servingsAvailableQuery, tillServingsQuery } from '#server/utils/bar-linkage'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -238,6 +238,80 @@ describe('retiring a stocked item the bar still pours (F-128 criteria 5 and 6)',
         const [, ...parameters] = boundStatement(database, statement)
         expect(parameters.length).toBeLessThanOrEqual(MAX_BOUND_PARAMETERS)
       }
+    })
+  })
+})
+
+describe('the till reads every size\'s servings in one query (F-128 criterion 8)', () => {
+  function tillServings(database: TestDatabase): Map<string, number | null> {
+    const [statement, ...parameters] = boundStatement(database, tillServingsQuery())
+    return new Map(rows<{ variantId: string, servings: number | null }>(database, statement, ...parameters)
+      .map(row => [row.variantId, row.servings]))
+  }
+
+  test('every active size reads what its own product page reads', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      delivery(database, 'item-gin', 700)
+      delivery(database, 'item-tonic', 400)
+
+      const till = tillServings(database)
+      for (const productId of ['prod-gin', 'prod-negroni', 'prod-crisps']) {
+        for (const row of servings(database, productId)) expect(till.get(row.variantId)).toBe(row.servings)
+      }
+      expect(till.get('var-double')).toBe(2)
+      expect(till.get('var-crisps')).toBe(0)
+    })
+  })
+
+  test('a hidden product and a retired size are not on the till, so they are not read', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      database.batch([
+        [`UPDATE bar_products SET status = 'HIDDEN' WHERE id = ?`, 'prod-negroni'],
+        [`UPDATE product_variants SET status = 'RETIRED' WHERE id = ?`, 'var-double'],
+      ])
+      expect([...tillServings(database).keys()].sort()).toEqual(['var-crisps', 'var-single'])
+    })
+  })
+
+  // 0006 from the second direction: a read walking the whole catalogue binds nothing per row of it.
+  test('the read binds no parameter at all, however large the catalogue', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      const [, ...parameters] = boundStatement(database, tillServingsQuery())
+      expect(parameters).toEqual([])
+    })
+  })
+})
+
+describe('the stock is counted once a stocktake has been applied (F-128 criterion 8, 0080)', () => {
+  function counted(database: TestDatabase): boolean {
+    const [statement, ...parameters] = boundStatement(database, STOCK_COUNTED_QUERY)
+    return Number(rows<{ counted: number }>(database, statement, ...parameters)[0]?.counted) === 1
+  }
+
+  test('with no stocktake the balance is not yet trusted', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      delivery(database, 'item-gin', 700)
+      expect(counted(database)).toBe(false)
+    })
+  })
+
+  test('a stocktake still open has not set anything', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      insert(database, 'stocktakes', { id: 'st-1', status: 'OPEN', opened_by: 'user-1', opened_at: 1000 })
+      expect(counted(database)).toBe(false)
+    })
+  })
+
+  test('an applied stocktake is the cutover count', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      insert(database, 'stocktakes', { id: 'st-1', status: 'APPLIED', opened_by: 'user-1', opened_at: 1000, applied_by: 'user-1', applied_at: 2000 })
+      expect(counted(database)).toBe(true)
     })
   })
 })

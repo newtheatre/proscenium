@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { CONFIG_KEYS, CONFIG_KEY_NAMES, hasDefault, isEnforced, isSensitive } from '#shared/utils/config'
+import { CONFIG_KEYS, CONFIG_KEY_NAMES, hasDefault, isEnforced, isSensitive, plannedFor } from '#shared/utils/config'
 
 // Every setting, with what it ships as, what it is now, and who last moved it (J-104 criterion 2).
 export default defineEventHandler(async (event) => {
@@ -33,6 +33,7 @@ export default defineEventHandler(async (event) => {
         // A rule the committee can record and the system does not yet enforce, said plainly (0012).
         enforced: isEnforced(key),
         sensitive: isSensitive(key),
+        plannedFor: plannedFor(key),
         // Needs its own preview and a typed echo before it saves, and its own audited flag (J-105).
         wideBlastRadius: wideBlastRadius.has(key),
         updatedAt: row?.updatedAt ?? null,
