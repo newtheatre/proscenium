@@ -2,7 +2,7 @@
 
 Training was the old estate's best module, and this backlog carries its judgement wholesale: records are append-only with validity derived at read time, marking a register is the single act that awards records for taught sessions, and clockwork notices expiry but never enacts anything. The unified system removes the API seam between records and the surfaces they gate (shifts, the till, kit loans), so a gate reads live competence with nothing to fail open. New in this system are delivery modes: in-person, self-directed online, or hybrid; mode and external material links are MVP schema, while quiz assessment, hybrid completion and the question channel are V2, and a safety-critical module can never be fully self-directed.
 
-Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-201 to G-212), 2 Later stubs (G-301, G-302), 3 resolved (G-124 and G-126 withdrawn, G-127 won't build). 43 total.
+Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G-201 to G-212), 2 Later stubs (G-301, G-302), 3 resolved (G-124 and G-126 withdrawn, G-127 won't build). 44 total.
 
 ## Open questions
 
@@ -471,6 +471,36 @@ Counts: 26 MVP stories (G-101 to G-123, G-125, G-128, G-129), 12 V2 stories (G-2
   columns of their own: level reads as the module's kind (`saysKind`) and duration as how long it
   is worth (`describeExpiry`). If "duration" was meant as teaching time, that needs a column and
   its own story; this session proceeded with the mapping above and flagged it in the pull request.
+
+## G-130: Record training for somebody with no account yet
+
+- Role: Training Manager
+- Phase: MVP
+- Story: As the Training Manager, I want to sign off or record a certificate for somebody who has
+  never signed in so that what they were taught is on file before they ever make an account.
+- Depends on: G-120, G-121, A-116
+- Acceptance criteria:
+  1. When the person picker on the records screen finds nobody, the screen offers recording by
+     address and name instead, never as an alternative to choosing an existing account. An
+     address an account already holds, or that an account is pre-linked to for Google sign-in,
+     is refused with the instruction to choose that account (K-123 criterion 1, A-104, 0091).
+  2. A sign-off and an external certificate each accept the address and name in place of an
+     account. The shadow account, the record and both audit entries are one batch; the unique
+     address is the conditional write, so two people recording the same address at once leave
+     exactly one account and one record, and the other is refused (0003).
+  3. Every G-120 and G-121 rule applies unchanged: department scope, award date, prerequisites
+     (which a new account holds none of), expiry and evidence.
+  4. Making the account needs `training.by-address`, held by the Training Manager, or a live
+     lead of the module's own department, derived at the request (0037); `accounts.create` is
+     not required and not granted.
+  5. Nothing is sent to the address. The record is the person's when they claim the account by
+     A-116's own mechanism; a Workspace address is claimed by Google alone (0008).
+  6. The audit detail carries identifiers only and says `byAddress: true`, never the address or
+     the name (0011); the account's entry is `account.created.console`.
+  7. After recording, the screen shows the new account's records, so anything further is
+     recorded against it by choosing it.
+- Source: Feedback (issue 1262); decided by the IT Manager on 24 September 2026 following 0088
+  (0091). The register already takes a walk-in by address (G-117 criterion 2).
 
 ## G-201: Self-directed module delivery
 

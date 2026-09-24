@@ -2512,6 +2512,16 @@ Three things are its own:
 a certificate we recorded never reads as one we assessed (criterion 4). There is no break-glass
 "never expires" here: the form has no shape that means it.
 
+**Either may be recorded by address** (G-130, 0091). When the picker finds nobody, a sign-off or a
+certificate names `{ email, name }` in place of `userId`. The route makes a shadow account and
+writes the record against it in one batch, with `account.created.console` and the record's own
+entry, so `user_id` stays NOT NULL and a record is never keyed to a bare address. The insert into
+`users` carries the pre-link refusal as its predicate and every later statement is guarded on the
+account having been written; the unique address settles two recorders racing (0003). An address
+an account holds or is pre-linked to is refused with the instruction to choose that account.
+Making the account needs `training.by-address` or a live lead of the module's department, never
+`accounts.create`, and nothing is sent to the address: A-116's claim is what hands it over.
+
 A **retrospective delivery log** (G-118) is the third, at `POST /api/admin/training/deliveries`,
 with its dry-run at `POST /api/admin/training/deliveries/preview`. It writes one record per
 attendee per module, `source` `SESSION`, dated to the day it was taught.

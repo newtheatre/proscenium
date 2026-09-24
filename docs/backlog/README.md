@@ -14,12 +14,12 @@ first tracker import resolves them.
 | `D-ticketing.md` | Box office and ticketing | 32 | 5 | 2 | 40 |
 | `E-show-night.md` | Show night operations | 31 | 4 | 1 | 36 |
 | `F-bar.md` | Bar | 28 | 3 | 1 | 33 |
-| `G-training.md` | Training and safety records | 26 | 11 | 2 | 42 |
+| `G-training.md` | Training and safety records | 27 | 11 | 2 | 43 |
 | `H-communications.md` | Communications | 9 | 5 | 1 | 15 |
 | `I-finance.md` | Finance | 9 | 3 | 1 | 13 |
 | `J-governance.md` | Governance and handover | 10 | 6 | 0 | 17 |
 | `K-platform.md` | Platform foundations and migration | 29 | 1 | 0 | 33 |
-| **Total** | | **226** | **48** | **20** | **305** |
+| **Total** | | **227** | **48** | **20** | **306** |
 
 The show night row also took a correction when E-130 and E-131 were added: E-128 and E-129 had
 reached their file without this table following, so its MVP count moved by four rather than two.
