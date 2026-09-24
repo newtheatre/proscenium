@@ -143,6 +143,22 @@ describe('the outbound call and every way it fails (criterion 7, 0092)', () => {
     expect(await fetchGovUkHolidays(declared, TODAY)).toEqual({ ok: false, failure: 'too-large' })
   })
 
+  test('the cap counts bytes, and an undeclared body is not read past it', async () => {
+    const wide = `"${'é'.repeat(SYNC_MAX_BYTES / 2 + 1)}"`
+    expect(await fetchGovUkHolidays(answering(wide).fetcher, TODAY)).toEqual({ ok: false, failure: 'too-large' })
+
+    let pulled = 0
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled++
+        controller.enqueue(new Uint8Array(64 * 1024))
+      },
+    })
+    const streaming = (async () => new Response(endless, { status: 200 })) as unknown as typeof fetch
+    expect(await fetchGovUkHolidays(streaming, TODAY)).toEqual({ ok: false, failure: 'too-large' })
+    expect(pulled).toBeLessThan(SYNC_MAX_BYTES / (64 * 1024) + 4)
+  })
+
   test('a body that is not JSON, and JSON that is not the feed, are told apart', async () => {
     expect(await fetchGovUkHolidays(answering('<html>maintenance</html>').fetcher, TODAY)).toEqual({ ok: false, failure: 'not-json' })
     expect(await fetchGovUkHolidays(answering('{"hello":"world"}').fetcher, TODAY)).toEqual({ ok: false, failure: 'invalid' })
