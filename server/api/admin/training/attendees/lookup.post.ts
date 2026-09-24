@@ -39,9 +39,9 @@ export default defineEventHandler(async (event) => {
   const name = input.name?.trim() || email
   const id = newId()
   const created = auditEntry({ actorId: resolved.account.id, action: 'account.created.console', target: `user:${id}` })
-  const statements = walkInAccountStatements(id, email, name, created).map(statement => db.run(statement))
+  const [account, entry] = walkInAccountStatements(id, email, name, created).map(statement => db.run(statement))
   try {
-    await db.batch([statements[0]!, statements[1]!])
+    await db.batch([account!, entry!])
   }
   catch (error) {
     const refusal = pendingGrantConstraintRefusal(error)
