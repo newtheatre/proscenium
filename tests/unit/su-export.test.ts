@@ -30,13 +30,18 @@ describe('mapping a (kind, source) pair to a nominal code (I-108 criterion 1)', 
 describe('every pair the code posts under has a mapping row (I-108 criterion 1)', () => {
   const listed = new Set(LEDGER_POSTING_PAIRS.map(pair => `${pair.kind}/${pair.source}`))
   const literals = (text: string): string[] => [...text.matchAll(/'([A-Z_]+)'/g)].map(match => match[1]!)
+  const tokens = (cell: string): string[] => [...cell.matchAll(/`([A-Z_]+)`/g)].map(match => match[1]!)
+  // The helper every caller posts through writes whatever kind and source it is handed.
+  const postingHelper = 'server/utils/ledger.ts'
 
   async function postingFiles(): Promise<{ file: string, text: string }[]> {
     const found: { file: string, text: string }[] = []
     for (const dir of ['server', 'migration']) {
       for (const entry of new Bun.Glob('**/*.ts').scanSync({ cwd: dir, onlyFiles: true })) {
-        const text = await Bun.file(`${dir}/${entry}`).text()
-        if (/\bpostEntry\(\{|INTO ledger_entries/.test(text)) found.push({ file: `${dir}/${entry}`, text })
+        const file = `${dir}/${entry}`
+        if (file === postingHelper) continue
+        const text = await Bun.file(file).text()
+        if (/\bpostEntry\(\{|INTO ledger_entries/.test(text)) found.push({ file, text })
       }
     }
     return found
@@ -84,10 +89,9 @@ describe('every pair the code posts under has a mapping row (I-108 criterion 1)'
     const section = doc.split('\n### The money paths\n')[1]?.split('\n## ')[0] ?? ''
     const documented = new Set<string>()
     for (const row of section.split('\n').filter(one => one.startsWith('| ') && !one.startsWith('| Money path') && !one.startsWith('| ---'))) {
-      const cells = row.split('|').slice(1, -1).map(cell => cell.trim())
-      const tokens = (cell: string): string[] => [...cell.matchAll(/`([A-Z_]+)`/g)].map(match => match[1]!)
-      for (const kind of tokens(cells[5]!)) {
-        for (const source of tokens(cells[3]!)) documented.add(`${kind}/${source}`)
+      const [, , , sources, , kinds] = row.split('|').slice(1, -1).map(cell => cell.trim())
+      for (const kind of tokens(kinds!)) {
+        for (const source of tokens(sources!)) documented.add(`${kind}/${source}`)
       }
     }
     expect([...listed].sort()).toEqual([...documented].sort())
