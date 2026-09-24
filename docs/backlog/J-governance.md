@@ -137,7 +137,7 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   6. The screen says where a restore happens and who does one. Restoring is not a screen, so the
      screen that records drills says so and links to the procedure rather than leaving a reader
      to look for a button that does not exist.
-- Source: Prompt Book K-1 (tested restore each term), P7; audit EW-3 (Time Travel restore points, weekly exports); Get-In part 6 (one blast radius). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10), amended by issue 1265.
+- Source: Prompt Book K-1 (tested restore each term), P7; audit EW-3 (Time Travel restore points, weekly exports); Get-In part 6 (one blast radius). Criterion 6 comes from the console review of 21 September 2026 (issue 1151 item 10).
 
 ## J-108: The audit archive import (superseded)
 
