@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { londonParts } from '#shared/utils/london'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, menuOptions, openSignedOutView, openView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-120 and G-122: the first thing that awards a record, and the only thing that takes one away.
@@ -408,8 +408,13 @@ describe.skipIf(skip !== null)('the officer screen (G-120, G-122)', () => {
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
       expect(await textOf(view, 'body')).toContain('Whose records')
 
+      await pickPerson(view, '[data-test="person-picker"]', member.email, member.name)
       await click(view, '[data-test="sign-off"]')
-      await waitFor(view, `document.querySelectorAll('[data-test^="sign-SGN-"]').length > 25`, 30_000)
+      // One searchable menu naming each module, never a button per module (G-120 criterion 7, issue 1259).
+      const offered = await menuOptions(view, '[data-test="sign-module"]')
+      expect(offered.filter(option => option.startsWith('SGN-')).length).toBeGreaterThan(25)
+      expect(offered).toContainEqual(expect.stringContaining('Catalogue filler 25'))
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test^="sign-SGN-"]'))`)).toBe(false)
     }
     finally {
       view.close()
