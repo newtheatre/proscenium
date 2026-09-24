@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { can, recordTrainingByAddress, viewAccounts } from '#shared/utils/abilities'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { EVIDENCE_REF_LIMIT, REVOKE_REASON_LIMIT, saysKind, saysSource } from '#shared/utils/training'
 import { saysDay } from '#shared/utils/when'
@@ -42,6 +43,46 @@ const person = ref<string | undefined>(undefined)
 const search = ref('')
 const failure = ref<string | null>(null)
 const saving = ref(false)
+
+// The address is only ever the fallback once the picker has found nobody (G-130, 0091).
+const byAddressAllowed = can(useViewer().value, recordTrainingByAddress)
+// A lead holds no accounts.read, so their picker asks a route that answers ids and names only.
+const pickerEndpoint = can(useViewer().value, viewAccounts) ? undefined : '/api/admin/training/people'
+const picker = ref<{ preset: (person: { id: string, name: string, email: string }) => void } | null>(null)
+const nobody = ref<string | null>(null)
+const byAddress = ref(false)
+const address = ref('')
+const name = ref('')
+
+// Nobody stays chosen behind the address, or an award would leave from their history for it.
+function recordByAddress(): void {
+  person.value = undefined
+  address.value = nobody.value?.includes('@') ? nobody.value : ''
+  byAddress.value = true
+}
+
+function searchAgain(): void {
+  nobody.value = null
+  byAddress.value = false
+  address.value = ''
+  name.value = ''
+}
+
+const newcomer = computed(() => byAddress.value && address.value.trim() && name.value.trim()
+  ? { email: address.value.trim(), name: name.value.trim() }
+  : null)
+
+// Whoever the award is for: the chosen account, or the address a new one is made for.
+const whom = (): { userId: string } | { email: string, name: string } =>
+  newcomer.value ?? { userId: person.value! }
+
+// The account the award made is who the screen shows next, so a second award chooses it (G-130 c7).
+function adopt(answer: { userId: string }): void {
+  const made = newcomer.value
+  if (!made) return
+  searchAgain()
+  picker.value?.preset({ id: answer.userId, name: made.name, email: made.email })
+}
 
 const { data, status, refresh, error } = await useAsyncData(
   'admin-training-records',
@@ -104,14 +145,15 @@ const recordable = computed(() =>
   Boolean(certificate.moduleId && certificate.awardedOn && certificate.expiresOn && certificate.evidenceRef.trim()))
 
 async function recordCertificate(): Promise<void> {
-  if (!person.value || !recordable.value) return
+  if (!(person.value || newcomer.value) || !recordable.value) return
   saving.value = true
   failure.value = null
   try {
-    await $fetch('/api/admin/training/external-certificates', {
+    const answer = await $fetch<{ userId: string }>('/api/admin/training/external-certificates', {
       method: 'POST',
-      body: { userId: person.value, ...certificate, evidenceRef: certificate.evidenceRef.trim() },
+      body: { ...whom(), ...certificate, evidenceRef: certificate.evidenceRef.trim() },
     })
+    adopt(answer)
     toast.add({ title: 'Recorded', icon: 'i-lucide-award', color: 'success' })
     recording.value = false
     await refresh()
@@ -125,14 +167,15 @@ async function recordCertificate(): Promise<void> {
 }
 
 async function signOff(): Promise<void> {
-  if (!person.value || !chosen.value) return
+  if (!(person.value || newcomer.value) || !chosen.value) return
   saving.value = true
   failure.value = null
   try {
-    await $fetch('/api/admin/training/signoffs', {
+    const answer = await $fetch<{ userId: string }>('/api/admin/training/signoffs', {
       method: 'POST',
-      body: { userId: person.value, moduleId: chosen.value, awardedOn: todayInLondon() },
+      body: { ...whom(), moduleId: chosen.value, awardedOn: todayInLondon() },
     })
+    adopt(answer)
     toast.add({ title: 'Signed off', icon: 'i-lucide-check', color: 'success' })
     signing.value = false
     await refresh()
@@ -292,10 +335,81 @@ watch(modalOpen, (nowOpen) => {
       description="Their whole history, including what has been revoked or superseded."
     >
       <PersonPicker
+        v-show="!byAddress"
+        ref="picker"
         v-model="person"
+        :endpoint="pickerEndpoint"
         class="w-full sm:w-96"
+        @nobody="term => nobody = term"
       />
+      <UButton
+        v-if="nobody && byAddressAllowed && !byAddress"
+        class="mt-1 p-0"
+        variant="link"
+        size="sm"
+        data-test="records-nobody-found"
+        @click="recordByAddress"
+      >
+        Not in the list? Record by address
+      </UButton>
     </UFormField>
+
+    <div
+      v-if="byAddress"
+      class="space-y-3"
+      data-test="records-by-address"
+    >
+      <p class="text-sm text-muted">
+        An account is made for this address with the record, and nobody can sign into it yet.
+        Nothing is sent: the record is theirs when they register with this address, or sign in
+        with Google if it is a theatre address.
+      </p>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <UFormField label="Address">
+          <UInput
+            v-model="address"
+            type="email"
+            class="w-full"
+            data-test="records-email"
+          />
+        </UFormField>
+        <UFormField label="Name">
+          <UInput
+            v-model="name"
+            class="w-full"
+            data-test="records-name"
+          />
+        </UFormField>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <UButton
+          data-test="sign-off"
+          icon="i-lucide-plus"
+          :disabled="signable.length === 0 || !newcomer"
+          @click="signing = true"
+        >
+          Sign something off
+        </UButton>
+        <UButton
+          data-test="record-external"
+          icon="i-lucide-award"
+          color="neutral"
+          variant="outline"
+          :disabled="external.length === 0 || !newcomer"
+          @click="recording = true"
+        >
+          Record a certificate
+        </UButton>
+        <UButton
+          variant="link"
+          size="sm"
+          data-test="records-search-again"
+          @click="searchAgain"
+        >
+          Search again
+        </UButton>
+      </div>
+    </div>
 
     <template v-if="person">
       <AdminToolbar

@@ -48,6 +48,9 @@ export const PERMISSIONS = [
   // never expiring, which is break-glass and absent from every screen (G-120 criterion 5).
   'training.revoke',
   'training.override',
+  // Making an account only as the subject of the record written with it, never Add someone's
+  // `accounts.create`; a lead of the module's department derives the same (0091).
+  'training.by-address',
   // The programme's configuration: ticket types, their prices and, from D-120, the overrides
   // over them. Selling a ticket is operational and derives from tonight (0009).
   'ticketing.read',
@@ -137,7 +140,7 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   THEATRE_MANAGER: ['accounts.read', 'audit.read', 'audit.write', 'config.read', 'fellowships.read', 'members.read', 'rooms.read', 'rooms.write', 'training.read'],
   // Owns the catalogue and appoints its stewards; `training.override` stays ADMIN because
   // never-expiring is the rarer break-glass (G-107, G-110, questions 7 and 8).
-  TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.leads', 'training.read', 'training.revoke', 'training.write'],
+  TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.by-address', 'training.leads', 'training.read', 'training.revoke', 'training.write'],
   // One committee post: the programme and the rota, and the door and duty manager screens without
   // a shift tonight, refund approval included. The till is the bar manager's (0044, 0090).
   FOH_MANAGER: ['ticketing.read', 'ticketing.write', 'ticketing.export', 'night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read'],

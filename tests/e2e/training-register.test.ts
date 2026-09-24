@@ -447,6 +447,17 @@ describe.skipIf(skip !== null)('somebody who turned up untracked (G-117)', () =>
     expect(await said(refused)).toContain('erased')
   }, CASE_TIMEOUT_MS)
 
+  test('an address pre-linked for Google sign-in is refused, pointing at the search (A-104, 0091)', async () => {
+    const holder = await adminSession(app, { roles: [] })
+    const email = `walk-in-${crypto.randomUUID().slice(0, 8)}@newtheatre.org.uk`
+    write('UPDATE users SET pending_google_email = ? WHERE id = ?', email, holder.id)
+
+    const refused = await lookup({ email })
+    expect(refused.status).toBe(409)
+    expect(await said(refused)).toContain('search')
+    expect(read('SELECT id FROM users WHERE email = ?', email)).toBeUndefined()
+  }, CASE_TIMEOUT_MS)
+
   test('a walk-in goes to the back, so a placed member keeps their place', async () => {
     const module = await addModule()
     const session = await sessionToday([module])
