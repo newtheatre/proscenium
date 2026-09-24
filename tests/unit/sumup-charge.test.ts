@@ -1,13 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 import { effectScope, nextTick, ref, watch } from 'vue'
+import { returnedAttemptKey } from '#composables/useSumUp'
 import { useSumUpCharge } from '#composables/useSumUpCharge'
+import { deviceNightCacheStore } from '#composables/useNightCache'
 import type { ChargedReceipt } from '#composables/useSumUpCharge'
 import type { BasketLine, WalkUpLine } from '#composables/useTillBasket'
 import type { TillBooking } from '#shared/utils/sale'
+import type { SumupAttemptView } from '#shared/utils/sumup'
 import type { TillSession } from '#shared/utils/till'
 
 // F-124 criterion 5: an attempt the app reports failed or abandoned brings the basket back and
-// says so. The till clears a charge failure on a basket edit; a restore is not one (issue 1144).
+// says so, once, in whichever tab on the phone gets there first (issues 1144, 1257).
 
 type Outcome = 'FAILED' | 'ABANDONED'
 
@@ -15,13 +18,22 @@ function aLine(): BasketLine {
   return { id: 'line-1', variantId: 'variant-1', productName: 'Lager', variantLabel: 'Pint', choiceItemId: null, choiceItemName: null, qty: 2 }
 }
 
-function setup(status: Outcome) {
+function aView(id: string, status: Outcome): SumupAttemptView {
+  return { id, status, createdAt: 0, createdByName: null, expectedTotalPence: 1000, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }
+}
+
+// One till tab. Every tab in a test shares the device store, as tabs on one phone share storage.
+function setup(status: Outcome, visible = ref(true)) {
   const scope = effectScope()
   const basket = ref<BasketLine[]>([])
   const chargeFailure = ref<string | null>(null)
   const deps = {
     // The app answering as the SumUp app told it: the attempt is over and the money never moved.
-    request: async <T>() => ({ status, error: null }) as T,
+    request: async <T>(path: string) => {
+      if (path.endsWith('/resolve')) return { status, error: null } as T
+      if (path === '/api/till/payments') return { attempts: [] } as T
+      return { attempt: aView(path.split('/').pop()!, status) } as T
+    },
     venueId: ref<string | null>(null),
     sumupEnabled: ref(true),
     selectedTabHolderId: ref<string | null>(null),
@@ -33,6 +45,7 @@ function setup(status: Outcome) {
     charged: ref<ChargedReceipt | null>(null),
     chargeFailure,
     resetSelections: () => {},
+    isVisible: () => visible.value,
   }
   const charge = scope.run(() => {
     // The till's own rule (app/pages/tonight/till/index.vue): editing the basket after a refusal
@@ -42,40 +55,151 @@ function setup(status: Outcome) {
     }, { deep: true })
     return useSumUpCharge(deps)
   })!
-  return { charge, basket, chargeFailure, scope }
+  return { charge, basket, chargeFailure, scope, visible }
 }
 
-function handOff(charge: ReturnType<typeof setup>['charge'], id: string): void {
-  charge.sumup.remember({ id, totalPence: 1000, startedAt: 0, basket: { bar: [aLine()], tickets: [], walkUps: [], discountId: null } })
+// The till keeps the basket on screen under the waiting card while the app has the phone.
+function handOff(tab: ReturnType<typeof setup>, id: string): void {
+  tab.basket.value = [aLine()]
+  tab.charge.sumup.remember({ id, totalPence: 1000, startedAt: Date.now(), basket: { bar: [aLine()], tickets: [], walkUps: [], discountId: null } })
+}
+
+async function settled(): Promise<void> {
+  await nextTick()
+  await nextTick()
 }
 
 describe('an attempt the app turned down brings the basket back, and says so (F-124 criterion 5)', () => {
   for (const status of ['FAILED', 'ABANDONED'] as const) {
     test(`${status.toLowerCase()} restores the basket and the message survives the restore`, async () => {
-      const { charge, basket, chargeFailure, scope } = setup(status)
-      handOff(charge, 'attempt-1')
+      const tab = setup(status)
+      handOff(tab, `attempt-1-${status}`)
 
-      await charge.resolveAttempt('attempt-1', 'abandoned')
-      await nextTick()
-      await nextTick()
+      await tab.charge.resolveAttempt(`attempt-1-${status}`, 'abandoned')
+      await settled()
 
-      expect(basket.value).toHaveLength(1)
-      expect(chargeFailure.value).toContain('The basket is back')
-      scope.stop()
+      expect(tab.basket.value).toHaveLength(1)
+      expect(tab.chargeFailure.value).toContain('The basket is back')
+      tab.scope.stop()
     })
   }
 
   test('a later edit to the restored basket still clears the message', async () => {
-    const { charge, basket, chargeFailure, scope } = setup('FAILED')
-    handOff(charge, 'attempt-2')
-    await charge.resolveAttempt('attempt-2', 'abandoned')
-    await nextTick()
-    await nextTick()
-    expect(chargeFailure.value).not.toBeNull()
+    const tab = setup('FAILED')
+    handOff(tab, 'attempt-2')
+    await tab.charge.resolveAttempt('attempt-2', 'abandoned')
+    await settled()
+    expect(tab.chargeFailure.value).not.toBeNull()
 
-    basket.value = []
+    tab.basket.value = []
     await nextTick()
-    expect(chargeFailure.value).toBeNull()
-    scope.stop()
+    expect(tab.chargeFailure.value).toBeNull()
+    tab.scope.stop()
+  })
+})
+
+describe('the first tab to restore the basket claims it; any other says so (F-124 criterion 5, issue 1257)', () => {
+  test('the tab the charge started in restores it, and a new tab on the return link restores nothing', async () => {
+    const started = setup('FAILED')
+    const returned = setup('FAILED')
+    handOff(started, 'attempt-claim-1')
+
+    await started.charge.checkAttempt()
+    await settled()
+    await returned.charge.resume('attempt-claim-1')
+    await settled()
+
+    expect(started.basket.value).toHaveLength(1)
+    expect(returned.basket.value).toHaveLength(0)
+    expect(returned.charge.returnNotice.value).toContain('restored in another tab')
+    started.scope.stop()
+    returned.scope.stop()
+  })
+
+  test('a new tab on the return link restores it first, and the tab left behind empties its basket', async () => {
+    const started = setup('FAILED')
+    const returned = setup('FAILED')
+    handOff(started, 'attempt-claim-2')
+
+    await returned.charge.resume('attempt-claim-2')
+    await settled()
+    await started.charge.checkAttempt()
+    await settled()
+
+    expect(returned.basket.value).toHaveLength(1)
+    expect(returned.chargeFailure.value).toContain('The basket is back')
+    expect(started.basket.value).toHaveLength(0)
+    expect(started.charge.returnNotice.value).toContain('restored in another tab')
+    started.scope.stop()
+    returned.scope.stop()
+  })
+
+  test('a tab in the background waits to be looked at, so the tab in front claims it', async () => {
+    const inFront = ref(false)
+    const started = setup('FAILED', inFront)
+    const returned = setup('FAILED')
+    handOff(started, 'attempt-claim-3')
+
+    // The poll in the background tab sees the answer first, and keeps the basket rather than taking it.
+    await started.charge.checkAttempt()
+    await settled()
+    expect(started.chargeFailure.value).toBeNull()
+    expect(deviceNightCacheStore().getItem(returnedAttemptKey('attempt-claim-3'))).not.toBeNull()
+
+    await returned.charge.resume('attempt-claim-3')
+    await settled()
+    expect(returned.basket.value).toHaveLength(1)
+
+    inFront.value = true
+    started.charge.returnToTab()
+    await settled()
+    expect(started.basket.value).toHaveLength(0)
+    expect(started.charge.returnNotice.value).toContain('restored in another tab')
+    started.scope.stop()
+    returned.scope.stop()
+  })
+
+  test('a basket kept from an earlier show night is not brought back', async () => {
+    const tab = setup('FAILED')
+    const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000
+    deviceNightCacheStore().setItem(returnedAttemptKey('attempt-old'), JSON.stringify({
+      id: 'attempt-old', totalPence: 1000, startedAt: twoDaysAgo, returnedAt: twoDaysAgo, status: 'FAILED', claimedBy: null,
+      basket: { bar: [aLine()], tickets: [], walkUps: [], discountId: null },
+    }))
+
+    await tab.charge.resume('attempt-old')
+    await settled()
+
+    expect(tab.basket.value).toHaveLength(0)
+    expect(deviceNightCacheStore().getItem(returnedAttemptKey('attempt-old'))).toBeNull()
+    tab.scope.stop()
+  })
+})
+
+describe('the restored basket offers Try SumUp again (F-124 criterion 5, F-104 criterion 3)', () => {
+  test('offered with the restored basket, and gone once the message is', async () => {
+    const tab = setup('FAILED')
+    handOff(tab, 'attempt-retry-1')
+    await tab.charge.checkAttempt()
+    await settled()
+    expect(tab.charge.retryOffered.value).toBe(true)
+
+    tab.basket.value = []
+    await settled()
+    expect(tab.charge.retryOffered.value).toBe(false)
+    tab.scope.stop()
+  })
+
+  test('never offered in a tab that did not restore the basket', async () => {
+    const started = setup('FAILED')
+    const returned = setup('FAILED')
+    handOff(started, 'attempt-retry-2')
+    await started.charge.checkAttempt()
+    await returned.charge.resume('attempt-retry-2')
+    await settled()
+
+    expect(returned.charge.retryOffered.value).toBe(false)
+    started.scope.stop()
+    returned.scope.stop()
   })
 })
