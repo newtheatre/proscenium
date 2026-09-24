@@ -81,16 +81,20 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     }
   }
 
+  function clearBasket(): void {
+    basket.value = []
+    ticketLines.value = []
+    walkUpLines.value = []
+    resetSelections()
+  }
+
   // What the till does once an attempt has an answer: a success clears the basket, a failure or an
   // abandonment brings it back, a mismatch stays on screen with its reason (criteria 4, 5).
   function settleAttempt(status: SumupAttemptStatus, pending: NonNullable<typeof sumup.pending.value>): void {
     if (status === 'SUCCEEDED') {
       stopWatching()
       charged.value = { totalPence: pending.totalPence, refusedLines: [], discount: null, tab: null, tickets: [], walkUps: [], viaSumup: true }
-      basket.value = []
-      ticketLines.value = []
-      walkUpLines.value = []
-      resetSelections()
+      clearBasket()
       sumup.forget()
       waiting.value = null
       void refreshOpenAttempts()
@@ -143,10 +147,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       })
     }
     else if (claim.outcome === 'elsewhere') {
-      basket.value = []
-      ticketLines.value = []
-      walkUpLines.value = []
-      resetSelections()
+      clearBasket()
       returnNotice.value = RESTORED_ELSEWHERE
     }
   }
