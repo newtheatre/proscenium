@@ -515,7 +515,7 @@ const columns: TableColumn<PassType>[] = [
                 <UInputNumber
                   v-model="row.pounds"
                   :min="0"
-                  :step="0.5"
+                  :step="0.01"
                   :format-options="{ style: 'currency', currency: 'GBP' }"
                   class="w-40"
                   :data-test="`pass-type-price-amount-${index}`"

@@ -539,7 +539,10 @@ cost basis starts at its next delivery.
 
 **Count everything.** An item nobody counts stays at nought, and the first sale of it is refused
 outright by the trigger that keeps on-hand from going negative. The stocktake screen lists what is
-uncounted before it is applied; read that list.
+uncounted before it is applied; read that list. Applying that first stocktake is also what turns
+the till's **Out of stock** label into a greyed-out button: the till reads "a stocktake has been
+applied" as any row in `stocktakes` with status `APPLIED`, and before one exists it labels a size
+with nothing on hand but leaves it pressable (F-128 criterion 8).
 
 ## The health check
 
