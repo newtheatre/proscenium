@@ -1150,7 +1150,9 @@ NULL (unmapped) · `updated_by` → users set null · `updated_at`. Unique on `(
 configuration that is not a scalar setting.** Decision 0025 refuses a config key that holds a
 keyed record, so a mapping from every `(kind, source)` to an SU nominal code cannot live in
 `config`; this table is the alternative. Nothing here ever creates or removes a pair: the seed
-migration enumerates the posting table in `architecture.md`, and a change is an audited `UPDATE`
+migrations enumerate the posting table in `architecture.md` (0094, and 0117 for the till's
+`TICKET_COLLECTION` and `WALK_UP` and the Fellowship award's `PASS_SALE` under `SYSTEM`, which 0094
+missed; issue #1283), and a change is an audited `UPDATE`
 (`finance.nominal-mapping.changed`, `server/utils/su-export.ts`'s `setNominalMapping`).
 `GET /api/admin/finance/nominal-mappings` lists it, `POST` changes one pair.
 
