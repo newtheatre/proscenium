@@ -75,3 +75,9 @@ export function recallTillVenue(store: Pick<DeviceStore, 'getItem'>, night: stri
     return null
   }
 }
+
+// Only the guard's own question (400, no bar named) is answered from the device; a night the
+// server resolves unaided opens where it says, so a stale memory cannot pick the wrong bar.
+export function rememberedBarAnswers(refusal: number | undefined, queried: string | undefined, remembered: string | undefined): boolean {
+  return refusal === 400 && !queried && Boolean(remembered)
+}

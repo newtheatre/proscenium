@@ -24,6 +24,8 @@ const {
   venuesFailure,
   needsVenue,
   chooseVenue,
+  usingDevice,
+  changeVenue,
   open,
   closeModalOpen,
   reconciliation,
@@ -453,7 +455,10 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           <!-- Not a per-sale action, so it lives here rather than under the thumb (K-102
                criterion 2). -->
           <UDropdownMenu
-            :items="[[{ label: 'Close till', icon: 'i-lucide-lock', onSelect: openCloseModal }]]"
+            :items="[[
+              { label: 'Close till', icon: 'i-lucide-lock', onSelect: openCloseModal },
+              ...(usingDevice ? [{ label: 'Change bar', icon: 'i-lucide-map-pin', onSelect: changeVenue }] : []),
+            ]]"
           >
             <UButton
               icon="i-lucide-ellipsis-vertical"
@@ -728,12 +733,25 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         </div>
       </div>
 
-      <p
+      <div
         v-else
-        data-test="till-closed"
+        class="space-y-3"
       >
-        The till is not open yet.
-      </p>
+        <p data-test="till-closed">
+          The till is not open yet.
+        </p>
+        <!-- The bar came from this phone's memory of tonight, so the way to another one is here. -->
+        <UButton
+          v-if="usingDevice"
+          data-test="till-change-venue"
+          color="neutral"
+          variant="subtle"
+          class="min-h-12"
+          icon="i-lucide-map-pin"
+          label="Change bar"
+          @click="changeVenue"
+        />
+      </div>
 
       <template #actions>
         <!-- One row, not three: the count, the comp chip and the total share it, because every
