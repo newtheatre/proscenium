@@ -3,7 +3,7 @@
 // provenance, a picture nothing shows, or a link to nowhere is drift, and drift is a defect.
 
 import { join } from 'node:path'
-import { DOCS_ROOT, contentPathOf } from '#shared/utils/docs-paths'
+import { DOCS_ROOT, HELP_ROOT, contentPathOf } from '#shared/utils/docs-paths'
 
 const IMAGES = 'public/images/docs'
 const REQUIRED = ['title', 'description', 'module', 'updatedBy'] as const
@@ -29,19 +29,21 @@ function frontMatter(source: string): Record<string, string> {
 
 const problems: string[] = []
 const pages = files('**/*.md', DOCS_ROOT)
+// Public help is held to the same provenance and links, in its own collection (0093).
+const help = files('**/*.md', HELP_ROOT).map(file => `${HELP_ROOT}/${file}`)
+const everyPage = [...pages.map(file => `${DOCS_ROOT}/${file}`), ...help]
 const pictures = new Set(files('**/*.{png,webp,jpg}', IMAGES).map(file => `/images/docs/${file}`))
 const referenced = new Set<string>()
 const routes = new Map<string, string>()
 
-for (const file of pages) {
-  const path = contentPathOf(`docs/${file}`)
+for (const where of everyPage) {
+  const path = contentPathOf(where)
   const held = routes.get(path)
-  if (held) problems.push(`${DOCS_ROOT}/${file}  resolves to ${path}, the same page as ${held}`)
-  routes.set(path, `${DOCS_ROOT}/${file}`)
+  if (held) problems.push(`${where}  resolves to ${path}, the same page as ${held}`)
+  routes.set(path, where)
 }
 
-for (const file of pages) {
-  const where = `${DOCS_ROOT}/${file}`
+for (const where of everyPage) {
   const source = await Bun.file(where).text()
   const fields = frontMatter(source)
 
@@ -56,7 +58,7 @@ for (const file of pages) {
       referenced.add(src)
       if (!pictures.has(src)) problems.push(`${where}:${index + 1}  picture ${src} is not under ${IMAGES}`)
     }
-    for (const match of line.matchAll(/\]\((\/docs[^)#\s]*)/g)) {
+    for (const match of line.matchAll(/\]\((\/(?:docs|help)[^)#\s]*)/g)) {
       if (!routes.has(match[1]!)) problems.push(`${where}:${index + 1}  link ${match[1]} is not a page`)
     }
   })
@@ -79,9 +81,9 @@ if (problems.length) {
   console.error('check-docs: the operator documentation has drifted from its own conventions.\n')
   for (const problem of problems) console.error(`  ${problem}`)
   console.error('\nEvery page carries title, description, module, updatedOn and updatedBy; every')
-  console.error(`picture it shows lives under ${IMAGES} and is shown by some page; every /docs link`)
+  console.error(`picture it shows lives under ${IMAGES} and is shown by some page; every /docs or /help link`)
   console.error('lands on a page; every section folder has a .navigation.yml with a title (0076).')
   process.exit(1)
 }
 
-console.log(`check-docs: ${pages.length} page(s), ${pictures.size} picture(s), all accounted for.`)
+console.log(`check-docs: ${everyPage.length} page(s), ${pictures.size} picture(s), all accounted for.`)

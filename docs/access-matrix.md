@@ -68,6 +68,7 @@ not require them here. Listed anyway, because A-129 named them explicitly.
 | `/passes` | `anybody`, by the reference in the link a pass was issued with. | None: a pass is not a membership benefit. | n/a |
 | `/qr` | `anybody`, by the cookie a booking confirmation set or a resend by reference and email. | None: booking a ticket has never needed membership; only a member-restricted price does (see below). | n/a |
 | `/board` | `anybody`, by tonight's join code. Carries no account at all (E-120). | None. | n/a |
+| `/help`, `/help/[...slug]` | `anybody`. Public help, its own collection, with an open dump and query route; nothing in it is operator documentation (0093). | None. | n/a |
 
 ## Elsewhere membership is read
 

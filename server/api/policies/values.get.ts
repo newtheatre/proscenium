@@ -23,7 +23,9 @@ export default defineEventHandler(async (event) => {
 
   // Keyed on the page, never on a list of keys from the caller: a request may only read the
   // settings that page already publishes, so this cannot become a way to read the whole surface.
-  const page = await queryCollection(event, 'content').path(path).first() ?? await docsPage(event, path)
+  const page = await queryCollection(event, 'content').path(path).first()
+    ?? await queryCollection(event, 'help').path(path).first()
+    ?? await docsPage(event, path)
   if (!page) throw createError({ statusCode: 404, statusMessage: 'Page not found' })
 
   const overrides = await configOverrides(event)
