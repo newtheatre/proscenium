@@ -572,7 +572,8 @@ Open questions:
      SumUp transaction code it carries is recorded so a fabricated one shows at reconciliation.
      The answer names the attempt's venue, so the return page's way back opens the till at that
      bar in whichever browser the app returned to, and the till remembers tonight's bar on the
-     device for the show night (0014), so a bare link to it does not ask again.
+     device for the show night (0014), so a bare link to it does not ask again. The memory answers
+     only the question the server would otherwise ask (which bar?), and "Change bar" forgets it.
   4. A success re-runs the whole cross-check against the database as it stands and posts the sale
      as F-122 and F-123 describe. If the basket can no longer be sold (the booking was collected
      at the desk meanwhile, the house filled), the attempt is marked mismatched with the reason,
