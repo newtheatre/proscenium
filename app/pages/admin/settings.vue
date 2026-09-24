@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { saysDayLong } from '#shared/utils/when'
+import { saysDayLong, saysMonthDay } from '#shared/utils/when'
+import { isDayOfYearKey } from '#shared/utils/config-rules'
 import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
 import { confirmationOptions } from '#shared/utils/blast-radius'
 import type { BlastRadiusPreview } from '#shared/utils/blast-radius'
@@ -96,10 +97,11 @@ const storyLink = (issue: number): string => `https://github.com/newtheatre/pros
 
 // Money is entered in pounds and stored in pence, everywhere (0004, 0032). The key says which
 // keys those are, because the schema only knows it is an integer.
-function kind(setting: Setting): 'boolean' | 'money' | 'number' | 'list' | 'text' {
+function kind(setting: Setting): 'boolean' | 'money' | 'dayOfYear' | 'number' | 'list' | 'text' {
   const value = standing(setting)
   if (typeof value === 'boolean') return 'boolean'
   if (setting.key.endsWith('_PENCE')) return 'money'
+  if (isDayOfYearKey(setting.key)) return 'dayOfYear'
   if (typeof value === 'number') return 'number'
   if (Array.isArray(value) || Array.isArray(setting.default)) return 'list'
   return 'text'
@@ -398,6 +400,24 @@ onMounted(async () => {
                 </UButton>
               </template>
 
+              <template v-else-if="kind(setting) === 'dayOfYear'">
+                <SettingsDayOfYearField
+                  v-model="drafts[setting.key]"
+                  :name="setting.key"
+                  :label="setting.describes"
+                />
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  :loading="saving === setting.key"
+                  :aria-label="`Save ${setting.describes}`"
+                  :data-test="`save-${setting.key}`"
+                  @click="attemptSave(setting, drafts[setting.key])"
+                >
+                  Save
+                </UButton>
+              </template>
+
               <template v-else-if="kind(setting) === 'number'">
                 <UInputNumber
                   v-model="numbers[setting.key]"
@@ -476,7 +496,8 @@ onMounted(async () => {
             </div>
 
             <p class="mt-2 text-xs text-muted">
-              <span v-if="setting.hasDefault">Ships as <span class="font-mono">{{ asText(setting.default) }}</span>. </span>
+              <span v-if="setting.hasDefault && kind(setting) === 'dayOfYear'">Ships as {{ saysMonthDay(String(setting.default)) }}. </span>
+              <span v-else-if="setting.hasDefault">Ships as <span class="font-mono">{{ asText(setting.default) }}</span>. </span>
               <span v-if="setting.updatedBy && setting.updatedAt">
                 Changed by {{ setting.updatedBy.name }} on
                 {{ saysDayLong(setting.updatedAt) }}.

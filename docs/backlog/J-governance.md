@@ -83,6 +83,11 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   1. Every number the backlog calls configurable (booking windows, hold expiry, room rules and caps, refund policy, tab cap, comp authority, expiry and retention windows, nag cadences) lives in one settings surface, seeded from the Phase 0 workshop defaults; no policy number is hardcoded.
   2. Each setting displays its default, its current value, and who last changed it and when.
   3. Values are validated per key (type, range, cross-field rules); an invalid value is refused and never stored, and an impossible date such as a 29 February year boundary is a named refusal case.
+     Amended 24 September 2026 (issue 1266): a yearly boundary written as a month and a day
+     (`YEAR_START`, `YEAR_END`, `ACADEMIC_YEAR_BOUNDARY`) is chosen from a calendar with no year in
+     it, drawn from a fixed common year so 29 February is never offered, and reads as "1 August"
+     rather than `08-01`. The holiday list gets no picker: it is kept from the published list
+     (issue 1267).
   4. Enforcement reads the setting at the write path, so the published policy and the enforced policy are the same document; a changed value takes effect without a deploy.
   5. Every change writes an audit entry with the from and to values.
   6. A setting nothing reads says what is true of it, that nothing enforces it, rather than
