@@ -270,15 +270,17 @@ describe('a figure read off the card reader is typed as pounds and pence', () =>
   })
 })
 
-// A bar price is any whole number of pence, and the input snaps what is typed to its step, so a
-// step coarser than a penny silently rounds the price (issue 1260, F-116, F-121 criterion 1).
-describe('a bar price is typed to the penny', () => {
-  test('every pounds input on a bar screen steps by a penny', async () => {
+// Money is any whole number of pence, and the input snaps what is typed to its step, so a step
+// coarser than a penny silently rounds a price or a Z reading (issue 1260, 0004, F-121).
+const POUNDS_INPUT = /currency:\s*'GBP'|(?:v-model|:model-value)="[^"]*pounds/i
+
+describe('an amount of money is typed to the penny', () => {
+  test('every pounds input in the application steps by a penny', async () => {
     const inputs: { path: string, tag: string }[] = []
-    for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/pages/bar', onlyFiles: true })) {
-      const path = join('app/pages/bar', entry).replaceAll('\\', '/')
+    for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app', onlyFiles: true })) {
+      const path = join('app', entry).replaceAll('\\', '/')
       for (const tag of openingTags(await Bun.file(path).text(), 'UInputNumber')) {
-        if (/v-model="[^"]*pounds[^"]*"/i.test(tag)) inputs.push({ path, tag })
+        if (POUNDS_INPUT.test(tag)) inputs.push({ path, tag })
       }
     }
     expect(inputs.length).toBeGreaterThan(0)
