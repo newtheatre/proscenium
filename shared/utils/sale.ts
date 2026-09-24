@@ -223,3 +223,22 @@ export interface PricedSale {
   walkUpsPence: number
   totalPence: number
 }
+
+// One wording for a basket the stock register cannot cover, whichever check reaches it first:
+// the read before the SumUp hand-off or the sale's own trigger (F-124 criterion 8, F-105).
+export const NOT_ENOUGH_STOCK = 'Not enough left in stock for this sale: nothing has been charged.'
+
+// The items a basket needs more of than is on hand, summed across its lines as the trigger sees
+// them in one batch; an item absent from `onHand` has none (F-124 criterion 8).
+export function stockShortOf(
+  lines: ReadonlyArray<{ depletion: ReadonlyArray<{ itemId: string, qty: number }>, qty: number }>,
+  onHand: ReadonlyMap<string, number>,
+): string[] {
+  const needed = new Map<string, number>()
+  for (const line of lines) {
+    for (const ingredient of line.depletion) {
+      needed.set(ingredient.itemId, (needed.get(ingredient.itemId) ?? 0) + ingredient.qty * line.qty)
+    }
+  }
+  return [...needed].filter(([itemId, qty]) => qty > (onHand.get(itemId) ?? 0)).map(([itemId]) => itemId)
+}

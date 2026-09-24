@@ -584,9 +584,15 @@ Open questions:
      they are reconciliation facts).
   7. A ticket line inside an open attempt cannot be charged again by hand until the attempt is
      resolved, so the phone and the laptop cannot both record one customer.
+  8. Added 24 September 2026 (issue 1258): before the app is opened, the cross-check also reads
+     whether on-hand covers everything the basket would deplete, summed across its lines, and a
+     basket it does not cover is refused with the sale's own stock wording; no attempt is written.
+     The read is advisory: the trigger on the sale's write stays what holds (F-105 criterion 5),
+     so a race lost between the hand-off and the answer still lands as criterion 4's mismatch.
 - Source: SumUp Payment Switch (developer.sumup.com/terminal-payments/payment-switch, and the
   sumup-android-url-scheme and sumup-ios-url-scheme references); decision 0069; Matt's
-  direction, 13 September 2026.
+  direction, 13 September 2026; issue 1258 (a stock-out found only after the reader took the
+  money), with the IT Manager's direction to check and grey out rather than hold stock.
 
 ## F-125: The till opens at a venue with nothing running
 
