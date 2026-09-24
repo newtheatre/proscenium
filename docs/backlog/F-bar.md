@@ -7,7 +7,7 @@ computes, cross-checks and records; it never initiates an online charge and neve
 data. Every sale, tab charge, comp and settlement posts to the unified ledger in integer pence, and
 on-hand stock is always the sum of movements, never a stored figure.
 
-Counts: 33 stories (28 MVP, 3 V2, 1 Later, 1 resolved won't-build).
+Counts: 34 stories (28 MVP, 4 V2, 1 Later, 1 resolved won't-build).
 
 Open questions:
 
@@ -774,6 +774,49 @@ Open questions:
      consecutive stocktakes) to the bar manager; the system notices, a human decides.
   4. All analytics derive from the existing movement ledger; no new write path is introduced.
 - Source: Prompt Book F-2, P6; audit PR-12.
+
+## F-205: Passes on the till
+
+- Role: Bar staff
+- Phase: V2
+- Story: As tonight's bar staff, I want to sell a season pass from the till so that somebody who
+  decides at the interval to come back for the rest of the season pays at the counter, on the
+  same reader as their drink, without a trip to the box office desk.
+- Depends on: D-123, D-124, F-122, F-124
+- Context: D-124 sells a pass at the desk only. The till is the one money-taking point on a show
+  night (F-122), so a pass sold there follows the till's ticket sales rather than the desk's: it
+  is the show-night counter's sale, on the till's own session and reconciliation. The till still
+  never edits a pass; suspension, refunds and transfers stay on the desk.
+- Acceptance criteria:
+  1. The Tickets tab offers a pass product (D-123) whose sales window is open tonight, at its
+     configured price points in integer pence, read out through the shared money wording.
+  2. A pass is sold only to a buyer with an account, found by search by name or email as the desk
+     finds one; a pending online request (D-124 criterion 3) shows beside the buyer for one-tap
+     fulfilment in the same batch. A buyer with no account is refused before anything reaches the
+     basket, since a pass has to resolve to somebody's account to be worth anything.
+  3. The product cap is the insert's own predicate at payment (`passCapAllows`, decision 0001),
+     exactly as the desk's issue path writes it: requests may exceed the cap, issues may not, and a
+     sale that loses the race is refused 409 with nothing written and nothing charged. A racing
+     test pins it across the till and the desk together.
+  4. A handed-off sale's `sumup_attempts` row carries the pass line in its basket exactly as
+     priced (F-124 criterion 2); nothing is issued and nothing posts until the attempt succeeds,
+     and a success re-runs the cap and the cross-check, marking the attempt mismatched with the
+     reason when the cap has filled meanwhile (F-124 criterion 4).
+  5. The sale posts under the source the till's ticket sales use (F-122, F-123), never the desk's:
+     `DOOR` is the source a till walk-up's reservation is written with, and a pass has no
+     reservation, so the pass sale rides the till's own ledger entry, source `TILL` and tender
+     `CARD`, carrying the pass as one `PASS_SALE` line beside any bar and ticket lines, in the same batch as the pass's issue and its audit
+     row, naming its issuer (D-124 criterion 1). The posting pair joins `LEDGER_POSTING_PAIRS`
+     and `docs/architecture.md`'s posting table, and the pass money appears in the till's
+     reconciliation inside the figure the reader is expected to show (F-118). A tab tender
+     refuses a basket holding a pass line.
+  6. The expected-total cross-check (F-104) covers the whole basket including the pass line; a
+     mismatch refuses quoting both figures. A discount applies to the bar subtotal only, never to
+     a pass line.
+  7. The holder receives the pass by email with its QR, as a desk-issued pass is (D-124
+     criterion 5).
+- Source: Feedback report 3cfb3c44878d46ffa07a8fddb279b156 (issue #1261, 23 September 2026);
+  accepted as V2 by Matt, 24 September 2026.
 
 ## F-301: Interval pre-orders
 
