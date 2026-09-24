@@ -17,6 +17,10 @@ export function returnedAttemptKey(id: string): string {
 // The device store belongs to the night cache (K-103); this borrows it rather than opening its own.
 const store = () => deviceNightCacheStore()
 
+function fromTonight(at: unknown, now = Date.now()): boolean {
+  return typeof at === 'number' && showNightOf(new Date(at)) === showNightOf(new Date(now))
+}
+
 export interface PendingAttempt<Basket> {
   id: string
   totalPence: number
@@ -54,6 +58,8 @@ export function useSumUp<Basket>() {
     catch {
       pending.value = null
     }
+    // One left in flight on an earlier show night is the sweep's to settle, never tonight's basket (0014).
+    if (pending.value && !fromTonight(pending.value.startedAt)) forget()
     return pending.value
   }
 
@@ -95,7 +101,7 @@ export function useSumUp<Basket>() {
   // Read and written in one task, which is as atomic as one browser's storage gets across its tabs.
   function claimReturned(id: string): ReturnClaim<Basket> {
     const held = readReturned(id)
-    if (typeof held?.returnedAt !== 'number' || showNightOf(new Date(held.returnedAt)) !== showNightOf(new Date())) return { outcome: 'none' }
+    if (!held || !fromTonight(held.returnedAt)) return { outcome: 'none' }
     if (held.claimedBy) return { outcome: 'elsewhere' }
     const claimed = { ...held, claimedBy: tabId }
     try {
@@ -108,15 +114,18 @@ export function useSumUp<Basket>() {
   // A kept basket lasts its show night (0014): tomorrow's till has no business with tonight's.
   function pruneReturned(now = Date.now()): void {
     try {
-      const tonight = showNightOf(new Date(now))
       const keys: string[] = []
       for (let index = 0; index < store().length; index++) {
         const key = store().key(index)
         if (key?.startsWith(RETURNED_PREFIX)) keys.push(key)
       }
       for (const key of keys) {
-        const held = JSON.parse(store().getItem(key) ?? 'null') as { returnedAt?: number } | null
-        if (typeof held?.returnedAt !== 'number' || showNightOf(new Date(held.returnedAt)) !== tonight) store().removeItem(key)
+        let held: { returnedAt?: unknown } | null = null
+        try {
+          held = JSON.parse(store().getItem(key) ?? 'null') as { returnedAt?: unknown } | null
+        }
+        catch { /* unreadable, so pruned with the rest */ }
+        if (!fromTonight(held?.returnedAt, now)) store().removeItem(key)
       }
     }
     catch { /* pruning is housekeeping; the claim still reads its own night */ }

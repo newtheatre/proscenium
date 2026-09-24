@@ -70,6 +70,8 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     if (!pending) return
     try {
       const answered = await request<{ attempt: SumupAttemptView }>(`/api/till/payments/${pending.id}`)
+      // A return to the tab asks several times at once; only the first answer settles it here.
+      if (sumup.pending.value?.id !== pending.id) return
       waiting.value = answered.attempt
       waitingFailure.value = null
       settleAttempt(answered.attempt.status, pending)
