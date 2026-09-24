@@ -1,4 +1,4 @@
-import { priorConfigValue, writeConfigValue } from '#server/utils/config-write'
+import { priorConfigValue, refuseSynced, writeConfigValue } from '#server/utils/config-write'
 import { isConfigKey } from '#shared/utils/config'
 
 // One action, one audited write: reads the value this key stood at immediately before its own
@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
   if (!isConfigKey(key)) {
     throw noSuch('setting')
   }
+  refuseSynced(key)
 
   const prior = await priorConfigValue(key)
   if (!prior) {

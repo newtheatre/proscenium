@@ -36,6 +36,7 @@ interface Setting {
   enforced: boolean
   sensitive: boolean
   wideBlastRadius: boolean
+  synced: boolean
   updatedAt: number | null
   updatedBy: { id: string, name: string } | null
 }
@@ -348,7 +349,10 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div class="mt-3 flex flex-wrap items-center gap-3">
+            <div
+              v-if="!setting.synced"
+              class="mt-3 flex flex-wrap items-center gap-3"
+            >
               <USwitch
                 v-if="kind(setting) === 'boolean'"
                 :model-value="standing(setting) === true"
@@ -457,8 +461,17 @@ onMounted(async () => {
                 class="text-sm text-muted"
               >{{ notices[setting.key] }}</span>
             </div>
+            <BankHolidaySync
+              v-else
+              class="mt-3"
+              :dates="(standing(setting) as string[] | null) ?? []"
+              @synced="load"
+            />
 
-            <p class="mt-2 text-xs text-muted">
+            <p
+              v-if="!setting.synced"
+              class="mt-2 text-xs text-muted"
+            >
               <span v-if="setting.hasDefault">Ships as <span class="font-mono">{{ asText(setting.default) }}</span>. </span>
               <span v-if="setting.updatedBy && setting.updatedAt">
                 Changed by {{ setting.updatedBy.name }} on

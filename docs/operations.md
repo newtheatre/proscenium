@@ -551,6 +551,12 @@ uncounted before it is applied; read that list.
 
 A 503 naming migrations means the deploy won the race. Run the migrate workflow by hand.
 
+Both answers also carry `bankHolidays`, which never changes the status code: `ok` and `coveredTo`
+say whether the holiday list reaches as far ahead as room requests are judged (C-121, 0038), and
+`sync` says how the weekly copy from gov.uk last went (`synced`, `failed` with the reason, `stale`
+after eight days without a success, or `never`; 0091). A failed sync leaves the list as it was;
+see `### bank-holidays:sync` below.
+
 **No GitHub runner can reach it** (J-106 criterion 3, issue 1014): Bot Fight Mode on
 `newtheatre.org.uk` challenges every runner with a 403, so no workflow checks it: `migrate.yml`'s
 health job and the scheduled `health-watch.yml` were both removed. After a migration run, open
@@ -614,8 +620,8 @@ Registered in `nuxt.config.ts` and mirrored in the wrangler cron triggers; the t
 agree, and `tests/unit/tasks.test.ts` fails if they drift or if a name has no handler.
 
 **`daily:sweeps`, `training:expiry-sweep`, `shifts:escalate`, `rooms:sweep`, `rooms:remind`,
-`shifts:remind`, `backup`, `health:watch`, `holds:release`, `payments:sweep` and `retention:sweep`
-do work today.**
+`shifts:remind`, `backup`, `bank-holidays:sync`, `health:watch`, `holds:release`, `payments:sweep`
+and `retention:sweep` do work today.**
 The other two (`sessions:sweep`, `nights:close`) are stubs that report the story they are waiting
 for, and exist so their cron trigger has something to call: a cron pointing at a missing handler
 errors on every firing.
@@ -732,6 +738,27 @@ on quietly, and row counts and money totals are exactly what the drill below rec
 **A failed export audits `backup.export-failed` with the error message**, actor `NULL`, so it
 reaches the trail rather than only a cron log nobody reads. To run it by hand,
 `POST /_nitro/tasks/backup`.
+
+### bank-holidays:sync (05:00 Monday) (C-121, 0091)
+
+Copies the England and Wales bank holidays from `https://www.gov.uk/bank-holidays.json` into
+`BANK_HOLIDAYS`, which nobody edits by hand: the settings write path refuses it. This is the
+Worker's only outbound call to a third party. It is a plain `GET` with a ten second timeout and
+no redirects; the body must be under 512 KB of JSON with an `england-and-wales` division of real
+dates reaching at least today, or nothing is written. From the feed's first date on the feed
+wins; stored dates older than that are kept. The list's own change is audited with no actor
+(system), and every run writes `bank-holidays.synced` or `bank-holidays.sync-failed`, the latter
+carrying one word (`timeout`, `network`, `http` with its status, `too-large`, `not-json`,
+`invalid`, `out-of-date`, `write`) and never the response.
+
+**A failure leaves the list exactly as it was.** It shows on `/api/health` (`bankHolidays.sync`)
+and on the Settings card straight away; once a failure streak is six days old (the second weekly
+run), every live `ADMIN` is sent `bank-holidays.sync-failed` once per streak. A success ends the
+streak. To run it by hand, press **Sync now** on the Settings card (`config.write`), or
+`POST /_nitro/tasks/bank-holidays:sync`. **Do this once after the first deploy of a new
+environment**, which otherwise reads as `never` synced until the Monday after. Workers fetch
+public hosts by default, so no Cloudflare setting is needed; if egress is ever restricted,
+allow `www.gov.uk`.
 
 **The restore drill itself is a manual exercise**, run by the IT Manager. Time Travel restores a
 database in place (`wrangler d1 time-travel restore <database> --bookmark` names the database it

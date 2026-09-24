@@ -1712,6 +1712,25 @@ The Nottingham New Theatre`,
     }
   },
 
+  'bank-holidays-sync-failed': (context: TemplateContext): Rendered => {
+    const since = String(context.since)
+    return {
+      subject: `The bank holiday list has not updated from gov.uk since ${since}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>The weekly copy of the bank holidays from gov.uk has been failing since ${since}. The list we
+already hold still stands, and room requests are counted against it until it runs out.</p>
+<p>Open Settings to see why it failed and to try again with Sync now.</p>`),
+      text: `Hello ${context.name},
+
+The weekly copy of the bank holidays from gov.uk has been failing since ${since}. The list we
+already hold still stands, and room requests are counted against it until it runs out.
+
+Open Settings to see why it failed and to try again with Sync now.
+
+The Nottingham New Theatre`,
+    }
+  },
+
   // A heads-up, not a demand: signing in at all is what clears it (K-111, 0011).
   'retention-warning-window': (context: TemplateContext): Rendered => ({
     subject: 'Your account has been quiet for a while',

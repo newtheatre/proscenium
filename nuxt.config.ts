@@ -154,7 +154,7 @@ export default defineNuxtConfig({
       '0 17 * * *': ['rooms:remind'],
       '12 0 * * *': ['nights:close'],
       '0 4 * * *': ['daily:sweeps', 'waiting-list:purge'],
-      '0 5 * * 1': ['backup'],
+      '0 5 * * 1': ['backup', 'bank-holidays:sync'],
       '0 4 1 * *': ['retention:sweep'],
     },
 

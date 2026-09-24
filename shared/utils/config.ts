@@ -20,6 +20,8 @@ interface ConfigKeyDefinition {
   // A value that can hold personal data. Its changes are audited as a hash rather than as the
   // value, because audit detail carries identifiers and never people (0011, 0024).
   sensitive?: true
+  // Written only by a sync from an outside source; the settings write path refuses it (0091).
+  synced?: true
 }
 
 export const CONFIG_KEYS = {
@@ -297,7 +299,8 @@ export const CONFIG_KEYS = {
       '2028-12-25', '2028-12-26',
     ],
     workshop: 'spaces-and-training',
-    describes: 'Days that do not count towards notice, as published for England and Wales. A request is refused rather than judged once this list stops reaching far enough ahead.',
+    describes: 'Days that do not count towards notice, copied weekly from the England and Wales dates gov.uk publishes. A request is refused rather than judged once this list stops reaching far enough ahead.',
+    synced: true,
   },
   ROOM_PURPOSES: {
     schema: z.array(z.string()).nonempty(),
@@ -862,6 +865,10 @@ export function isEnforced(key: ConfigKey): boolean {
 
 export function isSensitive(key: ConfigKey): boolean {
   return 'sensitive' in CONFIG_KEYS[key]
+}
+
+export function isSynced(key: ConfigKey): boolean {
+  return 'synced' in CONFIG_KEYS[key]
 }
 
 // A key the register proposed no value for. Reading one is a defect, not a fallback: the

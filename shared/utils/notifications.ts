@@ -567,6 +567,13 @@ export const MESSAGE_TYPES = {
     template: 'health-alert',
   },
 
+  // No topic, for the same reason: a list nobody refreshes ends in refused room requests (0091).
+  'bank-holidays.sync-failed': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'bank-holidays-sync-failed',
+  },
+
   // Module K: platform
 
   // No topic: an account approaching anonymisation is not something a preference silences

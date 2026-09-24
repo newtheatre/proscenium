@@ -5,13 +5,22 @@ import { formatLondon } from '#shared/utils/london'
 import { isSustainedlyUnhealthy } from '#shared/utils/health'
 import { pendingMigrations } from '#shared/utils/migrations'
 import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
+import type { SyncStanding } from '#shared/utils/bank-holidays'
 import type { H3Event } from 'h3'
 
 export interface HealthStatus {
   ok: boolean
   pendingMigrations: string[]
   sessionKey: 'ok' | 'missing'
-  bankHolidays: { ok: boolean, coveredTo: string | null, neededTo: string }
+  bankHolidays: HolidayHealth
+}
+
+// `ok` is coverage alone; the sync is reported beside it, never folded in (C-121 criterion 8).
+interface HolidayHealth {
+  ok: boolean
+  coveredTo: string | null
+  neededTo: string
+  sync: SyncStanding | null
 }
 
 // The same check /api/health answers with, reused by the sustained-unhealthiness task so
@@ -41,19 +50,28 @@ export async function healthStatus(event?: H3Event): Promise<HealthStatus> {
   return { ok: pending.length === 0 && sessionKey === 'ok', pendingMigrations: pending, sessionKey, bankHolidays }
 }
 
-// Reported, never what fails the check: a calendar running out is said before anybody is
-// refused (C-121, 0038), so it is not part of `ok` above.
-async function holidayCoverage(event?: H3Event): Promise<{ ok: boolean, coveredTo: string | null, neededTo: string }> {
+// Reported, never what fails the check: a calendar running out, or gov.uk not answering, is said
+// before anybody is refused (C-121, 0038, 0091), so neither is part of `ok` above.
+async function holidayCoverage(event?: H3Event): Promise<HolidayHealth> {
+  let sync: SyncStanding | null = null
+  try {
+    const { ok, status, syncedAt, failedAt, failure } = await bankHolidaySync()
+    sync = { ok, status, syncedAt, failedAt, failure }
+  }
+  catch (error) {
+    console.error('[health] could not read the bank holiday sync:', error)
+  }
+
   try {
     const holidays = await configValue(event, 'BANK_HOLIDAYS')
     const weeks = await configValue(event, 'ROOM_BOOKING_HORIZON_WEEKS')
     const horizon = new Date(Date.now() + weeks * 7 * 86_400_000)
 
-    return { ok: coversThrough(holidays, horizon), coveredTo: lastCovered(holidays), neededTo: londonDate(horizon) }
+    return { ok: coversThrough(holidays, horizon), coveredTo: lastCovered(holidays), neededTo: londonDate(horizon), sync }
   }
   catch (error) {
     console.error('[health] could not read the bank holiday list:', error)
-    return { ok: false, coveredTo: null, neededTo: '' }
+    return { ok: false, coveredTo: null, neededTo: '', sync }
   }
 }
 

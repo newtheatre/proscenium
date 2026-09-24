@@ -372,6 +372,8 @@ const CATALOGUE = {
   'fellowship.revoked': { label: 'Fellowship revoked', module: 'governance' },
 
   'config.changed': { label: 'Setting changed', module: 'governance' },
+  'bank-holidays.synced': { label: 'Bank holidays copied from gov.uk', module: 'governance' },
+  'bank-holidays.sync-failed': { label: 'Bank holidays could not be copied from gov.uk', module: 'governance' },
   'audit.exported': { label: 'Audit trail exported', module: 'governance' },
 
   'backup.drill-recorded': { label: 'Restore drill recorded', module: 'governance' },
