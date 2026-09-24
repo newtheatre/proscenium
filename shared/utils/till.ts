@@ -1,5 +1,6 @@
 import { saysMoney } from './bar'
 import { z } from 'zod'
+import type { NightCacheStore } from './night-cache'
 
 // The till's own session (F-102): the one accountable window that every sale, tab charge and comp
 // hangs off. One per venue per night, opened once and closed once.
@@ -54,19 +55,14 @@ export function saysChargeOnSumUp(totalPence: number | null): string {
 // fresh tab, issue 1257) opens there rather than asking again. Kept for its show night only (0014).
 export const TILL_VENUE_DEVICE_KEY = 'nnt-till-venue'
 
-interface DeviceStore {
-  getItem: (key: string) => string | null
-  setItem: (key: string, value: string) => void
-}
-
-export function rememberTillVenue(store: Pick<DeviceStore, 'setItem'>, night: string, venueId: string): void {
+export function rememberTillVenue(store: Pick<NightCacheStore, 'setItem'>, night: string, venueId: string): void {
   try {
     store.setItem(TILL_VENUE_DEVICE_KEY, JSON.stringify({ night, venueId }))
   }
   catch { /* a device that keeps nothing asks which bar again */ }
 }
 
-export function recallTillVenue(store: Pick<DeviceStore, 'getItem'>, night: string): string | null {
+export function recallTillVenue(store: Pick<NightCacheStore, 'getItem'>, night: string): string | null {
   try {
     const held = JSON.parse(store.getItem(TILL_VENUE_DEVICE_KEY) ?? 'null') as { night?: unknown, venueId?: unknown } | null
     return held?.night === night && typeof held.venueId === 'string' ? held.venueId : null
