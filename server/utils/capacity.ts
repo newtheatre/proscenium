@@ -34,15 +34,15 @@ export function heldSeatsQuery(performanceId: string): SQL {
   return sql`SELECT ${heldSeatsSubquery(sql`${performanceId}`)} AS held`
 }
 
-// The same predicate correlated to one booking rather than to a house: the party the door expects
-// through (E-129). A row count would call a refunded seat somebody arriving.
+// The same predicate correlated to one booking rather than to a house: the party the door, the till
+// and the glance expect through. Its own aliases, so a caller's `r.id` binds to the caller's row (#1295).
 export function heldSeatsForReservation(reservationId: SQL): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.reservation_id = ${reservationId}
-      AND t.refunded_at IS NULL
-      AND r.status IN (${holding})
+    SELECT count(*) FROM ${sql.raw(TICKETS)} party_t
+    JOIN ${sql.raw(RESERVATIONS)} party_r ON party_r.id = party_t.reservation_id
+    WHERE party_t.reservation_id = ${reservationId}
+      AND party_t.refunded_at IS NULL
+      AND party_r.status IN (${holding})
   )`
 }
 
@@ -50,18 +50,6 @@ export function heldSeatsForReservation(reservationId: SQL): SQL {
 // at once without binding a parameter per performance (0006).
 export function heldSeatsColumn(alias: string): SQL {
   return heldSeatsSubquery(sql`${sql.raw(alias)}.id`)
-}
-
-// How many seats one booking is bringing through the door, counted by the same rule as the house:
-// its own unrefunded tickets while the reservation still holds them.
-export function reservationSeatsSubquery(reservationId: SQL): SQL {
-  return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.reservation_id = ${reservationId}
-      AND t.refunded_at IS NULL
-      AND r.status IN (${holding})
-  )`
 }
 
 // Seats held but not yet paid for: a PENDING reservation is somebody coming who still owes the
