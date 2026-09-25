@@ -23,6 +23,7 @@ const EVERYTHING: TemplateContext = {
   securityUrl: 'https://newtheatre.org.uk/account/access',
   accountUrl: 'https://newtheatre.org.uk/account',
   membershipUrl: 'https://newtheatre.org.uk/account/membership',
+  accessUrl: 'https://newtheatre.org.uk/account/access',
   roomsUrl: ROOMS_URL,
   queueUrl: 'https://newtheatre.org.uk/admin/requests',
   safetyUrl: 'https://newtheatre.org.uk/rota/manage/safety',
@@ -369,6 +370,36 @@ describe('the rewritten bodies and subjects (item 7)', () => {
 })
 
 // G-106 criterion 6: a place taken away says so, gives the number, and keeps the way out.
+// Special category data lives in the encrypted payload and on the owner's own page, so an answer
+// to a declaration says only that there is one and where to read it (issue 1334, 0050).
+describe('the access profile answers carry nothing that was declared or decided', () => {
+  const ACCESS_URL = 'https://newtheatre.org.uk/account/access'
+  const secret = { ...EVERYTHING, accessUrl: ACCESS_URL, fohNote: 'Aisle seat, assistance dog', reason: 'The card number did not match' }
+
+  test('verified and declined each link the member's own page, in both parts', () => {
+    for (const name of ['access-profile-verified', 'access-profile-declined']) {
+      const { html, text } = render(name, secret)
+      expect(html).toContain(`href="${ACCESS_URL}"`)
+      expect(text).toContain(ACCESS_URL)
+    }
+  })
+
+  test('neither says the wording or the reason, whatever the context holds', () => {
+    for (const name of ['access-profile-verified', 'access-profile-declined']) {
+      const { subject, html, text } = render(name, secret)
+      for (const part of [subject, html, text]) {
+        expect(part).not.toContain('Aisle seat')
+        expect(part).not.toContain('card number did not match')
+      }
+    }
+  })
+
+  test('the subjects say which answer it is', () => {
+    expect(render('access-profile-verified', secret).subject).toBe('Your access requirements are verified')
+    expect(render('access-profile-declined', secret).subject).toBe('We could not verify your access requirements')
+  })
+})
+
 describe('the move back to the waiting list (G-106 criterion 6)', () => {
   test('it names the session, the new number and that they keep their turn, in both parts', () => {
     const told = render('training-session-demoted', EVERYTHING)

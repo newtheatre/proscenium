@@ -4,11 +4,15 @@ import {
   ACCESS_PROFILE_STATUSES,
   MAX_ACCESS_TICKETS_PER_PERFORMANCE,
   MAX_COMPANIONS,
+  accessConsentForm,
   accessEntitlementRefusal,
+  changesDeclaration,
   declareAccessProfileForm,
+  declineAccessProfileForm,
   doorWording,
   effectiveStatus,
   isEntitledToAccessTickets,
+  saveRepends,
   saysAccessProfileStatus,
 } from '#shared/utils/access-profiles'
 
@@ -156,5 +160,64 @@ describe('a declaration status reads as a sentence, never the raw enum (issue 91
       expect(saysAccessProfileStatus(status)).not.toBe(status)
       expect(saysAccessProfileStatus(status).length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('a save re-pends only on a real change; consent is its own switch (D-127 criterion 7, issue 1334)', () => {
+  const saved = {
+    flags: { ...flags(), levelAccess: true },
+    companions: 1,
+    requesterNote: 'Uses a wheelchair',
+    accessCardNumber: null,
+  }
+  const resaved = declareAccessProfileForm.parse({ ...saved, requesterNote: 'Uses a wheelchair', accessCardNumber: '', consent: true })
+
+  test('the same declaration, blank card number and all, is no change', () => {
+    expect(changesDeclaration(saved, resaved)).toBe(false)
+  })
+
+  test('consent is not part of the declaration: flipping it alone is no change', () => {
+    expect(changesDeclaration(saved, { ...resaved, consent: false })).toBe(false)
+  })
+
+  test('a need ticked or unticked is a change', () => {
+    expect(changesDeclaration(saved, { ...resaved, flags: { ...resaved.flags, crowds: true } })).toBe(true)
+    expect(changesDeclaration(saved, { ...resaved, flags: { ...resaved.flags, levelAccess: false } })).toBe(true)
+  })
+
+  test('the companions, the note and a card number offered are each a change', () => {
+    expect(changesDeclaration(saved, { ...resaved, companions: 2 })).toBe(true)
+    expect(changesDeclaration(saved, { ...resaved, requesterNote: 'Uses a wheelchair, and a stick' })).toBe(true)
+    expect(changesDeclaration(saved, { ...resaved, requesterNote: null })).toBe(true)
+    expect(changesDeclaration(saved, { ...resaved, accessCardNumber: 'NAC0001234' })).toBe(true)
+  })
+
+  test('a current profile goes back to the officer only when the declaration changed', () => {
+    expect(saveRepends('VERIFIED', false)).toBe(false)
+    expect(saveRepends('VERIFIED', true)).toBe(true)
+    expect(saveRepends('PENDING', false)).toBe(false)
+  })
+
+  test('saving a profile that is not current is the ask to be checked again, changed or not', () => {
+    for (const status of ['EXPIRED', 'DECLINED', 'WITHDRAWN'] as const) {
+      expect(`${status}: ${saveRepends(status, false)}`).toBe(`${status}: true`)
+    }
+    expect(saveRepends(null, false)).toBe(true)
+  })
+
+  test('the switch carries the consent and nothing else', () => {
+    expect(accessConsentForm.parse({ consent: false }).consent).toBe(false)
+    expect(() => accessConsentForm.parse({ consent: true, companions: 2 })).toThrow()
+  })
+})
+
+describe('a decline says why, for the owner alone (issue 1334, 0050)', () => {
+  test('the reason is required', () => {
+    expect(() => declineAccessProfileForm.parse({})).toThrow()
+    expect(() => declineAccessProfileForm.parse({ reason: '  ' })).toThrow()
+  })
+
+  test('a reason is trimmed and kept', () => {
+    expect(declineAccessProfileForm.parse({ reason: ' The card number did not match ' }).reason).toBe('The card number did not match')
   })
 })
