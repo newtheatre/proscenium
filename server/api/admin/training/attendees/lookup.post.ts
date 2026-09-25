@@ -45,8 +45,11 @@ export default defineEventHandler(async (event) => {
   }
   catch (error) {
     const refusal = pendingGrantConstraintRefusal(error)
-    if (refusal) throw createError(refusal)
-    throw error
+    if (!refusal) throw error
+    // Losing the unique address means another trainer made the account a moment ago (G-117 criterion 10).
+    const made = await findByEmail(email)
+    if (made && made.anonymisedAt === null) return { id: made.id, name: made.name, created: false }
+    throw createError(refusal)
   }
   // The insert's own predicate refused it: a pre-link landed between the check and the write.
   if (!await findById(id)) {

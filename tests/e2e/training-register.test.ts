@@ -437,6 +437,17 @@ describe.skipIf(skip !== null)('somebody who turned up untracked (G-117)', () =>
     expect(second.created).toBe(false)
   }, CASE_TIMEOUT_MS)
 
+  test('two trainers adding one new address at once both get the one account made (criterion 10)', async () => {
+    const email = registrableAddress('walk-in-racing')
+    const answers = await Promise.all([lookup({ email }), lookup({ email })])
+    expect(answers.map(answer => answer.status)).toEqual([200, 200])
+
+    const bodies = await Promise.all(answers.map(async answer => await answer.json() as { id: string, created: boolean }))
+    expect(bodies[0]!.id).toBe(bodies[1]!.id)
+    expect(bodies.filter(body => body.created)).toHaveLength(1)
+    expect(read<{ n: number }>('SELECT count(*) n FROM users WHERE email = ?', email)?.n).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
   test('an erased account is refused, because a record cannot attach to a tombstone', async () => {
     const email = registrableAddress('walk-in-erased')
     const { id } = await (await lookup({ email })).json() as { id: string }

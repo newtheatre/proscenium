@@ -702,7 +702,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
   // A hint is for the first sale of the night, not a line above every one of them.
   test('the hint goes once there is something in the basket', async () => {
     const { view, productId } = await atTheTill()
-    expect(await textOf(view, '[data-test="night-hint"]')).toContain('Tap a size')
+    expect(await textOf(view, '[data-test="night-hint"]')).toContain('Tap an item to add it')
 
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="night-hint"]') === null`)
