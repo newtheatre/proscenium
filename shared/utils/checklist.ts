@@ -18,10 +18,16 @@ export type SystemCheck = (typeof SYSTEM_CHECKS)[number]
 // third check must touch both, and `never` refuses to compile until it does.
 export function saysSystemCheck(check: SystemCheck): string {
   switch (check) {
-    case 'NO_SHOW_HOLDS_RELEASED': return 'No-show holds released'
+    case 'NO_SHOW_HOLDS_RELEASED': return 'Unpaid holds released'
     case 'INCIDENTS_REVIEWED': return 'Tonight\'s incidents reviewed'
     default: return check satisfies never
   }
+}
+
+// `systemClear` is null for a hand-ticked item. Any item, one that ticks itself included, is
+// answered by an exception with a reason (criterion 5, issue 1296).
+export function checklistEntryDone(state: { systemClear: boolean | null, ticked: boolean, exempted: boolean }): boolean {
+  return state.exempted || (state.systemClear ?? state.ticked)
 }
 
 // One sentence, so no full stop, and the open items are named: a bare "cannot close" leaves a

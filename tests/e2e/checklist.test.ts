@@ -263,6 +263,43 @@ function shift(performanceId: string, role: string, userId: string): void {
     `${performanceId}-${role}`, performanceId, role, userId, 'CONFIRMED')
 }
 
+// Issue 1296: a paid no-show never holds the night open, and an unpaid hold takes an exception.
+describe.skipIf(skip !== null)('the holds check and its exception (E-114 criteria 3, 5)', () => {
+  test('a paid booking nobody used leaves the check clear; an unpaid hold is answered with a reason and the night closes', async () => {
+    const { venueId, paidId, heldId } = (() => {
+      const database = new Database(app.databaseFile)
+      try {
+        const target = sqliteTarget(database)
+        const venue = testVenue(target, { suffix: 'checklist-holds-house' })
+        const paid = tonightsPerformance(target, { suffix: 'checklist-holds-paid', venueId: venue.id, curtainHoursAfterNightStart: 10 })
+        const held = tonightsPerformance(target, { suffix: 'checklist-holds-held', venueId: venue.id, curtainHoursAfterNightStart: 15.5 })
+        return { venueId: venue.id, paidId: paid.performanceId, heldId: held.performanceId }
+      }
+      finally {
+        database.close()
+      }
+    })()
+    write('INSERT INTO reservations (id, reference, performance_id, status, source) VALUES (?, ?, ?, ?, ?)', 'r-holds-paid', 'HLDPD1', paidId, 'COLLECTED', 'WEB')
+    write('INSERT INTO reservations (id, reference, performance_id, status, source) VALUES (?, ?, ?, ?, ?)', 'r-holds-held', 'HLDHL1', heldId, 'PENDING', 'WEB')
+    const created = await send('POST', '/api/admin/checklist/items', { venueId, phase: 'POST', label: 'Unpaid holds released', sort: 1, required: true, systemCheck: 'NO_SHOW_HOLDS_RELEASED' })
+    expect(created.status).toBe(200)
+
+    const paidRead = await send('GET', `/api/tonight/checklist?performanceId=${paidId}`, undefined, foh.cookie)
+    const { items: paidItems } = await paidRead.json() as { items: { done: boolean }[] }
+    expect(paidItems[0]!.done).toBe(true)
+
+    const heldRead = await send('GET', `/api/tonight/checklist?performanceId=${heldId}`, undefined, foh.cookie)
+    const { items: heldItems } = await heldRead.json() as { items: { id: string, done: boolean }[] }
+    expect(heldItems[0]!.done).toBe(false)
+    expect((await send('POST', '/api/tonight/checklist/close', { performanceId: heldId }, foh.cookie)).status).toBe(409)
+
+    const exempted = await send('POST', `/api/tonight/checklist/${heldItems[0]!.id}/exempt`, { performanceId: heldId, reason: 'Director\'s hold, never collected' }, foh.cookie)
+    expect(exempted.status).toBe(200)
+    const closed = await send('POST', '/api/tonight/checklist/close', { performanceId: heldId }, foh.cookie)
+    expect(closed.status).toBe(200)
+  })
+})
+
 describe.skipIf(skip !== null)('two performances, one venue, one day (E-128)', () => {
   test('a matinee and an evening keep their own checklist, and closing one does not touch the other', async () => {
     const dm = await registerMember(app, 'checklist-matinee-dm', generatePassword())

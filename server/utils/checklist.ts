@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { checklistEntryDone } from '#shared/utils/checklist'
 import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import type { ListClause } from './list-filters'
 import type { ChecklistItemInput, Phase, SystemCheck } from '#shared/utils/checklist'
@@ -205,14 +206,14 @@ export async function ensureStamped(performanceId: string): Promise<void> {
   await db.all(ensureStampedStatement(performanceId))
 }
 
-// No reservation for this performance is left in a status a show should have resolved by its
-// own end (criterion 3). Nothing marks a no-show yet (docs/known-issues.md).
+// No unpaid hold is left on this performance (criterion 3). A paid booking nobody used stays
+// COLLECTED and is the night report's no-show, never a hold to release (issue 1296).
 export function noShowHoldsReleasedQuery(performanceId: string): SQL {
   return sql`
     SELECT count(*) AS unresolved
     FROM reservations r
     WHERE r.performance_id = ${performanceId}
-      AND r.status IN ('PENDING', 'COLLECTED')
+      AND r.status = 'PENDING'
   `
 }
 
@@ -278,7 +279,7 @@ export async function checklistFor(performanceId: string): Promise<ChecklistEntr
 
   const entries: ChecklistEntry[] = []
   for (const stamp of stamps) {
-    const systemDone = stamp.systemCheck ? (resolved.get(stamp.systemCheck) ?? false) : null
+    const systemClear = stamp.systemCheck ? (resolved.get(stamp.systemCheck) ?? false) : null
     entries.push({
       id: stamp.id,
       itemId: stamp.itemId,
@@ -286,7 +287,7 @@ export async function checklistFor(performanceId: string): Promise<ChecklistEntr
       label: stamp.label,
       required: stamp.required === 1,
       systemCheck: stamp.systemCheck,
-      done: systemDone ?? (stamp.tickedAt !== null || stamp.exempted === 1),
+      done: checklistEntryDone({ systemClear, ticked: stamp.tickedAt !== null, exempted: stamp.exempted === 1 }),
       tickedByName: stamp.tickedByName,
       tickedAt: stamp.tickedAt,
       exempted: stamp.exempted === 1,
@@ -310,14 +311,14 @@ export function tickStatement(stampId: string, performanceId: string, tickedBy: 
   `
 }
 
-// Guarded like `tickStatement`, `system_check IS NULL` included: `checklistFor` never reads
-// `exempted` for a system-verified stamp, so recording one there would audit a no-op.
+// Guarded like `tickStatement` but open to a system-verified stamp: one that cannot clear
+// tonight is answered with a reason like any other item (criterion 5, issue 1296).
 export function exemptStatement(stampId: string, performanceId: string, reason: string, exemptedBy: string): SQL {
   return sql`
     UPDATE checklist_stamps
     SET exempted = 1, exempt_reason = ${reason}, exempted_by = ${exemptedBy}, exempted_at = unixepoch()
     WHERE id = ${stampId} AND performance_id = ${performanceId}
-      AND system_check IS NULL AND ticked_at IS NULL AND exempted = 0
+      AND ticked_at IS NULL AND exempted = 0
     RETURNING id
   `
 }

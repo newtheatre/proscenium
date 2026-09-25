@@ -1359,8 +1359,10 @@ first time `GET /api/tonight/checklist` reads it, resolving the venue's active i
 the performance it is given (criterion 1, keyed to a performance since E-128, never a venue and
 a night). An edit to `checklist_items` afterwards changes nothing already stamped. Ticking
 (`POST .../tick`) and exempting (`POST .../exempt`) are both predicated `UPDATE`s decided from
-`RETURNING` via `auditedWrite()` (0049); a system-verified stamp's `system_check IS NULL`
-predicate is what refuses a hand-tick outright, matched by its own CHECK at the schema layer too.
+`RETURNING` via `auditedWrite()` (0049); the tick's `system_check IS NULL` predicate is what
+refuses a hand-tick on a system-verified stamp outright. The exemption carries no such predicate:
+a system-verified item that cannot clear tonight takes an exception with a reason like any
+other (criterion 5, issue 1296), and `checklistEntryDone()` counts it answered.
 
 `GET /api/admin/checklist`, the committee's own overview, filters by venue name and by
 `configured` through `shared/utils/checklist-venues-list.ts` (K-129); a venue with nothing
@@ -1369,7 +1371,8 @@ configured yet still lists, its `items` empty.
 A system-verified item's done state is never stored: `noShowHoldsReleased()` and
 `incidentsReviewed()` (`server/utils/checklist.ts`) run live against this performance's own
 `reservations` and `incidents`/`audit_log` on every read, so a matinee's checklist never waits
-on the evening's data (E-128). Reviewing an incident (`POST
+on the evening's data (E-128). The holds check counts `PENDING` only: a paid booking nobody used
+stays `COLLECTED`, which is the night report's no-show, not a hold to release (issue 1296). Reviewing an incident (`POST
 /api/tonight/incidents/[id]/review`) writes an `incident.reviewed` audit entry rather than a
 column on `incidents`, which cannot be touched post-insert; acknowledgement, not E-116's later
 severity-routed resolution, which is a separate workflow this does not build. `/tonight/incidents`
@@ -1392,10 +1395,9 @@ their siblings are: `checklist.read`/`checklist.write` (a new, paired standing p
 'DUTY_MANAGER')` for the tonight screen, since criterion 1 names the checklist as the duty
 manager's own, unlike the incident log's wider `BAR`/`DOOR`/`DUTY_MANAGER` reach.
 
-Two gaps recorded in `docs/known-issues.md`: criterion 5's exception reason now prints in the
+One gap recorded in `docs/known-issues.md`: criterion 5's exception reason prints in the
 report `compileNightReport()` builds (E-123) and the frozen row E-124 signs, but still has no
-FOH digest of its own; and `noShowHoldsReleased()` can never clear itself in production until
-D-126 builds a door to move a reservation off `PENDING`/`COLLECTED`.
+FOH digest of its own.
 
 **Also closes a standing gap from E-106/E-107**: `POST /api/rota/shifts/[id]/dismiss` lets a
 member clear a declined claim off their own `/rota` list. It returns the shift to `OPEN`, naming
@@ -1535,7 +1537,7 @@ real SQL:
 
 | Section | Reads | Note |
 | --- | --- | --- |
-| Attendance | `reservations` | Sold rides `heldSeatsSubquery` (D-105); admitted is `status = 'DOOR'`, a walk-up the same status with `source = 'DOOR'`, a no-show `status = 'NO_SHOW'`, a status nothing yet sets (D-126). |
+| Attendance | `reservations` | Sold rides `heldSeatsSubquery` (D-105); admitted is `status = 'DOOR'`, a walk-up the same status with `source = 'DOOR'`, a no-show a booking paid and never admitted (`COLLECTED` at compile time, derived and never written, so sold and a later refund are untouched; issue 1296) or one the old estate imported as `NO_SHOW`. |
 | Takings | `ledger_entries`, `ledger_lines` | Grouped by tender, summed from `ll.amount_pence` on the lines matched to this performance, never `le.total_pence`, which can span more than one performance or product in a single entry. A reversal's negative line nets against what it reverses in the same sum; nothing is filtered by `void_of_entry_id`, which marks a tab-charge reversal, not something to exclude (0031). |
 | Incidents | `incidents`, `incident_severity_config`, `incident_followup_closures` | The full chain, each flagged with its follow-up requirement and closure state whichever way it sits. Closes the known-issues gap E-116 criterion 4 left open. |
 | Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |

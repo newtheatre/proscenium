@@ -1,7 +1,7 @@
 import { exemptForm } from '#shared/utils/checklist'
 
-// The exception path: close over an incomplete item by recording a reason (criterion 5), for a
-// night report and FOH digest that do not exist yet to read it (docs/known-issues.md).
+// The exception path: close over an incomplete item, one that ticks itself included, by recording
+// a reason the night report prints (criterion 5, issue 1296).
 export default defineEventHandler(async (event) => {
   const stampId = getRouterParam(event, 'stampId') ?? ''
   const { performanceId, reason } = await readValidatedBodyOrThrow(event, exemptForm)
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     db.all<{ id: string }>(exemptStatement(stampId, target, reason, resolved.account.id)),
     entry,
   )
-  if (!exempted) throw createError({ statusCode: 409, statusMessage: 'That item cannot be made an exception: it may already be ticked, an exception, or one that ticks itself' })
+  if (!exempted) throw createError({ statusCode: 409, statusMessage: 'That item cannot be made an exception: it may already be ticked or an exception' })
 
   return { ok: true }
 })
