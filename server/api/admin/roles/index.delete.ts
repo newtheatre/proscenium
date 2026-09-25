@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { strandingRefusal } from '#shared/utils/protected-role'
 import { ROLES } from '#shared/utils/roles'
 
 // Query, not body: a DELETE carrying a body hangs the Workers runtime when read (0068).
@@ -15,12 +16,8 @@ export default defineEventHandler(async (event) => {
 
   // Removing a factor is refused while the account holds a role that requires one (A-112
   // criterion 3); removing the role itself is the way out.
-  if (await wouldStrandTheSystem(input.role, input.userId)) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'That is the last IT Manager: grant another before revoking this one',
-    })
-  }
+  const stranding = await wouldStrandTheSystem(input.role, input.userId)
+  if (stranding) throw createError({ statusCode: 409, statusMessage: strandingRefusal(stranding, 'revoking') })
 
   await db.batch([
     db.delete(schema.roleGrants).where(and(

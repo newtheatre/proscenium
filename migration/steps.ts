@@ -4,7 +4,7 @@ import type { Database } from 'bun:sqlite'
 import { join } from 'node:path'
 import { transformBookings, reconcile as reconcileBookings } from './bookings'
 import { transformCatalogue, reconcileCatalogue, PASS_ADMISSION_MAP_KEY } from './catalogue'
-import { createCore, transformIdentity } from './identity'
+import { createCore, permanentItManagers, transformIdentity } from './identity'
 import { OUT, ROOT, SOURCES, count, ensureOut, execDump, idFor, loadDump, readMap, sum, tables, writeJson, writeLines, writeMap } from './lib'
 import { buildLoad, applyLoad, loadedCounts } from './load'
 import { buildLoad as buildMoneyLoad, reconcileMoney, transformMoney } from './money'
@@ -134,6 +134,7 @@ export function checkIdentity(manifest: Manifest, summary: Record<string, unknow
   check('grants accounted for', s.grantsImported + s.grantsCollapsed + s.grantsSkipped === src.auth!.tables.user_roles, `${s.grantsImported} imported + ${s.grantsCollapsed} collapsed + ${s.grantsSkipped} skipped vs ${src.auth!.tables.user_roles}`)
   check('old audit history not imported', core.query('SELECT name FROM sqlite_master WHERE name = ?').all('audit_archive').length === 0, '0030')
   check('every live old grant has a decision', s.undecided.length === 0, s.undecided.length ? `${s.undecided.length} undecided: run bun run migration:review-roles` : 'all decided')
+  check('an IT Manager grant is permanent', permanentItManagers(core) > 0, 'every one would lapse with nobody left to grant another (A-120): run bun run migration:review-roles')
   check('no old estate ids in granted_by', count(core, 'role_grants', 'granted_by IS NOT NULL AND granted_by NOT IN (SELECT id FROM users)') === 0, '0015')
   check('every address is lowercase', count(core, 'users', 'email != lower(email)') === 0, `${s.emailsLowercased} normalised`)
   check('K-115 guard: incident register still empty', src.proscenium!.checks.incident_log === 0, `${src.proscenium!.checks.incident_log} rows`)

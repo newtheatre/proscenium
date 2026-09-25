@@ -1,5 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { strandingRefusal } from '#shared/utils/protected-role'
 
 const body = z.object({
   operation: z.enum(['disable', 'enable', 'sign-out', 'reset-mfa', 'erase']),
@@ -31,12 +32,8 @@ export default defineEventHandler(async (event) => {
     return { ok: true, operation: input.operation, ...await eraseAccount(id, resolved.account.id) }
   }
 
-  if (input.operation === 'disable' && await wouldStrandTheSystem('ADMIN', id)) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'That is the last IT Manager: grant another before disabling this one',
-    })
-  }
+  const stranding = input.operation === 'disable' ? await wouldStrandTheSystem('ADMIN', id) : null
+  if (stranding) throw createError({ statusCode: 409, statusMessage: strandingRefusal(stranding, 'disabling') })
 
   // The epoch is what ends every session at once, and it never goes backwards, so re-enabling
   // cannot resurrect a cookie sealed before the disable (criterion 1).

@@ -38,6 +38,8 @@ interface Register {
   pending: Holder[]
   // Lapsed grants the default listing left out; 0 whenever they were not hidden.
   lapsedHidden: number
+  // Whether a usable IT Manager holds a grant that cannot lapse (A-120 criterion 1).
+  permanentItManager: boolean
 }
 
 const request = useRequestFetch()
@@ -46,7 +48,7 @@ const toast = useToast()
 // The chosen role lives in the URL like every other filter, so a register can be linked (K-129).
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(rolesList)
 
-const empty = (): Register => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1, counts: {}, permanent: [], pending: [], lapsedHidden: 0 })
+const empty = (): Register => ({ items: [], page: 1, pageSize: 0, total: 0, pages: 1, counts: {}, permanent: [], pending: [], lapsedHidden: 0, permanentItManager: true })
 
 const { data: register, status, error, refresh } = await useAsyncData(
   'people-roles',
@@ -113,8 +115,9 @@ async function granted(): Promise<void> {
   await refresh()
 }
 
+// Always with the year: a grant ending next July reads as ending this one otherwise (issue #1355).
 const when = (at: number | null): string =>
-  at === null ? 'further notice' : saysDay(at)
+  at === null ? 'further notice' : saysDay(at, { year: true })
 
 // Hidden lapsed grants are counted on the total line, so hidden never means lost (0071).
 const totalLine = computed(() => register.value.lapsedHidden
@@ -202,6 +205,17 @@ const columns: TableColumn<Holder>[] = [
       variant="subtle"
       :description="listingFailure.message"
       :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
+    />
+
+    <UAlert
+      v-if="!register.permanentItManager"
+      data-test="no-permanent-it-manager"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-triangle-alert"
+      title="No IT Manager grant is permanent"
+      description="Every IT Manager grant runs out on its date, and once the last has, nobody can grant another. Grant one IT Manager until further notice."
+      :actions="sees.grants ? [{ label: 'Show the IT Managers', color: 'warning', variant: 'outline', onClick: () => choose('ADMIN') }] : []"
     />
 
     <p class="text-sm text-muted">

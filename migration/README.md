@@ -14,7 +14,9 @@ script, and only one, replaces production's contents with it (0072).
 - The id maps (`out/*-id-map.tsv`, `out/id-map.tsv`) are working artefacts (decision 0015): they
   never enter the application database and are archived with the read-only old estate.
 - Every role grant crosses because a person decided it should, at a prompt, and the decision is
-  on file in `out/role-decisions.tsv` (0070). A build with an undecided grant fails.
+  on file in `out/role-decisions.tsv` (0070). A build with an undecided grant fails, and so does
+  one where no usable IT Manager's grant is permanent (A-120): the review asks which to make
+  permanent when every IT Manager decision is dated.
 
 ```mermaid
 flowchart LR

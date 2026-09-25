@@ -3,7 +3,7 @@
 
 import { erasureStatements } from '../../shared/utils/erasure'
 import { PERSONAS, PERSONA_PASSWORD } from '../../shared/utils/personas'
-import { defaultRoleExpiry } from '../../shared/utils/roles'
+import { PROTECTED_ROLE, defaultRoleExpiry } from '../../shared/utils/roles'
 import { boundFromSQL, holds, insert, seedId } from './statements'
 import type { BoundStatement, SeedTarget } from './statements'
 
@@ -151,7 +151,8 @@ export async function seedPeople(target: SeedTarget, options: PeopleOptions): Pr
         id: seedId('grant', seeded.id, persona.role),
         user_id: seeded.id,
         role: persona.role,
-        expires_at: defaultRoleExpiry(new Date(now * 1000)),
+        // The IT Manager the guard keeps holds a grant that cannot lapse, as in production (A-120).
+        expires_at: persona.role === PROTECTED_ROLE ? null : defaultRoleExpiry(new Date(now * 1000)),
         granted_by: null,
         note: 'Seeded persona (K-124).',
       })])

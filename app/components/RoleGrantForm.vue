@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { endOfLondonDay } from '#shared/utils/london'
 import { londonDay } from '#shared/utils/membership'
-import { ROLES, saysRole } from '#shared/utils/roles'
+import { ROLES, defaultRoleExpiry, saysRole } from '#shared/utils/roles'
+import { saysDayLong } from '#shared/utils/when'
 import type { Role } from '#shared/utils/roles'
 
 // One grant form for both doors into A-118: the register, which fixes the role and picks the
@@ -18,13 +19,14 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ granted: [] }>()
 
-const UNTIL = [
-  { value: 'year', label: 'The committee year end' },
+type Until = 'year' | 'date' | 'never'
+
+// The default names its date: a grant made in July otherwise ends within weeks unseen (issue #1355).
+const UNTIL = computed<{ value: Until, label: string }[]>(() => [
+  { value: 'year', label: `The committee year end, ${saysDayLong(defaultRoleExpiry(new Date()), { year: true })}` },
   { value: 'date', label: 'A date I pick' },
   { value: 'never', label: 'Further notice' },
-] as const
-
-type Until = (typeof UNTIL)[number]['value']
+])
 
 const chosenRole = ref<Role | undefined>(props.role)
 const chosenPerson = ref<string | undefined>(props.userId)
@@ -194,7 +196,7 @@ async function grant(): Promise<void> {
       <UFormField label="Until">
         <USelect
           v-model="until"
-          :items="[...UNTIL]"
+          :items="UNTIL"
           value-key="value"
           class="w-full"
           data-test="grant-until"

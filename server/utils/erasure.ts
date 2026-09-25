@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { PERSONAL_TABLES } from '#shared/utils/personal-data'
 import { erasureStatements } from '#shared/utils/erasure'
+import { strandingRefusal } from '#shared/utils/protected-role'
 
 export interface ErasureOutcome { erased: boolean, alreadyErased: boolean }
 
@@ -12,12 +13,8 @@ export async function eraseAccount(userId: string, actorId: string | null): Prom
 
   if (account.anonymisedAt !== null) return { erased: false, alreadyErased: true }
 
-  if (await wouldStrandTheSystem('ADMIN', userId)) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'That is the last IT Manager: grant another before erasing this one',
-    })
-  }
+  const stranding = await wouldStrandTheSystem('ADMIN', userId)
+  if (stranding) throw createError({ statusCode: 409, statusMessage: strandingRefusal(stranding, 'erasing') })
 
   const now = Math.floor(Date.now() / 1000)
   const statements = erasureStatements(userId, now)

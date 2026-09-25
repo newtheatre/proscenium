@@ -1,5 +1,7 @@
 import type { H3Event } from 'h3'
 import { and, eq, gt, isNull, or } from 'drizzle-orm'
+import { strandingBy } from '#shared/utils/protected-role'
+import type { ProtectedHolder, Stranding } from '#shared/utils/protected-role'
 import type { Grant, Permission, Role } from '#shared/utils/roles'
 import type { AccountRow } from '#server/utils/accounts'
 
@@ -77,15 +79,22 @@ export function owns(resolved: Authority, userId: string): boolean {
   return resolved.account.id === userId
 }
 
+// Usable excludes disabled, anonymised and pending accounts: a disabled second administrator,
+// or one who has never signed in, does not satisfy the guard (A-120, 0088).
+export async function protectedHolders(now = new Date()): Promise<ProtectedHolder[]> {
+  return await db.all<ProtectedHolder>(protectedHoldersStatement(Math.floor(now.getTime() / 1000)))
+}
+
+export async function isUsableAccount(userId: string): Promise<boolean> {
+  const [row] = await db.select({ id: schema.users.id }).from(schema.users)
+    .where(and(eq(schema.users.id, userId), usableAccountWhere()))
+    .limit(1)
+  return row !== undefined
+}
+
 // The last administrator cannot be removed: it is a write check rather than a constraint,
 // because it depends on every other row (A-120).
-export async function wouldStrandTheSystem(role: Role, userId: string, now = new Date()): Promise<boolean> {
-  if (role !== PROTECTED_ROLE) return false
-  // Usable excludes disabled, anonymised and pending accounts: a disabled second administrator,
-  // or one who has never signed in, does not satisfy the guard (A-120, 0088).
-  const holders = await db.select({ userId: schema.roleGrants.userId })
-    .from(schema.roleGrants)
-    .innerJoin(schema.users, eq(schema.users.id, schema.roleGrants.userId))
-    .where(usableHolderWhere(PROTECTED_ROLE, Math.floor(now.getTime() / 1000)))
-  return holders.filter(holder => holder.userId !== userId).length === 0
+export async function wouldStrandTheSystem(role: Role, userId: string, now = new Date()): Promise<Stranding | null> {
+  if (role !== PROTECTED_ROLE) return null
+  return strandingBy(await protectedHolders(now), userId)
 }

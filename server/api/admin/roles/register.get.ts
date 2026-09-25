@@ -71,5 +71,7 @@ export default defineEventHandler(async (event) => {
     permanent: permanent.map(row => ({ ...row, live: true })),
     pending: pending.map(isLive),
     lapsedHidden: hiddenLapsed ? await registerTotal(hiddenLapsed) : 0,
+    // Without one, the last IT Manager lapses on a date and no guard sees it (A-120 criterion 1).
+    permanentItManager: (await protectedHolders()).some(holder => holder.expiresAt === null),
   }
 })
