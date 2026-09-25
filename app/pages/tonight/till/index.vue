@@ -410,7 +410,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
     <NightScreen
       title="Till"
       :hint="session
-        ? (basketEmpty ? 'Tap a size to add it. Quantities and lines are editable before payment.' : undefined)
+        ? (basketEmpty ? 'Tap an item to add it; one with several sizes asks which. Quantities and lines are editable before payment.' : undefined)
         : 'One till for the whole night. Everyone at this bar sells against it.'"
       :stale="session ? catalogue.cachedAt.value : syncedAt"
       :busy="busy || catalogue.pending.value"

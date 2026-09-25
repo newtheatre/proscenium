@@ -2354,6 +2354,8 @@ mints the claimable password-less account A-116 describes and refuses an anonymi
 attaching training to a tombstone would write a person back onto the row erasure emptied (0011).
 An address an account is pre-linked to for Google (A-104) is refused up front, with the same check
 a record by address makes (0091).
+Two trainers minting the same new address at once leave one account: the unique address is the
+conditional write, and the lookup whose batch lost answers with the account the other made (0003).
 The same lookup serves the retrospective log, because teaching off-system is often taught to people
 who have not signed in.
 

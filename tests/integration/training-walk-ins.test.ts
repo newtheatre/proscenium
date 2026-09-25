@@ -118,16 +118,19 @@ describe('a walk-in joins the register as a walk-in (G-117 criterion 5)', () => 
 
 // What the lookup runs once its own checks have passed: the batch, then reading back whether the
 // account was written, since a predicate that refused raises nothing (0003).
-function mint(database: TestDatabase, index: number, email: string): { status: number } {
+function mint(database: TestDatabase, index: number, email: string): { status: number, id?: string } {
   const id = `walk-in-${index}`
   const created = auditEntry({ actorId: 'u-trainer', action: 'account.created.console', target: `user:${id}` })
   try {
     database.batch(walkInAccountStatements(id, email, email, created).map(statement => boundStatement(database, statement)))
   }
   catch (error) {
-    return { status: pendingGrantConstraintRefusal(error)?.statusCode ?? 500 }
+    if (!pendingGrantConstraintRefusal(error)) return { status: 500 }
+    // Losing the unique address means somebody else made it: answer with theirs (criterion 10).
+    const [held] = rows<{ id: string }>(database, 'SELECT id FROM users WHERE email = ? AND anonymised_at IS NULL', email)
+    return held ? { status: 200, id: held.id } : { status: 409 }
   }
-  return { status: rows(database, 'SELECT id FROM users WHERE id = ?', id).length ? 200 : 409 }
+  return rows(database, 'SELECT id FROM users WHERE id = ?', id).length ? { status: 200, id } : { status: 409 }
 }
 
 // Pre-link the address to another member's account, as A-104 criterion 6's route writes it.
@@ -160,6 +163,18 @@ describe('a walk-in by address mints a shadow account only while nobody is pre-l
       expect(mint(database, 0, WORKSPACE).status).toBe(409)
       expect(rows(database, 'SELECT id FROM users WHERE email = ?', WORKSPACE)).toHaveLength(0)
       expect(rows(database, `SELECT id FROM audit_log WHERE target = 'user:walk-in-0'`)).toHaveLength(0)
+    })
+  })
+
+  test('two walk-ins racing for one new address both answer with the one account made (criterion 10)', async () => {
+    await withDatabase(async (database) => {
+      seed(database)
+      const answers = await race(2, async index => mint(database, index, 'twice@example.test'))
+      expect(answers.map(answer => answer.status)).toEqual([200, 200])
+      const made = rows<{ id: string }>(database, 'SELECT id FROM users WHERE email = ?', 'twice@example.test')
+      expect(made).toHaveLength(1)
+      expect(answers.map(answer => answer.id)).toEqual([made[0]!.id, made[0]!.id])
+      expect(rows(database, `SELECT id FROM audit_log WHERE action = 'account.created.console'`)).toHaveLength(1)
     })
   })
 
