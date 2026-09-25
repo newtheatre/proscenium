@@ -146,6 +146,7 @@ export const members: Shot[] = [
     url: '/account/access',
     marker: '[data-test="access-form"]',
     width: PHONE_WIDTH,
+    height: 1500,
     annotations: [
       { selector: '[data-test="flag-standing"]', label: 'What you need' },
       { selector: '[data-test="access-companions"]', label: 'Companions' },

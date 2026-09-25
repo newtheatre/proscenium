@@ -16,10 +16,9 @@ export const bar: Shot[] = [
     width: CONSOLE_WIDTH,
     annotations: [
       { selector: '[data-test="set-up-product"]', label: 'Set up a product' },
-      { selector: '[data-test="add-product"]', label: 'Add a product' },
       { selector: '[data-test^="sizes-"]', label: 'Serving sizes' },
       { selector: '[data-test^="edit-"]', label: 'Edit' },
-      { selector: '[data-test^="retire-"]', label: 'Retire' },
+      { selector: '[data-test="bar-products-table"] [data-test^="more-"]', label: 'More actions, with Retire' },
     ],
   },
   {
@@ -45,7 +44,7 @@ export const bar: Shot[] = [
       { selector: '[data-test="product-name"]', label: 'The product' },
       { selector: '[data-test="add-variant"]', label: 'Add a serving size' },
       { selector: '[data-test^="recipe-"]', label: 'What it depletes' },
-      { selector: '[data-test^="choice-"]:not([data-test^="clear-choice-"])', label: 'Add or change a choice' },
+      { selector: '[data-test="bar-variants-table"] [data-test^="more-"]', label: 'More actions, with the choice' },
       { selector: '[data-test^="prices-"]', label: 'Prices' },
       { selector: '[data-test="toolbar-filters"]', label: 'Filters, including retired sizes' },
     ],

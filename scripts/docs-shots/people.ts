@@ -31,7 +31,7 @@ export const people: Shot[] = [
     annotations: [
       { selector: '[data-test="account-name"]', label: 'The name and state' },
       { selector: '[data-test="grant-role"]', label: 'Grant a role' },
-      { selector: '[data-test="grant-permanent"]', label: 'Permanent' },
+      { selector: '[data-test="grant-until"]', label: 'Until' },
       { selector: '[data-test="grant-submit"]', label: 'Grant it' },
     ],
   },
@@ -47,7 +47,7 @@ export const people: Shot[] = [
       { selector: '[data-test="disable"]', label: 'Disable the account' },
       { selector: '[data-test="reset-mfa"]', label: 'Reset the authenticator' },
       { selector: '[data-test="erase-reveal"]', label: 'Erase this account' },
-      { selector: '[data-test="merge-search"]', label: 'Merge into another account' },
+      { selector: '[data-test="merge-winner"]', label: 'The winning account' },
     ],
   },
   {

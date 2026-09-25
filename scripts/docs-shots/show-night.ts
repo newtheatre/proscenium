@@ -71,7 +71,7 @@ export const showNight: Shot[] = [
       { selector: '[data-test="till-open"]', label: 'Open since' },
       { selector: '[data-test="till-panes"] button[role="tab"]:nth-of-type(1)', label: 'Bar' },
       { selector: '[data-test="till-panes"] button[role="tab"]:nth-of-type(2)', label: 'Tickets' },
-      { selector: '[data-test^="variant-"]', label: 'A size' },
+      { selector: 'button[data-test^="product-"]', label: 'A product' },
       { selector: '[data-test^="allergen-"]', label: 'Allergens' },
       { selector: '[data-test="till-overflow-menu"]', label: 'Close till (not a per-sale action)' },
     ],
@@ -82,10 +82,11 @@ export const showNight: Shot[] = [
     url: '/tonight/till',
     marker: '[data-test="till-panes"]',
     width: PHONE_WIDTH,
-    // The first size on a seeded bar always offers a mixer, so the choice is answered before the
-    // line lands and the comp chip, which needs a priced basket, has anything to show for.
-    after: 'document.querySelector(\'[data-test^="variant-"]\')?.click(); '
-      + 'setTimeout(() => document.querySelector(\'[data-test^="choice-option-"]\')?.click(), 400); '
+    // An unrestricted product, so no Challenge 25 sheet sits under the comp; the size sheet and a
+    // mixer are answered if they appear, since the comp chip needs a priced basket.
+    after: '[...document.querySelectorAll(\'button[data-test^="product-"]\')].find(tile => !tile.querySelector(\'[data-test^="restricted-mark-"]\'))?.click(); '
+      + 'setTimeout(() => document.querySelector(\'[data-test="size-sheet"] [data-test^="variant-"]:not([disabled])\')?.click(), 300); '
+      + 'setTimeout(() => document.querySelector(\'[data-test^="choice-option-"]\')?.click(), 700); '
       + 'setTimeout(() => document.querySelector(\'[data-test="till-comp-chip"]\')?.click(), 1100)',
     annotations: [
       { selector: '[data-test="comp-request-total"]', label: 'What is being given away' },
@@ -113,8 +114,8 @@ export const showNight: Shot[] = [
     width: PHONE_WIDTH,
     after: 'document.querySelector(\'[data-test="open-log-check"]\').click()',
     annotations: [
-      { selector: '[data-test="log-performance"]', label: 'Performance' },
       { selector: '[data-test="log-outcome"]', label: 'Outcome' },
+      { selector: '[data-test="log-id-type"]', label: 'ID shown' },
       { selector: '[data-test="log-description"]', label: 'Who you checked' },
       { selector: '[data-test="log-submit"]', label: 'Log it' },
     ],
@@ -126,8 +127,8 @@ export const showNight: Shot[] = [
     marker: '[data-test="close-night"]',
     width: PHONE_WIDTH,
     annotations: [
-      // The list where one performance runs; the refusal naming the ambiguity where two do.
-      { selector: '[data-test="checklist-list"], [data-test="checklist-failure"]', label: 'The checklist' },
+      // The list where one performance runs; the house to choose where two do.
+      { selector: '[data-test="checklist-list"], [data-test="checklist-performance-switcher"], [data-test="checklist-failure"]', label: 'The checklist' },
       { selector: '[data-test="close-night"]', label: 'Close the night' },
     ],
   },
@@ -139,9 +140,8 @@ export const showNight: Shot[] = [
     width: PHONE_WIDTH,
     annotations: [
       { selector: '[data-test="tonight-team"]', label: 'On tonight' },
-      { selector: '[data-test="open-log-incident-inline"]', label: 'Log incident' },
       { selector: '[data-test="incidents-list"]', label: 'The log' },
-      { selector: '[data-test="open-near-miss"]', label: 'Report a near miss' },
+      { selector: '[data-test="night-actions"]', label: 'Log an incident and Report a near miss' },
     ],
   },
   {
@@ -150,8 +150,10 @@ export const showNight: Shot[] = [
     url: '/tonight/emergency',
     marker: '[data-test="emergency-999"]',
     width: PHONE_WIDTH,
+    height: 1700,
     annotations: [
       { selector: '[data-test="emergency-999"]', label: 'Read to 999' },
+      { selector: '[data-test="emergency-duty-manager"]', label: 'After 999' },
       { selector: '[data-test="emergency-evacuation"]', label: 'Evacuation' },
       { selector: '[data-test="emergency-first-aid"]', label: 'First aid' },
       { selector: '[data-test="emergency-as-of"]', label: 'When it was filed' },
