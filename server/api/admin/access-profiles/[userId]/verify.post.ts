@@ -8,5 +8,12 @@ export default defineEventHandler(async (event) => {
 
   await verifyAccessProfile(event, userId, resolved.account.id, input.fohNote)
 
+  // Says only that there is an answer: the wording is read on the owner's own page (0050).
+  await notify(event, {
+    type: 'access-profile.verified',
+    userId,
+    context: { name: '', accessUrl: `${useRuntimeConfig(event).public.baseURL}/account/access` },
+  })
+
   return { ok: true }
 })

@@ -1696,6 +1696,44 @@ Leave the waiting list: ${removeUrl}
 The Nottingham New Theatre`,
     }
   },
+  // Neither answer reads the wording or the reason from its context, so neither can carry them
+  // into an inbox or a mailbox (0050).
+  'access-profile-verified': (context: TemplateContext): Rendered => {
+    const url = String(context.accessUrl)
+    return {
+      subject: 'Your access requirements are verified',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>The Accessibility Officer has verified your access requirements. What the people on the door
+are shown, and the date the verification runs to, are on your account.</p>
+<p><a href="${url}">See your access requirements</a></p>`),
+      text: `Hello ${context.name},
+
+The Accessibility Officer has verified your access requirements. What the people on the door are
+shown, and the date the verification runs to, are on your account.
+
+See your access requirements: ${url}
+
+The Nottingham New Theatre`,
+    }
+  },
+  'access-profile-declined': (context: TemplateContext): Rendered => {
+    const url = String(context.accessUrl)
+    return {
+      subject: 'We could not verify your access requirements',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>The Accessibility Officer could not verify your access requirements. Why, and what you can do
+next, is on your account.</p>
+<p><a href="${url}">See your access requirements</a></p>`),
+      text: `Hello ${context.name},
+
+The Accessibility Officer could not verify your access requirements. Why, and what you can do
+next, is on your account.
+
+See your access requirements: ${url}
+
+The Nottingham New Theatre`,
+    }
+  },
   'health-alert': (context: TemplateContext): Rendered => {
     const since = String(context.since)
     return {

@@ -1651,7 +1651,12 @@ Access profiles are declared at `/account/access` and verified at `/box-office/a
 permissions: an accessibility officer, never general box office. The special-category payload is
 one AES-256-GCM blob per row, `server/utils/access-profile-crypto.ts` the only place that touches
 the key (0050); `server/utils/access-profiles.ts` is where declaring, verifying, declining,
-withdrawing and the door's read all live.
+withdrawing and the door's read all live. A save compares itself with what is stored
+(`changesDeclaration()` and `saveRepends()` in `shared/utils/access-profiles.ts`), so an
+unchanged save keeps a verification; consent is its own write, `PUT
+/api/account/access-profile/consent`, conditional on a real change so a double switch leaves one
+trail entry (D-127 criterion 7). The verify and decline routes send `access-profile.verified` and
+`access-profile.declined`, which carry no wording and no reason (D-127 criterion 8).
 
 `shared/utils/programme.ts` holds the publish flow and the booking window as pure rules:
 

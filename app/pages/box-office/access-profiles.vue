@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, saysAccessProfileStatus, verifyAccessProfileForm } from '#shared/utils/access-profiles'
+import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, declineAccessProfileForm, saysAccessProfileStatus, verifyAccessProfileForm } from '#shared/utils/access-profiles'
 import { accessProfilesList } from '#shared/utils/access-profiles-list'
-import type { AccessProfileStatus, OfficerAccessProfile } from '#shared/utils/access-profiles'
+import type { AccessProfileStatus, DeclineAccessProfileInput, OfficerAccessProfile } from '#shared/utils/access-profiles'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Access profiles', middleware: 'console', docs: '/docs/box-office/access-profiles' })
@@ -49,8 +49,11 @@ const { data: listing, status: fetchStatus, error, refresh } = await useAsyncDat
 const loading = computed(() => fetchStatus.value === 'pending')
 const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The declarations could not be read.') : null))
 
+// The sidebar counts the pending declarations, so deciding one moves it too (issue 1334).
+const nav = useNavCounts()
+
 async function load(): Promise<void> {
-  await refresh()
+  await Promise.all([refresh(), nav.refresh()])
 }
 
 const reviewing = ref<Summary | null>(null)
@@ -95,17 +98,23 @@ async function verify(event: FormSubmitEvent<{ fohNote: string }>): Promise<void
   }
 }
 
-// The route takes no reason, so the confirmation carries no field: it states what declining does
-// and asks for the word (K-123 criterion 7).
+// The member reads the reason on their own page, so the confirmation asks for it (K-123 criterion 7).
 const declining = ref(false)
 const declineFailure = ref<string | null>(null)
+const declineState = reactive({ reason: '' })
 
-async function decline(): Promise<void> {
+function askToDecline(): void {
+  declineFailure.value = null
+  declineState.reason = ''
+  declining.value = true
+}
+
+async function decline(event: FormSubmitEvent<DeclineAccessProfileInput>): Promise<void> {
   if (!reviewing.value) return
   deciding.value = true
   declineFailure.value = null
   try {
-    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/decline`, { method: 'POST' })
+    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/decline`, { method: 'POST', body: event.data })
     toast.add({ title: `${reviewing.value.name}'s access profile declined`, icon: 'i-lucide-x', color: 'neutral' })
     declining.value = false
     reviewing.value = null
@@ -307,6 +316,18 @@ watch(modalOpen, (nowOpen) => {
             Companions: <span class="font-medium">{{ detail.companions }}</span>
           </p>
 
+          <p
+            class="text-sm"
+            data-test="review-consent"
+          >
+            <template v-if="detail.consentGiven">
+              They have agreed to the door being shown the wording you set.
+            </template>
+            <template v-else>
+              They have not agreed to the door being shown any wording, so the door sees nothing until they switch it on.
+            </template>
+          </p>
+
           <div v-if="detail.requesterNote">
             <p class="text-sm font-medium">
               In their own words
@@ -351,7 +372,7 @@ watch(modalOpen, (nowOpen) => {
           variant="subtle"
           color="error"
           data-test="decline"
-          @click="declineFailure = null; declining = true"
+          @click="askToDecline"
         >
           Decline the declaration
         </UButton>
@@ -370,10 +391,34 @@ watch(modalOpen, (nowOpen) => {
       name="decline-declaration"
       :title="reviewing ? `Decline ${reviewing.name}'s declaration` : ''"
       verb="Decline the declaration"
-      consequence="The Access Card number is cleared and the door is given no wording for them. They may declare again."
+      consequence="The Access Card number is cleared and the door is given no wording for them. They read why on their own page, and may declare again."
+      form="access-decline-form"
       :loading="deciding"
       :failure="declineFailure"
-      @confirm="decline"
-    />
+    >
+      <template #body>
+        <UForm
+          id="access-decline-form"
+          :schema="declineAccessProfileForm"
+          :state="declineState"
+          @submit="decline"
+        >
+          <UFormField
+            name="reason"
+            label="Why"
+            description="Only they read this, so say what would let you verify it next time."
+            required
+          >
+            <UTextarea
+              v-model="declineState.reason"
+              data-test="decline-reason"
+              :rows="3"
+              autofocus
+              class="w-full"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+    </ConfirmModal>
   </div>
 </template>

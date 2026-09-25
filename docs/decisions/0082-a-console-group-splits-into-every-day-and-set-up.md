@@ -14,7 +14,7 @@ the answer, and the pre-cutover review (issue 1151 item 1) found what that does 
 using it.
 
 Every group interleaves two different jobs. Box office puts Desk, the screen a member opens at
-19:15 on a Tuesday, in the same undifferentiated list as Access profiles and Show categories,
+19:15 on a Tuesday, in the same undifferentiated list as Ticket types and Show categories,
 which a Box Office Manager touches when a season is built and then not again for a year. Bar
 puts Stock beside Discounts. The group named Tonight is not tonight at all: it holds shift
 templates, approvals, checklists, emergency cards, safety and the age-check register, all of it
@@ -55,8 +55,9 @@ on money, two sending screens, three governance screens.
 Two placements are worth naming, because they could have gone the other way. **Movements** is
 every day, not set-up: it is the history of what the till sold and what a stocktake adjusted,
 read when a figure looks wrong, and a reversal is posted from it. **Access profiles** is
-set-up: verifying a profile is occasional and the screen is the vocabulary the box office
-offers, not a queue.
+every day as well: declarations wait there to be sighted in person, and the queue carries its
+count on the sidebar, so it is weekly work rather than vocabulary set once (issue 1334, from the
+MVP flow review of 25 September 2026).
 
 ### The group is Rota, the shell is Tonight
 

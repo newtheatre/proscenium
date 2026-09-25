@@ -717,8 +717,18 @@ Open questions:
   6. Withdrawing asks first, in the shared confirmation: it says nothing is shown to staff from
      that moment and the profile is deleted after the 30 days; nothing is withdrawn until the
      patron confirms.
+  7. A save sends the profile back for verification only when it changes the declaration (a
+     need, the companions, the note or a card number); saving a verified profile unchanged keeps
+     it verified, with its wording and its expiry. Saving a profile that is expired, declined or
+     withdrawn is the ask to be checked again. Consent is a switch of its own that changes at
+     once and never sends the profile back.
+  8. The patron sees the agreed wording and the date the verification runs to; the officer
+     deciding sees whether consent is given. Verifying or declining sends the patron a message
+     that says only that there is an answer: the wording and a decline's reason are read on the
+     patron's own page, and the reason is kept in the encrypted payload, never in the audit trail.
 - Source: Prompt Book D-6; audit PR-4; Get-In part 2 (access profiles: carry, add encryption at
-  rest); issue 1153 item 7 (criterion 6, withdrawing was one click)
+  rest); issue 1153 item 7 (criterion 6, withdrawing was one click); issue 1334 (criteria 7 and
+  8, from the MVP flow review of 25 September 2026)
 
 ## D-128: Access tickets and companion seats
 
