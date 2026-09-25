@@ -1,6 +1,7 @@
-import { h, resolveComponent } from 'vue'
+import { h } from 'vue'
 import type { VNode } from 'vue'
 import type { DropdownMenuItem } from '@nuxt/ui'
+import { UButton, UDropdownMenu } from '#components'
 
 // A secondary column at 390px pushes every row action off-screen behind a horizontal scroll
 // (issue 922). Hidden below sm, its content moves into the primary cell's own sm:hidden line.
@@ -18,8 +19,8 @@ export const ACTIONS_HEADER = (): VNode => h('span', { class: 'sr-only' }, 'Acti
 // trigger answers to `more-<id>`, which is what a browser test presses to reach them.
 export function rowOverflow(id: string, items: DropdownMenuItem[]): VNode | null {
   if (items.length === 0) return null
-  return h(resolveComponent('UDropdownMenu'), { items, content: { align: 'end' } }, () =>
-    h(resolveComponent('UButton'), {
+  return h(UDropdownMenu, { items, content: { align: 'end' } }, () =>
+    h(UButton, {
       'size': 'sm',
       'color': 'neutral',
       'variant': 'ghost',
