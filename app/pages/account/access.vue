@@ -88,6 +88,9 @@ async function withdraw(): Promise<void> {
 
 const companionOptions = [0, 1, 2].map(value => ({ label: String(value), value }))
 
+// The label fills the row, so the whole 48px line is the target, words included (K-101).
+const NEED_ROW = { root: 'min-h-12 items-center', wrapper: 'flex self-stretch', label: 'flex flex-1 items-center py-2' }
+
 onMounted(load)
 
 useSeoMeta({ title: 'Access requirements' })
@@ -132,17 +135,21 @@ useSeoMeta({ title: 'Access requirements' })
           data-test="access-form"
           @submit="save"
         >
-          <UFormField label="What do you need?">
-            <div class="space-y-2">
-              <UCheckbox
-                v-for="flag in ACCESS_FLAGS"
-                :key="flag"
-                v-model="state.flags[flag]"
-                :label="ACCESS_FLAG_LABELS[flag]"
-                :data-test="`flag-${flag}`"
-              />
-            </div>
-          </UFormField>
+          <!-- Not a UFormField: every checkbox inside one takes the field's id, which sends every label's tap to the first need. -->
+          <fieldset data-test="access-needs">
+            <legend class="mb-1 text-sm font-medium text-default">
+              What do you need?
+            </legend>
+            <UCheckbox
+              v-for="flag in ACCESS_FLAGS"
+              :id="`access-need-${flag}`"
+              :key="flag"
+              v-model="state.flags[flag]"
+              :label="ACCESS_FLAG_LABELS[flag]"
+              :data-test="`flag-${flag}`"
+              :ui="NEED_ROW"
+            />
+          </fieldset>
 
           <UFormField
             label="Companions"
