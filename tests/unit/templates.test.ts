@@ -376,7 +376,7 @@ describe('the access profile answers carry nothing that was declared or decided'
   const ACCESS_URL = 'https://newtheatre.org.uk/account/access'
   const secret = { ...EVERYTHING, accessUrl: ACCESS_URL, fohNote: 'Aisle seat, assistance dog', reason: 'The card number did not match' }
 
-  test('verified and declined each link the member's own page, in both parts', () => {
+  test('verified and declined each link the member to their own page, in both parts', () => {
     for (const name of ['access-profile-verified', 'access-profile-declined']) {
       const { html, text } = render(name, secret)
       expect(html).toContain(`href="${ACCESS_URL}"`)
