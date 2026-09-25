@@ -78,7 +78,7 @@ async function coveredPerformance(capacity: number | null = 120): Promise<{ perf
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
   const showId = (await show.json() as { id: string }).id
 
-  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId: showVenue, startsAt: nextWeek() })
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId: showVenue, startsAt: nextWeek(), durationMinutes: 120 })
   const performanceId = (await performance.json() as { id: string }).id
   expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
 

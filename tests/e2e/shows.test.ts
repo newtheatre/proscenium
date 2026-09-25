@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, fillDate, fillTime, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, fillNumber, fillTime, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -45,10 +45,23 @@ const send = (method: string, path: string, body?: unknown, as = officer.cookie)
   })
 
 // Seed changes closed after Wave 0, so the venue a performance needs comes from tests/helpers.
-function venue(): string {
+function venue(options: { isExternal?: boolean } = {}): string {
   const database = new Database(app.databaseFile)
   try {
-    return testVenue(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8) }).id
+    return testVenue(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8), ...options }).id
+  }
+  finally {
+    database.close()
+  }
+}
+
+// A performance as the diary import left it: at a venue we run, with no running time.
+function importedPerformance(showId: string): string {
+  const database = new Database(app.databaseFile)
+  try {
+    const id = `performance-imported-${crypto.randomUUID().slice(0, 8)}`
+    database.run('INSERT INTO performances (id, show_id, venue_id, starts_at, status) VALUES (?, ?, ?, ?, ?)', [id, showId, venueId, nextWeek(), 'DRAFT'])
+    return id
   }
   finally {
     database.close()
@@ -78,6 +91,7 @@ interface ListedShow {
   bookingClosesHoursBefore: number | null
   performanceCount: number
   onSaleCount: number
+  untimedPerformanceCount: number
   soldTickets: number
   capacity: number
   posterUrl: string | null
@@ -114,6 +128,7 @@ async function addPerformance(showId: string, over: Record<string, unknown> = {}
   const answered = await send('POST', `/api/admin/shows/${showId}/performances`, {
     venueId,
     startsAt: nextWeek(),
+    durationMinutes: 120,
     ...over,
   })
   expect(answered.status).toBe(200)
@@ -307,6 +322,7 @@ describe.skipIf(skip !== null)('the booking window is per performance and inheri
     expect((await send('PUT', `/api/admin/performances/${performance}`, {
       venueId,
       startsAt: nextWeek(),
+      durationMinutes: 120,
       bookingClosesHoursBefore: 4,
     })).status).toBe(200)
 
@@ -340,6 +356,7 @@ describe.skipIf(skip !== null)('the booking window is per performance and inheri
       const answered = await send('POST', `/api/admin/shows/${id}/performances`, {
         venueId,
         startsAt: nextWeek(),
+        durationMinutes: 120,
         bookingClosesHoursBefore: hours,
       })
       expect(answered.status).toBe(400)
@@ -351,9 +368,56 @@ describe.skipIf(skip !== null)('the booking window is per performance and inheri
     const answered = await send('POST', `/api/admin/shows/${id}/performances`, {
       venueId,
       startsAt: nextWeek(),
+      durationMinutes: 120,
       doorsAt: nextWeek(1),
     })
     expect(answered.status).toBe(400)
+  })
+})
+
+// Every shift's window ends from the running time, so one left empty at a venue we run strands
+// the whole rota at curtain plus the offset (0078).
+describe.skipIf(skip !== null)('a performance at a venue we run carries its running time (D-121 criterion 6)', () => {
+  test('adding one without it is refused, naming the venue, and nothing is written', async () => {
+    const id = await newShow()
+    const answered = await send('POST', `/api/admin/shows/${id}/performances`, { venueId, startsAt: nextWeek() })
+    expect(answered.status).toBe(400)
+    const says = await answered.text()
+    expect(says).toContain('running time')
+    expect(says).toContain('The Test House')
+    expect((await detail(id)).performances).toHaveLength(0)
+  })
+
+  test('an external venue may leave it empty', async () => {
+    const id = await newShow()
+    const answered = await send('POST', `/api/admin/shows/${id}/performances`, { venueId: venue({ isExternal: true }), startsAt: nextWeek() })
+    expect(answered.status).toBe(200)
+  })
+
+  test('saving one without it is refused, and saving one with it clears the checklist and the list', async () => {
+    const id = await newShow()
+    const performance = importedPerformance(id)
+    expect((await detail(id)).show.untimedPerformanceCount).toBe(1)
+
+    const listed = await send('GET', '/api/admin/shows?untimed=true&pageSize=100')
+    expect((await listed.json() as { items: { id: string }[] }).items.map(one => one.id)).toContain(id)
+
+    const refused = await send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt: nextWeek() })
+    expect(refused.status).toBe(400)
+    expect(await refused.text()).toContain('running time')
+
+    const saved = await send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt: nextWeek(), durationMinutes: 150 })
+    expect(saved.status).toBe(200)
+    expect((await detail(id)).show.untimedPerformanceCount).toBe(0)
+  })
+
+  test('a cancelled performance may be saved without it', async () => {
+    const id = await newShow()
+    const performance = importedPerformance(id)
+    expect((await send('POST', `/api/admin/performances/${performance}/cancel`)).status).toBe(200)
+
+    const saved = await send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt: nextWeek(), notes: 'Called off' })
+    expect(saved.status).toBe(200)
   })
 })
 
@@ -365,6 +429,7 @@ describe.skipIf(skip !== null)('a performance may hand its ticketing to an exter
     expect((await send('PUT', `/api/admin/performances/${performance}`, {
       venueId,
       startsAt: nextWeek(),
+      durationMinutes: 120,
       externalBookingUrl: 'https://tickets.example.org/seagull',
     })).status).toBe(200)
 
@@ -397,6 +462,7 @@ describe.skipIf(skip !== null)('a performance may hand its ticketing to an exter
     expect((await send('PUT', `/api/admin/performances/${performance}`, {
       venueId,
       startsAt: nextWeek(),
+      durationMinutes: 120,
       externalBookingUrl: null,
     })).status).toBe(200)
 
@@ -415,6 +481,7 @@ describe.skipIf(skip !== null)('a performance may hand its ticketing to an exter
     const answered = await send('PUT', `/api/admin/performances/${performance}`, {
       venueId,
       startsAt: nextWeek(),
+      durationMinutes: 120,
       externalBookingUrl: 'the box office',
     })
     expect(answered.status).toBe(400)
@@ -540,11 +607,24 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)
     await fillDate(view, '[data-test="performance-day"]', '2027-03-04')
     await fillTime(view, '[data-test="performance-clock"]', '20:15')
+    await fillNumber(view, '[data-test="performance-duration"]', '135')
     await click(view, '[data-test="performance-submit"]')
 
     await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('4 Mar 2027')`)
     expect(await textOf(view, '[data-test="performances-table"]')).toContain('20:15')
     expect((await detail(id)).performances.length).toBe(1)
+    view.close()
+  }, 120_000)
+
+  // D-121 criterion 6: the row and the checklist both say so, on the screen that can put it right.
+  test('a performance missing its running time is named on its row and on the checklist', async () => {
+    const id = await newShow({ title: named('Untimed') })
+    importedPerformance(id)
+
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, '[data-test="performances-table"]')
+    expect(await textOf(view, '[data-test="performances-table"]')).toContain('No running time')
+    expect(await textOf(view, '[data-test="check-running-time"]')).toContain('Running time set for every performance: not yet')
     view.close()
   }, 120_000)
 

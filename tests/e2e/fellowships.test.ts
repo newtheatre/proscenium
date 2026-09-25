@@ -226,7 +226,7 @@ async function coveredPerformance(): Promise<string> {
   const title = named('The Alchemist')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) }, cookie)
   const { id: showId } = await show.json() as { id: string }
-  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId: venue(), startsAt: nextWeek() }, cookie)
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId: venue(), startsAt: nextWeek(), durationMinutes: 120 }, cookie)
   const { id: performanceId } = await performance.json() as { id: string }
   expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true }, cookie)).status).toBe(200)
   return performanceId

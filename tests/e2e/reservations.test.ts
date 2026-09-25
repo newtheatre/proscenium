@@ -57,7 +57,7 @@ async function bookableShow(over: Record<string, unknown> = {}): Promise<{ showI
   const showId = (await show.json() as { id: string }).id
 
   const performance = await send('POST', `/api/admin/shows/${showId}/performances`, {
-    venueId, startsAt: nextWeek(), ...over,
+    venueId, startsAt: nextWeek(), durationMinutes: 120, ...over,
   })
   const performanceId = (await performance.json() as { id: string }).id
 
@@ -154,7 +154,7 @@ describe.skipIf(skip !== null)('the last seat cannot be sold twice (D-105 criter
   test('two orders for a one-seat house leave exactly one winner', async () => {
     const { performanceId, ticketTypeId } = await bookableShow()
     expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
-      venueId, startsAt: nextWeek(), capacityOverride: 1, intervalCount: 0,
+      venueId, startsAt: nextWeek(), durationMinutes: 120, capacityOverride: 1, intervalCount: 0,
     })).status).toBe(200)
 
     const order = () => send('POST', '/api/reservations', {

@@ -104,7 +104,7 @@ async function bookableShow(price = 900): Promise<{ performanceId: string, ticke
   const showId = (await show.json() as { id: string }).id
 
   const startsAt = Math.floor(Date.now() / 1000) + weekOffsetSeconds
-  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt }, officer.cookie)
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120 }, officer.cookie)
   const performanceId = (await performance.json() as { id: string }).id
 
   const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price }, officer.cookie)

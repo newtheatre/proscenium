@@ -40,7 +40,7 @@ describe('the show screen is split into sections (criterion 1)', () => {
     const all = sources.join('\n')
     const markers = [
       'show-status', 'show-copy', 'copy-submit', 'performances-table', 'add-performance',
-      'performance-form', 'performance-day', 'performance-clock', 'performance-submit',
+      'performance-form', 'performance-day', 'performance-clock', 'performance-duration', 'performance-submit',
       'performance-external-url', 'show-warnings', 'show-prices', 'show-sales',
     ]
     for (const marker of markers) expect(all).toContain(marker)

@@ -328,6 +328,44 @@ describe('the shows list filters by its declaration (K-129)', () => {
   })
 })
 
+// The imported diary holds performances with no running time; the list is where they are found.
+describe('a show with an upcoming performance missing its running time is counted and found (D-121 criterion 6)', () => {
+  const listed = (database: TestDatabase, raw: Record<string, string>): string[] =>
+    read<{ id: string }>(database, showsQuery(showsClause(parsedShows(raw)), 25, 0)).map(row => row.id)
+
+  function seedUntimed(database: TestDatabase): void {
+    const timed = tonightsPerformance(database, { night: '2099-01-01' })
+    tonightsPerformance(database, { suffix: 'b', night: '2099-01-01' })
+    const later = timed.startsAt + 86_400
+    const untimed = 'INSERT INTO performances (id, show_id, venue_id, starts_at, status) VALUES (?, ?, ?, ?, ?)'
+    database.batch([
+      ['INSERT INTO venues (id, name, is_external) VALUES (?, ?, ?)', 'venue-away', 'Somebody Else\'s Hall', 1],
+      [untimed, 'p-untimed', 'show-a', 'venue-a', later, 'DRAFT'],
+      [untimed, 'p-cancelled', 'show-b', 'venue-b', later, 'CANCELLED'],
+      [untimed, 'p-past', 'show-b', 'venue-b', 1_000_000, 'DRAFT'],
+      [untimed, 'p-away', 'show-b', 'venue-away', later, 'DRAFT'],
+    ])
+  }
+
+  test('only an upcoming, uncancelled performance at a venue we run with no running time counts', async () => {
+    await withDatabase((database) => {
+      seedUntimed(database)
+      const counted = read<{ id: string, untimedPerformanceCount: number }>(database, showsQuery(everyShow(), 25, 0))
+      expect(Object.fromEntries(counted.map(row => [row.id, row.untimedPerformanceCount]))).toEqual({ 'show-a': 1, 'show-b': 0 })
+    })
+  })
+
+  test('the list filters on it both ways, binding nothing per performance', async () => {
+    await withDatabase((database) => {
+      seedUntimed(database)
+      expect(listed(database, { untimed: 'true' })).toEqual(['show-a'])
+      expect(listed(database, { untimed: 'false' })).toEqual(['show-b'])
+      const [statement] = boundStatement(database, showsQuery(showsClause(parsedShows({ untimed: 'true' })), 25, 0))
+      expect(statement).not.toContain(' IN (?')
+    })
+  })
+})
+
 // D-132: one show's performances as a console list, and the unpaid queue the status strip states.
 describe('a show\'s performances filter by their declaration (D-132, K-129)', () => {
   const performancesSchema = filterQuerySchema(performancesList)

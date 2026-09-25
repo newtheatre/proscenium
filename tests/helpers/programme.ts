@@ -66,6 +66,7 @@ export interface TestVenueOptions {
   name?: string
   capacity?: number | null
   roomId?: string | null
+  isExternal?: boolean
 }
 
 // A venue on its own, for a suite that needs somewhere to put a performance and nothing else.
@@ -74,8 +75,8 @@ export function testVenue(into: AcceptsStatements, options: TestVenueOptions = {
   const id = `venue-${suffix}`
   const capacity = options.capacity === undefined ? 120 : options.capacity
   into.batch([[
-    'INSERT INTO venues (id, name, capacity, room_id) VALUES (?, ?, ?, ?)',
-    id, options.name ?? `The Test House ${suffix}`, capacity, options.roomId ?? null,
+    'INSERT INTO venues (id, name, capacity, room_id, is_external) VALUES (?, ?, ?, ?, ?)',
+    id, options.name ?? `The Test House ${suffix}`, capacity, options.roomId ?? null, options.isExternal ? 1 : 0,
   ]])
   return { id, capacity }
 }

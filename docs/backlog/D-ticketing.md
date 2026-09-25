@@ -560,6 +560,12 @@ Open questions:
      and closes sales, and the act is audited.
   5. A performance with sold tickets cannot be deleted; it can be cancelled, which triggers the
      refund workflow for collected bookings and notification to all ticket holders.
+  6. A performance at a venue we run carries its running time, because every shift's window ends
+     from it (0078): adding or saving one without it is refused, naming the venue. An external
+     venue, and a cancelled performance, may leave it empty. The publish checklist (D-132
+     criterion 7) states whether every upcoming performance has one, and the shows list filters
+     for a show with an upcoming performance still missing it, which is how the imported diary is
+     found and put right; saving the running time restamps the shifts (issue 1298).
 - Source: Prompt Book D-1; audit PR-7; Get-In constraint 2, part 2 (shows and publish flow:
   carry)
 
@@ -833,7 +839,8 @@ Open questions:
      previews the artwork through `PosterFrame`, which is also what tells the reader that a show
      with no poster keeps its gradient on the public site.
   7. A publish checklist beside the editor states, in words, whether the poster is uploaded, the
-     performances are scheduled and the pricing is set. It reports readiness and gates nothing:
+     performances are scheduled, every upcoming performance at a venue we run has its running time
+     (D-121 criterion 6) and the pricing is set. It reports readiness and gates nothing:
      publishing is still D-121's own action. Cast list and rights are not on it, having no schema
      behind them yet.
   8. The editor's copy is grouped as the mockup groups it: a basics card (title, address, tagline

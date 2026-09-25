@@ -162,6 +162,7 @@ describe.skipIf(skip !== null)('a show takes a poster and the public page draws 
     await send('POST', `/api/admin/shows/${show.id}/performances`, {
       venueId,
       startsAt: Math.floor(Date.now() / 1000) + 7 * 86_400,
+      durationMinutes: 120,
     })
     expect((await send('POST', `/api/admin/shows/${show.id}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
 

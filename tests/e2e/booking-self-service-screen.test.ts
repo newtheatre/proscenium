@@ -59,7 +59,7 @@ async function twoNightBooking(): Promise<{ qrToken: string, reference: string, 
 
   const nights: string[] = []
   for (const offset of [0, 24]) {
-    const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: nextWeek(offset) })
+    const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: nextWeek(offset), durationMinutes: 120 })
     nights.push((await performance.json() as { id: string }).id)
   }
 

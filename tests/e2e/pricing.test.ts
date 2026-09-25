@@ -77,7 +77,7 @@ async function newShow(): Promise<{ id: string, slug: string }> {
 
 async function addPerformance(showId: string, over: Record<string, unknown> = {}): Promise<string> {
   const answered = await send('POST', `/api/admin/shows/${showId}/performances`, {
-    venueId, startsAt: nextWeek(), ...over,
+    venueId, startsAt: nextWeek(), durationMinutes: 120, ...over,
   })
   expect(answered.status).toBe(200)
   return (await answered.json() as { id: string }).id
@@ -248,7 +248,7 @@ describe.skipIf(skip !== null)('capacity moves by its own action (D-105 criterio
     const performance = await addPerformance(show.id, { capacityOverride: 10 })
 
     const answered = await send('PUT', `/api/admin/performances/${performance}`, {
-      venueId, startsAt: nextWeek(), capacityOverride: 500,
+      venueId, startsAt: nextWeek(), durationMinutes: 120, capacityOverride: 500,
     })
     expect(answered.status).toBe(200)
   })
@@ -258,7 +258,7 @@ describe.skipIf(skip !== null)('capacity moves by its own action (D-105 criterio
     const performance = await addPerformance(show.id, { capacityOverride: 10 })
 
     await send('PUT', `/api/admin/performances/${performance}`, {
-      venueId, startsAt: nextWeek(), capacityOverride: 25,
+      venueId, startsAt: nextWeek(), durationMinutes: 120, capacityOverride: 25,
     })
 
     const detail = JSON.stringify(trail('performance.updated', `performance:${performance}`)?.detail)
@@ -270,7 +270,7 @@ describe.skipIf(skip !== null)('capacity moves by its own action (D-105 criterio
     const show = await newShow()
     const performance = await addPerformance(show.id, { capacityOverride: 10 })
 
-    await send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt: nextWeek() })
+    await send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt: nextWeek(), durationMinutes: 120 })
 
     const answered = await send('GET', `/api/admin/shows/${show.id}`)
     const { performances } = await answered.json() as { performances: { id: string, capacityOverride: number | null, venueCapacity: number }[] }

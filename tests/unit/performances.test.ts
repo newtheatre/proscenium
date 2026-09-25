@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { saleRefusal } from '#shared/utils/programme'
+import { runningTimeRefusal, saleRefusal } from '#shared/utils/programme'
 import { showNightBounds } from '#shared/utils/show-night'
 import { effectiveCapacity, isOnSale, performanceNight } from '#server/utils/performances'
 import type { PerformanceSaleState } from '#shared/utils/programme'
@@ -128,5 +128,26 @@ describe('the programme utilities derive the night rather than restating it', ()
     expect(source).toContain('showNightOf')
     expect(/hour\s*[<>]=?\s*4\b/.test(source)).toBe(false)
     expect(source).not.toContain('SHOW_NIGHT_START_HOUR =')
+  })
+})
+
+// A shift's window ends from the running time, so a performance at a venue we run without one
+// strands every volunteer at curtain plus the offset (D-121 criterion 6, 0078).
+describe('a performance at a venue we run carries its running time (D-121 criterion 6)', () => {
+  const house = { name: 'The Studio', isExternal: false }
+  const elsewhere = { name: 'The Corn Exchange', isExternal: true }
+
+  test('one of ours with no running time is refused, naming the venue and why', () => {
+    const refusal = runningTimeRefusal(house, null)
+    expect(refusal).toContain('The Studio')
+    expect(refusal).toContain('running time')
+    expect(refusal).toContain('shift')
+    expect(runningTimeRefusal(house, undefined)).toBe(refusal)
+  })
+
+  test('one of ours with a running time, and any external venue, is taken', () => {
+    expect(runningTimeRefusal(house, 120)).toBeNull()
+    expect(runningTimeRefusal(elsewhere, null)).toBeNull()
+    expect(runningTimeRefusal(elsewhere, 90)).toBeNull()
   })
 })
