@@ -7,7 +7,7 @@ import { approveSlotStatement, claimSlotStatement, declineSlotStatement, ourVenu
 import { predicate, whereFrom } from './list-filters'
 import { barOpeningConstraintRefusal } from '#shared/utils/rota-openings'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
-import type { ClaimScope } from './rota'
+import type { ApprovalGate, ClaimScope } from './rota'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { AuditRow } from '#shared/utils/audit'
@@ -157,8 +157,8 @@ export function claimOpeningShiftStatement(slotId: string, userId: string, statu
   return claimSlotStatement(OPENING_CLAIM_SCOPE, slotId, userId, status)
 }
 
-export function approveOpeningShiftStatement(slotId: string): SQL {
-  return approveSlotStatement(OPENING_CLAIM_SCOPE, slotId)
+export function approveOpeningShiftStatement(slotId: string, gate: ApprovalGate): SQL {
+  return approveSlotStatement(OPENING_CLAIM_SCOPE, slotId, gate)
 }
 
 export function declineOpeningShiftStatement(slotId: string, reason: string): SQL {

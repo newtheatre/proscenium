@@ -104,7 +104,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Acceptance criteria:
   1. One committee setting selects auto-confirm or queue mode, surfaced with its default, current value and last changer per the configuration surface.
   2. In auto-confirm mode a successful claim becomes CONFIRMED immediately; in queue mode it becomes PENDING and appears on the FOH officer's approval list.
-  3. Approving or declining a queued claim notifies the claimant; a decline carries a reason the claimant sees.
+  3. Approving or declining a queued claim notifies the claimant; a decline carries a reason the claimant sees. Amended 26 September 2026 (issue 1302): approving a queued claim re-runs E-104's eligibility check as a predicate on the confirming statement, so a claimant who no longer holds the role's module is not confirmed; the officer is told "No longer qualifies" and offered Decline with the reason filled in.
   4. Changing the setting affects only future claims; pending claims keep their state.
 - Source: Prompt Book E-1, J-3; audit PR-13 (auto-confirmation toggle carries).
 

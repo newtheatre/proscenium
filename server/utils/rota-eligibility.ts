@@ -30,6 +30,16 @@ async function moduleNames(ids: string[]): Promise<Map<string, string>> {
   return new Map(rows.map(row => [row.id, row.name]))
 }
 
+export interface ShiftRoleGate { moduleId: string | null, moduleName: string | null }
+
+// One role's rule and its module's name: an approval re-runs the gate at its write and names what
+// lapsed when the write refuses (E-105 criterion 3).
+export async function shiftRoleGate(event: H3Event, role: ShiftRole): Promise<ShiftRoleGate> {
+  const moduleId = (await shiftRoleRules(event))[role]
+  if (moduleId === null) return { moduleId, moduleName: null }
+  return { moduleId, moduleName: (await moduleNames([moduleId])).get(moduleId) ?? moduleId }
+}
+
 // Held modules come from `modulesHeldBy()`, never a copy of it: an EXPIRING record counts as
 // held here exactly because it does there, and this is one request's own read (criteria 1, 3).
 export async function shiftEligibilities(

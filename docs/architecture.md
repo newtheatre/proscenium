@@ -1017,7 +1017,13 @@ the row's resulting state, which a winner has already set, the same shape `perfo
 templates to (module E open question 1). The list filters by role and by `night`, against the
 show night rather than the calendar day, through `shared/utils/rota-approvals-list.ts` (K-129).
 Approving and declining both ride the same
-`changes() = 1` shape; a decline's reason lands on `shifts.decline_reason`, which the claimant is
+`changes() = 1` shape. Approving also re-runs E-104's eligibility gate on the confirming `UPDATE`
+itself: the role's `SHIFT_ELIGIBILITY_*_MODULE` and London's today are bound into an `EXISTS` over
+the claimant's unrevoked, unexpired `training_records` (the SQL twin of `heldNow`), so a claimant
+whose record lapsed after claiming is never confirmed, and an unset rule confirms nobody (E-105
+criterion 3, issue 1302). A write that matched nothing on a row still `CLAIMED` is that gate, and
+the 409 names it "No longer qualifies" with a `declineReason` in its `data` for the screen to fill
+in; a bar opening's approval does the same under the bar's rule. A decline's reason lands on `shifts.decline_reason`, which the claimant is
 emailed, never in the audit trail, which keeps only that the status changed (0011). A declined
 shift still stays off the open list rather than reopening itself, but it is no longer invisible:
 `GET /api/admin/rota/shifts` lists every `OPEN` or `DECLINED` shift on a performance still to

@@ -896,15 +896,30 @@ describe('claiming an open shift (E-104)', () => {
   })
 })
 
+// The claim's own training gate, as the approval route hands it to the write (E-105 criterion 3).
+const TODAY = '2026-10-12'
+const GATE = { moduleId: 'SFTY-001', today: TODAY }
+
+function trained(database: TestDatabase, userId: string, record: { id?: string, expiresOn?: string | null, revoked?: boolean } = {}): void {
+  database.batch([
+    ['INSERT OR IGNORE INTO departments (code, name) VALUES (?, ?)', 'SFTY', 'Safety'],
+    ['INSERT OR IGNORE INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'SFTY-001', 'SFTY', 'MODULE', 'First Aid'],
+    [`INSERT INTO training_records (id, user_id, module_id, awarded_on, expires_on, source, revoked_at)
+      VALUES (?, ?, ?, '2025-08-21', ?, 'SIGNOFF', ?)`,
+    record.id ?? `tr-${userId}`, userId, 'SFTY-001', record.expiresOn ?? null, record.revoked ? 1_760_000_000 : null],
+  ])
+}
+
 describe('answering a queued claim (E-105)', () => {
   test('approving a claimed shift confirms it', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       const who = person(database, 'claimant')
+      trained(database, who)
       database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
         'shift-queued', tonight.performanceId, 'DOOR', who, 'CLAIMED']])
 
-      expect(run(database, approveShiftStatement('shift-queued'))).toHaveLength(1)
+      expect(run(database, approveShiftStatement('shift-queued', GATE))).toHaveLength(1)
       expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({ status: 'CONFIRMED', user_id: who })
     })
   })
@@ -913,11 +928,12 @@ describe('answering a queued claim (E-105)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       const who = person(database, 'claimant')
+      trained(database, who)
       database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
         'shift-queued', tonight.performanceId, 'DOOR', who, 'CLAIMED']])
 
-      run(database, approveShiftStatement('shift-queued'))
-      expect(run(database, approveShiftStatement('shift-queued'))).toHaveLength(0)
+      run(database, approveShiftStatement('shift-queued', GATE))
+      expect(run(database, approveShiftStatement('shift-queued', GATE))).toHaveLength(0)
     })
   })
 
@@ -926,6 +942,7 @@ describe('answering a queued claim (E-105)', () => {
       const tonight = tonightsPerformance(database)
       const first = person(database, 'first')
       const second = person(database, 'second')
+      trained(database, second)
       database.batch([
         ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
           'shift-a', tonight.performanceId, 'DUTY_MANAGER', first, 'CONFIRMED'],
@@ -933,7 +950,7 @@ describe('answering a queued claim (E-105)', () => {
           'shift-b', tonight.performanceId, 'DUTY_MANAGER', second, 'CLAIMED'],
       ])
 
-      const refusal = refusalFor(() => run(database, approveShiftStatement('shift-b')))
+      const refusal = refusalFor(() => run(database, approveShiftStatement('shift-b', GATE)))
       expect(refusal?.statusCode).toBe(409)
       expect(refusal?.statusMessage).toContain('confirmed duty manager')
     })
@@ -951,6 +968,90 @@ describe('answering a queued claim (E-105)', () => {
       const shift = rows<{ status: string, user_id: string, decline_reason: string | null }>(database,
         'SELECT status, user_id, decline_reason FROM shifts WHERE id = ?', 'shift-queued')[0]!
       expect(shift).toMatchObject({ status: 'DECLINED', user_id: who, decline_reason: 'Already rostered elsewhere' })
+    })
+  })
+
+  test('a claimant whose training has since expired is not confirmed, and stays claimed (#1302)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'claimant')
+      trained(database, who, { expiresOn: '2026-08-21' })
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-queued', tonight.performanceId, 'DOOR', who, 'CLAIMED']])
+
+      expect(run(database, approveShiftStatement('shift-queued', GATE))).toHaveLength(0)
+      expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({ status: 'CLAIMED', user_id: who, confirmed_at: null })
+    })
+  })
+
+  test('a record expiring today no longer counts; one expiring tomorrow still does (G-101 criterion 3)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const lapsing = person(database, 'lapsing')
+      const expiring = person(database, 'expiring')
+      trained(database, lapsing, { expiresOn: TODAY })
+      trained(database, expiring, { expiresOn: '2026-10-13' })
+      database.batch([
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+          'shift-lapsing', tonight.performanceId, 'DOOR', lapsing, 'CLAIMED'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 2, ?, ?)',
+          'shift-expiring', tonight.performanceId, 'DOOR', expiring, 'CLAIMED'],
+      ])
+
+      expect(run(database, approveShiftStatement('shift-lapsing', GATE))).toHaveLength(0)
+      expect(run(database, approveShiftStatement('shift-expiring', GATE))).toHaveLength(1)
+    })
+  })
+
+  test('a revoked record is not confirmed, and a current one beside it is (#1302)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const revoked = person(database, 'revoked')
+      const renewed = person(database, 'renewed')
+      trained(database, revoked, { revoked: true })
+      trained(database, renewed, { id: 'tr-renewed-old', revoked: true })
+      trained(database, renewed, { id: 'tr-renewed-new' })
+      database.batch([
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+          'shift-revoked', tonight.performanceId, 'DOOR', revoked, 'CLAIMED'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 2, ?, ?)',
+          'shift-renewed', tonight.performanceId, 'DOOR', renewed, 'CLAIMED'],
+      ])
+
+      expect(run(database, approveShiftStatement('shift-revoked', GATE))).toHaveLength(0)
+      expect(run(database, approveShiftStatement('shift-renewed', GATE))).toHaveLength(1)
+    })
+  })
+
+  test('the check reads the claimant, never whoever else holds the module (#1302)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'claimant')
+      trained(database, person(database, 'someone-else'))
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-queued', tonight.performanceId, 'DOOR', who, 'CLAIMED']])
+
+      expect(run(database, approveShiftStatement('shift-queued', GATE))).toHaveLength(0)
+    })
+  })
+
+  test('an unset rule confirms nobody, as it lets nobody claim (E-103 criterion 4)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'claimant')
+      trained(database, who)
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+        'shift-queued', tonight.performanceId, 'DOOR', who, 'CLAIMED']])
+
+      expect(run(database, approveShiftStatement('shift-queued', { moduleId: null, today: TODAY }))).toHaveLength(0)
+      expect(shiftsOn(database, tonight.performanceId)[0]).toMatchObject({ status: 'CLAIMED' })
+    })
+  })
+
+  test('the gate binds the same parameters whoever claimed and whatever they hold (0006)', async () => {
+    await withDatabase(async (database) => {
+      const [, ...parameters] = boundStatement(database, approveShiftStatement('shift-queued', GATE))
+      expect(parameters).toHaveLength(3)
     })
   })
 

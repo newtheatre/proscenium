@@ -65,6 +65,12 @@ async function approve(row: PendingApproval): Promise<void> {
     await refresh()
   }
   catch (error) {
+    // A claimant who no longer qualifies is declined instead, with the route's reason filled in.
+    const declineReason = refusalData<{ declineReason?: string }>(error)?.declineReason
+    if (declineReason) {
+      declining.value = row
+      decline.reason = declineReason
+    }
     failure.value = refusalText(error)
   }
   finally {
@@ -120,7 +126,10 @@ const columns: TableColumn<PendingApproval>[] = [
         'color': 'error',
         'variant': 'ghost',
         'data-test': `decline-${row.original.shiftId}`,
-        'onClick': () => { declining.value = row.original },
+        'onClick': () => {
+          declining.value = row.original
+          decline.reason = undefined
+        },
       }, () => 'Decline'),
     ]),
   },

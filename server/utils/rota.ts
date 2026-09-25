@@ -501,12 +501,27 @@ export function claimShiftStatement(shiftId: string, userId: string, status: Shi
   return claimSlotStatement(SHIFT_CLAIM_SCOPE, shiftId, userId, status)
 }
 
-// Answering a queued claim, under whichever table holds it: the predicate is the status alone, so
-// two officers deciding at once settle it once between them (E-105 criterion 2, 0003).
-export function approveSlotStatement(scope: ClaimScope, slotId: string): SQL {
+// The role's gating module and London's today, as the claim itself was checked (E-104 criterion 1).
+export interface ApprovalGate { moduleId: string | null, today: string }
+
+// `heldNow` in SQL, for the claimant named on the row being written. An unset rule holds for
+// nobody, as it lets nobody claim (E-103 criterion 4).
+function claimantHoldsGate(gate: ApprovalGate): SQL {
+  if (gate.moduleId === null) return sql`0`
+  return sql`EXISTS (
+    SELECT 1 FROM training_records gate_record
+    WHERE gate_record.user_id = target.user_id AND gate_record.module_id = ${gate.moduleId}
+      AND gate_record.revoked_at IS NULL
+      AND (gate_record.expires_on IS NULL OR gate_record.expires_on > ${gate.today})
+  )`
+}
+
+// Answering a queued claim, under whichever table holds it. The status settles two officers at
+// once and the gate rides the same write, so a lapsed claimant is never confirmed (E-105, 0003).
+export function approveSlotStatement(scope: ClaimScope, slotId: string, gate: ApprovalGate): SQL {
   return sql`
-    UPDATE ${sql.raw(scope.table)} SET status = 'CONFIRMED', confirmed_at = unixepoch()
-    WHERE id = ${slotId} AND status = 'CLAIMED'
+    UPDATE ${sql.raw(scope.table)} AS target SET status = 'CONFIRMED', confirmed_at = unixepoch()
+    WHERE target.id = ${slotId} AND target.status = 'CLAIMED' AND ${claimantHoldsGate(gate)}
     RETURNING id
   `
 }
@@ -522,8 +537,8 @@ export function declineSlotStatement(scope: ClaimScope, slotId: string, reason: 
 }
 
 // Answering a queued claim (E-105 criteria 2 and 3).
-export function approveShiftStatement(shiftId: string): SQL {
-  return approveSlotStatement(SHIFT_CLAIM_SCOPE, shiftId)
+export function approveShiftStatement(shiftId: string, gate: ApprovalGate): SQL {
+  return approveSlotStatement(SHIFT_CLAIM_SCOPE, shiftId, gate)
 }
 
 export function declineShiftStatement(shiftId: string, reason: string): SQL {
