@@ -60,11 +60,6 @@ quietly moved on to the next night.
 
 ![The hub with the on-shift badge (1), the performance switcher (2), the house numbers (3), the Scan ticket tile (4), the Admit pass holder tile (5) and the Emergency tile (6)](/images/docs/show-night/hub.png)
 
-::callout{icon="i-lucide-camera" color="warning"}
-The picture above was taken before the Checklist, Night report and Challenge 25 tiles were added and before the
-house numbers were relabelled, so it shows six tiles and the old words. It needs retaking.
-::
-
 1. **The badge** says how you got in: **On shift** with your first name, or **Officer** when a
    role opened the screen with no shift behind it.
 2. **The performance switcher** appears only when the venue runs more than one performance

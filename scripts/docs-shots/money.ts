@@ -13,7 +13,6 @@ export const money: Shot[] = [
     annotations: [
       { selector: '[data-test="period-kind"]', label: 'Period kind' },
       { selector: '[data-test="period-year"]', label: 'Year' },
-      { selector: '[data-test="refresh-summary"]', label: 'Refresh' },
       { selector: '[data-test="section-revenue"]', label: 'Revenue by source' },
       { selector: '[data-test="section-figures"]', label: 'Refunds, foregone value and open variance' },
     ],
@@ -26,7 +25,6 @@ export const money: Shot[] = [
     width: CONSOLE_WIDTH,
     annotations: [
       { selector: '[data-test="period-year"]', label: 'Year' },
-      { selector: '[data-test="refresh-revenue"]', label: 'Refresh' },
       { selector: '[data-test="show-row"]', label: 'A show\'s row' },
       { selector: '[data-test="section-passes"]', label: 'Pass utilisation' },
     ],
@@ -40,7 +38,6 @@ export const money: Shot[] = [
     annotations: [
       { selector: '[data-test="scope-kind"]', label: 'Scope' },
       { selector: '[data-test="scope-from"]', label: 'Date range' },
-      { selector: '[data-test="refresh-report"]', label: 'Refresh' },
       { selector: '[data-test="section-foregone"]', label: 'Foregone value' },
       { selector: '[data-test="section-access"]', label: 'Access and companion admissions' },
     ],

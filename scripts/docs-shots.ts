@@ -34,7 +34,7 @@ function overlay(shot: Shot): string {
     const notes = ${JSON.stringify(shot.annotations)};
     const found = notes.map(note => [note, document.querySelector(note.selector)]);
     const missing = found.filter(([, element]) => !element).map(([note]) => note.selector);
-    const visible = box => box.width > 0 && box.top >= 0 && box.top < window.innerHeight - 40;
+    const visible = box => box.width > 0 && box.top >= 0 && box.top < window.innerHeight - Math.min(40, box.height);
     for (const [, element] of found) {
       if (element && !visible(element.getBoundingClientRect())) element.scrollIntoView({ block: 'nearest' });
     }
