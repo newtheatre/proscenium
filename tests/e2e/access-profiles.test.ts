@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { ACCESS_FLAG_LABELS, ACCESS_FLAGS } from '#shared/utils/access-profiles'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -197,18 +198,53 @@ describe.skipIf(skip !== null)('GDPR erasure deletes the profile immediately, no
   })
 })
 
+async function patronOnAccessPage(): Promise<Bun.WebView> {
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', patron.email)
+  await fill(view, 'form input[type="password"]', patronPassword)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+  await visit(view, `${app.baseURL}/account/access`, '[data-test="access-form"]')
+  return view
+}
+
+function ticked(view: Bun.WebView, flag: string): Promise<string | null> {
+  return view.evaluate<string | null>(`document.querySelector('[data-test="flag-${flag}"]')?.getAttribute('aria-checked') ?? null`)
+}
+
 describe.skipIf(skip !== null)('the screens', () => {
   test('the patron declares access requirements from their own account page', async () => {
-    const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/sign-in`)
-    await fill(view, 'form input[type="email"]', patron.email)
-    await fill(view, 'form input[type="password"]', patronPassword)
-    await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
-
-    await visit(view, `${app.baseURL}/account/access`, '[data-test="access-form"]')
+    const view = await patronOnAccessPage()
     const text = await textOf(view, '[data-test="access-form"]')
     expect(text).toContain('What do you need?')
+    view.close()
+  }, 120_000)
+
+  test('each need has its own id, so tapping its words ticks that need and no other (issue 1333, K-101)', async () => {
+    const view = await patronOnAccessPage()
+    const ids = await view.evaluate<string[]>(
+      `[...document.querySelectorAll('[data-test="access-needs"] [role="checkbox"]')].map(box => box.id)`,
+    )
+    expect(ids).toHaveLength(ACCESS_FLAGS.length)
+    expect(new Set(ids).size).toBe(ACCESS_FLAGS.length)
+
+    expect(await ticked(view, 'standing')).toBe('false')
+    expect(await ticked(view, 'crowds')).toBe('false')
+    await view.evaluate(`[...document.querySelectorAll('[data-test="access-needs"] label')]
+      .find(label => label.innerText.trim() === ${JSON.stringify(ACCESS_FLAG_LABELS.crowds)}).click()`)
+    await waitFor(view, `document.querySelector('[data-test="flag-crowds"]')?.getAttribute('aria-checked') === 'true'`)
+    expect(await ticked(view, 'standing')).toBe('false')
+    view.close()
+  }, 120_000)
+
+  test('every need is a row a thumb can hit: at least 48px tall, words included (issue 1333, K-101)', async () => {
+    const view = await patronOnAccessPage()
+    const heights = await view.evaluate<number[]>(
+      `[...document.querySelectorAll('[data-test="access-needs"] label')].map(label => label.getBoundingClientRect().height)`,
+    )
+    expect(heights).toHaveLength(ACCESS_FLAGS.length)
+    for (const height of heights) expect(height).toBeGreaterThanOrEqual(48)
     view.close()
   }, 120_000)
 })
