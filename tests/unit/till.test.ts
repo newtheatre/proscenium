@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { isOpen, requireOpenSession } from '#server/utils/till'
 import { closeTillSessionForm } from '#shared/utils/reconciliation'
-import { TILL_VENUE_DEVICE_KEY, recallTillVenue, rememberTillVenue, rememberedBarAnswers, tillScopeForm } from '#shared/utils/till'
+import { TILL_VENUE_DEVICE_KEY, chargePaths, recallTillVenue, rememberTillVenue, rememberedBarAnswers, tillScopeForm } from '#shared/utils/till'
 import type { TillSession } from '#shared/utils/till'
 
 // F-102's write-path rules over a session object, with no database beneath them: the schema's
@@ -126,6 +126,22 @@ describe('the device remembers tonight\'s bar, and only tonight\'s (F-124 criter
     }
     expect(() => rememberTillVenue(refusing, '2026-09-24', 'venue-1')).not.toThrow()
     expect(recallTillVenue(refusing, '2026-09-24')).toBeNull()
+  })
+})
+
+// Decision 0096, F-124 criterion 1 as amended: one charge button under the thumb, whichever path.
+describe('the till shows one way to charge, and keying by hand is the fallback link (0096)', () => {
+  test('a phone with the hand-off offers SumUp, with keying the figure as the secondary link', () => {
+    expect(chargePaths(true, false)).toEqual({ primary: 'sumup', secondary: 'typed' })
+  })
+
+  test('the laptop, or a till without the hand-off, keys the figure and offers nothing else', () => {
+    expect(chargePaths(false, false)).toEqual({ primary: 'typed', secondary: null })
+  })
+
+  test('a tab never goes to the reader, whatever the device', () => {
+    expect(chargePaths(true, true)).toEqual({ primary: 'tab', secondary: null })
+    expect(chargePaths(false, true)).toEqual({ primary: 'tab', secondary: null })
   })
 })
 

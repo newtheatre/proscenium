@@ -4,6 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellOnTheTill } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -551,7 +552,7 @@ describe.skipIf(skip !== null)('a comp depletes exactly as a paid sale would, re
 
     const answers = await race(2, index => index === 0
       ? give(id, venueId, 500)
-      : send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500 }, barStaff.cookie))
+      : sellOnTheTill(app.baseURL, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500 }, barStaff.cookie))
 
     expectOneWinner(answers)
     expect(onHandOfItem(itemId)).toBe(0)

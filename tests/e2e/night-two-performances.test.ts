@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellOnTheTill } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -111,7 +112,7 @@ describe.skipIf(skip !== null)('a matinee and an evening at one venue, end to en
     // A sale named to the matinee lands there and only there: the server already supports this,
     // even though the till screen has no picker to choose it yet (docs/known-issues.md).
     const variantId = await aSellableVariant()
-    const sale = await send('POST', '/api/till/sale', {
+    const sale = await sellOnTheTill(app.baseURL, {
       venueId, performanceId: matineeId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250,
     }, bar.cookie)
     expect(sale.status).toBe(200)
@@ -216,12 +217,12 @@ describe.skipIf(skip !== null)('two sales in one till session land on different 
     const { session } = await opened.json() as { session: { id: string } }
 
     placeHouses(ids, 'matinee')
-    const matineeSale = await send('POST', '/api/till/sale', { venueId: ids.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 })
+    const matineeSale = await sellOnTheTill(app.baseURL, { venueId: ids.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, admin.cookie)
     expect(matineeSale.status).toBe(200)
     const { entryId: matineeEntry } = await matineeSale.json() as { entryId: string }
 
     placeHouses(ids, 'evening')
-    const eveningSale = await send('POST', '/api/till/sale', { venueId: ids.venueId, lines: [{ variantId, qty: 2 }], expectedTotalPence: 500 })
+    const eveningSale = await sellOnTheTill(app.baseURL, { venueId: ids.venueId, lines: [{ variantId, qty: 2 }], expectedTotalPence: 500 }, admin.cookie)
     expect(eveningSale.status).toBe(200)
     const { entryId: eveningEntry } = await eveningSale.json() as { entryId: string }
 

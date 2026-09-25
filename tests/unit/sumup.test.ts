@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   OPEN_ATTEMPT_STATUSES,
+  SUMUP_ATTEMPT_KINDS,
   SUMUP_ATTEMPT_STATUSES,
   attemptIdFromKey,
   attemptMayMove,
@@ -9,6 +10,8 @@ import {
   isTerminalAttempt,
   readSumupReturn,
   resolveAttemptForm,
+  saysAttemptStatus,
+  startAttemptForm,
   sumupLaunchUrl,
   sumupReturnForm,
   sumupReturnWords,
@@ -119,6 +122,37 @@ describe('an attempt moves only along the paths the story names (criterion 5)', 
     expect(resolveAttemptForm.safeParse({ outcome: 'succeeded' }).success).toBe(true)
     expect(resolveAttemptForm.parse({ outcome: 'abandoned', note: 'refunded on the reader' }).note).toBe('refunded on the reader')
     expect(resolveAttemptForm.safeParse({ outcome: 'lost' }).success).toBe(false)
+  })
+})
+
+// Decision 0096: the typed path is an attempt too, answered by the person at the reader.
+describe('a typed charge is an attempt of its own kind (0096)', () => {
+  const aBasket = { lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 250 }
+
+  test('the two kinds are the hand-off and the figure keyed by hand', () => {
+    expect([...SUMUP_ATTEMPT_KINDS].sort()).toEqual(['SUMUP', 'TYPED'])
+  })
+
+  test('starting one names its kind, and a caller naming none starts a hand-off as before', () => {
+    expect(startAttemptForm.parse(aBasket).kind).toBe('SUMUP')
+    expect(startAttemptForm.parse({ ...aBasket, kind: 'TYPED' }).kind).toBe('TYPED')
+    expect(startAttemptForm.safeParse({ ...aBasket, kind: 'CASH' }).success).toBe(false)
+  })
+
+  test('the sale\'s own refusals still hold on the start: an empty basket and ticket money on a tab', () => {
+    expect(startAttemptForm.safeParse({ lines: [], expectedTotalPence: 0, kind: 'TYPED' }).success).toBe(false)
+    expect(startAttemptForm.safeParse({ lines: [], tickets: [{ reservationId: 'r-1' }], expectedTotalPence: 900, tabHolderId: 'u-1', kind: 'TYPED' }).success).toBe(false)
+  })
+
+  test('Card declined is an answer the person at the reader can give', () => {
+    expect(resolveAttemptForm.parse({ outcome: 'declined' }).outcome).toBe('declined')
+  })
+
+  test('a typed attempt waits for the reader, never for the SumUp app', () => {
+    expect(saysAttemptStatus('STARTED', 'TYPED')).not.toContain('SumUp')
+    expect(saysAttemptStatus('STARTED', 'TYPED')).toContain('reader')
+    expect(saysAttemptStatus('STARTED', 'SUMUP')).toContain('SumUp')
+    expect(saysAttemptStatus('FAILED', 'TYPED')).toBe('Card declined')
   })
 })
 

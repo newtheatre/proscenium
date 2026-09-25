@@ -3,6 +3,7 @@
 - Status: Proposed
 - Date: 2026-09-14
 - Supersedes: the "no reader integration is built" clause of 0005. Everything else in 0005 stands.
+- Superseded in part by 0096: the typed path is an attempt too, answered by the person at the reader.
 
 ## Context
 

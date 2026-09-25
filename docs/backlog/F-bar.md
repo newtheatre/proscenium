@@ -124,6 +124,10 @@ Open questions:
   6. The figure to key into the reader is the one number the confirmation is read for: it is shown
      at display size in the mono face, with tabular figures, and the words around it stay short
      enough to read across a bar. Nothing else on the confirmation competes with it.
+     Amended by decision 0096 (issue 1300): the figure is shown on the typed attempt, before the
+     card goes in, not on a confirmation after the sale is written. Under it the person at the
+     reader answers **Reader took it**, which records the sale, or **Card declined**, which
+     records nothing and brings the basket back.
 - Source: Prompt Book F-1, D-3, Get-In constraint 1; audit PR-5, PR-12; issue 1150 item 6.
 
 ## F-105: Atomic sale write
@@ -576,6 +580,10 @@ Open questions:
      app with the basket's total, a title, a unique foreign transaction id and a return URL of
      ours. Without the key, or on the counter laptop, the till behaves exactly as before: the
      figure is keyed into the reader by hand.
+     Amended by decision 0096 (issue 1300): keying by hand is an attempt too, a `TYPED` row
+     holding the basket as priced, and nothing posts until the person at the reader answers
+     **Reader took it**. With the key on a handheld the till shows one charge button, the
+     hand-off, and keying the figure by hand is a secondary link under it.
   2. Every hand-off is a `sumup_attempts` row holding the basket exactly as priced. Nothing posts
      to the ledger and no booking is collected until the SumUp app reports success, or until
      staff explicitly resolve the attempt as paid.

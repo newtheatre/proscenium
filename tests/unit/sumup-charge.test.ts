@@ -19,7 +19,7 @@ function aLine(): BasketLine {
 }
 
 function aView(id: string, status: Outcome): SumupAttemptView {
-  return { id, status, createdAt: 0, createdByName: null, expectedTotalPence: 1000, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }
+  return { id, kind: 'SUMUP', status, createdAt: 0, createdByName: null, expectedTotalPence: 1000, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }
 }
 
 // One till tab. Every tab in a test shares the device store, as tabs on one phone share storage.
@@ -201,6 +201,94 @@ describe('the restored basket offers Try SumUp again (F-124 criterion 5, F-104 c
     expect(returned.charge.retryOffered.value).toBe(false)
     started.scope.stop()
     returned.scope.stop()
+  })
+})
+
+// Decision 0096: a typed charge is an attempt too, answered by the person at the reader.
+describe('a typed charge waits for the person at the reader (0096)', () => {
+  const aReceipt = {
+    entryId: 'entry-1', totalPence: 1900, lines: [], ageCheck: null, refusedLines: [], discount: null, tab: null, comp: null,
+    tickets: [{ reservationId: 'r-1', reference: 'ABC123', amountPence: 900 }],
+    walkUps: [],
+  }
+
+  function typedTab(answer: { status: string, receipt?: unknown }, sumupEnabled = false) {
+    const scope = effectScope()
+    const basket = ref<BasketLine[]>([])
+    const charged = ref<ChargedReceipt | null>(null)
+    const chargeFailure = ref<string | null>(null)
+    const asked: string[] = []
+    const charge = scope.run(() => {
+      watch(basket, () => {
+        chargeFailure.value = null
+      }, { deep: true })
+      return useSumUpCharge({
+        request: async <T>(path: string) => {
+          asked.push(path)
+          if (path.endsWith('/resolve')) return { status: answer.status, error: null, receipt: answer.receipt ?? null } as T
+          if (path === '/api/till/payments') return { attempts: [] } as T
+          return { attempt: { ...aView(path.split('/').pop()!, 'FAILED'), status: answer.status, kind: 'TYPED' } } as T
+        },
+        venueId: ref<string | null>('venue-1'),
+        sumupEnabled: ref(sumupEnabled),
+        selectedTabHolderId: ref<string | null>(null),
+        session: ref<TillSession | null>(null),
+        basket,
+        ticketLines: ref<TillBooking[]>([]),
+        walkUpLines: ref<WalkUpLine[]>([]),
+        selectedDiscountId: ref<string | null>(null),
+        charged,
+        chargeFailure,
+        resetSelections: () => {},
+        isVisible: () => true,
+      })
+    })!
+    return { charge, basket, charged, chargeFailure, scope, asked }
+  }
+
+  function keyedIn(tab: ReturnType<typeof typedTab>, id: string): void {
+    tab.basket.value = [aLine()]
+    tab.charge.sumup.remember({ id, kind: 'TYPED', totalPence: 1900, startedAt: Date.now(), basket: { bar: [aLine()], tickets: [], walkUps: [], discountId: null } })
+  }
+
+  test('Card declined brings the basket back and says the card was declined', async () => {
+    const tab = typedTab({ status: 'FAILED' })
+    keyedIn(tab, 'typed-declined')
+
+    await tab.charge.resolveAttempt('typed-declined', 'declined')
+    await settled()
+
+    expect(tab.basket.value).toHaveLength(1)
+    expect(tab.charged.value).toBeNull()
+    expect(tab.chargeFailure.value).toContain('declined')
+    expect(tab.chargeFailure.value).not.toContain('SumUp')
+    expect(tab.charge.sumup.pending.value).toBeNull()
+    tab.scope.stop()
+  })
+
+  test('Reader took it shows the sale as recorded, with the bookings it paid', async () => {
+    const tab = typedTab({ status: 'SUCCEEDED', receipt: aReceipt })
+    keyedIn(tab, 'typed-taken')
+
+    await tab.charge.resolveAttempt('typed-taken', 'succeeded')
+    await settled()
+
+    expect(tab.charged.value?.totalPence).toBe(1900)
+    expect(tab.charged.value?.viaSumup).toBe(false)
+    expect(tab.charged.value?.tickets.map(ticket => ticket.reference)).toEqual(['ABC123'])
+    expect(tab.basket.value).toHaveLength(0)
+    expect(tab.charge.sumup.pending.value).toBeNull()
+    tab.scope.stop()
+  })
+
+  test('tonight\'s open attempts are read with the hand-off switched off, since a typed one needs no key', async () => {
+    const tab = typedTab({ status: 'FAILED' })
+    keyedIn(tab, 'typed-listed')
+
+    await tab.charge.resolveAttempt('elsewhere', 'declined')
+
+    expect(tab.asked).toContain('/api/till/payments')
+    tab.scope.stop()
   })
 })
 

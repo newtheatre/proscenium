@@ -5,6 +5,7 @@ import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { currentShowNight } from '#shared/utils/show-night'
 import { officerBypassTarget } from '#shared/utils/night-authority'
@@ -449,7 +450,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fillNumber(view, '[data-test="actual-z-input"]', '0')
     expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="variance-note"]')`)).toBe(false)
 
-    await request(app, 'POST', '/api/till/sale', { venueId: closing.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, screenBar.cookie)
+    await sellOnTheTill(app.baseURL, { venueId: closing.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, screenBar.cookie)
 
     await click(view, '[data-test="confirm-close-till"]')
     await waitFor(view, `document.querySelector('[data-test="close-failure"]')`)

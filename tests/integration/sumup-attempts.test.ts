@@ -142,6 +142,26 @@ describe('a completion posts once, whatever the sweep did meanwhile (F-124 crite
   })
 })
 
+// Decision 0096: a typed charge is an attempt of its own kind, and every row written before the
+// kind existed is a hand-off. The column carries no CHECK, since adding one would rebuild (0063).
+describe('an attempt says which way the card was charged (0096)', () => {
+  test('a row with no kind reads as a hand-off, and a typed one as typed', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const { venueId } = tonightsPerformance(database, { suffix: 'kind' })
+      insert(database, 'till_sessions', { id: 't-1', venue_id: venueId, night: '2026-09-14', opened_by: opener, opened_at: 1000 })
+      attempt(database, 'att-old', 't-1', venueId, opener)
+      insert(database, 'sumup_attempts', {
+        id: 'att-typed', till_session_id: 't-1', venue_id: venueId, night: '2026-09-14', created_by: opener,
+        basket: '{}', expected_total_pence: 250, status: 'STARTED', kind: 'TYPED',
+      })
+
+      const found = read<{ id: string, kind: string }>(database, stuckAttemptsQuery(4_000_000_000, 1))
+      expect(Object.fromEntries(found.map(row => [row.id, row.kind]))).toEqual({ 'att-old': 'SUMUP', 'att-typed': 'TYPED' })
+    })
+  })
+})
+
 // The stuck clock runs from the answer, not from the hand-off: an attempt answered a moment ago
 // is still in flight however long ago it was started (F-124 criterion 5).
 describe('a completion is stuck when its answer is old, not when its hand-off is', () => {
