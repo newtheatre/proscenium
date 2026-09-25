@@ -160,7 +160,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         variant="subtle"
         icon="i-lucide-clock"
         title="A seat is free"
-        :description="`Held for you until ${saysWhenLong(data!.offerExpiresAt)}.`"
+        :description="`You have first refusal until ${saysWhenLong(data!.offerExpiresAt)}. Nothing is kept for you until you claim.`"
       />
 
       <p

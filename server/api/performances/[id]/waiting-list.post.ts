@@ -1,3 +1,4 @@
+import { saleRefusal } from '#shared/utils/programme'
 import { joinWaitingListForm } from '#shared/utils/waiting-list'
 
 // Join the waiting list for a sold-out (or any) performance (D-113 criterion 1). Guest checkout
@@ -9,6 +10,11 @@ export default defineEventHandler(async (event) => {
 
   const performance = await performanceById(id)
   if (!performance) throw noSuch('performance')
+
+  // Past the online cut-off no offer can ever be made, so a join would wait for nothing: the door
+  // sells what frees after it (D-113 criterion 2, issue 1328).
+  const refusal = saleRefusal(performance, new Date(), 'CUSTOMER', await holdReleaseMinutesFor(event, performance))
+  if (refusal?.reason === 'WINDOW_CLOSED') throw createError({ statusCode: 409, statusMessage: refusal.says })
 
   const account = await currentAccount(event)
   const email = account?.email ?? input.guest?.email

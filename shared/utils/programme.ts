@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { formatLondon } from './london'
+import { holdExpiresAt } from './reservations'
 import { plural } from './text'
 import { POSTER_PREFIX, posterUrl } from './seo'
 import type { PublicContentWarning, WarningAssessment } from './content-warnings'
@@ -486,12 +487,19 @@ export function performanceClosesAt(performance: PerformanceSaleState): number {
   }))
 }
 
-// Why a sales path may not sell this performance, or null when it may. Every internal path asks
-// this one question, so a refusal reads the same at the desk as it does online (D-112, D-121).
+// The one online cut-off: the window or the hold release, whichever comes first, since a hold made
+// after its own release would be released the moment it was made (D-106, D-112 criterion 1).
+export function onlineClosesAt(performance: PerformanceSaleState, holdReleaseMinutes: number): number {
+  return Math.min(performanceClosesAt(performance), holdExpiresAt(performance.startsAt, holdReleaseMinutes))
+}
+
+// Why a sales path may not sell this performance, or null when it may. Every online path passes the
+// hold release; the desk's bypass record asks about the window alone, so it passes none (D-112).
 export function saleRefusal(
   performance: PerformanceSaleState,
   at: Date = new Date(),
   channel: SalesChannel = 'CUSTOMER',
+  holdReleaseMinutes: number | null = null,
 ): SaleRefusal | null {
   if (performance.status === 'CANCELLED') {
     return { reason: 'CANCELLED', says: 'This performance has been cancelled.' }
@@ -510,7 +518,7 @@ export function saleRefusal(
     }
   }
 
-  const closedAt = performanceClosesAt(performance)
+  const closedAt = holdReleaseMinutes === null ? performanceClosesAt(performance) : onlineClosesAt(performance, holdReleaseMinutes)
   // The desk bypasses the customer window and nothing else: a cancelled or externally ticketed
   // performance refuses at the desk exactly as it refuses online.
   if (channel === 'CUSTOMER' && Math.floor(at.getTime() / 1000) >= closedAt) {
@@ -524,8 +532,8 @@ export function saleRefusal(
   return null
 }
 
-// The allow-list a listing and a show page both build from. `bookingClosesAt` is resolved here
-// rather than sent as an offset, so no consumer has to know the inheritance rule (D-101, D-112).
+// The allow-list a listing and a show page both build from. `bookingClosesAt` is the online cut-off,
+// resolved here so no consumer has to know the inheritance rule or the release (D-101, D-112).
 export function publicPerformance(performance: PerformanceSaleState & {
   id: string
   venueName: string
@@ -533,7 +541,7 @@ export function publicPerformance(performance: PerformanceSaleState & {
   durationMinutes: number | null
   intervalCount: number
   intervalMinutes?: number | null
-}): PublicPerformance | null {
+}, holdReleaseMinutes: number): PublicPerformance | null {
   if (!isPublicPerformance(performance)) return null
   return {
     id: performance.id,
@@ -544,7 +552,7 @@ export function publicPerformance(performance: PerformanceSaleState & {
     intervalMinutes: performance.intervalMinutes ?? null,
     venueName: performance.venueName,
     externalBookingUrl: performance.externalBookingUrl,
-    bookingClosesAt: performanceClosesAt(performance),
+    bookingClosesAt: onlineClosesAt(performance, holdReleaseMinutes),
     cancelled: performance.status === 'CANCELLED',
   }
 }
@@ -595,6 +603,13 @@ export interface ListedShow {
   performances: ListedPerformance[]
 }
 
+// The two figures a listing is judged against, both configuration read by the route (0012). The
+// release is the default a performance's own override inherits (D-106).
+export interface ListingRules {
+  limitedPercent: number
+  holdReleaseMinutes: number
+}
+
 export function remainingSeats(house: PerformanceHouse): number | null {
   if (house.capacity === null) return null
   return Math.max(0, house.capacity - house.sold)
@@ -606,9 +621,10 @@ export function performanceAvailability(
   performance: PerformanceSaleState,
   house: PerformanceHouse,
   limitedAtOrBelowPercent: number,
+  holdReleaseMinutes: number,
   at: Date = new Date(),
 ): Availability {
-  if (saleRefusal(performance, at) !== null) return 'BOOKING_CLOSED'
+  if (saleRefusal(performance, at, 'CUSTOMER', holdReleaseMinutes) !== null) return 'BOOKING_CLOSED'
 
   const remaining = remainingSeats(house)
   if (remaining === null) return 'AVAILABLE'

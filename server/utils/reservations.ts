@@ -3,19 +3,27 @@ import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
 import { auditedWrite } from './audit'
 import { capacityAllows, heldSeatsQuery, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
+import { configValue } from './configuration'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
 import { HOLDING_STATUSES, capacityRefusal } from '#shared/utils/capacity'
-import { generateReservationReference } from '#shared/utils/reservations'
+import { generateReservationReference, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 import { resolvePrice } from '#shared/utils/ticket-types'
 import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
 import type { ReservationSource, TicketTypeCount } from '#shared/utils/reservations'
 import type { PriceSource, TicketTypeAccessKind, TicketTypeRestriction } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
+import type { H3Event } from 'h3'
 
 // Resolving what a performance may sell and writing what it sold (D-104). The predicate that
 // gates capacity is D-105's; this is the one place that assembles an order against it.
+
+// Where this performance's unpaid holds release, which is also where online booking stops when the
+// window has not stopped it first (D-106, D-112 criterion 1).
+export async function holdReleaseMinutesFor(event: H3Event | undefined, performance: { holdReleaseMinutesBefore: number | null }): Promise<number> {
+  return resolveHoldReleaseMinutes(performance.holdReleaseMinutesBefore, await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE'))
+}
 
 export interface BookableTicketTypeRow {
   id: string

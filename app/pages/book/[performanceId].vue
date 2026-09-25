@@ -320,7 +320,7 @@ useSeoMeta({
         color="neutral"
         variant="subtle"
         :icon="data!.refusal.waitingListUrl ? 'i-lucide-clock' : 'i-lucide-ticket-x'"
-        :title="data!.refusal.waitingListUrl ? saysAvailability('SOLD_OUT', null) : 'Booking is not open'"
+        :title="data!.refusal.waitingListUrl ? saysAvailability('SOLD_OUT', null) : data!.refusal.reason === 'WINDOW_CLOSED' ? 'Online booking has closed' : 'Booking is not open'"
         :description="data!.refusal.says"
         data-test="booking-refused"
       />

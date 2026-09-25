@@ -1,11 +1,9 @@
 import { exchangeReservation } from '#server/utils/exchange'
 import { saleRefusal } from '#shared/utils/programme'
 import {
-  bornExpiredReason,
   differentShowReason,
   holdExpiresAt,
   reservationExchangeForm,
-  resolveHoldReleaseMinutes,
   sameNightReason,
 } from '#shared/utils/reservations'
 
@@ -30,7 +28,8 @@ export default defineEventHandler(async (event) => {
   const differentShow = differentShowReason(reservation.showId, target.showId)
   if (differentShow) throw createError({ statusCode: 400, statusMessage: differentShow })
 
-  const refusal = saleRefusal(target, new Date(), 'CUSTOMER')
+  const releaseMinutes = await holdReleaseMinutesFor(event, target)
+  const refusal = saleRefusal(target, new Date(), 'CUSTOMER', releaseMinutes)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal.says })
 
   const lines = await exchangeableTicketLines(reservationId)
@@ -49,10 +48,7 @@ export default defineEventHandler(async (event) => {
     return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source }
   })
 
-  const releaseMinutes = resolveHoldReleaseMinutes(target.holdReleaseMinutesBefore, await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE'))
   const expiresAt = holdExpiresAt(target.startsAt, releaseMinutes)
-  const bornExpired = bornExpiredReason(expiresAt, Math.floor(Date.now() / 1000))
-  if (bornExpired) throw createError({ statusCode: 409, statusMessage: bornExpired })
 
   const result = await exchangeReservation({
     reservationId,

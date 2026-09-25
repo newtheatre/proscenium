@@ -35,7 +35,7 @@ export const CONFIG_KEYS = {
     schema: z.number().int().positive(),
     default: 15,
     workshop: 'money-and-box-office',
-    describes: 'Minutes before curtain that an unpaid reservation hold is released. Per-show override allowed.',
+    describes: 'Minutes before curtain that an unpaid reservation hold is released, and online booking closes if the booking window has not closed it first. Per-show override allowed.',
   },
   // Proposed and unconfirmed, per docs/workshops.md: shipped rather than left unset, so the
   // reminder is live from day one instead of a dormant feature awaiting a value (0019, D-107).
@@ -63,7 +63,7 @@ export const CONFIG_KEYS = {
     schema: z.number().int().positive(),
     default: 120,
     workshop: 'money-and-box-office',
-    describes: 'How long a waiting-list offer stands before it lapses to the next entry, capped at the performance start.',
+    describes: 'How long a waiting-list offer stands before it lapses to the next entry, capped at the moment online booking closes.',
   },
   WAITING_LIST_OFFER_BATCH_CAP: {
     schema: z.number().int().positive(),

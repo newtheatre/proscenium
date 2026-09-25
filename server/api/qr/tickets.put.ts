@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
     const performance = await performanceById(reservation.performanceId)
     if (!performance) throw noSuch('performance')
 
-    const refusal = saleRefusal(performance, new Date(), 'CUSTOMER')
+    const refusal = saleRefusal(performance, new Date(), 'CUSTOMER', await holdReleaseMinutesFor(event, performance))
     if (refusal) throw createError({ statusCode: 409, statusMessage: refusal.says })
 
     const cap = await configValue(event, 'PUBLIC_ORDER_SEAT_CAP')
