@@ -72,6 +72,21 @@ describe('attendance (criterion 1)', () => {
     })
   })
 
+  // Issue 1296: derived at compile time, never written, so sold and a later refund are untouched.
+  test('a paid booking never admitted counts as a no-show, and an unpaid hold does not', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      reserve(database, 'r-admitted', tonight.performanceId, 'DOOR', 'WEB')
+      reserve(database, 'r-paid-absent', tonight.performanceId, 'COLLECTED', 'WEB')
+      reserve(database, 'r-unpaid', tonight.performanceId, 'PENDING', 'WEB')
+
+      const [row] = read<{ admitted: number, noShows: number }>(database, reportAttendanceQuery(tonight.performanceId))
+      expect(row).toMatchObject({ admitted: 1, noShows: 1 })
+      const [held] = rows<{ status: string }>(database, 'SELECT status FROM reservations WHERE id = ?', 'r-paid-absent')
+      expect(held?.status).toBe('COLLECTED')
+    })
+  })
+
   // D-126 criterion 3: pass admissions are `admitted`'s own subset, not a second seat count.
   test('a pass admission is counted separately from an ordinary paid admission', async () => {
     await withDatabase(async (database) => {
