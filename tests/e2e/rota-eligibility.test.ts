@@ -122,7 +122,9 @@ async function shiftsFor(as: string, query: Record<string, string> = {}): Promis
 }
 
 describe.skipIf(skip !== null)('an unnamed rule refuses eligibility rather than admitting everyone (criterion 4)', () => {
+  // The key ships naming a module since issue 1318, so unset is now a choice somebody makes.
   test('a role with no gating module configured lists as ineligible', async () => {
+    await gate('DOOR', null)
     const house = programme('gate-unset')
     stampOpen(house.performanceId, 'DOOR', 1)
 
@@ -130,6 +132,39 @@ describe.skipIf(skip !== null)('an unnamed rule refuses eligibility rather than 
     const shift = listed.items.find(item => item.shiftId === `${house.performanceId}-DOOR-1`)
     expect(shift?.eligible).toBe(false)
     expect(shift?.unlockedBy).toBeNull()
+  })
+
+  // Issue 1318: the shipped modules are drafts until the Training Manager publishes them, and a
+  // draft has no page a member can act on, so there is nothing to link to.
+  test('a role gated on a draft module, or one the catalogue lacks, lists as not open, linking nowhere', async () => {
+    const draft = `${department}-${suffix()}`
+    expect((await send('POST', '/api/admin/training/modules', { id: draft, department, kind: 'MODULE', name: `Module ${draft}`, status: 'DRAFT' })).status).toBe(200)
+    const house = programme('gate-draft')
+    stampOpen(house.performanceId, 'DOOR', 1)
+    stampOpen(house.performanceId, 'BAR', 1)
+
+    await gate('DOOR', draft)
+    await gate('BAR', 'NOPE-999')
+    try {
+      const listed = await shiftsFor(member.cookie)
+      for (const role of ['DOOR', 'BAR']) {
+        const shift = listed.items.find(item => item.shiftId === `${house.performanceId}-${role}-1`)
+        expect(shift?.eligible).toBe(false)
+        expect(shift?.unlockedBy).toBeNull()
+      }
+    }
+    finally {
+      await gate('DOOR', null)
+      await gate('BAR', null)
+    }
+  })
+
+  test('the list names the Front of House Manager, whom a member asks about a role not yet open', async () => {
+    const officer = await registerMember(app, 'rota-foh', generatePassword())
+    expect((await send('POST', '/api/admin/roles', { userId: officer.id, role: 'FOH_MANAGER' })).status).toBe(200)
+
+    const listed = await shiftsFor(member.cookie) as Listed & { officers: string[] }
+    expect(listed.officers).toContain(officer.name)
   })
 })
 
