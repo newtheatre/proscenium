@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
-import { productForm } from '#shared/utils/bar'
+import { checkIdRefusal, productForm } from '#shared/utils/bar'
 
-// Edit a product. Its status is a separate decision, so this does not take one.
+// Edit a product. Its status is a separate decision, so this does not take one, and one pouring
+// restricted stock is not saved without Check ID (issue 1299).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const resolved = await requirePermission(event, 'bar.write')
@@ -31,6 +32,7 @@ export default defineEventHandler(async (event) => {
           allergen_note = ${note}
       WHERE id = ${id}
         AND NOT EXISTS (SELECT 1 FROM bar_products WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
+        AND ${checkIdHeld(id, input.ageRestricted)}
       RETURNING id
     `),
     auditEntry({
@@ -54,8 +56,11 @@ export default defineEventHandler(async (event) => {
 
   if (!applied) {
     const taken = await claimName('product', input.name, id)
-    if (!taken) throw noSuch('product')
-    throw createError({ statusCode: 409, statusMessage: `A product is already called ${taken.name}` })
+    if (taken) throw createError({ statusCode: 409, statusMessage: `A product is already called ${taken.name}` })
+    if (!await productById(id)) throw noSuch('product')
+    // What it pours is read after the refusal, so the message names whatever stood in the way.
+    const unchecked = checkIdRefusal({ name: input.name, ageRestricted: input.ageRestricted }, await restrictedPoursOf(id))
+    throw createError({ statusCode: 409, statusMessage: unchecked ?? `${held.name} changed while you were editing it: reload and try again` })
   }
 
   return { ok: true }

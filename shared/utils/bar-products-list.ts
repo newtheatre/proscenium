@@ -17,6 +17,14 @@ export const barProductsList = {
       icon: 'i-lucide-layout-grid',
     },
     { key: 'retired', label: 'Retired', kind: 'yes-no' },
+    // The Bar Manager's correction list: unretired, unrestricted, pouring restricted stock (issue 1299).
+    {
+      key: 'withoutCheckId',
+      label: 'Pours restricted stock without Check ID',
+      kind: 'yes-no',
+      negated: 'Asks for Check ID where its stock needs it',
+      icon: 'i-lucide-id-card',
+    },
   ],
   sort: {
     fields: [

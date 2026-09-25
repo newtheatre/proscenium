@@ -3,10 +3,12 @@ import {
   ALLERGEN_STATES,
   MEASURE_PRESETS,
   PRODUCT_AGE_RESTRICTED_DEFAULT,
+  STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   STOCK_UNITS,
   measurePreset,
   presetForCategory,
   says,
+  saysRestricted,
 } from '#shared/utils/bar'
 import type {
   AllergenState,
@@ -93,7 +95,12 @@ const product = reactive({
 
 const itemMode = ref<'NEW' | 'EXISTING'>('NEW')
 const existingItemId = ref('')
-const newItem = reactive({ name: '', unit: 'ITEM' as StockUnit, containerMl: null as number | null })
+const newItem = reactive({
+  name: '',
+  unit: 'ITEM' as StockUnit,
+  containerMl: null as number | null,
+  ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
+})
 
 interface SizeRow {
   servingKind: ServingKind
@@ -111,6 +118,27 @@ const components = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 25
 const choice = reactive({ offered: false, name: '', includedInPrice: false, qty: 1 })
 const choiceOptions = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 1 }])
 const opening = reactive({ offered: false, qty: 1, unitCostPounds: null as number | null })
+
+// The product's switch follows what it pours: a new item by its own switch, anything from the
+// register by the flag it already carries (F-111 criterion 6, issue 1299).
+const restrictedPoured = computed<string[]>(() => {
+  if (shape.value !== 'RECIPE' && itemMode.value === 'NEW') {
+    return newItem.ageRestricted ? [newItem.name.trim() || 'the new stocked item'] : []
+  }
+  const ids = shape.value === 'RECIPE'
+    ? [...components.value.map(line => line.itemId), ...(choice.offered ? choiceOptions.value.map(option => option.itemId) : [])]
+    : [existingItemId.value]
+  const restricted = ids.map(id => knownItems.value.find(item => item.id === id)).filter(item => item?.ageRestricted)
+  return [...new Set(restricted.map(item => item!.name))]
+})
+
+// Restricted stock holds the switch on; otherwise it is the product's own "restricted anyway".
+const ageRestricted = computed({
+  get: () => restrictedPoured.value.length > 0 || product.ageRestricted,
+  set: (value: boolean) => {
+    product.ageRestricted = value
+  },
+})
 
 const asPounds = (pence: number | null | undefined): number | null =>
   (pence === null || pence === undefined ? null : pence / 100)
@@ -267,7 +295,7 @@ function itemPayload(): Record<string, unknown> {
       name: newItem.name.trim(),
       unit: newItem.unit,
       containerMl: newItem.unit === 'ML' ? newItem.containerMl : null,
-      ageRestricted: product.ageRestricted,
+      ageRestricted: newItem.ageRestricted,
     },
   }
 }
@@ -278,7 +306,7 @@ function productPayload(): Record<string, unknown> {
     categoryId: product.categoryId,
     sort: product.sort,
     staffedOnly: product.staffedOnly,
-    ageRestricted: product.ageRestricted,
+    ageRestricted: ageRestricted.value,
     allergenState: product.allergenState,
     allergenNote: product.allergenNote.trim() || null,
   }
@@ -544,11 +572,19 @@ function moveFocus(step: number): void {
           </UFormField>
 
           <USwitch
-            v-model="product.ageRestricted"
+            v-model="ageRestricted"
+            :disabled="restrictedPoured.length > 0"
             label="Age restricted"
             description="A basket holding one of these asks for a Challenge 25 outcome before it can be paid for."
             data-test="setup-age-restricted"
           />
+          <p
+            v-if="restrictedPoured.length > 0"
+            class="text-sm text-muted"
+            data-test="setup-age-follows"
+          >
+            It pours {{ saysRestricted(restrictedPoured) }}, so it asks for Check ID too.
+          </p>
         </div>
       </UCard>
 
@@ -605,6 +641,13 @@ function moveFocus(step: number): void {
                 data-test="setup-container"
               />
             </UFormField>
+
+            <USwitch
+              v-model="newItem.ageRestricted"
+              label="The stocked item is age restricted"
+              description="A new stocked item starts restricted, since most of the shelf is alcohol. Switch it off for a soft drink or a snack."
+              data-test="setup-item-age-restricted"
+            />
           </template>
 
           <UFormField

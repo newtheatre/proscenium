@@ -41,6 +41,65 @@ export function readPouredBy(value: string | null): PouredBy[] {
   return Array.isArray(parsed) ? parsed : []
 }
 
+// The other direction: the items a product's live sizes deplete, or offer as a choice. A subquery
+// over the product it is handed, so it binds nothing per product or item (0006).
+function itemsPouredBy(product: SQL): SQL {
+  return sql`
+    SELECT c.item_id FROM product_variants v JOIN variant_components c ON c.variant_id = v.id
+    WHERE v.product_id = ${product} AND v.status = 'ACTIVE' AND c.item_id IS NOT NULL
+    UNION
+    SELECT g.item_id FROM product_variants v JOIN variant_components c ON c.variant_id = v.id
+    JOIN choice_group_items g ON g.choice_group_id = c.choice_group_id
+    WHERE v.product_id = ${product} AND v.status = 'ACTIVE'
+  `
+}
+
+const restrictedPoured = (product: SQL): SQL =>
+  sql`SELECT 1 FROM bar_items r WHERE r.age_restricted = 1 AND r.id IN (${itemsPouredBy(product)})`
+
+// Issue 1299: which restricted stocked items a product pours, by name, for the list and the editor.
+export function restrictedPoursColumn(alias: string): SQL {
+  return sql`(
+    SELECT json_group_array(name) FROM (
+      SELECT r.name AS name FROM bar_items r
+      WHERE r.age_restricted = 1 AND r.id IN (${itemsPouredBy(sql.raw(`${alias}.id`))})
+      ORDER BY r.name COLLATE NOCASE
+    )
+  )`
+}
+
+export function readRestrictedPours(value: string | null): string[] {
+  if (!value) return []
+  const parsed = JSON.parse(value) as string[]
+  return Array.isArray(parsed) ? parsed : []
+}
+
+// The Bar Manager's correction list: a product still on the catalogue, left unrestricted, that
+// pours restricted stock. Hidden counts, since it goes back on the till with one press.
+export function withoutCheckIdPredicate(alias: string): SQL {
+  const product = sql.raw(alias)
+  return sql`(${product}.age_restricted = 0 AND ${product}.status <> 'RETIRED'
+    AND EXISTS (${restrictedPoured(sql.raw(`${alias}.id`))}))`
+}
+
+// Rides an edit's own UPDATE, so a component landing between the read and the write cannot leave
+// a product pouring restricted stock saved without Check ID (0049).
+export function checkIdHeld(productId: string, ageRestricted: boolean): SQL {
+  return sql`(${ageRestricted ? 1 : 0} = 1 OR NOT EXISTS (${restrictedPoured(sql`${productId}`)}))`
+}
+
+export function restrictedPoursOfQuery(productId: string): SQL {
+  return sql`
+    SELECT r.name AS name FROM bar_items r
+    WHERE r.age_restricted = 1 AND r.id IN (${itemsPouredBy(sql`${productId}`)})
+    ORDER BY r.name COLLATE NOCASE
+  `
+}
+
+export async function restrictedPoursOf(productId: string): Promise<string[]> {
+  return (await db.all<{ name: string }>(restrictedPoursOfQuery(productId))).map(row => row.name)
+}
+
 // Servings one recipe row supports: its item's on-hand over the quantity a serving takes.
 function servingsOfRow(alias: 'c' | 'g' | 'o'): SQL {
   const row = sql.raw(alias)

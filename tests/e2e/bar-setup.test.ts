@@ -63,14 +63,18 @@ const anItem = async (name: string, over: Record<string, unknown> = {}): Promise
   created(await send('POST', '/api/admin/bar/items', { name, unit: 'ML', containerMl: 700, ...over }))
 
 interface Catalogue {
-  products: { id: string, name: string, variants: { label: string, pricePence: number }[] }[]
+  products: { id: string, name: string, ageRestricted: boolean, variants: { label: string, pricePence: number }[] }[]
 }
 
-async function tillSees(name: string): Promise<{ label: string, pricePence: number }[] | null> {
+async function tillProduct(name: string): Promise<Catalogue['products'][number] | null> {
   const answered = await send('GET', `/api/till/products?venueId=${venueId}`, undefined, barManager.cookie)
   expect(answered.status).toBe(200)
   const listed = await answered.json() as Catalogue
-  return listed.products.find(product => product.name === name)?.variants ?? null
+  return listed.products.find(product => product.name === name) ?? null
+}
+
+async function tillSees(name: string): Promise<{ label: string, pricePence: number }[] | null> {
+  return (await tillProduct(name))?.variants ?? null
 }
 
 async function signedInBarManager(): Promise<Bun.WebView> {
@@ -220,6 +224,98 @@ describe.skipIf(skip !== null)('a size nothing prices hides the product rather t
       const listed = await send('GET', `/api/admin/bar/products?search=${encodeURIComponent(productName)}`)
       const products = await listed.json() as { items: { name: string, status: string }[] }
       expect(products.items.find(product => product.name === productName)?.status).toBe('HIDDEN')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+})
+
+// Issue 1299 (F-106, F-111 criterion 6): Review Merlot went on the till with no Check ID because
+// the form wrote the product's starting value onto its new stocked item.
+describe.skipIf(skip !== null)('the product\'s age flag follows what it pours (issue 1299)', () => {
+  const setUp = async (view: Bun.WebView): Promise<void> => {
+    await click(view, '[data-test="setup-submit"]')
+    await waitFor(view, `location.pathname.startsWith('/bar/products/') && !location.pathname.endsWith('/new')`, 30_000)
+  }
+
+  test('a wine over a new stocked item asks for Check ID without anyone switching it on', async () => {
+    const categoryName = named('Wine')
+    await aCategory(categoryName)
+    const productName = named('Review Merlot')
+
+    const view = await signedInBarManager()
+    try {
+      await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, '[data-test="shape-measured"]')
+      await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
+
+      await fill(view, '[data-test="setup-name"]', productName)
+      await pickOption(view, '[data-test="setup-category"]', categoryName)
+      await waitFor(view, `document.querySelector('[data-test="size-125ml"]')`)
+      await fill(view, '[data-test="setup-item-name"]', named('Review Merlot 750ml'))
+      for (const [kind, pounds] of [['bottle', '16'], ['250ml', '6'], ['175ml', '4.5'], ['125ml', '3.5']] as const) {
+        await fillNumber(view, `[data-test="size-price-${kind}"]`, pounds)
+      }
+      await setUp(view)
+
+      expect((await tillProduct(productName))?.ageRestricted).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('a can whose new stocked item is switched off sells without Check ID', async () => {
+    const categoryName = named('Soft drinks')
+    await aCategory(categoryName)
+    const productName = named('Cola')
+
+    const view = await signedInBarManager()
+    try {
+      await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, '[data-test="shape-simple"]')
+      await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
+
+      await fill(view, '[data-test="setup-name"]', productName)
+      await pickOption(view, '[data-test="setup-category"]', categoryName)
+      await fill(view, '[data-test="setup-item-name"]', named('Cola 330ml can'))
+      await click(view, '[data-test="setup-item-age-restricted"]')
+      await fillNumber(view, '[data-test="setup-price"]', '1.5')
+      await setUp(view)
+
+      expect((await tillProduct(productName))?.ageRestricted).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('a product over a restricted item from the register follows it', async () => {
+    const categoryName = named('Cans and bottles')
+    await aCategory(categoryName)
+    const itemName = named('Lager 330ml bottle')
+    await anItem(itemName, { unit: 'ITEM', containerMl: null })
+    const productName = named('Lager')
+
+    const view = await signedInBarManager()
+    try {
+      await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, '[data-test="shape-simple"]')
+      await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
+
+      await fill(view, '[data-test="setup-name"]', productName)
+      await pickOption(view, '[data-test="setup-category"]', categoryName)
+      await view.evaluate(`[...document.querySelectorAll('[data-test="setup-item-mode"] label')]
+        .find(label => label.innerText.includes('already on the stock register')).click()`)
+      await waitFor(view, `document.querySelector('[data-test="setup-existing-item"]')`)
+      await pickOption(view, '[data-test="setup-existing-item"]', itemName)
+      await waitFor(view, `document.querySelector('[data-test="setup-age-follows"]')`)
+      expect(await textOf(view, '[data-test="setup-age-follows"]')).toContain(itemName)
+      await fillNumber(view, '[data-test="setup-price"]', '4')
+      await setUp(view)
+
+      expect((await tillProduct(productName))?.ageRestricted).toBe(true)
     }
     finally {
       view.close()

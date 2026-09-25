@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ALLERGEN_STATES, PRODUCT_AGE_RESTRICTED_DEFAULT, productForm, says } from '#shared/utils/bar'
+import { ALLERGEN_STATES, PRODUCT_AGE_RESTRICTED_DEFAULT, productForm, says, saysRestricted } from '#shared/utils/bar'
 import { barProductsList } from '#shared/utils/bar-products-list'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { AllergenState, BarCategory, BarProduct, ProductStatus } from '#shared/utils/bar'
@@ -42,6 +42,19 @@ const { data, status, error, refresh } = await useAsyncData(
   { watch: [query], default: noProducts },
 )
 
+// The correction list's size whatever the page shows: a product pouring restricted stock that
+// sells without Check ID is the Bar Manager's to fix (F-106, issue 1299).
+const { data: unchecked, refresh: recount } = await useAsyncData(
+  'bar-products-without-check-id',
+  () => request<Listing<BarProduct>>('/api/admin/bar/products', { query: { withoutCheckId: 'is:true', pageSize: 1 } }),
+  { default: noProducts },
+)
+const showingUnchecked = computed(() => conditions.value.some(condition => condition.key === 'withoutCheckId'))
+
+function showUnchecked(): void {
+  set('withoutCheckId', { key: 'withoutCheckId', operator: 'is', values: ['true'] })
+}
+
 const editing = ref<BarProduct | null>(null)
 const open = ref(false)
 const removing = ref<BarProduct | null>(null)
@@ -78,7 +91,7 @@ watch(() => state.allergenState, (chosen) => {
 const allergenOptions = ALLERGEN_STATES.map(value => ({ label: says(value), value }))
 
 async function reload(): Promise<void> {
-  await refresh()
+  await Promise.all([refresh(), recount()])
   if (page.value > data.value.pages) page.value = data.value.pages
 }
 
@@ -90,7 +103,8 @@ function edit(product: BarProduct | null): void {
     categoryId: product?.categoryId ?? categoryOptions.value[0]?.value ?? '',
     sort: product?.sort ?? 0,
     staffedOnly: product?.staffedOnly ?? false,
-    ageRestricted: product?.ageRestricted ?? PRODUCT_AGE_RESTRICTED_DEFAULT,
+    // The switch follows what the product pours, so restricted stock opens it switched on (issue 1299).
+    ageRestricted: product ? product.ageRestricted || product.restrictedPours.length > 0 : PRODUCT_AGE_RESTRICTED_DEFAULT,
     allergenState: product?.allergenState ?? 'UNKNOWN',
     allergenNote: product?.allergenNote ?? undefined,
   })
@@ -201,11 +215,17 @@ const columns: TableColumn<BarProduct>[] = [
         row.original.ageRestricted
           ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Age restricted')
           : null,
+        !row.original.ageRestricted && row.original.restrictedPours.length > 0
+          ? h(UBadge, { 'color': 'error', 'variant': 'subtle', 'size': 'sm', 'data-test': `no-check-id-${row.original.id}` }, () => 'No Check ID')
+          : null,
         row.original.staffedOnly
           ? h(UBadge, { color: 'neutral', variant: 'outline', size: 'sm' }, () => 'Staffed only')
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, row.original.categoryName),
+      !row.original.ageRestricted && row.original.restrictedPours.length > 0
+        ? h('div', { class: 'text-xs text-error' }, `Pours ${saysRestricted(row.original.restrictedPours)}`)
+        : null,
       // Below sm the allergens and sold columns are hidden: their content sits here instead,
       // so a phone keeps the row actions in view without losing what those columns said (922).
       h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, [
@@ -299,6 +319,17 @@ const columns: TableColumn<BarProduct>[] = [
       color="error"
       variant="subtle"
       :description="failure"
+    />
+
+    <UAlert
+      v-if="unchecked.total > 0 && !showingUnchecked"
+      data-test="without-check-id"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-id-card"
+      :title="`${plural(unchecked.total, 'product')} ${unchecked.total === 1 ? 'pours' : 'pour'} age-restricted stock without Check ID`"
+      description="Edit each one and switch Age restricted on, or switch the stocked item off on the stock register if it is not alcohol."
+      :actions="[{ 'label': 'Show them', 'color': 'warning', 'data-test': 'show-without-check-id', 'onClick': showUnchecked }]"
     />
 
     <p class="text-sm text-muted">
@@ -454,10 +485,19 @@ const columns: TableColumn<BarProduct>[] = [
 
           <USwitch
             v-model="state.ageRestricted"
+            :disabled="(editing?.restrictedPours.length ?? 0) > 0"
             label="Age restricted"
             description="A basket holding one of these asks for a Challenge 25 outcome before it can be paid for."
             data-test="product-age-restricted"
           />
+          <p
+            v-if="editing && editing.restrictedPours.length > 0"
+            class="text-sm text-muted"
+            data-test="product-age-follows"
+          >
+            It pours {{ saysRestricted(editing.restrictedPours) }}, so it asks for Check ID too. Switch the
+            stocked item off on the stock register if it is not alcohol.
+          </p>
 
           <USwitch
             v-model="state.staffedOnly"

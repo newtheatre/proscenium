@@ -23,6 +23,20 @@ export type AllergenState = (typeof ALLERGEN_STATES)[number]
 export const PRODUCT_AGE_RESTRICTED_DEFAULT = false
 export const STOCK_ITEM_AGE_RESTRICTED_DEFAULT = true
 
+// "Gin and Campari, which are age restricted": what every Check ID notice says a product pours.
+export function saysRestricted(names: readonly string[]): string {
+  const named = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0] ?? ''
+  return `${named}, which ${names.length > 1 ? 'are' : 'is'} age restricted`
+}
+
+// A product pouring restricted stock sells with Check ID, so one saved without it is refused
+// naming what it pours (F-106 criterion 5, issue 1299). Null where nothing stands in the way.
+export function checkIdRefusal(product: { name: string, ageRestricted: boolean }, restricted: readonly string[]): string | null {
+  if (product.ageRestricted || restricted.length === 0) return null
+  return `${product.name} pours ${saysRestricted(restricted)}, so it asks for Check ID too: switch Age restricted on, `
+    + 'or switch it off on any stocked item that is not alcohol'
+}
+
 // Complete at birth: widening a CHECK is a table rebuild, and a rebuild of an append-only table
 // is refused outright (0010). The kinds no screen writes yet are listed with the path that will.
 export const STOCK_MOVEMENT_KINDS = [
@@ -463,6 +477,9 @@ export interface BarProduct {
   allergenState: AllergenState
   allergenNote: string | null
   everSold: boolean
+  // The age-restricted stocked items its live sizes pour, choices included, derived rather than
+  // stored; unrestricted with any here is a product selling without Check ID (issue 1299).
+  restrictedPours: string[]
 }
 
 export interface VariantComponent {
