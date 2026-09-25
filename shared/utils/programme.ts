@@ -187,6 +187,8 @@ export interface AdminShow {
   posterUrl: string | null
   // Ticket types this show actually offers, which is what the checklist reads as pricing set.
   activePriceCount: number
+  // Upcoming, uncancelled performances at a venue we run with no running time (D-121 criterion 6).
+  untimedPerformanceCount: number
 }
 
 // What may be attached as a show's artwork (D-132 criterion 6). Stated here rather than beside the
@@ -226,11 +228,12 @@ export function posterKeyFor(showId: string, type: string): string {
 export interface PublishReadiness {
   posterUrl: string | null
   performanceCount: number
+  untimedPerformanceCount: number
   activePriceCount: number
 }
 
 export interface PublishCheck {
-  key: 'poster' | 'performances' | 'pricing'
+  key: 'poster' | 'performances' | 'running-time' | 'pricing'
   says: string
   done: boolean
 }
@@ -241,8 +244,16 @@ export function publishChecklist(show: PublishReadiness): PublishCheck[] {
   return [
     { key: 'poster', says: 'Poster uploaded', done: show.posterUrl !== null },
     { key: 'performances', says: 'Performances scheduled', done: show.performanceCount > 0 },
+    { key: 'running-time', says: 'Running time set for every performance', done: show.untimedPerformanceCount === 0 },
     { key: 'pricing', says: 'Pricing set', done: show.activePriceCount > 0 },
   ]
+}
+
+// Every shift's window ends from the running time, so one of ours without it strands the rota at
+// curtain plus the offset (0078). An external venue has no rota of ours to strand.
+export function runningTimeRefusal(venue: { name: string, isExternal: boolean }, durationMinutes: number | null | undefined): string | null {
+  if (venue.isExternal || durationMinutes != null) return null
+  return `A performance at ${venue.name} needs its running time: every shift on its rota ends from it`
 }
 
 export function saysPublishCheck(check: PublishCheck): string {
@@ -259,6 +270,7 @@ export interface ShowReference {
 
 export interface ShowVenue extends ShowReference {
   capacity: number | null
+  isExternal: boolean
 }
 
 export interface AdminPerformance {
