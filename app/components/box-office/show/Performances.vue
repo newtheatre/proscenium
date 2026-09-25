@@ -243,7 +243,7 @@ const venueOf = (venueId: string): ShowVenue | undefined => props.venues.find(on
 const chosenExternal = computed(() => venueOf(form.venueId)?.isExternal ?? false)
 
 // The route's own rule, asked before the request so the field says it rather than a banner (D-121).
-function checkRunningTime(state: Partial<typeof form>): FormError[] {
+function checkRunningTime(state: { venueId?: string, durationMinutes?: number | null }): FormError[] {
   const venue = venueOf(state.venueId ?? '')
   if (!venue || editingPerformance.value?.status === 'CANCELLED') return []
   const refusal = runningTimeRefusal(venue, state.durationMinutes)
