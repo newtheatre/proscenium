@@ -134,6 +134,26 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     }
   })
 
+  // A lapse is not an act the guard sees, so the first IT Manager is the one it keeps, and that
+  // grant cannot lapse (A-120 criterion 1, issue #1355).
+  test('the bootstrap grant is permanent, and its audit entry says so', async () => {
+    const { Database } = await import('bun:sqlite')
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const grant = database.query(`
+        SELECT g.expires_at AS expiresAt FROM role_grants g JOIN users u ON u.id = g.user_id
+        WHERE u.email = ? AND g.role = 'ADMIN'
+      `).get(officer.email) as { expiresAt: number | null } | null
+      expect(grant).toEqual({ expiresAt: null })
+
+      const entry = database.query(`SELECT detail FROM audit_log WHERE action = 'role.granted.bootstrap'`).get() as { detail: string }
+      expect(JSON.parse(entry.detail)).toEqual({ role: 'ADMIN', expiresAt: null, permanent: true })
+    }
+    finally {
+      database.close()
+    }
+  })
+
   // Bootstrapping exists for an environment with no way in, and this one now has one
   // (K-122 criterion 4).
   test('the bootstrap refuses to grant a second administrator', () => {

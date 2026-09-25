@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { decideByMap, decisionKey, formatRoleDecisions, parseRoleDecisions } from '#migration/role-decisions'
+import { administratorDecisions, decideByMap, decisionKey, formatRoleDecisions, parseRoleDecisions } from '#migration/role-decisions'
 import type { RoleDecision, RoleDecisions } from '#migration/role-decisions'
 
 // The role decisions file is the only record of a human's choice per old grant (0070): what is
@@ -58,5 +58,30 @@ describe('decideByMap accepts only what the map covers', () => {
   test('a null expiry is permanent', () => {
     const decisions = decideByMap([{ user_id: 'u-1', role: 'admin' }], { admin: 'COMMITTEE' }, null)
     expect(decisions.get(decisionKey('u-1', 'admin'))).toEqual({ role: 'COMMITTEE', expiresAt: null })
+  })
+})
+
+// A-120 criterion 1 and issue #1355: a build whose IT Manager grants are all dated loses its last
+// one to a lapse nobody acts on, so the review asks which is permanent rather than defaulting one.
+describe('the IT Manager decisions are read apart', () => {
+  test('permanent and dated IT Manager grants are named by their decision keys', () => {
+    const decisions: RoleDecisions = new Map<string, RoleDecision>([
+      [decisionKey('u-1', 'auth:ADMIN'), { role: 'ADMIN', expiresAt: 1_785_456_000 }],
+      [decisionKey('u-2', 'ticketing:ADMIN'), { role: 'ADMIN', expiresAt: null }],
+      [decisionKey('u-3', 'rooms:ADMIN'), 'SKIP'],
+      [decisionKey('u-4', 'auth:TREASURER'), { role: 'TREASURER', expiresAt: null }],
+    ])
+    expect(administratorDecisions(decisions)).toEqual({
+      permanent: [decisionKey('u-2', 'ticketing:ADMIN')],
+      dated: [decisionKey('u-1', 'auth:ADMIN')],
+    })
+  })
+
+  test('a file with every IT Manager dated has none permanent to keep', () => {
+    const decisions: RoleDecisions = new Map<string, RoleDecision>([
+      [decisionKey('u-1', 'auth:ADMIN'), { role: 'ADMIN', expiresAt: 1_785_456_000 }],
+    ])
+    expect(administratorDecisions(decisions).permanent).toEqual([])
+    expect(administratorDecisions(new Map())).toEqual({ permanent: [], dated: [] })
   })
 })

@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { rolesList } from '#shared/utils/roles-list'
-import { grantsClause, holderCountsStatement } from '#server/utils/roles-register'
+import { protectedGrantRefusal, strandingBy } from '#shared/utils/protected-role'
+import { grantsClause, holderCountsStatement, protectedHoldersStatement, usableAccountWhere } from '#server/utils/roles-register'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
@@ -151,6 +152,55 @@ describe('every role is counted in one statement, never a query each (criterion 
       const [text, ...parameters] = boundStatement(database, holderCountsStatement(NOW))
       expect(text.toLowerCase()).toContain('group by')
       expect(parameters.length).toBeLessThanOrEqual(2)
+    })
+  })
+})
+
+// A-120 criteria 1 and 3, issue #1355: the guard keeps a usable IT Manager whose grant cannot
+// lapse, so what it reads is every usable holder with their expiry, and nobody else.
+describe('the IT Manager the guard keeps is a usable one with a permanent grant', () => {
+  function holders(database: TestDatabase): { userId: string, expiresAt: number | null }[] {
+    const [text, ...parameters] = boundStatement(database, protectedHoldersStatement(NOW))
+    return rows<{ userId: string, expiresAt: number | null }>(database, text, ...parameters)
+      .sort((left, right) => left.userId.localeCompare(right.userId))
+  }
+
+  function usable(database: TestDatabase): string[] {
+    const [text, ...parameters] = boundStatement(database, sql`SELECT id FROM users WHERE ${usableAccountWhere()}`)
+    return rows<{ id: string }>(database, text, ...parameters).map(row => row.id).sort()
+  }
+
+  function seedHolders(database: TestDatabase): void {
+    seed(database)
+    database.batch([
+      ['INSERT INTO users (id, email, name, verified, password) VALUES (?, ?, ?, ?, ?)', 'dan', 'dan@example.test', 'Dan Dated', 1, 'hash'],
+      ['INSERT INTO users (id, email, name, verified, password, disabled) VALUES (?, ?, ?, ?, ?, ?)', 'dis', 'dis@example.test', 'Dis Abled', 1, 'hash', 1],
+      ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, ?)', 'pen', 'pen@example.test', 'Pen Ding', 0],
+      ['INSERT INTO users (id, email, name, verified, password) VALUES (?, ?, ?, ?, ?)', 'old', 'old@example.test', 'Old Lapsed', 1, 'hash'],
+      ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-dan', 'dan', 'ADMIN', NOW + YEAR],
+      ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-dis', 'dis', 'ADMIN', null],
+      ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-pen', 'pen', 'ADMIN', null],
+      ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-old', 'old', 'ADMIN', NOW - 60],
+    ])
+  }
+
+  test('disabled, waiting, lapsed and erased holders are not read at all', async () => {
+    await withDatabase((database) => {
+      seedHolders(database)
+      expect(holders(database)).toEqual([
+        { userId: 'ada', expiresAt: null },
+        { userId: 'dan', expiresAt: NOW + YEAR },
+      ])
+      expect(usable(database)).toEqual(['ada', 'bea', 'cal', 'dan', 'old'])
+    })
+  })
+
+  test('so a disabled permanent IT Manager does not let the usable one be dated or revoked', async () => {
+    await withDatabase((database) => {
+      seedHolders(database)
+      expect(strandingBy(holders(database), 'ada')).toBe('dated')
+      expect(strandingBy(holders(database), 'dan')).toBeNull()
+      expect(protectedGrantRefusal(holders(database), { userId: 'ada', expiresAt: NOW + YEAR, usable: true })).not.toBeNull()
     })
   })
 })
