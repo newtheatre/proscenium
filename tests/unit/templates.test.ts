@@ -397,6 +397,16 @@ describe('the waiting-list offer agrees in number (item 7)', () => {
     expect(html).toContain('3 seats')
     expect(html).toContain('Claim my seats<')
   })
+
+  // Issue 1328: an offer reserves nothing until it is claimed, so it is first refusal, not a hold.
+  test('an offer is first refusal until its time, and never says the seats are held', () => {
+    const { html, text } = render('waiting-list-offered', { ...EVERYTHING, partySize: 2 })
+    for (const part of [html, text]) {
+      expect(flat(part)).toContain('first refusal')
+      expect(flat(part)).toContain('Friday 2 October 2026 at 18:00')
+      expect(flat(part)).not.toContain('held for you')
+    }
+  })
 })
 
 describe('ordinal (item 7)', () => {

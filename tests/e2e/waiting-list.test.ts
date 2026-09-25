@@ -64,6 +64,37 @@ async function bookableShow(): Promise<{ showId: string, performanceId: string }
   return { showId, performanceId }
 }
 
+// An hour out, with the performance's own hold release, so the test decides where online booking
+// stops: the offer window's two hours would otherwise run all the way to curtain.
+async function soonShow(holdReleaseMinutesBefore: number): Promise<{ performanceId: string, startsAt: number }> {
+  const title = named('The Cherry Orchard')
+  const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
+  const showId = (await show.json() as { id: string }).id
+
+  const startsAt = Math.floor(Date.now() / 1000) + 60 * 60
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt })
+  const performanceId = (await performance.json() as { id: string }).id
+  expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
+    venueId, startsAt, intervalCount: 0, holdReleaseMinutesBefore,
+  })).status).toBe(200)
+
+  await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
+  expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
+
+  return { performanceId, startsAt }
+}
+
+function offerFor(performanceId: string): { status: string, offerExpiresAt: number | null } | undefined {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query('SELECT status, offer_expires_at AS offerExpiresAt FROM waiting_list WHERE performance_id = ?')
+      .get(performanceId) as { status: string, offerExpiresAt: number | null } | undefined
+  }
+  finally {
+    database.close()
+  }
+}
+
 function entriesFor(performanceId: string): { id: string, status: string }[] {
   const database = new Database(app.databaseFile, { readonly: true })
   try {
@@ -224,5 +255,53 @@ describe.skipIf(skip !== null)('leaving is asked about first (criterion 4)', () 
     finally {
       view.close()
     }
+  }, CASE_TIMEOUT_MS)
+})
+
+// Issue 1328: an offer reserves nothing, and a claim after the online cut-off is refused, so an
+// offer is first refusal until the cut-off and nothing is offered past it.
+describe.skipIf(skip !== null)('an offer stands until online booking closes, and none is made after (criterion 2)', () => {
+  test('an offer made before the cut-off lapses at the cut-off, not at curtain, and says first refusal', async () => {
+    const { performanceId, startsAt } = await soonShow(30)
+    const email = `refusal-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
+      performanceId, partySize: 1, guest: { name: 'Ada First', email },
+    }, '')).status).toBe(200)
+
+    const offered = await send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`)
+    expect(offered.status).toBe(200)
+    expect(await offered.json()).toEqual({ offered: 1 })
+
+    const entry = offerFor(performanceId)
+    expect(entry?.status).toBe('OFFERED')
+    expect(entry?.offerExpiresAt).toBe(startsAt - 30 * 60)
+
+    const letter = (await letters(app)).find(text => text.includes(email) && text.includes('first refusal'))
+    expect(letter).toBeDefined()
+    expect(letter).not.toContain('held for you')
+  }, CASE_TIMEOUT_MS)
+
+  test('past the cut-off nothing is offered, and a join is refused naming the door', async () => {
+    const { performanceId, startsAt } = await soonShow(5)
+    expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
+      performanceId, partySize: 1, guest: { name: 'Ada Early', email: `early-${crypto.randomUUID().slice(0, 8)}@example.invalid` },
+    }, '')).status).toBe(200)
+
+    expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
+      venueId, startsAt, intervalCount: 0, holdReleaseMinutesBefore: 90,
+    })).status).toBe(200)
+
+    const offered = await send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`)
+    expect(await offered.json()).toEqual({ offered: 0 })
+    expect(offerFor(performanceId)?.status).toBe('WAITING')
+
+    const late = await send('POST', `/api/performances/${performanceId}/waiting-list`, {
+      performanceId, partySize: 1, guest: { name: 'Ada Late', email: `late-${crypto.randomUUID().slice(0, 8)}@example.invalid` },
+    }, '')
+    expect(late.status).toBe(409)
+    const says = await late.text()
+    expect(says).toContain('Online booking closed at')
+    expect(says).toContain('on the door')
+    expect(entriesFor(performanceId)).toHaveLength(1)
   }, CASE_TIMEOUT_MS)
 })
