@@ -72,7 +72,7 @@ describe('a guest with no account never satisfies either ability', () => {
 // still open without granting the wider bar catalogue or stock screens.
 describe('viewBarReports admits the treasurer alongside the bar manager', () => {
   const withPermissions = (permissions: Viewer['permissions']): Viewer => ({
-    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' },
+    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, keepsBarTab: false, membershipState: { kind: 'none' },
   })
 
   test('bar.read and finance.read each satisfy it', () => {
@@ -89,7 +89,7 @@ describe('viewBarReports admits the treasurer alongside the bar manager', () => 
 // finance or bar read opens nothing here.
 describe('viewReports rests on reports.read alone', () => {
   const withPermissions = (permissions: Viewer['permissions']): Viewer => ({
-    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' },
+    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, keepsBarTab: false, membershipState: { kind: 'none' },
   })
 
   test('reports.read satisfies it', () => {

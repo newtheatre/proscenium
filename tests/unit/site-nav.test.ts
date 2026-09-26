@@ -295,7 +295,7 @@ describe('a waiting count rides the entry that opens it', () => {
   })
 
   // Tab holders ship unnamed, so the register is set-up work until somebody holds a tab (issue 1342).
-  test('Tabs sits under the bar's Set-up', () => {
+  test('Tabs sits under the Set-up of the bar group', () => {
     const bar = CONSOLE_NAV.find(group => group.key === 'bar')!
     expect(bar.items.find(item => item.to === '/bar/tabs')?.section).toBe('Set-up')
   })
