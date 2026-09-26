@@ -237,6 +237,13 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(text).toContain('https://newtheatre.org.uk/shows/the-tempest')
   })
 
+  // Age guidance is an officer's own words, so it never reaches the HTML part as markup.
+  test('the guidance is escaped in the HTML part', () => {
+    const { html } = render('reservation-confirmed', { ...EVERYTHING, guidance: ['Age guidance: <b>14+</b>'] })
+    expect(html).toContain('&lt;b&gt;14+&lt;/b&gt;')
+    expect(html).not.toContain('<b>14+</b>')
+  })
+
   test('the confirmation says not yet paid in plain weight, and is a booking', () => {
     const { subject, html } = render('reservation-confirmed', EVERYTHING)
     expect(subject).toBe('Your booking for The Tempest')

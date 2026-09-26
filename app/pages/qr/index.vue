@@ -3,7 +3,6 @@ import type * as z from 'zod'
 import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
 import { qrStatusDisplay, reservationResendForm, saysExchangeNight } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
-import type { ShowGuidance } from '#shared/utils/content-warnings'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 
 type Outcome = 'working' | 'found' | 'resend' | 'sent'
@@ -20,7 +19,8 @@ interface Booking {
   cancelledBy: string | null
   show: string
   showSlug: string | null
-  guidance: ShowGuidance | null
+  // Empty once the booking is no longer somebody coming (cancelled, lapsed, exchanged, admitted).
+  guidance: string[]
   when: string
   totalDue: string | null
   qrSvg: string
@@ -276,8 +276,8 @@ useSeoMeta({ title: 'Your booking' })
         />
 
         <BeforeYouBook
-          v-if="booking.guidance && booking.showSlug"
-          :guidance="booking.guidance"
+          v-if="booking.guidance.length"
+          :lines="booking.guidance"
           :slug="booking.showSlug"
           heading="Before you come"
         />

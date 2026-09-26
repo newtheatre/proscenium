@@ -280,14 +280,21 @@ describe('the vocabulary form offers an icon from a shortlist, never typed', () 
 // Issue 1330: the booking form, the booking page and the confirmation email all say this, in the
 // same words, from the show's own rows.
 describe('the guidance a booker is told before they come (D-102 criterion 4)', () => {
-  const strobe = { title: 'Strobe lighting', level: null }
-  const violence = { title: 'Gun violence', level: 'DEPICTED' as const }
+  const strobe = { title: 'Strobe lighting', kind: 'TECHNICAL' as const, level: null }
+  const violence = { title: 'Gun violence', kind: 'GENERAL' as const, level: 'DEPICTED' as const }
+  const smoking = { title: 'Smoking', kind: 'GENERAL' as const, level: 'MENTIONED' as const }
 
   test('age guidance comes first, then each warning with its level', () => {
     expect(saysShowGuidance({ ageGuidance: 'Recommended 14 and over', assessment: 'WARNED', warnings: [strobe, violence] })).toEqual([
       'Age guidance: Recommended 14 and over',
       'Content warnings: Strobe lighting; Gun violence: depicted',
     ])
+  })
+
+  // The show page's own grouping: staging, then depicted, discussed and mentioned, strongest first.
+  test('the warnings follow the show page\'s order, whatever order they arrive in', () => {
+    expect(saysShowGuidance({ ageGuidance: null, assessment: 'WARNED', warnings: [smoking, violence, strobe] })[1])
+      .toBe('Content warnings: Strobe lighting; Gun violence: depicted; Smoking: mentioned')
   })
 
   test('unset age guidance says so in the house words', () => {
