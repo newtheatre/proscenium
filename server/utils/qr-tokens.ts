@@ -55,6 +55,11 @@ export function rememberQrToken(event: H3Event, token: string): void {
   })
 }
 
+// The path has to match rememberQrToken's, or the browser keeps the cookie.
+export function forgetQrToken(event: H3Event): void {
+  deleteCookie(event, QR_COOKIE_NAME, { path: '/' })
+}
+
 // Constant-time-ish: length is checked first (both are fixed-length base64url, so a mismatch
 // there is not itself a timing leak), then every byte is compared regardless of an early miss.
 function signaturesMatch(a: string, b: string): boolean {

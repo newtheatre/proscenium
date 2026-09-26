@@ -210,7 +210,7 @@ describe.skipIf(skip !== null)('using a pass lands on its booking, and signing o
   test('Use my pass opens the booking as booked, and after sign-out it no longer opens', async () => {
     const { performanceId, passTypeId, priceId } = await coveredPerformance()
     const password = generatePassword()
-    const holder = await registerMember(app, 'holder', password)
+    const holder = await registerMember(app, 'holder', password, { signIn: false })
     expect((await send('POST', '/api/box-office/desk/passes', {
       passTypeId, passTypePriceId: priceId, userId: holder.id, expectedTotalPence: 4500,
     }, boxOffice.cookie)).status).toBe(200)

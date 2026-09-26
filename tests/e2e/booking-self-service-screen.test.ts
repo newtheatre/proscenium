@@ -136,6 +136,37 @@ describe.skipIf(skip !== null)('the booking screen says which night and which wa
     }
   }, CASE_TIMEOUT_MS)
 
+  // Issue 1329: one cookie names one booking, and opening or making another moves it. A page
+  // still showing the first is refused rather than cancelling the second behind its back.
+  test('cancelling from a page showing one booking never cancels another the cookie now names', async () => {
+    const first = await twoNightBooking()
+    const second = await twoNightBooking()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/qr/${first.qrToken}`, '[data-test="booking-found"]')
+      expect(await view.evaluate<number>(`fetch('/qr/${second.qrToken}').then(response => response.status)`)).toBe(200)
+
+      await click(view, '[data-test="booking-cancel-start"]')
+      await waitFor(view, `document.querySelector('[data-test="confirm-cancel-booking-verb"]')`)
+      await click(view, '[data-test="confirm-cancel-booking-verb"]')
+      await waitFor(view, `document.body.innerText.includes('This page is showing a different booking')`)
+    }
+    finally {
+      view.close()
+    }
+
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const statuses = database.query('SELECT reference, status FROM reservations WHERE reference IN (?, ?)')
+        .all(first.reference, second.reference) as { reference: string, status: string }[]
+      expect(statuses.map(row => row.status)).toEqual(['PENDING', 'PENDING'])
+    }
+    finally {
+      database.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   // Issue 1329: a cancelled booking admits nobody, so its code is not offered to be saved.
   test('a cancelled booking shows no QR code', async () => {
     const { qrToken } = await twoNightBooking()
