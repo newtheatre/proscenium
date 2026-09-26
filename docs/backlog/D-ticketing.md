@@ -613,7 +613,12 @@ Open questions:
   3. A pass product that has ever been issued can only be archived, never deleted; archived
      products resolve for every held pass and report.
   4. Covered shows can be extended during the season (additive); removing a covered show from a
-     product with live passes requires a manager role and is audited.
+     product with live passes requires a manager role and is audited. Amended 26 September 2026
+     (issue 1323): the cover is also chosen where the show is put on sale. The show's publish sheet
+     lists each pass on sale whose validity holds one of the show's performances, with an Include
+     tick preset on for a show playing only at venues we run, and publishing adds the show to each
+     ticked pass by the same additive action, in the same batch and audited as it is. The screens
+     call the list "Covered shows" everywhere.
   5. Product creation and changes are audited with actor and diff.
   6. A price point is integer pence and is read out through the shared money wording, never
      assembled on a screen.
@@ -862,7 +867,8 @@ Open questions:
      with no poster keeps its gradient on the public site.
   7. A publish checklist beside the editor states, in words, whether the poster is uploaded, the
      performances are scheduled, every upcoming performance at a venue we run has its running time
-     (D-121 criterion 6) and the pricing is set. It reports readiness and gates nothing:
+     (D-121 criterion 6), every pass on sale for its dates covers it (D-123 criterion 4) and the
+     pricing is set. It reports readiness and gates nothing:
      publishing is still D-121's own action. Cast list and rights are not on it, having no schema
      behind them yet.
   8. The editor's copy is grouped as the mockup groups it: a basics card (title, address, tagline

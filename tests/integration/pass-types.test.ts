@@ -2,12 +2,17 @@ import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
 import {
   PASS_TYPE_REFERENCES,
+  coveringPassesQuery,
   everIssuedColumn,
   everIssuedQuery,
   issuedReferences,
   liveCoverageQuery,
 } from '#server/utils/pass-types'
+import { showsClause, showsQuery } from '#server/utils/programme'
+import { showsList } from '#shared/utils/shows-list'
+import { filterQuerySchema } from '#shared/utils/list-filters'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { tonightsPerformance } from '#tests/helpers/programme'
 import type { PassCoverageReference, PassTypeReference } from '#server/utils/pass-types'
 import type { TestDatabase } from '#tests/helpers/database'
 
@@ -268,6 +273,53 @@ describe('a pass product with prices and covered shows (criterion 1)', () => {
       insert(database, 'pass_type_shows', { id: 'cover-1', pass_type_id: id, show_id: 's1' })
 
       expect(() => database.batch([['DELETE FROM shows WHERE id = ?', 's1']])).toThrow()
+    })
+  })
+})
+
+// The publish sheet asks, for one show, which passes on sale are valid on one of its nights and
+// whether each already covers it (issue 1323, D-123 criterion 4).
+describe('the passes on sale for a show\'s dates are found by the show alone (issue 1323)', () => {
+  function seed(database: TestDatabase): { showId: string } {
+    const seeded = tonightsPerformance(database, { night: '2099-01-01' })
+    const window = { valid_from: seeded.startsAt - 86_400, valid_until: seeded.startsAt + 86_400 }
+    passType(database, { id: 'pt-on', slug: 'on', name: 'Season pass', status: 'ON_SALE', ...window })
+    passType(database, { id: 'pt-covering', slug: 'covering', name: 'Friends pass', status: 'ON_SALE', ...window })
+    passType(database, { id: 'pt-draft', slug: 'draft', name: 'Draft pass', status: 'DRAFT', ...window })
+    passType(database, { id: 'pt-closed', slug: 'closed', name: 'Closed pass', status: 'CLOSED', ...window })
+    passType(database, { id: 'pt-before', slug: 'before', name: 'Last year', status: 'ON_SALE', valid_from: 1_000, valid_until: 2_000 })
+    insert(database, 'pass_type_shows', { id: 'pts-1', pass_type_id: 'pt-covering', show_id: seeded.showId })
+    return { showId: seeded.showId }
+  }
+
+  const covering = (database: TestDatabase, showId: string): { passTypeId: string, name: string, covered: number }[] => {
+    const [query, ...parameters] = boundStatement(database, coveringPassesQuery(showId))
+    expect(parameters).toEqual([showId])
+    return rows<{ passTypeId: string, name: string, covered: number }>(database, query, ...parameters)
+  }
+
+  test('only a pass on sale whose validity holds one of the show\'s nights is listed, with whether it covers the show', async () => {
+    await withDatabase((database) => {
+      const { showId } = seed(database)
+      expect(covering(database, showId).map(one => `${one.passTypeId}:${one.covered}`).sort()).toEqual(['pt-covering:1', 'pt-on:0'])
+    })
+  })
+
+  test('a show whose only night is cancelled is offered no pass', async () => {
+    await withDatabase((database) => {
+      const { showId } = seed(database)
+      database.batch([['UPDATE performances SET status = ? WHERE show_id = ?', 'CANCELLED', showId]])
+      expect(covering(database, showId)).toEqual([])
+    })
+  })
+
+  test('the shows list counts the passes on sale for a show\'s dates that do not yet cover it', async () => {
+    await withDatabase((database) => {
+      const { showId } = seed(database)
+      const clause = showsClause(filterQuerySchema(showsList).parse({}))
+      const [query, ...parameters] = boundStatement(database, showsQuery(clause, 25, 0))
+      const row = rows<{ id: string, uncoveredPassCount: number }>(database, query, ...parameters).find(one => one.id === showId)
+      expect(row?.uncoveredPassCount).toBe(1)
     })
   })
 })
