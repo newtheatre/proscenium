@@ -277,4 +277,27 @@ describe.skipIf(skip !== null)('a pass booking is changed or cancelled only at t
     const admissions = query<{ total: number }>('SELECT count(*) AS total FROM pass_admissions WHERE pass_id = ?', passId)
     expect(admissions?.total).toBe(1)
   }, CASE_TIMEOUT_MS)
+
+  // The desk reads it as booked by pass: nothing to collect, and no zero card sale in the ledger.
+  test('the desk has nothing to collect on a pass booking, and says so on the row it finds', async () => {
+    const { performanceId, passTypeId, priceId } = await coveredPerformance()
+    const { holder, passId } = await holderWithPass(passTypeId, priceId)
+    const redeemed = await send('POST', `/api/passes/${passId}/redeem`, { performanceId }, holder.cookie)
+    const { reference } = await redeemed.json() as { reference: string }
+    const id = query<{ id: string }>('SELECT id FROM reservations WHERE reference = ?', reference)!.id
+
+    const searched = await send('GET', `/api/box-office/desk/search?performanceId=${performanceId}&q=${reference}`, undefined, boxOffice.cookie)
+    const { items } = await searched.json() as { items: { reference: string, holdExpiresAt: number | null, totalPence: number }[] }
+    expect(items.find(item => item.reference === reference)).toMatchObject({ holdExpiresAt: null, totalPence: 0 })
+
+    const collected = await send('POST', `/api/box-office/desk/reservations/${id}/collect`, { tender: 'CARD', expectedTotalPence: 0 }, boxOffice.cookie)
+    expect(collected.status).toBe(409)
+    expect(await collected.text()).toContain('pass')
+    expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', id)?.status).toBe('PENDING')
+    const deskEntries = query<{ total: number }>(
+      `SELECT count(*) AS total FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
+       WHERE l.reservation_id = ? AND e.source = 'DESK'`, id,
+    )
+    expect(deskEntries?.total).toBe(0)
+  }, CASE_TIMEOUT_MS)
 })

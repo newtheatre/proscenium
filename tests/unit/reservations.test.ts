@@ -12,6 +12,7 @@ import {
   otherBookingReason,
   overCapReason,
   passBookingReason,
+  passCollectReason,
   pastCurtainReason,
   qrStatusDisplay,
   reservationEditForm,
@@ -168,6 +169,13 @@ describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', (
   test('a booking made with a pass is changed or cancelled only at the box office', () => {
     expect(passBookingReason(false)).toBeNull()
     expect(passBookingReason(true)).toContain('box office')
+  })
+
+  // The desk has nothing to take for a pass booking, so it never collects one as a £0 card sale.
+  test('the desk is told there is nothing to collect on a pass booking, and only on one', () => {
+    expect(passCollectReason(null, 0)).toContain('pass')
+    expect(passCollectReason(1_900_000_000, 0)).toBeNull()
+    expect(passCollectReason(null, 900)).toBeNull()
   })
 
   // Issue 1329: one cookie names one booking, so a page showing another is refused, not obeyed.

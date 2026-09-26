@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { sql } from 'drizzle-orm'
+import { unpaidSeatsColumn } from '#server/utils/capacity'
 import {
   countDeskSearchQuery,
   deskReservationQuery,
@@ -179,6 +181,45 @@ describe('deskSummaryQuery reads the house in seats for one performance (D-114 c
         accessBookings: 1,
         passAdmissions: 2,
       })
+    })
+  })
+})
+
+// Issue 1390: a pass booking stays PENDING with nothing to collect, so no count or pill that
+// means "still owes the desk" may include it.
+describe('a pass booking owes nothing, so it is neither unpaid nor pending at the desk', () => {
+  test('the unpaid tile, the unpaid alert, the programme\'s unpaid count and the Pending pill leave it out', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'a@example.invalid', 'A Pending')
+      user(database, 'u-2', 'b@example.invalid', 'B Pass Holder')
+      reservation(database, 'r-1', seeded.performanceId, 'u-1', 'PENDING', 'AAA111')
+      reservation(database, 'r-2', seeded.performanceId, 'u-2', 'PENDING', 'BBB222')
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-pass', 'Pass admission', 0, 'PASS_ADMISSION'],
+        ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until) VALUES (?, ?, ?, ?, ?)', 'pt-1', 'season', 'Season pass', 1_000, 2_000],
+        ['INSERT INTO pass_type_prices (id, pass_type_id, label, price) VALUES (?, ?, ?, 0)', 'price-1', 'pt-1', 'Standard'],
+        ['INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, issued_by) VALUES (?, ?, ?, ?, ?, 0, ?)',
+          'pass-1', 'PASS01', 'pt-1', 'price-1', 'u-2', 'u-2'],
+      ])
+      ticket(database, 't-1', 'r-1', seeded.performanceId, 'tt-standard', 900)
+      ticket(database, 't-2', 'r-2', seeded.performanceId, 'tt-pass', 0)
+      database.batch([['INSERT INTO pass_admissions (id, pass_id, performance_id, ticket_id) VALUES (?, ?, ?, ?)',
+        'admission-1', 'pass-1', seeded.performanceId, 't-2']])
+
+      const [summary] = read<{ reserved: number, unpaidCount: number, unpaidOwedPence: number, passAdmissions: number }>(
+        database, deskSummaryQuery(seeded.performanceId))
+      expect(summary).toMatchObject({ reserved: 2, unpaidCount: 1, unpaidOwedPence: 900, passAdmissions: 1 })
+
+      const [programme] = read<{ unpaid: number }>(database, sql`SELECT ${unpaidSeatsColumn('p')} AS unpaid FROM performances p WHERE p.id = ${seeded.performanceId}`)
+      expect(programme?.unpaid).toBe(1)
+
+      const idsFor = (status: 'ALL' | 'PENDING'): string[] =>
+        read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, undefined, status, 10, 0)).map(row => row.id)
+      expect(idsFor('PENDING')).toEqual(['r-1'])
+      expect(read<{ total: number }>(database, countDeskSearchQuery(seeded.performanceId, undefined, 'PENDING'))[0]?.total).toBe(1)
+      expect(idsFor('ALL').sort()).toEqual(['r-1', 'r-2'])
     })
   })
 })
