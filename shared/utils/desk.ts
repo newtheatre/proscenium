@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { readScannedCode } from './door'
+import { saysSeatsLeft } from './night-hub'
 import { guestDetailsForm } from './reservations'
 import { pageQuery } from './pagination'
 import { saysPrice } from './ticket-types'
@@ -15,10 +16,48 @@ import { saysDay } from './when'
 export const DESK_TENDERS = ['CARD', 'COMP'] as const
 export type DeskTender = (typeof DESK_TENDERS)[number]
 
-// The desk's own status pills (D-132), the three reservation states named directly: pending is
-// reserved and unpaid, collected is reserved and now paid, door is a walk-up with no reservation.
+// The desk's status pills (D-114 criterion 7), one per stored state: unpaid, paid and not yet in,
+// and in (admission sets DOOR on any booking, a walk-up's included). Keys stay the stored states.
 export const DESK_STATUS_FILTERS = ['ALL', 'PENDING', 'COLLECTED', 'DOOR'] as const
 export type DeskStatusFilter = (typeof DESK_STATUS_FILTERS)[number]
+
+export const DESK_STATUS_LABELS: Record<DeskStatusFilter, string> = {
+  ALL: 'All',
+  PENDING: 'Unpaid',
+  COLLECTED: 'Paid',
+  DOOR: 'In',
+}
+
+// A booking's state in the pill's own word, so a row and the pill that found it agree.
+export function saysDeskStatus(status: string): string {
+  return status !== 'ALL' && status in DESK_STATUS_LABELS
+    ? DESK_STATUS_LABELS[status as DeskStatusFilter]
+    : saysReservationStatus(status)
+}
+
+export interface DeskHouse {
+  capacity: number | null
+  sold: number
+  admitted: number
+  walkUps: number
+  unpaidCount: number
+  unpaidOwedPence: number
+}
+
+export interface DeskFigure { key: string, label: string, value: string }
+
+// The house in the words every show-night screen uses (E-112 criterion 1), counted in seats, with
+// what the desk alone needs beside it: the money still owed and the seats sold at the door.
+export function deskFigures(house: DeskHouse): DeskFigure[] {
+  const seatsLeft = house.capacity === null ? null : Math.max(0, house.capacity - house.sold)
+  return [
+    { key: 'sold', label: 'Sold', value: house.capacity === null ? String(house.sold) : `${house.sold} of ${house.capacity}` },
+    { key: 'in', label: 'In', value: String(house.admitted) },
+    { key: 'seats-left', label: 'Seats left', value: saysSeatsLeft(seatsLeft) },
+    { key: 'unpaid', label: 'Unpaid', value: house.unpaidCount === 0 ? 'None' : `${house.unpaidCount} · ${saysPrice(house.unpaidOwedPence)}` },
+    { key: 'walk-ups', label: 'Walk-ups', value: String(house.walkUps) },
+  ]
+}
 
 export const deskSearchForm = pageQuery.extend({
   performanceId: z.string().trim().min(1, 'Say which performance you mean'),

@@ -721,6 +721,13 @@ had already closed (D-112 criterion 3; nothing yet writes DESK, so this stays fa
 desk-side creation route does) · timestamps.
 Indexes: (`performance_id`, `status`), (`user_id`, `created_at`), `hold_expires_at`.
 
+**Admission is a status, a walk-up is a source.** Admitting a booking at the door moves it from
+PENDING or COLLECTED to DOOR (`admitAtDoorStatement()`), and a walk-up sold at the desk or the
+door is written straight to DOOR with source DOOR. So `status = 'DOOR'` means through the door,
+whoever booked, and a walk-up is `source = 'DOOR'`. The desk counts both in seats (D-114 criterion
+7, issue 1326): "in" is `admittedSeatsSubquery()` and "walk-ups" is `walkUpSeatsSubquery()` in
+`server/utils/capacity.ts`, beside "sold" (`heldSeatsSubquery()`) and "unpaid" (PENDING seats).
+
 **Booking (D-104).** `POST /api/reservations` is the one write path, deliberately public: a
 signed-in caller attaches to their own account, and a guest supplies a name and an email, which
 resolves to an existing account or mints a claimable one (`guestAccount()` in

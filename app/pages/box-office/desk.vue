@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { DESK_SALE_LINE_QUANTITY_CAP, DESK_STATUS_FILTERS, DESK_TENDERS, REINSTATE_REASON_LIMIT, compBlockedSays, deskEmptySays, reinstateRefusal, saysDeskNight, uncollectableReason, walkUpRefusal, walkUpTotalPence } from '#shared/utils/desk'
+import { DESK_SALE_LINE_QUANTITY_CAP, DESK_STATUS_FILTERS, DESK_STATUS_LABELS, DESK_TENDERS, REINSTATE_REASON_LIMIT, compBlockedSays, deskEmptySays, deskFigures, reinstateRefusal, saysDeskStatus, saysDeskNight, uncollectableReason, walkUpRefusal, walkUpTotalPence } from '#shared/utils/desk'
 import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
 import { saysClock } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
-import type { DeskStatusFilter, DeskTender } from '#shared/utils/desk'
+import type { DeskHouse, DeskStatusFilter, DeskTender } from '#shared/utils/desk'
 import type { WalkUpOption } from '#shared/utils/sale'
 import type { ScannerFailure } from '~/composables/useQrScanner'
 import type { TableColumn } from '@nuxt/ui'
@@ -12,13 +12,6 @@ import type { TableColumn } from '@nuxt/ui'
 // Comp authority is the request and its approval now, not a permission the desk screen checks
 // itself (D-117): every tender is always offered, and the route is what actually decides.
 const tenderOptions = [...DESK_TENDERS]
-
-const STATUS_PILL_LABELS: Record<DeskStatusFilter, string> = {
-  ALL: 'All',
-  PENDING: 'Pending',
-  COLLECTED: 'Collected',
-  DOOR: 'Door',
-}
 
 definePageMeta({ layout: 'console', title: 'Desk', middleware: 'console', docs: '/docs/box-office/desk' })
 
@@ -75,13 +68,7 @@ interface ReservationDetail {
   compRequest: ReservationCompRequest | null
 }
 
-interface DeskSummary {
-  capacity: number | null
-  reserved: number
-  collected: number
-  door: number
-  unpaidCount: number
-  unpaidOwedPence: number
+interface DeskSummary extends DeskHouse {
   accessBookings: number
   passAdmissions: number
   reservationsReleaseAt: number
@@ -119,28 +106,9 @@ async function loadSummary(): Promise<void> {
   }
 }
 
-// Capacity is uncapped for a general-admission house (D-105): headroom is then unbounded, so
-// there is nothing here to put a number on. Reserved and door between them are every seat taken.
-const walkUpHeadroom = computed(() => {
-  if (!summary.value || summary.value.capacity === null) return null
-  return Math.max(summary.value.capacity - summary.value.reserved - summary.value.door, 0)
-})
-
 const releaseTime = computed(() => (summary.value ? saysClock(summary.value.reservationsReleaseAt) : null))
 
-interface SummaryTile { key: string, label: string, value: string }
-
-const summaryTiles = computed<SummaryTile[]>(() => {
-  if (!summary.value) return []
-  const s = summary.value
-  return [
-    { key: 'capacity', label: 'Capacity', value: s.capacity === null ? 'Uncapped' : String(s.capacity) },
-    { key: 'reserved', label: 'Reserved', value: String(s.reserved) },
-    { key: 'collected', label: 'Collected', value: String(s.collected) },
-    { key: 'door', label: 'Door', value: String(s.door) },
-    { key: 'walk-up-headroom', label: 'Walk-up headroom', value: walkUpHeadroom.value === null ? 'Uncapped' : String(walkUpHeadroom.value) },
-  ]
-})
+const summaryTiles = computed(() => (summary.value ? deskFigures(summary.value) : []))
 
 const { data: nightly, refresh: refreshNightly, error: nightlyError } = await useAsyncData<Nightly>(
   'desk-nightly',
@@ -525,7 +493,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
     cell: ({ row }) => h(UBadge, {
       color: statusColor[row.original.status] ?? 'neutral',
       variant: 'subtle',
-    }, () => saysReservationStatus(row.original.status)),
+    }, () => saysDeskStatus(row.original.status)),
   },
   { id: 'total', header: 'Total', meta: RIGHT_ALIGNED, cell: ({ row }) => saysPrice(row.original.totalPence) },
   {
@@ -637,8 +605,8 @@ const resultColumns: TableColumn<SearchRow>[] = [
       color="warning"
       variant="subtle"
       icon="i-lucide-clock-alert"
-      :title="`${plural(summary.unpaidCount, 'unpaid reservation')} · ${saysPrice(summary.unpaidOwedPence)} owed`"
-      :description="`Unpaid reservations release at ${releaseTime} for walk-ups.`"
+      :title="`${plural(summary.unpaidCount, 'unpaid ticket')} · ${saysPrice(summary.unpaidOwedPence)} owed`"
+      :description="`Unpaid bookings release at ${releaseTime}, and their seats go back on sale.`"
       data-test="desk-unpaid-alert"
     />
 
@@ -722,7 +690,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
               :data-test="`desk-status-${pill.toLowerCase()}`"
               @click="statusFilter = pill"
             >
-              {{ STATUS_PILL_LABELS[pill] }}
+              {{ DESK_STATUS_LABELS[pill] }}
             </UButton>
           </div>
         </template>

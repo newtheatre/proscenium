@@ -88,7 +88,9 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Email | E-mail | Already the practice: no hyphenated form appears under `app/`, `shared/` or `server/`. |
 | Postcode | Post code, post-code | One word, no hyphen, wherever an address is collected. |
 | Paid | Collected, for a booking | A booking whose money has been taken, whoever took it: the door's PAID card and the till's confirmation both say it (K-128, issue 1150 item 16). |
-| In | Admitted, collected, for a person | Through the door. `HUB_KPI_LABELS` carries the three house words, sold, in and seats left, and every show-night screen reads them from there. |
+| In | Admitted, collected, for a person | Through the door. `HUB_KPI_LABELS` carries the three house words, sold, in and seats left, and every show-night screen reads them from there. The desk uses the same three, in seats (issue 1326). |
+| Unpaid | Pending, held, for a booking | A booking not yet paid for. The desk's pill and its tile say it; the tile gives the tickets and the amount they owe. |
+| Walk-up | Door, for a sale | A booking sold at the door, known by its source. Admission also marks a booking made ahead as through the door, so "door" is never a count of walk-ups. |
 | Exception | Closed over, exempted | A checklist item answered with a reason instead of a tick. The control is "Make an exception", the record reads "Exception: …", and the night report prints the reason. |
 | Backstage code | Tonight's code, board code | The six digits a crew device joins the backstage board with. Revealed on request with "Show the code" and put away with "Hide the code". |
 | Ticks itself | System-verified | A checklist item that reads the live data rather than being hand-ticked. |

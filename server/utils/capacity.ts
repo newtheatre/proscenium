@@ -70,37 +70,27 @@ export function unpaidSeatsColumn(alias: string): SQL {
   return unpaidSeatsSubquery(sql`${sql.raw(alias)}.id`)
 }
 
-// Reserved in advance, paid or not: pending and collected are the two states a reservation
-// made ahead of the night can be in (Matt's ruling on #996). Door is a walk-up, never this.
-export function reservedSeatsSubquery(performanceId: SQL): SQL {
-  return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.status IN ('PENDING', 'COLLECTED')
-  )`
-}
-
-// Reserved in advance and paid for at the desk.
-export function collectedSeatsSubquery(performanceId: SQL): SQL {
-  return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.status = 'COLLECTED'
-  )`
-}
-
-// A walk-up sale, with no reservation made ahead of the night.
-export function doorSeatsSubquery(performanceId: SQL): SQL {
+// Seats through the door: admission sets DOOR on any booking, a walk-up's included, so this is
+// "in" and never a count of walk-ups (D-114 criterion 7, issue 1326).
+export function admittedSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
     SELECT count(*) FROM ${sql.raw(TICKETS)} t
     JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
     WHERE t.performance_id = ${performanceId}
       AND t.refunded_at IS NULL
       AND r.status = 'DOOR'
+  )`
+}
+
+// Seats sold at the door, known by the booking's source rather than by its status, still held.
+export function walkUpSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.source = 'DOOR'
+      AND r.status IN (${holding})
   )`
 }
 

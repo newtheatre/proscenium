@@ -15,6 +15,7 @@ import {
   deskSearchForm,
   readDeskScan,
   saysDeskNight,
+  saysDeskStatus,
   walkUpRefusal,
   walkUpTotalPence,
   refundTicketForm,
@@ -57,6 +58,12 @@ describe('the desk states the house in the night\'s words (issue 1326)', () => {
 
   test('the pills say all, unpaid, paid and in, never the stored state', () => {
     expect(DESK_STATUS_FILTERS.map(filter => DESK_STATUS_LABELS[filter])).toEqual(['All', 'Unpaid', 'Paid', 'In'])
+  })
+
+  test('a result row names its state as the pill that finds it does, and any other state in words', () => {
+    expect(['PENDING', 'COLLECTED', 'DOOR'].map(saysDeskStatus)).toEqual(['Unpaid', 'Paid', 'In'])
+    expect(saysDeskStatus('CANCELLED')).toBe('Cancelled')
+    expect(saysDeskStatus('ALL')).not.toBe('All')
   })
 
   test('the old words are gone from the screen', async () => {
