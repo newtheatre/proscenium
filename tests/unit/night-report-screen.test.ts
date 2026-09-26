@@ -70,4 +70,17 @@ describe('the officer warning and the switcher read the performance on screen (0
     expect(source).not.toContain('v-if="row.officerBypass"')
     expect(source).toContain('data-test="staffing-officer-bypass"')
   })
+
+  // 0098: every role an officer stood in for, each said in words, not the duty manager's alone.
+  test('each role an officer stood in for is its own line', async () => {
+    const source = await Bun.file(PAGE).text()
+    expect(source).toContain('in report.bypasses"')
+    expect(source).toContain('saysOfficerBypass(bypass)')
+  })
+
+  test('a report frozen before 0098 still shows its duty manager flag', async () => {
+    const source = await Bun.file(PAGE).text()
+    expect(source).toContain('report.staffing.some(row => row.officerBypass)')
+    expect(source).toContain('An officer opened the duty manager\'s screens without the shift')
+  })
 })

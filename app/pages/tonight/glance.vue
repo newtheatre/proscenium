@@ -81,7 +81,7 @@ async function loadComps(performanceId: string): Promise<void> {
 
 async function load(): Promise<void> {
   try {
-    data.value = await request<DutyManagerTonight>('/api/tonight/duty-manager')
+    data.value = await request<DutyManagerTonight>('/api/tonight/duty-manager', { query: { access: 1 } })
     syncedAt.value = new Date()
     failure.value = null
   }
