@@ -1,4 +1,4 @@
-import { closeTillSessionForm } from '#shared/utils/reconciliation'
+import { closeTillSessionForm, readerExpectation, saysExpectedOnTheReader } from '#shared/utils/reconciliation'
 import { saysMoney } from '#shared/utils/bar'
 
 // Close a till session, stamping who and when, and record the expected-versus-actual reader
@@ -24,14 +24,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Recomputed here, never trusted from an earlier preview read, and scoped to this session, so
-  // a second bar open the same night stamps its own figure (F-202 criterion 3).
-  const bar = await barReconciliation(session.night, { sessionId: session.id })
-  const variancePence = actualZPence - bar.expectedPence
+  // Recomputed here, never trusted from an earlier preview read. One reader and one login serve
+  // the desk and the bar, so the Z is the whole night's, a single whole-day number (F-118.1, F-202.3).
+  const expected = readerExpectation(await nightReconciliation(session.night, { sessionId: session.id }))
+  const variancePence = actualZPence - expected.totalPence
   if (variancePence !== 0 && !varianceNote) {
     throw createError({
       statusCode: 400,
-      statusMessage: `The reader read ${saysMoney(actualZPence)}; we expect ${saysMoney(bar.expectedPence)}. `
+      statusMessage: `The reader read ${saysMoney(actualZPence)}; it should show ${saysExpectedOnTheReader(expected)}. `
         + 'That difference needs a note before it can be recorded.',
     })
   }
@@ -40,7 +40,15 @@ export default defineEventHandler(async (event) => {
     actorId: account.id,
     action: 'bar.till.closed',
     target: `till:${session.venueId}:${session.night}`,
-    detail: { venueId: session.venueId, night: session.night, expectedPence: bar.expectedPence, actualZPence, variancePence },
+    detail: {
+      venueId: session.venueId,
+      night: session.night,
+      expectedPence: expected.totalPence,
+      barPence: expected.barPence,
+      deskPence: expected.deskPence,
+      actualZPence,
+      variancePence,
+    },
   })
 
   // Both predicates ride the write, so a second close attempt and a hand-off started since the
@@ -50,7 +58,7 @@ export default defineEventHandler(async (event) => {
     venueId: session.venueId,
     night: session.night,
     closedBy: account.id,
-    expectedPence: bar.expectedPence,
+    expectedPence: expected.totalPence,
     actualZPence,
     variancePence,
     varianceNote: varianceNote ?? null,

@@ -1626,9 +1626,11 @@ Partial UNIQUE (`venue_id`, `night`) WHERE `closed_at IS NULL`: at most one *ope
 venue per night, so a session once closed stays closed and a fresh one opening later that night is
 a row of its own rather than a reuse. Keys to the night rather than a performance, so one session
 covers a matinee and an evening at the same venue (E-127), the same choice 0044 makes for an
-officer bypass. The expected figure is this session's own: `barReconciliation` takes an optional session or venue
-scope and the close passes its own session (`server/utils/reconciliation.ts`), so two venues
-running the same night each stamp their own total rather than the estate's combined one (F-202.3).
+officer bypass. The expected figure is the whole night's: a show night has one SumUp reader and one
+login shared by the desk and the bar, so the Z the close takes covers both, and the close stamps
+`wholeNightExpectedPence` (every bar's takings plus the desk's), a single whole-day number
+(F-118 criterion 1, F-202.3, issue 1308). The itemised lines on the close are this session's own:
+`barReconciliation` takes an optional session or venue scope (`server/utils/reconciliation.ts`).
 Append-only from the close onwards: `till_sessions_closed_is_append_only` fires
 `BEFORE UPDATE` whenever `closed_at` is already set and refuses the write, so the Z figure, the
 variance and the close itself are facts once recorded (F-118 criterion 3, 0010). A mis-keyed Z is

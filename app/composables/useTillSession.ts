@@ -1,5 +1,6 @@
 import { listFailureFrom } from './useListFailure'
 import { deviceNightCacheStore } from './useNightCache'
+import { closeVariancePence } from '#shared/utils/reconciliation'
 import { currentShowNight } from '#shared/utils/show-night'
 import { recallTillVenue, rememberTillVenue, rememberedBarAnswers } from '#shared/utils/till'
 import type { ListFailure } from './useListFailure'
@@ -142,11 +143,12 @@ export function useTillSession() {
   const closeFailure = ref<string | null>(null)
 
   const actualZPence = computed(() => Math.round((actualZPounds.value ?? 0) * 100))
-  const variancePreviewPence = computed(() => (reconciliation.value ? actualZPence.value - reconciliation.value.bar.expectedPence : 0))
+  // Against the whole night, as the close itself compares it: one reader serves desk and bar (issue 1308).
+  const variancePreviewPence = computed(() => (reconciliation.value ? closeVariancePence(reconciliation.value, actualZPence.value) : 0))
 
   // A note explains one variance, not a different one: it clears on either side changing, a
   // corrected Z figure or a refetched expected figure (F-118 criterion 3). The only reset.
-  watch([actualZPounds, () => reconciliation.value?.bar.expectedPence], () => {
+  watch([actualZPounds, () => reconciliation.value?.wholeNightExpectedPence], () => {
     varianceNote.value = ''
   })
 
