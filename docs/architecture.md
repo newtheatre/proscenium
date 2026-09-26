@@ -892,9 +892,10 @@ administrative only (0009, 0044). `FOH_MANAGER` also holds the programme and the
 permission, never through the bypass (0102). Planning the rota is not one of them: `rota.read` and
 `rota.write` are ordinary administrative permissions, held by `FOH_MANAGER` and `ADMIN`, and they
 are what open `/rota/manage/**` (0046). Every officer resolution that acts writes
-`night.officer-bypass`: a `GET` or `HEAD` records nothing, unless its route passes `recordsRead`
-as the glance does for tonight's access wording, and every other method records (0098, through
-`bypassIsRecorded`). It is written once per account, night, venue and role, held by a partial unique index rather than by reading
+`night.officer-bypass`: a `GET` or `HEAD` records nothing, unless it passes `recordsRead`, which
+only the glance's request for tonight's access wording does (`GET /api/tonight/duty-manager?access=1`,
+the one read that decrypts an access profile; without the flag the route returns no wording and the
+hub's poll records nothing), and every other method records (0098, through `bypassIsRecorded`). It is written once per account, night, venue and role, held by a partial unique index rather than by reading
 before writing; the row's detail carries every performance that venue ran that night, and on a
 bar opening an empty list and the `openingId` the officer let themselves into (0077). Holding one
 of the three does not admit anybody to the console: `reachConsole` reads the standing permissions

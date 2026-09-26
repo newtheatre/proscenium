@@ -212,10 +212,6 @@ export async function reportStaffing(performanceId: string): Promise<ReportStaff
   return db.all<ReportStaffingRow>(reportStaffingQuery(performanceId))
 }
 
-// `OfficerBypassLine` as the report carries it: the role an officer stood in for, who, and
-// whether a confirmed shift of that role was on the performance anyway.
-export type ReportOfficerBypass = OfficerBypassLine
-
 // Every role an officer acted in on this performance, read from the targets the guard writes for
 // the venue's night, three bound whatever the night holds (E-123 criterion 1, 0098, 0006).
 export function reportOfficerBypassesQuery(performanceId: string, venueId: string, night: string): SQL {
@@ -236,8 +232,8 @@ export function reportOfficerBypassesQuery(performanceId: string, venueId: strin
   `
 }
 
-export async function reportOfficerBypasses(performanceId: string, venueId: string, night: string): Promise<ReportOfficerBypass[]> {
-  const rows = await db.all<Omit<ReportOfficerBypass, 'confirmedShift'> & { confirmedShift: number }>(
+export async function reportOfficerBypasses(performanceId: string, venueId: string, night: string): Promise<OfficerBypassLine[]> {
+  const rows = await db.all<Omit<OfficerBypassLine, 'confirmedShift'> & { confirmedShift: number }>(
     reportOfficerBypassesQuery(performanceId, venueId, night),
   )
   return rows.map(row => ({ ...row, confirmedShift: Boolean(row.confirmedShift) }))
@@ -295,7 +291,7 @@ export interface NightReport {
   ageChecks: ReportAgeChecks
   milestones: ReportMilestone[]
   staffing: ReportStaffingRow[]
-  bypasses: ReportOfficerBypass[]
+  bypasses: OfficerBypassLine[]
   bar: ReportBarSummary
   access: ReportAccess
   checklist: ChecklistEntry[]

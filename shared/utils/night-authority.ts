@@ -87,8 +87,8 @@ export function outsideWindowRefusal(window: string): { statusCode: 403, statusM
   }
 }
 
-// Looking is not standing in: a read records no bypass unless it shows what only tonight's team
-// may see and asks to be recorded; every write records (0098, amending 0044).
+// Looking is not standing in: a read records no bypass unless it decrypts access-profile wording
+// (D-127) and asks to be recorded; every write records (0098, amending 0044).
 export function bypassIsRecorded(method: string, recordsRead = false): boolean {
   return recordsRead || !['GET', 'HEAD'].includes(method.toUpperCase())
 }

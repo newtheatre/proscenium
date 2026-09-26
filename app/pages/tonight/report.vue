@@ -262,8 +262,8 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
           data-test="staffing-officer-bypass"
         >
           <li
-            v-for="bypass in report.bypasses"
-            :key="`${bypass.role}-${bypass.officerName ?? ''}`"
+            v-for="(bypass, index) in report.bypasses"
+            :key="`${bypass.role}-${index}`"
           >
             <UBadge
               color="warning"

@@ -136,8 +136,8 @@ async function recordOfficerBypass(actorId: string, night: string, covered: Nigh
   await db.insert(schema.auditLog).values(entry).onConflictDoNothing()
 }
 
-// A read that shows what only tonight's team may see, such as the agreed access wording, sets
-// `recordsRead` so an officer reading it is recorded as an act would be (0098).
+// A read that decrypts access-profile wording (D-127) sets `recordsRead`, so an officer reading
+// it is recorded as an act would be (0098).
 export interface NightAuthorityOptions { recordsRead?: boolean }
 
 // Hiding a link is never the enforcement (E-111 criterion 5), and the night is `showNightOf`'s

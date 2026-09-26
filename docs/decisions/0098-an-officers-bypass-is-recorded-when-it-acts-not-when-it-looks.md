@@ -34,9 +34,11 @@ night) records `night.officer-bypass` once per account, night, venue and role, u
 partial unique index. The rule is the request's method, read by `bypassIsRecorded`, so a write
 route added later records without anybody remembering to make it.
 
-**One read is an act: tonight at a glance.** The glance shows the agreed door wording for tonight's
-access bookings, which is the one show-night read of something only tonight's team may see. Its
-route passes `recordsRead`, so an officer reading it is recorded as standing in.
+**One read is an act: the glance's request for the access wording.** The glance shows the agreed
+door wording for tonight's access bookings, which is the one show-night read that decrypts an
+access profile (D-127). It asks for the wording with `access=1`, and only that request passes
+`recordsRead`, so an officer reading it is recorded as standing in. The hub polls the same route
+for the house numbers without the flag, is given no access wording, and records nothing.
 
 **The night report flags every role an officer stood in for.** Its staffing section lists each
 bypass recorded against the performance, in role order: the role, the officer's name, and whether
@@ -48,9 +50,10 @@ manager's row is gone.
 - An officer who opens the hub, reads the door list and leaves is not on the report. One who admits
   a single person at the door is, once, for the night; one who reads the glance is, for the duty
   manager's role.
-- A new `GET` route that shows personal data only tonight's team may see must pass `recordsRead`.
-  A reviewer who finds such a route without it has found a defect; one that reads counts or
-  tonight's own programme needs nothing.
+- A new `GET` route that decrypts access-profile wording must pass `recordsRead`; one that reads
+  names, counts or tonight's programme needs nothing.
+- The season report's per-performance officer-bypass column (E-126) reads the same rows, so it now
+  counts acts only.
 - "Beside a confirmed shift" is its own finding: an officer acting while the rota says somebody
   else holds the role is a question about the rota, and the report now says which it was.
 - A report frozen before this record carries only the duty manager's flag, and the screen still

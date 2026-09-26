@@ -105,6 +105,22 @@ describe.skipIf(skip !== null)('an officer opens a show-night screen with no shi
     expect(bypasses(foh.id)).toEqual([])
   })
 
+  // The hub polls the glance's route for the house numbers; only reading the access wording is
+  // standing in, since it decrypts what the patron agreed to share (D-127, 0098).
+  test('the hub\'s poll records nothing, and the glance\'s read of the access wording does', async () => {
+    const officer = await registerMember(app, 'foh-glance', generatePassword())
+    await request(app, 'POST', '/api/admin/roles', { userId: officer.id, role: 'FOH_MANAGER' }, admin.cookie)
+    const target = `night:${night}:${house.venueId}:DUTY_MANAGER`
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect((await request(app, 'GET', `/api/tonight/duty-manager?venueId=${house.venueId}`, undefined, officer.cookie)).status).toBe(200)
+    }
+    expect(bypasses(officer.id).map(row => row.target)).not.toContain(target)
+
+    expect((await request(app, 'GET', `/api/tonight/duty-manager?venueId=${house.venueId}&access=1`, undefined, officer.cookie)).status).toBe(200)
+    expect(bypasses(officer.id).map(row => row.target)).toContain(target)
+  })
+
   test('acting is recorded once however many times the officer acts', async () => {
     for (let attempt = 0; attempt < 3; attempt++) expect((await resolveAtDoor(house.performanceId, foh.cookie)).status).toBe(200)
     const written = bypasses(foh.id).filter(row => row.target.endsWith(`:${house.venueId}:DOOR`))

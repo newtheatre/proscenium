@@ -150,9 +150,14 @@ describe('the bypass is recorded when the officer acts, not when a screen opens 
     expect(bypassIsRecorded('GET', true)).toBe(true)
   })
 
-  test('the glance, which reads the agreed access wording, asks to be recorded', async () => {
-    const source = await Bun.file('server/api/tonight/duty-manager.get.ts').text()
-    expect(source).toContain('{ recordsRead: true }')
+  // The hub polls the same route for the house, so only the glance's request for the wording records.
+  test('the glance\'s request for the access wording records, and only it decrypts', async () => {
+    const route = await Bun.file('server/api/tonight/duty-manager.get.ts').text()
+    expect(route).toContain('{ recordsRead: withAccess }')
+    expect(route).toContain('withAccess ? accessTonight(performanceId)')
+    expect(route).not.toContain('z.coerce.boolean')
+    expect(await Bun.file('app/pages/tonight/glance.vue').text()).toContain('{ query: { access: 1 } }')
+    expect(await Bun.file('app/pages/tonight/index.vue').text()).not.toContain('access: 1')
   })
 
   test('the role check the hub makes records nothing, since it is a read', async () => {
