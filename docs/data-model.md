@@ -2755,7 +2755,8 @@ confirmation (J-104, J-105). Policy pages resolve `{{TOKENS}}` against this tabl
 `id` PK · `actor_id` NULL = system · `action` · `target` · `detail` JSON (never personal
 free text) · `created_at`. Indexes on actor, action, target, created_at, and one partial unique
 index on (`actor_id`, `target`) covering `night.officer-bypass` alone, which is what holds that
-an officer bypass is recorded once per night, venue and role (0044, E-111).
+an officer bypass is recorded once per night, venue and role (0044, E-111), and only when the
+officer acts rather than looks (0098).
 Trigger-enforced: rows are never deleted, and no field may be rewritten except `detail`. The
 aim is that `detail` never carries identifying values (0011), but aim is not guarantee, so
 erasure can redact one that has. Everything that says what happened, and when, and to whom it

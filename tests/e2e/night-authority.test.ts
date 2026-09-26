@@ -63,6 +63,10 @@ function programme(suffix: string, status: 'ON_SALE' | 'CANCELLED' = 'ON_SALE'):
 const ask = (query: string, as?: string): Promise<Response> =>
   request(app, 'GET', `/api/tonight/authority?${query}`, undefined, as)
 
+// An act at the door that changes nothing: a typed reference resolved to itself (E-129 criterion 2).
+const resolveAtDoor = (performanceId: string, as?: string): Promise<Response> =>
+  request(app, 'POST', '/api/tonight/door/resolve', { scanned: 'ABC234', performanceId }, as)
+
 interface Resolved { night: string, role: string, venueId: string, performanceIds: string[], via: string }
 
 function bypasses(actorId: string): { target: string, detail: string }[] {
@@ -92,8 +96,17 @@ describe.skipIf(skip !== null)('an officer opens a show-night screen with no shi
     expect(resolved.performanceIds).toEqual([house.performanceId])
   })
 
-  test('the use is recorded once however many times the screen is opened', async () => {
-    for (let attempt = 0; attempt < 3; attempt++) await ask(`role=DOOR&venueId=${house.venueId}`, foh.cookie)
+  // 0098: the role check every screen makes is a read, and looking is not standing in.
+  test('opening the screens records nothing, however often', async () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      expect((await ask(`role=DOOR&venueId=${house.venueId}`, foh.cookie)).status).toBe(200)
+      expect((await ask(`role=DUTY_MANAGER&venueId=${house.venueId}`, foh.cookie)).status).toBe(200)
+    }
+    expect(bypasses(foh.id)).toEqual([])
+  })
+
+  test('acting is recorded once however many times the officer acts', async () => {
+    for (let attempt = 0; attempt < 3; attempt++) expect((await resolveAtDoor(house.performanceId, foh.cookie)).status).toBe(200)
     const written = bypasses(foh.id).filter(row => row.target.endsWith(`:${house.venueId}:DOOR`))
     expect(written.length).toBe(1)
     expect(JSON.parse(written[0]!.detail)).toMatchObject({ role: 'DOOR', night, venueId: house.venueId })
@@ -102,14 +115,14 @@ describe.skipIf(skip !== null)('an officer opens a show-night screen with no shi
   // The lead's question, answered: without the venue in the key the second venue's night report
   // would show nothing (0044).
   test('a second venue on the same night is recorded separately', async () => {
-    await ask(`role=DOOR&venueId=${studio.venueId}`, foh.cookie)
+    await resolveAtDoor(studio.performanceId, foh.cookie)
     const targets = bypasses(foh.id).map(row => row.target)
     expect(targets).toContain(`night:${night}:${house.venueId}:DOOR`)
     expect(targets).toContain(`night:${night}:${studio.venueId}:DOOR`)
   })
 
   test('a second role at the same venue is recorded separately', async () => {
-    await ask(`role=DUTY_MANAGER&venueId=${house.venueId}`, foh.cookie)
+    await request(app, 'POST', '/api/tonight/checklist/no-such-stamp/tick', { performanceId: house.performanceId }, foh.cookie)
     expect(bypasses(foh.id).map(row => row.target)).toContain(`night:${night}:${house.venueId}:DUTY_MANAGER`)
   })
 })
@@ -299,6 +312,7 @@ describe.skipIf(skip !== null)('a confirmed shift is tonight\'s authority, tried
     shiftFor(house.performanceId, 'DOOR', holder.id)
 
     await ask(`role=DOOR&performanceId=${house.performanceId}`, holder.cookie)
+    expect((await resolveAtDoor(house.performanceId, holder.cookie)).status).toBe(200)
     expect(bypasses(holder.id)).toEqual([])
   })
 
@@ -410,14 +424,17 @@ describe.skipIf(skip !== null)('the bar opens on a night with nothing running (F
 
   // The bar manager's own way in on a hire the rota never covered: the venue is what stands in
   // for the performance, and the bypass records that there was none.
-  test('the bar manager opens the till at a named venue with nothing running, and it is recorded', async () => {
+  test('the bar manager opens the till at a named venue with nothing running, and acting there is recorded', async () => {
     const venueId = hireVenue()
     const response = await ask(`role=BAR&venueId=${venueId}`, bar.cookie)
     expect(response.status).toBe(200)
     const resolved = await response.json() as Resolved
     expect(resolved).toMatchObject({ venueId, via: 'OFFICER' })
     expect(resolved.performanceIds).toEqual([])
+    expect(bypasses(bar.id).filter(row => row.target.endsWith(`:${venueId}:BAR`))).toEqual([])
 
+    // Pricing a basket is the till acting, whether or not a session is open to sell into (0098).
+    await request(app, 'POST', '/api/till/price', { venueId, lines: [{ variantId: 'no-such-variant', qty: 1 }] }, bar.cookie)
     const written = bypasses(bar.id).filter(row => row.target.endsWith(`:${venueId}:BAR`))
     expect(written.length).toBe(1)
     expect(JSON.parse(written[0]!.detail)).toMatchObject({ role: 'BAR', night, venueId, performanceIds: [] })

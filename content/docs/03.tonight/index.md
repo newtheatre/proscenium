@@ -21,8 +21,8 @@ address also works typed into any phone.
 duty manager shift on one of tonight's performances is the ordinary way in, and it stops working
 at 04:00 with nothing to revoke. Two roles open the screens anyway when the rota is wrong at
 19:20: the Front of House Manager opens the door and the duty manager's screens, and the Bar
-Manager opens the till. Every opening of that kind is recorded and flagged on the night report,
-which is how the committee sees a rota that is not being kept.
+Manager opens the till. Every act they take there is recorded and flagged on the night report,
+which is how the committee sees a rota that is not being kept; looking at a screen is not.
 ::
 
 ## If something goes wrong
@@ -130,8 +130,10 @@ required pre-show checklist item that is still not done.
 
 ## What happens next
 
-An officer opening a screen with no shift writes one audit entry per night, venue and role, and
-the night report's staffing section flags it. A shift holder writes nothing extra: the rota's own
+An officer acting on a screen with no shift (admitting at the door, selling at the till, ticking
+the checklist, logging an incident, closing the night, or reading tonight at a glance) writes one
+audit entry per night, venue and role, and the night report's staffing section names the officer
+and the role. Only looking at a screen records nothing. A shift holder writes nothing extra: the rota's own
 claim and confirmation are the record of how they came to hold it. Every admission, sale, check
 and incident logged from these screens keys to a performance, never to a day.
 
