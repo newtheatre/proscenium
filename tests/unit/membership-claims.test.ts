@@ -5,6 +5,7 @@ import {
   CLAIM_REASON_LIMIT,
   canTransition,
   claimDeclineForm,
+  claimFormStart,
   claimsWaitingClaimFor,
   membershipClaimForm,
 } from '#shared/utils/membership-claims'
@@ -59,6 +60,28 @@ describe('what a claim carries (A-130 criterion 1)', () => {
     for (const term of [0, 2, 4, '1', undefined]) {
       expect(membershipClaimForm.safeParse({ ...good, term }).success).toBe(false)
     }
+  })
+
+  // Nearly every cutover claim is for a day that is not today, so no day is assumed (issue 1343).
+  test('a claim with no purchase day asks for the date on the SU receipt', () => {
+    const { studentId, term } = good
+    const answer = membershipClaimForm.safeParse({ studentId, term })
+    expect(answer.success).toBe(false)
+    expect(answer.error?.issues.find(issue => issue.path[0] === 'startsOn')?.message).toBe('Give the date on your SU receipt')
+  })
+})
+
+describe('where the claim form starts (issue 1343)', () => {
+  test('no purchase day, a one-year term, and the number the account already holds', () => {
+    expect(claimFormStart('20123456', '20999999')).toStrictEqual({ studentId: '20123456', term: 1 })
+  })
+
+  test('with no number recorded, the one last claimed, so a declined claim is put right rather than retyped', () => {
+    expect(claimFormStart(null, '20999999').studentId).toBe('20999999')
+  })
+
+  test('with neither, a blank number', () => {
+    expect(claimFormStart(null, null).studentId).toBe('')
   })
 })
 

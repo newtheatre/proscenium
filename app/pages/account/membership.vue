@@ -3,7 +3,7 @@ import { saysDayLong } from '#shared/utils/when'
 import { MEMBERSHIP_TERMS, londonDay, saysMembershipState } from '#shared/utils/membership'
 import { saysMembershipSentence } from '#shared/utils/my-summary'
 import type { MembershipState } from '#shared/utils/membership'
-import { membershipClaimForm } from '#shared/utils/membership-claims'
+import { claimFormStart, membershipClaimForm } from '#shared/utils/membership-claims'
 import type { MembershipClaimInput } from '#shared/utils/membership-claims'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { PolicyValues } from '#shared/utils/policy-tokens'
@@ -26,6 +26,7 @@ interface Own {
   state: MembershipState
   graceDays: number
   claim: OwnClaim | null
+  studentId: string | null
 }
 
 const request = useRequestFetch()
@@ -37,7 +38,7 @@ const today = londonDay(new Date())
 const { data, refresh, error } = await useAsyncData<Own>(
   'account-membership',
   () => request<Own>('/api/account/membership'),
-  { default: (): Own => ({ membership: null, state: { kind: 'none' }, graceDays: 0, claim: null }) },
+  { default: (): Own => ({ membership: null, state: { kind: 'none' }, graceDays: 0, claim: null, studentId: null }) },
 )
 const listFailure = useListFailure(error, 'Your membership could not be read.')
 
@@ -61,8 +62,7 @@ const standing = computed(() => {
 
 const termLabel = (years: number): string => `${years} year${years === 1 ? '' : 's'}`
 
-// The form starts from today because most people claim on the day they bought it.
-const claim = reactive<Partial<MembershipClaimInput>>({ studentId: '', startsOn: today, term: 1 })
+const claim = reactive<Partial<MembershipClaimInput>>(claimFormStart(data.value.studentId, data.value.claim?.studentId ?? null))
 const claimForm = useTemplateRef('claimForm')
 const submitting = ref(false)
 const withdrawing = ref(false)
@@ -73,8 +73,7 @@ async function submit(event: FormSubmitEvent<MembershipClaimInput>): Promise<voi
   failure.value = null
   try {
     await $fetch('/api/account/membership/claim', { method: 'POST', body: event.data })
-    toast.add({ title: 'Claim sent', description: 'An officer will record it against the SU\'s list.', icon: 'i-lucide-check', color: 'success' })
-    claim.studentId = ''
+    toast.add({ title: 'Claim sent', description: 'An officer records it, usually within a day.', icon: 'i-lucide-check', color: 'success' })
     await refresh()
   }
   catch (error) {
@@ -225,7 +224,7 @@ useSeoMeta({ title: 'Membership' })
             <dd>{{ termLabel(open.term) }}</dd>
           </dl>
           <p class="text-muted">
-            An officer checks it against the SU's list and records it. You will hear either way.
+            An officer records it, usually within a day. The committee checks memberships against the SU's list later.
           </p>
           <UButton
             data-test="claim-withdraw"
@@ -283,7 +282,7 @@ useSeoMeta({ title: 'Membership' })
             <UFormField
               name="startsOn"
               label="Bought on"
-              description="The term runs from this day."
+              description="The date on your SU receipt. The term runs from this day."
               required
             >
               <DateField
