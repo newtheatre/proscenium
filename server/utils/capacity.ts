@@ -34,8 +34,8 @@ export function heldSeatsQuery(performanceId: string): SQL {
   return sql`SELECT ${heldSeatsSubquery(sql`${performanceId}`)} AS held`
 }
 
-// The same predicate correlated to one booking rather than to a house: the party the door, the till
-// and the glance expect through. Its own aliases, so a caller's `r.id` binds to the caller's row (#1295).
+// The same predicate correlated to one booking: its party, where a row count would call a refunded
+// seat somebody arriving. Its own aliases, so a caller's `r.id` binds to the caller's row (#1295).
 export function heldSeatsForReservation(reservationId: SQL): SQL {
   return sql`(
     SELECT count(*) FROM ${sql.raw(TICKETS)} party_t
