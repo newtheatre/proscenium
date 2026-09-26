@@ -3,7 +3,7 @@ title: Rota
 description: Setting a show night up from the console, from the venue's staffing to the wings device.
 module: Show night
 audience: committee
-updatedOn: 2026-09-22
+updatedOn: 2026-09-26
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -43,7 +43,7 @@ reaches these screens: a confirmed shift opens the night's tools, and a role ope
   ::card{icon="i-lucide-shield-alert" title="Safety" to="/docs/rota/safety"}
   Which incident severities reach the Safety Officer, and closing the follow-ups they open.
   ::
-  ::card{icon="i-lucide-file-down" title="Age-check register" to="/docs/rota/age-check-register"}
+  ::card{icon="i-lucide-file-down" title="Challenge 25 register" to="/docs/rota/challenge-25-register"}
   Exporting the Challenge 25 register for a licensing inspection.
   ::
   ::card{icon="i-lucide-radio" title="Backstage board" to="/docs/rota/backstage-board"}

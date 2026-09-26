@@ -105,7 +105,8 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Approvals', icon: 'i-lucide-check-check', to: '/rota/manage/approvals', ability: viewRota, section: 'Every day' },
       { label: 'Bar openings', icon: 'i-lucide-store', to: '/rota/manage/openings', ability: viewRota, section: 'Every day' },
       { label: 'Safety', icon: 'i-lucide-hard-hat', to: '/rota/manage/safety', ability: viewSafety, section: 'Every day' },
-      { label: 'Age-check register', icon: 'i-lucide-id-card', to: '/rota/manage/age-checks', ability: exportAgeChecks, section: 'Every day' },
+      // What the door calls it, so one register has one name everywhere (issue 1365).
+      { label: 'Challenge 25 register', icon: 'i-lucide-id-card', to: '/rota/manage/age-checks', ability: exportAgeChecks, section: 'Every day' },
       { label: 'Shift templates', icon: 'i-lucide-layout-template', to: '/rota/manage/templates', ability: viewRota, section: 'Set-up' },
       { label: 'Checklists', icon: 'i-lucide-list-checks', to: '/rota/manage/checklists', ability: viewChecklist, section: 'Set-up' },
       { label: 'Emergency cards', icon: 'i-lucide-siren', to: '/rota/manage/emergency', ability: viewEmergencyCard, section: 'Set-up' },
@@ -150,7 +151,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Stocktakes', icon: 'i-lucide-clipboard-list', to: '/bar/stock/stocktakes', ability: viewBarStock, section: 'Every day' },
       { label: 'Order list', icon: 'i-lucide-truck', to: '/bar/stock/order-list', ability: viewBarStock, section: 'Every day' },
       { label: 'Tabs', icon: 'i-lucide-receipt', to: '/bar/tabs', ability: manageBarTabs, section: 'Every day' },
-      { label: 'Reports', icon: 'i-lucide-bar-chart-3', to: '/bar/reports', ability: viewBarReports, section: 'Every day' },
+      { label: 'Bar reports', icon: 'i-lucide-bar-chart-3', to: '/bar/reports', ability: viewBarReports, section: 'Every day' },
       { label: 'Products', icon: 'i-lucide-cup-soda', to: '/bar/products', ability: viewBarCatalogue, section: 'Set-up' },
       { label: 'Product categories', icon: 'i-lucide-layout-grid', to: '/bar/categories', ability: viewBarCatalogue, section: 'Set-up' },
       { label: 'Discounts', icon: 'i-lucide-percent', to: '/bar/discounts', ability: viewBarCatalogue, section: 'Set-up' },
@@ -221,14 +222,14 @@ export const CONSOLE_NAV: NavGroup[] = [
   },
 
   // Module E's cross-season reports: read by front of house, safety and the committee, so a
-  // group of their own rather than a corner of any one of theirs (E-126 criterion 5).
+  // group of their own, which the sidebar draws as its one entry (E-126 criterion 5, 0105).
   {
     key: 'reports',
     label: 'Reports',
     icon: 'i-lucide-chart-line',
     prefix: '/reports',
     items: [
-      { label: 'Reports', icon: 'i-lucide-chart-no-axes-combined', to: '/reports', ability: viewReports },
+      { label: 'Night reports', icon: 'i-lucide-chart-no-axes-combined', to: '/reports', ability: viewReports },
     ],
   },
 

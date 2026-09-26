@@ -2,6 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-09-21
+- Amended by: 0105
 
 ## Context
 

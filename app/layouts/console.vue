@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { can } from '#shared/utils/abilities'
+import { SIDEBAR_DEFAULT_SIZE, SIDEBAR_MAX_SIZE, openOnArrival, sidebarParts } from '#shared/utils/console-sidebar'
 import { CONSOLE_HOME, CONSOLE_NAV, groupFor, navCount } from '#shared/utils/site-nav'
 import type { NavEntry, NavSection } from '#shared/utils/site-nav'
 import type { NavigationMenuItem } from '@nuxt/ui'
@@ -41,6 +42,12 @@ watch(() => route.path, (path) => {
   if (key && !opened.value.includes(key)) opened.value = [...opened.value, key]
 }, { immediate: true })
 
+// A viewer with one group to choose finds it open, whatever screen they land on (0105).
+watch(groups, (visible) => {
+  const lone = openOnArrival(visible).filter(key => !opened.value.includes(key))
+  if (lone.length) opened.value = [...opened.value, ...lone]
+}, { immediate: true })
+
 // Muted section headings, and none when the sidebar is collapsed: a collapsed group opens as a
 // popover, which draws every child as a link and so has nowhere to put a heading (0082).
 function withSections(items: NavEntry[], collapsed: boolean): NavigationMenuItem[] {
@@ -56,13 +63,16 @@ function withSections(items: NavEntry[], collapsed: boolean): NavigationMenuItem
 
 function items(collapsed: boolean): NavigationMenuItem[][] {
   const first: NavigationMenuItem[] = home.value ? [link(CONSOLE_HOME)] : []
-  const rest: NavigationMenuItem[] = groups.value.map(group => ({
-    label: group.label,
-    icon: group.icon,
-    value: group.key,
-    badge: badge(navCount(group.items, counts.value)),
-    children: withSections(group.items, collapsed),
-  }))
+  // A group of one is drawn as its entry, in the group's place (0105).
+  const rest: NavigationMenuItem[] = sidebarParts(groups.value).map(part => part.kind === 'entry'
+    ? link(part.entry)
+    : {
+        label: part.group.label,
+        icon: part.group.icon,
+        value: part.group.key,
+        badge: badge(navCount(part.group.items, counts.value)),
+        children: withSections(part.group.items, collapsed),
+      })
   const dev: NavigationMenuItem[] = import.meta.dev
     // Development only, and absent from a build because the page it points at is (K-124).
     ? [{ label: 'Developer tools', icon: 'i-lucide-flask-conical', to: '/dev' }]
@@ -76,6 +86,8 @@ function items(collapsed: boolean): NavigationMenuItem[][] {
     <UDashboardSidebar
       collapsible
       resizable
+      :default-size="SIDEBAR_DEFAULT_SIZE"
+      :max-size="SIDEBAR_MAX_SIZE"
     >
       <template #header>
         <NuxtLink
