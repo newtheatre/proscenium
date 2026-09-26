@@ -3,7 +3,7 @@ import { join, sep } from 'node:path'
 import { ABILITY_PERMISSIONS, can, manageTonight, reachConsole, workTheDoor, workTheTill } from '#shared/utils/abilities'
 import { isAuditAction } from '#shared/utils/audit-actions'
 import { AUDIT_COVERAGE } from '#shared/utils/audit-coverage'
-import { OPERATIONAL_PERMISSIONS, PERMISSION_MAP } from '#shared/utils/roles'
+import { OPERATIONAL_PERMISSIONS, PERMISSION_MAP, saysRole } from '#shared/utils/roles'
 import {
   CLAIM_CONFIRMER,
   NIGHT_ROLES,
@@ -119,7 +119,7 @@ describe('a refusal names what would unlock it (E-111, F-101 criterion 5)', () =
       expect(refusal.statusCode).toBe(403)
       expect(refusal.statusMessage).toContain('claimed')
       expect(refusal.statusMessage).toContain('not confirmed')
-      expect(refusal.statusMessage).toContain(CLAIM_CONFIRMER.words)
+      expect(refusal.statusMessage).toContain(saysRole(CLAIM_CONFIRMER))
       expect(refusal.statusMessage).not.toContain(role)
     }
     expect(claimedShiftRefusal('DOOR').statusMessage)
@@ -127,7 +127,7 @@ describe('a refusal names what would unlock it (E-111, F-101 criterion 5)', () =
   })
 
   test('whoever the claimed refusal names can confirm a claim (E-105)', () => {
-    expect(PERMISSION_MAP[CLAIM_CONFIRMER.role] as readonly string[]).toContain('rota.write')
+    expect(PERMISSION_MAP[CLAIM_CONFIRMER] as readonly string[]).toContain('rota.write')
   })
 })
 

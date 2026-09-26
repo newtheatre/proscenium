@@ -7,7 +7,7 @@ import { saysTeamHolder } from '#shared/utils/tonight'
 import { saysClock } from '#shared/utils/when'
 import type { Category, Severity } from '#shared/utils/incidents'
 import type { NightReportSigner } from '#shared/utils/night-signoff'
-import type { ShiftRole } from '#shared/utils/rota'
+import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/night-report' })
 useSeoMeta({ title: 'Night report' })
@@ -20,7 +20,7 @@ interface Report {
   incidents: { id: string, category: Category, severity: Severity, body: string, happenedAt: number, supersededBy: string | null, followUpRequired: boolean }[]
   ageChecks: { accepted: number, refused: number }
   milestones: { id: string, label: string, composedAt: number, supersededBy: string | null }[]
-  staffing: { shiftId: string, role: ShiftRole, slot: number, status: string, name: string | null, officerBypass: boolean }[]
+  staffing: { shiftId: string, role: ShiftRole, slot: number, status: ShiftStatus, name: string | null, officerBypass: boolean }[]
   bar: { revenuePence: number, itemsSold: number }
   access: { verified: number }
   checklist: { id: string, label: string, exempted: boolean, exemptReason: string | null }[]

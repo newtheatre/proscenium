@@ -12,6 +12,7 @@ import { daysAfter } from '#shared/utils/membership'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
+import type { ConfirmedShiftScope } from '#server/utils/rota'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
@@ -174,14 +175,14 @@ describe('the performance a screen is asked about', () => {
   })
 })
 
+function rostered(database: TestDatabase, id: string, performanceId: string, role: ShiftRole, userId: string, status: ShiftStatus = 'CONFIRMED'): void {
+  database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+    id, performanceId, role, userId, status]])
+}
+
 // The emergency card names who to ring after 999, and the number comes from tonight's own rota
 // rather than a standing list (E-113, 0009, issue 1150 item 14).
 describe('who to ring after 999 (E-113 criterion 1)', () => {
-  function shift(database: TestDatabase, id: string, performanceId: string, role: string, userId: string): void {
-    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
-      id, performanceId, role, userId, 'CONFIRMED']])
-  }
-
   function team(database: TestDatabase, performanceIds: string[]): ReturnType<typeof readTeamRow>[] {
     return performanceIds
       .flatMap(id => read(database, tonightTeamQuery(id)) as Parameters<typeof readTeamRow>[0][])
@@ -193,7 +194,7 @@ describe('who to ring after 999 (E-113 criterion 1)', () => {
       const tonight = tonightsPerformance(database)
       const who = person(database, 'dm-consenting')
       database.batch([['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', who]])
-      shift(database, 'dm-shift', tonight.performanceId, 'DUTY_MANAGER', who)
+      rostered(database, 'dm-shift', tonight.performanceId, 'DUTY_MANAGER', who)
 
       expect(dutyManagersOnCall(team(database, [tonight.performanceId])))
         .toEqual([{ name: 'Someone dm-consenting', phone: '07700 900000' }])
@@ -204,7 +205,7 @@ describe('who to ring after 999 (E-113 criterion 1)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       const who = person(database, 'dm-quiet')
-      shift(database, 'dm-quiet-shift', tonight.performanceId, 'DUTY_MANAGER', who)
+      rostered(database, 'dm-quiet-shift', tonight.performanceId, 'DUTY_MANAGER', who)
 
       expect(dutyManagersOnCall(team(database, [tonight.performanceId]))).toEqual([])
     })
@@ -214,11 +215,8 @@ describe('who to ring after 999 (E-113 criterion 1)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       const who = person(database, 'dm-claimed')
-      database.batch([
-        ['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', who],
-        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
-          'dm-claimed-shift', tonight.performanceId, 'DUTY_MANAGER', who, 'CLAIMED'],
-      ])
+      database.batch([['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', who]])
+      rostered(database, 'dm-claimed-shift', tonight.performanceId, 'DUTY_MANAGER', who, 'CLAIMED')
 
       expect(dutyManagersOnCall(team(database, [tonight.performanceId]))).toEqual([])
     })
@@ -229,7 +227,7 @@ describe('who to ring after 999 (E-113 criterion 1)', () => {
       const tonight = tonightsPerformance(database)
       const who = person(database, 'door-consenting')
       database.batch([['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', who]])
-      shift(database, 'door-shift', tonight.performanceId, 'DOOR', who)
+      rostered(database, 'door-shift', tonight.performanceId, 'DOOR', who)
 
       expect(dutyManagersOnCall(team(database, [tonight.performanceId]))).toEqual([])
     })
@@ -243,8 +241,8 @@ describe('who to ring after 999 (E-113 criterion 1)', () => {
       const evening = tonightsPerformance(database, { suffix: 'evening' })
       const who = person(database, 'dm-both')
       database.batch([['INSERT INTO shift_contact_preferences (user_id, visible) VALUES (?, 1)', who]])
-      shift(database, 'dm-matinee', matinee.performanceId, 'DUTY_MANAGER', who)
-      shift(database, 'dm-evening', evening.performanceId, 'DUTY_MANAGER', who)
+      rostered(database, 'dm-matinee', matinee.performanceId, 'DUTY_MANAGER', who)
+      rostered(database, 'dm-evening', evening.performanceId, 'DUTY_MANAGER', who)
 
       expect(dutyManagersOnCall(team(database, [matinee.performanceId, evening.performanceId])))
         .toEqual([{ name: 'Someone dm-both', phone: '07700 900000' }])
@@ -260,24 +258,33 @@ describe('a claim waiting tonight, for the refusal that names it', () => {
     return [Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)]
   }
 
-  function claimed(database: TestDatabase, userId: string, role: ShiftRole, night: string): boolean {
-    const [row] = read<{ claimed: number }>(database, claimedShiftTonightQuery(userId, role, ...bounds(night)))
+  function claimed(database: TestDatabase, userId: string, role: ShiftRole, night: string, scope: ConfirmedShiftScope = {}): boolean {
+    const [row] = read<{ claimed: number }>(database, claimedShiftTonightQuery(userId, role, ...bounds(night), scope))
     return Boolean(row?.claimed)
-  }
-
-  function shift(database: TestDatabase, id: string, performanceId: string, role: ShiftRole, userId: string, status: ShiftStatus): void {
-    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
-      id, performanceId, role, userId, status]])
   }
 
   test('a door claim tonight is found for the door, and not for the bar', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       const who = person(database, 'tomasz')
-      shift(database, 'door-claimed', tonight.performanceId, 'DOOR', who, 'CLAIMED')
+      rostered(database, 'door-claimed', tonight.performanceId, 'DOOR', who, 'CLAIMED')
 
       expect(claimed(database, who, 'DOOR', tonight.night)).toBe(true)
       expect(claimed(database, who, 'BAR', tonight.night)).toBe(false)
+    })
+  })
+
+  // Confirming a claim at one venue would not open another, so an ask there is not told about it.
+  test('a door claim at another venue or on another performance is not found for a narrowed ask', async () => {
+    await withDatabase(async (database) => {
+      const house = tonightsPerformance(database)
+      const studio = tonightsPerformance(database, { suffix: 'studio' })
+      const who = person(database, 'tomasz')
+      rostered(database, 'door-claimed', house.performanceId, 'DOOR', who, 'CLAIMED')
+
+      expect(claimed(database, who, 'DOOR', house.night, { venueId: house.venueId })).toBe(true)
+      expect(claimed(database, who, 'DOOR', house.night, { venueId: studio.venueId })).toBe(false)
+      expect(claimed(database, who, 'DOOR', house.night, { performanceId: studio.performanceId })).toBe(false)
     })
   })
 
@@ -288,9 +295,9 @@ describe('a claim waiting tonight, for the refusal that names it', () => {
       const confirmed = person(database, 'confirmed')
       const declined = person(database, 'declined')
       const early = person(database, 'early')
-      shift(database, 'door-confirmed', tonight.performanceId, 'DOOR', confirmed, 'CONFIRMED')
-      shift(database, 'dm-declined', tonight.performanceId, 'DUTY_MANAGER', declined, 'DECLINED')
-      shift(database, 'door-tomorrow', tomorrow.performanceId, 'DOOR', early, 'CLAIMED')
+      rostered(database, 'door-confirmed', tonight.performanceId, 'DOOR', confirmed, 'CONFIRMED')
+      rostered(database, 'dm-declined', tonight.performanceId, 'DUTY_MANAGER', declined, 'DECLINED')
+      rostered(database, 'door-tomorrow', tomorrow.performanceId, 'DOOR', early, 'CLAIMED')
 
       expect(claimed(database, confirmed, 'DOOR', tonight.night)).toBe(false)
       expect(claimed(database, declined, 'DUTY_MANAGER', tonight.night)).toBe(false)
@@ -313,6 +320,8 @@ describe('a claim waiting tonight, for the refusal that names it', () => {
 
       expect(claimed(database, who, 'BAR', night)).toBe(true)
       expect(claimed(database, who, 'DOOR', night)).toBe(false)
+      expect(claimed(database, who, 'BAR', night, { venueId: venue.id })).toBe(true)
+      expect(claimed(database, who, 'BAR', night, { venueId: 'venue-elsewhere' })).toBe(false)
     })
   })
 })

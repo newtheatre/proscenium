@@ -1,4 +1,5 @@
 import { auditEntry } from './audit'
+import { saysRole } from './roles'
 import type { AuditRow } from './audit'
 import type { Permission, Role } from './roles'
 
@@ -64,7 +65,7 @@ export function nightAuthorityRefusal(role: NightRole): { statusCode: 403, statu
 
 // Whoever confirms a queued claim (E-105): a unit test fails when this role stops holding
 // `rota.write`, so the refusal below cannot send a volunteer to somebody who cannot help.
-export const CLAIM_CONFIRMER: { role: Role, words: string } = { role: 'FOH_MANAGER', words: 'the Front of House Manager' }
+export const CLAIM_CONFIRMER: Role = 'FOH_MANAGER'
 
 const CLAIMED_ROLE_WORDS: Record<NightRole, string> = { DUTY_MANAGER: 'duty manager', DOOR: 'door', BAR: 'bar' }
 
@@ -73,7 +74,7 @@ const CLAIMED_ROLE_WORDS: Record<NightRole, string> = { DUTY_MANAGER: 'duty mana
 export function claimedShiftRefusal(role: NightRole): { statusCode: 403, statusMessage: string } {
   return {
     statusCode: 403,
-    statusMessage: `Your ${CLAIMED_ROLE_WORDS[role]} shift tonight is claimed, not confirmed yet: ${CLAIM_CONFIRMER.words} confirms it on the rota`,
+    statusMessage: `Your ${CLAIMED_ROLE_WORDS[role]} shift tonight is claimed, not confirmed yet: the ${saysRole(CLAIM_CONFIRMER)} confirms it on the rota`,
   }
 }
 

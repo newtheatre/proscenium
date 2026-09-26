@@ -2,6 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { heldSeatsSubquery } from './capacity'
 import { showNightBounds } from '#shared/utils/show-night'
+import type { ConfirmedShiftScope } from './rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { SQL } from 'drizzle-orm'
 
@@ -85,15 +86,19 @@ export async function tonightTeam(performanceId: string): Promise<TonightTeamMem
   return rows.map(readTeamRow)
 }
 
-// A claim of this role waiting for an officer on tonight's programme, so a refusal can name it; a
-// bar claim may sit on a performance or on tonight's bar opening (E-104, 0077).
-export function claimedShiftTonightQuery(userId: string, role: ShiftRole, from: number, to: number): SQL {
+// A claim of this role waiting for an officer, inside the request's own scope on tonight's
+// programme; a bar claim may sit on a performance or on tonight's bar opening (E-104, 0077).
+export function claimedShiftTonightQuery(userId: string, role: ShiftRole, from: number, to: number, scope: ConfirmedShiftScope = {}): SQL {
+  const atVenue = scope.venueId ? sql` AND p.venue_id = ${scope.venueId}` : sql``
+  const atPerformance = scope.performanceId ? sql` AND p.id = ${scope.performanceId}` : sql``
+  // Narrowed as the guard's own opening lookup is: by venue alone, since an opening names no performance.
+  const openingAtVenue = scope.venueId ? sql` AND o.venue_id = ${scope.venueId}` : sql``
   const opening = role === 'BAR'
     ? sql` OR EXISTS (
         SELECT 1 FROM bar_opening_shifts os
         JOIN bar_openings o ON o.id = os.opening_id
         WHERE os.user_id = ${userId} AND os.status = 'CLAIMED'
-          AND o.status <> 'CANCELLED' AND o.starts_at >= ${from} AND o.starts_at < ${to}
+          AND o.status <> 'CANCELLED' AND o.starts_at >= ${from} AND o.starts_at < ${to}${openingAtVenue}
       )`
     : sql``
   return sql`
@@ -101,15 +106,15 @@ export function claimedShiftTonightQuery(userId: string, role: ShiftRole, from: 
       SELECT 1 FROM shifts s
       JOIN performances p ON p.id = s.performance_id
       WHERE s.user_id = ${userId} AND s.role = ${role} AND s.status = 'CLAIMED'
-        AND p.status <> 'CANCELLED' AND p.starts_at >= ${from} AND p.starts_at < ${to}
+        AND p.status <> 'CANCELLED' AND p.starts_at >= ${from} AND p.starts_at < ${to}${atVenue}${atPerformance}
     )${opening}) AS claimed
   `
 }
 
-export async function claimedShiftTonight(userId: string, role: ShiftRole, night: string): Promise<boolean> {
+export async function claimedShiftTonight(userId: string, role: ShiftRole, night: string, scope: ConfirmedShiftScope = {}): Promise<boolean> {
   const { from, to } = showNightBounds(night)
   const [row] = await db.all<{ claimed: number }>(
-    claimedShiftTonightQuery(userId, role, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)),
+    claimedShiftTonightQuery(userId, role, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000), scope),
   )
   return Boolean(row?.claimed)
 }

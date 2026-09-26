@@ -172,7 +172,7 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
   if (!resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) {
     if (held.outsideWindow) throw createError(outsideWindowRefusal(held.outsideWindow))
     // A claim still waiting is named, with who confirms it, rather than refused as no shift at all.
-    if (await claimedShiftTonight(resolved.account.id, role, tonight)) throw createError(claimedShiftRefusal(role))
+    if (await claimedShiftTonight(resolved.account.id, role, tonight, scope)) throw createError(claimedShiftRefusal(role))
     throw createError(nightAuthorityRefusal(role))
   }
   // A bypass is a standing grant being used, so it carries the gate that grant carries elsewhere

@@ -59,7 +59,7 @@ async function resolveAuthority(): Promise<void> {
   }
 }
 
-interface TeamSlot { role: NightRole, filled: boolean, claimed: boolean, name: string | null, phone: string | null }
+interface TeamSlot { shiftId: string, role: NightRole, filled: boolean, claimed: boolean, name: string | null, phone: string | null }
 
 const team = ref<TeamSlot[]>([])
 
@@ -245,7 +245,7 @@ async function submitCorrect(): Promise<void> {
             </p>
             <div
               v-for="slot in team"
-              :key="`${slot.role}-${slot.filled ? 'on' : slot.claimed ? 'claimed' : 'unfilled'}-${slot.name ?? ''}`"
+              :key="slot.shiftId"
               class="flex items-center gap-3 rounded-xl bg-elevated"
               :class="slot.filled ? 'p-4' : 'px-4 py-2'"
               :data-test="`team-${slot.role}`"
