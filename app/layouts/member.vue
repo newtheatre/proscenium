@@ -36,6 +36,8 @@ const links = computed(() => MY_NAV
       </UHeader>
     </div>
 
+    <OnShiftBar />
+
     <UMain class="grow">
       <!-- The strip is contained; the page is not, because every member screen already brings its
            own container. Below sm the header's menu holds the same list (0104). -->

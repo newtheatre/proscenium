@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { landingAfterSignIn } from '#shared/utils/night-authority'
+
 const route = useRoute()
-const { refresh } = useAccount()
+const { account, refresh } = useAccount()
 
 type Outcome = 'working' | 'challenge' | 'expired'
 
@@ -43,7 +45,8 @@ const askAgain = computed(() =>
 
 async function signedIn(): Promise<void> {
   await refresh()
-  await navigateTo(nextPath.value)
+  // An explicit next wins; with none, somebody on shift lands on Tonight (0094).
+  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight))
 }
 
 useSeoMeta({

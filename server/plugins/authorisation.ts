@@ -12,7 +12,7 @@ export default defineNitroPlugin((nitroApp) => {
         const [term, graceDays, onShift, keepsTab] = await Promise.all([
           longestTerm(account.id),
           configValue(event, 'MEMBERSHIP_GRACE_DAYS'),
-          onShiftTonight(account.id),
+          onShiftTonight(event, account.id),
           keepsBarTab(event, account.id),
         ])
         const viewer: Viewer = {

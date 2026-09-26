@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import * as z from 'zod'
+import { landingAfterSignIn } from '#shared/utils/night-authority'
 import type { AuthFormField, ButtonProps, FormSubmitEvent } from '@nuxt/ui'
 
 // Somebody already signed in has nothing to do here, and typing a second set of details would
@@ -7,7 +8,7 @@ import type { AuthFormField, ButtonProps, FormSubmitEvent } from '@nuxt/ui'
 definePageMeta({ middleware: 'signed-out', docs: '/docs/getting-started/signing-in' })
 
 const route = useRoute()
-const { refresh } = useAccount()
+const { account, refresh } = useAccount()
 
 // The Google route redirects here with a code rather than a sentence, so the wording lives on
 // the page that shows it (A-104).
@@ -122,7 +123,8 @@ async function signInWithPasskey(): Promise<void> {
 
 async function signedIn(): Promise<void> {
   await refresh()
-  await navigateTo(nextPath.value)
+  // An explicit next wins; with none, somebody on shift lands on Tonight (0094).
+  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight))
 }
 
 useSeoMeta({ title: 'Sign in' })

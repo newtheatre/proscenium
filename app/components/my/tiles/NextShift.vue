@@ -1,11 +1,19 @@
 <script setup lang="ts">
+import { isNightRole } from '#shared/utils/night-authority'
+import { saysShiftRole } from '#shared/utils/rota'
 import { saysWhen } from '#shared/utils/when'
 import type { MySummary } from '#shared/utils/my-summary'
 
 const props = defineProps<{ summary: MySummary }>()
 
 const badgeColor = computed(() => (props.summary.shift?.status === 'CONFIRMED' ? 'success' : 'neutral'))
-const badgeLabel = computed(() => (props.summary.shift?.status === 'CONFIRMED' ? 'Confirmed' : 'Claimed'))
+// A claim opens nothing until an officer confirms it, so it says so rather than reading as a shift (0094).
+const badgeLabel = computed(() => (props.summary.shift?.status === 'CONFIRMED' ? 'Confirmed' : 'Claimed, waiting to be confirmed'))
+// The rota's value is never shown: `DUTY_MANAGER` is a column, not something a member reads.
+const roleWords = computed(() => {
+  const role = props.summary.shift?.role
+  return role && isNightRole(role) ? saysShiftRole(role) : ''
+})
 </script>
 
 <template>
@@ -29,7 +37,7 @@ const badgeLabel = computed(() => (props.summary.shift?.status === 'CONFIRMED' ?
       {{ summary.shift?.showTitle }}
     </p>
     <p class="text-sm text-muted">
-      {{ summary.shift?.role }} · {{ summary.shift?.venueName }}
+      {{ roleWords }} · {{ summary.shift?.venueName }}
     </p>
     <div class="mt-2 flex items-center gap-2">
       <span class="text-sm">{{ summary.shift && saysWhen(summary.shift.startsAt) }}</span>

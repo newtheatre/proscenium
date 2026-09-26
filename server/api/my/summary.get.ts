@@ -8,11 +8,12 @@ export default defineEventHandler(async (event) => {
   const nowSeconds = Math.floor(now.getTime() / 1000)
   const today = londonToday(now)
 
-  const [graceDays, closesHours, rules, year] = await Promise.all([
+  const [graceDays, closesHours, rules, year, onShift] = await Promise.all([
     configValue(event, 'MEMBERSHIP_GRACE_DAYS'),
     configValue(event, 'SESSION_SIGNUP_CLOSES_HOURS'),
     listingRules(event),
     academicYear(event),
+    onShiftTonight(event, account.id, now),
   ])
 
   const [
@@ -51,6 +52,7 @@ export default defineEventHandler(async (event) => {
   return assembleMySummary({
     now,
     viewerId: account.id,
+    onShiftTonight: onShift,
     shift: shifts[0]
       ? {
           shiftId: shifts[0].shiftId,

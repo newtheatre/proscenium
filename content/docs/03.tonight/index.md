@@ -12,9 +12,12 @@ navigation:
 
 The show-night screens live at `/tonight` and are built for a phone held in one hand in a
 foyer: a dark screen, big buttons, the actions under your thumb, no sidebar. The hub is the
-navigation; every other screen has a back arrow to it. On a night you hold a confirmed shift,
-**Tonight** appears in the account menu and the **Next shift** tile on My NNT points here; the
-address also works typed into any phone.
+navigation; every other screen has a back arrow to it. While you are on shift (a confirmed shift
+inside its own hours), **Tonight** is the first entry in the account menu, a bar under the header
+of every public and member page says **You are on shift tonight** with **Open Tonight**, signing
+in lands here, and the **Next shift** tile on My NNT points here. The Front of House Manager and
+the Bar Manager see the menu entry all night without the bar. The address also works typed into
+any phone.
 
 ::callout{icon="i-lucide-info" color="info"}
 **A shift tonight is what opens these screens, not a standing role.** A confirmed door, bar or

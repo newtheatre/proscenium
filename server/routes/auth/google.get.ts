@@ -1,4 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm'
+import { landingAfterSignIn } from '#shared/utils/night-authority'
 import type { CandidateAccount } from '#shared/utils/google-sign-in'
 
 function candidate(row: { id: string, googleSub: string | null, disabled: boolean, anonymisedAt: number | null } | undefined): CandidateAccount | null {
@@ -73,7 +74,8 @@ export default defineOAuthGoogleEventHandler({
     const account = await findById(userId)
     if (!account) return sendRedirect(event, '/sign-in?refused=account')
 
-    const after = onwards(getCookie(event, RETURN_COOKIE))
+    const asked = getCookie(event, RETURN_COOKIE)
+    const after = onwards(asked)
     deleteCookie(event, RETURN_COOKIE)
 
     // A reassertion, not a sign-in: it must land back on the same account already in session, or
@@ -98,8 +100,9 @@ export default defineOAuthGoogleEventHandler({
     ])
     await startSession(event, account, 'google')
 
-    // Where they were when they were asked to sign in again, remembered across the round trip.
-    return sendRedirect(event, after)
+    // Where they were when they were asked to sign in again, remembered across the round trip;
+    // with nowhere asked, somebody on shift lands on Tonight (0094).
+    return sendRedirect(event, landingAfterSignIn(asked, await onShiftTonight(event, account.id)))
   },
 
   onError(event, error) {

@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { approveSlotStatement, claimSlotStatement, declineSlotStatement, ourVenue } from './rota'
+import { approveSlotStatement, claimSlotStatement, declineSlotStatement, ourVenue, tonightStartOf } from './rota'
 import { predicate, whereFrom } from './list-filters'
 import { barOpeningConstraintRefusal } from '#shared/utils/rota-openings'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
@@ -304,8 +304,8 @@ export interface MyOpeningShiftRow {
   endsAt: number
 }
 
-// A member's own opening slots, upcoming and not cancelled, labelled by the opening rather than
-// by a show title (E-130 criterion 4). Bounded by LIMIT, as `myShiftsQuery` is.
+// A member's own opening slots from tonight on, kept until 04:00 as a performance shift is (0094),
+// labelled by the opening rather than a show title (E-130 criterion 4). Bounded as `myShiftsQuery` is.
 export function myOpeningShiftsQuery(userId: string, now: number): SQL {
   return sql`
     SELECT s.id AS slotId, o.id AS openingId, s.slot AS slot, s.status AS status,
@@ -314,7 +314,7 @@ export function myOpeningShiftsQuery(userId: string, now: number): SQL {
     JOIN bar_openings o ON o.id = s.opening_id
     JOIN venues v ON v.id = o.venue_id
     WHERE s.user_id = ${userId} AND s.status <> 'CANCELLED' AND o.status <> 'CANCELLED'
-      AND o.ends_at >= ${now}
+      AND o.starts_at >= ${tonightStartOf(now)}
     ORDER BY o.starts_at, s.slot
     LIMIT 100
   `

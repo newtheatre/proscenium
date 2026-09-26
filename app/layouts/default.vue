@@ -76,6 +76,8 @@ const links = computed(() => [
       </UHeader>
     </div>
 
+    <OnShiftBar />
+
     <UMain class="grow">
       <slot />
     </UMain>

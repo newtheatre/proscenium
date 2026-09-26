@@ -10,6 +10,8 @@ export interface AccountSnapshot {
   // Any live role grant, including one with no permission: the docs tree reads it (0093).
   holdsRole: boolean
   onShiftTonight: boolean
+  // A shift in its window or a night permission: what every Tonight link reads (0094).
+  canWorkTonight: boolean
   leadsDepartment: boolean
   isTrainer: boolean
   keepsBarTab: boolean
@@ -26,6 +28,7 @@ export function useAccount(): { account: Ref<AccountSnapshot>, refresh: () => Pr
     permissions: [],
     holdsRole: false,
     onShiftTonight: false,
+    canWorkTonight: false,
     leadsDepartment: false,
     isTrainer: false,
     keepsBarTab: false,
@@ -41,6 +44,7 @@ export function useAccount(): { account: Ref<AccountSnapshot>, refresh: () => Pr
       permissions: [],
       holdsRole: false,
       onShiftTonight: false,
+      canWorkTonight: false,
       leadsDepartment: false,
       isTrainer: false,
       keepsBarTab: false,

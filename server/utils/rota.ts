@@ -6,8 +6,9 @@ import { createError } from 'h3'
 import { configValue } from './configuration'
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
+import { onShiftAt } from '#shared/utils/night-authority'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { showNightBounds, showNightOf } from '#shared/utils/show-night'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ListClause } from './list-filters'
 import type { AuditRow } from '#shared/utils/audit'
@@ -478,19 +479,29 @@ export interface MyShiftRow {
   venueName: string
   showTitle: string
   startsAt: number
+  // The shift's own window, null where it was stamped before shifts carried one (0078).
+  windowStartsAt: number | null
+  windowEndsAt: number | null
 }
 
-// A member's own shifts, upcoming and not cancelled. Bounded by LIMIT rather than paged: nobody
+// The start of the show night `now` falls in: a shift is that night's work until 04:00, not until
+// its curtain, so a member's own list keeps it all evening (0014, 0094).
+export function tonightStartOf(now: number): number {
+  return Math.floor(showNightBounds(showNightOf(new Date(now * 1000))).from.getTime() / 1000)
+}
+
+// A member's own shifts from tonight on, not cancelled. Bounded by LIMIT rather than paged: nobody
 // holds enough shifts at once to need a second page (E-103).
 export function myShiftsQuery(userId: string, now: number): SQL {
   return sql`
     SELECT s.id AS shiftId, s.role AS role, s.status AS status, p.id AS performanceId,
-           v.name AS venueName, sh.title AS showTitle, p.starts_at AS startsAt
+           v.name AS venueName, sh.title AS showTitle, p.starts_at AS startsAt,
+           s.starts_at AS windowStartsAt, s.ends_at AS windowEndsAt
     FROM shifts s
     JOIN performances p ON p.id = s.performance_id
     JOIN venues v ON v.id = p.venue_id
     JOIN shows sh ON sh.id = p.show_id
-    WHERE s.user_id = ${userId} AND s.status <> 'CANCELLED' AND p.starts_at >= ${now}
+    WHERE s.user_id = ${userId} AND s.status <> 'CANCELLED' AND p.starts_at >= ${tonightStartOf(now)}
     ORDER BY p.starts_at, s.role, s.slot
     LIMIT 100
   `
@@ -857,27 +868,38 @@ export async function confirmedShiftsTonight(
   return await db.all<ConfirmedShiftTonight>(confirmedShiftsTonightQuery(userId, role, from, to, scope))
 }
 
-// The viewer fact the chrome gates Tonight on (0040). CONFIRMED only, since a claim awaiting
-// approval is not yet authority (0009, 0044); the night's own bounds, not the day (0014).
-export function onShiftTonightQuery(userId: string, from: number, to: number): SQL {
+// The windows behind the viewer's "on shift" fact (0094): confirmed only, since a claim is not
+// authority, on a performance or a bar opening inside the night, for a live account (0009, 0077).
+export function tonightShiftWindowsQuery(userId: string, from: number, to: number): SQL {
   return sql`
-    SELECT count(*) AS n
+    SELECT s.starts_at AS startsAt, s.ends_at AS endsAt
     FROM shifts s
     JOIN performances p ON p.id = s.performance_id
-    WHERE s.user_id = ${userId}
-      AND s.status = 'CONFIRMED'
-      AND p.status <> 'CANCELLED'
-      AND p.starts_at >= ${from}
-      AND p.starts_at < ${to}
+    JOIN users u ON u.id = s.user_id
+    WHERE s.user_id = ${userId} AND s.status = 'CONFIRMED' AND p.status <> 'CANCELLED'
+      AND p.starts_at >= ${from} AND p.starts_at < ${to}
+      AND u.disabled = 0 AND u.anonymised_at IS NULL
+    UNION ALL
+    SELECT o.starts_at AS startsAt, o.ends_at AS endsAt
+    FROM bar_opening_shifts os
+    JOIN bar_openings o ON o.id = os.opening_id
+    JOIN users u ON u.id = os.user_id
+    WHERE os.user_id = ${userId} AND os.status = 'CONFIRMED' AND o.status <> 'CANCELLED'
+      AND o.starts_at >= ${from} AND o.starts_at < ${to}
+      AND u.disabled = 0 AND u.anonymised_at IS NULL
   `
 }
 
-export async function onShiftTonight(userId: string): Promise<boolean> {
-  const { from, to } = showNightBounds(currentShowNight())
-  const [row] = await db.all<{ n: number }>(
-    onShiftTonightQuery(userId, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)),
-  )
-  return (row?.n ?? 0) > 0
+// Inside a confirmed shift's own window with the guard's grace, read per request (0078, 0094).
+export async function onShiftTonight(event: H3Event, userId: string, at = new Date()): Promise<boolean> {
+  const { from, to } = showNightBounds(showNightOf(at))
+  const [windows, grace] = await Promise.all([
+    db.all<{ startsAt: number | null, endsAt: number | null }>(
+      tonightShiftWindowsQuery(userId, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)),
+    ),
+    configValue(event, 'SHIFT_AUTHORITY_GRACE_MINUTES'),
+  ])
+  return onShiftAt(windows, Math.floor(at.getTime() / 1000), grace)
 }
 
 export interface UnfilledShiftRow {
