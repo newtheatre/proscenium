@@ -46,14 +46,14 @@ function daysFrom(days: number): string {
   return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
 }
 
-async function addModule(): Promise<string> {
+async function addModule(status: 'ACTIVE' | 'DRAFT' = 'ACTIVE'): Promise<string> {
   const id = `${department}-${suffix()}`
   const answered = await send('POST', '/api/admin/training/modules', {
     id,
     department,
     kind: 'MODULE',
     name: `Module ${id}`,
-    status: 'ACTIVE',
+    status,
   })
   expect(answered.status).toBe(200)
   return id
@@ -134,11 +134,10 @@ describe.skipIf(skip !== null)('an unnamed rule refuses eligibility rather than 
     expect(shift?.unlockedBy).toBeNull()
   })
 
-  // Issue 1318: the shipped modules are drafts until the Training Manager publishes them, and a
-  // draft has no page a member can act on, so there is nothing to link to.
+  // Issue 1318: a gating module nobody has published has no page a member can act on, so there is
+  // nothing to link to.
   test('a role gated on a draft module, or one the catalogue lacks, lists as not open, linking nowhere', async () => {
-    const draft = `${department}-${suffix()}`
-    expect((await send('POST', '/api/admin/training/modules', { id: draft, department, kind: 'MODULE', name: `Module ${draft}`, status: 'DRAFT' })).status).toBe(200)
+    const draft = await addModule('DRAFT')
     const house = programme('gate-draft')
     stampOpen(house.performanceId, 'DOOR', 1)
     stampOpen(house.performanceId, 'BAR', 1)

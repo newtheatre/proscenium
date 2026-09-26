@@ -40,8 +40,8 @@ export function gatingModulesQuery(ids: readonly string[]): SQL {
 interface GatingModule { id: string, name: string, status: ModuleLifecycle }
 
 // At most three ids, one per shift role, read from configuration rather than a result set.
-export async function gatingModules(rules: Readonly<Record<ShiftRole, string | null>>): Promise<Map<string, GatingModule>> {
-  const ids = [...new Set(SHIFT_ROLES.map(role => rules[role]).filter((id): id is string => id !== null))]
+export async function gatingModules(named: readonly (string | null)[]): Promise<Map<string, GatingModule>> {
+  const ids = [...new Set(named.filter((id): id is string => id !== null))]
   if (ids.length === 0) return new Map()
   const rows = await db.all<GatingModule>(gatingModulesQuery(ids))
   return new Map(rows.map(row => [row.id, row]))
@@ -49,7 +49,7 @@ export async function gatingModules(rules: Readonly<Record<ShiftRole, string | n
 
 export async function roleEligibilities(event?: H3Event): Promise<RoleEligibility[]> {
   const rules = await shiftRoleRules(event)
-  const modules = await gatingModules(rules)
+  const modules = await gatingModules(Object.values(rules))
 
   return SHIFT_ROLES.map((role) => {
     const moduleId = rules[role]

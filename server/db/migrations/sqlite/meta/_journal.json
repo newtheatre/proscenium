@@ -834,6 +834,13 @@
       "when": 1790380400835,
       "tag": "0118_a_typed_till_charge_is_an_attempt",
       "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "6",
+      "when": 1790396281150,
+      "tag": "0119_the_show_night_basics_are_seeded",
+      "breakpoints": true
     }
   ]
 }

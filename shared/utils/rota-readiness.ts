@@ -2,6 +2,7 @@ import { SYSTEM_CHECKS, saysSystemCheck } from './checklist'
 import { saysRole } from './roles'
 import { SHIFT_ROLES, saysShiftRole } from './rota'
 import type { SystemCheck } from './checklist'
+import type { ConfigKey } from './config'
 import type { ShiftRole } from './rota'
 import type { ModuleLifecycle } from './training'
 
@@ -12,7 +13,7 @@ export const ELIGIBILITY_KEYS = {
   DUTY_MANAGER: 'SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE',
   DOOR: 'SHIFT_ELIGIBILITY_DOOR_MODULE',
   BAR: 'SHIFT_ELIGIBILITY_BAR_MODULE',
-} as const satisfies Record<ShiftRole, string>
+} as const satisfies Record<ShiftRole, ConfigKey>
 
 // UNSET and MISSING refuse every claim; DRAFT and RETIRED refuse everybody who does not already
 // hold the module, which is nobody for a draft (E-103 criterion 4).
@@ -29,9 +30,7 @@ export interface RoleEligibility {
 export function eligibilityStanding(moduleId: string | null, status: ModuleLifecycle | null): EligibilityStanding {
   if (moduleId === null) return 'UNSET'
   if (status === null) return 'MISSING'
-  if (status === 'DRAFT') return 'DRAFT'
-  if (status === 'RETIRED') return 'RETIRED'
-  return 'SET'
+  return status === 'ACTIVE' ? 'SET' : status
 }
 
 function saysModule(line: RoleEligibility): string {
