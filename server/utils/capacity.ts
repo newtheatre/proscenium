@@ -82,7 +82,8 @@ export function admittedSeatsSubquery(performanceId: SQL): SQL {
   )`
 }
 
-// Seats sold at the door, known by the booking's source rather than by its status, still held.
+// Seats for a booking made on the night (a desk or till sale, or a pass admitted on the spot),
+// known by the booking's source rather than by its status, and still held.
 export function walkUpSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
     SELECT count(*) FROM ${sql.raw(TICKETS)} t

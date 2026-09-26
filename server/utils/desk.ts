@@ -61,8 +61,7 @@ function searchPredicate(q: string | undefined): SQL {
   return sql` AND u.name LIKE ${contains(trimmed)} ESCAPE '\\'`
 }
 
-// The pills name the desk's own three states directly (Matt's ruling on #996): pending is
-// reserved and unpaid, collected is reserved and paid, door is a walk-up with no reservation.
+// One stored state per pill (D-114 criterion 7): unpaid, paid and not yet in, and in, a walk-up included.
 function statusPredicate(status: DeskStatusFilter): SQL {
   switch (status) {
     case 'PENDING': return sql` AND r.status = 'PENDING'`

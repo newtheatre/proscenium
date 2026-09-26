@@ -380,12 +380,13 @@ Open questions:
      references, and never before.
   6. Collection clears the hold expiry (D-106) and marks every ticket in the booking collected in
      one atomic write.
-  7. A reservation is pending (reserved and unpaid), collected (reserved in advance and now
-     paid for) or door (a walk-up sale with no reservation); pending moves to collected or to
-     door and nowhere else. Trimmed 26 September 2026 (issue 1326): the screen shows the house
-     for the performance on screen in the night's words (E-112 criterion 1), counted in seats:
-     sold against capacity, in (admitted through the door), seats left (capacity less sold, or
-     no cap), unpaid (the count and the amount still owed) and walk-ups (sold at the door,
+  7. A reservation is pending (booked and unpaid), collected (paid for and not yet through the
+     door) or door (through the door, whether booked ahead or sold as a walk-up); the desk moves
+     pending to collected, and admission moves either to door. Trimmed 26 September 2026 (issue
+     1326): the screen shows the house for the performance on screen in the night's words (E-112
+     criterion 1), counted in seats: sold against capacity, in (admitted through the door), seats
+     left (capacity less sold, or no cap), unpaid (the count and the amount still owed) and
+     walk-ups (made on the night, sold at the desk or the till or a pass admitted on the spot,
      counted by the booking's source, never by the status admission sets). Status pills (all,
      unpaid, paid, in) narrow the search results by the same states. A side card names
      tonight's access booking count (with a pointer to the door screen), pass admissions, the
