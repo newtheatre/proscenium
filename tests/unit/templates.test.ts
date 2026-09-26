@@ -369,7 +369,6 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   })
 })
 
-// G-106 criterion 6: a place taken away says so, gives the number, and keeps the way out.
 // Special category data lives in the encrypted payload and on the owner's own page, so an answer
 // to a declaration says only that there is one and where to read it (issue 1334, 0050).
 describe('the access profile answers carry nothing that was declared or decided', () => {
@@ -400,6 +399,7 @@ describe('the access profile answers carry nothing that was declared or decided'
   })
 })
 
+// G-106 criterion 6: a place taken away says so, gives the number, and keeps the way out.
 describe('the move back to the waiting list (G-106 criterion 6)', () => {
   test('it names the session, the new number and that they keep their turn, in both parts', () => {
     const told = render('training-session-demoted', EVERYTHING)
