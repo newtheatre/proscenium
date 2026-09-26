@@ -4,10 +4,9 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (0055).
 import { createError } from 'h3'
 import { newId } from './accounts'
-import { performanceNight } from './performances'
 import { nightReconciliation } from './reconciliation'
 import { saysMoney } from '#shared/utils/bar'
-import { FIRST_RECONCILED_NIGHT, currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { FIRST_RECONCILED_NIGHT, currentShowNight, showNightBounds, showNightOf } from '#shared/utils/show-night'
 import type { ExpectedByKind, NightExpected, OutstandingNight, RecordZReadingInput, ZReading } from '#shared/utils/night-reconciliation'
 import type { SQL } from 'drizzle-orm'
 
@@ -105,17 +104,32 @@ export async function readingHistory(night: string): Promise<ZReading[]> {
   return rows.map(row => ({ ...row, writtenOff: Boolean(row.writtenOff) }))
 }
 
-// Nights a till session ran or a performance was on, from the first reconciled night: bounded
-// in SQL too, so imported history back to 2014 is never walked (I-104 criterion 6).
-async function operationalNights(): Promise<Set<string>> {
-  const floorAt = windowOf(FIRST_RECONCILED_NIGHT).fromAt
-  const [sessions, performances] = await Promise.all([
-    db.all<{ night: string }>(sql`SELECT DISTINCT night FROM till_sessions WHERE night >= ${FIRST_RECONCILED_NIGHT}`),
-    db.all<{ startsAt: number }>(sql`SELECT DISTINCT starts_at AS startsAt FROM performances WHERE starts_at >= ${floorAt}`),
-  ])
-  const nights = new Set(sessions.map(row => row.night))
-  for (const { startsAt } of performances) nights.add(performanceNight(startsAt))
-  return nights
+export interface TakingsDay {
+  day: string
+  firstAt: number
+  lastAt: number
+}
+
+// Reader money only, from the sources the expected figure is made of (F-118), one row per London
+// day from the floor: a whole season, never the ledger back to 2014 (I-104 criteria 5 and 6).
+export function takingsDaysQuery(): SQL {
+  return sql`
+    SELECT london_day AS day, min(happened_at) AS firstAt, max(happened_at) AS lastAt
+    FROM ledger_entries
+    WHERE tender = 'CARD' AND source IN ('DESK', 'TILL') AND london_day >= ${FIRST_RECONCILED_NIGHT}
+    GROUP BY london_day
+  `
+}
+
+// A day's first and last takings name every night it holds money for: before 04:00 is the night
+// before's (0014), so a day's entries span at most two nights (issue #1359).
+export function nightsWithTakings(days: readonly TakingsDay[]): string[] {
+  const nights = new Set<string>()
+  for (const { firstAt, lastAt } of days) {
+    nights.add(showNightOf(new Date(firstAt * 1000)))
+    nights.add(showNightOf(new Date(lastAt * 1000)))
+  }
+  return [...nights].sort()
 }
 
 // Every night from the floor to tonight that ran with no reading, never truncated (criteria 5
@@ -127,12 +141,14 @@ export function outstandingNights(ran: Iterable<string>, covered: Set<string>, t
     .map(night => ({ night }))
 }
 
+// Nights with takings, not nights with a performance or a till session: a pass sold on a quiet
+// day or a tab settled with no till open is money a reading has to account for (issue #1359).
 export async function nightsMissingAReading(): Promise<OutstandingNight[]> {
-  const [operational, recorded] = await Promise.all([
-    operationalNights(),
+  const [days, recorded] = await Promise.all([
+    db.all<TakingsDay>(takingsDaysQuery()),
     db.all<{ night: string }>(sql`SELECT DISTINCT night FROM z_readings`),
   ])
-  return outstandingNights(operational, new Set(recorded.map(row => row.night)), currentShowNight())
+  return outstandingNights(nightsWithTakings(days), new Set(recorded.map(row => row.night)), currentShowNight())
 }
 
 // A night whose live reading still disagrees with the ledger and has not been written off: open
