@@ -57,7 +57,8 @@ describe('the training screens name a module (G-101 criterion 7, issue 1153 item
   test('every suggestion carries the one action that acts on it', async () => {
     const source = await read(TRAINING)
     const section = source.split('What you could do next')[1]?.split('What you have asked for')[0] ?? ''
-    expect(section).toContain('ask-next-')
+    // One derived action, Ask only when no session is open (issue 1335).
+    expect(section).toContain('<TrainingModuleAction')
   })
 })
 

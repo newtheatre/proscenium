@@ -13,7 +13,9 @@ import {
 } from '#shared/utils/training-signup'
 import type { ClosureReason, Place, SignUpOrder, SignUpStatus, SignUpWindow } from '#shared/utils/training-signup'
 import { prerequisiteGaps } from '#shared/utils/training'
+import { trainingAction } from '#shared/utils/training-action'
 import type { PrerequisiteGap } from '#shared/utils/training'
+import type { ActionSession, TrainingAction } from '#shared/utils/training-action'
 import type { TemplateContext } from '#server/utils/templates'
 import type { H3Event } from 'h3'
 
@@ -230,6 +232,29 @@ export async function sessionsForMember(
       warnings: warningGaps(mine),
     }
   })
+}
+
+// The one action each module offers this member (issue 1335), from one read of the sessions they
+// can see and one of their asks, whatever the catalogue holds: never a query per module (0003).
+export async function trainingActionsFor(userId: string, today: string, closesHours: number): Promise<(moduleId: string) => TrainingAction> {
+  const [sessions, requested] = await Promise.all([sessionsForMember(userId, today, closesHours), openRequestsOf(userId)])
+
+  const byModule = new Map<string, ActionSession[]>()
+  for (const session of sessions) {
+    const offered: ActionSession = {
+      id: session.id,
+      heldOn: session.heldOn,
+      startsAt: session.startsAt,
+      place: session.place,
+      full: session.status === 'FULL' || session.signedUp >= session.capacity,
+      open: session.closure === null && session.blocked.length === 0,
+      placed: session.myPosition === null ? null : session.placed,
+      waitlistPosition: session.waitlistPosition,
+    }
+    for (const module of session.modules) byModule.set(module.id, [...(byModule.get(module.id) ?? []), offered])
+  }
+
+  return moduleId => trainingAction(byModule.get(moduleId) ?? [], requested.has(moduleId))
 }
 
 // What a promotion and a move back both say about the session they concern.

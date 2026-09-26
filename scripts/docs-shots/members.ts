@@ -111,10 +111,12 @@ export const members: Shot[] = [
     marker: '[data-test="rota-page"]',
     width: PHONE_WIDTH,
     annotations: [
-      // Absent for a member holding nothing; the role filter then stands in for it.
-      { selector: '[data-test="my-shifts"], [data-test="role-filter-all"]', label: 'What you hold' },
-      { selector: '[data-test="role-filter-DOOR"]', label: 'Filter by role' },
-      { selector: '[data-test="open-shifts-list"], [data-test="open-shifts-empty"]', label: 'Open shifts' },
+      // Absent for a member holding nothing; the week chips then stand in for it.
+      { selector: '[data-test="my-shifts"], [data-test="week-ALL"]', label: 'What you hold' },
+      { selector: '[data-test="week-THIS_WEEK"]', label: 'Choose the week' },
+      { selector: '[data-test="open-shifts-list"], [data-test="open-shifts-empty"]', label: 'Shifts you can take' },
+      // Absent for a member who qualifies for every role; the list then stands in for it.
+      { selector: '[data-test="roles-you-could-take"], [data-test="open-shifts-list"], [data-test="open-shifts-empty"]', label: 'Roles you could take' },
     ],
   },
   {

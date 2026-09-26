@@ -3,6 +3,7 @@ import { saysNoSuch } from '#shared/utils/no-such'
 import { describeExpiry, saysDeliveryMode, saysKind } from '#shared/utils/training'
 import { saysDay } from '#shared/utils/when'
 import type { DeliveryMode, ExpiryMode, ModuleKind } from '#shared/utils/training'
+import type { TrainingAction } from '#shared/utils/training-action'
 
 interface Prerequisite { moduleId: string, name: string, held: boolean | null }
 interface NextSession { id: string, heldOn: string, startsAt: string, place: string | null }
@@ -23,6 +24,7 @@ interface Module {
   nextSession: NextSession | null
   requested: boolean | null
   held: boolean | null
+  action: TrainingAction | null
 }
 
 interface Catalogue { items: Module[], signedIn: boolean }
@@ -109,19 +111,19 @@ useSeoMeta({
               </div>
             </dl>
             <template #footer>
-              <TrainingRequestModule
-                v-if="data.signedIn"
+              <TrainingModuleAction
+                v-if="module.action"
                 :module-id="module.id"
                 :module-name="module.name"
-                :requested="module.requested === true"
-                @requested="refresh"
+                :action="module.action"
+                @changed="refresh"
               />
               <ULink
-                v-else
+                v-else-if="!data.signedIn"
                 to="/sign-in"
                 class="text-sm"
               >
-                Sign in to request
+                Sign in to take it
               </ULink>
             </template>
           </UPageCard>
@@ -159,6 +161,21 @@ useSeoMeta({
             You hold this
           </UBadge>
         </div>
+      </div>
+
+      <!-- The aside is hidden below lg, so on a phone the one action sits here instead (issue 1335). -->
+      <div
+        v-if="module.action"
+        class="mt-6 lg:hidden"
+        data-test="module-action-phone"
+      >
+        <TrainingModuleAction
+          :module-id="module.id"
+          :module-name="module.name"
+          :action="module.action"
+          large
+          @changed="refresh"
+        />
       </div>
 
       <p

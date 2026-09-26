@@ -8,7 +8,10 @@ export default defineEventHandler(async (event) => {
 
   // Revoked records are never the member's to see (G-101 criterion 6), and a superseded one is
   // hidden the same way: a renewal replaces what it renews.
-  const held = await recordsFor(account.id)
+  const [held, actionFor] = await Promise.all([
+    recordsFor(account.id),
+    trainingActionsFor(account.id, today, await configValue(event, 'SESSION_SIGNUP_CLOSES_HOURS')),
+  ])
   const superseded = supersededIn(held)
 
   const items = held.filter(record => !superseded.has(record.id)).map((record) => {
@@ -25,6 +28,8 @@ export default defineEventHandler(async (event) => {
       source: record.source,
       state: record.kind === 'BRIEF' ? null : state,
       held: countsAsHeld(state),
+      // What renews it, for one expired or expiring: the same one action as anywhere (issue 1335).
+      action: record.kind !== 'BRIEF' && (state === 'EXPIRED' || state === 'EXPIRING') ? actionFor(record.moduleId) : null,
     }
   })
 

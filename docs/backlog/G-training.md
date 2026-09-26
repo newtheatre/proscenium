@@ -76,7 +76,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   1. A member may hold at most one open request per module, enforced by a database constraint, not an application read; withdrawing a request frees a re-ask.
   2. Leads and administrators see a demand board ordered by request volume per module, with the requesters listed.
   3. Declining a request requires a reason, and the requester is shown that reason; a decline with no reason is refused.
-  4. Requests for a module resolve automatically when a matching session becomes visible to members (opened for sign-up, not merely created), and each requester is emailed once.
+  4. Requests for a module resolve automatically when a matching session becomes visible to members (opened for sign-up, not merely created), and each requester is emailed once. Amended 26 September 2026 (issue 1335): asking is offered only when no session teaching the module is open to the member; while one is, the offer is Sign up or Join the waiting list, so an ask is never made that waits on a session already there.
   5. A request is a demand signal only: it confers no queue position, priority or place in any session.
   6. Requests for draft or retired modules are refused.
   7. The demand board carries the grant beside the decline: every module on it links straight to
@@ -471,8 +471,10 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   1. `/training/modules` groups modules by department, with cards carrying level, duration,
      prerequisites and the next scheduled session, and keeps every G-128 criterion: readable
      signed out, drafts hidden, at most one spotlight.
-  2. A signed-in member sees which modules they hold and can request one from its card through
-     the existing module request path.
+  2. A signed-in member sees which modules they hold and can act on one from its card. Amended
+     26 September 2026 (issue 1335): the card carries the one derived action, Sign up, Join the
+     waiting list, "You have a place" or the module request path when no session is open, the
+     same action the module page (on a phone as well), My training and My rota offer.
   3. `/training/catalogue` still resolves to the public catalogue.
   4. `app/pages/training/manage/index.vue` is split into components (catalogue table, module
      editor, department filter) with no behaviour change: the existing tests pass untouched.

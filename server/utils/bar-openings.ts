@@ -333,20 +333,35 @@ export interface OpenOpeningShiftRow {
 
 // The open slots an opening still has, offered beside the rota's own open shifts (criterion 4).
 // Bounded by count rather than paged: a night holds a handful of openings, not a page of them.
-export function openOpeningShiftsQuery(window: { from?: number, to?: number }, now: number, limit: number): SQL {
+export function openOpeningShiftsQuery(window: { from?: number, to?: number }, now: number, limit: number, notWorkedBy?: string): SQL {
   // The same window the open-shift list narrows by, so a reader filtering to a fortnight is not
   // handed every opening the season holds.
   const notBefore = Math.max(now, window.from ?? now)
   const notAfter = window.to === undefined ? sql`` : sql` AND o.starts_at <= ${window.to}`
+  // An opening this member already works is left out, as a performance is (issue 1335).
+  const notWorked = notWorkedBy === undefined
+    ? sql``
+    : sql` AND NOT EXISTS (SELECT 1 FROM bar_opening_shifts worked WHERE worked.opening_id = o.id
+        AND worked.user_id = ${notWorkedBy} AND worked.status IN ('CLAIMED', 'CONFIRMED'))`
   return sql`
     SELECT s.id AS slotId, o.id AS openingId, s.slot AS slot, o.label AS label,
            v.id AS venueId, v.name AS venueName, o.starts_at AS startsAt, o.ends_at AS endsAt
     FROM bar_opening_shifts s
     JOIN bar_openings o ON o.id = s.opening_id
     JOIN venues v ON v.id = o.venue_id
-    WHERE s.status = 'OPEN' AND o.status <> 'CANCELLED' AND o.starts_at >= ${notBefore}${notAfter}
+    WHERE s.status = 'OPEN' AND o.status <> 'CANCELLED' AND o.starts_at >= ${notBefore}${notAfter}${notWorked}
     ORDER BY o.starts_at, s.slot
     LIMIT ${limit}
+  `
+}
+
+// Open slots on bar openings from now on, counted with the bar role's own open shifts (issue 1335).
+export function countOpenOpeningShiftsQuery(now: number): SQL {
+  return sql`
+    SELECT count(*) AS total
+    FROM bar_opening_shifts s
+    JOIN bar_openings o ON o.id = s.opening_id
+    WHERE s.status = 'OPEN' AND o.status <> 'CANCELLED' AND o.starts_at >= ${now}
   `
 }
 

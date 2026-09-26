@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DeliveryMode, ExpiryMode, ModuleKind } from '#shared/utils/training'
+import type { TrainingAction } from '#shared/utils/training-action'
 import type { PageLink } from '@nuxt/ui'
 
 // Public: what the theatre teaches is how somebody decides to get involved (G-128). Signing in
@@ -27,6 +28,7 @@ interface Module {
   prerequisites: Prerequisite[]
   nextSession: NextSession | null
   requested: boolean | null
+  action: TrainingAction | null
 }
 
 interface Catalogue {

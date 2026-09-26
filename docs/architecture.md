@@ -1130,8 +1130,21 @@ each locked row carries the module id and name that would unlock it, or neither 
 member can act on is named: no module, or one that is a draft, retired or not in the catalogue
 (criterion 2). Where any role is in that state the list also carries `officers`, the names of the
 live Front of House Manager grants (at most three), which the screen names as the person to ask.
-`GET /api/rota/mine` is a member's own shifts. Both are member-facing reads with no write and so
-carry no audit row (`shared/utils/audit-coverage.ts`).
+`claimable=true` is what My rota asks for (issue 1335): only the roles the caller qualifies for
+(`roles` on `openShiftTerms`, bound once per role) and never a performance or bar opening they
+already hold a claimed or confirmed shift on (`notWorkedBy`, one correlated `NOT EXISTS`). The
+roles they do not qualify for come from `GET /api/rota/roles`, one card each with the open count
+(`openShiftCountsByRoleQuery`, plus bar opening slots for the bar), the published module and its
+one training action. `GET /api/rota/mine` is a member's own shifts. All three are member-facing
+reads with no write and so carry no audit row (`shared/utils/audit-coverage.ts`).
+
+The one training action (`shared/utils/training-action.ts`, issue 1335) is derived, never stored:
+`trainingActionsFor()` in `server/utils/training-signup.ts` reads the sessions a member can see
+and their open asks once, and answers per module: their own sign-up first (a place or a waiting
+position), then the soonest session open to them (Sign up, or Join the waiting list when full),
+then Ask, or Asked once they have. `/api/training/next`, `/api/training/records` (for an expired
+or expiring record), `/api/training/catalogue` (signed in) and `/api/rota/roles` all carry it, so
+My training, the catalogue, the module page and My rota offer the same thing.
 
 ### Show-night readiness (issue 1318)
 

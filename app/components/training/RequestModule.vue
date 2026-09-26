@@ -47,7 +47,7 @@ async function submit(): Promise<void> {
     variant="subtle"
     data-test="module-requested"
   >
-    Requested
+    Asked for
   </UBadge>
   <UButton
     v-else
@@ -55,7 +55,7 @@ async function submit(): Promise<void> {
     data-test="request-module"
     @click.stop.prevent="open = true"
   >
-    Request this module
+    Ask for it
   </UButton>
 
   <UModal
