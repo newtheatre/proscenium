@@ -141,6 +141,29 @@ async function detail(showId: string, as = officer.cookie): Promise<{ show: List
   return await answered.json() as { show: ListedShow, performances: ListedPerformance[] }
 }
 
+// A pass valid for half a year from now, so a performance a week out falls inside it. A pass has
+// to cover one show to exist, so it starts with a show of its own unless told which.
+async function passOnSale(over: { status?: string, covering?: string } = {}): Promise<{ id: string, name: string }> {
+  const name = named('Season pass')
+  const now = Math.floor(Date.now() / 1000)
+  const window = { validFrom: now, validUntil: now + 180 * 86_400 }
+  const showIds = [over.covering ?? await newShow()]
+  const created = await send('POST', '/api/admin/pass-types', {
+    name, slug: slugged(name), ...window, prices: [{ label: 'Standard', price: 4500 }], showIds,
+  })
+  expect(created.status).toBe(200)
+  const { id } = await created.json() as { id: string }
+  expect((await send('PUT', `/api/admin/pass-types/${id}`, {
+    name, slug: slugged(name), ...window, prices: [{ label: 'Standard', price: 4500 }], status: over.status ?? 'ON_SALE',
+  })).status).toBe(200)
+  return { id, name }
+}
+
+async function coveredShows(passTypeId: string): Promise<string[]> {
+  const answered = await send('GET', `/api/admin/pass-types/${passTypeId}`)
+  return (await answered.json() as { passType: { showIds: string[] } }).passType.showIds
+}
+
 describe.skipIf(skip !== null)('a show is a draft nobody outside can see until it is published (criterion 1)', () => {
   test('a show is created DRAFT, whatever the request asks for', async () => {
     const id = await newShow({ status: 'PUBLISHED' })
@@ -658,6 +681,74 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('Externally ticketed')`)
     view.close()
   }, 120_000)
+
+  // Issue 1323: the sheet names each pass on sale for the show's dates, ticked for an in-house show.
+  test('the publish sheet lists a pass on sale for the show\'s dates, ticked, and publishing covers the show', async () => {
+    const id = await newShow({ title: named('Covered on screen') })
+    await addPerformance(id)
+    const pass = await passOnSale()
+
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="publish"]')
+    expect(await textOf(view, '[data-test="check-passes"]')).toContain('Covered by every pass on sale for its dates: not yet')
+    await click(view, '[data-test="publish"]')
+    await waitFor(view, `document.querySelector('[data-test="cover-pass-${pass.id}"]')`)
+    expect(await textOf(view, '[data-test="publish-passes"]')).toContain(pass.name)
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="cover-pass-${pass.id}"] [role="checkbox"]')?.getAttribute('aria-checked') === 'true'`)).toBe(true)
+
+    await click(view, '[data-test="confirm-publish"]')
+    await waitFor(view, `document.querySelector('[data-test="show-status"]')?.textContent.includes('Published')`)
+    expect(await coveredShows(pass.id)).toContain(id)
+    view.close()
+  }, 120_000)
+})
+
+// Issue 1323, D-123 criterion 4: the cover is chosen where the show goes on sale, by the same
+// additive action as the pass's own Covered shows, and never removes one.
+describe.skipIf(skip !== null)('publishing may add the show to the passes on sale for its dates (issue 1323)', () => {
+  test('the show\'s detail names each pass on sale for its dates and whether it covers the show', async () => {
+    const id = await newShow()
+    await addPerformance(id)
+    const pass = await passOnSale()
+
+    const answered = await send('GET', `/api/admin/shows/${id}`)
+    const { coveringPasses } = await answered.json() as { coveringPasses: { id: string, name: string, covered: boolean }[] }
+    expect(coveringPasses.find(one => one.id === pass.id)).toEqual({ id: pass.id, name: pass.name, covered: false })
+  })
+
+  test('publishing with a pass ticked adds the show to it, audited as the pass\'s own action', async () => {
+    const id = await newShow()
+    await addPerformance(id)
+    const pass = await passOnSale()
+
+    const published = await send('POST', `/api/admin/shows/${id}/publish`, { published: true, coverPassTypeIds: [pass.id] })
+    expect(published.status).toBe(200)
+    expect(await coveredShows(pass.id)).toContain(id)
+    expect(trail<{ detail: { added: string[], removed: string[] } }>('pass-type.shows.updated', `pass-type:${pass.id}`)?.detail)
+      .toEqual({ added: [id], removed: [] })
+  })
+
+  test('a pass not on sale for the show\'s dates is refused, and nothing is published or covered', async () => {
+    const id = await newShow()
+    await addPerformance(id)
+    const pass = await passOnSale({ status: 'DRAFT' })
+
+    const refused = await send('POST', `/api/admin/shows/${id}/publish`, { published: true, coverPassTypeIds: [pass.id] })
+    expect(refused.status).toBe(409)
+    expect(await refused.text()).toContain(pass.name)
+    expect((await detail(id)).show.status).toBe('DRAFT')
+    expect(await coveredShows(pass.id)).not.toContain(id)
+  })
+
+  test('a pass already covering the show is left as it is', async () => {
+    const id = await newShow()
+    await addPerformance(id)
+    const pass = await passOnSale({ covering: id })
+
+    const published = await send('POST', `/api/admin/shows/${id}/publish`, { published: true, coverPassTypeIds: [pass.id] })
+    expect(published.status).toBe(200)
+    expect((await coveredShows(pass.id)).filter(one => one === id)).toHaveLength(1)
+  })
 })
 
 // J-111 criterion 8: the booking form names what is being booked, so it never has to fetch the
