@@ -1,4 +1,5 @@
 import { saysRole } from '#shared/utils/roles'
+import { SAYS_BEFORE_YOU_COME, SAYS_WARNINGS_LINK } from '#shared/utils/content-warnings'
 import { formatLondon } from '#shared/utils/london'
 import { PRODUCTION_SITE_URL } from '#shared/utils/seo'
 import { ordinal, plural } from '#shared/utils/text'
@@ -74,17 +75,15 @@ function paragraphs(body: string): string {
 }
 
 // The show's guidance on a booking, as the booking form said it (D-102 criterion 4, issue 1330).
-// A retry of a message stored before the guidance existed renders without it rather than failing.
 function guidanceBlock(context: TemplateContext): { html: string, text: string } {
-  const lines = Array.isArray(context.guidance) ? context.guidance.map(String) : []
+  const lines = context.guidance as string[]
   if (lines.length === 0) return { html: '', text: '' }
   // Left out once the show is off the public site, rather than link to a page that 404s.
   const showUrl = typeof context.showUrl === 'string' && context.showUrl ? context.showUrl : null
-  const link = 'What each warning means, on the show page'
   return {
-    html: `\n<p><strong>Before you come</strong></p>\n${paragraphs(lines.join('\n'))}`
-      + (showUrl ? `\n<p><a href="${escapeHtml(showUrl)}">${link}</a></p>` : ''),
-    text: `\n\nBefore you come\n${lines.join('\n')}${showUrl ? `\n${link}: ${showUrl}` : ''}`,
+    html: `\n<p><strong>${SAYS_BEFORE_YOU_COME}</strong></p>\n<p>${lines.map(escapeHtml).join('<br>')}</p>`
+      + (showUrl ? `\n<p><a href="${escapeHtml(showUrl)}">${SAYS_WARNINGS_LINK}</a></p>` : ''),
+    text: `\n\n${SAYS_BEFORE_YOU_COME}\n${lines.join('\n')}${showUrl ? `\n${SAYS_WARNINGS_LINK}: ${showUrl}` : ''}`,
   }
 }
 

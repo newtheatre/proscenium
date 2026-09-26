@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SAYS_WARNINGS_LINK } from '#shared/utils/content-warnings'
+
 // The show's age guidance and warnings where a booker decides, and again on the booking itself
 // (D-102 criterion 4, issue 1330). The lines are the server's; the show page carries the rest.
 defineProps<{
@@ -31,7 +33,7 @@ defineProps<{
       :to="`/shows/${slug}`"
       class="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-primary underline"
     >
-      What each warning means, on the show page
+      {{ SAYS_WARNINGS_LINK }}
     </NuxtLink>
   </UCard>
 </template>

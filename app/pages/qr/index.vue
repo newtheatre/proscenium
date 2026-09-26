@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type * as z from 'zod'
 import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
+import { SAYS_BEFORE_YOU_COME } from '#shared/utils/content-warnings'
 import { qrStatusDisplay, reservationResendForm, saysExchangeNight } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
@@ -18,9 +19,8 @@ interface Booking {
   status: string
   cancelledBy: string | null
   show: string
-  showSlug: string | null
-  // Empty once the booking is no longer somebody coming (cancelled, lapsed, exchanged, admitted).
-  guidance: string[]
+  // Null once the booking is no longer somebody coming
+  guidance: { lines: string[], slug: string | null } | null
   when: string
   totalDue: string | null
   qrSvg: string
@@ -276,10 +276,10 @@ useSeoMeta({ title: 'Your booking' })
         />
 
         <BeforeYouBook
-          v-if="booking.guidance.length"
-          :lines="booking.guidance"
-          :slug="booking.showSlug"
-          heading="Before you come"
+          v-if="booking.guidance"
+          :lines="booking.guidance.lines"
+          :slug="booking.guidance.slug"
+          :heading="SAYS_BEFORE_YOU_COME"
         />
 
         <div
