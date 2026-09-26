@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { ROTA_FLOW } from '#shared/utils/rota-flow'
+import { sessionForm } from '#shared/utils/training'
 
 // The rota and training console screens, read as source: one workflow that links itself, a board
 // with a date window, module names on the pickers, and the grant beside the decline (item 10).
@@ -103,5 +104,46 @@ describe('the demand board offers the grant (G-104 criterion 7)', () => {
   test('the sessions screen opens on the module it was sent', async () => {
     const source = await read(SESSIONS)
     expect(source).toContain('route.query.module')
+  })
+})
+
+const REGISTER = 'app/pages/training/sessions/[id]/register.vue'
+const MY_TRAINING = 'app/pages/training/index.vue'
+
+// Issue 1336: a trainer finds their own sessions where they look, and a register they may not open
+// says why rather than claiming it could not be read (docs/copy-style.md sections 6 and 7).
+describe('a trainer reaches the register of their own session', () => {
+  test('My training lists the sessions they teach, each with the register one tap away', async () => {
+    const source = await read(MY_TRAINING)
+    expect(source).toContain('/api/training/teaching')
+    expect(source).toContain('data-test="sessions-you-teach"')
+    expect(source).toContain('Open the register')
+  })
+
+  test('the register\'s header names the session, not a bare date', async () => {
+    const source = await read(REGISTER)
+    expect(source).toContain('data-test="register-title"')
+    expect(source).not.toMatch(/<h1[^>]*>\s*\{\{ data\.heldOn \}\}\s*<\/h1>/)
+  })
+
+  test('a refused read shows the refusal it was given', async () => {
+    const source = await read(REGISTER)
+    expect(source).toContain('useListFailure(error')
+    expect(source).toContain('data-test="register-refused"')
+  })
+})
+
+describe('the scheduler names who teaches (G-112, issue 1336)', () => {
+  const session = { heldOn: '2026-10-08', startsAt: '19:00', endsAt: '21:00', capacity: 12, moduleIds: ['SFTY-001'] }
+
+  test('the form takes a trainer, and none named means the scheduler', () => {
+    expect(sessionForm.parse({ ...session, trainerId: 'aoife' }).trainerId).toBe('aoife')
+    expect(sessionForm.parse(session).trainerId).toBeNull()
+  })
+
+  test('the scheduling dialogue carries a Taught by picker', async () => {
+    const source = await read(SESSIONS)
+    expect(source).toContain('Taught by')
+    expect(source).toContain('data-test="session-trainer"')
   })
 })

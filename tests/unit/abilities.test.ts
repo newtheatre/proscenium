@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { can, member, memberOrGrace, viewBarReports, viewReports, workTonight } from '#shared/utils/abilities'
+import { can, member, memberOrGrace, reachConsole, viewBarReports, viewReports, workTonight } from '#shared/utils/abilities'
 import type { Viewer } from '#shared/utils/abilities'
 import type { MembershipState } from '#shared/utils/membership'
 
@@ -19,6 +19,22 @@ const CURRENT: MembershipState = { kind: 'current', until: '2027-09-13' }
 const GRACE: MembershipState = { kind: 'grace', until: '2027-09-27', expiredOn: '2027-09-13' }
 const LAPSED: MembershipState = { kind: 'lapsed', expiredOn: '2026-09-13' }
 const NONE: MembershipState = { kind: 'none' }
+
+// Issue 1336, 0040's Consequences: derived standing reaches the console its screens live in, so a
+// trainer can open their own session and a lead their department, with no role granted (0009).
+describe('the console admits derived standing as well as held permissions', () => {
+  test('a trainer with no permission reaches it', () => {
+    expect(can({ ...viewerWith(NONE), isTrainer: true }, reachConsole)).toBe(true)
+  })
+
+  test('a department lead with no permission reaches it', () => {
+    expect(can({ ...viewerWith(NONE), leadsDepartment: true }, reachConsole)).toBe(true)
+  })
+
+  test('a member with neither, and no permission, does not', () => {
+    expect(can(viewerWith(CURRENT), reachConsole)).toBe(false)
+  })
+})
 
 describe('member is current only (A-129 criterion 1)', () => {
   test('current holds it', () => {

@@ -599,4 +599,110 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
   }, CASE_TIMEOUT_MS)
 })
 
+// Issue 1336, G-112 as amended: whoever schedules a session names who teaches it, and the named
+// trainer, not the scheduler, is the one who opens and marks its register (G-111 criterion 3).
+describe.skipIf(skip !== null)('the scheduler names the trainer (G-112)', () => {
+  async function aTrainerHolding(module: string): Promise<{ id: string, cookie: string }> {
+    const person = await adminSession(app, { roles: [] })
+    award(person.id, trainerCert)
+    award(person.id, module)
+    return person
+  }
+
+  test('the Training Manager schedules a session taught by somebody else, who is then its trainer', async () => {
+    const module = await addModule()
+    const teacher = await aTrainerHolding(module)
+
+    const answered = await schedule({ moduleIds: [module], trainerId: teacher.id })
+    expect(answered.status).toBe(200)
+    const { id } = await answered.json() as { id: string }
+    expect(read<{ trainer: string }>('SELECT trainer_id trainer FROM training_sessions WHERE id = ?', id)?.trainer).toBe(teacher.id)
+
+    // Their register, not the scheduler's: the trainer running it reads it.
+    expect((await send('GET', `/api/admin/training/sessions/${id}/register`, undefined, teacher.cookie)).status).toBe(200)
+  })
+
+  test('with nobody named, the scheduler teaches it, as before', async () => {
+    const module = await addModule()
+    const teacher = await aTrainerHolding(module)
+    const { id } = await (await schedule({ moduleIds: [module] }, teacher.cookie)).json() as { id: string }
+    expect(read<{ trainer: string }>('SELECT trainer_id trainer FROM training_sessions WHERE id = ?', id)?.trainer).toBe(teacher.id)
+  })
+
+  test('naming somebody with no trainer certification is refused, and says so', async () => {
+    const module = await addModule()
+    const stranger = await adminSession(app, { roles: [] })
+    const refused = await schedule({ moduleIds: [module], trainerId: stranger.id })
+    expect(refused.status).toBe(422)
+    expect(await said(refused)).toContain('trainer certification')
+  })
+
+  test('naming a trainer who does not hold what the session teaches is refused', async () => {
+    const module = await addModule()
+    const other = await addModule()
+    const teacher = await aTrainerHolding(other)
+    const refused = await schedule({ moduleIds: [module], trainerId: teacher.id })
+    expect(refused.status).toBe(422)
+    expect(await said(refused)).toContain(module)
+  })
+
+  test('a trainer schedules only their own sessions, so naming somebody else is refused', async () => {
+    const module = await addModule()
+    const teacher = await aTrainerHolding(module)
+    const colleague = await aTrainerHolding(module)
+    expect((await schedule({ moduleIds: [module], trainerId: colleague.id }, teacher.cookie)).status).toBe(403)
+  })
+
+  test('somebody else\'s register refuses a trainer, naming the Training Manager rather than a bare permission', async () => {
+    const module = await addModule()
+    const teacher = await aTrainerHolding(module)
+    const colleague = await aTrainerHolding(module)
+    const { id } = await (await schedule({ moduleIds: [module], trainerId: teacher.id })).json() as { id: string }
+
+    const refused = await send('GET', `/api/admin/training/sessions/${id}/register`, undefined, colleague.cookie)
+    expect(refused.status).toBe(403)
+    expect(await said(refused)).toContain('Training Manager')
+  })
+})
+
+// Issue 1336: a trainer's own sessions are where they look for them, with the register one tap away.
+describe.skipIf(skip !== null)('the sessions a trainer teaches (G-111 criterion 3)', () => {
+  interface Taught { items: { id: string, heldOn: string, modules: { id: string }[] }[] }
+
+  test('lists the trainer\'s own coming sessions and nobody else\'s', async () => {
+    const module = await addModule()
+    const teacher = await adminSession(app, { roles: [] })
+    award(teacher.id, trainerCert)
+    award(teacher.id, module)
+    const mine = await (await schedule({ moduleIds: [module], trainerId: teacher.id })).json() as { id: string }
+    const theirs = await (await schedule({ moduleIds: [module] })).json() as { id: string }
+
+    const answered = await send('GET', '/api/training/teaching', undefined, teacher.cookie)
+    expect(answered.status).toBe(200)
+    const taught = await answered.json() as Taught
+    expect(taught.items.map(item => item.id)).toContain(mine.id)
+    expect(taught.items.map(item => item.id)).not.toContain(theirs.id)
+    expect(taught.items.find(item => item.id === mine.id)?.modules.map(one => one.id)).toEqual([module])
+  })
+
+  test('a cancelled session drops off the list', async () => {
+    const module = await addModule()
+    const teacher = await adminSession(app, { roles: [] })
+    award(teacher.id, trainerCert)
+    award(teacher.id, module)
+    const { id } = await (await schedule({ moduleIds: [module], trainerId: teacher.id })).json() as { id: string }
+    expect((await send('POST', `/api/admin/training/sessions/${id}/cancel`, { reason: 'Room flooded' })).status).toBe(200)
+
+    const taught = await (await send('GET', '/api/training/teaching', undefined, teacher.cookie)).json() as Taught
+    expect(taught.items.map(item => item.id)).not.toContain(id)
+  })
+
+  test('somebody who teaches nothing gets an empty list, not a refusal', async () => {
+    const member = await adminSession(app, { roles: [] })
+    const answered = await send('GET', '/api/training/teaching', undefined, member.cookie)
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as Taught).items).toEqual([])
+  })
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
