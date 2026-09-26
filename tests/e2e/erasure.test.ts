@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { TOMBSTONE_NAME, tombstoneEmail } from '#shared/utils/erasure'
+import { londonDay } from '#shared/utils/membership'
 import { PERSONAL_TABLES } from '#shared/utils/personal-data'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -197,6 +198,28 @@ describe.skipIf(skip !== null)('erasing somebody else (A-125 criterion 6)', () =
 
     const tombstones = await (await send('GET', '/api/admin/accounts?anonymised=true', null, cookie)).json() as { items: { id: string }[] }
     expect(tombstones.items.map(item => item.id)).toContain(person.id)
+  })
+
+  // Issue #1364 and A-121 criterion 4: a tombstone is nobody's membership, so the register, its
+  // count and the SU's export leave it out, and the register says how many it hid (0071).
+  test('an erased member leaves the membership register and its export, counted as hidden', async () => {
+    const person = await member('erased-member')
+    const recorded = await send('POST', '/api/admin/memberships', { userId: person.id, startsOn: londonDay(new Date()), years: 1 }, cookie)
+    expect(recorded.status).toBe(200)
+
+    const before = await (await send('GET', '/api/admin/memberships?filter=everyone', null, cookie)).json() as { items: { userId: string }[], total: number, erasedHidden: number }
+    expect(before.items.map(item => item.userId)).toContain(person.id)
+
+    await send('POST', `/api/admin/accounts/${person.id}/security`, { operation: 'erase' }, cookie)
+
+    const after = await (await send('GET', '/api/admin/memberships?filter=everyone', null, cookie)).json() as { items: { userId: string }[], total: number, erasedHidden: number }
+    expect(after.items.map(item => item.userId)).not.toContain(person.id)
+    expect(after.total).toBe(before.total - 1)
+    expect(after.erasedHidden).toBe(before.erasedHidden + 1)
+
+    const exported = await (await send('GET', '/api/admin/memberships/export?filter=everyone', null, cookie)).text()
+    expect(exported).not.toContain(TOMBSTONE_NAME)
+    expect(exported).not.toContain(tombstoneEmail(person.id))
   })
 
   // The bundle is the definition of completeness, so it is the thing worth checking twice.
