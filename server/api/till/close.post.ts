@@ -14,8 +14,8 @@ export default defineEventHandler(async (event) => {
 
   const account = await closerFor(event, session)
 
-  // Money may still be arriving on the reader for a charge nobody has answered for, at any bar
-  // tonight since they share it; the Z cannot be reconciled around it (F-124.6, 0096, issue 1308).
+  // Money may still reach the one reader for a charge nobody has answered, at any bar tonight: the Z
+  // cannot be reconciled around it, but a mismatch is a fact, not a wait (F-124.6, 0096, issue 1308).
   const waiting = await openAttemptCount(session.night)
   if (waiting > 0) {
     throw createError({

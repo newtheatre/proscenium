@@ -122,9 +122,7 @@ export function basketOf(row: AttemptRow): AttemptBasket {
 // hand-off (criterion 7). Scanned in memory over the night's open rows, never an IN list.
 export async function refuseBookingsInOpenAttempts(night: string, reservationIds: string[]): Promise<void> {
   if (reservationIds.length === 0) return
-  const rows = await db.all<{ basket: string }>(sql`
-    SELECT basket FROM sumup_attempts WHERE ${openAttemptsOn(night)}
-  `)
+  const rows = await db.all<{ basket: string }>(sql`SELECT basket FROM sumup_attempts WHERE ${openAttemptsOn(night)}`)
   for (const row of rows) {
     const basket = JSON.parse(row.basket) as AttemptBasket
     const held = basket.sale.tickets.map(ticket => ticket.reservationId)
