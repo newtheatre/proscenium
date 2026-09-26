@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import { configValue } from './configuration'
 import { warningsForListedShowsQuery } from './content-warnings'
 import { performanceSoldColumn } from './programme'
-import { publicContentWarnings, warningAssessment } from '#shared/utils/content-warnings'
+import { saysShowGuidance, visitorWarnings } from '#shared/utils/content-warnings'
 import { offsetFor } from '#shared/utils/pagination'
 import { showNightOf } from '#shared/utils/show-night'
 import {
@@ -228,27 +228,73 @@ function assemble(
   const warningsFor = new Map<string, ShowContentWarning[]>()
   for (const row of warnings) {
     const held = warningsFor.get(row.showId) ?? []
-    held.push({ ...row, archived: row.archived === 1 })
+    held.push(readWarning(row))
     warningsFor.set(row.showId, held)
   }
 
   return shows.flatMap((row) => {
     const projected = publicShow(row)
     if (!projected) return []
-    const carried = warningsFor.get(row.id) ?? []
+    const warned = visitorWarnings(row.warningsConfirmedNone === 1, warningsFor.get(row.id) ?? [])
     return [{
       show: projected,
       categoryName: row.categoryName,
-      assessment: warningAssessment({
-        warningsConfirmedNone: row.warningsConfirmedNone === 1,
-        warningCount: carried.length,
-      }),
-      warnings: publicContentWarnings(carried),
+      ...warned,
+      guidance: saysShowGuidance({ ageGuidance: row.ageGuidance, ...warned }),
       contentNotes: row.contentNotes,
       performances: listed.get(row.id) ?? [],
     }]
   })
 }
+
+function readWarning(row: ShowWarningRow): ShowContentWarning {
+  return { ...row, archived: row.archived === 1 }
+}
+
+interface GuidanceShowRow {
+  slug: string
+  status: string
+  ageGuidance: string | null
+  warningsConfirmedNone: number
+}
+
+export function guidanceShowQuery(scope: SQL): SQL {
+  return sql`
+    SELECT slug, status, age_guidance AS ageGuidance, warnings_confirmed_none AS warningsConfirmedNone
+    FROM shows WHERE id IN (${scope})
+  `
+}
+
+export interface BookingGuidance {
+  lines: string[]
+  // Null once the show is off the public site, so a booking never links to a page that 404s.
+  slug: string | null
+}
+
+// A booking's guidance is the show page's own projection, so /qr and the email cannot drift from
+// it (D-102 criterion 4, issue 1330).
+export function bookingGuidanceFor(show: GuidanceShowRow, warnings: ShowWarningRow[]): BookingGuidance {
+  const warned = visitorWarnings(show.warningsConfirmedNone === 1, warnings.map(readWarning))
+  return {
+    lines: saysShowGuidance({ ageGuidance: show.ageGuidance, ...warned }),
+    slug: show.status === 'PUBLISHED' ? show.slug : null,
+  }
+}
+
+// Scoped by subquery, so a booking found by id or by reference binds one parameter (0006).
+export async function bookingGuidance(scope: SQL): Promise<BookingGuidance | null> {
+  const [[show], warnings] = await Promise.all([
+    db.all<GuidanceShowRow>(guidanceShowQuery(scope)),
+    db.all<ShowWarningRow>(warningsForListedShowsQuery(scope)),
+  ])
+  return show ? bookingGuidanceFor(show, warnings) : null
+}
+
+export const reservationShowScope = (reservationId: string): SQL =>
+  sql`SELECT p.show_id FROM reservations r JOIN performances p ON p.id = r.performance_id WHERE r.id = ${reservationId}`
+
+export const referenceShowScope = (reference: string): SQL =>
+  sql`SELECT p.show_id FROM reservations r JOIN performances p ON p.id = r.performance_id WHERE r.reference = ${reference}`
 
 // The season the public heading names (0087): the current one, else the next to begin, else none.
 // A finished or retired season is never advertised, and nothing stands in for a missing name.

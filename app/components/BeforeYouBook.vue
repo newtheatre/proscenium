@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { saysShowGuidance } from '#shared/utils/content-warnings'
-import type { ShowGuidance } from '#shared/utils/content-warnings'
-
 // The show's age guidance and warnings where a booker decides, and again on the booking itself
-// (D-102 criterion 4, issue 1330). The show page carries each warning's description and the notes.
+// (D-102 criterion 4, issue 1330). The lines are the server's; the show page carries the rest.
 defineProps<{
-  guidance: ShowGuidance
-  slug: string
+  lines: string[]
+  // Null once the show is off the public site, so the block never links to a page that 404s.
+  slug: string | null
   heading: string
 }>()
 </script>
@@ -21,7 +19,7 @@ defineProps<{
 
     <ul class="space-y-1 text-sm">
       <li
-        v-for="line in saysShowGuidance(guidance)"
+        v-for="line in lines"
         :key="line"
       >
         {{ line }}
@@ -29,6 +27,7 @@ defineProps<{
     </ul>
 
     <NuxtLink
+      v-if="slug"
       :to="`/shows/${slug}`"
       class="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-primary underline"
     >

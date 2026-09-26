@@ -22,7 +22,6 @@ export default defineEventHandler(async (event) => {
   await sendReservationConfirmation(event, {
     userId: entry.userId,
     reference: result.reservation.reference,
-    showId: entry.showId,
     showTitle: entry.showTitle,
     startsAt: entry.startsAt,
     totalPence: result.reservation.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0),

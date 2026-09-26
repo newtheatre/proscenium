@@ -208,22 +208,34 @@ export function publicContentWarnings(warnings: ShowContentWarning[]): PublicCon
     }))
 }
 
+// One show's warnings as a visitor reads them, wherever they are read: the show page, the listing
+// and a booking all project the same rows the same way (D-102 criteria 2 and 4).
+export function visitorWarnings(confirmedNone: boolean, carried: ShowContentWarning[]): {
+  assessment: WarningAssessment
+  warnings: PublicContentWarning[]
+} {
+  return {
+    assessment: warningAssessment({ warningsConfirmedNone: confirmedNone, warningCount: carried.length }),
+    warnings: publicContentWarnings(carried),
+  }
+}
+
 // What a booker is told before they come, from the show's own rows (D-102 criterion 4).
 export interface ShowGuidance {
   ageGuidance: string | null
   assessment: WarningAssessment
-  warnings: { title: string, level: ContentWarningLevel | null }[]
+  warnings: Pick<PublicContentWarning, 'title' | 'level' | 'kind'>[]
 }
 
 // In the same words on the booking form, the booking page and the email (issue 1330): the age
-// guidance first, then each warning in the show page's order, or whether anybody has looked.
+// guidance first, then each warning in the show page's own grouping, or whether anybody has looked.
 export function saysShowGuidance(guidance: ShowGuidance): string[] {
   const age = `Age guidance: ${guidance.ageGuidance ?? TO_BE_CONFIRMED}`
   if (guidance.assessment === 'CONFIRMED_NONE') return [age, `${saysAssessment('CONFIRMED_NONE')}.`]
   if (guidance.assessment === 'NOT_ASSESSED') {
     return [age, `${saysAssessment('NOT_ASSESSED')}. Ask the box office if it matters to you.`]
   }
-  const named = guidance.warnings.map((warning) => {
+  const named = groupContentWarnings(guidance.warnings).flatMap(group => group.warnings).map((warning) => {
     const level = saysWarningLevel(warning.level)
     return level ? `${warning.title}: ${level.toLowerCase()}` : warning.title
   })

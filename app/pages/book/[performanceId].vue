@@ -5,7 +5,7 @@ import { SAYS_PAYMENT, saysAvailability, saysNightLine } from '#shared/utils/pro
 import { overCapReason } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import { plural } from '#shared/utils/text'
-import type { PublicContentWarning, ShowGuidance, WarningAssessment } from '#shared/utils/content-warnings'
+import type { ListedShow } from '#shared/utils/programme'
 
 // The reservation flow (D-104): a guest or a signed-in account holds seats online; the box
 // office takes payment in person, on the night. Nothing here ever moves money (0005).
@@ -48,18 +48,6 @@ interface Confirmation {
   qrToken: string
 }
 
-interface RunPerformance {
-  id: string
-  startsAt: number
-  venueName: string
-  availability: 'AVAILABLE' | 'LIMITED' | 'SOLD_OUT' | 'BOOKING_CLOSED'
-  remaining: number | null
-  says: string
-  cancelled: boolean
-  externalBookingUrl: string | null
-  prices: { name: string, price: number, restrictedTo: string | null }[]
-}
-
 const route = useRoute()
 const performanceId = computed(() => String(route.params.performanceId))
 
@@ -71,19 +59,9 @@ if (!data.value) {
 
 const { account } = useAccount()
 
-// The run's other nights, from the public listing the show page already reads: picking one is a
-// navigation, so the chosen night is always in the address (booking.png).
-const { data: run } = await useFetch<{
-  show: { ageGuidance: string | null }
-  assessment: WarningAssessment
-  warnings: PublicContentWarning[]
-  performances: RunPerformance[]
-}>(() => `/api/shows/${data.value?.show.slug ?? ''}`)
-
-// What's on links straight here, past the show page, so its guidance comes too (D-102 criterion 4).
-const guidance = computed<ShowGuidance | null>(() => (run.value
-  ? { ageGuidance: run.value.show.ageGuidance, assessment: run.value.assessment, warnings: run.value.warnings }
-  : null))
+// The run's nights from the show page's own payload, so the address always names the night picked
+// (booking.png); What's on skips the show page, so its guidance comes too (D-102 criterion 4).
+const { data: run } = await useFetch<ListedShow>(() => `/api/shows/${data.value?.show.slug ?? ''}`)
 
 const nights = computed(() => (run.value?.performances ?? []).filter(one => !one.cancelled && !one.externalBookingUrl))
 
@@ -558,16 +536,17 @@ useSeoMeta({
       </div>
 
       <!-- The show's guidance, then the order as a ticket stub with the view's one marquee at its
-           foot. Below lg both follow the form, so a phone reads the guidance just before Book. -->
-      <div class="space-y-6 self-start lg:sticky lg:top-24">
+           foot; only the stub is sticky, so Book stays on screen. A phone reads both after the form. -->
+      <div class="space-y-6">
         <BeforeYouBook
-          v-if="guidance"
-          :guidance="guidance"
+          v-if="run?.guidance.length"
+          :lines="run.guidance"
           :slug="data!.show.slug"
           heading="Before you book"
         />
         <UCard
           variant="ticket"
+          class="lg:sticky lg:top-24"
           data-test="booking-summary"
         >
           <template #header>

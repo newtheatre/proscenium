@@ -13,6 +13,8 @@ const RESERVATION = {
   url: 'https://newtheatre.org.uk/qr/r-1.sig',
   imageUrl: 'https://newtheatre.org.uk/qr/r-1.sig/image.png',
   qrWidth: 165,
+  guidance: ['Age guidance: Recommended 14 and over', 'Content warnings: Strobe lighting'],
+  showUrl: 'https://newtheatre.org.uk/shows/the-tempest',
 }
 
 const PASS = {

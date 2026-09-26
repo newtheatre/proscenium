@@ -63,14 +63,29 @@ function expiry(at: Date): string {
   return formatLondon(at, { dateStyle: 'full', timeStyle: 'short' })
 }
 
-// Every other template's free text is a short, code-written phrase; an announcement's body is an
-// officer's own paragraphs, so this is the one place raw input reaches the HTML part at all.
+// Text somebody typed, such as an announcement's body or a show's age guidance, reaches the HTML
+// part only through this, so it can never become markup there.
 function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
 function paragraphs(body: string): string {
   return body.split(/\n{2,}/).map(part => `<p>${escapeHtml(part).replaceAll('\n', '<br>')}</p>`).join('\n')
+}
+
+// The show's guidance on a booking, as the booking form said it (D-102 criterion 4, issue 1330).
+// A retry of a message stored before the guidance existed renders without it rather than failing.
+function guidanceBlock(context: TemplateContext): { html: string, text: string } {
+  const lines = Array.isArray(context.guidance) ? context.guidance.map(String) : []
+  if (lines.length === 0) return { html: '', text: '' }
+  // Left out once the show is off the public site, rather than link to a page that 404s.
+  const showUrl = typeof context.showUrl === 'string' && context.showUrl ? context.showUrl : null
+  const link = 'What each warning means, on the show page'
+  return {
+    html: `\n<p><strong>Before you come</strong></p>\n${paragraphs(lines.join('\n'))}`
+      + (showUrl ? `\n<p><a href="${escapeHtml(showUrl)}">${link}</a></p>` : ''),
+    text: `\n\nBefore you come\n${lines.join('\n')}${showUrl ? `\n${link}: ${showUrl}` : ''}`,
+  }
 }
 
 const TEMPLATES = {
@@ -1569,17 +1584,7 @@ The Nottingham New Theatre`,
     const url = String(context.url)
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
-    // The show's guidance, as the booking form said it (D-102 criterion 4, issue 1330). Age
-    // guidance is an officer's own words, so it is escaped like any other free text.
-    const guidance = Array.isArray(context.guidance) ? context.guidance.map(String) : []
-    const showUrl = String(context.showUrl)
-    const guidanceHtml = guidance.length === 0
-      ? ''
-      : `\n<p><strong>Before you come</strong><br>${guidance.map(escapeHtml).join('<br>')}<br>
-<a href="${showUrl}">What each warning means, on the show page</a></p>`
-    const guidanceText = guidance.length === 0
-      ? ''
-      : `\n\nBefore you come\n${guidance.join('\n')}\nWhat each warning means, on the show page: ${showUrl}`
+    const guidance = guidanceBlock(context)
     return {
       subject: `Your booking for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
@@ -1587,7 +1592,7 @@ The Nottingham New Theatre`,
 <p>Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats
 and is not a purchase until then.</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
-<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>${guidanceHtml}`),
+<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>${guidance.html}`),
       text: `Hello ${context.name},
 
 Reference ${reference} for ${show}, ${when}.
@@ -1595,7 +1600,7 @@ Reference ${reference} for ${show}, ${when}.
 Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats and
 is not a purchase until then.
 
-Open your booking: ${url}${guidanceText}
+Open your booking: ${url}${guidance.text}
 
 The Nottingham New Theatre`,
     }

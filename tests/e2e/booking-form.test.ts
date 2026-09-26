@@ -141,6 +141,31 @@ describe.skipIf(skip !== null)('age guidance and warnings travel with the bookin
     expect(letter).toContain('Age guidance: Recommended 14 and over')
     expect(letter).toContain(warning)
   }, CASE_TIMEOUT_MS)
+
+  // Guidance is for somebody still coming: a cancelled booking admits nobody, so it says nothing.
+  test('a cancelled booking\'s page no longer says it', async () => {
+    const { performanceId, ticketTypeId } = await guidedShow()
+    const answered = await send('POST', '/api/reservations', {
+      performanceId,
+      lines: [{ ticketTypeId, quantity: 1 }],
+      guest: { name: 'Banquo', email: `banquo-${crypto.randomUUID().slice(0, 8)}@example.com` },
+    }, '')
+    const { qrToken } = await answered.json() as { qrToken: string }
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/qr/${qrToken}`, '[data-test="booking-found"]')
+      await waitFor(view, `document.querySelector('[data-test="before-you-book"]')`)
+      await click(view, '[data-test="booking-cancel-start"]')
+      await waitFor(view, `document.querySelector('[data-test="confirm-cancel-booking-verb"]')`)
+      await click(view, '[data-test="confirm-cancel-booking-verb"]')
+      await waitFor(view, `document.querySelector('[data-test="booking-status"]')?.textContent.includes('Cancelled')`)
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="before-you-book"]') === null`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('the booking screen is three numbered steps (criterion 7)', () => {
