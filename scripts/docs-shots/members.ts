@@ -115,8 +115,7 @@ export const members: Shot[] = [
       { selector: '[data-test="my-shifts"], [data-test="week-ALL"]', label: 'What you hold' },
       { selector: '[data-test="week-THIS_WEEK"]', label: 'Choose the week' },
       { selector: '[data-test="open-shifts-list"], [data-test="open-shifts-empty"]', label: 'Shifts you can take' },
-      // Absent for a member who qualifies for every role; the list then stands in for it.
-      { selector: '[data-test="roles-you-could-take"], [data-test="open-shifts-list"], [data-test="open-shifts-empty"]', label: 'Roles you could take' },
+      { selector: '[data-test^="role-card-"]', label: 'A role you could take' },
     ],
   },
   {
