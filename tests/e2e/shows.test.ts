@@ -397,8 +397,6 @@ describe.skipIf(skip !== null)('the booking window is per performance and inheri
   })
 })
 
-// Every shift's window ends from the running time, so one left empty at a venue we run strands
-// the whole rota at curtain plus the offset (0078).
 // D-132 criterion 10: a run is one transaction, every night or none.
 describe.skipIf(skip !== null)('performances are added as a run (D-132 criterion 10)', () => {
   const nights = (count: number): { startsAt: number, doorsAt: number }[] =>
@@ -447,6 +445,8 @@ describe.skipIf(skip !== null)('performances are added as a run (D-132 criterion
   })
 })
 
+// Every shift's window ends from the running time, so one left empty at a venue we run strands
+// the whole rota at curtain plus the offset (0078).
 describe.skipIf(skip !== null)('a performance at a venue we run carries its running time (D-121 criterion 6)', () => {
   test('adding one without it is refused, naming the venue, and nothing is written', async () => {
     const id = await newShow()

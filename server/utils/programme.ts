@@ -332,7 +332,8 @@ const PERFORMANCE_COLUMNS = sql`
   p.hold_release_minutes_before AS holdReleaseMinutesBefore,
   p.external_booking_url AS externalBookingUrl,
   p.status AS status,
-  p.notes AS notes
+  p.notes AS notes,
+  (SELECT count(*) FROM shifts sh WHERE sh.performance_id = p.id AND sh.status <> 'CANCELLED') AS shiftCount
 `
 
 // Every performance of one show, bound by the show id alone: two venues may run at once and one

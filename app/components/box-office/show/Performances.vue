@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { formatLondon, fromLondonWallClock } from '#shared/utils/london'
+import { formatLondon } from '#shared/utils/london'
 import { saysWhen } from '#shared/utils/when'
 import {
+  MAX_RUN_NIGHTS,
   addPerformanceRefusal,
   bookingWindowSource,
+  nightInstants,
   performanceScreenForm,
   preselectedVenueId,
   resolveBookingClosesHours,
+  runScreenForm,
   runningTimeRefusal,
   saysBookingWindow,
   saysPerformanceStatus,
@@ -67,10 +70,13 @@ async function changed(): Promise<void> {
 
 const performanceOpen = ref(false)
 const editingPerformance = ref<AdminPerformance | null>(null)
+// The rare overrides, shown on Edit only when asked for or already set (D-132 criterion 10).
+const more = ref(false)
 
 const form = reactive({
   venueId: '',
   day: '',
+  days: [''] as string[],
   clock: '19:30',
   doorsClock: '',
   durationMinutes: null as number | null,
@@ -85,79 +91,96 @@ const form = reactive({
 
 const blank = (value: string): string | null => (value.trim() ? value.trim() : null)
 
-// The wall clock an officer typed, turned into the instant it names in London (0014).
-function instantOf(day: string, clock: string): number {
-  const [year, month, date] = day.split('-').map(Number)
-  const [hour, minute] = clock.split(':').map(Number)
-  return Math.floor(fromLondonWallClock(year!, month!, date!, hour!, minute!).getTime() / 1000)
-}
-
-// Counted on the civil date, never by subtracting a day of seconds, which is wrong twice a year.
-function dayBefore(day: string): string {
-  const [year, month, date] = day.split('-').map(Number)
-  const at = new Date(Date.UTC(year!, month! - 1, date!))
-  at.setUTCDate(at.getUTCDate() - 1)
-  return at.toISOString().slice(0, 10)
-}
-
-// The show night runs 04:00 to 04:00, so a curtain after midnight has its doors on the London day
-// before it (0014). Only the clocks are typed, so this is where that is worked out.
-function doorsBefore(day: string, clock: string, startsAt: number): number {
-  const sameDay = instantOf(day, clock)
-  return sameDay > startsAt ? instantOf(dayBefore(day), clock) : sameDay
-}
-
 const dayOf = (at: number): string => formatLondon(new Date(at * 1000), { year: 'numeric', month: '2-digit', day: '2-digit' })
   .split('/').reverse().join('-')
 const clockOf = (at: number): string => formatLondon(new Date(at * 1000), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
-function editPerformance(one: AdminPerformance | null): void {
-  editingPerformance.value = one
+const NO_OVERRIDES = { capacityOverride: null, bookingClosesHoursBefore: null, holdReleaseMinutesBefore: null, externalBookingUrl: '', notes: '' }
+
+// A run starts empty or, for Duplicate, from a performance's venue, clocks and running time; only
+// its nights are new (D-132 criterion 10).
+function addRun(from: AdminPerformance | null): void {
+  editingPerformance.value = null
+  more.value = false
   failure.value = null
   Object.assign(form, {
-    venueId: one?.venueId ?? preselectedVenueId(props.venues, props.show.lastVenueId),
-    day: one ? dayOf(one.startsAt) : '',
-    clock: one ? clockOf(one.startsAt) : '19:30',
-    doorsClock: one?.doorsAt ? clockOf(one.doorsAt) : '',
-    durationMinutes: one?.durationMinutes ?? null,
-    intervalCount: one?.intervalCount ?? 0,
-    intervalMinutes: one?.intervalMinutes ?? null,
-    capacityOverride: one?.capacityOverride ?? null,
-    bookingClosesHoursBefore: one?.bookingClosesHoursBefore ?? null,
-    holdReleaseMinutesBefore: one?.holdReleaseMinutesBefore ?? null,
-    externalBookingUrl: one?.externalBookingUrl ?? '',
-    notes: one?.notes ?? '',
+    ...NO_OVERRIDES,
+    venueId: from?.venueId ?? preselectedVenueId(props.venues, props.show.lastVenueId),
+    days: [''],
+    clock: from ? clockOf(from.startsAt) : '19:30',
+    doorsClock: from?.doorsAt ? clockOf(from.doorsAt) : '',
+    durationMinutes: from?.durationMinutes ?? null,
+    intervalCount: from?.intervalCount ?? 0,
+    intervalMinutes: from?.intervalMinutes ?? null,
   })
   performanceOpen.value = true
+}
+
+function editPerformance(one: AdminPerformance): void {
+  editingPerformance.value = one
+  failure.value = null
+  more.value = one.capacityOverride !== null || one.bookingClosesHoursBefore !== null
+    || one.holdReleaseMinutesBefore !== null || one.externalBookingUrl !== null || one.notes !== null
+  Object.assign(form, {
+    venueId: one.venueId,
+    day: dayOf(one.startsAt),
+    clock: clockOf(one.startsAt),
+    doorsClock: one.doorsAt ? clockOf(one.doorsAt) : '',
+    durationMinutes: one.durationMinutes,
+    intervalCount: one.intervalCount,
+    intervalMinutes: one.intervalMinutes,
+    capacityOverride: one.capacityOverride,
+    bookingClosesHoursBefore: one.bookingClosesHoursBefore,
+    holdReleaseMinutesBefore: one.holdReleaseMinutesBefore,
+    externalBookingUrl: one.externalBookingUrl ?? '',
+    notes: one.notes ?? '',
+  })
+  performanceOpen.value = true
+}
+
+// Every night of a run in one request, so the run lands whole or not at all (D-132 criterion 10).
+function saveRun(): Promise<unknown> {
+  return $fetch(`/api/admin/shows/${props.show.id}/runs`, {
+    method: 'POST',
+    body: {
+      venueId: form.venueId,
+      durationMinutes: form.durationMinutes,
+      intervalCount: form.intervalCount,
+      intervalMinutes: form.intervalMinutes,
+      nights: form.days.map(day => nightInstants(day, form.clock, form.doorsClock)),
+    },
+  })
 }
 
 async function savePerformance(): Promise<void> {
   saving.value = true
   failure.value = null
-  const startsAt = instantOf(form.day, form.clock)
-  const body = {
-    venueId: form.venueId,
-    startsAt,
-    doorsAt: form.doorsClock ? doorsBefore(form.day, form.doorsClock, startsAt) : null,
-    durationMinutes: form.durationMinutes,
-    intervalCount: form.intervalCount,
-    intervalMinutes: form.intervalMinutes,
-    capacityOverride: form.capacityOverride,
-    bookingClosesHoursBefore: form.bookingClosesHoursBefore,
-    holdReleaseMinutesBefore: form.holdReleaseMinutesBefore,
-    externalBookingUrl: blank(form.externalBookingUrl),
-    notes: blank(form.notes),
-  }
+  const editing = editingPerformance.value
+  const added = form.days.length
   try {
-    if (editingPerformance.value) {
-      await $fetch(`/api/admin/performances/${editingPerformance.value.id}`, { method: 'PUT', body })
+    if (editing) {
+      await $fetch(`/api/admin/performances/${editing.id}`, {
+        method: 'PUT',
+        body: {
+          ...nightInstants(form.day, form.clock, form.doorsClock),
+          venueId: form.venueId,
+          durationMinutes: form.durationMinutes,
+          intervalCount: form.intervalCount,
+          intervalMinutes: form.intervalMinutes,
+          capacityOverride: form.capacityOverride,
+          bookingClosesHoursBefore: form.bookingClosesHoursBefore,
+          holdReleaseMinutesBefore: form.holdReleaseMinutesBefore,
+          externalBookingUrl: blank(form.externalBookingUrl),
+          notes: blank(form.notes),
+        },
+      })
     }
     else {
-      await $fetch(`/api/admin/shows/${props.show.id}/performances`, { method: 'POST', body })
+      await saveRun()
     }
     toast.add({
-      title: editingPerformance.value ? 'Performance changed' : 'Performance added',
-      description: editingPerformance.value ? undefined : 'It is off sale until you put it on sale, or publish the show.',
+      title: editing ? 'Performance changed' : `${plural(added, 'performance', 'performances')} added`,
+      description: editing ? undefined : 'Off sale until you put them on sale, or publish the show.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -350,6 +373,7 @@ const columns: TableColumn<AdminPerformance>[] = [
             'onClick': () => setOnSale(row.original, row.original.status !== 'ON_SALE'),
           }, () => (row.original.status === 'ON_SALE' ? 'Off sale' : 'On sale')),
       rowOverflow(row.original.id, [
+        { label: 'Duplicate', icon: 'i-lucide-copy', onSelect: () => addRun(row.original) },
         ...(row.original.status === 'CANCELLED'
           ? []
           : [{
@@ -418,9 +442,9 @@ const columns: TableColumn<AdminPerformance>[] = [
           icon="i-lucide-plus"
           :disabled="addRefusal !== null"
           :aria-describedby="addRefusal === null ? undefined : 'add-performance-blocked'"
-          @click="editPerformance(null)"
+          @click="addRun(null)"
         >
-          Add a performance
+          Add performances
         </UButton>
       </template>
     </AdminToolbar>
@@ -474,13 +498,15 @@ const columns: TableColumn<AdminPerformance>[] = [
 
     <UModal
       v-model:open="performanceOpen"
-      :title="editingPerformance ? 'Edit this performance' : 'Add a performance'"
-      description="A performance belongs to one venue at one time. Two venues can run at once, and one venue can run a matinee and an evening."
+      :title="editingPerformance ? 'Edit this performance' : 'Add performances'"
+      :description="editingPerformance
+        ? 'A performance belongs to one venue at one time. Two venues can run at once, and one venue can run a matinee and an evening.'
+        : 'One night or a run: each night becomes its own performance at the venue, times and running time given here.'"
     >
       <template #body>
         <UForm
           id="performance-form"
-          :schema="performanceScreenForm"
+          :schema="editingPerformance ? performanceScreenForm : runScreenForm"
           :state="form"
           :validate="checkRunningTime"
           class="space-y-4"
@@ -508,18 +534,59 @@ const columns: TableColumn<AdminPerformance>[] = [
             />
           </UFormField>
 
-          <div class="grid gap-4 sm:grid-cols-3">
-            <UFormField
-              label="Day"
-              name="day"
-              required
-            >
-              <DateField
-                v-model="form.day"
-                data-test="performance-day"
-              />
-            </UFormField>
+          <UFormField
+            v-if="editingPerformance"
+            label="Day"
+            name="day"
+            required
+          >
+            <DateField
+              v-model="form.day"
+              data-test="performance-day"
+            />
+          </UFormField>
 
+          <UFormField
+            v-else
+            label="Nights"
+            name="days"
+            required
+            description="Each night is one performance at the curtain below."
+          >
+            <div class="space-y-2">
+              <div
+                v-for="(_, index) in form.days"
+                :key="index"
+                class="flex items-center gap-2"
+              >
+                <DateField
+                  v-model="form.days[index]"
+                  :data-test="index === 0 ? 'performance-day' : `performance-day-${index + 1}`"
+                />
+                <UButton
+                  v-if="index > 0"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-x"
+                  :aria-label="`Remove night ${index + 1}`"
+                  @click="form.days.splice(index, 1)"
+                />
+              </div>
+              <UButton
+                color="neutral"
+                variant="outline"
+                size="sm"
+                icon="i-lucide-plus"
+                :disabled="form.days.length >= MAX_RUN_NIGHTS"
+                data-test="run-add-night"
+                @click="form.days.push('')"
+              >
+                Add another night
+              </UButton>
+            </div>
+          </UFormField>
+
+          <div class="grid gap-4 sm:grid-cols-2">
             <UFormField
               label="Curtain"
               name="clock"
@@ -587,7 +654,22 @@ const columns: TableColumn<AdminPerformance>[] = [
             </UFormField>
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
+          <UButton
+            v-if="editingPerformance"
+            color="neutral"
+            variant="link"
+            :icon="more ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+            :aria-expanded="more"
+            data-test="performance-more"
+            @click="more = !more"
+          >
+            {{ more ? 'Fewer' : 'More: capacity, booking window, external ticketing, notes' }}
+          </UButton>
+
+          <div
+            v-if="editingPerformance && more"
+            class="grid gap-4 sm:grid-cols-2"
+          >
             <UFormField
               label="Capacity"
               name="capacityOverride"
@@ -634,6 +716,7 @@ const columns: TableColumn<AdminPerformance>[] = [
           </div>
 
           <UFormField
+            v-if="editingPerformance && more"
             label="External ticketing"
             name="externalBookingUrl"
             hint="Optional"
@@ -649,6 +732,7 @@ const columns: TableColumn<AdminPerformance>[] = [
           </UFormField>
 
           <UFormField
+            v-if="editingPerformance && more"
             label="Internal notes"
             name="notes"
             hint="Optional"
@@ -670,7 +754,7 @@ const columns: TableColumn<AdminPerformance>[] = [
           :loading="saving"
           data-test="performance-submit"
         >
-          {{ editingPerformance ? 'Save the performance' : 'Add a performance' }}
+          {{ editingPerformance ? 'Save the performance' : form.days.length > 1 ? `Add ${form.days.length} performances` : 'Add the performance' }}
         </UButton>
         <UButton
           color="neutral"

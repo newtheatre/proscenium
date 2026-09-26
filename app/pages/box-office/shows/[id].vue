@@ -247,22 +247,15 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
 
     <UModal
       v-model:open="publishing"
-      title="Publish this show"
-      description="The public page goes live. Performances still off sale can go on sale with it."
+      title="Put this show on sale"
+      description="The public page goes live. Check each night before it does; nothing here stops you."
     >
       <template #body>
-        <div class="space-y-4">
-          <USwitch
-            v-model="cascade"
-            label="Put its performances on sale too"
-            description="Cancelled performances are left alone."
-            data-test="cascade"
-          />
-          <BoxOfficeShowPublishPasses
-            v-model="coverTicked"
-            :detail="data"
-          />
-        </div>
+        <BoxOfficeShowPublishSheet
+          v-model:cascade="cascade"
+          v-model:cover="coverTicked"
+          :detail="data"
+        />
       </template>
 
       <template #footer>
@@ -271,7 +264,7 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
           data-test="confirm-publish"
           @click="setPublished(true)"
         >
-          Publish the show
+          Put on sale
         </UButton>
         <UButton
           color="neutral"
