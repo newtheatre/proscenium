@@ -43,22 +43,18 @@ async function load(): Promise<void> {
 
 async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<void> {
   saving.value = true
-  const wasVerified = profile.value?.status === 'VERIFIED'
   try {
     const { repended } = await $fetch<{ repended: boolean }>('/api/account/access-profile', { method: 'PUT', body: event.data })
-    toast.add(repended
-      ? {
-          title: 'Access profile saved',
-          description: 'The Accessibility Officer verifies it before it reaches anybody working the door.',
-          icon: 'i-lucide-check',
-          color: 'success',
-        }
-      : {
-          title: 'Nothing has changed',
-          description: wasVerified ? 'Your requirements are as they were, so they stay verified.' : 'Your requirements are as they were, and still with the Accessibility Officer.',
-          icon: 'i-lucide-check',
-          color: 'success',
-        })
+    toast.add({
+      title: repended ? 'Access profile saved' : 'Nothing has changed',
+      description: repended
+        ? 'The Accessibility Officer verifies it before it reaches anybody working the door.'
+        : profile.value?.status === 'VERIFIED'
+          ? 'Your requirements are as they were, so they stay verified.'
+          : 'Your requirements are as they were, and still with the Accessibility Officer.',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
     await load()
   }
   catch (error) {
@@ -69,9 +65,9 @@ async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<
   }
 }
 
-// Once a profile exists, consent is a switch of its own that saves at once and never sends the
-// profile back to the officer; a first declaration asks for it with the rest (D-127 criterion 7).
-const consentSwitch = computed(() => profile.value !== null && profile.value.status !== 'WITHDRAWN')
+// A profile in force: consent is then a switch of its own that never sends it back to the officer,
+// and it can be withdrawn. A first declaration asks for consent with the rest (D-127 criterion 7).
+const standing = computed(() => profile.value !== null && profile.value.status !== 'WITHDRAWN')
 const switchingConsent = ref(false)
 
 async function switchConsent(consent: boolean): Promise<void> {
@@ -79,7 +75,6 @@ async function switchConsent(consent: boolean): Promise<void> {
   try {
     await $fetch('/api/account/access-profile/consent', { method: 'PUT', body: { consent } })
     state.consent = consent
-    if (profile.value) profile.value = { ...profile.value, consentGiven: consent }
     toast.add({
       title: consent ? 'The door may be shown your agreed wording' : 'The door is shown nothing from now on',
       icon: 'i-lucide-check',
@@ -209,9 +204,9 @@ useSeoMeta({ title: 'Access requirements' })
         </div>
 
         <UFormField
-          v-if="consentSwitch"
+          v-if="standing"
           label="Show my agreed wording to the people on the door"
-          description="Changes at once, and never sends your requirements back to be checked."
+          description="Changes at once, and never sends your requirements back to be checked. While it is off, the door is shown nothing and access tickets are not offered."
         >
           <USwitch
             :model-value="state.consent"
@@ -283,7 +278,7 @@ useSeoMeta({ title: 'Access requirements' })
           </UFormField>
 
           <UFormField
-            v-if="!consentSwitch"
+            v-if="!standing"
             name="consent"
           >
             <UCheckbox
@@ -297,7 +292,7 @@ useSeoMeta({ title: 'Access requirements' })
             v-if="profile?.status === 'VERIFIED'"
             class="text-sm text-muted"
           >
-            Changing a need, the companions or the note sends your requirements back to be checked. Saving without a change keeps them verified.
+            Changing a need, the companions, the note or the Access Card number sends your requirements back to be checked. Saving without a change keeps them verified.
           </p>
 
           <UButton
@@ -309,7 +304,7 @@ useSeoMeta({ title: 'Access requirements' })
           </UButton>
         </UForm>
 
-        <template v-if="profile && profile.status !== 'WITHDRAWN'">
+        <template v-if="standing">
           <USeparator />
           <div>
             <p class="text-sm text-muted">

@@ -28,6 +28,7 @@ const payload: AccessProfilePayload = {
   requesterNote: 'Uses a mobility aid',
   fohNote: null,
   accessCardNumber: 'NAC1234567',
+  declineReason: null,
 }
 
 describe('access profile encryption (D-127, 0050)', () => {

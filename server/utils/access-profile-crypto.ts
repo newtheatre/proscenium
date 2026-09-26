@@ -32,5 +32,7 @@ export async function encryptAccessProfilePayload(payload: AccessProfilePayload,
 }
 
 export async function decryptAccessProfilePayload(encrypted: EncryptedPayload, userId: string): Promise<AccessProfilePayload> {
-  return decryptWithKey(encrypted, await encryptionKey(), userId)
+  const payload = await decryptWithKey(encrypted, await encryptionKey(), userId)
+  // A payload written before declines carried a reason has no such key.
+  return { ...payload, declineReason: payload.declineReason ?? null }
 }

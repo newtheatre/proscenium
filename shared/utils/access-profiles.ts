@@ -57,8 +57,8 @@ export interface AccessProfilePayload {
   fohNote: string | null
   // Self-declared, sighted at verification and cleared the moment it is (D-127 criterion 1).
   accessCardNumber: string | null
-  // The officer's reason for a decline, for the owner alone; absent from older payloads.
-  declineReason?: string | null
+  // The officer's reason for a decline, for the owner alone (D-127 criterion 8).
+  declineReason: string | null
 }
 
 const flagsShape = Object.fromEntries(ACCESS_FLAGS.map(flag => [flag, z.boolean().default(false)])) as
@@ -88,17 +88,12 @@ export const accessConsentForm = z.strictObject({
 })
 
 // What a save is compared against: the declaration itself, never the consent.
-export interface SavedDeclaration {
-  flags: Record<AccessFlag, boolean>
-  companions: number
-  requesterNote: string | null
-  accessCardNumber: string | null
-}
+export type SavedDeclaration = Omit<DeclareAccessProfileInput, 'consent'>
 
 export function changesDeclaration(saved: SavedDeclaration, input: DeclareAccessProfileInput): boolean {
   if (saved.companions !== input.companions) return true
-  if ((saved.requesterNote ?? null) !== (input.requesterNote ?? null)) return true
-  if ((saved.accessCardNumber ?? null) !== (input.accessCardNumber ?? null)) return true
+  if (saved.requesterNote !== input.requesterNote) return true
+  if (saved.accessCardNumber !== input.accessCardNumber) return true
   return ACCESS_FLAGS.some(flag => Boolean(saved.flags[flag]) !== Boolean(input.flags[flag]))
 }
 
@@ -208,9 +203,9 @@ export interface AccessProfileSummary {
   updatedAt: number
 }
 
-// What the accessibility officer reads to decide: everything the owner sees, plus who they are
-// and who verified them. Never sent anywhere but this one screen (D-127 criterion 2).
-export interface OfficerAccessProfile extends OwnAccessProfile {
+// What the accessibility officer reads to decide: the owner's view bar a decline's reason, which is
+// the owner's alone (D-127 criterion 8), plus who they are and who verified them (criterion 2).
+export interface OfficerAccessProfile extends Omit<OwnAccessProfile, 'declineReason'> {
   userId: string
   name: string
   email: string

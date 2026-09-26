@@ -51,8 +51,7 @@ async function payloadOf(row: Pick<AccessProfileRow, 'encryptedPayload' | 'encry
   if (!row.encryptedPayload || !row.encryptionIv) {
     return { flags: emptyFlags(), requesterNote: null, fohNote: null, accessCardNumber: null, declineReason: null }
   }
-  const payload = await decryptAccessProfilePayload({ ciphertext: row.encryptedPayload, iv: row.encryptionIv }, userId)
-  return { ...payload, declineReason: payload.declineReason ?? null }
+  return decryptAccessProfilePayload({ ciphertext: row.encryptedPayload, iv: row.encryptionIv }, userId)
 }
 
 function shapeOwn(row: AccessProfileRow, payload: AccessProfilePayload, now: number): OwnAccessProfile {
@@ -66,7 +65,7 @@ function shapeOwn(row: AccessProfileRow, payload: AccessProfilePayload, now: num
     consentGiven: row.consentFohAt !== null,
     verifiedAt: row.verifiedAt,
     expiresAt: row.expiresAt,
-    declineReason: payload.declineReason ?? null,
+    declineReason: payload.declineReason,
   }
 }
 
@@ -120,10 +119,9 @@ export async function declareAccessProfile(event: H3Event, userId: string, input
   const existing = await rowFor(userId)
 
   if (existing) {
-    const saved = await payloadOf(existing, userId)
-    const status = effectiveStatus({ status: asAccessProfileStatus(existing.status), expiresAt: existing.expiresAt }, now)
-    if (!saveRepends(status, changesDeclaration({ ...saved, companions: existing.companions }, input))) {
-      await setAccessConsent(userId, input.consent)
+    const own = shapeOwn(existing, await payloadOf(existing, userId), now)
+    if (!saveRepends(own.status, changesDeclaration(own, input))) {
+      if (own.consentGiven !== input.consent) await setAccessConsent(userId, input.consent)
       return { repended: false }
     }
   }
@@ -133,6 +131,7 @@ export async function declareAccessProfile(event: H3Event, userId: string, input
     requesterNote: input.requesterNote ?? null,
     fohNote: null,
     accessCardNumber: input.accessCardNumber ?? null,
+    declineReason: null,
   }
   const encrypted = await encryptAccessProfilePayload(payload, userId)
 
@@ -231,7 +230,8 @@ export async function accessProfileForOfficer(userId: string): Promise<OfficerAc
   if (!account || !row) return null
 
   const now = Math.floor(Date.now() / 1000)
-  return { userId, name: account.name, email: account.email, verifiedBy: row.verifiedBy, ...shapeOwn(row, await payloadOf(row, userId), now) }
+  const { declineReason: _reason, ...declaration } = shapeOwn(row, await payloadOf(row, userId), now)
+  return { userId, name: account.name, email: account.email, verifiedBy: row.verifiedBy, ...declaration }
 }
 
 // Evidence is sighted and never stored, whichever way the decision goes (D-127 criterion 1).

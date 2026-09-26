@@ -6,6 +6,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
+import type { OwnAccessProfile } from '#shared/utils/access-profiles'
 
 // D-127 through the real routes: a self-declared profile, verified only by a named accessibility
 // officer, encrypted at rest, and gone on withdrawal or erasure. The suite runs in file order.
@@ -142,17 +143,9 @@ describe.skipIf(skip !== null)('only a named accessibility officer verifies (cri
   })
 })
 
-interface Own {
-  status: string
-  fohNote: string | null
-  expiresAt: number | null
-  consentGiven: boolean
-  declineReason?: string | null
-}
-
-async function own(member: TestMember = patron): Promise<Own> {
+async function own(member: TestMember = patron): Promise<OwnAccessProfile> {
   const answered = await send('GET', '/api/account/access-profile', undefined, member.cookie)
-  return (await answered.json() as { profile: Own }).profile
+  return (await answered.json() as { profile: OwnAccessProfile }).profile
 }
 
 function count(sql: string, ...parameters: unknown[]): number {
@@ -263,6 +256,13 @@ describe.skipIf(skip !== null)('the owner is told, and told nothing declared or 
     expect(inbox?.body ?? '').not.toContain('Access Card')
   })
 
+  test('the officer reading the declined profile is not shown the reason (criterion 8)', async () => {
+    const answered = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${declined.id}`, undefined, accessOfficer.cookie))
+    expect(answered.status).toBe(200)
+    const { profile } = await answered.json() as { profile: Record<string, unknown> }
+    expect(profile).not.toHaveProperty('declineReason')
+  })
+
   test('saving a declined profile again, unchanged, asks to be checked again and clears the reason', async () => {
     const saved = await send('PUT', '/api/account/access-profile', declaration({ accessCardNumber: null }), declined.cookie)
     expect(await saved.json()).toMatchObject({ repended: true })
@@ -297,6 +297,11 @@ describe.skipIf(skip !== null)('withdrawal and reinstatement (criterion 5)', () 
     const answered = await send('POST', '/api/account/access-profile/withdraw', {}, patron.cookie)
     expect(answered.status).toBe(200)
     expect(await answered.json()).toMatchObject({ withdrawn: false, alreadyWithdrawn: true })
+  })
+
+  test('the consent switch puts nothing back: withdrawn is refused, and no profile is not there to switch (criterion 7)', async () => {
+    expect((await send('PUT', '/api/account/access-profile/consent', { consent: true }, patron.cookie)).status).toBe(409)
+    expect((await send('PUT', '/api/account/access-profile/consent', { consent: true }, boxOffice.cookie)).status).toBe(404)
   })
 
   test('a withdrawn profile cannot be verified: only the owner reinstates it', async () => {
