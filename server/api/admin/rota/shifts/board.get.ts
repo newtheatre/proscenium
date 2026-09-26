@@ -8,17 +8,21 @@ export default defineEventHandler(async (event) => {
   await requirePermission(event, 'rota.write')
   const window = await getValidatedQueryOrThrow(event, boardWindowQuery)
   const bounds = boardWindowBounds(window)
+  // The approvals queue: performances holding a claim to confirm, whatever the window (issue 1365).
+  const scope = window.waiting ? 'waiting' : bounds
 
-  const [performances, shifts, openings, openingShifts] = await Promise.all([
-    db.all<RosterPerformanceRow>(rosterPerformancesQuery(bounds)),
-    db.all<RosterShiftRow>(rosterShiftsQuery(bounds)),
-    db.all<RosterOpening>(rosterOpeningsQuery(bounds)),
-    db.all<RosterOpeningShiftRow>(rosterOpeningShiftsQuery(bounds)),
+  const [performances, shifts, openings, openingShifts, [claims]] = await Promise.all([
+    db.all<RosterPerformanceRow>(rosterPerformancesQuery(scope)),
+    db.all<RosterShiftRow>(rosterShiftsQuery(scope)),
+    window.waiting ? Promise.resolve([]) : db.all<RosterOpening>(rosterOpeningsQuery(bounds)),
+    window.waiting ? Promise.resolve([]) : db.all<RosterOpeningShiftRow>(rosterOpeningShiftsQuery(bounds)),
+    db.all<{ waiting: number }>(waitingClaimsQuery()),
   ])
 
   return {
     from: window.from,
     to: window.to,
+    waiting: Number(claims?.waiting ?? 0),
     items: boardEntries(
       performances.map(performance => ({
         ...performance,

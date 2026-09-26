@@ -534,7 +534,7 @@ performance's start. "Is not X" includes rows with no value at all, and "is empt
 
 The first endpoints migrated were `GET /api/admin/accounts` and `GET /api/admin/shows`, both
 documented in `docs/data-model.md` beside their tables. Rota followed: `GET /api/admin/rota/shifts`,
-`GET /api/admin/rota/approvals`, `GET /api/admin/rota/templates`, `GET /api/admin/checklist` and
+`GET /api/admin/rota/templates`, `GET /api/admin/checklist` and
 `GET /api/admin/venues/emergency`, the last three paging a subquery-scoped join over venues rather
 than a flat table (0006). Migration runs one module per pull request; `tests/unit/admin-conventions.test.ts`
 holds the migrated pages to the declaration now and the whole console once the last module lands.
@@ -1054,11 +1054,12 @@ account, which is exactly what a retried claim looks like. A losing write's audi
 suppressed by predicating on `changes() = 1`, this connection's own preceding row count, not on
 the row's resulting state, which a winner has already set, the same shape `performances/[id]/index.put.ts` uses.
 
-`GET /api/admin/rota/approvals`, `POST /api/admin/rota/approvals/[id]/approve` and
-`.../decline` are E-105's queue, gated on `rota.write`, the audience E-101 already gave the
-templates to (module E open question 1). The list filters by role and by `night`, against the
-show night rather than the calendar day, through `shared/utils/rota-approvals-list.ts` (K-129).
-Approving and declining both ride the same `changes() = 1` shape. Approving also re-runs E-104's
+`POST /api/admin/rota/approvals/[id]/approve` and `.../decline` answer E-105's queue, gated on
+`rota.write`, the audience E-101 already gave the templates to (module E open question 1). The
+queue is not a list of its own any more: it is the rota board's "Waiting for confirmation" filter,
+`GET /api/admin/rota/shifts/board?waiting=true`, which reads every performance holding a claim
+whatever the window and carries the count, and `/rota/manage/approvals` forwards there (issue
+1365). Approving and declining both ride the same `changes() = 1` shape. Approving also re-runs E-104's
 eligibility gate on the confirming `UPDATE` itself: the role's `SHIFT_ELIGIBILITY_*_MODULE` and
 London's today are bound into an `EXISTS` over the claimant's unrevoked, unexpired
 `training_records` (the SQL twin of `heldNow`), so a claimant whose record lapsed after claiming is
@@ -1070,7 +1071,7 @@ is emailed, never in the audit trail, which keeps only that the status changed (
 shift still stays off the open list rather than reopening itself, but it is no longer invisible:
 `GET /api/admin/rota/shifts` lists every `OPEN` or `DECLINED` shift on a performance still to
 come, filtered by role, status and night through `shared/utils/unfilled-shifts-list.ts`, the same
-`dateAs: 'night'` extension the approvals list uses (K-129, 0014). No screen reads that paged
+`dateAs: 'night'` extension (K-129, 0014). No screen reads that paged
 list any more. `/rota/manage/shifts` is the Rota board (E-107 criterion 6, issue 933): it reads
 `GET /api/admin/rota/shifts/board`, which returns the next `BOARD_WINDOW` performances whole,
 every shift on them, filled ones included, and is what an officer reassigns from. Each performance

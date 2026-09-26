@@ -103,7 +103,6 @@ export const CONSOLE_NAV: NavGroup[] = [
     prefix: '/rota/manage',
     items: [
       { label: 'Rota board', icon: 'i-lucide-users-round', to: '/rota/manage/shifts', ability: viewRota, section: 'Every day' },
-      { label: 'Approvals', icon: 'i-lucide-check-check', to: '/rota/manage/approvals', ability: viewRota, section: 'Every day' },
       { label: 'Bar openings', icon: 'i-lucide-store', to: '/rota/manage/openings', ability: viewRota, section: 'Every day' },
       { label: 'Safety', icon: 'i-lucide-hard-hat', to: '/rota/manage/safety', ability: viewSafety, section: 'Every day' },
       // What the door calls it, so one register has one name everywhere (issue 1365).

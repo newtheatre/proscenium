@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { saysDay, saysClock, saysDayLong } from '#shared/utils/when'
 import { defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
-import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
+import { SHIFT_ROLES, saysShiftRole, saysShiftStatus, shiftDeclineForm } from '#shared/utils/rota'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
+import type { FormSubmitEvent } from '@nuxt/ui'
 import type { BoardEntry } from '#shared/utils/rota-board'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
@@ -39,7 +40,7 @@ interface RosterOpening {
   shifts: { shiftId: string, slot: number, status: ShiftStatus, holderName: string | null }[]
 }
 
-type Board = { items: BoardEntry<RosterPerformance, RosterOpening>[] }
+type Board = { items: BoardEntry<RosterPerformance, RosterOpening>[], waiting: number }
 
 interface Candidate { id: string, name: string, email: string, eligible: boolean }
 
@@ -51,17 +52,37 @@ const failure = ref<string | null>(null)
 // pair of date fields and not a K-129 condition, as the utilisation report's span is.
 const window = reactive(defaultBoardWindow(new Date()))
 
+// The approvals queue is this filter, and it lives in the URL so the old address can land on it
+// (E-105 criterion 2, issue 1365). It reads every claim still to confirm, whatever the window.
+const route = useRoute()
+const waiting = computed<boolean>({
+  get: () => route.query.waiting === 'true',
+  set: (on) => {
+    void navigateTo({ query: { ...route.query, waiting: on ? 'true' : undefined } }, { replace: true })
+  },
+})
+
 const { data, status, refresh } = await useAsyncData(
   'rota-shifts-board',
   () => request<Board>('/api/admin/rota/shifts/board', {
-    query: { from: window.from, to: window.to },
+    query: { from: window.from, to: window.to, ...(waiting.value ? { waiting: 'true' } : {}) },
   }),
-  { watch: [() => window.from, () => window.to], default: (): Board => ({ items: [] }) },
+  { watch: [() => window.from, () => window.to, waiting], default: (): Board => ({ items: [], waiting: 0 }) },
 )
 
 const opened = defaultBoardWindow(new Date())
 
 const activeFilters = computed<ActiveFilter[]>(() => {
+  if (waiting.value) {
+    return [{
+      key: 'waiting',
+      label: 'Waiting for confirmation',
+      icon: 'i-lucide-hourglass',
+      clear: () => {
+        waiting.value = false
+      },
+    }]
+  }
   if (window.from === opened.from && window.to === opened.to) return []
   return [{
     key: 'window',
@@ -70,6 +91,11 @@ const activeFilters = computed<ActiveFilter[]>(() => {
     clear: () => Object.assign(window, defaultBoardWindow(new Date())),
   }]
 })
+
+function clearFilters(): void {
+  waiting.value = false
+  Object.assign(window, defaultBoardWindow(new Date()))
+}
 
 function spanOf(startsAt: number): string {
   return `${saysDay(startsAt)} · ${saysClock(startsAt)}`
@@ -174,7 +200,47 @@ async function confirm(shift: RosterShift): Promise<void> {
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    // A claimant who no longer qualifies is offered the decline, its reason already written, and
+    // the refusal is said inside that dialogue rather than behind it (#1302's offer).
+    const offered = refusalData<{ declineReason?: string }>(error)?.declineReason
+    if (offered) {
+      openDecline(shift, offered)
+      declineFailure.value = refusalText(error)
+    }
+    else {
+      failure.value = refusalText(error)
+    }
+  }
+}
+
+// Declining a claim carries a reason the claimant reads word for word (E-105 criterion 3).
+const declining = ref<RosterShift | null>(null)
+const declineFailure = ref<string | null>(null)
+const decline = reactive<{ reason?: string }>({})
+
+// Every opening sets the reason, so one claimant's text never carries into another's dialogue.
+function openDecline(shift: RosterShift, reason?: string): void {
+  declineFailure.value = null
+  declining.value = shift
+  decline.reason = reason
+}
+
+async function submitDecline(event: FormSubmitEvent<{ reason: string }>): Promise<void> {
+  const shift = declining.value
+  if (!shift) return
+  declineFailure.value = null
+  try {
+    await $fetch(`/api/admin/rota/approvals/${shift.shiftId}/decline`, { method: 'POST', body: event.data })
+    toast.add({
+      title: 'Declined',
+      description: `${shift.holderName ?? 'The claimant'} is told why, and the shift stays off the open list until it is reassigned.`,
+      icon: 'i-lucide-x',
+    })
+    declining.value = null
+    await refresh()
+  }
+  catch (error) {
+    declineFailure.value = refusalText(error)
   }
 }
 
@@ -234,7 +300,7 @@ const roleOptions = SHIFT_ROLES.map(role => ({ label: saysShiftRole(role), value
 
 // A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
 // is shown wherever the action was taken.
-const modalOpen = computed(() => assigning.value !== null || adding.value !== null || unconfirming.value !== null)
+const modalOpen = computed(() => assigning.value !== null || adding.value !== null || unconfirming.value !== null || declining.value !== null)
 
 watch(modalOpen, (nowOpen) => {
   if (!nowOpen) failure.value = null
@@ -261,19 +327,27 @@ watch(modalOpen, (nowOpen) => {
       :active="activeFilters"
       :loading="status === 'pending'"
       :searchable="false"
-      @clear="Object.assign(window, defaultBoardWindow(new Date()))"
+      @clear="clearFilters"
     >
       <template #filters>
+        <UCheckbox
+          v-model="waiting"
+          data-test="board-waiting"
+          :label="`Waiting for confirmation (${data.waiting})`"
+          description="Every claim still to confirm, whatever the dates."
+        />
         <UFormField label="From">
           <DateField
             v-model="window.from"
             data-test="board-from"
+            :disabled="waiting"
           />
         </UFormField>
         <UFormField label="Until">
           <DateField
             v-model="window.to"
             data-test="board-until"
+            :disabled="waiting"
           />
         </UFormField>
       </template>
@@ -295,9 +369,14 @@ watch(modalOpen, (nowOpen) => {
       class="text-sm text-muted"
       data-test="board-empty"
     >
-      No performance or bar opening between {{ saysDayLong(window.from) }} and
-      {{ saysDayLong(window.to) }} carries a shift. Widen the dates, or stamp a venue's template onto
-      the diary.
+      <template v-if="waiting">
+        No claim is waiting for confirmation.
+      </template>
+      <template v-else>
+        No performance or bar opening between {{ saysDayLong(window.from) }} and
+        {{ saysDayLong(window.to) }} carries a shift. Widen the dates, or stamp a venue's template onto
+        the diary.
+      </template>
     </p>
 
     <div
@@ -453,6 +532,17 @@ watch(modalOpen, (nowOpen) => {
                   @click="confirm(shift)"
                 >
                   Confirm
+                </UButton>
+                <UButton
+                  v-if="shift.status === 'CLAIMED'"
+                  size="xs"
+                  color="error"
+                  variant="ghost"
+                  icon="i-lucide-x"
+                  :data-test="`decline-${shift.shiftId}`"
+                  @click="openDecline(shift)"
+                >
+                  Decline
                 </UButton>
                 <UButton
                   v-else-if="shift.status === 'CONFIRMED'"
@@ -692,5 +782,41 @@ watch(modalOpen, (nowOpen) => {
       @update:open="value => { if (!value) unconfirming = null }"
       @confirm="unconfirm"
     />
+
+    <ConfirmModal
+      :open="declining !== null"
+      name="decline-claim"
+      :title="declining ? `Decline ${declining.holderName ?? 'this claim'}` : ''"
+      verb="Decline the claim"
+      consequence="Say why: the claimant sees this word for word, and the shift stays off the open list until an officer reassigns it."
+      form="decline-form"
+      :failure="declineFailure"
+      @update:open="value => { if (!value) { declining = null; declineFailure = null } }"
+    >
+      <template #body>
+        <UForm
+          id="decline-form"
+          :schema="shiftDeclineForm"
+          :state="decline"
+          class="space-y-4"
+          @submit="submitDecline"
+        >
+          <UFormField
+            name="reason"
+            label="Reason"
+            required
+          >
+            <UTextarea
+              v-model="decline.reason"
+              data-test="decline-reason"
+              :rows="3"
+              autoresize
+              :maxrows="6"
+              class="w-full"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+    </ConfirmModal>
   </div>
 </template>

@@ -28,10 +28,16 @@ export function boardWindowBounds(window: BoardWindow): BoardBounds {
   }
 }
 
-// Both ends default, so a bare read of the board opens on the coming fortnight.
+// The approvals queue is a filter on the board, not a screen of its own (E-105 criterion 2,
+// issue 1365); the old address forwards here.
+export const BOARD_WAITING_HREF = '/rota/manage/shifts?waiting=true'
+
+// Both ends default, so a bare read of the board opens on the coming fortnight. Waiting reads
+// every claim still to confirm, whatever the window.
 export const boardWindowQuery = z.object({
   from: londonDayField.default(() => defaultBoardWindow(new Date()).from),
   to: londonDayField.default(() => defaultBoardWindow(new Date()).to),
+  waiting: z.union([z.boolean(), z.enum(['true', 'false'])]).default(false).transform(value => value === true || value === 'true'),
 })
   .refine(window => window.from <= window.to, { message: 'That window runs backwards', path: ['to'] })
   .refine(window => daysAfter(window.from, MAX_BOARD_WINDOW_NIGHTS) > window.to,
