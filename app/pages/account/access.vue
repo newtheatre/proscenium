@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ACCESS_FLAGS, ACCESS_FLAG_LABELS, declareAccessProfileForm, saysAccessProfileStatus, WITHDRAWAL_TOMBSTONE_DAYS } from '#shared/utils/access-profiles'
+import { saysDayLong } from '#shared/utils/when'
 import type { AccessFlag, DeclareAccessProfileInput, OwnAccessProfile } from '#shared/utils/access-profiles'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
@@ -43,10 +44,14 @@ async function load(): Promise<void> {
 async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<void> {
   saving.value = true
   try {
-    await $fetch('/api/account/access-profile', { method: 'PUT', body: event.data })
+    const { repended } = await $fetch<{ repended: boolean }>('/api/account/access-profile', { method: 'PUT', body: event.data })
     toast.add({
-      title: 'Access profile saved',
-      description: 'The Accessibility Officer verifies it before it reaches anybody working the door.',
+      title: repended ? 'Access profile saved' : 'Nothing has changed',
+      description: repended
+        ? 'The Accessibility Officer verifies it before it reaches anybody working the door.'
+        : profile.value?.status === 'VERIFIED'
+          ? 'Your requirements are as they were, so they stay verified.'
+          : 'Your requirements are as they were, and still with the Accessibility Officer.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -59,6 +64,32 @@ async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<
     saving.value = false
   }
 }
+
+// A profile in force: consent is then a switch of its own that never sends it back to the officer,
+// and it can be withdrawn. A first declaration asks for consent with the rest (D-127 criterion 7).
+const standing = computed(() => profile.value !== null && profile.value.status !== 'WITHDRAWN')
+const switchingConsent = ref(false)
+
+async function switchConsent(consent: boolean): Promise<void> {
+  switchingConsent.value = true
+  try {
+    await $fetch('/api/account/access-profile/consent', { method: 'PUT', body: { consent } })
+    state.consent = consent
+    toast.add({
+      title: consent ? 'The door may be shown your agreed wording' : 'The door is shown nothing from now on',
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    switchingConsent.value = false
+  }
+}
+
+const until = (at: number): string => saysDayLong(at, { year: true })
 
 // Asked before it happens (D-127 criterion 6); a refusal stays in the dialogue that asked.
 const confirmingWithdrawal = ref(false)
@@ -119,14 +150,71 @@ useSeoMeta({ title: 'Access requirements' })
         v-else
         class="space-y-6"
       >
-        <UBadge
+        <div
           v-if="profile"
-          data-test="access-status"
-          :color="profile.status === 'VERIFIED' ? 'success' : profile.status === 'DECLINED' ? 'error' : 'neutral'"
-          variant="subtle"
+          class="space-y-2"
         >
-          {{ saysAccessProfileStatus(profile.status) }}
-        </UBadge>
+          <UBadge
+            data-test="access-status"
+            :color="profile.status === 'VERIFIED' ? 'success' : profile.status === 'DECLINED' ? 'error' : 'neutral'"
+            variant="subtle"
+          >
+            {{ saysAccessProfileStatus(profile.status) }}
+          </UBadge>
+          <template v-if="profile.status === 'VERIFIED'">
+            <p
+              v-if="profile.fohNote"
+              class="text-sm"
+              data-test="access-wording"
+            >
+              Agreed wording for the door: <span class="font-medium">{{ profile.fohNote }}</span>
+            </p>
+            <p
+              v-if="profile.expiresAt"
+              class="text-sm text-muted"
+              data-test="access-expiry"
+            >
+              Verified until {{ until(profile.expiresAt) }}.
+            </p>
+          </template>
+          <p
+            v-else-if="profile.status === 'EXPIRED' && profile.expiresAt"
+            class="text-sm text-muted"
+            data-test="access-expiry"
+          >
+            The verification ran out on {{ until(profile.expiresAt) }}. Save your requirements to have them checked again.
+          </p>
+          <p
+            v-else-if="profile.status === 'DECLINED'"
+            class="text-sm"
+            data-test="access-decline-reason"
+          >
+            The Accessibility Officer could not verify this.
+            <template v-if="profile.declineReason">
+              Why: {{ profile.declineReason }}
+            </template>
+            Save your requirements to ask again.
+          </p>
+          <p
+            v-else-if="profile.status === 'PENDING'"
+            class="text-sm text-muted"
+          >
+            With the Accessibility Officer, who checks it in person before the door is shown anything.
+          </p>
+        </div>
+
+        <UFormField
+          v-if="standing"
+          label="Show my agreed wording to the people on the door"
+          description="Changes at once, and never sends your requirements back to be checked. While it is off, the door is shown nothing and access tickets are not offered."
+        >
+          <USwitch
+            :model-value="state.consent"
+            :loading="switchingConsent"
+            data-test="access-consent"
+            @update:model-value="switchConsent"
+          />
+        </UFormField>
 
         <UForm
           :schema="declareAccessProfileForm"
@@ -189,13 +277,23 @@ useSeoMeta({ title: 'Access requirements' })
             />
           </UFormField>
 
-          <UFormField name="consent">
+          <UFormField
+            v-if="!standing"
+            name="consent"
+          >
             <UCheckbox
               v-model="state.consent"
               label="Show my agreed wording to the people on the door once it is verified"
               data-test="access-consent"
             />
           </UFormField>
+
+          <p
+            v-if="profile?.status === 'VERIFIED'"
+            class="text-sm text-muted"
+          >
+            Changing a need, the companions, the note or the Access Card number sends your requirements back to be checked. Saving without a change keeps them verified.
+          </p>
 
           <UButton
             type="submit"
@@ -206,7 +304,7 @@ useSeoMeta({ title: 'Access requirements' })
           </UButton>
         </UForm>
 
-        <template v-if="profile && profile.status !== 'WITHDRAWN'">
+        <template v-if="standing">
           <USeparator />
           <div>
             <p class="text-sm text-muted">

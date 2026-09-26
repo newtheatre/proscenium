@@ -54,6 +54,8 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'pass.issued': 'BOX_OFFICE',
   'waiting-list.joined': 'BOX_OFFICE',
   'waiting-list.offered': 'BOX_OFFICE',
+  'access-profile.verified': 'BOX_OFFICE',
+  'access-profile.declined': 'BOX_OFFICE',
   'shift.performance-cancelled': 'ANNOUNCEMENTS',
   'shift.opening-cancelled': 'ANNOUNCEMENTS',
   'shift.venue-changed': 'ANNOUNCEMENTS',

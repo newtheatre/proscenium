@@ -264,7 +264,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/access-profiles/[userId]/verify.post.ts', actions: ['access-profile.verified'], via: ['server/utils/access-profiles.ts'] },
   { route: 'server/api/admin/access-profiles/[userId]/decline.post.ts', actions: ['access-profile.declined'], via: ['server/utils/access-profiles.ts'] },
   { route: 'server/api/account/access-profile.get.ts', exempt: 'reads the caller\'s own declaration' },
-  { route: 'server/api/account/access-profile.put.ts', actions: ['access-profile.updated'], via: ['server/utils/access-profiles.ts'] },
+  { route: 'server/api/account/access-profile.put.ts', actions: ['access-profile.updated', 'access-profile.consent.changed'], via: ['server/utils/access-profiles.ts'] },
+  { route: 'server/api/account/access-profile/consent.put.ts', actions: ['access-profile.consent.changed'], via: ['server/utils/access-profiles.ts'] },
   { route: 'server/api/account/access-profile/withdraw.post.ts', actions: ['access-profile.withdrawn'], via: ['server/utils/access-profiles.ts'] },
   {
     route: 'server/api/reservations.post.ts',

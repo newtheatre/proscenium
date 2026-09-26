@@ -323,6 +323,22 @@ export const MESSAGE_TYPES = {
     sender: 'BOX_OFFICE',
   },
 
+  // An answer to what the member asked for, so transactional, and kept in the inbox. Neither
+  // carries the wording or the reason: those are special category and live on the account (0050).
+  'access-profile.verified': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'access-profile-verified',
+    sender: 'BOX_OFFICE',
+  },
+
+  'access-profile.declined': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'access-profile-declined',
+    sender: 'BOX_OFFICE',
+  },
+
   // Module E: show night
 
   // Transactional, so no rota preference can silence it: somebody who turned shift email off

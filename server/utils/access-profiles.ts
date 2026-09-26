@@ -13,8 +13,10 @@ import {
   ACCESS_FLAGS,
   WITHDRAWAL_TOMBSTONE_DAYS,
   asAccessProfileStatus,
+  changesDeclaration,
   doorWording,
   effectiveStatus,
+  saveRepends,
 } from '#shared/utils/access-profiles'
 import { accessProfilesList } from '#shared/utils/access-profiles-list'
 import { conditionsOf } from '#shared/utils/list-filters'
@@ -23,6 +25,7 @@ import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type {
   AccessFlag,
+  AccessProfileDeclaration,
   AccessProfilePayload,
   AccessProfileStatus,
   DeclareAccessProfileInput,
@@ -30,8 +33,8 @@ import type {
   OwnAccessProfile,
 } from '#shared/utils/access-profiles'
 
-// Declaring, verifying and withdrawing an access profile. The encrypted payload is the only place
-// the nine flags, the two notes and the self-declared card number ever live (D-127, 0050).
+// Declaring, deciding and withdrawing an access profile. The encrypted payload is the only place
+// the nine flags, the two notes, the card number and a decline's reason ever live (D-127, 0050).
 
 type AccessProfileRow = typeof schema.accessProfiles.$inferSelect
 
@@ -47,12 +50,12 @@ async function rowFor(userId: string): Promise<AccessProfileRow | undefined> {
 
 async function payloadOf(row: Pick<AccessProfileRow, 'encryptedPayload' | 'encryptionIv'>, userId: string): Promise<AccessProfilePayload> {
   if (!row.encryptedPayload || !row.encryptionIv) {
-    return { flags: emptyFlags(), requesterNote: null, fohNote: null, accessCardNumber: null }
+    return { flags: emptyFlags(), requesterNote: null, fohNote: null, accessCardNumber: null, declineReason: null }
   }
   return decryptAccessProfilePayload({ ciphertext: row.encryptedPayload, iv: row.encryptionIv }, userId)
 }
 
-function shapeOwn(row: AccessProfileRow, payload: AccessProfilePayload, now: number): OwnAccessProfile {
+function shapeDeclaration(row: AccessProfileRow, payload: AccessProfilePayload, now: number): AccessProfileDeclaration {
   return {
     status: effectiveStatus({ status: asAccessProfileStatus(row.status), expiresAt: row.expiresAt }, now),
     flags: payload.flags,
@@ -64,6 +67,10 @@ function shapeOwn(row: AccessProfileRow, payload: AccessProfilePayload, now: num
     verifiedAt: row.verifiedAt,
     expiresAt: row.expiresAt,
   }
+}
+
+function shapeOwn(row: AccessProfileRow, payload: AccessProfilePayload, now: number): OwnAccessProfile {
+  return { ...shapeDeclaration(row, payload, now), declineReason: payload.declineReason }
 }
 
 export async function ownAccessProfile(userId: string, now = Date.now()): Promise<OwnAccessProfile | null> {
@@ -107,17 +114,28 @@ function monthsFromNow(now: number, months: number): number {
   return Math.floor(at.getTime() / 1000)
 }
 
-// A declaration always lands PENDING: only the owner can call this, so it is the one sanctioned
-// reinstatement path from withdrawal (D-127 criterion 5), and a change to a verified one retires it.
-export async function declareAccessProfile(event: H3Event, userId: string, input: DeclareAccessProfileInput): Promise<void> {
+export interface DeclareOutcome { repended: boolean }
+
+// Only the owner calls this, so it is the one reinstatement path from withdrawal (D-127 criterion
+// 5). A save that changes nothing leaves a current profile as it is, bar the consent (criterion 7).
+export async function declareAccessProfile(event: H3Event, userId: string, input: DeclareAccessProfileInput): Promise<DeclareOutcome> {
   const now = Math.floor(Date.now() / 1000)
   const existing = await rowFor(userId)
+
+  if (existing) {
+    const own = shapeDeclaration(existing, await payloadOf(existing, userId), now)
+    if (!saveRepends(own.status, changesDeclaration(own, input))) {
+      if (own.consentGiven !== input.consent) await setAccessConsent(userId, input.consent)
+      return { repended: false }
+    }
+  }
 
   const payload: AccessProfilePayload = {
     flags: input.flags,
     requesterNote: input.requesterNote ?? null,
     fohNote: null,
     accessCardNumber: input.accessCardNumber ?? null,
+    declineReason: null,
   }
   const encrypted = await encryptAccessProfilePayload(payload, userId)
 
@@ -147,6 +165,29 @@ export async function declareAccessProfile(event: H3Event, userId: string, input
       detail: { wasVerified: existing?.status === 'VERIFIED' },
     })),
   ])
+  return { repended: true }
+}
+
+// The predicate rides the write, so only a real change lands, and two switches racing to one
+// answer leave one trail entry (0003, 0006). Withdrawn is put back by declaring, not by this.
+export async function setAccessConsent(userId: string, consent: boolean): Promise<void> {
+  const now = Math.floor(Date.now() / 1000)
+  const entry = auditEntry({ actorId: userId, action: 'access-profile.consent.changed', target: `user:${userId}`, detail: { consent } })
+  const applied = await auditedWrite(
+    db.all<{ userId: string }>(sql`
+      UPDATE access_profiles SET consent_foh_at = ${consent ? now : null}, updated_at = ${now}
+      WHERE user_id = ${userId} AND status <> 'WITHDRAWN' AND (consent_foh_at IS NULL) = ${consent ? 1 : 0}
+      RETURNING user_id AS userId
+    `),
+    entry,
+  )
+  if (applied) return
+
+  const row = await rowFor(userId)
+  if (!row) throw noSuch('access profile')
+  if (row.status === 'WITHDRAWN') {
+    throw createError({ statusCode: 409, statusMessage: 'These requirements are withdrawn. Save them again to put them back.' })
+  }
 }
 
 export interface WithdrawOutcome { withdrawn: boolean, alreadyWithdrawn: boolean }
@@ -193,7 +234,7 @@ export async function accessProfileForOfficer(userId: string): Promise<OfficerAc
   if (!account || !row) return null
 
   const now = Math.floor(Date.now() / 1000)
-  return { userId, name: account.name, email: account.email, verifiedBy: row.verifiedBy, ...shapeOwn(row, await payloadOf(row, userId), now) }
+  return { userId, name: account.name, email: account.email, verifiedBy: row.verifiedBy, ...shapeDeclaration(row, await payloadOf(row, userId), now) }
 }
 
 // Evidence is sighted and never stored, whichever way the decision goes (D-127 criterion 1).
@@ -243,11 +284,13 @@ export async function verifyAccessProfile(event: H3Event, userId: string, office
   if (!applied) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000))
 }
 
-export async function declineAccessProfile(event: H3Event, userId: string, officerId: string): Promise<void> {
+// The reason goes into the encrypted payload for the owner to read, never into the trail (0011, 0050).
+export async function declineAccessProfile(event: H3Event, userId: string, officerId: string, reason: string): Promise<void> {
   const now = Math.floor(Date.now() / 1000)
   const existing = requireDecidable(await rowFor(userId), now)
 
   const payload = await clearCardNumber(existing, userId)
+  payload.declineReason = reason
   const encrypted = await encryptAccessProfilePayload(payload, userId)
   const entry = auditEntry({ actorId: officerId, action: 'access-profile.declined', target: `user:${userId}` })
 

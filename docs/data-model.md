@@ -280,7 +280,7 @@ Everything else, special category, lives in `encrypted_payload` and `encryption_
 AES-256-GCM blob carrying the nine need flags below, the requester's own note (never shown to the
 door), the officer's agreed operational wording (shown to the holder once verified), and the
 self-declared evidence reference, cleared the moment an officer has sighted it, verified or
-declined (0050). `status` and `companions` stay plain columns because the database enforces them
+declined, and a decline's reason, read by the holder alone (0050, D-127 criterion 8). `status` and `companions` stay plain columns because the database enforces them
 directly; nothing else does, and D1 has no column-level encryption to enforce it on ciphertext
 regardless. Deleted outright on erasure and 30 days after withdrawal (D-6, D-127 criterion 5);
 `expires_at` is enforced at read time, the same rule 0009 gives a role grant.

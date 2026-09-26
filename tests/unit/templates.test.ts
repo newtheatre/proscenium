@@ -10,6 +10,7 @@ import type { TemplateContext } from '#server/utils/templates'
 // pinned here so a reintroduced house word, enum word or stray call to action fails CI.
 
 const ROOMS_URL = 'https://newtheatre.org.uk/rooms/mine'
+const ACCESS_URL = 'https://newtheatre.org.uk/account/access'
 
 // A part is wrapped for the plain-text reader, so a sentence is matched without its line breaks.
 const flat = (part: string): string => part.replace(/\s+/g, ' ')
@@ -23,6 +24,7 @@ const EVERYTHING: TemplateContext = {
   securityUrl: 'https://newtheatre.org.uk/account/access',
   accountUrl: 'https://newtheatre.org.uk/account',
   membershipUrl: 'https://newtheatre.org.uk/account/membership',
+  accessUrl: ACCESS_URL,
   roomsUrl: ROOMS_URL,
   queueUrl: 'https://newtheatre.org.uk/admin/requests',
   safetyUrl: 'https://newtheatre.org.uk/rota/manage/safety',
@@ -365,6 +367,35 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     const quiet = render('training-expiry-digest', { ...EVERYTHING, expiring: [], expired: [] })
     expect(flat(quiet.html)).toContain('If this email ever stops arriving, the monthly sweep has stopped running')
     expect(quiet.html).not.toContain('clockwork')
+  })
+})
+
+// Special category data lives in the encrypted payload and on the owner's own page, so an answer
+// to a declaration says only that there is one and where to read it (issue 1334, 0050).
+describe('the access profile answers carry nothing that was declared or decided', () => {
+  const secret = { ...EVERYTHING, fohNote: 'Aisle seat, assistance dog', reason: 'The card number did not match' }
+
+  test('verified and declined each link the member to their own page, in both parts', () => {
+    for (const name of ['access-profile-verified', 'access-profile-declined']) {
+      const { html, text } = render(name, secret)
+      expect(html).toContain(`href="${ACCESS_URL}"`)
+      expect(text).toContain(ACCESS_URL)
+    }
+  })
+
+  test('neither says the wording or the reason, whatever the context holds', () => {
+    for (const name of ['access-profile-verified', 'access-profile-declined']) {
+      const { subject, html, text } = render(name, secret)
+      for (const part of [subject, html, text]) {
+        expect(part).not.toContain('Aisle seat')
+        expect(part).not.toContain('card number did not match')
+      }
+    }
+  })
+
+  test('the subjects say which answer it is', () => {
+    expect(render('access-profile-verified', secret).subject).toBe('Your access requirements are verified')
+    expect(render('access-profile-declined', secret).subject).toBe('We could not verify your access requirements')
   })
 })
 

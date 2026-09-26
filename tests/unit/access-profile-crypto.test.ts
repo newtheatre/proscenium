@@ -28,6 +28,7 @@ const payload: AccessProfilePayload = {
   requesterNote: 'Uses a mobility aid',
   fohNote: null,
   accessCardNumber: 'NAC1234567',
+  declineReason: null,
 }
 
 describe('access profile encryption (D-127, 0050)', () => {
@@ -35,6 +36,14 @@ describe('access profile encryption (D-127, 0050)', () => {
     const key = await testKey()
     const encrypted = await encryptWithKey(payload, key, OWNER)
     expect(await decryptWithKey(encrypted, key, OWNER)).toEqual(payload)
+  })
+
+  // Written before a decline carried a reason, so the key is missing rather than null (issue 1334).
+  test('an older payload without a decline reason reads as having none', async () => {
+    const key = await testKey()
+    const { declineReason: _absent, ...older } = payload
+    const encrypted = await encryptWithKey(older as AccessProfilePayload, key, OWNER)
+    expect(await decryptWithKey(encrypted, key, OWNER)).toEqual({ ...older, declineReason: null })
   })
 
   test('two writes of the same payload use different nonces and different ciphertext', async () => {

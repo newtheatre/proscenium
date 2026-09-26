@@ -55,7 +55,7 @@ export interface NavEntry {
   count?: NavCount
 }
 
-export const NAV_COUNTS = ['membership-claims'] as const
+export const NAV_COUNTS = ['membership-claims', 'access-profiles'] as const
 
 export type NavCount = (typeof NAV_COUNTS)[number]
 
@@ -125,13 +125,14 @@ export const CONSOLE_NAV: NavGroup[] = [
       // own, with its own table and its own refusals (0082).
       { label: 'Pass desk', icon: 'i-lucide-ticket-plus', to: '/box-office/desk-passes', ability: viewProgramme, section: 'Every day' },
       { label: 'Shows', icon: 'i-lucide-drama', to: '/box-office/shows', ability: viewProgramme, section: 'Every day' },
+      // A declaration waits on somebody to be met in person, so it is daily work (issue 1334).
+      { label: 'Access profiles', icon: 'i-lucide-accessibility', to: '/box-office/access-profiles', ability: verifyAccessProfiles, section: 'Every day', count: 'access-profiles' },
       { label: 'Ticket types', icon: 'i-lucide-tag', to: '/box-office/ticket-types', ability: viewTicketTypes, section: 'Set-up' },
       { label: 'Pass types', icon: 'i-lucide-wallet-cards', to: '/box-office/pass-types', ability: viewPassTypes, section: 'Set-up' },
       { label: 'Venues', icon: 'i-lucide-map-pin', to: '/box-office/venues', ability: viewProgramme, section: 'Set-up' },
       { label: 'Seasons', icon: 'i-lucide-calendar-range', to: '/box-office/seasons', ability: viewProgramme, section: 'Set-up' },
       { label: 'Show categories', icon: 'i-lucide-shapes', to: '/box-office/show-categories', ability: viewProgramme, section: 'Set-up' },
       { label: 'Content warnings', icon: 'i-lucide-triangle-alert', to: '/box-office/content-warnings', ability: viewProgramme, section: 'Set-up' },
-      { label: 'Access profiles', icon: 'i-lucide-accessibility', to: '/box-office/access-profiles', ability: verifyAccessProfiles, section: 'Set-up' },
     ],
   },
 

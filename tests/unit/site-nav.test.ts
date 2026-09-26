@@ -239,6 +239,15 @@ describe('a waiting count rides the entry that opens it', () => {
     expect(people.items.find(entry => entry.to === '/people/members')?.count).toBe('membership-claims')
   })
 
+  // Declarations wait on a person to be met, so the queue is daily work with its count (issue 1334).
+  test('Access profiles is Every day work carrying the declarations waiting', () => {
+    const boxOffice = CONSOLE_NAV.find(group => group.key === 'box-office')!
+    const entry = boxOffice.items.find(item => item.to === '/box-office/access-profiles')
+    expect(entry?.section).toBe('Every day')
+    expect(entry?.count).toBe('access-profiles')
+    expect(navCount(boxOffice.items, { 'access-profiles': 2 })).toBe(2)
+  })
+
   test('a group reads the sum of what its entries carry, and nothing when nothing waits', () => {
     expect(navCount(people.items, { 'membership-claims': 4 })).toBe(4)
     expect(navCount(people.items, { 'membership-claims': 0 })).toBe(0)

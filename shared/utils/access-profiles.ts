@@ -57,6 +57,8 @@ export interface AccessProfilePayload {
   fohNote: string | null
   // Self-declared, sighted at verification and cleared the moment it is (D-127 criterion 1).
   accessCardNumber: string | null
+  // The officer's reason for a decline, for the owner alone (D-127 criterion 8).
+  declineReason: string | null
 }
 
 const flagsShape = Object.fromEntries(ACCESS_FLAGS.map(flag => [flag, z.boolean().default(false)])) as
@@ -80,12 +82,41 @@ export const declareAccessProfileForm = z.strictObject({
 
 export type DeclareAccessProfileInput = z.output<typeof declareAccessProfileForm>
 
+// The owner's switch for the door's sight of the wording, saved on its own (D-127 criterion 7).
+export const accessConsentForm = z.strictObject({
+  consent: z.boolean(),
+})
+
+// What a save is compared against: the declaration itself, never the consent.
+export type SavedDeclaration = Omit<DeclareAccessProfileInput, 'consent'>
+
+export function changesDeclaration(saved: SavedDeclaration, input: DeclareAccessProfileInput): boolean {
+  if (saved.companions !== input.companions) return true
+  if (saved.requesterNote !== input.requesterNote) return true
+  if (saved.accessCardNumber !== input.accessCardNumber) return true
+  return ACCESS_FLAGS.some(flag => Boolean(saved.flags[flag]) !== Boolean(input.flags[flag]))
+}
+
+// A current profile goes back to the officer on a real change only; saving one that is not current
+// is the ask to be checked again (D-127 criterion 7). No profile yet is a first declaration.
+export function saveRepends(status: AccessProfileStatus | null, changed: boolean): boolean {
+  if (status === 'VERIFIED' || status === 'PENDING') return changed
+  return true
+}
+
 export const verifyAccessProfileForm = z.strictObject({
   fohNote: z.string().trim().min(1, 'Agreed wording is what the door reads out').max(200),
 })
 
-// What the owner sees of their own declaration: every flag, both notes, the lot.
-export interface OwnAccessProfile {
+// The owner reads it on their own page and nowhere else: it may say something about their needs.
+export const declineAccessProfileForm = z.strictObject({
+  reason: z.string().trim().min(1, 'Say why, so they know what to bring next time').max(MAX_NOTE_LENGTH),
+})
+
+export type DeclineAccessProfileInput = z.output<typeof declineAccessProfileForm>
+
+// The declaration and where it stands: every flag, both notes and the card number.
+export interface AccessProfileDeclaration {
   status: AccessProfileStatus
   flags: Record<AccessFlag, boolean>
   companions: number
@@ -95,6 +126,11 @@ export interface OwnAccessProfile {
   consentGiven: boolean
   verifiedAt: number | null
   expiresAt: number | null
+}
+
+// What the owner sees of their own declaration: the lot, and a decline's reason (D-127 criterion 8).
+export interface OwnAccessProfile extends AccessProfileDeclaration {
+  declineReason: string | null
 }
 
 // What a staff surface may ever see: the agreed wording, once every gate holds, and nothing that
@@ -171,9 +207,8 @@ export interface AccessProfileSummary {
   updatedAt: number
 }
 
-// What the accessibility officer reads to decide: everything the owner sees, plus who they are
-// and who verified them. Never sent anywhere but this one screen (D-127 criterion 2).
-export interface OfficerAccessProfile extends OwnAccessProfile {
+// The officer reads the declaration, never a decline's reason (D-127 criteria 2, 8).
+export interface OfficerAccessProfile extends AccessProfileDeclaration {
   userId: string
   name: string
   email: string

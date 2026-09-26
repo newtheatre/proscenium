@@ -41,6 +41,24 @@ function purchaseLink(context: TemplateContext): { html: string, text: string } 
   }
 }
 
+// Takes no field but the name and the link, so neither answer can carry the wording or the reason (0050).
+function accessAnswer(context: TemplateContext, subject: string, said: string): Rendered {
+  const url = String(context.accessUrl)
+  return {
+    subject,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>${said}</p>
+<p><a href="${url}">See your access requirements</a></p>`),
+    text: `Hello ${context.name},
+
+${said}
+
+See your access requirements: ${url}
+
+The Nottingham New Theatre`,
+  }
+}
+
 function expiry(at: Date): string {
   return formatLondon(at, { dateStyle: 'full', timeStyle: 'short' })
 }
@@ -1696,6 +1714,10 @@ Leave the waiting list: ${removeUrl}
 The Nottingham New Theatre`,
     }
   },
+  'access-profile-verified': (context: TemplateContext): Rendered => accessAnswer(context, 'Your access requirements are verified',
+    'The Accessibility Officer has verified your access requirements. What the people on the door are shown, and the date the verification runs to, are on your account.'),
+  'access-profile-declined': (context: TemplateContext): Rendered => accessAnswer(context, 'We could not verify your access requirements',
+    'The Accessibility Officer could not verify your access requirements. Why, and what you can do next, is on your account.'),
   'health-alert': (context: TemplateContext): Rendered => {
     const since = String(context.since)
     return {
