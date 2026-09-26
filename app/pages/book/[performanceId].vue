@@ -423,7 +423,6 @@ useSeoMeta({
                   :min="0"
                   :max="maxFor(type)"
                   :aria-label="`${type.name} tickets`"
-                  class="w-36"
                   :data-test="`quantity-${type.id}`"
                 />
               </div>

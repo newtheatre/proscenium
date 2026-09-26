@@ -50,9 +50,6 @@ const notice = ref('')
 // (issue 1329, D-104 criterion 8); a reload or a later visit shows the booking plainly.
 const made = useBookingMade()
 const justMade = ref(made.value)
-onMounted(() => {
-  made.value = null
-})
 
 const resendFields: AuthFormField[] = [
   { name: 'reference', type: 'text', label: 'Booking reference', autocomplete: 'off', required: true },
@@ -67,6 +64,7 @@ async function loadBooking(): Promise<void> {
 // The exchanged cookie names the booking; a missing or spent one is an invitation to resend,
 // never a dead end (D-108 criterion 2 sits next to criterion 4 for exactly this reason).
 onMounted(async () => {
+  made.value = null
   try {
     await loadBooking()
   }
@@ -127,6 +125,7 @@ async function saveEdit(): Promise<void> {
       .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }))
     await $fetch('/api/qr/tickets', { method: 'PUT', body: { lines } })
     editing.value = false
+    justMade.value = null
     await loadBooking()
   }
   catch (error) {
@@ -147,6 +146,7 @@ async function cancelBooking(): Promise<void> {
   try {
     await $fetch('/api/qr/cancel', { method: 'POST' })
     cancelConfirming.value = false
+    justMade.value = null
     await loadBooking()
   }
   catch (error) {
@@ -189,6 +189,7 @@ async function submitExchange(): Promise<void> {
   try {
     await $fetch('/api/qr/exchange', { method: 'POST', body: { performanceId: exchangeChoice.value } })
     exchanging.value = false
+    justMade.value = null
     await loadBooking()
   }
   catch (error) {
@@ -402,7 +403,7 @@ useSeoMeta({ title: 'Your booking' })
             <UInputNumber
               v-model="quantities[type.id]"
               v-bind="TOUCH_STEPPER"
-              class="w-36 shrink-0"
+              class="shrink-0"
               :min="0"
               :max="editCap"
               :aria-label="`${type.name} tickets`"

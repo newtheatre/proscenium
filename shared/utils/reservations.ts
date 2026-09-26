@@ -204,7 +204,9 @@ export function qrStatusDisplay(
 ): QrStatusDisplay {
   switch (status) {
     case 'PENDING':
-      return { headline: 'Unpaid', detail: totalDue ? `${totalDue} due at the box office on the night.` : null }
+      return totalDue
+        ? { headline: 'Unpaid', detail: `${totalDue} due at the box office on the night.` }
+        : { headline: 'Booked', detail: 'Nothing is due.' }
     case 'COLLECTED':
       return { headline: 'Paid', detail: 'You paid for this at the box office.' }
     case 'DOOR':

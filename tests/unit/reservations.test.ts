@@ -147,6 +147,11 @@ describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', (
     expect(qrStatusDisplay('PENDING', null, '£9.00')).toEqual({ headline: 'Unpaid', detail: '£9.00 due at the box office on the night.' })
   })
 
+  // Issue 1329 review: a pass redemption is a booking with nothing to pay, not "Unpaid, £0.00".
+  test('a booking with nothing due reads as booked, never unpaid', () => {
+    expect(qrStatusDisplay('PENDING', null, null)).toEqual({ headline: 'Booked', detail: 'Nothing is due.' })
+  })
+
   test('paid and admitted read differently from each other', () => {
     expect(qrStatusDisplay('COLLECTED', null, null).headline).toBe('Paid')
     expect(qrStatusDisplay('DOOR', null, null).headline).toBe('Admitted')

@@ -7,7 +7,7 @@ import type { H3Event } from 'h3'
 // The cookie a browser exchange leaves behind, so the token itself stops sitting in the
 // address bar and any referrer header after the first open (D-108 criterion 4).
 export const QR_COOKIE_NAME = 'nnt-qr-token'
-export const QR_COOKIE_MAX_AGE_SECONDS = 60 * 60
+const QR_COOKIE_MAX_AGE_SECONDS = 60 * 60
 
 let key: Promise<CryptoKey> | undefined
 

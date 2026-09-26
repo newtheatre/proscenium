@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     cancelledBy: reservation.cancelledBy,
     show: reservation.showTitle,
     when: formatLondon(new Date(reservation.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
-    totalDue: reservation.status === 'PENDING' ? saysPrice(reservation.totalPence) : null,
+    totalDue: reservation.status === 'PENDING' && reservation.totalPence > 0 ? saysPrice(reservation.totalPence) : null,
     qrSvg: qrSvgBase64(url),
     lines: await namedTicketLines(reservationId),
     exchangedTo: reservation.exchangedToShowTitle && reservation.exchangedToStartsAt
