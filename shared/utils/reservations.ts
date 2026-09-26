@@ -107,6 +107,13 @@ export const reservationResendForm = z.object({
 // another, or none, is refused. Optional so the refusal is a sentence, not a field error.
 const showingReference = z.string().trim().length(RESERVATION_REFERENCE_LENGTH).optional()
 
+// Issue 1390: a pass booking stands on an append-only admission, once per night, so cancelling it
+// online would spend the use and editing it would leave paid seats no hold releases.
+export function passBookingReason(passBooking: boolean): string | null {
+  if (!passBooking) return null
+  return 'A booking made with a pass is changed or cancelled at the box office. Contact the box office directly.'
+}
+
 export function otherBookingReason(showing: string | undefined, held: string): string | null {
   if (showing === undefined) return 'This page is out of date. Reload it, then try again.'
   if (showing.toUpperCase() === held.toUpperCase()) return null
@@ -303,13 +310,15 @@ export function doorTicketOutcome(
   totalDue: string | null,
   exchangedTo: QrExchangedTo | null = null,
   admittedAt: number | null = null,
+  // A pass booking (`nothingToCollect`) has nothing for the desk to take, so it admits as paid.
+  nothingDue = false,
 ): DoorTicketOutcome {
   // Admitted to another house is not a re-entry to this one: the matinee's ticket at the evening.
   if (performanceId !== selectedPerformanceId && (status === 'PENDING' || status === 'COLLECTED' || status === 'DOOR')) {
     const said = status === 'DOOR' ? `Admitted for ${showTitle}, ${when}.` : `This ticket is for ${showTitle}, ${when}.`
     return { headline: 'Wrong performance', detail: `${said} Ask ${DOOR_REFERRAL}.`, admit: false }
   }
-  if (status === 'COLLECTED') return { headline: 'Admit', detail: null, admit: true }
+  if (status === 'COLLECTED' || (status === 'PENDING' && nothingDue)) return { headline: 'Admit', detail: null, admit: true }
   if (status === 'PENDING') return { ...qrStatusDisplay(status, cancelledBy, totalDue, exchangedTo), admit: false }
   return { ...doorStatusWording(status, cancelledBy, exchangedTo, admittedAt), admit: false }
 }

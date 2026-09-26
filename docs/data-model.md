@@ -862,7 +862,10 @@ already refuses over, with nothing further to build.
 cookie names, no account session required, since a guest booker has none, and only when the body's
 `reference` names that same one (`shownSelfServiceReservation()`, issue 1329). The two reads behind
 the forms, `GET /api/qr/edit-options` and `GET /api/qr/exchange-options`, make the same check,
-taking `reference` from the query string instead. Editing sends desired totals per type,
+taking `reference` from the query string instead. All five refuse a pass booking
+(`passBookingColumn()`: a ticket standing on a `pass_admissions` row), which only the box office
+changes, since its admission is append-only and unique per pass and performance (issue 1390).
+Editing sends desired totals per type,
 the same line shape a fresh booking uses (`reservationEditForm`); `ticketEditDelta()` (pure,
 `shared/utils/reservations.ts`) turns that into additions and removals against what is currently
 held. Every added and removed line, in the same request, shares one guard computed once

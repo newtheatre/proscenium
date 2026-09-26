@@ -225,9 +225,9 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
 
   // Issue 1390: a booking made with a pass owes nothing and holds nothing, so the door admits it.
   test('a booking with nothing to collect admits for its own performance, and still refuses at another', () => {
-    const own = doorTicketOutcome('PENDING', null, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', null, null, true)
+    const own = doorTicketOutcome('PENDING', null, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', null, null, null, true)
     expect(own).toEqual({ headline: 'Admit', detail: null, admit: true })
-    const other = doorTicketOutcome('PENDING', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null, null, true)
+    const other = doorTicketOutcome('PENDING', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null, null, null, true)
     expect(other.headline).toBe('Wrong performance')
   })
 

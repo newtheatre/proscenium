@@ -675,7 +675,11 @@ Open questions:
   3. Capacity still applies in full: a pass is entitlement, not a reserved seat, and redemption
      into a full house is refused with the waiting list offered.
   4. A redeemed ticket follows the ordinary lifecycle: it appears on the e-ticket, scans at the
-     door, and cancelling it frees both the capacity and that performance's redemption.
+     door, and cancelling it frees both the capacity and that performance's redemption. Amended
+     26 September 2026 (issue 1390): the booking it makes owes nothing and holds nothing, so its
+     page and email say so and the door admits it as paid; it is changed or cancelled only at the
+     box office, since the admission is append-only and unique per pass and performance, and
+     whether a cancel gives that performance's use back awaits a committee decision.
   5. Redemption writes a zero-value ledger line referencing the pass, so per-admission
      utilisation is queryable per product and per pass.
 - Source: Prompt Book D-7; audit PR-8 (UNIQUE(pass, performance) carried)

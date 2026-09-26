@@ -31,6 +31,8 @@ export default defineEventHandler(async (event) => {
     cancelledBy: reservation.cancelledBy,
     show: reservation.showTitle,
     guidance,
+    // The page offers no change, exchange or cancel on a pass booking (issue 1390).
+    passBooking: reservation.passBooking === 1,
     when: formatLondon(new Date(reservation.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
     totalDue: reservation.status === 'PENDING' && !nothingToCollect(reservation.holdExpiresAt, reservation.totalPence) ? saysPrice(reservation.totalPence) : null,
     qrSvg: qrSvgBase64(url),

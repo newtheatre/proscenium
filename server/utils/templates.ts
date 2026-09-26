@@ -1604,20 +1604,22 @@ The Nottingham New Theatre`,
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
     const guidance = guidanceBlock(context)
+    // A pass booking owes nothing and holds nothing (issue 1390); every other booking is a hold.
+    const owed = context.nothingDue === true
+      ? 'Nothing to pay: this booking was made with your pass.'
+      : `Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats and is not a purchase until then.`
     return {
       subject: `Your booking for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Reference <strong>${reference}</strong> for ${show}, ${when}.</p>
-<p>Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats
-and is not a purchase until then.</p>
+<p>${owed}</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>${guidance.html}`),
       text: `Hello ${context.name},
 
 Reference ${reference} for ${show}, ${when}.
 
-Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats and
-is not a purchase until then.
+${owed}
 
 Open your booking: ${url}${guidance.text}
 

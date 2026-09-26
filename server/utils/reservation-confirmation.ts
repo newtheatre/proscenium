@@ -1,7 +1,9 @@
 import { notify } from './notify'
 import { qrPng } from './qr'
 import { bookingGuidance, referenceShowScope } from './whats-on'
+import { holdExpiresAtByReference } from './reservations'
 import { formatLondon } from '#shared/utils/london'
+import { nothingToCollect } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { BookingLink } from './holds'
 import type { H3Event } from 'h3'
@@ -33,7 +35,10 @@ export interface ConfirmationContext {
 // template with the same QR rather than a second, driftable copy (D-108 criteria 1, 2).
 export async function sendReservationConfirmation(event: H3Event | undefined, context: ConfirmationContext): Promise<void> {
   // The e-ticket carries the show's guidance from the rows the show page reads (D-102 criterion 4).
-  const shown = await bookingGuidance(referenceShowScope(context.reference))
+  const [shown, holdExpiresAt] = await Promise.all([
+    bookingGuidance(referenceShowScope(context.reference)),
+    holdExpiresAtByReference(context.reference),
+  ])
   await notify(event, {
     userId: context.userId,
     type: 'reservation.confirmed',
@@ -43,6 +48,8 @@ export async function sendReservationConfirmation(event: H3Event | undefined, co
       show: context.showTitle,
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       totalDue: saysPrice(context.totalPence),
+      // A pass booking owes nothing, so it never reads "£0.00 is due" (issue 1390).
+      nothingDue: nothingToCollect(holdExpiresAt, context.totalPence),
       ...bookingLink(event, context.qrToken),
       guidance: shown?.lines ?? [],
       showUrl: shown?.slug ? `${useRuntimeConfig(event).public.baseURL}/shows/${shown.slug}` : null,
