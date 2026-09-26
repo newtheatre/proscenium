@@ -21,7 +21,7 @@ const emit = defineEmits<{ granted: [] }>()
 
 type Until = 'year' | 'date' | 'never'
 
-// The default names its date: a grant made in July otherwise ends within weeks unseen (issue #1355).
+// The default names its date: a grant made in July otherwise ends within weeks unseen (issue 1355).
 const UNTIL = computed<{ value: Until, label: string }[]>(() => [
   { value: 'year', label: `The committee year end, ${saysDayLong(defaultRoleExpiry(new Date()), { year: true })}` },
   { value: 'date', label: 'A date I pick' },

@@ -115,7 +115,7 @@ async function granted(): Promise<void> {
   await refresh()
 }
 
-// Always with the year: a grant ending next July reads as ending this one otherwise (issue #1355).
+// Always with the year: a grant ending next July reads as ending this one otherwise (issue 1355).
 const when = (at: number | null): string =>
   at === null ? 'further notice' : saysDay(at, { year: true })
 
