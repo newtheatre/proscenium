@@ -116,7 +116,7 @@ describe.skipIf(skip !== null)('sales, GP, comps and discounts are read live fro
     const { venueId, performanceId } = programme(`report-sale-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aStockedProduct(500, 100)
     await openTill(venueId, performanceId)
-    await sellOnTheTill(app.baseURL, { venueId, lines: [{ variantId, qty: 2 }], expectedTotalPence: 1000 }, barStaff.cookie)
+    await sellOnTheTill(app, { venueId, lines: [{ variantId, qty: 2 }], expectedTotalPence: 1000 }, barStaff.cookie)
 
     const answered = await runReport()
     expect(answered.status).toBe(200)
@@ -168,7 +168,7 @@ describe.skipIf(skip !== null)('sales, GP, comps and discounts are read live fro
     const discountAnswered = await send('POST', '/api/admin/bar/discounts', { name, percent: 20 })
     const { id: discountId } = await discountAnswered.json() as { id: string }
 
-    await sellOnTheTill(app.baseURL, {
+    await sellOnTheTill(app, {
       venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 800, discountId,
     }, barManager.cookie)
 
@@ -184,7 +184,7 @@ describe.skipIf(skip !== null)('CSV export is guarded and formatted at display, 
     const { venueId, performanceId } = programme(`report-csv-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aStockedProduct(500, 100)
     await openTill(venueId, performanceId)
-    await sellOnTheTill(app.baseURL, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500 }, barStaff.cookie)
+    await sellOnTheTill(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500 }, barStaff.cookie)
 
     const answered = await send('GET', `/api/admin/bar/reports/export?${customRange()}&section=sales`)
     expect(answered.status).toBe(200)
@@ -200,7 +200,7 @@ describe.skipIf(skip !== null)('CSV export is guarded and formatted at display, 
     await openTill(venueId, performanceId, barManager.cookie)
     const discountAnswered = await send('POST', '/api/admin/bar/discounts', { name: `=SUM(A1) ${crypto.randomUUID().slice(0, 6)}`, percent: 10 })
     const { id: discountId } = await discountAnswered.json() as { id: string }
-    await sellOnTheTill(app.baseURL, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 900, discountId }, barManager.cookie)
+    await sellOnTheTill(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 900, discountId }, barManager.cookie)
 
     const csv = await (await send('GET', `/api/admin/bar/reports/export?${customRange()}&section=discounts`)).text()
     expect(csv).toContain('"\'=SUM(A1)')
@@ -234,7 +234,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     const { venueId, performanceId } = programme(`report-screen-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aStockedProduct(500, 100)
     await openTill(venueId, performanceId)
-    await sellOnTheTill(app.baseURL, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500 }, barStaff.cookie)
+    await sellOnTheTill(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500 }, barStaff.cookie)
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)

@@ -13,8 +13,7 @@ export type SumupAttemptStatus = (typeof SUMUP_ATTEMPT_STATUSES)[number]
 export const SUMUP_ATTEMPT_KINDS = ['SUMUP', 'TYPED'] as const
 export type SumupAttemptKind = (typeof SUMUP_ATTEMPT_KINDS)[number]
 
-// Starting either kind is the sale's own submission, and names which (0096). None named is a
-// hand-off, which is what every caller before the typed attempt meant.
+// Starting either kind is the sale's own submission; none named is a hand-off (0096).
 export const startAttemptForm = saleForm.safeExtend({
   kind: z.enum(SUMUP_ATTEMPT_KINDS).default('SUMUP'),
 })

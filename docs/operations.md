@@ -955,7 +955,7 @@ Developers, and under Payment Switch generate an affiliate key against an applic
 choosing (`uk.org.newtheatre.unified` is the one to use; it must match `NUXT_SUMUP_APP_ID`
 exactly). Set both as worker secrets with `bunx wrangler secret put`, mirror them in the password
 manager, and redeploy. The till shows "Charge on SumUp" on a handheld from the next request, as
-its one charge button, with "Key it into the reader instead" as a link under it. The
+its one charge button, with "Key in by hand" as a link under it. The
 SumUp app on each volunteer's phone must be signed in to the SU's account and paired with the
 reader, exactly as it is for a hand-keyed payment.
 

@@ -5,14 +5,14 @@ import { useSumUpCharge } from '#composables/useSumUpCharge'
 import { deviceNightCacheStore } from '#composables/useNightCache'
 import type { ChargedReceipt } from '#composables/useSumUpCharge'
 import type { BasketLine, WalkUpLine } from '#composables/useTillBasket'
-import type { TillBooking } from '#shared/utils/sale'
-import type { SumupAttemptView } from '#shared/utils/sumup'
+import type { SaleReceipt, TillBooking } from '#shared/utils/sale'
+import type { SumupAttemptKind, SumupAttemptView } from '#shared/utils/sumup'
 import type { TillSession } from '#shared/utils/till'
 
 // F-124 criterion 5: an attempt the app reports failed or abandoned brings the basket back and
 // says so, once, in whichever tab on the phone gets there first (issues 1144, 1257).
 
-type Outcome = 'FAILED' | 'ABANDONED'
+type Outcome = 'FAILED' | 'ABANDONED' | 'SUCCEEDED'
 
 function aLine(): BasketLine {
   return { id: 'line-1', variantId: 'variant-1', productName: 'Lager', variantLabel: 'Pint', choiceItemId: null, choiceItemName: null, qty: 2 }
@@ -22,27 +22,36 @@ function aView(id: string, status: Outcome): SumupAttemptView {
   return { id, kind: 'SUMUP', status, createdAt: 0, createdByName: null, expectedTotalPence: 1000, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }
 }
 
+interface SetupOptions {
+  receipt?: SaleReceipt
+  sumupEnabled?: boolean
+  venueId?: string | null
+}
+
 // One till tab. Every tab in a test shares the device store, as tabs on one phone share storage.
-function setup(status: Outcome, visible = ref(true)) {
+function setup(status: Outcome, visible = ref(true), options: SetupOptions = {}) {
   const scope = effectScope()
   const basket = ref<BasketLine[]>([])
   const chargeFailure = ref<string | null>(null)
+  const charged = ref<ChargedReceipt | null>(null)
+  const asked: string[] = []
   const deps = {
     // The app answering as the SumUp app told it: the attempt is over and the money never moved.
     request: async <T>(path: string) => {
-      if (path.endsWith('/resolve')) return { status, error: null } as T
+      asked.push(path)
+      if (path.endsWith('/resolve')) return { status, error: null, receipt: options.receipt ?? null } as T
       if (path === '/api/till/payments') return { attempts: [] } as T
       return { attempt: aView(path.split('/').pop()!, status) } as T
     },
-    venueId: ref<string | null>(null),
-    sumupEnabled: ref(true),
+    venueId: ref<string | null>(options.venueId ?? null),
+    sumupEnabled: ref(options.sumupEnabled ?? true),
     selectedTabHolderId: ref<string | null>(null),
     session: ref<TillSession | null>(null),
     basket,
     ticketLines: ref<TillBooking[]>([]),
     walkUpLines: ref<WalkUpLine[]>([]),
     selectedDiscountId: ref<string | null>(null),
-    charged: ref<ChargedReceipt | null>(null),
+    charged,
     chargeFailure,
     resetSelections: () => {},
     isVisible: () => visible.value,
@@ -55,13 +64,13 @@ function setup(status: Outcome, visible = ref(true)) {
     }, { deep: true })
     return useSumUpCharge(deps)
   })!
-  return { charge, basket, chargeFailure, scope, visible }
+  return { charge, basket, chargeFailure, charged, asked, scope, visible }
 }
 
-// The till keeps the basket on screen under the waiting card while the app has the phone.
-function handOff(tab: ReturnType<typeof setup>, id: string): void {
+// The till keeps the basket on screen under the waiting card while the reader has the charge.
+function handOff(tab: ReturnType<typeof setup>, id: string, over: { kind?: SumupAttemptKind, totalPence?: number } = {}): void {
   tab.basket.value = [aLine()]
-  tab.charge.sumup.remember({ id, totalPence: 1000, startedAt: Date.now(), basket: { bar: [aLine()], tickets: [], walkUps: [], discountId: null } })
+  tab.charge.sumup.remember({ id, kind: over.kind, totalPence: over.totalPence ?? 1000, startedAt: Date.now(), basket: { bar: [aLine()], tickets: [], walkUps: [], discountId: null } })
 }
 
 async function settled(): Promise<void> {
@@ -206,54 +215,15 @@ describe('the restored basket offers Try SumUp again (F-124 criterion 5, F-104 c
 
 // Decision 0096: a typed charge is an attempt too, answered by the person at the reader.
 describe('a typed charge waits for the person at the reader (0096)', () => {
-  const aReceipt = {
+  const aReceipt: SaleReceipt = {
     entryId: 'entry-1', totalPence: 1900, lines: [], ageCheck: null, refusedLines: [], discount: null, tab: null, comp: null,
     tickets: [{ reservationId: 'r-1', reference: 'ABC123', amountPence: 900 }],
     walkUps: [],
   }
 
-  function typedTab(answer: { status: string, receipt?: unknown }, sumupEnabled = false) {
-    const scope = effectScope()
-    const basket = ref<BasketLine[]>([])
-    const charged = ref<ChargedReceipt | null>(null)
-    const chargeFailure = ref<string | null>(null)
-    const asked: string[] = []
-    const charge = scope.run(() => {
-      watch(basket, () => {
-        chargeFailure.value = null
-      }, { deep: true })
-      return useSumUpCharge({
-        request: async <T>(path: string) => {
-          asked.push(path)
-          if (path.endsWith('/resolve')) return { status: answer.status, error: null, receipt: answer.receipt ?? null } as T
-          if (path === '/api/till/payments') return { attempts: [] } as T
-          return { attempt: { ...aView(path.split('/').pop()!, 'FAILED'), status: answer.status, kind: 'TYPED' } } as T
-        },
-        venueId: ref<string | null>('venue-1'),
-        sumupEnabled: ref(sumupEnabled),
-        selectedTabHolderId: ref<string | null>(null),
-        session: ref<TillSession | null>(null),
-        basket,
-        ticketLines: ref<TillBooking[]>([]),
-        walkUpLines: ref<WalkUpLine[]>([]),
-        selectedDiscountId: ref<string | null>(null),
-        charged,
-        chargeFailure,
-        resetSelections: () => {},
-        isVisible: () => true,
-      })
-    })!
-    return { charge, basket, charged, chargeFailure, scope, asked }
-  }
-
-  function keyedIn(tab: ReturnType<typeof typedTab>, id: string): void {
-    tab.basket.value = [aLine()]
-    tab.charge.sumup.remember({ id, kind: 'TYPED', totalPence: 1900, startedAt: Date.now(), basket: { bar: [aLine()], tickets: [], walkUps: [], discountId: null } })
-  }
-
   test('Card declined brings the basket back and says the card was declined', async () => {
-    const tab = typedTab({ status: 'FAILED' })
-    keyedIn(tab, 'typed-declined')
+    const tab = setup('FAILED', ref(true), { sumupEnabled: false })
+    handOff(tab, 'typed-declined', { kind: 'TYPED', totalPence: 1900 })
 
     await tab.charge.resolveAttempt('typed-declined', 'declined')
     await settled()
@@ -267,8 +237,8 @@ describe('a typed charge waits for the person at the reader (0096)', () => {
   })
 
   test('Reader took it shows the sale as recorded, with the bookings it paid', async () => {
-    const tab = typedTab({ status: 'SUCCEEDED', receipt: aReceipt })
-    keyedIn(tab, 'typed-taken')
+    const tab = setup('SUCCEEDED', ref(true), { receipt: aReceipt, sumupEnabled: false })
+    handOff(tab, 'typed-taken', { kind: 'TYPED', totalPence: 1900 })
 
     await tab.charge.resolveAttempt('typed-taken', 'succeeded')
     await settled()
@@ -281,9 +251,9 @@ describe('a typed charge waits for the person at the reader (0096)', () => {
     tab.scope.stop()
   })
 
-  test('tonight\'s open attempts are read with the hand-off switched off, since a typed one needs no key', async () => {
-    const tab = typedTab({ status: 'FAILED' })
-    keyedIn(tab, 'typed-listed')
+  test('tonight\'s open charges are read with the hand-off switched off, since a typed one needs no key', async () => {
+    const tab = setup('FAILED', ref(true), { sumupEnabled: false, venueId: 'venue-1' })
+    handOff(tab, 'typed-listed', { kind: 'TYPED' })
 
     await tab.charge.resolveAttempt('elsewhere', 'declined')
 

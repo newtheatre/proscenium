@@ -116,7 +116,7 @@ async function pendingBooking(performanceId: string, ticketTypeId: string, quant
 }
 
 const sale = (venueId: string, body: Record<string, unknown>, as = barManager.cookie): Promise<Response> =>
-  sellOnTheTill(app.baseURL, { venueId, lines: [], ...body }, as)
+  sellOnTheTill(app, { venueId, lines: [], ...body }, as)
 
 interface EntryRow { id: string, source: string, tender: string, total_pence: number }
 interface LineRow { kind: string, amount_pence: number, reservation_id: string | null }
@@ -394,13 +394,13 @@ describe.skipIf(skip !== null)('a booking in a typed charge is collected only on
     const entries = (): number => query<{ n: number }>('SELECT count(*) AS n FROM ledger_entries')!.n
 
     const before = entries()
-    const first = await (await startTypedCharge(app.baseURL, basket, barManager.cookie)).json() as { id: string }
+    const first = await (await startTypedCharge(app, basket, barManager.cookie)).json() as { id: string }
     expect(bookingStatus()).toBe('PENDING')
 
     // Held by the open attempt, so a second charge of it waits for the first (F-124 criterion 7).
-    expect((await startTypedCharge(app.baseURL, basket, barManager.cookie)).status).toBe(409)
+    expect((await startTypedCharge(app, basket, barManager.cookie)).status).toBe(409)
 
-    expect((await answerCharge(app.baseURL, first.id, 'declined', barManager.cookie)).status).toBe(200)
+    expect((await answerCharge(app, first.id, 'declined', barManager.cookie)).status).toBe(200)
     expect(bookingStatus()).toBe('PENDING')
     expect(entries()).toBe(before)
 

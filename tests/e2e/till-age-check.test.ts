@@ -107,7 +107,7 @@ async function aMixedBasketSetup(): Promise<MixedBasket> {
 }
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, ageCheck: unknown, as = barManager.cookie): Promise<Response> =>
-  sellOnTheTill(app.baseURL, { venueId, lines, expectedTotalPence, ageCheck }, as)
+  sellOnTheTill(app, { venueId, lines, expectedTotalPence, ageCheck }, as)
 
 interface Counts { entries: number, lines: number, movements: number, ageChecks: number, ageCheckAudits: number, saleAudits: number }
 
@@ -422,6 +422,41 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     await waitFor(view, `document.querySelector('[data-test="reader-took-it"]')`)
     await click(view, '[data-test="reader-took-it"]')
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
+    view.close()
+  }, 120_000)
+
+  // 0096 writes a card sale only once the reader answers, so a refusal given at the charge cannot
+  // ride the sale: it is on the register at once, and a declined card leaves it there.
+  test('a refusal given at the charge stays on the register when the card is then declined', async () => {
+    const { venueId, restrictedProductId, ordinaryProductId, restrictedProductName } = await aMixedBasketSetup()
+    const view = await atTheTill(venueId, `[data-test="product-${ordinaryProductId}"]`)
+
+    await click(view, `[data-test="product-${ordinaryProductId}"]`)
+    await click(view, `[data-test="product-${restrictedProductId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="age-check-refuse"]')`)
+    // Closed rather than answered, so the charge is what asks.
+    await view.evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find(button => (button.getAttribute('aria-label') || '').toLowerCase().includes('close')).click()`)
+    await waitFor(view, `!document.querySelector('[data-test="age-check-refuse"]')`)
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£5.50')`)
+
+    const before = counts()
+    await click(view, `[aria-label="Charge £5.50"]`)
+    await waitFor(view, `document.querySelector('[data-test="age-check-refuse"]')`)
+    await click(view, '[data-test="age-check-refuse"]')
+    await click(view, '[data-test="age-check-reason-NO_ID_SHOWN"]')
+    await fill(view, '[data-test="age-check-description"]', 'Declined to show ID')
+    await click(view, '[data-test="age-check-confirm-refuse"]')
+
+    await waitFor(view, `document.querySelector('[data-test="reader-charge"]')`)
+    expect(await textOf(view, '[data-test="charge-amount-figure"]')).toContain('£3.00')
+    expect(counts().ageChecks).toBe(before.ageChecks + 1)
+
+    await click(view, '[data-test="card-declined"]')
+    await waitFor(view, `document.querySelector('[data-test="charge-failure"]')`)
+    expect(counts()).toMatchObject({ entries: before.entries, ageChecks: before.ageChecks + 1 })
+    const row = latestAgeCheck()
+    expect(row).toMatchObject({ outcome: 'REFUSED', reason: 'NO_ID_SHOWN' })
+    expect(row?.product).toContain(restrictedProductName)
     view.close()
   }, 120_000)
 

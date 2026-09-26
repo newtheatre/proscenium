@@ -88,7 +88,7 @@ function openTill(venueId: string, performanceId: string): Promise<Response> {
 }
 
 const sell = (venueId: string, variantId: string, pricePence: number): Promise<Response> =>
-  sellOnTheTill(app.baseURL, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence }, bar.cookie)
+  sellOnTheTill(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence }, bar.cookie)
 
 interface Reconciliation {
   bar: { cardSalesPence: number, tabSettlementsPence: number, expectedPence: number }

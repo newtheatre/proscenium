@@ -450,7 +450,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fillNumber(view, '[data-test="actual-z-input"]', '0')
     expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="variance-note"]')`)).toBe(false)
 
-    await sellOnTheTill(app.baseURL, { venueId: closing.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, screenBar.cookie)
+    await sellOnTheTill(app, { venueId: closing.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, screenBar.cookie)
 
     await click(view, '[data-test="confirm-close-till"]')
     await waitFor(view, `document.querySelector('[data-test="close-failure"]')`)

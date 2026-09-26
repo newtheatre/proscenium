@@ -76,15 +76,15 @@ export const saleForm = basketForm.extend({
 )
 
 export type SaleInput = z.output<typeof saleForm>
+export type TicketLineInput = z.output<typeof ticketLineForm>
+export type WalkUpLineInput = z.output<typeof walkUpLineForm>
+export type WalkUpGuestInput = z.output<typeof walkUpGuestForm>
 
 // Whether the reader must answer ahead of the write (0096): only a tab charge and a basket with
 // nothing left to take involve no reader, so only they post in one step.
 export function needsTheReader(sale: Pick<SaleInput, 'tabHolderId' | 'expectedTotalPence'>): boolean {
   return sale.tabHolderId === null && sale.expectedTotalPence > 0
 }
-export type TicketLineInput = z.output<typeof ticketLineForm>
-export type WalkUpLineInput = z.output<typeof walkUpLineForm>
-export type WalkUpGuestInput = z.output<typeof walkUpGuestForm>
 
 // What the Tickets tab shows about a booking it found (F-122 criterion 2): no email, no price
 // per ticket, only what is owed and whether the till may take it.

@@ -94,7 +94,7 @@ async function aSellableProduct(): Promise<{ variantId: string }> {
 }
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, discountId: string | null, as = barManager.cookie): Promise<Response> =>
-  sellOnTheTill(app.baseURL, { venueId, lines, expectedTotalPence, discountId }, as)
+  sellOnTheTill(app, { venueId, lines, expectedTotalPence, discountId }, as)
 
 interface LedgerLineRow { amount_pence: number, discount_id: string | null, discount_percent: number | null, discount_pence: number | null }
 

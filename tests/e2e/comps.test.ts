@@ -4,9 +4,9 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { sellOnTheTill } from '#tests/helpers/till'
+import { answerCharge, startTypedCharge } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
-import { expectOneWinner, race } from '#tests/helpers/race'
+import { race } from '#tests/helpers/race'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -550,11 +550,14 @@ describe.skipIf(skip !== null)('a comp depletes exactly as a paid sale would, re
     const { id } = await asked.json() as { id: string }
     await approve(id, barManager.cookie)
 
-    const answers = await race(2, index => index === 0
+    // The card sale's contended write is its answer at the reader (0096), so that is what races.
+    const attempt = await (await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500 }, barStaff.cookie)).json() as { id: string }
+    const [given, answered] = await race(2, index => index === 0
       ? give(id, venueId, 500)
-      : sellOnTheTill(app.baseURL, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500 }, barStaff.cookie))
+      : answerCharge(app, attempt.id, 'succeeded', barStaff.cookie))
 
-    expectOneWinner(answers)
+    const sold = (await answered!.json() as { status: string }).status === 'SUCCEEDED'
+    expect([given!.status === 200, sold].filter(Boolean)).toHaveLength(1)
     expect(onHandOfItem(itemId)).toBe(0)
   })
 })

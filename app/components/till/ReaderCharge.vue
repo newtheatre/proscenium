@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { saysMoney } from '#shared/utils/bar'
 import type { ResolveOutcome, SumupAttemptView } from '#shared/utils/sumup'
 
 // A typed charge waiting for the person at the reader (0096, F-104 criterion 6 as amended): the
@@ -24,21 +23,14 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
     class="space-y-3"
     data-test="reader-charge"
   >
-    <!-- The one number read across a bar, so it carries the block and the words stay short. -->
-    <div class="rounded-xl bg-elevated px-4 py-5 text-center">
-      <p class="text-sm text-muted">
-        Key this into the reader
-      </p>
-      <p
-        class="mt-1 font-mono text-5xl font-bold tabular-nums"
-        data-test="charge-amount-figure"
-      >
-        {{ saysMoney(pending.totalPence) }}
-      </p>
+    <TillChargeFigure
+      label="Key this into the reader"
+      :pence="pending.totalPence"
+    >
       <p class="mt-2 text-sm text-muted">
         Nothing is recorded until you answer below.
       </p>
-    </div>
+    </TillChargeFigure>
 
     <UAlert
       v-if="waitingFailure"
@@ -73,7 +65,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
         data-test="reader-charge-give-up"
         @click="emit('resolve', pending.id, 'abandoned', abandonNote.trim())"
       >
-        Give it up, with this note
+        Give up, with note
       </UButton>
     </div>
   </div>

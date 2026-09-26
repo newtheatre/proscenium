@@ -85,7 +85,7 @@ const deliver = (itemId: string, qty: number): Promise<Response> =>
   send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty, unitCostPence: 100 })
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, as = barManager.cookie): Promise<Response> =>
-  sellOnTheTill(app.baseURL, { venueId, lines, expectedTotalPence }, as)
+  sellOnTheTill(app, { venueId, lines, expectedTotalPence }, as)
 
 interface Counts { entries: number, lines: number, movements: number, audits: number }
 

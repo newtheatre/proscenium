@@ -24,7 +24,7 @@ function fromTonight(at: unknown, now = Date.now()): boolean {
 
 export interface PendingAttempt<Basket> {
   id: string
-  // Absent on one kept before the typed attempt existed, which was a hand-off (0096).
+  // Absent reads as a hand-off (0096).
   kind?: SumupAttemptKind
   totalPence: number
   startedAt: number

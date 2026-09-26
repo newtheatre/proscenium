@@ -112,7 +112,7 @@ describe.skipIf(skip !== null)('a matinee and an evening at one venue, end to en
     // A sale named to the matinee lands there and only there: the server already supports this,
     // even though the till screen has no picker to choose it yet (docs/known-issues.md).
     const variantId = await aSellableVariant()
-    const sale = await sellOnTheTill(app.baseURL, {
+    const sale = await sellOnTheTill(app, {
       venueId, performanceId: matineeId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250,
     }, bar.cookie)
     expect(sale.status).toBe(200)
@@ -217,12 +217,12 @@ describe.skipIf(skip !== null)('two sales in one till session land on different 
     const { session } = await opened.json() as { session: { id: string } }
 
     placeHouses(ids, 'matinee')
-    const matineeSale = await sellOnTheTill(app.baseURL, { venueId: ids.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, admin.cookie)
+    const matineeSale = await sellOnTheTill(app, { venueId: ids.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, admin.cookie)
     expect(matineeSale.status).toBe(200)
     const { entryId: matineeEntry } = await matineeSale.json() as { entryId: string }
 
     placeHouses(ids, 'evening')
-    const eveningSale = await sellOnTheTill(app.baseURL, { venueId: ids.venueId, lines: [{ variantId, qty: 2 }], expectedTotalPence: 500 }, admin.cookie)
+    const eveningSale = await sellOnTheTill(app, { venueId: ids.venueId, lines: [{ variantId, qty: 2 }], expectedTotalPence: 500 }, admin.cookie)
     expect(eveningSale.status).toBe(200)
     const { entryId: eveningEntry } = await eveningSale.json() as { entryId: string }
 

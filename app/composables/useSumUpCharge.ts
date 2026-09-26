@@ -4,7 +4,7 @@ import { useSumUp } from './useSumUp'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
 import type { PricedLine, SaleReceipt, TillBooking } from '#shared/utils/sale'
-import type { ResolveOutcome, SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
+import type { ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
 import type { TillSession } from '#shared/utils/till'
 import type { BasketLine, WalkUpLine } from './useTillBasket'
 import type { PendingAttempt } from './useSumUp'
@@ -50,16 +50,18 @@ export interface SumUpChargeDeps {
 
 const RESTORED_ELSEWHERE = 'SumUp did not take that payment, and its basket was restored in another tab on this phone. Carry on in that tab.'
 
+const TOOK_IT_ALREADY = 'if the reader did take the money, charge it again and press Reader took it without taking the card a second time.'
+
 // What the till says over a basket that came back, by who turned it down (0096).
-function returnedWords(attempt: { kind?: SumupAttemptView['kind'], status: 'FAILED' | 'ABANDONED' }): string {
+function returnedWords(attempt: { kind?: SumupAttemptKind, status: 'FAILED' | 'ABANDONED' }): string {
   if (attempt.kind === 'TYPED') {
     return attempt.status === 'FAILED'
       ? 'Card declined, so nothing was recorded. The basket is back.'
-      : 'That charge was given up on, so nothing was recorded. The basket is back; if the reader did take the money, charge it again.'
+      : `That charge was given up on, so nothing was recorded. The basket is back; ${TOOK_IT_ALREADY}`
   }
   return attempt.status === 'FAILED'
     ? 'The SumUp app reported the payment did not go through. The basket is back.'
-    : 'That hand-off was abandoned. The basket is back; if the reader did take the money, ring it up again.'
+    : `That hand-off was abandoned. The basket is back; ${TOOK_IT_ALREADY}`
 }
 
 export function useSumUpCharge(deps: SumUpChargeDeps) {
@@ -105,9 +107,15 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
   function settleAttempt(status: SumupAttemptStatus, pending: NonNullable<typeof sumup.pending.value>, receipt: SaleReceipt | null = null): void {
     if (status === 'SUCCEEDED') {
       stopWatching()
-      charged.value = receipt
-        ? { totalPence: receipt.totalPence, refusedLines: receipt.refusedLines, discount: receipt.discount, tab: null, tickets: receipt.tickets, walkUps: receipt.walkUps, viaSumup: pending.kind !== 'TYPED' }
-        : { totalPence: pending.totalPence, refusedLines: [], discount: null, tab: null, tickets: [], walkUps: [], viaSumup: pending.kind !== 'TYPED' }
+      charged.value = {
+        totalPence: receipt?.totalPence ?? pending.totalPence,
+        refusedLines: receipt?.refusedLines ?? [],
+        discount: receipt?.discount ?? null,
+        tab: null,
+        tickets: receipt?.tickets ?? [],
+        walkUps: receipt?.walkUps ?? [],
+        viaSumup: pending.kind !== 'TYPED',
+      }
       clearBasket()
       sumup.forget()
       waiting.value = null
@@ -265,6 +273,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     checkAttempt,
     startWatching,
     resolveAttempt,
+    refreshOpenAttempts,
     resume,
     returnToTab,
   }

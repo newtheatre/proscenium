@@ -311,6 +311,7 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
 // "Card declined" fails one still waiting, "it did not" abandons, with a note on a mismatch.
 export async function resolveAttempt(row: AttemptRow, outcome: ResolveOutcome, smpTxCode: string | null, note: string | null, by: CompletionActor): Promise<CompletionOutcome> {
   if (outcome === 'declined') {
+    if (row.kind !== 'TYPED') throw createError({ statusCode: 409, statusMessage: 'A hand-off is answered Payment did not, not Card declined' })
     const moved = await move(row.id, 'STARTED', 'FAILED', { resolution: 'STAFF', resolvedBy: by.actorId }, by.actorId)
     if (!moved) throw createError({ statusCode: 409, statusMessage: 'That charge has already been answered, so it cannot be declined now. Read the till again.' })
     return { status: 'FAILED', receipt: null, error: null }
