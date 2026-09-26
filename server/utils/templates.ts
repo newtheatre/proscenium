@@ -36,7 +36,7 @@ function purchaseLink(context: TemplateContext): { html: string, text: string } 
   const url = typeof context.purchaseUrl === 'string' && context.purchaseUrl ? context.purchaseUrl : null
   if (!url) return { html: '', text: '' }
   return {
-    html: `\n<p><a href="${escapeHtml(url)}">Buy a membership from the Students' Union</a></p>`,
+    html: `\n<p><a href="${url}">Buy a membership from the Students' Union</a></p>`,
     text: `\n\nBuy a membership from the Students' Union: ${url}`,
   }
 }
@@ -45,14 +45,26 @@ function expiry(at: Date): string {
   return formatLondon(at, { dateStyle: 'full', timeStyle: 'short' })
 }
 
-// Every other template's free text is a short, code-written phrase; an announcement's body is an
-// officer's own paragraphs, so this is the one place raw input reaches the HTML part at all.
+// Any string in a context may have been typed by somebody outside the committee, a guest's name
+// among them, so `render` escapes them all before a template builds its HTML part (issue 1391).
 function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;').replaceAll('\'', '&#39;')
 }
 
+// Strings at any depth; a Date, a number or a flag is not typed text and passes as it is.
+function escaped(value: unknown): unknown {
+  if (typeof value === 'string') return escapeHtml(value)
+  if (Array.isArray(value)) return value.map(escaped)
+  if (value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, escaped(inner)]))
+  }
+  return value
+}
+
+// The one place that adds markup to typed text. Its input is already escaped by `render`.
 function paragraphs(body: string): string {
-  return body.split(/\n{2,}/).map(part => `<p>${escapeHtml(part).replaceAll('\n', '<br>')}</p>`).join('\n')
+  return body.split(/\n{2,}/).map(part => `<p>${part.replaceAll('\n', '<br>')}</p>`).join('\n')
 }
 
 const TEMPLATES = {
@@ -1839,7 +1851,10 @@ export function render(name: string, context: TemplateContext): Rendered {
   const template = TEMPLATES[name as TemplateName]
   if (!template) throw new Error(`no template \`${name}\``)
 
-  const rendered = template(context)
+  // The HTML part is built from an escaped copy, so no template escapes for itself or can forget
+  // to; the subject and the text part keep the words as typed (issue 1391).
+  const plain = template(context)
+  const rendered: Rendered = { ...plain, html: template(escaped(context) as TemplateContext).html }
   for (const [part, value] of Object.entries(rendered)) {
     if (value.includes('undefined') || value.includes('[object Object]')) {
       throw new Error(`template \`${name}\` rendered ${part} with a missing field`)
