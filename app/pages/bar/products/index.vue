@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ALLERGEN_STATES, PRODUCT_AGE_RESTRICTED_DEFAULT, productForm, says, saysRestricted, sellsWithoutCheckId } from '#shared/utils/bar'
+import { ALLERGEN_STATES, productForm, says, saysRestricted, sellsWithoutCheckId } from '#shared/utils/bar'
 import { barProductsList } from '#shared/utils/bar-products-list'
 import { encodeCondition } from '#shared/utils/list-filters'
 import type { FilterCondition, FilterOption } from '#shared/utils/list-filters'
@@ -87,7 +87,8 @@ const state = reactive<FormState>({
   categoryId: '',
   sort: 0,
   staffedOnly: false,
-  ageRestricted: PRODUCT_AGE_RESTRICTED_DEFAULT,
+  // Restricted anyway only: what it pours decides the rest (issue 1299).
+  ageRestricted: false,
   allergenState: 'UNKNOWN',
 })
 
@@ -113,7 +114,7 @@ function edit(product: BarProduct | null): void {
     sort: product?.sort ?? 0,
     staffedOnly: product?.staffedOnly ?? false,
     // The switch follows what the product pours, so restricted stock opens it switched on (issue 1299).
-    ageRestricted: product ? product.ageRestricted || product.restrictedPours.length > 0 : PRODUCT_AGE_RESTRICTED_DEFAULT,
+    ageRestricted: product ? product.ageRestricted || product.restrictedPours.length > 0 : false,
     allergenState: product?.allergenState ?? 'UNKNOWN',
     allergenNote: product?.allergenNote ?? undefined,
   })
@@ -225,7 +226,7 @@ const columns: TableColumn<BarProduct>[] = [
           ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Age restricted')
           : null,
         sellsWithoutCheckId(row.original)
-          ? h(UBadge, { 'color': 'error', 'variant': 'subtle', 'size': 'sm', 'data-test': `no-check-id-${row.original.id}` }, () => 'No Check ID')
+          ? h(UBadge, { 'color': 'error', 'variant': 'subtle', 'size': 'sm', 'data-test': `no-check-id-${row.original.id}` }, () => 'Switched off')
           : null,
         row.original.staffedOnly
           ? h(UBadge, { color: 'neutral', variant: 'outline', size: 'sm' }, () => 'Staffed only')
@@ -336,8 +337,8 @@ const columns: TableColumn<BarProduct>[] = [
       color="warning"
       variant="subtle"
       icon="i-lucide-id-card"
-      :title="`${plural(unchecked.total, 'product')} ${unchecked.total === 1 ? 'pours' : 'pour'} age-restricted stock without Check ID`"
-      description="Edit each one and switch Age restricted on, or switch the stocked item off on the stock register if it is not alcohol."
+      :title="`${plural(unchecked.total, 'product')} ${unchecked.total === 1 ? 'pours' : 'pour'} age-restricted stock with Age restricted off`"
+      description="The till asks for Check ID on them anyway. Edit each one so the list agrees, or switch the stocked item off on the stock register if it is not alcohol."
       :actions="[{ label: 'Show them', color: 'warning', onClick: showUnchecked }]"
     />
 
