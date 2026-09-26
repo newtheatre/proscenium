@@ -17,7 +17,7 @@ export const OLD_SITE_REDIRECTS: Record<string, string> = {
   '/get-involved/stagecraft': '/training/modules',
 
   // A member's own screens
-  '/account': '/my',
+  '/account': '/my', // K-127 criterion 4
   '/account/reservations': '/qr',
   '/account/shifts': '/rota',
   '/account/tab': '/account/bar-tab',
