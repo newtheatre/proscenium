@@ -16,7 +16,7 @@ const SESSIONS = 'app/pages/training/manage/sessions/index.vue'
 
 describe('each rota screen names the step after it (K-123 criterion 12)', () => {
   test('every screen in the flow carries the shared step link', async () => {
-    for (const [path, step] of [[TEMPLATES, 'templates'], [BOARD, 'board'], [OPENINGS, 'openings'], [APPROVALS, 'approvals']] as const) {
+    for (const [path, step] of [[TEMPLATES, 'templates'], [BOARD, 'board'], [OPENINGS, 'openings']] as const) {
       expect(await read(path)).toContain(`<RotaFlow step="${step}"`)
     }
   })
@@ -26,17 +26,37 @@ describe('each rota screen names the step after it (K-123 criterion 12)', () => 
     expect(board).not.toContain('to="/rota/manage/openings"')
   })
 
-  test('the flow covers four of the rota group\'s sidebar entries', () => {
-    expect(ROTA_FLOW).toHaveLength(4)
+  test('the flow covers three of the rota group\'s sidebar entries', () => {
+    expect(ROTA_FLOW).toHaveLength(3)
   })
 })
 
-describe('a refused Confirm offers the decline, its reason written (E-105 criterion 3)', () => {
-  test('the approvals screen opens Decline with the route\'s reason, and a plain Decline starts empty', async () => {
+// Issue #1365: the approvals screen duplicated the board's Confirm, so the queue became a board
+// filter and the old address forwards to it; Decline, and #1302's offer of it, moved with it.
+describe('the claims waiting for confirmation are worked on the board (E-105 criteria 2 and 3)', () => {
+  test('the old approvals address forwards to the board\'s filter, and draws nothing of its own', async () => {
     const source = await read(APPROVALS)
+    expect(source).toContain('navigateTo(BOARD_WAITING_HREF')
+    expect(source).not.toContain('layout: \'console\'')
+  })
+
+  test('the board offers the filter, with how many claims are waiting', async () => {
+    const source = await read(BOARD)
+    expect(source).toContain('Waiting for confirmation')
+    expect(source).toContain('data-test="board-waiting"')
+  })
+
+  test('a claim on the board can be declined with a reason, as well as confirmed', async () => {
+    const source = await read(BOARD)
+    expect(source).toContain(':data-test="`decline-${shift.shiftId}`"')
+    expect(source).toContain('/decline`')
+  })
+
+  test('a refused Confirm opens Decline with the route\'s reason, and a plain Decline starts empty', async () => {
+    const source = await read(BOARD)
     expect(source).toContain('refusalData<{ declineReason?: string }>(error)?.declineReason')
-    expect(source).toContain('openDecline(row, offered)')
-    expect(source).toContain('\'onClick\': () => openDecline(row.original)')
+    expect(source).toContain('openDecline(shift, offered)')
+    expect(source).toContain('@click="openDecline(shift)"')
   })
 })
 

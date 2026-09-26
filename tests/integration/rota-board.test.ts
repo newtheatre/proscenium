@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { rosterOpeningShiftsQuery, rosterOpeningsQuery, rosterPerformancesQuery, rosterShiftsQuery } from '#server/utils/rota'
+import { rosterOpeningShiftsQuery, rosterOpeningsQuery, rosterPerformancesQuery, rosterShiftsQuery, waitingClaimsQuery } from '#server/utils/rota'
 import { daysAfter } from '#shared/utils/membership'
 import { boardWindowBounds } from '#shared/utils/rota-board'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
@@ -192,6 +192,46 @@ describe('the board reads bar openings in the same window (E-130 criterion 8)', 
         expect(wide.length).toBe(narrow.length)
         expect(wide.length - 1).toBeLessThanOrEqual(MAX_BOUND_PARAMETERS)
       }
+    })
+  })
+})
+
+// Issue #1365 and E-105 criterion 2: the approvals queue became the board's "Waiting for
+// confirmation" filter, so it reads every claim waiting, whatever the window, and counts them.
+describe('the board\'s waiting filter is the approvals queue', () => {
+  function claims(database: TestDatabase): void {
+    fourNights(database)
+    database.batch([
+      ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'claimant', 'claimant@example.invalid', 'Clara Claimant'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)', 'shift-past-claimed', 'performance-past', 'DOOR', 1, 'CLAIMED', 'claimant'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', 'shift-tonight-open', 'performance-tonight', 'DOOR', 1, 'OPEN'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)', 'shift-later-claimed', 'performance-later', 'BAR', 1, 'CLAIMED', 'claimant'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)', 'shift-later-confirmed', 'performance-later', 'DOOR', 1, 'CONFIRMED', 'claimant'],
+    ])
+  }
+
+  test('every performance holding a claim is read, beyond any window, and no other', async () => {
+    await withDatabase((database) => {
+      claims(database)
+      expect(run<{ performanceId: string }>(database, rosterPerformancesQuery('waiting')).map(row => row.performanceId))
+        .toEqual(['performance-past', 'performance-later'])
+    })
+  })
+
+  test('its cards come whole, so the claim is read beside the shifts already filled', async () => {
+    await withDatabase((database) => {
+      claims(database)
+      expect(run<{ shiftId: string }>(database, rosterShiftsQuery('waiting')).map(row => row.shiftId).sort())
+        .toEqual(['shift-later-claimed', 'shift-later-confirmed', 'shift-past-claimed'])
+    })
+  })
+
+  test('the count is the claims waiting, as the filter\'s label says it', async () => {
+    await withDatabase((database) => {
+      claims(database)
+      expect(run<{ waiting: number }>(database, waitingClaimsQuery())).toEqual([{ waiting: 2 }])
+      database.batch([['UPDATE performances SET status = ? WHERE id = ?', 'CANCELLED', 'performance-later']])
+      expect(run<{ waiting: number }>(database, waitingClaimsQuery())).toEqual([{ waiting: 1 }])
     })
   })
 })

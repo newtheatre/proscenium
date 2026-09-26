@@ -1,14 +1,16 @@
 import { describe, expect, test } from 'bun:test'
-import { boardWindowBounds, boardWindowQuery, BOARD_WINDOW_NIGHTS, defaultBoardWindow } from '#shared/utils/rota-board'
+import { BOARD_WAITING_HREF, boardWindowBounds, boardWindowQuery, BOARD_WINDOW_NIGHTS, defaultBoardWindow } from '#shared/utils/rota-board'
 import { ROTA_FLOW, rotaStepAfter } from '#shared/utils/rota-flow'
 import { showNightBounds } from '#shared/utils/show-night'
 
 // The rota as one workflow (K-123 criterion 12) and the board's date window (E-107 criterion 7),
 // both pure logic; the route's half is proved in `tests/integration/rota-board.test.ts`.
 
+// Issue #1365: approving is done on the board, under its "Waiting for confirmation" filter, so the
+// flow is three screens and ends on the openings.
 describe('the rota flow names its own order (K-123 criterion 12)', () => {
-  test('the four steps run templates, board, openings, approvals', () => {
-    expect(ROTA_FLOW.map(step => step.key)).toEqual(['templates', 'board', 'openings', 'approvals'])
+  test('the three steps run templates, board, openings', () => {
+    expect(ROTA_FLOW.map(step => step.key)).toEqual(['templates', 'board', 'openings'])
   })
 
   test('every step names a console route under the rota group', () => {
@@ -17,16 +19,16 @@ describe('the rota flow names its own order (K-123 criterion 12)', () => {
 
   test('the way on to a step is a verb and its object, as a console control is', () => {
     expect(rotaStepAfter('templates')?.onward).toBe('Fill the rota')
-    expect(rotaStepAfter('openings')?.onward).toBe('Approve the claims')
+    expect(rotaStepAfter('board')?.onward).toBe('Plan the bar openings')
   })
 
   test('each step but the last names the one after it', () => {
     expect(rotaStepAfter('templates')?.key).toBe('board')
     expect(rotaStepAfter('board')?.key).toBe('openings')
-    expect(rotaStepAfter('openings')?.key).toBe('approvals')
   })
 
   test('the last step names nothing after it rather than looping back', () => {
+    expect(rotaStepAfter('openings')).toBeNull()
     expect(rotaStepAfter('approvals')).toBeNull()
   })
 
@@ -81,5 +83,18 @@ describe('the board refuses a window it cannot read (K-129 criterion 5)', () => 
 
   test('a window longer than a season is refused rather than read whole', () => {
     expect(boardWindowQuery.safeParse({ from: '2026-09-21', to: '2028-09-21' }).success).toBe(false)
+  })
+})
+
+// Issue #1365 and E-105 criterion 2: the queue of claims is a filter on the board, reached from
+// the old approvals address, rather than a second screen confirming the same shifts.
+describe('the board filters to the claims waiting for confirmation', () => {
+  test('the filter reads as yes or no, and is off unless asked for', () => {
+    expect(boardWindowQuery.parse({ from: '2026-09-21', to: '2026-10-04' }).waiting).toBe(false)
+    expect(boardWindowQuery.parse({ from: '2026-09-21', to: '2026-10-04', waiting: 'true' }).waiting).toBe(true)
+  })
+
+  test('the old approvals address forwards to the filter', () => {
+    expect(BOARD_WAITING_HREF).toBe('/rota/manage/shifts?waiting=true')
   })
 })

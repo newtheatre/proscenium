@@ -196,18 +196,21 @@ describe.skipIf(skip !== null)('the queue (E-105)', () => {
     await setAutoConfirm(true)
   })
 
-  test('a queued claim appears on the approval list and an ordinary member cannot reach it', async () => {
+  // Issue #1365: the queue is the board's "Waiting for confirmation" filter, with its count.
+  test('a queued claim is on the board\'s waiting filter and an ordinary member cannot reach it', async () => {
     await setAutoConfirm(false)
     const house = programme('queue-list')
     const shiftId = openShift(house.performanceId, 'DOOR', 1)
     await send('POST', `/api/rota/shifts/${shiftId}/claim`, undefined, member.cookie)
 
-    expect((await send('GET', '/api/admin/rota/approvals', undefined, member.cookie)).status).toBe(403)
+    expect((await send('GET', '/api/admin/rota/shifts/board?waiting=true', undefined, member.cookie)).status).toBe(403)
 
-    const listed = await send('GET', '/api/admin/rota/approvals', undefined, foh.cookie)
+    const listed = await send('GET', '/api/admin/rota/shifts/board?waiting=true', undefined, foh.cookie)
     expect(listed.status).toBe(200)
-    const { items } = await listed.json() as { items: { shiftId: string }[] }
-    expect(items.map(item => item.shiftId)).toContain(shiftId)
+    const board = await listed.json() as { waiting: number, items: { kind: string, shifts: { shiftId: string, status: string }[] }[] }
+    expect(board.items.every(item => item.kind === 'performance')).toBe(true)
+    expect(board.items.flatMap(item => item.shifts).find(shift => shift.shiftId === shiftId)?.status).toBe('CLAIMED')
+    expect(board.waiting).toBeGreaterThanOrEqual(1)
     await setAutoConfirm(true)
   })
 
