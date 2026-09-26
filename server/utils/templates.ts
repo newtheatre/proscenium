@@ -90,10 +90,10 @@ function guidanceBlock(context: TemplateContext): { html: string, text: string }
   const lines = context.guidance as string[]
   if (lines.length === 0) return { html: '', text: '' }
   // Left out once the show is off the public site, rather than link to a page that 404s.
-  const showUrl = typeof context.showUrl === 'string' && context.showUrl ? context.showUrl : null
+  const showUrl = context.showUrl as string | null
   return {
-    html: `\n<p><strong>${SAYS_BEFORE_YOU_COME}</strong></p>\n<p>${lines.map(escapeHtml).join('<br>')}</p>`
-      + (showUrl ? `\n<p><a href="${escapeHtml(showUrl)}">${SAYS_WARNINGS_LINK}</a></p>` : ''),
+    html: `\n<p><strong>${SAYS_BEFORE_YOU_COME}</strong></p>\n<p>${lines.join('<br>')}</p>`
+      + (showUrl ? `\n<p><a href="${showUrl}">${SAYS_WARNINGS_LINK}</a></p>` : ''),
     text: `\n\n${SAYS_BEFORE_YOU_COME}\n${lines.join('\n')}${showUrl ? `\n${SAYS_WARNINGS_LINK}: ${showUrl}` : ''}`,
   }
 }

@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import { configValue } from './configuration'
 import { warningsForListedShowsQuery } from './content-warnings'
 import { performanceSoldColumn } from './programme'
-import { visitorWarnings } from '#shared/utils/content-warnings'
+import { visitorGuidance } from '#shared/utils/content-warnings'
 import { offsetFor } from '#shared/utils/pagination'
 import { showNightOf } from '#shared/utils/show-night'
 import {
@@ -239,7 +239,7 @@ function assemble(
     return [{
       show: projected,
       categoryName: row.categoryName,
-      ...visitorWarnings({ ageGuidance: row.ageGuidance, confirmedNone: row.warningsConfirmedNone === 1 }, warningsFor.get(row.id) ?? []),
+      ...visitorGuidance({ ageGuidance: row.ageGuidance, confirmedNone: row.warningsConfirmedNone === 1 }, warningsFor.get(row.id) ?? []),
       contentNotes: row.contentNotes,
       performances: listed.get(row.id) ?? [],
     }]
@@ -275,7 +275,7 @@ export interface BookingGuidance {
 export function bookingGuidanceFor(show: GuidanceShowRow, warnings: ShowWarningRow[]): BookingGuidance {
   const shown = { ageGuidance: show.ageGuidance, confirmedNone: show.warningsConfirmedNone === 1 }
   return {
-    lines: visitorWarnings(shown, warnings.map(readWarning)).guidance,
+    lines: visitorGuidance(shown, warnings.map(readWarning)).guidance,
     slug: isPublishedShow(show) ? show.slug : null,
   }
 }

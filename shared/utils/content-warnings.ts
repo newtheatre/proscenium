@@ -210,7 +210,7 @@ export function publicContentWarnings(warnings: ShowContentWarning[]): PublicCon
 
 // One show's warnings as a visitor reads them, wherever they are read: the show page, the listing
 // and a booking all project the same rows the same way, guidance included (D-102 criteria 2, 4).
-export function visitorWarnings(show: { ageGuidance: string | null, confirmedNone: boolean }, carried: ShowContentWarning[]): {
+export function visitorGuidance(show: { ageGuidance: string | null, confirmedNone: boolean }, carried: ShowContentWarning[]): {
   assessment: WarningAssessment
   warnings: PublicContentWarning[]
   guidance: string[]
@@ -220,7 +220,7 @@ export function visitorWarnings(show: { ageGuidance: string | null, confirmedNon
   return { assessment, warnings, guidance: saysShowGuidance({ ageGuidance: show.ageGuidance, assessment, warnings }) }
 }
 
-// The block's words, the same on the booking page and in the email (issue 1330).
+// The block's words on the booking page and in the email; the booking form shares the link (issue 1330).
 export const SAYS_BEFORE_YOU_COME = 'Before you come'
 export const SAYS_WARNINGS_LINK = 'What each warning means, on the show page'
 
