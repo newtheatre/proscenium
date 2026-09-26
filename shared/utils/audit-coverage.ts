@@ -374,7 +374,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/tonight/duty-manager.get.ts',
     actions: ['night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
-  },  {
+  },
+  {
     route: 'server/api/tonight/house.get.ts',
     actions: ['night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
