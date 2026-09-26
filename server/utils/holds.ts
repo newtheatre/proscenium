@@ -121,7 +121,7 @@ export async function sendHoldReminders(
 
   let sent = 0
   for (const candidate of candidates) {
-    // Minted before the claim, so a failure here leaves the reminder unclaimed for the next run.
+    // Minted before the claim, since a throw after claiming would lose this reminder for good.
     const link = await linkFor(candidate.id)
     const claim = holdReminderClaim(candidate.id, candidate.holdExpiresAt)
     const took = await claimNotification({

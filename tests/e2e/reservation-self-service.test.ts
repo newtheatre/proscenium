@@ -302,7 +302,7 @@ describe.skipIf(skip !== null)('D-110: the QR is unchanged by an edit (criterion
 
 // Issue 1329: one cookie names one booking, and opening or making another moves it, so a write
 // acts only when it names the booking the cookie holds, and one naming another or none is refused.
-describe.skipIf(skip !== null)('a write acts only on the booking the page is showing', () => {
+describe.skipIf(skip !== null)('a write or a read acts only on the booking the page is showing', () => {
   test('naming another booking, or none, changes nothing on the booking the cookie holds', async () => {
     const { performanceId, standardId } = await bookableShow()
     const first = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
@@ -327,6 +327,26 @@ describe.skipIf(skip !== null)('a write acts only on the booking the page is sho
        FROM reservations r WHERE r.reference = ?`, second.reference,
     )
     expect(row).toEqual({ status: 'PENDING', tickets: 1 })
+  }, CASE_TIMEOUT_MS)
+
+  test('the two reads behind the forms refuse a page naming another booking, or none', async () => {
+    const { performanceId, standardId } = await bookableShow()
+    const first = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
+    const second = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
+    const cookie = await qrCookie(second.qrToken)
+
+    for (const path of ['/api/qr/edit-options', '/api/qr/exchange-options']) {
+      const other = await send('GET', `${path}?reference=${first.reference}`, undefined, cookie)
+      expect(other.status).toBe(409)
+      expect(await other.text()).toContain('showing a different booking')
+
+      const none = await send('GET', path, undefined, cookie)
+      expect(none.status).toBe(409)
+      expect(await none.text()).toContain('out of date')
+
+      const shown = await send('GET', `${path}?reference=${second.reference.toLowerCase()}`, undefined, cookie)
+      expect(shown.status).toBe(200)
+    }
   }, CASE_TIMEOUT_MS)
 })
 

@@ -103,7 +103,7 @@ export const reservationResendForm = z.object({
   email: z.string().email('Enter a real email address').max(320),
 })
 
-// The booking the page is showing (issue 1329): one cookie names one booking, so a write naming
+// The booking the page is showing (issue 1329): one cookie names one booking, so a request naming
 // another, or none, is refused. Optional so the refusal is a sentence, not a field error.
 const showingReference = z.string().trim().length(RESERVATION_REFERENCE_LENGTH).optional()
 
