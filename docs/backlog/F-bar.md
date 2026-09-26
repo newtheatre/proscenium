@@ -163,6 +163,9 @@ Open questions:
   1. Products carry an age-restricted flag; a basket containing any restricted line requires a
      Challenge 25 outcome (not required, checked and passed, or refused) before payment can
      proceed.
+     Amended by issue 1299: a line is restricted when what it pours, its size's recipe or the
+     option chosen, includes an age-restricted stocked item, or when its product is marked age
+     restricted anyway. The product's flag adds the check and never takes it away.
   2. The prompt is inline in the sale flow, two taps for the routine pass case; the basket is
      preserved throughout.
   3. A refusal writes to the append-only Challenge 25 register with a mandatory reason and a
@@ -290,6 +293,9 @@ Open questions:
      new stocked item's each start from one stated default, read by every screen that offers
      either rather than spelled again per screen. A picker over the stock register reaches the
      whole register, by searching it where it is longer than one page (K-123).
+     Amended by issue 1299: a product's Check ID follows what it pours (F-106 criterion 1), so
+     only a stocked item keeps a stated default; a new product's own switch, "restricted anyway",
+     starts off.
 - Source: Prompt Book F-2; audit PR-12, PR-7 (archive-not-delete judgment); criterion 6 from
   issue 1151 item 10, 21 September 2026.
 

@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { pencePayable } from './useTillBasket'
 import { usePendingPoll } from './usePendingPoll'
-import { refusalText } from '../utils/refusal'
+import { refusalData, refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { CompRequest } from '#shared/utils/comps'
@@ -16,10 +16,12 @@ interface SentLine extends TillCompLine { restricted: boolean }
 export interface TillCompDeps {
   venueId: Ref<string | null>
   // Read once, at the moment of asking, and frozen from there (F-110 criterion 4).
-  isVariantRestricted: (variantId: string) => boolean
+  isLineRestricted: (line: TillCompLine) => boolean
   requestComp: (body: { venueId: string, lines: TillCompLine[], reason: string }) => Promise<{ id: string, priced: PricedBasket }>
   pollRequest: (id: string) => Promise<{ request: CompRequest }>
   giveComp: (id: string, body: { venueId: string, expectedForegonePence: number, ageCheck: InlineAgeCheckInput | null }) => Promise<SaleReceipt>
+  // Reads the till's drinks again, for a line the server says asks where this till did not know.
+  refreshCatalogue: () => Promise<void>
 }
 
 const POLL_MS = 4000
@@ -28,7 +30,7 @@ const POLL_MS = 4000
 const POLL_CUTOFF_MS = 2 * 60 * 60 * 1000
 
 export function useTillComp(deps: TillCompDeps) {
-  const { venueId, isVariantRestricted, requestComp, pollRequest, giveComp } = deps
+  const { venueId, isLineRestricted, requestComp, pollRequest, giveComp, refreshCatalogue } = deps
 
   const open = ref(false)
   const reason = ref('')
@@ -111,7 +113,7 @@ export function useTillComp(deps: TillCompDeps) {
     try {
       const answered = await requestComp({ venueId: venueId.value, lines, reason: reason.value.trim() })
       requestId.value = answered.id
-      sentLines.value = lines.map(line => ({ ...line, restricted: isVariantRestricted(line.variantId) }))
+      sentLines.value = lines.map(line => ({ ...line, restricted: isLineRestricted(line) }))
       sentPriced.value = answered.priced
       pendingPoll.start(poll, POLL_MS, POLL_CUTOFF_MS)
       void poll()
@@ -131,16 +133,25 @@ export function useTillComp(deps: TillCompDeps) {
     return pencePayable(sentPriced.value, sentLines.value.map(line => line.restricted), ageCheck)
   }
 
-  async function give(ageCheck: InlineAgeCheckInput | null): Promise<void> {
-    if (!requestId.value || !venueId.value) return
+  // True when the server asked for Challenge 25 on a line this till held as unrestricted: the lines
+  // are marked from the catalogue read again, and only ever gain restriction (F-110 criterion 4).
+  async function give(ageCheck: InlineAgeCheckInput | null): Promise<boolean> {
+    if (!requestId.value || !venueId.value) return false
     givingBusy.value = true
     giveFailure.value = null
     try {
       given.value = await giveComp(requestId.value, { venueId: venueId.value, expectedForegonePence: foregonePence(ageCheck), ageCheck })
       pendingPoll.stop()
+      return false
     }
     catch (refused) {
+      if (refusalData<{ ageCheckFor?: string[] }>(refused)?.ageCheckFor?.length) {
+        await refreshCatalogue()
+        sentLines.value = sentLines.value.map(line => ({ ...line, restricted: line.restricted || isLineRestricted(line) }))
+        if (needsAgeCheck.value) return true
+      }
       giveFailure.value = refusalText(refused)
+      return false
     }
     finally {
       givingBusy.value = false

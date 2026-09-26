@@ -1,10 +1,12 @@
 import { computed, ref, watch } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
-import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
+import { MAX_BASKET_LINE_QTY, lineNeedsCheckId } from '#shared/utils/sale'
 import { refusalText, writeFailureText } from '../utils/refusal'
 import type { ComputedRef, Ref } from 'vue'
 import type { InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
 import type { PricedBasket, PricedLine, SaleChoice, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
+
+type RestrictableLine = Pick<BasketLine, 'variantId' | 'choiceItemId'>
 
 // A refusal drops the restricted lines from what is payable, for a comp's own give (useTillComp.ts),
 // which is the one path an inline refusal still rides.
@@ -71,13 +73,13 @@ export function useTillBasket(deps: TillBasketDeps) {
         qty: 1,
       })
     }
-    askIfRestricted(productName, variant.id)
+    askIfRestricted(productName, { variantId: variant.id, choiceItemId })
   }
 
   // Before the drink is poured, not at the charge (F-106 criterion 6). A sale that already
   // passed does not ask again; a refusal is not a pass, so a later restricted tap asks afresh.
-  function askIfRestricted(productName: string, variantId: string): void {
-    if (!isVariantRestricted(variantId) || passedAgeCheck.value) return
+  function askIfRestricted(productName: string, line: RestrictableLine): void {
+    if (!isLineRestricted(line) || passedAgeCheck.value) return
     refusalRecordFailure.value = null
     askingAgeCheckFor.value = productName
   }
@@ -208,15 +210,12 @@ export function useTillBasket(deps: TillBasketDeps) {
     ? null
     : (basket.value.length ? priced.value!.totalPence : 0) + ticketsPence.value + walkUpsPence.value)
 
-  // A restricted line is the product's flag, already on the catalogue this screen holds: no second
-  // lookup, and no route sells one without an outcome on record first (F-106 criteria 1, 5).
-  function isVariantRestricted(variantId: string): boolean {
-    return products.value.some(product => product.ageRestricted && product.variants.some(variant => variant.id === variantId))
+  // What the line pours, already on the catalogue this screen holds: no second lookup, and no
+  // route sells one without an outcome on record first (F-106 criteria 1, 5, issue 1299).
+  function isLineRestricted(line: RestrictableLine): boolean {
+    return lineNeedsCheckId(products.value, line)
   }
-  function isRestricted(line: BasketLine): boolean {
-    return isVariantRestricted(line.variantId)
-  }
-  const needsAgeCheck = computed(() => basket.value.some(isRestricted))
+  const needsAgeCheck = computed(() => basket.value.some(isLineRestricted))
 
   // What this sale has already settled, what it is asking about now, and what a refusal left
   // behind for the screen to say (F-106 criterion 6).
@@ -233,9 +232,9 @@ export function useTillBasket(deps: TillBasketDeps) {
   // The lines go at once, and the register entry is written here rather than riding on a sale
   // that may never be made: a basket left with nothing in it still owes the licence a record.
   async function refuseAgeCheck(outcome: InlineAgeCheckInput): Promise<void> {
-    const removed = basket.value.filter(isRestricted)
+    const removed = basket.value.filter(isLineRestricted)
     const names = [...new Set(removed.map(line => line.productName))].join(', ')
-    basket.value = basket.value.filter(line => !isRestricted(line))
+    basket.value = basket.value.filter(line => !isLineRestricted(line))
     askingAgeCheckFor.value = null
     refusedLinesNote.value = names ? `ID refused. Not sold: ${names}` : null
     refusalRecordFailure.value = null
@@ -304,8 +303,7 @@ export function useTillBasket(deps: TillBasketDeps) {
     offline,
     recomputeTotal,
     grandTotalPence,
-    isRestricted,
-    isVariantRestricted,
+    isLineRestricted,
     needsAgeCheck,
     passedAgeCheck,
     askingAgeCheckFor,

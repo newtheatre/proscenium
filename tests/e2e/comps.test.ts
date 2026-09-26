@@ -396,6 +396,35 @@ describe.skipIf(skip !== null)('a restricted line still needs a Challenge 25 out
     expect(answered.status).toBe(409)
     expect(await message(answered)).toContain('Challenge 25')
   })
+
+  // F-106 criterion 3: a refusal is on the register whether or not anything is left to give.
+  test('a comp whose every line is refused gives nothing, and the refusal still reaches the register', async () => {
+    const { venueId, performanceId } = programme(`comps-agecheck-refused-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500, true)
+    await openTill(venueId, performanceId)
+    confirmShift(performanceId, 'DUTY_MANAGER', barManager.id)
+
+    const asked = await ask({ venueId, lines: [{ variantId, qty: 1 }], reason: 'A round on the house' })
+    const { id } = await asked.json() as { id: string }
+    await approve(id, barManager.cookie)
+
+    const registered = (): number => {
+      const database = new Database(app.databaseFile, { readonly: true })
+      try {
+        return (database.query(`SELECT count(*) AS n FROM age_checks WHERE outcome = 'REFUSED'`).get() as { n: number }).n
+      }
+      finally {
+        database.close()
+      }
+    }
+    const before = registered()
+    const answered = await give(id, venueId, 0, barStaff.cookie, { outcome: 'REFUSED', reason: 'NO_ID_SHOWN', description: 'Declined to show ID' })
+    expect(answered.status).toBe(200)
+    const receipt = await answered.json() as { entryId: string | null, ageCheck: { outcome: string } | null }
+    expect(receipt.entryId).toBeNull()
+    expect(receipt.ageCheck).toMatchObject({ outcome: 'REFUSED' })
+    expect(registered()).toBe(before + 1)
+  })
 })
 
 describe.skipIf(skip !== null)('a comp is spent where it was approved (review-till 13)', () => {
