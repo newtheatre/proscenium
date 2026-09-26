@@ -162,9 +162,9 @@ useSeoMeta({
       >
         <UInputNumber
           v-model="state.partySize"
+          v-bind="TOUCH_STEPPER"
           :min="1"
           :max="MAX_PARTY_SIZE"
-          class="w-28"
           data-test="waiting-list-party-size"
         />
       </UFormField>

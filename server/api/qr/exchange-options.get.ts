@@ -1,9 +1,12 @@
+import { showingBookingQuery } from '#shared/utils/reservations'
+
 // What the exchange form needs: the other performances of the same show, the same honest
 // availability the public listing shows (D-111, D-101).
 export default defineEventHandler(async (event) => {
   const reservationId = await requireQrReservationId(event)
+  const { reference } = await getValidatedQueryOrThrow(event, showingBookingQuery)
 
-  const reservation = await selfServiceReservation(reservationId)
+  const reservation = await shownSelfServiceReservation(reservationId, reference)
   if (!reservation || reservation.status !== 'PENDING') {
     throw createError({ statusCode: 409, statusMessage: 'This booking can no longer be exchanged here' })
   }

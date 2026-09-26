@@ -1,4 +1,7 @@
+import { selfServiceReservation } from './reservations'
 import { decodeQrToken, encodeQrToken } from '#shared/utils/qr-tokens'
+import { otherBookingReason } from '#shared/utils/reservations'
+import type { SelfServiceReservation } from './reservations'
 import type { H3Event } from 'h3'
 
 // Stateless by design: a resend recomputes the identical signature from the reservation id
@@ -7,7 +10,7 @@ import type { H3Event } from 'h3'
 // The cookie a browser exchange leaves behind, so the token itself stops sitting in the
 // address bar and any referrer header after the first open (D-108 criterion 4).
 export const QR_COOKIE_NAME = 'nnt-qr-token'
-export const QR_COOKIE_MAX_AGE_SECONDS = 60 * 60
+const QR_COOKIE_MAX_AGE_SECONDS = 60 * 60
 
 let key: Promise<CryptoKey> | undefined
 
@@ -44,6 +47,22 @@ export async function qrTokenFor(reservationId: string): Promise<string> {
   return encodeQrToken(reservationId, await sign(reservationId))
 }
 
+// The browser now holds this booking as if its link had been opened, so whatever just made or
+// moved it can go straight to the booking page (D-108 criterion 4, issue 1329).
+export function rememberQrToken(event: H3Event, token: string): void {
+  setCookie(event, QR_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: QR_COOKIE_MAX_AGE_SECONDS,
+  })
+}
+
+// The path has to match rememberQrToken's, or the browser keeps the cookie.
+export function forgetQrToken(event: H3Event): void {
+  deleteCookie(event, QR_COOKIE_NAME, { path: '/' })
+}
+
 // Constant-time-ish: length is checked first (both are fixed-length base64url, so a mismatch
 // there is not itself a timing leak), then every byte is compared regardless of an early miss.
 function signaturesMatch(a: string, b: string): boolean {
@@ -72,4 +91,13 @@ export async function requireQrReservationId(event: H3Event): Promise<string> {
   if (!reservationId) throw createError({ statusCode: 401, statusMessage: 'That link has expired. Open it again from your email' })
 
   return reservationId
+}
+
+// The cookie's booking, only when it is the one the page is showing: booking in another tab moves
+// the cookie, so a page naming another booking, or none, is refused (issue 1329).
+export async function shownSelfServiceReservation(reservationId: string, showing: string | undefined): Promise<SelfServiceReservation | undefined> {
+  const reservation = await selfServiceReservation(reservationId)
+  const other = reservation && otherBookingReason(showing, reservation.reference)
+  if (other) throw createError({ statusCode: 409, statusMessage: other })
+  return reservation
 }

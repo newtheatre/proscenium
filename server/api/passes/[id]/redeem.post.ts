@@ -45,6 +45,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const qrToken = await qrTokenFor(result.reservationId!)
+  rememberQrToken(event, qrToken)
 
   await sendReservationConfirmation(event, {
     userId: account.id,

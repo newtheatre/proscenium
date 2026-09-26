@@ -244,6 +244,16 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(html).not.toContain('<b>14+</b>')
   })
 
+  // Issue 1329: the reminder said pay or cancel and carried no way to do either. Cancelling is a
+  // confirmed step on the booking page, never a link in an email a scanner might follow.
+  test('the unpaid hold opens the booking and carries its QR, with no one-click cancel', () => {
+    const { html, text } = render('reservation-hold-expiring', EVERYTHING)
+    expect(html).toContain(`<a href="${String(EVERYTHING.url)}">Open your booking</a>`)
+    expect(html).toContain(`src="${String(EVERYTHING.imageUrl)}"`)
+    expect(text).toContain(`Open your booking: ${String(EVERYTHING.url)}`)
+    for (const part of [html, text]) expect(part).not.toContain('/cancel')
+  })
+
   test('the confirmation says not yet paid in plain weight, and is a booking', () => {
     const { subject, html } = render('reservation-confirmed', EVERYTHING)
     expect(subject).toBe('Your booking for The Tempest')

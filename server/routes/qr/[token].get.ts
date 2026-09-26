@@ -5,11 +5,6 @@ export default defineEventHandler(async (event) => {
   const reservationId = await verifyQrToken(token)
   if (!reservationId) return sendRedirect(event, '/qr?refused=invalid')
 
-  setCookie(event, QR_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: QR_COOKIE_MAX_AGE_SECONDS,
-  })
+  rememberQrToken(event, token)
   return sendRedirect(event, '/qr')
 })

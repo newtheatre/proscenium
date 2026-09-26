@@ -736,8 +736,8 @@ response distinguishes an address that already held an account from one that did
 **Release and reminders (D-106, D-107).** `hold_expires_at` is set at reservation to curtain
 minus `HOLD_RELEASE_MINUTES_BEFORE` (15 by default), or a performance's own
 `hold_release_minutes_before` when it has one, the same NULL-means-inherit rule the booking
-window uses. The `holds:release` cron reads `server/utils/holds.ts` every ten minutes: it warns
-first, then releases. `releaseHoldStatement()` is one conditional `UPDATE ... WHERE id = ? AND
+window uses. The `holds:release` cron reads `server/utils/holds.ts` every ten minutes: it releases
+first, then warns. `releaseHoldStatement()` is one conditional `UPDATE ... WHERE id = ? AND
 status = 'PENDING' RETURNING id`, its audit row predicated on `changes() = 1`, so a hold moved by
 anything else in the window writes no trail for a release that did not happen. A reminder claims
 `notification_log` on `reservation.hold-expiring:<reservationId>:<holdExpiresAt>`
@@ -851,8 +851,11 @@ already an ordinary reservation holding ordinary tickets, which the same live ca
 already refuses over, with nothing further to build.
 
 **Self-service while unpaid (D-110).** The QR cookie D-108 already issues is the only credential:
-`PUT /api/qr/tickets` and `POST /api/qr/cancel` act on whichever reservation the cookie names, no
-account session required, since a guest booker has none. Editing sends desired totals per type,
+`PUT /api/qr/tickets`, `POST /api/qr/cancel` and `POST /api/qr/exchange` act on the reservation the
+cookie names, no account session required, since a guest booker has none, and only when the body's
+`reference` names that same one (`shownSelfServiceReservation()`, issue 1329). The two reads behind
+the forms, `GET /api/qr/edit-options` and `GET /api/qr/exchange-options`, make the same check,
+taking `reference` from the query string instead. Editing sends desired totals per type,
 the same line shape a fresh booking uses (`reservationEditForm`); `ticketEditDelta()` (pure,
 `shared/utils/reservations.ts`) turns that into additions and removals against what is currently
 held. Every added and removed line, in the same request, shares one guard computed once
@@ -870,7 +873,7 @@ identical everywhere and either the whole request landed or none of it did.
 **Exchange to another performance of the same show, while unpaid (D-111).** `GET
 /api/qr/exchange-options` lists the show's other on-sale performances, the same honest
 availability `publicShowBySlug()` gives the public listing. `POST /api/qr/exchange` (body:
-`{ performanceId }`) refuses a different show outright (criterion 5, `differentShowReason()`) and
+`{ performanceId, reference }`) refuses a different show (criterion 5, `differentShowReason()`) and
 a booking carrying an access or companion ticket type, since D-128's entitlement is checked once,
 against the performance it was granted for, and re-running it against a different one is a box
 office conversation rather than this form's job (`docs/known-issues.md`). The write,

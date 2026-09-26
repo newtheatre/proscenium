@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const reservationId = await requireQrReservationId(event)
   const input = await readValidatedBodyOrThrow(event, reservationEditForm)
 
-  const reservation = await selfServiceReservation(reservationId)
+  const reservation = await shownSelfServiceReservation(reservationId, input.reference)
   if (!reservation || reservation.status !== 'PENDING') {
     throw createError({ statusCode: 409, statusMessage: 'This booking can no longer be changed here' })
   }

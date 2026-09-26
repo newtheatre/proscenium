@@ -1,9 +1,12 @@
+import { showingBookingQuery } from '#shared/utils/reservations'
+
 // What the edit form needs while a booking is still unpaid: what may be added, and what is
 // already held, priced and named for the booker who actually holds the reservation (D-110).
 export default defineEventHandler(async (event) => {
   const reservationId = await requireQrReservationId(event)
+  const { reference } = await getValidatedQueryOrThrow(event, showingBookingQuery)
 
-  const reservation = await selfServiceReservation(reservationId)
+  const reservation = await shownSelfServiceReservation(reservationId, reference)
   if (!reservation || reservation.status !== 'PENDING') {
     throw createError({ statusCode: 409, statusMessage: 'This booking can no longer be changed here' })
   }
