@@ -304,41 +304,26 @@ const columns: TableColumn<AdminPerformance>[] = [
           ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'No running time')
           : null,
       ]),
-      h('div', { class: 'text-xs text-muted' }, row.original.venueName),
-      // Below sm the booking window and the house figures are hidden: shown here instead, so a
-      // phone keeps the row actions in view without losing what they said (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.externalBookingUrl
-        ? windowOf(row.original)
-        : `${windowOf(row.original)} · ${row.original.soldTickets} sold of ${row.original.capacityOverride ?? row.original.venueCapacity ?? 'an uncapped house'}`),
+      // The booking window rides the venue line at every width: a column of its own pushed the
+      // row actions past the edge beside the rail at 1280 (issue 1351).
+      h('div', { class: 'text-xs text-muted' }, `${row.original.venueName} · ${windowOf(row.original)}`),
+      // Below sm the house figures are hidden: shown here instead, so a phone keeps the row
+      // actions in view without losing what they said (issue 922).
+      row.original.externalBookingUrl
+        ? null
+        : h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.soldTickets} sold of ${row.original.capacityOverride ?? row.original.venueCapacity ?? 'an uncapped house'}`),
     ]),
-  },
-  {
-    id: 'window',
-    header: 'Online booking',
-    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
-    cell: ({ row }) => h('span', { class: 'text-sm' }, windowOf(row.original)),
-  },
-  {
-    id: 'capacity',
-    header: 'Capacity',
-    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
-    cell: ({ row }) => {
-      // Tickets for this performance are sold elsewhere, so a house figure would answer a
-      // question nobody asked here (D-122 criterion 2).
-      if (row.original.externalBookingUrl) return h('span', { class: 'text-sm text-muted' }, 'Externally ticketed')
-      const capacity = row.original.capacityOverride ?? row.original.venueCapacity
-      return h('span', { class: 'text-sm' }, capacity === null ? 'Uncapped' : `${capacity}`)
-    },
   },
   {
     id: 'sold',
     header: 'Sold',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
+    // Sold against capacity in one column, the night's own words (E-112). Nought would read as
+    // nobody buying, when nobody sells one here to count (D-122 criterion 2).
     cell: ({ row }) => {
-      // Nought here would read as nobody has bought a ticket, when nobody sells one internally
-      // to count (D-122 criterion 2).
       if (row.original.externalBookingUrl) return h('span', { class: 'text-sm text-muted' }, 'n/a')
-      return h('span', { class: 'text-sm text-muted' }, `${row.original.soldTickets}`)
+      const capacity = row.original.capacityOverride ?? row.original.venueCapacity
+      return h('span', { class: 'text-sm' }, capacity === null ? `${row.original.soldTickets}, uncapped` : `${row.original.soldTickets} of ${capacity}`)
     },
   },
   {
