@@ -44,6 +44,17 @@ export async function qrTokenFor(reservationId: string): Promise<string> {
   return encodeQrToken(reservationId, await sign(reservationId))
 }
 
+// The browser now holds this booking as if its link had been opened, so whatever just made or
+// moved it can go straight to the booking page (D-108 criterion 4, issue 1329).
+export function rememberQrToken(event: H3Event, token: string): void {
+  setCookie(event, QR_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: QR_COOKIE_MAX_AGE_SECONDS,
+  })
+}
+
 // Constant-time-ish: length is checked first (both are fixed-length base64url, so a mismatch
 // there is not itself a timing leak), then every byte is compared regardless of an early miss.
 function signaturesMatch(a: string, b: string): boolean {

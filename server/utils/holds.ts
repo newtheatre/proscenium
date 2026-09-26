@@ -101,7 +101,20 @@ export interface HoldReminderRun {
   sent: number
 }
 
-export async function sendHoldReminders(event: H3Event | undefined, at: Date, cap: number): Promise<HoldReminderRun> {
+// The booking page link and its hosted QR (D-108 criterion 2). Passed in, because minting a token
+// needs a live Nitro runtime and `tests/` imports this file under Bun.
+export interface BookingLink {
+  url: string
+  imageUrl: string
+  qrWidth: number
+}
+
+export async function sendHoldReminders(
+  event: H3Event | undefined,
+  at: Date,
+  cap: number,
+  linkFor: (reservationId: string) => Promise<BookingLink>,
+): Promise<HoldReminderRun> {
   const reminderMinutes = await configValue(event, 'HOLD_REMINDER_MINUTES_BEFORE')
   const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<ReminderCandidateRow>(reminderCandidatesQuery(now, reminderMinutes, cap))
@@ -127,6 +140,7 @@ export async function sendHoldReminders(event: H3Event | undefined, at: Date, ca
         show: candidate.showTitle,
         when: formatLondon(new Date(candidate.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
         releasesAt: formatLondon(new Date(candidate.holdExpiresAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+        ...await linkFor(candidate.id),
       },
     })
     if (outcome === 'SENT') sent += 1

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { saysNoSuch } from '#shared/utils/no-such'
 import { saysWhenLong } from '#shared/utils/when'
-import { SAYS_PAYMENT } from '#shared/utils/programme'
 import { saysPrice } from '#shared/utils/ticket-types'
 import { partySizeMismatchReason } from '#shared/utils/waiting-list'
 
@@ -17,12 +16,6 @@ interface Entry {
   partySize: number
   offerExpiresAt: number | null
   ticketTypes: TicketType[]
-}
-
-interface Confirmation {
-  reference: string
-  totalPence: number
-  qrToken: string
 }
 
 const route = useRoute()
@@ -55,9 +48,11 @@ const submitting = ref(false)
 const leaving = ref(false)
 const removing = ref(false)
 const notice = ref<string | null>(null)
-const confirmation = ref<Confirmation | null>(null)
 const removed = ref(false)
+const made = useBookingMade()
 
+// A claim is an ordinary booking, so it lands on the booking page as one does (issue 1329). The
+// offer went to the entry's own address, which this page never reads, so it is not named.
 async function claim(): Promise<void> {
   notice.value = null
   if (mismatch.value) {
@@ -66,10 +61,12 @@ async function claim(): Promise<void> {
   }
   submitting.value = true
   try {
-    confirmation.value = await $fetch<Confirmation>(`/api/waiting-list/${token.value}/claim`, {
+    await $fetch(`/api/waiting-list/${token.value}/claim`, {
       method: 'POST',
       body: { lines: lines.value },
     })
+    made.value = { emailedTo: null }
+    await navigateTo('/qr')
   }
   catch (error) {
     notice.value = refusalText(error, 'This offer could not be claimed')
@@ -122,24 +119,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
     </p>
 
     <div
-      v-if="confirmation"
-      class="mt-8 space-y-3"
-      data-test="waiting-list-claimed"
-    >
-      <UAlert
-        color="success"
-        variant="subtle"
-        icon="i-lucide-ticket"
-        title="Seats claimed"
-        :description="`Reference ${confirmation.reference}. ${SAYS_PAYMENT} ${saysPrice(confirmation.totalPence)} is due.`"
-      />
-      <UButton :to="`/qr/${confirmation.qrToken}`">
-        View your booking
-      </UButton>
-    </div>
-
-    <div
-      v-else-if="removed"
+      v-if="removed"
       class="mt-8"
       data-test="waiting-list-removed"
     >
@@ -198,9 +178,11 @@ useSeoMeta({ title: 'Your waiting-list entry' })
             </div>
             <UInputNumber
               v-model="quantities[type.id]"
+              v-bind="TOUCH_STEPPER"
               :min="0"
               :max="data!.partySize"
-              class="w-28"
+              :aria-label="`${type.name} tickets`"
+              class="w-36"
               :data-test="`quantity-${type.id}`"
             />
           </li>
