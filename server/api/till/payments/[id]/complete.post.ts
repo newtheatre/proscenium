@@ -1,7 +1,7 @@
 import { completeAttemptForm } from '#shared/utils/sumup'
 
 // The SumUp app's answer (F-124 criteria 3, 4). Accepted from a browser with no session when it
-// carries the attempt's own signed key, otherwise under tonight's bar authority; never from nobody.
+// carries the attempt's own signed key, otherwise under the night's bar authority; never from nobody.
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const input = await readValidatedBodyOrThrow(event, completeAttemptForm)
@@ -16,8 +16,8 @@ export default defineEventHandler(async (event) => {
   let resolution: 'KEY' | 'CALLBACK' = 'KEY'
   const keyed = input.key ? await verifyAttemptKey(input.key) : null
   if (keyed !== id) {
-    const resolved = await requireNightAuthority(event, 'BAR', { venueId: row.venueId })
-    actorId = resolved.account.id
+    // Tonight's shift never reaches back into an ended night, as the staff answer does not.
+    actorId = (await barAuthorityFor(event, row.night, { venueId: row.venueId }, 'A charge from an earlier night', 'answer')).id
     resolution = 'CALLBACK'
   }
 

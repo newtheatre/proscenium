@@ -483,7 +483,7 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
 
     const response = await closeTill(id, foh.cookie)
     expect(response.status).toBe(403)
-    expect(await message(response)).toContain('bar manager')
+    expect(await message(response)).toContain('Bar Manager\'s role')
   })
 })
 
