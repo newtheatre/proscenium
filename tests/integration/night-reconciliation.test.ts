@@ -4,10 +4,16 @@ import {
   deskByKindQuery,
   deskForegoneQuery,
   nightsWithOpenVarianceQuery,
+  nightsWithTakings,
+  outstandingNights,
   readingHistoryQuery,
+  takingsDaysQuery,
   zReadingStatement,
 } from '#server/utils/night-reconciliation'
+import { fromLondonWallClock } from '#shared/utils/london'
+import { londonDay } from '#shared/utils/membership'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import type { TakingsDay } from '#server/utils/night-reconciliation'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 import type { ZReading } from '#shared/utils/night-reconciliation'
@@ -191,6 +197,62 @@ describe('open variances, never truncated (criterion 5)', () => {
       const writeOff = zReadingStatement({ night: NIGHT, readerPence: 500, supersedesId: first, writtenOff: true, note: 'Accepted' }, 'treasurer', 0)
       read(database, writeOff.statement)
       expect(read(database, nightsWithOpenVarianceQuery())).toEqual([])
+    })
+  })
+})
+
+// Issue #1359: the nights needing a reading come from reader takings, whatever took them, not
+// from performances or till sessions; the period close warns from the same list (I-107 c5).
+describe('every night with reader takings needs a reading (criterion 5)', () => {
+  const at = (day: string, hour: number): number => {
+    const [year, month, date] = day.split('-').map(Number) as [number, number, number]
+    return Math.floor(fromLondonWallClock(year, month, date, hour).getTime() / 1000)
+  }
+
+  function taking(database: TestDatabase, source: string, tender: string, happenedAt: number, kind: string, amountPence: number): void {
+    const id = `t-${++entrySeq}`
+    database.batch([['INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence) VALUES (?, ?, ?, ?, ?, ?)',
+      id, londonDay(new Date(happenedAt * 1000)), source, tender, happenedAt, amountPence]])
+    line(database, id, kind, amountPence)
+  }
+
+  function missing(database: TestDatabase, recorded: string[] = []): string[] {
+    const nights = nightsWithTakings(read<TakingsDay>(database, takingsDaysQuery()))
+    return outstandingNights(nights, new Set(recorded), '2026-09-26').map(row => row.night)
+  }
+
+  test('a pass-sale-only night and a tab-settlement-only night are listed, with no performance or session', async () => {
+    await withDatabase(async (database) => {
+      taking(database, 'DESK', 'CARD', at('2026-09-05', 14), 'PASS_SALE', 3500)
+      taking(database, 'TILL', 'CARD', at('2026-09-23', 21), 'TAB_SETTLEMENT', 2400)
+      expect(missing(database)).toEqual(['2026-09-05', '2026-09-23'])
+      expect(missing(database, ['2026-09-05'])).toEqual(['2026-09-23'])
+    })
+  })
+
+  test('a settlement at 01:00 is the night before\'s', async () => {
+    await withDatabase(async (database) => {
+      taking(database, 'TILL', 'CARD', at('2026-09-24', 1), 'TAB_SETTLEMENT', 800)
+      expect(missing(database)).toEqual(['2026-09-23'])
+    })
+  })
+
+  test('credit, comps, zero-value admissions and imported history are not reader takings', async () => {
+    await withDatabase(async (database) => {
+      taking(database, 'TILL', 'TAB', at('2026-09-10', 20), 'BAR_ITEM', 600)
+      taking(database, 'TILL', 'COMP', at('2026-09-11', 20), 'BAR_ITEM', 0)
+      taking(database, 'SELF_SERVE', 'NONE', at('2026-09-12', 20), 'PASS_ADMISSION', 0)
+      taking(database, 'IMPORT', 'CARD', at('2026-09-13', 20), 'IMPORT', 128_400)
+      expect(missing(database)).toEqual([])
+    })
+  })
+
+  test('takings before the first reconciled night are never walked', async () => {
+    await withDatabase(async (database) => {
+      taking(database, 'DESK', 'CARD', at('2026-08-20', 19), 'WALK_UP', 900)
+      const [text] = boundStatement(database, takingsDaysQuery())
+      expect(text.toLowerCase()).toContain('group by')
+      expect(read(database, takingsDaysQuery())).toEqual([])
     })
   })
 })
