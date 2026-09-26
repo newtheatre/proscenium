@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { HUB_KPI_LABELS, checklistHint, compApprovalLine, doorStripLine, firstNameOf, groupedBoardCode, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysIntervals, saysSeatsLeft, seesAccessTonight, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, checklistHint, compApprovalLine, doorStripLine, doorStripNumbers, firstNameOf, groupedBoardCode, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysIntervals, saysSeatsLeft, seesAccessTonight, staleBannerLine } from '#shared/utils/night-hub'
 
 // The show-night hub's wording and numbers (E-112, E-127, issue 905). The screens place these; what
 // they say is decided here, so one test holds it.
@@ -225,6 +225,11 @@ describe('the strip under the door\'s camera (issue 1307)', () => {
     expect(saysIntervals(0, null)).toBe('straight through')
     expect(saysIntervals(1, 20)).toBe('1 interval of 20 minutes')
     expect(saysIntervals(2, null)).toBe('2 intervals')
+  })
+
+  test('the strip\'s numbers are the house\'s own three words, in the order the door needs them', () => {
+    expect(doorStripNumbers({ sold: 40, admitted: 12, capacity: 60, remaining: 20 })).toBe('12 in · 40 sold · 20 seats left')
+    expect(doorStripNumbers({ sold: 40, admitted: 12, capacity: null, remaining: null })).toBe('12 in · 40 sold · no cap')
   })
 
   test('the strip names the latecomer rule and the intervals, in the glance\'s own words', () => {

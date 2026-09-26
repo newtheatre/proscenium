@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { CAMERA_FALLBACK_SAYS, doorFailureVerdict, doorMissVerdict, doorNameTerm, lookUpOutcome, readScannedCode, saysDoorParty, verdictBuzz, verdictHoldMs } from '#shared/utils/door'
+import { doorStripLine, doorStripNumbers } from '#shared/utils/night-hub'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
+import type { HubHouse } from '#shared/utils/night-hub'
 import type { DoorAdmission, DoorPassCard, DoorTicketFound, DoorVerdict, LookUpHalf, ScannerFailure } from '#shared/utils/door'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/door' })
@@ -8,7 +10,8 @@ useSeoMeta({ title: 'Door' })
 
 interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
 interface Authority { performanceIds: string[], performances: CoveredPerformance[] }
-interface RefusalData { verdict?: DoorVerdict, reference?: string, holderName?: string | null, partySize?: number }
+interface RefusalData { verdict?: DoorVerdict, reference?: string, holderName?: string | null, partySize?: number, accessWording?: string | null }
+interface HouseView { performanceId: string, house: HubHouse, latecomerPolicy: string | null, intervalCount: number, intervalMinutes: number | null }
 
 const request = useRequestFetch()
 
@@ -56,7 +59,7 @@ const scanning = ref(false)
 interface Found { tickets: DoorTicketFound[], passes: DoorPassCard[], unchecked: LookUpHalf | null }
 const found = ref<Found | null>(null)
 
-interface Shown { verdict: DoorVerdict, reference: string, party: string | null }
+interface Shown { verdict: DoorVerdict, reference: string, party: string | null, access: string | null }
 const shown = ref<Shown | null>(null)
 let holdTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -78,10 +81,10 @@ function bringIntoView(area: HTMLElement | null): void {
 
 // Over the camera the card clears itself so the queue keeps moving, holding longer for a reason
 // that has to be read out; with no camera it stays until the next check (issue 1150 item 1).
-function show(verdict: DoorVerdict, reference: string, holderName: string | null, partySize: number): void {
+function show(verdict: DoorVerdict, reference: string, holderName: string | null, partySize: number, access: string | null = null): void {
   clearVerdict()
   found.value = null
-  shown.value = { verdict, reference, party: partySize > 0 ? saysDoorParty(holderName, partySize) : null }
+  shown.value = { verdict, reference, party: partySize > 0 ? saysDoorParty(holderName, partySize) : null, access }
   buzz(verdict)
   bringIntoView(answerArea.value)
   if (!cameraNote.value) holdTimer = setTimeout(clearVerdict, verdictHoldMs(verdict.state))
@@ -147,6 +150,7 @@ async function scanPass(reference: string, holderName: string | null): Promise<v
     body: { reference, performanceId: performanceId.value },
   })
   show(pass.verdict, pass.reference, holderName ?? pass.holderName, pass.partySize)
+  loadHouse()
 }
 
 // `name` is what a typed entry is looked up as when no booking or pass carries it as a reference.
@@ -156,7 +160,8 @@ async function admit(code: string, name: string | null = null): Promise<void> {
       method: 'POST',
       body: { reference: code, performanceId: performanceId.value },
     })
-    show(ticket.verdict, ticket.reference, ticket.holderName, ticket.partySize)
+    show(ticket.verdict, ticket.reference, ticket.holderName, ticket.partySize, ticket.accessWording ?? null)
+    loadHouse()
   }
   catch (ticketRefused) {
     // Only "no such booking" tries the reference as a pass instead; any other refusal (wrong
@@ -201,7 +206,7 @@ async function lookUp(term: string, options: { passesOnly?: boolean } = {}): Pro
 function showRefusal(refused: unknown, code: string): void {
   const carried = (refused as { data?: { data?: RefusalData } }).data?.data
   if (carried?.verdict) {
-    show(carried.verdict, carried.reference ?? code, carried.holderName ?? null, carried.partySize ?? 0)
+    show(carried.verdict, carried.reference ?? code, carried.holderName ?? null, carried.partySize ?? 0, carried.accessWording ?? null)
     return
   }
   show(doorFailureVerdict(refusalStatus(refused), refusalText(refused)), code, null, 0)
@@ -229,6 +234,30 @@ function admitFound(reference: string): Promise<void> {
 function admitFoundPass(reference: string, holderName: string): Promise<void> {
   return oneAtATime(() => scanPass(reference, holderName).catch(refused => showRefusal(refused, reference)))
 }
+
+// The house under the camera for whoever holds the door, not only the duty manager: in, sold, seats
+// left, the latecomer rule and the intervals (issue 1307). Best effort, never in the door's way.
+const HOUSE_POLL_MS = 20_000
+const houses = ref<HouseView[]>([])
+const strip = computed(() => houses.value.find(one => one.performanceId === performanceId.value) ?? null)
+let houseTimer: ReturnType<typeof setInterval> | undefined
+
+async function loadHouse(): Promise<void> {
+  try {
+    houses.value = (await $fetch<{ performances: HouseView[] }>('/api/tonight/house')).performances
+  }
+  catch {
+    // The strip is a courtesy: a door that cannot read the house still admits.
+  }
+}
+
+onMounted(() => {
+  loadHouse()
+  houseTimer = setInterval(loadHouse, HOUSE_POLL_MS)
+})
+onBeforeUnmount(() => {
+  if (houseTimer) clearInterval(houseTimer)
+})
 </script>
 
 <template>
@@ -286,6 +315,7 @@ function admitFoundPass(reference: string, holderName: string): Promise<void> {
               :verdict="shown.verdict"
               :reference="shown.reference"
               :party="shown.party"
+              :access="shown.access"
               @dismiss="clearVerdict"
             />
           </template>
@@ -297,6 +327,7 @@ function admitFoundPass(reference: string, holderName: string): Promise<void> {
             :verdict="shown.verdict"
             :reference="shown.reference"
             :party="shown.party"
+            :access="shown.access"
             @dismiss="clearVerdict"
           />
 
@@ -308,6 +339,19 @@ function admitFoundPass(reference: string, holderName: string): Promise<void> {
             data-test="door-camera-note"
           />
         </template>
+      </div>
+
+      <div
+        v-if="strip"
+        class="rounded-xl bg-elevated px-3 py-2 text-center"
+        data-test="door-strip"
+      >
+        <p class="font-mono text-sm font-bold tabular-nums">
+          {{ doorStripNumbers(strip.house) }}
+        </p>
+        <p class="text-xs text-muted">
+          {{ doorStripLine(strip.latecomerPolicy, strip.intervalCount, strip.intervalMinutes) }}
+        </p>
       </div>
 
       <UFormField label="QR, reference or name">

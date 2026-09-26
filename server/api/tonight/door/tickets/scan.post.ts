@@ -29,12 +29,14 @@ export default defineEventHandler(async (event) => {
   // amount due while the screen shows the wording (E-129 criterion 7).
   const party = await doorParty(reservation.id)
   const unpaid = reservation.status === 'PENDING' && reservation.performanceId === input.performanceId
+  // Tonight's own booking only: the agreed wording is for the person in front of the door (D-128 4).
+  const accessWording = reservation.performanceId === input.performanceId ? await doorAccessWording(reservation.id) : null
 
   if (!outcome.admit) {
     throw createError({
       statusCode: 409,
       statusMessage: outcome.detail ?? outcome.headline,
-      data: { verdict: doorVerdict(outcome, unpaid), reference: reservation.reference, ...party },
+      data: { verdict: doorVerdict(outcome, unpaid), reference: reservation.reference, ...party, accessWording },
     })
   }
 
@@ -47,5 +49,6 @@ export default defineEventHandler(async (event) => {
     reference: reservation.reference,
     verdict: doorVerdict(outcome, false),
     ...party,
+    accessWording,
   }
 })

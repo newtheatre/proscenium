@@ -47,9 +47,9 @@ which is how the committee sees a rota that is not being kept.
 | Screen | A shift of | Or the role |
 | --- | --- | --- |
 | The door | Door | Front of house manager |
-| Tonight at a glance, Checklist, Night report, Backstage, house numbers on the hub | Duty manager | Front of house manager |
+| Checklist, Night report, Backstage, and the glance's comp requests, rota and backstage code | Duty manager | Front of house manager |
 | The till | Bar | Bar manager |
-| Contacts and incidents, Challenge 25, Emergency | Any of the three | Either |
+| Tonight at a glance and the hub's house numbers (access wording for the door and duty manager only), Contacts and incidents, Challenge 25, Emergency | Any of the three | Either |
 
 A door shift does not open the till, and the Front of house manager's role does not either; the
 roles are not interchangeable. The show night runs from 04:00 to 04:00, so a performance that
@@ -70,8 +70,7 @@ quietly moved on to the next night.
    door) and **seats left** (capacity less sold, or **No cap** where the house is uncapped).
    They refresh on their own every 20 seconds; a dropped connection leaves the last numbers on
    screen with a warning rather than a spinner, and the **Last synced** line at the top of every
-   screen says how old what you are looking at is. The numbers need duty manager authority; a
-   door or bar shift sees the tiles without them.
+   screen says how old what you are looking at is. Any of tonight's shifts sees them.
 4. **Door** opens [the door](/docs/tonight/door), for tickets and passes alike.
 5. **Emergency** opens [the emergency card](/docs/tonight/emergency), which is cached on
    the phone the moment any show-night screen opens.

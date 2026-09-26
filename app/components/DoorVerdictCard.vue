@@ -3,7 +3,7 @@ import type { DoorVerdict } from '#shared/utils/door'
 
 // The whole of what door mode shows (E-129 criterion 7). Over the viewfinder while the camera is
 // open, in place of the field where there is none; the same card either way.
-defineProps<{ verdict: DoorVerdict, reference: string, party: string | null, overlay?: boolean }>()
+defineProps<{ verdict: DoorVerdict, reference: string, party: string | null, access?: string | null, overlay?: boolean }>()
 const emit = defineEmits<{ dismiss: [] }>()
 
 const cardClass: Record<DoorVerdict['state'], string> = {
@@ -63,6 +63,18 @@ const cardIcon: Record<DoorVerdict['state'], string> = {
       >
         {{ party }}
       </UBadge>
+      <!-- The wording the Accessibility Officer agreed, and nothing behind it (D-127 criterion 3). -->
+      <p
+        v-if="access"
+        class="flex items-center gap-2 rounded-lg bg-default px-3 py-2 text-base font-semibold text-default"
+        data-test="door-verdict-access"
+      >
+        <UIcon
+          name="i-lucide-accessibility"
+          class="size-5 shrink-0"
+        />
+        {{ access }}
+      </p>
       <p
         v-if="verdict.note"
         class="text-sm text-muted"

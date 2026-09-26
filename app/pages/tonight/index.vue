@@ -14,14 +14,14 @@ interface Performance {
   doorsAt: number | null
   house: HubHouse
 }
-interface DutyManagerTonight { night: string, venueId: string, performances: Performance[] }
+interface HouseTonight { night: string, venueId: string, performances: Performance[] }
 interface ChecklistEntry { phase: 'PRE' | 'POST', label: string, required: boolean, done: boolean }
 
 // Every 20 seconds while the screen is open, so house numbers move on their own (criterion 3).
 const POLL_MS = 20_000
 
 const request = useRequestFetch()
-const data = ref<DutyManagerTonight | null>(null)
+const data = ref<HouseTonight | null>(null)
 const checklist = ref<ChecklistEntry[]>([])
 const syncedAt = ref<Date | null>(null)
 // Two pieces, because a refusal that said nothing of its own is still staleness: the reason is
@@ -38,20 +38,21 @@ let timer: ReturnType<typeof setInterval> | undefined
 // Neither fetch depends on the other's answer, so they run together. The checklist one still
 // runs before house open, so its banner has data the instant `houseOpen` turns true.
 async function load(): Promise<void> {
-  const [dutyManager, checklistFetch] = await Promise.allSettled([
-    request<DutyManagerTonight>('/api/tonight/duty-manager'),
+  // The house is every role's to read, so a door or bar shift sees the numbers too (issue 1307).
+  const [houseFetch, checklistFetch] = await Promise.allSettled([
+    request<HouseTonight>('/api/tonight/house'),
     request<{ items: ChecklistEntry[] }>('/api/tonight/checklist'),
   ])
 
-  if (dutyManager.status === 'fulfilled') {
-    data.value = dutyManager.value
+  if (houseFetch.status === 'fulfilled') {
+    data.value = houseFetch.value
     syncedAt.value = new Date()
     stale.value = false
   }
   else {
-    // Not tonight's duty manager: the tiles below stand on their own, since each screen guards
+    // No shift tonight at all: the tiles below stand on their own, since each screen guards
     // itself (E-111 criterion 5). Still a definite answer, so it still counts as synced.
-    if (refusalStatus(dutyManager.reason) === 403 || refusalStatus(dutyManager.reason) === 401) {
+    if (refusalStatus(houseFetch.reason) === 403 || refusalStatus(houseFetch.reason) === 401) {
       syncedAt.value = new Date()
       stale.value = false
     }
@@ -59,7 +60,7 @@ async function load(): Promise<void> {
     // and NightStale is what says they are no longer current. Never a spinner (criterion 3).
     else {
       stale.value = true
-      staleReason.value = refusalText(dutyManager.reason, '')
+      staleReason.value = refusalText(houseFetch.reason, '')
     }
   }
 
