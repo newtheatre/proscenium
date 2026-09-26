@@ -240,13 +240,12 @@ const bookableVenues = computed(() => props.venues.filter(one => !one.archived))
 const addRefusal = computed(() => addPerformanceRefusal(bookableVenues.value.length))
 
 const venueOf = (venueId: string): ShowVenue | undefined => props.venues.find(one => one.id === venueId)
-const chosenExternal = computed(() => venueOf(form.venueId)?.isExternal ?? false)
+const runningTimeOptional = computed(() => editingPerformance.value?.status === 'CANCELLED' || (venueOf(form.venueId)?.isExternal ?? false))
 
 // The route's own rule, asked before the request so the field says it rather than a banner (D-121).
-function checkRunningTime(state: { venueId?: string, durationMinutes?: number | null }): FormError[] {
-  const venue = venueOf(state.venueId ?? '')
-  if (!venue || editingPerformance.value?.status === 'CANCELLED') return []
-  const refusal = runningTimeRefusal(venue, state.durationMinutes)
+function checkRunningTime(): FormError[] {
+  const venue = venueOf(form.venueId)
+  const refusal = venue ? runningTimeRefusal(venue, form.durationMinutes, editingPerformance.value?.status) : null
   return refusal ? [{ name: 'durationMinutes', message: refusal }] : []
 }
 
@@ -277,7 +276,7 @@ const columns: TableColumn<AdminPerformance>[] = [
           ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Externally ticketed')
           : null,
         untimed(row.original)
-          ? h(UBadge, { 'color': 'warning', 'variant': 'subtle', 'size': 'sm', 'data-test': `untimed-${row.original.id}` }, () => 'No running time')
+          ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'No running time')
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, row.original.venueName),
@@ -546,8 +545,8 @@ const columns: TableColumn<AdminPerformance>[] = [
             <UFormField
               label="Running time"
               name="durationMinutes"
-              :required="!chosenExternal"
-              :hint="chosenExternal ? 'Optional' : undefined"
+              :required="!runningTimeOptional"
+              :hint="runningTimeOptional ? 'Optional' : undefined"
               description="Minutes, without the intervals. Every shift ends from it."
             >
               <UInputNumber

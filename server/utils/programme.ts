@@ -9,7 +9,7 @@ import { showsList } from '#shared/utils/shows-list'
 import { posterUrl } from '#shared/utils/seo'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { AdminPerformance, AdminShow, ShowStatus, ShowsStandingCounts } from '#shared/utils/programme'
+import type { AdminPerformance, AdminShow, ShowStatus, ShowVenue, ShowsStandingCounts } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
 // Reading and counting the programme for its administration (D-121, D-112). "Has sold tickets" is
@@ -417,22 +417,14 @@ export function cascadeOnSaleQuery(showId: string): SQL {
   `
 }
 
-export interface ProgrammeVenue {
-  id: string
-  name: string
-  capacity: number | null
-  isExternal: boolean
-  archived: boolean
-}
-
-interface ProgrammeVenueRow extends Omit<ProgrammeVenue, 'archived' | 'isExternal'> {
+interface ProgrammeVenueRow extends Omit<ShowVenue, 'archived' | 'isExternal'> {
   isExternal: number
   archived: number
 }
 
 // Every venue, retired ones included: a rota template pointing at one already has to resolve it.
 // A picker for new work filters on `archived` itself (D-131 criterion 5).
-export async function listVenues(): Promise<ProgrammeVenue[]> {
+export async function listVenues(): Promise<ShowVenue[]> {
   const rows = await db.all<ProgrammeVenueRow>(sql`
     SELECT id, name, capacity, is_external AS isExternal, archived FROM venues ORDER BY name COLLATE NOCASE
   `)

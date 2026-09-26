@@ -250,9 +250,9 @@ export function publishChecklist(show: PublishReadiness): PublishCheck[] {
 }
 
 // Every shift's window ends from the running time, so one of ours without it strands the rota at
-// curtain plus the offset (0078). An external venue has no rota of ours to strand.
-export function runningTimeRefusal(venue: { name: string, isExternal: boolean }, durationMinutes: number | null | undefined): string | null {
-  if (venue.isExternal || durationMinutes != null) return null
+// curtain plus the offset (0078). An external venue or a cancelled performance has no rota to strand.
+export function runningTimeRefusal(venue: { name: string, isExternal: boolean }, durationMinutes: number | null | undefined, status?: PerformanceStatus): string | null {
+  if (venue.isExternal || status === 'CANCELLED' || durationMinutes != null) return null
   return `A performance at ${venue.name} needs its running time: every shift on its rota ends from it`
 }
 

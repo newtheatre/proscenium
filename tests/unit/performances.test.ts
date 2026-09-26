@@ -145,9 +145,10 @@ describe('a performance at a venue we run carries its running time (D-121 criter
     expect(runningTimeRefusal(house, undefined)).toBe(refusal)
   })
 
-  test('one of ours with a running time, and any external venue, is taken', () => {
+  test('one of ours with a running time, any external venue, and a cancelled performance are taken', () => {
     expect(runningTimeRefusal(house, 120)).toBeNull()
     expect(runningTimeRefusal(elsewhere, null)).toBeNull()
     expect(runningTimeRefusal(elsewhere, 90)).toBeNull()
+    expect(runningTimeRefusal(house, null, 'CANCELLED')).toBeNull()
   })
 })

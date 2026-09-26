@@ -488,7 +488,8 @@ while listing warnings is a 409, because it is two answers to one question.
 
 ### performances
 `id` PK · `show_id` → shows cascade · `venue_id` → venues restrict · `starts_at` ·
-`doors_at` · `duration_minutes` (the running time, required by the write path at a venue we run, D-121 criterion 6) · `interval_count` (default nought) · `interval_minutes` ·
+`doors_at` · `duration_minutes` (the running time, required by the write path at a venue we
+run, D-121 criterion 6) · `interval_count` (default nought) · `interval_minutes` ·
 `capacity_override` NULL = venue capacity · `booking_closes_hours_before` NULL = inherit the
 show's default, and an explicit 0 = this performance closes at curtain-up (D-112) ·
 `hold_release_minutes_before` NULL = config default ·

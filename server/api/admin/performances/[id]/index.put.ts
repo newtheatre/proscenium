@@ -22,8 +22,7 @@ export default defineEventHandler(async (event) => {
   if (venue.archived && venue.id !== held.venueId) {
     throw createError({ statusCode: 409, statusMessage: `${venue.name} is retired and cannot be booked for a new performance` })
   }
-  // A cancelled performance has no rota left to window (D-121 criterion 6).
-  const untimed = held.status === 'CANCELLED' ? null : runningTimeRefusal(venue, input.durationMinutes)
+  const untimed = runningTimeRefusal(venue, input.durationMinutes, held.status)
   if (untimed) throw createError({ statusCode: 400, statusMessage: untimed })
 
   // The capacity that will apply, so clearing the override or moving to a smaller venue is checked
