@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TO_BE_CONFIRMED } from './programme'
 
 // What a show warns about, from a vocabulary rather than from prose (D-102). A warning is a row
 // somebody chose, so two shows warning about the same thing say it in the same words.
@@ -205,6 +206,28 @@ export function publicContentWarnings(warnings: ShowContentWarning[]): PublicCon
       icon: warning.icon,
       level: warning.level,
     }))
+}
+
+// What a booker is told before they come, from the show's own rows (D-102 criterion 4).
+export interface ShowGuidance {
+  ageGuidance: string | null
+  assessment: WarningAssessment
+  warnings: { title: string, level: ContentWarningLevel | null }[]
+}
+
+// In the same words on the booking form, the booking page and the email (issue 1330): the age
+// guidance first, then each warning in the show page's order, or whether anybody has looked.
+export function saysShowGuidance(guidance: ShowGuidance): string[] {
+  const age = `Age guidance: ${guidance.ageGuidance ?? TO_BE_CONFIRMED}`
+  if (guidance.assessment === 'CONFIRMED_NONE') return [age, `${saysAssessment('CONFIRMED_NONE')}.`]
+  if (guidance.assessment === 'NOT_ASSESSED') {
+    return [age, `${saysAssessment('NOT_ASSESSED')}. Ask the box office if it matters to you.`]
+  }
+  const named = guidance.warnings.map((warning) => {
+    const level = saysWarningLevel(warning.level)
+    return level ? `${warning.title}: ${level.toLowerCase()}` : warning.title
+  })
+  return [age, `Content warnings: ${named.join('; ')}`]
 }
 
 export interface ContentWarningGroup<T> {

@@ -81,6 +81,7 @@ export default defineEventHandler(async (event) => {
     await sendReservationConfirmation(event, {
       userId: reservation.userId,
       reference: result.reservation.reference,
+      showId: target.showId,
       showTitle: target.showTitle,
       startsAt: target.startsAt,
       totalPence,
