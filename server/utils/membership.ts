@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm'
+import { and, asc, eq, isNotNull, isNull, like, lte, or, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
@@ -39,9 +39,18 @@ export function notRenewed(): SQL {
     where later.user_id = ${schema.memberships.userId} and later.expires_on > ${schema.memberships.expiresOn})`
 }
 
+// An erased account's term is statistics, not somebody on the register: no view of it or its
+// export shows one, and the listing counts what it left out (A-121 criterion 4, 0071).
+const notErased = (): SQL => isNull(schema.users.anonymisedAt)
+
+export interface MembershipsClause extends ListClause {
+  // The same filter and search, over the erased rows the register leaves out.
+  hiddenErased: SQL
+}
+
 // The register's own declaration, read through one predicate (K-129): current is the hidden
 // default, the same shape the accounts directory gives anonymised rows.
-export function membershipsClause(query: ListQuery, grace: number): ListClause {
+export function membershipsClause(query: ListQuery, grace: number): MembershipsClause {
   const clause = whereFrom(membershipsList, query, {
     column: tableColumns(schema.memberships),
     search: [schema.users.name, schema.users.email, sql`coalesce(${schema.users.studentId}, '')`],
@@ -56,7 +65,24 @@ export function membershipsClause(query: ListQuery, grace: number): ListClause {
     },
   })
   const asked = conditionsOf(membershipsList, query).some(condition => condition.key === 'filter')
-  return asked ? clause : { ...clause, where: and(registerFilterPredicate('current', grace)!, clause.where) }
+  const where = asked ? clause.where : and(registerFilterPredicate('current', grace)!, clause.where)
+  return { ...clause, where: and(notErased(), where), hiddenErased: and(isNotNull(schema.users.anonymisedAt), where)! }
+}
+
+// The CSV export's own predicate, without paging, sorting or search in the URL (A-117 criterion 5).
+export function registerExportWhere(filter: typeof MEMBER_FILTERS[number], search: string | undefined, grace: number): SQL {
+  const terms: SQL[] = [notErased()]
+  const filterTerm = registerFilterPredicate(filter, grace)
+  if (filterTerm) terms.push(filterTerm)
+  if (search) {
+    const wanted = `%${search.toLowerCase()}%`
+    terms.push(or(
+      like(sql`lower(${schema.users.name})`, wanted),
+      like(sql`lower(${schema.users.email})`, wanted),
+      like(sql`lower(coalesce(${schema.users.studentId}, ''))`, wanted),
+    )!)
+  }
+  return and(...terms)!
 }
 
 // Either membership route's statements as one batch. A number another account holds fails it on

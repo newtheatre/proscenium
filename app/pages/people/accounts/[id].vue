@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysDay, saysWhen } from '#shared/utils/when'
+import { saysDay, saysDayLong, saysWhen } from '#shared/utils/when'
 import { can, createAccounts, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
 import { saysRole } from '#shared/utils/roles'
 import { describeAction } from '#shared/utils/audit-actions'
@@ -136,6 +136,7 @@ async function eraseAccount(): Promise<void> {
     await $fetch(`/api/admin/accounts/${route.params.id}/security`, { method: 'POST', body: { operation: 'erase' } })
     eraseReveal.value = false
     eraseConfirmEmail.value = ''
+    toast.add({ title: 'Account erased', icon: 'i-lucide-check', color: 'success' })
     await load()
   }
   catch (error) {
@@ -214,6 +215,10 @@ async function operate(operation: 'sign-out' | 'enable'): Promise<void> {
   }
 }
 
+// An erased account is a record kept for the theatre's statistics: nothing on it can be changed,
+// so none of the controls that would are drawn (issue #1364, 0011).
+const erased = computed(() => view.value?.account.anonymisedAt ?? null)
+
 const signsInWith = computed(() => {
   const methods = view.value?.methods
   if (!methods) return []
@@ -278,13 +283,31 @@ onMounted(load)
           >
             {{ view.account.name }}
           </h2>
-          <p class="font-mono text-sm text-muted">
+          <p
+            v-if="erased"
+            data-test="erased-line"
+            class="text-sm text-muted"
+          >
+            Erased on {{ saysDayLong(erased, { year: true }) }}. Kept only for the theatre's statistics.
+          </p>
+          <p
+            v-else
+            class="font-mono text-sm text-muted"
+          >
             {{ view.account.email }}
           </p>
         </div>
         <div class="flex gap-1">
           <UBadge
-            v-if="view.account.disabled"
+            v-if="erased"
+            data-test="state-erased"
+            color="neutral"
+            variant="subtle"
+          >
+            Erased
+          </UBadge>
+          <UBadge
+            v-else-if="view.account.disabled"
             data-test="state-disabled"
             color="error"
             variant="subtle"
@@ -292,7 +315,7 @@ onMounted(load)
             Disabled
           </UBadge>
           <UBadge
-            v-if="view.account.shadow"
+            v-if="!erased && view.account.shadow"
             data-test="state-shadow"
             color="neutral"
             variant="subtle"
@@ -300,7 +323,7 @@ onMounted(load)
             Shadow
           </UBadge>
           <UBadge
-            v-else-if="!view.account.verified"
+            v-else-if="!erased && !view.account.verified"
             color="warning"
             variant="subtle"
           >
@@ -326,7 +349,7 @@ onMounted(load)
           v-else
           class="text-sm text-muted"
         >
-          Nothing yet. This account cannot sign in.
+          {{ erased ? 'Nothing. An erased account cannot sign in.' : 'Nothing yet. This account cannot sign in.' }}
         </p>
 
         <div
@@ -420,7 +443,7 @@ onMounted(load)
               </span>
             </span>
             <UButton
-              v-if="grant.live && sees.revokes"
+              v-if="grant.live && sees.revokes && !erased"
               size="xs"
               color="error"
               variant="ghost"
@@ -434,7 +457,7 @@ onMounted(load)
         </ul>
 
         <div
-          v-if="sees.grants"
+          v-if="sees.grants && !erased"
           class="mt-3 border-t border-default pt-3"
         >
           <RoleGrantForm
@@ -503,7 +526,7 @@ onMounted(load)
       </UPageCard>
 
       <UPageCard
-        v-if="sees.disables"
+        v-if="sees.disables && !erased"
         title="Security"
         description="These take effect on the next request, everywhere."
       >

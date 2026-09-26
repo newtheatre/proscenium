@@ -36,6 +36,8 @@ interface Listing {
   total: number
   pages: number
   graceDays: number
+  // Memberships of erased accounts the listing left out, under the same filter and search (0071).
+  erasedHidden: number
 }
 
 interface Claim {
@@ -538,6 +540,12 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
         class="text-sm text-muted"
       >
         {{ onQueue ? plural(claims?.total ?? 0, 'claim') : plural(listing?.total ?? 0, 'membership') }}
+        <span
+          v-if="!onQueue && listing?.erasedHidden"
+          data-test="members-erased-hidden"
+        >
+          ({{ plural(listing.erasedHidden, 'erased account') }} left out, kept only for the theatre's statistics)
+        </span>
       </p>
       <UPagination
         v-if="onQueue ? claims && claims.pages > 1 : listing && listing.pages > 1"
