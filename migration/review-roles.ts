@@ -3,10 +3,10 @@
 // and the answer lands in out/role-decisions.tsv (0070). Nothing here writes to any database.
 import { join } from 'node:path'
 import { OUT, ROOT, ensureOut, latestStamp, loadDump } from './lib'
-import { decisionKey, formatRoleDecisions, parseRoleDecisions } from './role-decisions'
+import { administratorDecisions, decisionHolder, decisionKey, formatRoleDecisions, parseRoleDecisions } from './role-decisions'
 import type { RoleDecision, RoleDecisions } from './role-decisions'
 import { formatLondon, nextCommitteeYearEnd } from '../shared/utils/london'
-import { ROLES, isRole } from '../shared/utils/roles'
+import { PROTECTED_ROLE, ROLES, isRole } from '../shared/utils/roles'
 
 interface Holder {
   id: string
@@ -103,6 +103,32 @@ if (import.meta.main) {
       }
       decisions.set(decisionKey(userId, grant.role), decision)
       asked++
+      await save()
+    }
+  }
+
+  // Dated, every IT Manager lapses with nobody left to grant another, so one is made permanent
+  // here, by a person's choice, or the build refuses the file (A-120 criterion 1).
+  const holderOf = (userId: string) => auth.query<Holder, [string]>('SELECT * FROM users WHERE id = ?').get(userId)
+  // The build counts only live grants on enabled, unerased holders (migration/identity.ts).
+  const counts = (userId: string): boolean => {
+    const holder = holderOf(userId)
+    return holder !== null && !holder.disabled && !holder.email.endsWith('@anonymised.invalid')
+  }
+  const counted = new Set(grants.filter(grant => counts(grant.user_id)).map(grant => decisionKey(grant.user_id, grant.role)))
+  const administrators = administratorDecisions(new Map([...decisions].filter(([key]) => counted.has(key))))
+  if (!administrators.permanent.length && !administrators.dated.length) {
+    console.log('\nNo grant is decided as IT Manager, so the build will refuse. Re-run with --review-all to choose one.')
+  }
+  else if (!administrators.permanent.length) {
+    console.log('\nNo IT Manager grant is permanent, so every one would lapse with nobody left to grant another.')
+    administrators.dated.forEach((key, index) => {
+      const holder = holderOf(decisionHolder(key))
+      console.log(`  [${index + 1}] ${holder ? `${holder.name} <${holder.email}>` : decisionHolder(key)}`)
+    })
+    const chosen = administrators.dated[Number(ask('  make which one permanent? (blank leaves them dated, and the build refuses): ')) - 1]
+    if (chosen) {
+      decisions.set(chosen, { role: PROTECTED_ROLE, expiresAt: null })
       await save()
     }
   }

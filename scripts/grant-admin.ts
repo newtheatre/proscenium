@@ -16,7 +16,7 @@ const target = args[1] ?? DEFAULT_TARGET
 
 if (!email) {
   console.error('usage: bun scripts/grant-admin.ts <email> [database] [--additional]')
-  console.error('Grants ADMIN, expiring at the committee year end, to an existing account.')
+  console.error('Grants ADMIN to an existing account: permanent, unless another usable permanent one exists already.')
   process.exit(1)
 }
 
@@ -36,10 +36,11 @@ if (!account) {
 // Bootstrapping is for an environment with no way in, so it refuses one that already has a way
 // in: an ordinary grant is audited to a person, and this one is not (K-122 criterion 4).
 const usable = db.query(`
-  SELECT count(*) n FROM role_grants g JOIN users u ON u.id = g.user_id
+  SELECT count(*) n, coalesce(sum(g.expires_at IS NULL AND g.user_id != ?), 0) permanent
+  FROM role_grants g JOIN users u ON u.id = g.user_id
   WHERE g.role = 'ADMIN' AND u.disabled = 0 AND u.anonymised_at IS NULL
     AND (g.expires_at IS NULL OR g.expires_at > unixepoch())
-`).get() as { n: number }
+`).get(account.id) as { n: number, permanent: number }
 
 if (usable.n > 0 && !additional) {
   console.error(`This database already has ${usable.n} usable administrator(s).`)
@@ -48,7 +49,9 @@ if (usable.n > 0 && !additional) {
   process.exit(1)
 }
 
-const expiresAt = defaultRoleExpiry(new Date())
+// A lapse is no act the guard sees, so this grant is permanent unless another usable one is; the
+// target's own is left out of that count, or --additional on its holder would date it (A-120).
+const expiresAt = usable.permanent > 0 ? defaultRoleExpiry(new Date()) : null
 const id = crypto.randomUUID().replaceAll('-', '')
 
 // Through auditEntry even here, so the action catalogue governs every writer and not only the
@@ -57,15 +60,20 @@ const entry = auditEntry({
   actorId: null,
   action: 'role.granted.bootstrap',
   target: `user:${account.id}`,
-  detail: { role: 'ADMIN', expiresAt },
+  detail: { role: 'ADMIN', expiresAt, permanent: expiresAt === null },
 })
 
+// A lapsed grant is still the one row for this person and role, so it is renewed rather than left
+// lapsed: an insert that ignored it would report a grant it never made.
 db.transaction(() => {
-  db.query('INSERT OR IGNORE INTO role_grants (id, user_id, role, expires_at, granted_by) VALUES (?, ?, ?, ?, ?)')
-    .run(id, account.id, 'ADMIN', expiresAt, null)
+  db.query(`INSERT INTO role_grants (id, user_id, role, expires_at, granted_by) VALUES (?, ?, ?, ?, NULL)
+    ON CONFLICT (user_id, role) DO UPDATE SET expires_at = excluded.expires_at, granted_by = NULL,
+      granted_at = unixepoch(), expiry_warned_at = NULL`)
+    .run(id, account.id, 'ADMIN', expiresAt)
   db.query('INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (?, ?, ?, ?, ?)')
     .run(entry.id, entry.actorId, entry.action, entry.target, JSON.stringify(entry.detail))
 })()
 
-console.log(`ADMIN granted to ${account.name} <${email}>, expiring ${new Date(expiresAt * 1000).toISOString()}`)
+const until = expiresAt === null ? 'until further notice, listed with the permanent grants' : `expiring ${new Date(expiresAt * 1000).toISOString()}`
+console.log(`ADMIN granted to ${account.name} <${email}>, ${until}`)
 db.close()

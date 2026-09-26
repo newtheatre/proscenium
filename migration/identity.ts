@@ -2,7 +2,7 @@
 // stage-door id. The old-to-new map is an input as well as an output (0015, migration/README.md).
 import { Database } from 'bun:sqlite'
 import { join } from 'node:path'
-import { isRole } from '../shared/utils/roles'
+import { PROTECTED_ROLE, isRole } from '../shared/utils/roles'
 import { ROOT, nanoid } from './lib'
 import { decisionKey } from './role-decisions'
 import type { RoleDecisions } from './role-decisions'
@@ -69,6 +69,17 @@ interface Grant {
   granted_at: number | null
   note: string | null
   expiry_warned_at: number | null
+}
+
+// Usable IT Managers whose grant cannot lapse, a holder waiting for a first sign-in excluded as the
+// app excludes one (0088); none fails the reconciliation (A-120 criterion 1).
+export function permanentItManagers(core: Database): number {
+  const row = core.query<{ n: number }, [string]>(`
+    SELECT count(*) AS n FROM role_grants g JOIN users u ON u.id = g.user_id
+    WHERE g.role = ? AND g.expires_at IS NULL AND u.disabled = 0 AND u.anonymised_at IS NULL
+      AND NOT (u.password IS NULL AND u.google_sub IS NULL AND u.last_login_at IS NULL)
+  `).get(PROTECTED_ROLE)
+  return row?.n ?? 0
 }
 
 export function transformIdentity(input: TransformInput): TransformResult {

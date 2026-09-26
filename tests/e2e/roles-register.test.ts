@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { ROLES, defaultRoleExpiry } from '#shared/utils/roles'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { saysDay, saysDayLong } from '#shared/utils/when'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openView, pickPerson, skipReason, startApp, textOf, waitFor } from '#tests/helpers/webview'
@@ -103,6 +104,8 @@ interface Register {
   // Grants on an account nobody has signed into yet, listed apart and never counted (A-132).
   pending: Holder[]
   lapsedHidden: number
+  // Whether a usable IT Manager holds a grant that cannot lapse (A-120 criterion 1).
+  permanentItManager: boolean
 }
 
 async function register(query = ''): Promise<Register> {
@@ -261,8 +264,38 @@ describe.skipIf(skip !== null)('a grant carries its expiry, its note and its his
     }, cookie)
 
     expect(response.status).toBe(409)
-    expect((await response.json()).statusMessage ?? '').toMatch(/last IT Manager/i)
+    expect((await response.json()).statusMessage ?? '').toMatch(/choose Further notice/)
     expect(read<{ expires_at: number | null }>('SELECT expires_at FROM role_grants WHERE user_id = ? AND role = ?', self, 'ADMIN')!.expires_at).toBeNull()
+  })
+
+  // Issue #1355: a lapse is not an act, so with every IT Manager grant dated the next IT Manager
+  // grant has to be a permanent one, and the register says so until one is.
+  test('with every IT Manager grant dated, a dated one is refused and the register says so', async () => {
+    const self = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
+    write('UPDATE role_grants SET expires_at = ? WHERE user_id = ? AND role = ?', Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60, self, 'ADMIN')
+    try {
+      expect((await register()).permanentItManager).toBe(false)
+      const next = await person('next-it-manager')
+      const refused = await send('POST', '/api/admin/roles', { userId: next.id, role: 'ADMIN' }, cookie)
+      expect(refused.status).toBe(409)
+      expect((await refused.json()).statusMessage ?? '').toMatch(/choose Further notice/)
+      expect(read('SELECT id FROM role_grants WHERE user_id = ?', next.id)).toBeUndefined()
+    }
+    finally {
+      expect((await send('POST', '/api/admin/roles', { userId: self, role: 'ADMIN', expiresAt: null }, cookie)).status).toBe(200)
+    }
+    expect((await register()).permanentItManager).toBe(true)
+  })
+
+  test('the only permanent IT Manager cannot be revoked beside a dated one, and the dated one can', async () => {
+    const second = await person('dated-it-manager')
+    expect((await send('POST', '/api/admin/roles', { userId: second.id, role: 'ADMIN' }, cookie)).status).toBe(200)
+    const self = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
+
+    const refused = await send('DELETE', `/api/admin/roles?userId=${self}&role=ADMIN`, null, cookie)
+    expect(refused.status).toBe(409)
+    expect((await refused.json()).statusMessage ?? '').toMatch(/make one permanent/)
+    expect((await send('DELETE', `/api/admin/roles?userId=${second.id}&role=ADMIN`, null, cookie)).status).toBe(200)
   })
 })
 
@@ -291,11 +324,17 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
       await waitFor(view, `document.querySelector('[data-test="role-tiles"]')`)
       expect(await textOf(view, '[data-test="role-tiles"]')).toContain('Front of House Manager')
 
+      // Issue #1355: the default names its date, so a grant made in July is seen to end within weeks.
+      const yearEnd = defaultRoleExpiry(new Date())
+      expect(await textOf(view, '[data-test="grant-until"]')).toContain(saysDayLong(yearEnd, { year: true }))
+
       await pickPerson(view, '[data-test="grant-person"]', holder.email.split('@')[0]!, holder.name)
       await click(view, '[data-test="grant-submit"]')
       await waitFor(view, `document.body.innerText.includes(${JSON.stringify(holder.name)})`)
 
       expect(read<{ role: string }>('SELECT role FROM role_grants WHERE user_id = ?', holder.id)?.role).toBe('FOH_MANAGER')
+      // And the register shows the year, which is what makes a lapse next summer read as one.
+      expect(await textOf(view, '[data-test="holders-table"]')).toContain(saysDay(yearEnd, { year: true }))
 
       // K-123: the press opens the confirmation, and the named verb is what revokes.
       await click(view, `[data-test="revoke-${holder.id}-FOH_MANAGER"]`)

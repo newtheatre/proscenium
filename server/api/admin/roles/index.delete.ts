@@ -15,12 +15,7 @@ export default defineEventHandler(async (event) => {
 
   // Removing a factor is refused while the account holds a role that requires one (A-112
   // criterion 3); removing the role itself is the way out.
-  if (await wouldStrandTheSystem(input.role, input.userId)) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'That is the last IT Manager: grant another before revoking this one',
-    })
-  }
+  await refuseStranding(input.role, input.userId, 'revoking')
 
   await db.batch([
     db.delete(schema.roleGrants).where(and(

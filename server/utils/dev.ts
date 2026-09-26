@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 // The writer's own constant, so the tools cannot read a path the centre stopped writing to.
 import { MAILBOX } from './mailbox'
 import { PERSONAS, PERSONA_PASSWORD, PERSONA_TOTP_SECRET } from '#shared/utils/personas'
+import { PROTECTED_ROLE } from '#shared/utils/roles'
 
 // Development-only helpers (K-124). Every caller is guarded, and nuxt.config keeps the routes out
 // of a production build entirely rather than trusting a guard to be remembered.
@@ -108,7 +109,8 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
         id: newId(),
         userId: id,
         role: persona.role,
-        expiresAt: defaultRoleExpiry(new Date()),
+        // The IT Manager the guard keeps holds a grant that cannot lapse, as in production (A-120).
+        expiresAt: persona.role === PROTECTED_ROLE ? null : defaultRoleExpiry(new Date()),
       }).onConflictDoNothing()
     }
     // Confirmed outright: a privileged role needs a second factor (A-112), and re-enrolling one

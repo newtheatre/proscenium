@@ -409,7 +409,7 @@ onMounted(load)
               <span>{{ saysRole(grant.role) }}</span>
               <span class="text-muted">
                 {{ grant.live ? 'until' : 'lapsed' }}
-                {{ grant.expiresAt ? saysWhen(grant.expiresAt) : 'further notice' }}
+                {{ grant.expiresAt ? saysWhen(grant.expiresAt, { year: true }) : 'further notice' }}
               </span>
               <span
                 v-if="grant.note"

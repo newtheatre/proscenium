@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { buildLoad, applyLoad, loadedCounts } from '#migration/load'
-import { createCore, transformIdentity } from '#migration/identity'
+import { createCore, permanentItManagers, transformIdentity } from '#migration/identity'
 import { decideByMap } from '#migration/role-decisions'
 import { Scrypt } from '@adonisjs/hash/drivers/scrypt'
 import { erasureStatements, tombstoneEmail } from '#shared/utils/erasure'
@@ -286,6 +286,41 @@ describe('the identity import lands in the application schema (K-112)', () => {
     }
     finally {
       target.close()
+      source.close()
+    }
+  })
+})
+
+// A-120 criterion 1 and issue #1355: a lapse is not an act the guard sees, so a build whose IT
+// Manager grants are all dated fails the reconciliation rather than landing a lapse in waiting.
+describe('the import carries an IT Manager whose grant cannot lapse', () => {
+  test('dated decisions leave none, and a disabled or never-signed-in holder never counts', async () => {
+    const source = sourceEstate()
+    addPerson(source, { id: 'old-1', email: 'officer@example.invalid', password: 'hash' })
+    addPerson(source, { id: 'old-2', email: 'disabled@example.invalid', password: 'hash', disabled: 1 })
+    addPerson(source, { id: 'old-3', email: 'waiting@example.invalid' })
+    for (const holder of ['old-1', 'old-2', 'old-3']) {
+      source.query('INSERT INTO user_roles VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(holder, 'auth:ADMIN', null, null, 1700000000, null, null)
+    }
+    const grants = source.query('SELECT user_id, role FROM user_roles').all() as { user_id: string, role: string }[]
+
+    const permanentAfter = async (expiresAt: number | null): Promise<number> => {
+      const core = await createCore(':memory:')
+      try {
+        transformIdentity({ auth: source, mirrors: [], decisions: decideByMap(grants, ROLE_MAP, expiresAt), idMap: new Map(), target: core })
+        return permanentItManagers(core)
+      }
+      finally {
+        core.close()
+      }
+    }
+
+    try {
+      expect(await permanentAfter(1_900_000_000)).toBe(0)
+      expect(await permanentAfter(null)).toBe(1)
+    }
+    finally {
       source.close()
     }
   })

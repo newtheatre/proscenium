@@ -175,6 +175,12 @@ What a bad result looks like, checked before moving on:
 Before the real review, delete any rehearsal `out/role-decisions.tsv`: the review only asks about
 grants with no line on file.
 
+The review ends by checking that at least one IT Manager grant is decided as permanent. If every
+one is dated it lists them and asks which to make permanent; leaving them all dated is allowed at
+the prompt, but `build.ts` then fails with "an IT Manager grant is permanent", because a dated
+last IT Manager lapses with nobody left to grant another (A-120, issue #1355). A disabled or
+erased holder, or a grant no longer live, does not count, and the review leaves it out too.
+
 What a green build is actually proving: in the 13 September 2026 export, 8,268 of 9,975
 `auth.users` are anonymised and 9,943 have no way to sign in (shadow accounts, 0071). A build
 proving "an active account with roles and a second factor carries across" is exercising a few
@@ -855,6 +861,12 @@ bun run grant-admin <email>
 The account must already exist, so register or sign in once first. The script refuses any target
 that is not a local database, and refuses to run at all with `NODE_ENV=production`.
 
+The grant it writes is **permanent**: the first IT Manager is the one the last-IT-Manager guard
+keeps, and a grant that runs out on its date is not an act any guard can refuse (A-120, issue
+#1355). With `--additional` it writes the committee year end instead, as long as another usable
+IT Manager's grant is already permanent. An account that still carries a lapsed IT Manager grant has
+that row renewed, rather than the script reporting a grant it never made.
+
 **It also refuses when the database already has a usable administrator**, because an ordinary
 grant is audited to a person and this one is not. A local fixture that genuinely needs more than
 one passes `--additional`; there is no such escape hatch against a real database.
@@ -871,7 +883,10 @@ one passes `--additional`; there is no such escape hatch against a real database
    bunx wrangler d1 execute unified --remote --command "..."
    ```
 
-   The grant expires at the committee year end (31 July, London) like any other.
+   The grant is permanent (`expires_at` NULL), unlike an ordinary one: it is the IT Manager the
+   guard keeps, and a dated one would lapse with nobody left to grant another. If the account
+   still has a lapsed IT Manager row, update that row instead; the table allows one row per
+   person and role.
 4. That administrator grants every subsequent role through `/api/admin/roles`, which records who
    did it.
 

@@ -37,12 +37,7 @@ async function guardMergeable(winnerId: string, loserId: string): Promise<{ winn
     throw createError({ statusCode: 409, statusMessage: 'An anonymised account cannot take part in a merge' })
   }
 
-  if (await wouldStrandTheSystem('ADMIN', loserId)) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'That is the last IT Manager: grant another before merging this one away',
-    })
-  }
+  await refuseStranding(PROTECTED_ROLE, loserId, 'merging')
 
   return { winner, loser }
 }

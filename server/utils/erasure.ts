@@ -12,12 +12,7 @@ export async function eraseAccount(userId: string, actorId: string | null): Prom
 
   if (account.anonymisedAt !== null) return { erased: false, alreadyErased: true }
 
-  if (await wouldStrandTheSystem('ADMIN', userId)) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'That is the last IT Manager: grant another before erasing this one',
-    })
-  }
+  await refuseStranding(PROTECTED_ROLE, userId, 'erasing')
 
   const now = Math.floor(Date.now() / 1000)
   const statements = erasureStatements(userId, now)

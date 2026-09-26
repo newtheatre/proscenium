@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { changes } from '#shared/utils/audit'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
 import { CHOOSE_INSTEAD, PRE_LINKED, pendingGrantConstraintRefusal, pendingGrantDetail, pendingGrantStatements } from '#shared/utils/pending-grants'
-import { ROLES } from '#shared/utils/roles'
+import { PROTECTED_ROLE, ROLES } from '#shared/utils/roles'
 
 // Provenance on the grant, never in the audit trail's detail, which carries identifiers and never
 // prose about a person (A-118 criterion 2, 0011).
@@ -46,6 +46,8 @@ export default defineEventHandler(async (event) => {
     if (undeliverableReason({ email, anonymisedAt: null })) {
       throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
     }
+    // Waiting for a first sign-in, so it keeps nothing until then (A-120 criterion 3).
+    if (input.role === PROTECTED_ROLE) await refuseProtectedGrant(null, expiresAt)
 
     const userId = newId()
     const statements = pendingGrantStatements({
@@ -88,14 +90,9 @@ export default defineEventHandler(async (event) => {
     throw noSuch('account')
   }
 
-  // Putting an expiry on the last administrator is the same act as revoking them, delayed
-  // (A-120 criterion 1).
-  if (expiresAt !== null && await wouldStrandTheSystem(input.role, subject.id)) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'That is the last IT Manager: grant another before dating this one',
-    })
-  }
+  // A lapse is a revocation nobody acts on, so every IT Manager grant leaves one that cannot
+  // lapse (A-120 criterion 1).
+  if (input.role === PROTECTED_ROLE) await refuseProtectedGrant(subject.id, expiresAt)
 
   // The unique key is (user, role), so a lapsed grant is still a row: without this a renewal
   // would insert nothing, say nothing, and leave the role gone (A-131 criterion 5).

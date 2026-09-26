@@ -134,12 +134,49 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     }
   })
 
+  // A lapse is not an act the guard sees, so the first IT Manager is the one it keeps, and that
+  // grant cannot lapse (A-120 criterion 1, issue #1355).
+  test('the bootstrap grant is permanent, and its audit entry says so', async () => {
+    const { Database } = await import('bun:sqlite')
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const grant = database.query(`
+        SELECT g.expires_at AS expiresAt FROM role_grants g JOIN users u ON u.id = g.user_id
+        WHERE u.email = ? AND g.role = 'ADMIN'
+      `).get(officer.email) as { expiresAt: number | null } | null
+      expect(grant).toEqual({ expiresAt: null })
+
+      const entry = database.query(`SELECT detail FROM audit_log WHERE action = 'role.granted.bootstrap'`).get() as { detail: string }
+      expect(JSON.parse(entry.detail)).toEqual({ role: 'ADMIN', expiresAt: null, permanent: true })
+    }
+    finally {
+      database.close()
+    }
+  })
+
   // Bootstrapping exists for an environment with no way in, and this one now has one
   // (K-122 criterion 4).
   test('the bootstrap refuses to grant a second administrator', () => {
     const again = Bun.spawnSync(['bun', 'scripts/grant-admin.ts', subject.email, app.databaseFile])
     expect(again.exitCode).not.toBe(0)
     expect(again.stderr.toString()).toMatch(/already has/i)
+  })
+
+  // Its own permanent grant is not "another", so rerunning the bootstrap on it never dates it.
+  test('--additional on the only permanent IT Manager leaves their grant permanent', async () => {
+    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', officer.email, app.databaseFile, '--additional']).exitCode).toBe(0)
+    const { Database } = await import('bun:sqlite')
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const grant = database.query(`
+        SELECT g.expires_at AS expiresAt FROM role_grants g JOIN users u ON u.id = g.user_id
+        WHERE u.email = ? AND g.role = 'ADMIN'
+      `).get(officer.email) as { expiresAt: number | null } | null
+      expect(grant).toEqual({ expiresAt: null })
+    }
+    finally {
+      database.close()
+    }
   })
 
   test('an unknown role is refused by the schema once the caller is allowed in', async () => {

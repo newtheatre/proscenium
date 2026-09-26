@@ -31,12 +31,7 @@ export default defineEventHandler(async (event) => {
     return { ok: true, operation: input.operation, ...await eraseAccount(id, resolved.account.id) }
   }
 
-  if (input.operation === 'disable' && await wouldStrandTheSystem('ADMIN', id)) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'That is the last IT Manager: grant another before disabling this one',
-    })
-  }
+  if (input.operation === 'disable') await refuseStranding(PROTECTED_ROLE, id, 'disabling')
 
   // The epoch is what ends every session at once, and it never goes backwards, so re-enabling
   // cannot resurrect a cookie sealed before the disable (criterion 1).

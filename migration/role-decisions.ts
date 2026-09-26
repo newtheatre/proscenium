@@ -1,11 +1,14 @@
 // A role grant crosses only because a person decided it should (0070). The decisions file is the
 // record: one line per old grant, read back so a re-run never asks twice and never guesses.
+import { PROTECTED_ROLE } from '../shared/utils/roles'
 
 export type RoleDecision = { role: string, expiresAt: number | null } | 'SKIP'
 
 export type RoleDecisions = Map<string, RoleDecision>
 
 export const decisionKey = (userId: string, oldRole: string): string => `${userId}\t${oldRole}`
+
+export const decisionHolder = (key: string): string => key.split('\t')[0]!
 
 export function parseRoleDecisions(text: string): RoleDecisions {
   const decisions: RoleDecisions = new Map()
@@ -31,6 +34,19 @@ export function formatRoleDecisions(decisions: RoleDecisions): string {
       : `${key}\t${decision.role}\t${decision.expiresAt === null ? 'PERMANENT' : decision.expiresAt}`)
   }
   return `${lines.join('\n')}\n`
+}
+
+// The build needs an IT Manager whose grant cannot lapse, chosen at the prompt rather than
+// defaulted, so the review reads these decisions apart (A-120 criterion 1, 0070).
+export function administratorDecisions(decisions: RoleDecisions): { permanent: string[], dated: string[] } {
+  const permanent: string[] = []
+  const dated: string[] = []
+  for (const [key, decision] of decisions) {
+    if (decision === 'SKIP' || decision.role !== PROTECTED_ROLE) continue
+    if (decision.expiresAt === null) permanent.push(key)
+    else dated.push(key)
+  }
+  return { permanent, dated }
 }
 
 export interface GrantToDecide { user_id: string, role: string }
