@@ -28,11 +28,18 @@ export const CLAIM_REASON_LIMIT = 300
 export const membershipClaimForm = z.object({
   studentId: z.string().trim().min(1, 'Your student number is how the SU knows you').max(32),
   // Never in the future: a purchase is something that has happened (criterion 1).
-  startsOn: londonDayField.refine(day => day <= londonDay(new Date()), 'That purchase date has not happened yet'),
+  startsOn: z.string({ error: 'Give the date on your SU receipt' })
+    .pipe(londonDayField.refine(day => day <= londonDay(new Date()), 'That purchase date has not happened yet')),
   term: z.union([z.literal(1), z.literal(3)]),
 })
 
 export type MembershipClaimInput = z.output<typeof membershipClaimForm>
+
+// No purchase day, since nearly every claim is for a day that is not today; the number the account
+// holds, else the one last claimed, so a renewal or a declined claim is not retyped (issue 1343).
+export function claimFormStart(recorded: string | null, lastClaimed: string | null): Partial<MembershipClaimInput> {
+  return { studentId: recorded ?? lastClaimed ?? '', term: 1 }
+}
 
 // The one constraint a member can trip: the partial index that is criterion 1 (0047).
 const CLAIM_REFUSALS = [
