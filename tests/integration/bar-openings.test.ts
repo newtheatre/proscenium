@@ -54,6 +54,18 @@ function person(database: TestDatabase, id: string): string {
   return id
 }
 
+// The bar's training gate as the approval route hands it to the write (E-105 criterion 3).
+const BAR_GATE = { moduleId: 'ADMN-102', today: '2026-10-12' }
+
+function trained(database: TestDatabase, userId: string, expiresOn: string | null = null): void {
+  database.batch([
+    ['INSERT OR IGNORE INTO departments (code, name) VALUES (?, ?)', 'ADMN', 'Administration'],
+    ['INSERT OR IGNORE INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'ADMN-102', 'ADMN', 'MODULE', 'Bar induction'],
+    [`INSERT INTO training_records (id, user_id, module_id, awarded_on, expires_on, source)
+      VALUES (?, ?, ?, '2025-09-01', ?, 'SIGNOFF')`, `tr-${userId}`, userId, 'ADMN-102', expiresOn],
+  ])
+}
+
 function template(database: TestDatabase, venueId: string, slots: TemplateSlot[]): void {
   const actorId = person(database, 'officer')
   for (const statement of replaceTemplateStatements(venueId, slots, actorId)) run(database, statement)
@@ -254,8 +266,23 @@ describe('a slot is claimed through the rota\'s own race-safe write (E-130 crite
 
       expect(authority()).toHaveLength(0)
 
-      expect(run(database, approveOpeningShiftStatement(slot!.id))).toHaveLength(1)
+      trained(database, 'one')
+      expect(run(database, approveOpeningShiftStatement(slot!.id, BAR_GATE))).toHaveLength(1)
       expect(authority()).toHaveLength(1)
+    })
+  })
+
+  test('approval re-runs the bar gate: a claimant who no longer holds it stays claimed (#1302)', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      person(database, 'one')
+      const [slot] = slotsOn(database, openingId)
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CLAIMED'))
+      trained(database, 'one', '2026-10-01')
+
+      expect(run(database, approveOpeningShiftStatement(slot!.id, BAR_GATE))).toHaveLength(0)
+      expect(slotsOn(database, openingId)[0]).toMatchObject({ status: 'CLAIMED', user_id: 'one' })
+      expect(run(database, approveOpeningShiftStatement(slot!.id, { moduleId: null, today: BAR_GATE.today }))).toHaveLength(0)
     })
   })
 

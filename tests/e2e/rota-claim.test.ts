@@ -60,16 +60,18 @@ function daysFrom(days: number): string {
   return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
 }
 
-function award(userId: string, moduleId: string): void {
+function award(userId: string, moduleId: string): string {
+  const id = `tr-${crypto.randomUUID().slice(0, 8)}`
   const database = new Database(app.databaseFile)
   try {
     database.query(`
       INSERT INTO training_records (id, user_id, module_id, awarded_on, source) VALUES (?, ?, ?, ?, 'SIGNOFF')
-    `).run(`tr-${crypto.randomUUID().slice(0, 8)}`, userId, moduleId, daysFrom(-30))
+    `).run(id, userId, moduleId, daysFrom(-30))
   }
   finally {
     database.close()
   }
+  return id
 }
 
 async function setAutoConfirm(value: boolean): Promise<void> {
@@ -227,6 +229,26 @@ describe.skipIf(skip !== null)('the queue (E-105)', () => {
     expect(after - before).toBe(1)
 
     expect((await send('POST', `/api/admin/rota/approvals/${shiftId}/approve`, undefined, foh.cookie)).status).toBe(409)
+    await setAutoConfirm(true)
+  })
+
+  test('a claim whose training lapsed since is not confirmed, and the refusal offers its decline reason (#1302)', async () => {
+    await setAutoConfirm(false)
+    const lapsing = await registerMember(app, 'lapsing-claimant', generatePassword())
+    const recordId = award(lapsing.id, moduleId)
+    const house = programme('queue-lapsed')
+    const shiftId = openShift(house.performanceId, 'DOOR', 1)
+    expect((await send('POST', `/api/rota/shifts/${shiftId}/claim`, undefined, lapsing.cookie)).status).toBe(200)
+
+    write('UPDATE training_records SET revoked_at = unixepoch(), revoked_by = ?, revoke_reason = ? WHERE id = ?',
+      admin.id, 'Certificate not renewed', recordId)
+
+    const refused = await send('POST', `/api/admin/rota/approvals/${shiftId}/approve`, undefined, foh.cookie)
+    expect(refused.status).toBe(409)
+    const body = await refused.json() as { statusMessage: string, data?: { declineReason?: string } }
+    expect(body.statusMessage).toStartWith('No longer qualifies:')
+    expect(body.data?.declineReason).toContain(`Module ${moduleId}`)
+    expect(read<{ status: string }>('SELECT status FROM shifts WHERE id = ?', shiftId)?.status).toBe('CLAIMED')
     await setAutoConfirm(true)
   })
 

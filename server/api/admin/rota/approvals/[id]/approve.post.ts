@@ -2,8 +2,8 @@ import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
 import { approvalRefusal, saysShiftRole } from '#shared/utils/rota'
 
-// Approve a queued claim. The predicate rides the write, so two officers deciding at once
-// confirm it once between them (E-105 criteria 2 and 3, 0003).
+// Approve a queued claim. The status and the training gate both ride the write, so two officers
+// confirm it once and a lapsed claimant is never confirmed (E-105 criteria 2 and 3, 0003).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const resolved = await requirePermission(event, 'rota.write')
@@ -18,10 +18,13 @@ export default defineEventHandler(async (event) => {
     detail: changes({ status: [held.status, 'CONFIRMED'] }),
   })
 
-  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(approveShiftStatement(id)), entry))
+  const moduleId = (await shiftRoleRules(event))[held.role]
+  const statement = approveShiftStatement(id, { moduleId, today: londonToday() })
+  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(statement), entry))
 
   if (!applied) {
     const now = await shiftDetail(id)
+    if (now?.status === 'CLAIMED' && now.userId) throw await lapsedClaimRefusal(now.role, now.userId, moduleId)
     throw createError({ statusCode: 409, statusMessage: approvalRefusal(now?.status ?? held.status) })
   }
 

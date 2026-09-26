@@ -31,6 +31,15 @@ describe('each rota screen names the step after it (K-123 criterion 12)', () => 
   })
 })
 
+describe('a refused Confirm offers the decline, its reason written (E-105 criterion 3)', () => {
+  test('the approvals screen opens Decline with the route\'s reason, and a plain Decline starts empty', async () => {
+    const source = await read(APPROVALS)
+    expect(source).toContain('refusalData<{ declineReason?: string }>(error)?.declineReason')
+    expect(source).toContain('openDecline(row, offered)')
+    expect(source).toContain('\'onClick\': () => openDecline(row.original)')
+  })
+})
+
 describe('the board shows the nights it was asked for (E-107 criterion 7)', () => {
   test('the board sends a window with its read', async () => {
     const source = await read(BOARD)
