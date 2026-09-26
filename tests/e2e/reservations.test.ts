@@ -104,19 +104,29 @@ describe.skipIf(skip !== null)('a guest reserves online without an account (crit
     expect(row?.userId).not.toBeNull()
   }, CASE_TIMEOUT_MS)
 
-  test('a guest can complete the whole flow through the real booking page', async () => {
+  // Issue 1329: Book lands on the booking page itself, from its top, rather than a panel above
+  // the fold whose link opened a server route inside the app and found nothing there.
+  test('a guest can complete the whole flow through the real booking page, and lands on the booking', async () => {
     const { performanceId } = await bookableShow()
 
     const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/book/${performanceId}`, '[data-test="book-page"]')
+    try {
+      await visit(view, `${app.baseURL}/book/${performanceId}`, '[data-test="book-page"]')
 
-    await fillNumber(view, '[data-test^="quantity-"]', '1')
-    await fill(view, '[data-test="guest-name"]', 'Sam Guest')
-    await fill(view, '[data-test="guest-email"]', `sam-${crypto.randomUUID().slice(0, 8)}@example.invalid`)
+      await fillNumber(view, '[data-test^="quantity-"]', '1')
+      await fill(view, '[data-test="guest-name"]', 'Sam Guest')
+      await fill(view, '[data-test="guest-email"]', `sam-${crypto.randomUUID().slice(0, 8)}@example.invalid`)
 
-    await click(view, '[data-test="booking-submit"]')
-    await waitFor(view, `document.querySelector('[data-test="booking-confirmed"]')`)
-    expect(await textOf(view, '[data-test="booking-confirmed"]')).toContain('Reference')
+      await click(view, '[data-test="booking-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="booking-made"]')`)
+      expect(await view.evaluate<string>('location.pathname')).toBe('/qr')
+      expect(await textOf(view, '[data-test="booking-made"]')).toContain('Booking made')
+      expect(await textOf(view, '[data-test="booking-found"]')).toContain('Reference')
+      expect(await view.evaluate<number>('Math.round(window.scrollY)')).toBe(0)
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })
 

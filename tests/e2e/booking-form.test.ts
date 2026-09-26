@@ -194,11 +194,33 @@ describe.skipIf(skip !== null)('the screen answers everybody the same way (crite
       await fill(view, '[data-test="guest-name"]', 'Sonya Serebryakova')
       await fill(view, '[data-test="guest-email"]', address)
       await click(view, '[data-test="booking-submit"]')
-      await waitFor(view, `document.querySelector('[data-test="booking-confirmed"]')`)
+      await waitFor(view, `document.querySelector('[data-test="booking-made"]')`)
 
-      const confirmed = await textOf(view, '[data-test="booking-confirmed"]')
+      const confirmed = await textOf(view, '[data-test="booking-made"]')
       expect(confirmed).toContain(address)
       expect(confirmed).toContain('emailed')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // Issue 1329: a stepper is thumbed on a phone, so each of its buttons is a 44px target.
+  test('every quantity stepper button is at least 44px square', async () => {
+    const { first } = await twoNightRun()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/book/${first}`, '[data-test="book-page"]')
+      const measured = await view.evaluate<string>(`JSON.stringify(
+        [...document.querySelectorAll('[data-test^="quantity-"] ~ [data-slot="increment"] button, [data-test^="quantity-"] ~ [data-slot="decrement"] button')]
+          .map(button => { const box = button.getBoundingClientRect(); return [Math.round(box.width), Math.round(box.height)] }))`)
+      const sizes = JSON.parse(measured) as [number, number][]
+      expect(sizes.length).toBeGreaterThan(0)
+      for (const [width, height] of sizes) {
+        expect(width).toBeGreaterThanOrEqual(44)
+        expect(height).toBeGreaterThanOrEqual(44)
+      }
     }
     finally {
       view.close()

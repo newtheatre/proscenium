@@ -136,6 +136,27 @@ describe.skipIf(skip !== null)('the booking screen says which night and which wa
     }
   }, CASE_TIMEOUT_MS)
 
+  // Issue 1329: a cancelled booking admits nobody, so its code is not offered to be saved.
+  test('a cancelled booking shows no QR code', async () => {
+    const { qrToken } = await twoNightBooking()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/qr/${qrToken}`, '[data-test="booking-found"]')
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="booking-qr"]') !== null`)).toBe(true)
+
+      await click(view, '[data-test="booking-cancel-start"]')
+      await waitFor(view, `document.querySelector('[data-test="confirm-cancel-booking-verb"]')`)
+      await click(view, '[data-test="confirm-cancel-booking-verb"]')
+      await waitFor(view, `document.querySelector('[data-test="booking-status"]')?.textContent.includes('Cancelled')`)
+
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="booking-qr"]') === null`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('the edit form prices every type and caps it at the order cap', async () => {
     const { qrToken, performanceId } = await twoNightBooking()
     const { cap } = await (await send('GET', `/api/performances/${performanceId}/booking`, undefined, '')).json() as { cap: number }

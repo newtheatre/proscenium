@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { registrableAddress } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { letters, skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -221,6 +221,21 @@ describe.skipIf(skip !== null)('a reminder sends once, inside its own window (D-
       'reservation.hold-expiring', reservationId, 'SENT',
     )
     expect(sent?.total).toBe(0)
+  }, CASE_TIMEOUT_MS)
+
+  // Issue 1329: the reminder says pay or cancel, so it opens the booking where both are done.
+  test('the reminder opens the booking and carries its QR, and cancels nothing by itself', async () => {
+    expect((await send('PUT', '/api/admin/config/HOLD_REMINDER_MINUTES_BEFORE', { value: 50 })).status).toBe(200)
+    const { reservationId } = await bookedHold(HOLD_RELEASE_MINUTES_BEFORE, STARTS_AT_OFFSET_MINUTES)
+    const reference = query<{ reference: string }>('SELECT reference FROM reservations WHERE id = ?', reservationId)!.reference
+
+    await runReleaseTask()
+
+    const letter = (await letters(app)).find(text => text.includes(reference) && text.includes('is held until'))
+    expect(letter).toBeDefined()
+    expect(letter).toMatch(/Open your booking: https?:\/\/\S+\/qr\/\S+/)
+    expect(letter).not.toContain('/cancel')
+    expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', reservationId)?.status).toBe('PENDING')
   }, CASE_TIMEOUT_MS)
 
   test('a hold inside the reminder window is warned once, and a second run sends nothing more', async () => {
