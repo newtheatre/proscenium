@@ -277,6 +277,22 @@ describe.skipIf(skip !== null)('a series out of policy queues as a whole (criter
   })
 })
 
+// Issue 1337: a member's term is a rehearsal because it is for rehearsing, not because the form
+// said Production (C-115 criterion 1).
+describe.skipIf(skip !== null)('the server decides a series\' tier', () => {
+  test('a member who sends Production books every week as a rehearsal', async () => {
+    const room = await makeRoom()
+    const answered = await bookSeries(room, { startsOn: mondayIn(30), tier: 'PRODUCTION' })
+    expect(answered.status).toBe(200)
+    const { id } = await answered.json() as SeriesAnswer
+    const tiers = all<{ tier: string }>('SELECT tier FROM room_bookings WHERE series_id = ?', id).map(row => row.tier)
+    expect(tiers).toHaveLength(4)
+    expect(new Set(tiers)).toEqual(new Set(['REHEARSAL']))
+    expect(read<{ detail: string }>('SELECT detail FROM audit_log WHERE action = \'room.series.booked\' AND target = ?', `series:${id}`)?.detail)
+      .toContain('"tier":"REHEARSAL"')
+  })
+})
+
 describe.skipIf(skip !== null)('a series counts each occurrence against the cap', () => {
   test('a term longer than the cap queues rather than confirming', async () => {
     const room = await makeRoom()

@@ -3,10 +3,12 @@ import {
   BOOKING_STATUSES,
   HOLDS_A_SLOT,
   bookingForm,
+  bookingTier,
   isTier,
   maskConflicts,
   overlaps,
 } from '#shared/utils/bookings'
+import { seriesForm } from '#shared/utils/series'
 
 // C-107. Intervals are half-open, so back-to-back bookings never clash, and a member learns that a
 // slot is taken without learning whose it is (C-103 criteria 3 and 4).
@@ -126,5 +128,52 @@ describe('what a booking request must say', () => {
     expect(isTier('REHEARSAL')).toBe(true)
     expect(isTier('PRODUCTION')).toBe(true)
     expect(isTier('WHATEVER')).toBe(false)
+  })
+})
+
+// Issue 1337: a member's tier follows from what the room is for, because the tier decides who
+// keeps a contested slot; only an officer names Production or Committee (C-115 criterion 1).
+describe('the server decides a booking\'s tier (C-115 criterion 1)', () => {
+  test('a member\'s rehearsal is a rehearsal, whatever tier was sent', () => {
+    expect(bookingTier('REHEARSAL', 'PRODUCTION', false)).toBe('REHEARSAL')
+    expect(bookingTier('REHEARSAL', undefined, false)).toBe('REHEARSAL')
+  })
+
+  test('anything else a member books is general use', () => {
+    expect(bookingTier('MEETING', 'COMMITTEE', false)).toBe('GENERAL')
+    expect(bookingTier('GET_IN', 'PRODUCTION', false)).toBe('GENERAL')
+  })
+
+  test('an officer\'s named tier stands, and with none named it is derived as a member\'s is', () => {
+    expect(bookingTier('GET_IN', 'PRODUCTION', true)).toBe('PRODUCTION')
+    expect(bookingTier('MEETING', undefined, true)).toBe('GENERAL')
+  })
+
+  test('a booking form needs no tier', () => {
+    const parsed = bookingForm.safeParse({
+      roomId: 'r-1',
+      title: 'Rehearsal',
+      startsAt: '2026-09-14T09:00:00.000Z',
+      endsAt: '2026-09-14T11:00:00.000Z',
+      purpose: 'REHEARSAL',
+    })
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.tier).toBeUndefined()
+  })
+
+  test('nor does a series', () => {
+    const parsed = seriesForm.safeParse({
+      roomId: 'r-1',
+      title: 'Weekly rehearsal',
+      purpose: 'REHEARSAL',
+      frequency: 'WEEKLY',
+      weekdays: [1],
+      startsOn: '2026-10-05',
+      from: '19:00',
+      to: '21:00',
+      occurrences: 4,
+    })
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.tier).toBeUndefined()
   })
 })

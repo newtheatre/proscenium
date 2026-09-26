@@ -19,6 +19,13 @@ export function isTier(value: string): value is Tier {
   return (TIERS as readonly string[]).includes(value)
 }
 
+// The tier decides who keeps a contested slot, so a member's follows from what the room is for
+// and whatever they sent is ignored; only an officer names one (C-115 criterion 1, issue 1337).
+export function bookingTier(purpose: string, sent: Tier | undefined, officer: boolean): Tier {
+  if (officer && sent) return sent
+  return purpose === 'REHEARSAL' ? 'REHEARSAL' : 'GENERAL'
+}
+
 // What the room is for, which is a different question from who wins a contested slot. The tier
 // answers that; this answers what somebody would need the room to be like (C-119).
 export const PURPOSES = [
@@ -137,7 +144,8 @@ export const bookingForm = z.object({
   startsAt: instant,
   endsAt: instant,
   attendees: z.number().int().positive().nullish().transform(value => value ?? null),
-  tier: z.enum(TIERS).default('GENERAL'),
+  // Read only from an officer; `bookingTier()` decides everybody else's.
+  tier: z.enum(TIERS).optional(),
   // Validated against ROOM_PURPOSES at the write path, never a zod enum: the list is
   // committee-editable, and a frozen one breaks the moment they add to it (0033's reasoning).
   purpose: z.string().trim().min(1, 'Say what the room is for').max(32),

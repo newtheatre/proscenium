@@ -1,5 +1,5 @@
 import { requestForm } from '#shared/utils/requests'
-import { maskConflicts } from '#shared/utils/bookings'
+import { bookingTier, maskConflicts } from '#shared/utils/bookings'
 import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { formatLondon } from '#shared/utils/london'
@@ -47,6 +47,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const purpose = await requirePurpose(event, input.purpose)
+  const tier = bookingTier(purpose, input.tier, permissions.has('rooms.write'))
+
   // A request holds its slot, or an instant booking would take it from under a decision somebody
   // is in the middle of making (criterion 2).
   const claimed = await claimSlot({
@@ -56,8 +59,8 @@ export default defineEventHandler(async (event) => {
     attendees: input.attendees,
     startsAt: Math.floor(startsAt.getTime() / 1000),
     endsAt: Math.floor(endsAt.getTime() / 1000),
-    tier: input.tier,
-    purpose: await requirePurpose(event, input.purpose),
+    tier,
+    purpose,
     status: 'PENDING_APPROVAL',
     notes: input.notes,
     reason: input.reason,
@@ -79,7 +82,7 @@ export default defineEventHandler(async (event) => {
     action: 'room.requested',
     target: `booking:${claimed.id}`,
     // The rules it broke, never the reason: that is the member's own words (0011).
-    detail: { room: room.id, failed: verdict.failures.map(failure => failure.reason) },
+    detail: { room: room.id, tier, failed: verdict.failures.map(failure => failure.reason) },
   }))
 
   await notify(event, {

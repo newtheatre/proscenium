@@ -248,3 +248,48 @@ describe.skipIf(skip !== null)('one slot, one winner (C-107)', () => {
     expect(answers.filter(answer => answer.status === 409)).toHaveLength(9)
   })
 })
+
+// Issue 1337: the tier decides who keeps a contested slot, so a member cannot name one; it follows
+// from what the room is for, and only an officer sets Production or Committee (C-115 criterion 1).
+describe.skipIf(skip !== null)('the server decides a booking\'s tier (C-115 criterion 1)', () => {
+  const tierOf = (id: string): string | undefined => read<{ tier: string }>('SELECT tier FROM room_bookings WHERE id = ?', id)?.tier
+  const auditOf = (action: string, id: string): string | undefined =>
+    read<{ detail: string }>('SELECT detail FROM audit_log WHERE action = ? AND target = ?', action, `booking:${id}`)?.detail
+
+  test('a member who sends Production on a rehearsal books a rehearsal', async () => {
+    const room = await makeRoom()
+    const booker = await freshBooker()
+    const answered = await book(room, soon(15), booker, { tier: 'PRODUCTION' })
+    expect(answered.status).toBe(200)
+    const { id } = await answered.json() as { id: string }
+    expect(tierOf(id)).toBe('REHEARSAL')
+    expect(auditOf('room.booked', id)).toContain('"tier":"REHEARSAL"')
+  })
+
+  test('a member\'s meeting is general use, whatever it sends', async () => {
+    const room = await makeRoom()
+    const booker = await freshBooker()
+    const answered = await book(room, soon(16), booker, { purpose: 'MEETING', tier: 'COMMITTEE' })
+    expect(answered.status).toBe(200)
+    expect(tierOf((await answered.json() as { id: string }).id)).toBe('GENERAL')
+  })
+
+  test('a member\'s request is derived the same way', async () => {
+    const room = await makeRoom({ sensitive: true })
+    const booker = await freshBooker()
+    const answered = await send('POST', '/api/rooms/requests', {
+      roomId: room, title: 'Rehearsal', purpose: 'REHEARSAL', tier: 'PRODUCTION', reason: 'Show week', ...soon(17),
+    }, booker)
+    expect(answered.status).toBe(200)
+    const { id } = await answered.json() as { id: string }
+    expect(tierOf(id)).toBe('REHEARSAL')
+    expect(auditOf('room.requested', id)).toContain('"tier":"REHEARSAL"')
+  })
+
+  test('an officer\'s Production stands', async () => {
+    const room = await makeRoom()
+    const answered = await book(room, soon(18), officer, { purpose: 'GET_IN', tier: 'PRODUCTION' })
+    expect(answered.status).toBe(200)
+    expect(tierOf((await answered.json() as { id: string }).id)).toBe('PRODUCTION')
+  })
+})

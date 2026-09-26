@@ -60,6 +60,14 @@ describe('what a submit does (C-105 criteria 7 and 8, C-120 criterion 7, issue 1
     expect(source.match(/navigateTo\('\/rooms\/mine'\)/g)?.length).toBeGreaterThanOrEqual(3)
   })
 
+  // Issue 1337: the server derives a member's tier, so the form offers the choice to officers only.
+  test('the tier is asked only of an officer', async () => {
+    const source = await read(BOOK)
+    expect(source).toContain('v-if="namesTier"')
+    expect(source).toContain('manageRoomsEstate')
+    expect(source).toContain('tier: undefined,')
+  })
+
   test('no submit on the booking form goes round the schema', async () => {
     const source = await read(BOOK)
     expect(source).not.toContain('@click="bookSeries"')

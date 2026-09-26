@@ -770,9 +770,12 @@ describe.skipIf(skip !== null)('moving a request into one of our rooms', () => {
     expect(statusOf(id)).toBe('CANCELLED')
     expect(read<{ converted_to_booking_id: string }>(
       'SELECT converted_to_booking_id FROM external_requests WHERE id = ?', id)?.converted_to_booking_id).toBe(became)
-    expect(read<{ room_id: string, converted_from_request_id: string }>(
-      'SELECT room_id, converted_from_request_id FROM room_bookings WHERE id = ?', became))
-      .toEqual({ room_id: room, converted_from_request_id: id })
+    // A rehearsal asked for stays a rehearsal once relisted (C-115 criterion 1, issue 1337).
+    expect(read<{ room_id: string, converted_from_request_id: string, tier: string }>(
+      'SELECT room_id, converted_from_request_id, tier FROM room_bookings WHERE id = ?', became))
+      .toEqual({ room_id: room, converted_from_request_id: id, tier: 'REHEARSAL' })
+    expect(read<{ detail: string }>('SELECT detail FROM audit_log WHERE action = \'external.request.relisted\' AND target = ?', `external:${id}`)?.detail)
+      .toContain('"tier":"REHEARSAL"')
     expect(['CONFIRMED', 'PENDING_APPROVAL']).toContain(status)
   })
 

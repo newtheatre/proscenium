@@ -1821,6 +1821,9 @@ scrub · `reason` scrub (why an exception is asked for, the member's own words, 
 is exactly what the clash predicate reads, and on `user_id` for the active-bookings cap.
 `tier` carries no CHECK because `ROOM_PRIORITY_TIERS` is committee-editable, and a constraint
 behind an editable list breaks writes the moment the list is used (0033's reasoning, C-115).
+A member's `tier` is never taken from the request: `bookingTier()` derives it from `purpose` at
+every write path (a rehearsal is `REHEARSAL`, anything else `GENERAL`), and only `rooms.write`
+names one (C-115 criterion 1).
 
 **`purpose` is not `tier`.** A tier answers who keeps a contested slot; a purpose answers what the
 room is needed for, which is what makes a room suitable or not. One `USelect` was doing both jobs

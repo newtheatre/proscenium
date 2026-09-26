@@ -263,7 +263,7 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
 - Story: As the Theatre Manager, I want priority tiers with a fair bumping process so that productions, training and general use coexist by rule, not by argument.
 - Depends on: C-105, C-113
 - Acceptance criteria:
-  1. Every booking carries a tier; the default order is production in its show week, then scheduled training, then regular rehearsal, then general use, and the order is configuration confirmed in Phase 0 workshops.
+  1. Every booking carries a tier; the default order is production in its show week, then scheduled training, then regular rehearsal, then general use, and the order is configuration confirmed in Phase 0 workshops. Amended 26 September 2026 (issue 1337): the server derives a member's tier from the booking's purpose (a rehearsal is Rehearsal, anything else General) and ignores a tier the member sends; only an officer (`rooms.write`) sets Production or Committee, and the member's form does not offer the choice.
   2. A higher-tier need may bump a lower-tier confirmed booking; bumping requires a mandatory reason and an admin action, never happens automatically, and an equal or lower tier can never bump.
   3. The bumped member is notified immediately with the reason and offered the nearest equivalent free slot (same room, or a room of at least equal capacity, closest in time); accepting rebooks in one action.
   4. A bumped booking becomes status BUMPED, distinct from CANCELLED, and links to the replacement offer; it is never deleted.
