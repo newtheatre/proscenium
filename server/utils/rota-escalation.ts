@@ -25,24 +25,10 @@ function escalationWindow(at: Date): { from: number, to: number } {
   return { from, to: from + 7 * 86_400 }
 }
 
-// An open or declined shift (nobody is committed to either), an unconfirmed duty manager, or no
-// shifts at all: `shiftCount = 0` catches a template-less venue (E-101 criterion 4, E-107).
+// An open or declined shift, an unconfirmed duty manager, or no shifts at a venue we run:
+// `shiftCount = 0` catches a template-less venue of ours (E-101 criterion 4, E-107, issue 1319).
 async function unstaffedPerformances(from: number, to: number): Promise<UnstaffedRow[]> {
-  return db.all<UnstaffedRow>(sql`
-    SELECT s.title AS showTitle, v.name AS venueName, p.starts_at AS startsAt,
-           group_concat(DISTINCT CASE WHEN sh.status IN ('OPEN', 'DECLINED') THEN sh.role END) AS openRoles,
-           max(CASE WHEN sh.role = 'DUTY_MANAGER' AND sh.status NOT IN ('CONFIRMED', 'CANCELLED')
-                    THEN 1 ELSE 0 END) AS dutyManagerGap,
-           count(sh.id) AS shiftCount
-    FROM performances p
-    JOIN shows s ON s.id = p.show_id
-    JOIN venues v ON v.id = p.venue_id
-    LEFT JOIN shifts sh ON sh.performance_id = p.id AND sh.status <> 'CANCELLED'
-    WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${from} AND p.starts_at < ${to}
-    GROUP BY p.id
-    HAVING openRoles IS NOT NULL OR dutyManagerGap = 1 OR shiftCount = 0
-    ORDER BY p.starts_at
-  `)
+  return db.all<UnstaffedRow>(unstaffedPerformancesQuery(from, to))
 }
 
 // Whoever administers the rota, the same audience E-101 criterion 2 lets edit a template (0046).
