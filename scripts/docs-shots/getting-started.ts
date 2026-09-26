@@ -26,8 +26,8 @@ export const gettingStarted: Shot[] = [
     marker: '[data-test="account-security-page"]',
     width: CONSOLE_WIDTH,
     annotations: [
-      { selector: '[data-test="methods"]', label: 'How you sign in' },
-      { selector: '[data-test="new-email"]', label: 'Email address' },
+      { selector: '[data-test="methods"]', label: 'Ways in' },
+      { selector: '[data-test="next-step"]', label: 'Your next step' },
       { selector: '[data-test="mfa-active"]', label: 'An authenticator app' },
       { selector: '[data-test="regenerate"]', label: 'Show a new set of recovery codes' },
     ],

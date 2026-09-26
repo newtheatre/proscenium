@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { renderSVG } from 'uqr'
+import { securityNextStep } from '#shared/utils/sign-in-methods'
 import { saysDayLong } from '#shared/utils/when'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
@@ -154,6 +155,14 @@ const closeAccount = (): Promise<void> => attempt(async () => {
 const confirmedOn = computed(() =>
   state.value?.confirmedAt ? saysDayLong(state.value.confirmedAt, { year: true }) : null)
 
+// A role that needs an authenticator makes it this viewer's next step, ahead of a passkey (A-112).
+const authenticatorFirst = computed(() => state.value !== null && securityNextStep({
+  authenticatorRequired: state.value.required,
+  authenticatorConfirmed: state.value.confirmed,
+  passkeySupported: false,
+  holdsPasskey: false,
+}) === 'authenticator')
+
 onMounted(load)
 
 useSeoMeta({ title: 'Security' })
@@ -162,12 +171,16 @@ useSeoMeta({ title: 'Security' })
 <template>
   <AccountSettings
     data-test="account-security-page"
-    title="Sign-in and security"
-    description="An authenticator app is a second step at sign-in, so a stolen password is not enough on its own."
+    title="Security"
+    description="The ways into your account, and what protects them."
   >
-    <SignInMethods />
+    <SignInMethods :authenticator-first="state === null ? null : authenticatorFirst" />
 
-    <UPageCard class="mt-6">
+    <UPageCard
+      class="mt-6"
+      :highlight="authenticatorFirst"
+      :data-test="authenticatorFirst ? 'next-step' : undefined"
+    >
       <UAlert
         v-if="notice"
         class="mb-6"
@@ -188,14 +201,44 @@ useSeoMeta({ title: 'Security' })
       </div>
 
       <div
+        v-else-if="step === 'none' && authenticatorFirst"
+        class="space-y-4"
+      >
+        <div class="space-y-2">
+          <h2 class="text-lg font-semibold">
+            Your role needs an authenticator app
+          </h2>
+          <p class="text-sm text-muted">
+            A role you hold reaches money, personal data or safety records, so signing in with a
+            password needs a second step. The screens that role opens refuse you until it is set up.
+          </p>
+        </div>
+        <UButton
+          data-test="begin"
+          :loading="working"
+          @click="begin"
+        >
+          Set up an authenticator app
+        </UButton>
+      </div>
+
+      <div
         v-else-if="step === 'none'"
         class="space-y-4"
       >
-        <p class="text-muted">
-          You have no authenticator app on this account.
-        </p>
+        <div class="space-y-2">
+          <h2 class="text-lg font-semibold">
+            An authenticator app
+          </h2>
+          <p class="text-sm text-muted">
+            A second step at sign-in, so a stolen password is not enough on its own. You have none
+            on this account.
+          </p>
+        </div>
         <UButton
           data-test="begin"
+          color="neutral"
+          variant="subtle"
           :loading="working"
           @click="begin"
         >

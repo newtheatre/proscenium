@@ -5,7 +5,7 @@ import type { z } from 'zod'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
 
-type Profile = z.output<typeof profileForm> & { email: string }
+type Profile = z.output<typeof profileForm>
 
 const toast = useToast()
 const { refresh } = useAccount()
@@ -23,7 +23,6 @@ const state = reactive({
   emergencyPhone: '',
   emergencyRelation: '',
 })
-const email = ref('')
 
 // The audience is read from the field registry rather than written into the template, so a field
 // added without one is a failing test rather than a screen that quietly says nothing (A-114).
@@ -41,7 +40,6 @@ async function load(): Promise<void> {
     emergencyPhone: profile.emergencyPhone ?? '',
     emergencyRelation: profile.emergencyRelation ?? '',
   })
-  email.value = profile.email
   loading.value = false
 }
 
@@ -144,22 +142,6 @@ useSeoMeta({ title: 'Profile' })
           />
         </UFormField>
 
-        <UFormField
-          label="Email address"
-          :description="audienceOf('name')"
-        >
-          <UInput
-            :model-value="email"
-            disabled
-            class="w-full"
-          />
-          <template #help>
-            <ULink to="/account/security">
-              Change your email address
-            </ULink>
-          </template>
-        </UFormField>
-
         <USeparator label="Emergency contact" />
 
         <UAlert
@@ -215,5 +197,10 @@ useSeoMeta({ title: 'Profile' })
         </UButton>
       </UForm>
     </UPageCard>
+
+    <EmailChange
+      class="mt-6"
+      :audience="audienceOf('name')"
+    />
   </AccountSettings>
 </template>
