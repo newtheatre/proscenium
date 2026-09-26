@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   PHASES,
   SYSTEM_CHECKS,
+  checklistEntryDone,
   checklistItemForm,
   checklistScopeForm,
   exemptForm,
@@ -61,6 +62,26 @@ describe('the display wording names every value (0009: no member reads a bare co
   test('every phase and system check says something', () => {
     for (const phase of PHASES) expect(saysPhase(phase).length).toBeGreaterThan(2)
     for (const check of SYSTEM_CHECKS) expect(saysSystemCheck(check).length).toBeGreaterThan(2)
+  })
+
+  // Issue 1296: the check counts unpaid holds only, so its name says so, as the seeded item does.
+  test('the holds check is named for what it counts', () => {
+    expect(saysSystemCheck('NO_SHOW_HOLDS_RELEASED')).toBe('Unpaid holds released')
+  })
+})
+
+// Issue 1296: a system item that cannot clear tonight takes an exception like any other.
+describe('an item is answered by a tick, a clear check or an exception (criteria 3, 5)', () => {
+  test('a system item is answered once it clears, or once a reason is recorded against it', () => {
+    expect(checklistEntryDone({ systemClear: false, ticked: false, exempted: false })).toBe(false)
+    expect(checklistEntryDone({ systemClear: true, ticked: false, exempted: false })).toBe(true)
+    expect(checklistEntryDone({ systemClear: false, ticked: false, exempted: true })).toBe(true)
+  })
+
+  test('a hand-ticked item is answered by its tick or its exception', () => {
+    expect(checklistEntryDone({ systemClear: null, ticked: false, exempted: false })).toBe(false)
+    expect(checklistEntryDone({ systemClear: null, ticked: true, exempted: false })).toBe(true)
+    expect(checklistEntryDone({ systemClear: null, ticked: false, exempted: true })).toBe(true)
   })
 })
 

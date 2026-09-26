@@ -260,15 +260,17 @@ describe('ticking and exempting (criteria 2, 3, 5)', () => {
     })
   })
 
-  test('a system-verified item cannot be exempted either: recording one would be audited and have no effect', async () => {
+  // Issue 1296: a hold nobody released must not keep the night open for ever (criterion 5).
+  test('a system-verified item can be made an exception with a reason, once', async () => {
     await withDatabase(async (database) => {
       const officer = person(database, 'officer')
       const { venueId, performanceId } = tonightsPerformance(database)
-      const stampId = stampedItem(database, venueId, performanceId, officer, { systemCheck: 'INCIDENTS_REVIEWED', phase: 'POST' })
+      const stampId = stampedItem(database, venueId, performanceId, officer, { systemCheck: 'NO_SHOW_HOLDS_RELEASED', phase: 'POST' })
 
-      expect(run(database, exemptStatement(stampId, performanceId, 'Reason', officer))).toHaveLength(0)
+      expect(run(database, exemptStatement(stampId, performanceId, 'Desk hold for the director, never collected', officer))).toHaveLength(1)
+      expect(run(database, exemptStatement(stampId, performanceId, 'A second reason', officer))).toHaveLength(0)
       const [after] = run(database, stampsForPerformanceQuery(performanceId))
-      expect(after).toMatchObject({ exempted: 0, exemptReason: null })
+      expect(after).toMatchObject({ exempted: 1, exemptReason: 'Desk hold for the director, never collected' })
     })
   })
 
@@ -333,6 +335,20 @@ describe('the no-show-holds system check (criterion 3)', () => {
 
       database.batch([['UPDATE reservations SET status = ? WHERE id = ?', 'NO_SHOW', 'r-1']])
       expect(run(database, noShowHoldsReleasedQuery(made.performanceId))[0]?.unresolved).toBe(0)
+    })
+  })
+
+  // Issue 1296: a paid booking nobody used is a no-show for the report, not a hold to release.
+  test('a paid booking that was never admitted does not hold the check; only an unpaid hold does', async () => {
+    await withDatabase((database) => {
+      const made = tonightsPerformance(database)
+      database.batch([['INSERT INTO reservations (id, reference, performance_id, status, source) VALUES (?, ?, ?, ?, ?)',
+        'r-paid', 'PAID1', made.performanceId, 'COLLECTED', 'WEB']])
+      expect(run(database, noShowHoldsReleasedQuery(made.performanceId))[0]?.unresolved).toBe(0)
+
+      database.batch([['INSERT INTO reservations (id, reference, performance_id, status, source) VALUES (?, ?, ?, ?, ?)',
+        'r-unpaid', 'UNPD1', made.performanceId, 'PENDING', 'WEB']])
+      expect(run(database, noShowHoldsReleasedQuery(made.performanceId))[0]?.unresolved).toBe(1)
     })
   })
 

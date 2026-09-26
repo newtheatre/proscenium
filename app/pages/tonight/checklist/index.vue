@@ -161,7 +161,7 @@ async function closeNight(): Promise<void> {
   <div>
     <NightScreen
       title="Checklist"
-      hint="An item that ticks itself needs nothing from you. Tick the rest, or make an exception with a reason."
+      hint="Tick each item, or make an exception with a reason. An item that ticks itself needs a reason only if it cannot clear."
       :stale="syncedAt"
       :busy="busy"
     >
@@ -231,7 +231,13 @@ async function closeNight(): Promise<void> {
                   >(optional)</span>
                 </p>
                 <p
-                  v-if="entry.systemCheck"
+                  v-if="entry.exempted"
+                  class="text-xs text-muted"
+                >
+                  Exception: {{ entry.exemptReason }}
+                </p>
+                <p
+                  v-else-if="entry.systemCheck"
                   class="text-xs text-muted"
                 >
                   Ticks itself: {{ entry.done ? 'clear' : 'not yet clear' }}
@@ -242,21 +248,18 @@ async function closeNight(): Promise<void> {
                 >
                   Ticked by {{ entry.tickedByName }}
                 </p>
-                <p
-                  v-else-if="entry.exempted"
-                  class="text-xs text-muted"
-                >
-                  Exception: {{ entry.exemptReason }}
-                </p>
               </div>
+              <!-- An item that ticks itself but cannot clear tonight takes an exception like any
+                   other; only the Tick is withheld from it (E-114 criteria 3 and 5, issue 1296). -->
               <div class="flex shrink-0 items-center gap-2">
                 <UIcon
                   v-if="entry.done"
                   name="i-lucide-check"
                   class="size-5 text-success"
                 />
-                <template v-else-if="!entry.systemCheck">
+                <template v-else>
                   <UButton
+                    v-if="!entry.systemCheck"
                     class="min-h-12 min-w-12 justify-center"
                     :loading="savingId === entry.id"
                     :disabled="saving && savingId !== entry.id"

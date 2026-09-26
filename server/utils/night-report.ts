@@ -22,14 +22,15 @@ export interface ReportAttendance {
   fellowshipAdmissions: number
 }
 
-// "Sold" rides `heldSeatsSubquery` (D-105 criterion 2); a walk-up is a door-source reservation.
-// `passAdmissions` is `admitted`'s own subset (D-126 criterion 3), never a second count of seats.
+// A no-show is paid, never admitted and still holds an unrefunded ticket, derived and never written
+// (issue 1296). A walk-up is a door-source booking; `passAdmissions` is `admitted`'s subset (D-126).
 export function reportAttendanceQuery(performanceId: string): SQL {
   return sql`
     SELECT
       ${heldSeatsSubquery(sql`${performanceId}`)} AS sold,
       (SELECT count(*) FROM reservations WHERE performance_id = ${performanceId} AND status = 'DOOR') AS admitted,
-      (SELECT count(*) FROM reservations WHERE performance_id = ${performanceId} AND status = 'NO_SHOW') AS noShows,
+      (SELECT count(*) FROM reservations r WHERE r.performance_id = ${performanceId} AND (r.status = 'NO_SHOW'
+        OR (r.status = 'COLLECTED' AND EXISTS (SELECT 1 FROM tickets t WHERE t.reservation_id = r.id AND t.refunded_at IS NULL)))) AS noShows,
       (SELECT count(*) FROM reservations WHERE performance_id = ${performanceId} AND status = 'DOOR' AND source = 'DOOR') AS walkUps,
       (SELECT count(*) FROM reservations r
        JOIN tickets t ON t.reservation_id = r.id

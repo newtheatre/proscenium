@@ -1334,7 +1334,8 @@ own pattern). Keyed to a performance (E-128; rebuilt by hand from the venue-and-
 E-114 originally shipped, `docs/decisions/0063-hand-authored-table-rebuilds.md`), so a matinee
 and an evening never share one. A system-verified item's `ticked_by`/`ticked_at` stay NULL
 forever; its done state is read live against this performance's own data, never stored (E-114
-criterion 3).
+criterion 3), unless an exception with a reason answers it first, as any item's can (criterion
+5, issue 1296).
 
 ### checklist_closes
 `id` PK · `performance_id` → performances restrict, UNIQUE · `closed_by` restrict · `closed_at`.
