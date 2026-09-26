@@ -12,13 +12,15 @@ export async function closerFor(event: H3Event, session: { venueId: string, nigh
   if (session.night === currentShowNight()) {
     return (await requireNightAuthority(event, 'BAR', { venueId: session.venueId })).account
   }
+  return earlierNightOfficer(event, 'A session from an earlier night', 'close')
+}
 
+// The standing officer role, second factor and all: the one authority an ended night keeps, for
+// its session and its unanswered charges alike (F-102 criterion 5, issue 1308).
+export async function earlierNightOfficer(event: H3Event, what: string, to: string): Promise<AccountRow> {
   const resolved = await authority(event)
   if (!resolved.permissions.has('night.till')) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: `A session from an earlier night needs ${NIGHT_ROLE_OFFICER.BAR.words} to close`,
-    })
+    throw createError({ statusCode: 403, statusMessage: `${what} needs ${NIGHT_ROLE_OFFICER.BAR.words} to ${to}` })
   }
   await requireSecondFactorIfPrivileged(event, resolved)
   return resolved.account

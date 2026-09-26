@@ -10,10 +10,13 @@ export default defineEventHandler(async (event) => {
 
   const row = await attemptById(id)
   if (!row) throw noSuch('SumUp attempt')
-  const resolved = await requireNightAuthority(event, 'BAR', scope.venueId ? scope : { venueId: row.venueId })
+  // Tonight's shift never reaches back into an ended night, as its session's close does not.
+  const account = row.night === currentShowNight()
+    ? (await requireNightAuthority(event, 'BAR', scope.venueId ? scope : { venueId: row.venueId })).account
+    : await earlierNightOfficer(event, 'A charge from an earlier night', 'answer')
 
   const outcome = await resolveAttempt(row, input.outcome, input.smpTxCode, input.note, {
-    actorId: resolved.account.id,
+    actorId: account.id,
     resolution: 'STAFF',
     baseURL: useRuntimeConfig(event).public.baseURL,
     event,
