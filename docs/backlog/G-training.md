@@ -207,8 +207,13 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   5. Sessions survive DST transitions: a 19:00 session is 19:00 London time on either side of a clock change, pinned by a named regression test.
   6. The session's own page changes its places while it is planned, open or full and its register
      is unopened, and says how many members the change promoted or moved back to the waiting list.
+  7. Added 26 September 2026 (issue 1336): the scheduler names the trainer. A trainer always
+     teaches what they schedule; the training officer (`training.write`) may name anybody with
+     trainer standing today who holds every module the session teaches, and that person, not
+     the scheduler, is the session's trainer: it is theirs on My training, under "Sessions you
+     teach", and its register is theirs to open. Left unnamed, the scheduler teaches it.
 - Source: Prompt Book G-2; audit TR-4; Get-In part 5 (DST arithmetic); issue 1062 (criterion 6,
-  the capacity route had no screen)
+  the capacity route had no screen); issue 1336 (criterion 7)
 
 ## G-113: Cancel a session with reason and notification
 

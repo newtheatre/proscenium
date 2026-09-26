@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { can, nameTrainers } from '#shared/utils/abilities'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { saysDay } from '#shared/utils/when'
@@ -89,6 +90,18 @@ const teachable = computed(() => catalogue.value.items.filter(module =>
 const teachableOptions = computed(() => teachable.value
   .map(module => ({ label: `${module.id} ${module.name}`, value: module.id })))
 
+// The training officer names who teaches; a trainer always teaches what they schedule, so they are
+// not offered the choice (G-112 as amended, issue 1336).
+const namesTrainer = computed(() => can(useViewer().value, nameTrainers))
+const { data: trainers } = await useAsyncData(
+  'training-sessions-trainers',
+  () => (namesTrainer.value
+    ? request<{ items: { id: string, name: string }[] }>('/api/admin/training/trainers')
+    : Promise.resolve({ items: [] as { id: string, name: string }[] })),
+  { default: () => ({ items: [] as { id: string, name: string }[] }) },
+)
+const trainerOptions = computed(() => trainers.value.items.map(one => ({ label: one.name, value: one.id })))
+
 const shown = computed(() => {
   const term = search.value.trim().toLowerCase()
   if (!term) return data.value.items
@@ -108,7 +121,8 @@ const state = reactive<{
   notes?: string
   moduleIds: string[]
   opensAt?: number | null
-}>({ heldOn: '', startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [], opensAt: null })
+  trainerId?: string | null
+}>({ heldOn: '', startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [], opensAt: null, trainerId: null })
 
 // Scheduled ahead and logged behind: the write path refuses each the other way round, so the
 // pickers say so rather than letting somebody find out at the submit.
@@ -160,6 +174,7 @@ function begin(chosen: string[] = []): void {
     notes: undefined,
     moduleIds: chosen,
     opensAt: null,
+    trainerId: null,
   })
   opensNow.value = true
   opensOnDay.value = ''
@@ -596,6 +611,24 @@ const columns: TableColumn<Session>[] = [
               placeholder="Search the catalogue"
               class="w-full"
               data-test="session-modules"
+            />
+          </UFormField>
+
+          <UFormField
+            v-if="namesTrainer"
+            label="Taught by"
+            name="trainerId"
+            description="Somebody holding a current trainer certification and everything the session teaches. Left empty, you teach it."
+          >
+            <USelectMenu
+              :model-value="state.trainerId ?? undefined"
+              :items="trainerOptions"
+              value-key="value"
+              clearable
+              placeholder="You"
+              class="w-full"
+              data-test="session-trainer"
+              @update:model-value="value => state.trainerId = (value as string | undefined) ?? null"
             />
           </UFormField>
 

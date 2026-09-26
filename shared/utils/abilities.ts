@@ -28,9 +28,9 @@ export const signedIn = defineAbility((_viewer: Viewer) => true)
 export const anybody = defineAbility((_viewer: Viewer) => true)
 
 // Standing permissions are administrative save for the night bypass (0009, 0044), so holding one
-// of the rest is what admits somebody to the console at all.
+// of the rest admits somebody to the console, as does derived standing whose screens live there (0040).
 export const reachConsole = defineAbility((viewer: Viewer) =>
-  viewer.permissions.some(permission => !OPERATIONAL_PERMISSIONS.includes(permission)))
+  viewer.isTrainer || viewer.leadsDepartment || viewer.permissions.some(permission => !OPERATIONAL_PERMISSIONS.includes(permission)))
 
 export const viewAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.read'))
 export const disableAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.disable'))
@@ -62,6 +62,9 @@ export const recordTrainingByAddress = defineAbility((viewer: Viewer) => holds(v
 
 // Running a session derives from a current trainer certification (requireTrainer, G-111).
 export const runTrainingSessions = defineAbility((viewer: Viewer) => holds(viewer, 'training.write') || viewer.isTrainer)
+
+// Naming somebody else to teach a session: the training officer only, never a trainer (G-112, issue 1336).
+export const nameTrainers = defineAbility((viewer: Viewer) => holds(viewer, 'training.write'))
 
 // A membership is a dated fact, not a grant (0009, 0031). Grace counts for what these guard;
 // the refusal names the policy, never the ability (A-129).
@@ -188,6 +191,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   recordBackupDrills: 'backups.write',
   viewTrainingCatalogue: 'training.read',
   runTrainingSessions: 'training.write',
+  nameTrainers: 'training.write',
   recordTrainingByAddress: 'training.by-address',
   viewTicketTypes: 'ticketing.read',
   viewProgramme: 'ticketing.read',

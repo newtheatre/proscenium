@@ -15,9 +15,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // G-112 as amended (issue 1336): the scheduler names who teaches. A trainer schedules their own
+  // sessions; only the training officer names somebody else, who must hold trainer standing.
+  const teacher = await namedTeacher(resolved, input.trainerId, today)
+
   // Criteria 3 and 4, and question 4's answer. Shared with the retrospective log, which refuses
   // the same modules for the same reasons (G-118).
-  await assertTeachable(resolved, input.moduleIds, today)
+  await assertTeachable(resolved, input.moduleIds, today, teacher ?? undefined)
 
   const id = newId()
   await db.batch([
@@ -33,7 +37,7 @@ export default defineEventHandler(async (event) => {
       status: input.opensAt === null ? 'OPEN' : 'PLANNED',
       description: input.description,
       notes: input.notes,
-      trainerId: resolved.account.id,
+      trainerId: teacher?.id ?? resolved.account.id,
     }),
     ...input.moduleIds.map(moduleId => db.insert(schema.sessionModules).values({
       id: newId(),
@@ -44,7 +48,7 @@ export default defineEventHandler(async (event) => {
       actorId: resolved.account.id,
       action: 'session.scheduled',
       target: `session:${id}`,
-      detail: { heldOn: input.heldOn, modules: input.moduleIds, capacity: input.capacity },
+      detail: { heldOn: input.heldOn, modules: input.moduleIds, capacity: input.capacity, trainer: teacher?.id ?? resolved.account.id },
     })),
   ])
 

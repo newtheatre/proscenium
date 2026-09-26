@@ -42,6 +42,19 @@ const { data, status, error, refresh } = await useAsyncData(
   { default: () => null as Register | null },
 )
 
+const readFailure = useListFailure(error, 'The register could not be read.')
+const refused = computed(() => refusalStatus(error.value) === 403)
+
+// The session this register belongs to, named by what it teaches and when, in the shell's header
+// as well as the page's own: a bare date told a trainer nothing (issue 1336).
+const sessionTitle = computed(() => data.value?.modules.map(module => module.name).join(', ') || 'Register')
+const sessionWhen = computed(() => (data.value
+  ? `${saysDay(data.value.heldOn)}, ${data.value.startsAt} to ${data.value.endsAt}${data.value.place ? ` · ${data.value.place}` : ''}`
+  : ''))
+
+setNightEyebrow(() => 'Training register')
+setNightSubject(() => ({ title: sessionTitle.value, meta: sessionWhen.value || null }))
+
 // Everybody starts absent, which is the safe default: a record is created by saying somebody was
 // there, never by failing to say they were not (G-116 criterion 1).
 const present = ref(new Set<string>())
@@ -202,15 +215,15 @@ async function submit(): Promise<void> {
     />
 
     <!-- A failed read and an empty register look the same, and "nobody signed up" is an answer a
-      trainer would act on by going home. -->
+      trainer would act on by going home. A refusal says why, never that nothing could be read. -->
     <UAlert
-      v-if="error"
+      v-if="readFailure"
       color="error"
       variant="subtle"
-      icon="i-lucide-unplug"
-      data-test="load-failed"
-      title="The register could not be read"
-      description="This is not the same as nobody being on it. Try again before you start marking."
+      :icon="refused ? 'i-lucide-lock' : 'i-lucide-unplug'"
+      data-test="register-refused"
+      :title="readFailure.message"
+      :description="refused ? undefined : 'This is not the same as nobody being on it. Try again before you start marking.'"
     />
 
     <div
@@ -226,13 +239,14 @@ async function submit(): Promise<void> {
 
     <template v-else-if="data">
       <header class="space-y-1">
-        <h1 class="nnt-headline text-2xl">
-          {{ data.heldOn }}
+        <h1
+          class="nnt-headline text-2xl"
+          data-test="register-title"
+        >
+          {{ sessionTitle }}
         </h1>
         <p class="text-sm text-muted">
-          {{ data.startsAt }} to {{ data.endsAt }}<template v-if="data.place">
-            · {{ data.place }}
-          </template>
+          {{ sessionWhen }}
         </p>
         <div class="flex flex-wrap gap-1 pt-1">
           <UBadge

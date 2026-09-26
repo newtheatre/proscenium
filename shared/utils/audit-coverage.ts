@@ -717,6 +717,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/training/records/[id]/revoke.post.ts', actions: ['record.revoked'] },
   { route: 'server/api/admin/training/sessions/index.post.ts', actions: ['session.scheduled'] },
   { route: 'server/api/admin/training/sessions/index.get.ts', exempt: 'reads the scheduled sessions' },
+  { route: 'server/api/admin/training/trainers.get.ts', exempt: 'reads who holds trainer standing, for the Taught by picker' },
   {
     route: 'server/api/admin/training/deliveries/preview.post.ts',
     exempt: 'the dry-run for a retrospective log; it writes nothing at all',
@@ -730,6 +731,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['session.capacity.changed'],
   },
   { route: 'server/api/training/sessions/index.get.ts', exempt: 'reads the sessions open to you, and where you stand on each' },
+  { route: 'server/api/training/teaching.get.ts', exempt: 'reads the sessions you teach' },
   {
     route: 'server/api/training/sessions/[id]/signup.post.ts',
     exempt: 'joins a queue about yourself; the place it confers is derived, not granted',

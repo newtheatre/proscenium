@@ -38,6 +38,15 @@ const { data, status, error: recordsError, refresh: refreshRecords } = await use
 
 const recordsFailure = useListFailure(recordsError, 'Your training records could not be read.')
 
+// The sessions this member teaches that still need them, each a tap from its register (issue
+// 1336). Empty for everybody who teaches nothing, so the section simply does not show.
+interface Taught { id: string, heldOn: string, startsAt: string, place: string | null, modules: { id: string, name: string }[] }
+const { data: teaching } = await useAsyncData(
+  'training-teaching',
+  () => request<{ items: Taught[] }>('/api/training/teaching'),
+  { default: () => ({ items: [] as Taught[] }) },
+)
+
 // Grouped by department, which is how a member thinks about what they are allowed to do
 // (G-101 criterion 1). Order follows the server's, newest award first inside each group.
 const groups = computed(() => {
@@ -339,6 +348,45 @@ const standings = computed(() => [
         </ul>
       </section>
     </div>
+
+    <section
+      v-if="teaching.items.length > 0"
+      class="mt-12"
+      data-test="sessions-you-teach"
+    >
+      <h2 class="text-lg font-semibold">
+        Sessions you teach
+      </h2>
+      <ul class="mt-3 space-y-3">
+        <li
+          v-for="session in teaching.items"
+          :key="session.id"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default p-4"
+          :data-test="`teaching-${session.id}`"
+        >
+          <div>
+            <p class="font-medium">
+              {{ session.modules.map(module => module.name).join(', ') }}
+            </p>
+            <p class="mt-1 text-sm text-muted">
+              {{ saysDay(session.heldOn) }} at {{ session.startsAt }}
+              <template v-if="session.place">
+                · {{ session.place }}
+              </template>
+            </p>
+          </div>
+          <UButton
+            size="lg"
+            class="min-h-12"
+            icon="i-lucide-clipboard-check"
+            :to="`/training/sessions/${session.id}/register`"
+            :data-test="`open-register-${session.id}`"
+          >
+            Open the register
+          </UButton>
+        </li>
+      </ul>
+    </section>
 
     <section
       class="mt-12"
