@@ -180,22 +180,22 @@ describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority 
     const response = await openTill(shiftVenue.venueId, holder.cookie)
     expect(response.status).toBe(403)
     const refusal = await message(response)
-    expect(refusal).toContain('BAR')
-    expect(refusal).toContain('bar manager')
+    expect(refusal).toContain('a confirmed bar shift')
+    expect(refusal).toContain('Bar Manager\'s role')
   })
 
   test('the front of house officer does not open the till', async () => {
     const response = await openTill(studio.venueId, foh.cookie)
     expect(response.status).toBe(403)
-    expect(await message(response)).toContain('bar manager')
+    expect(await message(response)).toContain('Bar Manager\'s role')
   })
 
   test('an ordinary member is refused, and told what would unlock it', async () => {
     const response = await openTill(studio.venueId, member.cookie)
     expect(response.status).toBe(403)
     const refusal = await message(response)
-    expect(refusal).toContain('BAR')
-    expect(refusal).toContain('bar manager')
+    expect(refusal).toContain('a confirmed bar shift')
+    expect(refusal).toContain('Bar Manager\'s role')
   })
 
   test('a signed-out caller gets no further', async () => {
