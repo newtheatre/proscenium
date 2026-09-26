@@ -15,6 +15,12 @@ export async function closerFor(event: H3Event, session: { venueId: string, nigh
 // officer role reaches back, second factor and all, for its session and charges (F-102.5, issue 1308).
 export async function barAuthorityFor(event: H3Event, night: string, scope: NightScope, what: string, to: string): Promise<AccountRow> {
   if (night === currentShowNight()) return (await requireNightAuthority(event, 'BAR', scope)).account
+  return barOfficerFor(event, what, to)
+}
+
+// The standing half alone, for what only ever concerns ended nights: the till's list of what they
+// left open (issue 1316).
+export async function barOfficerFor(event: H3Event, what: string, to: string): Promise<AccountRow> {
   const resolved = await authority(event)
   if (!resolved.permissions.has('night.till')) {
     throw createError({ statusCode: 403, statusMessage: `${what} needs ${NIGHT_ROLE_OFFICER.BAR.words} to ${to}` })

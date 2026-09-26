@@ -3,9 +3,9 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { openAttemptsOn } from './sumup-queries'
+import { openAttemptsOn, unresolvedBefore } from './sumup-queries'
 import type { SQL } from 'drizzle-orm'
-import type { TillSession } from '#shared/utils/till'
+import type { EarlierTillLeftOpen, TillLeftOpen, TillSession } from '#shared/utils/till'
 
 // Reading and guarding tonight's till session (F-102). Opening and closing one is the write
 // path's own SQL in its route; what a reader needs is here so nothing restates the shape.
@@ -52,10 +52,26 @@ export function sessionByIdQuery(id: string): SQL {
   return sql`SELECT ${SESSION_COLUMNS} FROM till_sessions WHERE id = ${id}`
 }
 
-// Every unclosed session from a night that has already ended, for the duty manager's close-night
-// checklist (F-102 criterion 5). The checklist screen is E-114's and does not exist yet.
-export function staleUnclosedSessionsQuery(tonight: string): SQL {
-  return sql`SELECT ${SESSION_COLUMNS} FROM till_sessions WHERE closed_at IS NULL AND night <> ${tonight} ORDER BY night`
+// Every session an ended night left open, at any bar, for the Bar Manager's list on the till
+// (F-102 criterion 5, issue 1316).
+export function earlierOpenSessionsQuery(tonight: string): SQL {
+  return sql`
+    SELECT s.*, v.name AS venueName
+    FROM (SELECT ${SESSION_COLUMNS} FROM till_sessions WHERE closed_at IS NULL AND night < ${tonight}) s
+    JOIN venues v ON v.id = s.venueId
+    ORDER BY s.night, v.name
+  `
+}
+
+// One venue's bar for the close-night checklist: tonight's till still open, and what earlier
+// nights left there (E-114 criterion 3, issue 1316).
+export function tillLeftOpenQuery(venueId: string, tonight: string): SQL {
+  return sql`
+    SELECT
+      (SELECT count(*) FROM till_sessions WHERE venue_id = ${venueId} AND night = ${tonight} AND closed_at IS NULL) AS tonight,
+      (SELECT count(*) FROM till_sessions WHERE venue_id = ${venueId} AND night < ${tonight} AND closed_at IS NULL) AS earlier,
+      (SELECT count(*) FROM sumup_attempts a WHERE a.venue_id = ${venueId} AND ${unresolvedBefore(tonight)}) AS unanswered
+  `
 }
 
 export async function openSessionFor(venueId: string, night: string): Promise<TillSession | null> {
@@ -68,8 +84,13 @@ export async function sessionById(id: string): Promise<TillSession | null> {
   return row ?? null
 }
 
-export async function staleUnclosedSessions(tonight: string): Promise<TillSession[]> {
-  return db.all<TillSession>(staleUnclosedSessionsQuery(tonight))
+export async function earlierOpenSessions(tonight: string): Promise<EarlierTillLeftOpen['sessions']> {
+  return db.all<EarlierTillLeftOpen['sessions'][number]>(earlierOpenSessionsQuery(tonight))
+}
+
+export async function tillLeftOpen(venueId: string, tonight: string): Promise<TillLeftOpen> {
+  const [row] = await db.all<TillLeftOpen>(tillLeftOpenQuery(venueId, tonight))
+  return row ?? { tonight: 0, earlier: 0, unanswered: 0 }
 }
 
 export function isOpen(session: TillSession | null): session is TillSession {

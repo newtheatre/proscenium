@@ -453,10 +453,10 @@ describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterio
       }
     })()
     shift(performanceId, 'DUTY_MANAGER', dm.id)
-    const tillOf = async (): Promise<{ tonight: number, earlier: number, unanswered: number } | null> => {
+    const tillOf = async (): Promise<{ tonight: number, earlier: number, unanswered: number }> => {
       const answered = await send('GET', `/api/tonight/checklist?performanceId=${performanceId}`, undefined, dm.cookie)
       expect(answered.status).toBe(200)
-      return (await answered.json() as { till: { tonight: number, earlier: number, unanswered: number } | null }).till
+      return (await answered.json() as { till: { tonight: number, earlier: number, unanswered: number } }).till
     }
 
     expect(await tillOf()).toEqual({ tonight: 0, earlier: 0, unanswered: 0 })

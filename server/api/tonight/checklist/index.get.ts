@@ -12,9 +12,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'More than one performance is running tonight: name the performance' })
   }
 
-  const [items, close] = await Promise.all([
+  // The till line ticks itself from the bar's own sessions and never holds the close: only the bar
+  // can close a till, so it has no exception to take (F-102 criterion 5, issue 1316).
+  const [items, close, till] = await Promise.all([
     checklistFor(target),
     closeFor(target),
+    tillLeftOpen(resolved.venueId, resolved.night),
   ])
-  return { performanceId: target, night: resolved.night, venueId: resolved.venueId, items, close }
+  return { performanceId: target, night: resolved.night, venueId: resolved.venueId, items, close, till }
 })

@@ -8,13 +8,14 @@ import { auditedWrite } from './audit'
 import { commitSale } from './sale'
 import { openSessionFor, requireOpenSession } from './till'
 import { qrTokenFor, verifyQrToken } from './qr-tokens'
-import { ATTEMPT_COLUMNS, openAttemptsOn, recordPostedSaleStatement, stuckAttemptsQuery } from './sumup-queries'
+import { ATTEMPT_COLUMNS, earlierUnresolvedAttemptsQuery, openAttemptsOn, recordPostedSaleStatement, stuckAttemptsQuery } from './sumup-queries'
 import { auditEntry } from '#shared/utils/audit'
 import { londonDayOf } from '#shared/utils/ledger'
 import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, UNRESOLVED_ATTEMPT_STATUSES, attemptMayMove, isTerminalAttempt, sumupLaunchUrl } from '#shared/utils/sumup'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { SaleInput, SaleReceipt } from '#shared/utils/sale'
+import type { EarlierTillLeftOpen } from '#shared/utils/till'
 import type { ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView, SumupResolution, SumupReturnInput } from '#shared/utils/sumup'
 
 // One card charge (F-124, 0069, 0096): handed to the SumUp app or keyed into the reader, its
@@ -112,6 +113,11 @@ export async function attemptById(id: string): Promise<AttemptRow | undefined> {
 
 export async function unresolvedAttempts(night: string): Promise<SumupAttemptView[]> {
   return (await db.all<AttemptRow>(unresolvedAttemptsQuery(night))).map(view)
+}
+
+export async function earlierUnresolvedAttempts(tonight: string): Promise<EarlierTillLeftOpen['attempts']> {
+  const rows = await db.all<AttemptRow & { venueName: string }>(earlierUnresolvedAttemptsQuery(tonight))
+  return rows.map(row => ({ ...view(row), night: row.night, venueName: row.venueName }))
 }
 
 export function basketOf(row: AttemptRow): AttemptBasket {

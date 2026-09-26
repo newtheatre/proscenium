@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { closeSessionStatement, earlierOpenSessionsQuery, openSessionForQuery, sessionByIdQuery, staleUnclosedSessionsQuery, tillLeftOpenQuery } from '#server/utils/till'
+import { closeSessionStatement, earlierOpenSessionsQuery, openSessionForQuery, sessionByIdQuery, tillLeftOpenQuery } from '#server/utils/till'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 import type { TillSession } from '#shared/utils/till'
@@ -312,9 +312,9 @@ describe('the query builders read what the write path wrote', () => {
     })
   })
 
-  // The checklist reads every unclosed session that is not tonight's, whatever venue it is at
-  // (F-102 criterion 5).
-  test('staleUnclosedSessionsQuery names every unclosed session from an earlier night, and none from tonight or already closed', async () => {
+  // The Bar Manager's list reads every unclosed session that is not tonight's, whatever venue it
+  // is at (F-102 criterion 5).
+  test('earlierOpenSessionsQuery names every unclosed session from an earlier night, and none from tonight or already closed', async () => {
     await withDatabase((database) => {
       const opener = person(database)
       const houseId = venue(database, '1')
@@ -324,7 +324,7 @@ describe('the query builders read what the write path wrote', () => {
         id: 't-closed', venue_id: studioId, night: '2026-09-02', opened_by: opener, closed_by: opener, closed_at: 9000, opened_at: 1000 })
       insert(database, 'till_sessions', { id: 't-tonight', venue_id: houseId, night: '2026-09-04', opened_by: opener, opened_at: 1000 })
 
-      const found = rows<TillSession>(database, ...boundStatement(database, staleUnclosedSessionsQuery('2026-09-04')))
+      const found = rows<TillSession>(database, ...boundStatement(database, earlierOpenSessionsQuery('2026-09-04')))
       expect(found.map(session => session.id)).toEqual(['t-stale'])
     })
   })

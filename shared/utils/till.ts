@@ -1,6 +1,8 @@
 import { saysMoney } from './bar'
+import { plural } from './text'
 import { z } from 'zod'
 import type { NightCacheStore } from './night-cache'
+import type { SumupAttemptView } from './sumup'
 
 // The till's own session (F-102): the one accountable window that every sale, tab charge and comp
 // hangs off. One per venue per night, opened once and closed once.
@@ -39,6 +41,33 @@ export interface TillVenueOption {
 
 // Closing a session takes the reader's own reading and needs a live expected figure to compare
 // it against, so its form lives with that computation in `shared/utils/reconciliation.ts` (F-118).
+
+// What ended nights left open, each with its bar: no shift reaches back into a night, so the till
+// lists these for the Bar Manager alone to close and answer (F-102 criterion 5, issue 1316).
+export interface EarlierTillLeftOpen {
+  sessions: (TillSession & { venueName: string })[]
+  attempts: (SumupAttemptView & { night: string, venueName: string })[]
+}
+
+// The close-night checklist's reading of one venue's bar (E-114 criterion 3, issue 1316).
+export interface TillLeftOpen {
+  tonight: number
+  earlier: number
+  unanswered: number
+}
+
+// Null is the line ticked. Only the bar closes a till, so the line says who does, and it never
+// holds the duty manager's close (F-102 criterion 5).
+export function saysTillLeftOpen(left: TillLeftOpen): string | null {
+  const said: string[] = []
+  if (left.tonight > 0) said.push('Tonight\'s till is still open: whoever is on the bar closes it from the till.')
+  const earlier = [
+    left.earlier > 0 ? `${plural(left.earlier, 'till')} from an earlier night left open` : null,
+    left.unanswered > 0 ? `${plural(left.unanswered, 'card charge')} from an earlier night left unanswered` : null,
+  ].filter(part => part !== null)
+  if (earlier.length > 0) said.push(`${earlier.join(', and ')}. Tell the Bar Manager, whose role alone reaches an earlier night from the till.`)
+  return said.length > 0 ? said.join(' ') : null
+}
 
 // What a charge button reads. Show-night register: four words at most, verb first, so a total
 // read at arm's length mid-service is the whole label (K-128, copy-style §3).
