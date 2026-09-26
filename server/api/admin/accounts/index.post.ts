@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { PROTECTED_ROLE, ROLES, defaultRoleExpiry } from '#shared/utils/roles'
-import { protectedGrantRefusal } from '#shared/utils/protected-role'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
 import { PRE_LINKED } from '#shared/utils/pending-grants'
 import {
@@ -61,10 +60,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'You do not have permission to grant roles' })
   }
   // Refused before the account is made, so a refusal leaves nothing half done (A-120 criterion 1).
-  if (input.roles.includes(PROTECTED_ROLE)) {
-    const refusal = protectedGrantRefusal(await protectedHolders(), { userId: null, expiresAt: defaultRoleExpiry(new Date()), usable: false })
-    if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
-  }
+  if (input.roles.includes(PROTECTED_ROLE)) await refuseProtectedGrant(null, null)
 
   const id = newId()
   const statements = consoleAccountStatements({

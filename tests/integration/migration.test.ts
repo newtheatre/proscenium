@@ -294,11 +294,12 @@ describe('the identity import lands in the application schema (K-112)', () => {
 // A-120 criterion 1 and issue #1355: a lapse is not an act the guard sees, so a build whose IT
 // Manager grants are all dated fails the reconciliation rather than landing a lapse in waiting.
 describe('the import carries an IT Manager whose grant cannot lapse', () => {
-  test('dated decisions leave none, and a disabled holder never counts', async () => {
+  test('dated decisions leave none, and a disabled or never-signed-in holder never counts', async () => {
     const source = sourceEstate()
-    addPerson(source, { id: 'old-1', email: 'officer@example.invalid' })
-    addPerson(source, { id: 'old-2', email: 'disabled@example.invalid', disabled: 1 })
-    for (const holder of ['old-1', 'old-2']) {
+    addPerson(source, { id: 'old-1', email: 'officer@example.invalid', password: 'hash' })
+    addPerson(source, { id: 'old-2', email: 'disabled@example.invalid', password: 'hash', disabled: 1 })
+    addPerson(source, { id: 'old-3', email: 'waiting@example.invalid' })
+    for (const holder of ['old-1', 'old-2', 'old-3']) {
       source.query('INSERT INTO user_roles VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(holder, 'auth:ADMIN', null, null, 1700000000, null, null)
     }

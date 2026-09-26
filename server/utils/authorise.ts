@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import { and, eq, gt, isNull, or } from 'drizzle-orm'
-import { strandingBy } from '#shared/utils/protected-role'
-import type { ProtectedHolder, Stranding } from '#shared/utils/protected-role'
+import { protectedGrantRefusal, strandingBy, strandingRefusal } from '#shared/utils/protected-role'
+import type { ProtectedHolder, Stranding, StrandingAct } from '#shared/utils/protected-role'
 import type { Grant, Permission, Role } from '#shared/utils/roles'
 import type { AccountRow } from '#server/utils/accounts'
 
@@ -85,7 +85,7 @@ export async function protectedHolders(now = new Date()): Promise<ProtectedHolde
   return await db.all<ProtectedHolder>(protectedHoldersStatement(Math.floor(now.getTime() / 1000)))
 }
 
-export async function isUsableAccount(userId: string): Promise<boolean> {
+async function isUsableAccount(userId: string): Promise<boolean> {
   const [row] = await db.select({ id: schema.users.id }).from(schema.users)
     .where(and(eq(schema.users.id, userId), usableAccountWhere()))
     .limit(1)
@@ -97,4 +97,17 @@ export async function isUsableAccount(userId: string): Promise<boolean> {
 export async function wouldStrandTheSystem(role: Role, userId: string, now = new Date()): Promise<Stranding | null> {
   if (role !== PROTECTED_ROLE) return null
   return strandingBy(await protectedHolders(now), userId)
+}
+
+// Every act that takes an IT Manager's standing away refuses with the same 409, naming the way out.
+export async function refuseStranding(role: Role, userId: string, act: StrandingAct): Promise<void> {
+  const stranding = await wouldStrandTheSystem(role, userId)
+  if (stranding) throw createError({ statusCode: 409, statusMessage: strandingRefusal(stranding, act) })
+}
+
+// A grant on an account this request creates is on nobody usable yet (A-120 criterion 3).
+export async function refuseProtectedGrant(userId: string | null, expiresAt: number | null): Promise<void> {
+  const [holders, usable] = await Promise.all([protectedHolders(), userId === null ? false : isUsableAccount(userId)])
+  const refusal = protectedGrantRefusal(holders, { userId, expiresAt, usable })
+  if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 }

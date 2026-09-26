@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { changes } from '#shared/utils/audit'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
 import { CHOOSE_INSTEAD, PRE_LINKED, pendingGrantConstraintRefusal, pendingGrantDetail, pendingGrantStatements } from '#shared/utils/pending-grants'
-import { protectedGrantRefusal } from '#shared/utils/protected-role'
 import { PROTECTED_ROLE, ROLES } from '#shared/utils/roles'
 
 // Provenance on the grant, never in the audit trail's detail, which carries identifiers and never
@@ -48,10 +47,7 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
     }
     // Waiting for a first sign-in, so it keeps nothing until then (A-120 criterion 3).
-    if (input.role === PROTECTED_ROLE) {
-      const refusal = protectedGrantRefusal(await protectedHolders(), { userId: null, expiresAt, usable: false })
-      if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
-    }
+    if (input.role === PROTECTED_ROLE) await refuseProtectedGrant(null, expiresAt)
 
     const userId = newId()
     const statements = pendingGrantStatements({
@@ -96,10 +92,7 @@ export default defineEventHandler(async (event) => {
 
   // A lapse is a revocation nobody acts on, so every IT Manager grant leaves one that cannot
   // lapse (A-120 criterion 1).
-  if (input.role === PROTECTED_ROLE) {
-    const refusal = protectedGrantRefusal(await protectedHolders(), { userId: subject.id, expiresAt, usable: await isUsableAccount(subject.id) })
-    if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
-  }
+  if (input.role === PROTECTED_ROLE) await refuseProtectedGrant(subject.id, expiresAt)
 
   // The unique key is (user, role), so a lapsed grant is still a row: without this a renewal
   // would insert nothing, say nothing, and leave the role gone (A-131 criterion 5).

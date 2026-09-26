@@ -71,12 +71,13 @@ interface Grant {
   expiry_warned_at: number | null
 }
 
-// Usable IT Managers whose grant cannot lapse; none means the last one lapses on a date and no
-// guard sees it (A-120 criterion 1), so the reconciliation refuses a core with none.
+// Usable IT Managers whose grant cannot lapse, a holder waiting for a first sign-in excluded as the
+// app excludes one (0088); none fails the reconciliation (A-120 criterion 1).
 export function permanentItManagers(core: Database): number {
   const row = core.query<{ n: number }, [string]>(`
     SELECT count(*) AS n FROM role_grants g JOIN users u ON u.id = g.user_id
     WHERE g.role = ? AND g.expires_at IS NULL AND u.disabled = 0 AND u.anonymised_at IS NULL
+      AND NOT (u.password IS NULL AND u.google_sub IS NULL AND u.last_login_at IS NULL)
   `).get(PROTECTED_ROLE)
   return row?.n ?? 0
 }

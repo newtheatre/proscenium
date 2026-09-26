@@ -162,6 +162,23 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     expect(again.stderr.toString()).toMatch(/already has/i)
   })
 
+  // Its own permanent grant is not "another", so rerunning the bootstrap on it never dates it.
+  test('--additional on the only permanent IT Manager leaves their grant permanent', async () => {
+    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', officer.email, app.databaseFile, '--additional']).exitCode).toBe(0)
+    const { Database } = await import('bun:sqlite')
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const grant = database.query(`
+        SELECT g.expires_at AS expiresAt FROM role_grants g JOIN users u ON u.id = g.user_id
+        WHERE u.email = ? AND g.role = 'ADMIN'
+      `).get(officer.email) as { expiresAt: number | null } | null
+      expect(grant).toEqual({ expiresAt: null })
+    }
+    finally {
+      database.close()
+    }
+  })
+
   test('an unknown role is refused by the schema once the caller is allowed in', async () => {
     const response = await send('POST', '/api/admin/roles', { userId: subjectId, role: 'SUPREME_LEADER' }, cookie)
     expect(response.status).toBe(400)

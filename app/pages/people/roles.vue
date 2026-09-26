@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { can, grantRoles, revokeRoles } from '#shared/utils/abilities'
 import { saysDay } from '#shared/utils/when'
-import { ROLES, saysRole } from '#shared/utils/roles'
+import { PROTECTED_ROLE, ROLES, saysRole } from '#shared/utils/roles'
 import { rolesList } from '#shared/utils/roles-list'
 import type { Role } from '#shared/utils/roles'
 import type { TableColumn } from '@nuxt/ui'
@@ -215,7 +215,7 @@ const columns: TableColumn<Holder>[] = [
       icon="i-lucide-triangle-alert"
       title="No IT Manager grant is permanent"
       description="Every IT Manager grant runs out on its date, and once the last has, nobody can grant another. Grant one IT Manager until further notice."
-      :actions="sees.grants ? [{ label: 'Show the IT Managers', color: 'warning', variant: 'outline', onClick: () => choose('ADMIN') }] : []"
+      :actions="sees.grants ? [{ label: 'Show the IT Managers', color: 'warning', variant: 'outline', onClick: () => choose(PROTECTED_ROLE) }] : []"
     />
 
     <p class="text-sm text-muted">

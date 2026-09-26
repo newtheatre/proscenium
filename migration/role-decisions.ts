@@ -8,6 +8,8 @@ export type RoleDecisions = Map<string, RoleDecision>
 
 export const decisionKey = (userId: string, oldRole: string): string => `${userId}\t${oldRole}`
 
+export const decisionHolder = (key: string): string => key.split('\t')[0]!
+
 export function parseRoleDecisions(text: string): RoleDecisions {
   const decisions: RoleDecisions = new Map()
   for (const line of text.split('\n')) {

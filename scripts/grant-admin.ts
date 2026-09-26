@@ -16,7 +16,7 @@ const target = args[1] ?? DEFAULT_TARGET
 
 if (!email) {
   console.error('usage: bun scripts/grant-admin.ts <email> [database] [--additional]')
-  console.error('Grants ADMIN to an existing account: permanent, unless a usable permanent one exists already.')
+  console.error('Grants ADMIN to an existing account: permanent, unless another usable permanent one exists already.')
   process.exit(1)
 }
 
@@ -36,11 +36,11 @@ if (!account) {
 // Bootstrapping is for an environment with no way in, so it refuses one that already has a way
 // in: an ordinary grant is audited to a person, and this one is not (K-122 criterion 4).
 const usable = db.query(`
-  SELECT count(*) n, coalesce(sum(g.expires_at IS NULL), 0) permanent
+  SELECT count(*) n, coalesce(sum(g.expires_at IS NULL AND g.user_id != ?), 0) permanent
   FROM role_grants g JOIN users u ON u.id = g.user_id
   WHERE g.role = 'ADMIN' AND u.disabled = 0 AND u.anonymised_at IS NULL
     AND (g.expires_at IS NULL OR g.expires_at > unixepoch())
-`).get() as { n: number, permanent: number }
+`).get(account.id) as { n: number, permanent: number }
 
 if (usable.n > 0 && !additional) {
   console.error(`This database already has ${usable.n} usable administrator(s).`)
@@ -49,8 +49,8 @@ if (usable.n > 0 && !additional) {
   process.exit(1)
 }
 
-// The first IT Manager is the one the last-IT-Manager guard keeps, and a lapse is no act it sees,
-// so theirs cannot lapse; the grant is listed with the permanent ones (A-120 criterion 1, 0009).
+// A lapse is no act the guard sees, so this grant is permanent unless another usable one is; the
+// target's own is left out of that count, or --additional on its holder would date it (A-120).
 const expiresAt = usable.permanent > 0 ? defaultRoleExpiry(new Date()) : null
 const id = crypto.randomUUID().replaceAll('-', '')
 

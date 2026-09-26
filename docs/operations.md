@@ -178,8 +178,8 @@ grants with no line on file.
 The review ends by checking that at least one IT Manager grant is decided as permanent. If every
 one is dated it lists them and asks which to make permanent; leaving them all dated is allowed at
 the prompt, but `build.ts` then fails with "an IT Manager grant is permanent", because a dated
-last IT Manager lapses with nobody left to grant another (A-120, issue #1355). A disabled holder
-does not count.
+last IT Manager lapses with nobody left to grant another (A-120, issue #1355). A disabled or
+erased holder, or a grant no longer live, does not count, and the review leaves it out too.
 
 What a green build is actually proving: in the 13 September 2026 export, 8,268 of 9,975
 `auth.users` are anonymised and 9,943 have no way to sign in (shadow accounts, 0071). A build
@@ -863,8 +863,8 @@ that is not a local database, and refuses to run at all with `NODE_ENV=productio
 
 The grant it writes is **permanent**: the first IT Manager is the one the last-IT-Manager guard
 keeps, and a grant that runs out on its date is not an act any guard can refuse (A-120, issue
-#1355). With `--additional` it writes the committee year end instead, as long as a usable
-permanent IT Manager already exists. An account that still carries a lapsed IT Manager grant has
+#1355). With `--additional` it writes the committee year end instead, as long as another usable
+IT Manager's grant is already permanent. An account that still carries a lapsed IT Manager grant has
 that row renewed, rather than the script reporting a grant it never made.
 
 **It also refuses when the database already has a usable administrator**, because an ordinary

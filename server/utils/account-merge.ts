@@ -1,6 +1,5 @@
 import { eq, sql } from 'drizzle-orm'
 import { mergeStatements, planGrantMerge } from '#shared/utils/account-merge'
-import { strandingRefusal } from '#shared/utils/protected-role'
 import type { GrantRow, MergeCounts, MergeOutcome, MergePreview, TrainingRecordRow } from '#shared/utils/account-merge'
 
 // The database-touching half of a merge; shared/utils/account-merge.ts builds the plan and SQL.
@@ -38,8 +37,7 @@ async function guardMergeable(winnerId: string, loserId: string): Promise<{ winn
     throw createError({ statusCode: 409, statusMessage: 'An anonymised account cannot take part in a merge' })
   }
 
-  const stranding = await wouldStrandTheSystem('ADMIN', loserId)
-  if (stranding) throw createError({ statusCode: 409, statusMessage: strandingRefusal(stranding, 'merging') })
+  await refuseStranding(PROTECTED_ROLE, loserId, 'merging')
 
   return { winner, loser }
 }
