@@ -48,7 +48,9 @@ export async function decryptWithKey(encrypted: EncryptedPayload, key: CryptoKey
     key,
     fromBase64(encrypted.ciphertext) as BufferSource,
   )
-  return JSON.parse(new TextDecoder().decode(decrypted)) as AccessProfilePayload
+  const payload = JSON.parse(new TextDecoder().decode(decrypted)) as Omit<AccessProfilePayload, 'declineReason'> & { declineReason?: string | null }
+  // A payload written before declines carried a reason has no such key.
+  return { ...payload, declineReason: payload.declineReason ?? null }
 }
 
 export async function importAccessProfileKey(base64Key: string): Promise<CryptoKey> {

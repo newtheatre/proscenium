@@ -25,6 +25,7 @@ import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type {
   AccessFlag,
+  AccessProfileDeclaration,
   AccessProfilePayload,
   AccessProfileStatus,
   DeclareAccessProfileInput,
@@ -32,8 +33,8 @@ import type {
   OwnAccessProfile,
 } from '#shared/utils/access-profiles'
 
-// Declaring, verifying and withdrawing an access profile. The encrypted payload is the only place
-// the nine flags, the two notes and the self-declared card number ever live (D-127, 0050).
+// Declaring, deciding and withdrawing an access profile. The encrypted payload is the only place
+// the nine flags, the two notes, the card number and a decline's reason ever live (D-127, 0050).
 
 type AccessProfileRow = typeof schema.accessProfiles.$inferSelect
 
@@ -54,7 +55,7 @@ async function payloadOf(row: Pick<AccessProfileRow, 'encryptedPayload' | 'encry
   return decryptAccessProfilePayload({ ciphertext: row.encryptedPayload, iv: row.encryptionIv }, userId)
 }
 
-function shapeOwn(row: AccessProfileRow, payload: AccessProfilePayload, now: number): OwnAccessProfile {
+function shapeDeclaration(row: AccessProfileRow, payload: AccessProfilePayload, now: number): AccessProfileDeclaration {
   return {
     status: effectiveStatus({ status: asAccessProfileStatus(row.status), expiresAt: row.expiresAt }, now),
     flags: payload.flags,
@@ -65,8 +66,11 @@ function shapeOwn(row: AccessProfileRow, payload: AccessProfilePayload, now: num
     consentGiven: row.consentFohAt !== null,
     verifiedAt: row.verifiedAt,
     expiresAt: row.expiresAt,
-    declineReason: payload.declineReason,
   }
+}
+
+function shapeOwn(row: AccessProfileRow, payload: AccessProfilePayload, now: number): OwnAccessProfile {
+  return { ...shapeDeclaration(row, payload, now), declineReason: payload.declineReason }
 }
 
 export async function ownAccessProfile(userId: string, now = Date.now()): Promise<OwnAccessProfile | null> {
@@ -119,7 +123,7 @@ export async function declareAccessProfile(event: H3Event, userId: string, input
   const existing = await rowFor(userId)
 
   if (existing) {
-    const own = shapeOwn(existing, await payloadOf(existing, userId), now)
+    const own = shapeDeclaration(existing, await payloadOf(existing, userId), now)
     if (!saveRepends(own.status, changesDeclaration(own, input))) {
       if (own.consentGiven !== input.consent) await setAccessConsent(userId, input.consent)
       return { repended: false }
@@ -230,8 +234,7 @@ export async function accessProfileForOfficer(userId: string): Promise<OfficerAc
   if (!account || !row) return null
 
   const now = Math.floor(Date.now() / 1000)
-  const { declineReason: _reason, ...declaration } = shapeOwn(row, await payloadOf(row, userId), now)
-  return { userId, name: account.name, email: account.email, verifiedBy: row.verifiedBy, ...declaration }
+  return { userId, name: account.name, email: account.email, verifiedBy: row.verifiedBy, ...shapeDeclaration(row, await payloadOf(row, userId), now) }
 }
 
 // Evidence is sighted and never stored, whichever way the decision goes (D-127 criterion 1).

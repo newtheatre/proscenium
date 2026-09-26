@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { ACCESS_FLAG_LABELS, ACCESS_FLAGS } from '#shared/utils/access-profiles'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -192,7 +193,7 @@ describe.skipIf(skip !== null)('a save re-pends only on a real change (criterion
       `SELECT count(*) AS n FROM audit_log WHERE action = 'access-profile.consent.changed' AND target = ?`, `user:${patron.id}`,
     )
     const before = trail()
-    const answers = await Promise.all([1, 2].map(() => send('PUT', '/api/account/access-profile/consent', { consent: false }, patron.cookie)))
+    const answers = await race(2, () => send('PUT', '/api/account/access-profile/consent', { consent: false }, patron.cookie))
     expect(answers.map(answer => answer.status)).toEqual([200, 200])
     expect(trail()).toBe(before + 1)
 

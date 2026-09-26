@@ -170,7 +170,7 @@ describe('a save re-pends only on a real change; consent is its own switch (D-12
     requesterNote: 'Uses a wheelchair',
     accessCardNumber: null,
   }
-  const resaved = declareAccessProfileForm.parse({ ...saved, requesterNote: 'Uses a wheelchair', accessCardNumber: '', consent: true })
+  const resaved = declareAccessProfileForm.parse({ ...saved, accessCardNumber: '', consent: true })
 
   test('the same declaration, blank card number and all, is no change', () => {
     expect(changesDeclaration(saved, resaved)).toBe(false)

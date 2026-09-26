@@ -38,6 +38,14 @@ describe('access profile encryption (D-127, 0050)', () => {
     expect(await decryptWithKey(encrypted, key, OWNER)).toEqual(payload)
   })
 
+  // Written before a decline carried a reason, so the key is missing rather than null (issue 1334).
+  test('an older payload without a decline reason reads as having none', async () => {
+    const key = await testKey()
+    const { declineReason: _absent, ...older } = payload
+    const encrypted = await encryptWithKey(older as AccessProfilePayload, key, OWNER)
+    expect(await decryptWithKey(encrypted, key, OWNER)).toEqual({ ...older, declineReason: null })
+  })
+
   test('two writes of the same payload use different nonces and different ciphertext', async () => {
     const key = await testKey()
     const first = await encryptWithKey(payload, key, OWNER)

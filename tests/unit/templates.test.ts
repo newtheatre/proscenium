@@ -10,6 +10,7 @@ import type { TemplateContext } from '#server/utils/templates'
 // pinned here so a reintroduced house word, enum word or stray call to action fails CI.
 
 const ROOMS_URL = 'https://newtheatre.org.uk/rooms/mine'
+const ACCESS_URL = 'https://newtheatre.org.uk/account/access'
 
 // A part is wrapped for the plain-text reader, so a sentence is matched without its line breaks.
 const flat = (part: string): string => part.replace(/\s+/g, ' ')
@@ -23,7 +24,7 @@ const EVERYTHING: TemplateContext = {
   securityUrl: 'https://newtheatre.org.uk/account/access',
   accountUrl: 'https://newtheatre.org.uk/account',
   membershipUrl: 'https://newtheatre.org.uk/account/membership',
-  accessUrl: 'https://newtheatre.org.uk/account/access',
+  accessUrl: ACCESS_URL,
   roomsUrl: ROOMS_URL,
   queueUrl: 'https://newtheatre.org.uk/admin/requests',
   safetyUrl: 'https://newtheatre.org.uk/rota/manage/safety',
@@ -372,8 +373,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
 // Special category data lives in the encrypted payload and on the owner's own page, so an answer
 // to a declaration says only that there is one and where to read it (issue 1334, 0050).
 describe('the access profile answers carry nothing that was declared or decided', () => {
-  const ACCESS_URL = 'https://newtheatre.org.uk/account/access'
-  const secret = { ...EVERYTHING, accessUrl: ACCESS_URL, fohNote: 'Aisle seat, assistance dog', reason: 'The card number did not match' }
+  const secret = { ...EVERYTHING, fohNote: 'Aisle seat, assistance dog', reason: 'The card number did not match' }
 
   test('verified and declined each link the member to their own page, in both parts', () => {
     for (const name of ['access-profile-verified', 'access-profile-declined']) {

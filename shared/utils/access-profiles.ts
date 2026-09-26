@@ -115,8 +115,8 @@ export const declineAccessProfileForm = z.strictObject({
 
 export type DeclineAccessProfileInput = z.output<typeof declineAccessProfileForm>
 
-// What the owner sees of their own declaration: every flag, both notes, the lot.
-export interface OwnAccessProfile {
+// The declaration and where it stands: every flag, both notes and the card number.
+export interface AccessProfileDeclaration {
   status: AccessProfileStatus
   flags: Record<AccessFlag, boolean>
   companions: number
@@ -126,6 +126,10 @@ export interface OwnAccessProfile {
   consentGiven: boolean
   verifiedAt: number | null
   expiresAt: number | null
+}
+
+// What the owner sees of their own declaration: the lot, and a decline's reason (D-127 criterion 8).
+export interface OwnAccessProfile extends AccessProfileDeclaration {
   declineReason: string | null
 }
 
@@ -203,9 +207,8 @@ export interface AccessProfileSummary {
   updatedAt: number
 }
 
-// What the accessibility officer reads to decide: the owner's view bar a decline's reason, which is
-// the owner's alone (D-127 criterion 8), plus who they are and who verified them (criterion 2).
-export interface OfficerAccessProfile extends Omit<OwnAccessProfile, 'declineReason'> {
+// The officer reads the declaration, never a decline's reason (D-127 criteria 2, 8).
+export interface OfficerAccessProfile extends AccessProfileDeclaration {
   userId: string
   name: string
   email: string
