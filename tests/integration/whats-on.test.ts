@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
+import { warningsForListedShowsQuery } from '#server/utils/content-warnings'
 import {
+  bookingGuidanceFor,
   countListedShowsQuery,
+  guidanceShowQuery,
   headlineSeasonDay,
   headlineSeasonQuery,
   listedPerformancesQuery,
@@ -8,6 +11,7 @@ import {
   listedShowScope,
   listedShowsQuery,
   oneShowScope,
+  referenceShowScope,
 } from '#server/utils/whats-on'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
@@ -386,6 +390,52 @@ describe('the season the public heading names (0087)', () => {
       season(database, 'autumn-2026', 'Autumn 2026', '2026-09-21', '2026-12-11', 1)
       season(database, 'spring-2027', 'Spring 2027', '2027-01-18', '2027-03-26')
       expect(named(database, '2026-10-15')).toBe('Spring 2027')
+    })
+  })
+})
+
+// Issue 1330: /qr and the confirmation email read a booking's guidance through its show, by
+// subquery, with the show page's own projection; a show taken off the site is not linked to.
+describe('a booking reads its show\'s guidance, and links only a published show (D-102 criterion 4)', () => {
+  function guidanceFor(database: TestDatabase, reference: string): ReturnType<typeof bookingGuidanceFor> | null {
+    const [show] = read<Parameters<typeof bookingGuidanceFor>[0]>(database, guidanceShowQuery(referenceShowScope(reference)))
+    const warnings = read<Parameters<typeof bookingGuidanceFor>[1][number]>(database, warningsForListedShowsQuery(referenceShowScope(reference)))
+    return show ? bookingGuidanceFor(show, warnings) : null
+  }
+
+  function booked(database: TestDatabase, showStatus: 'PUBLISHED' | 'DRAFT'): void {
+    const seeded = tonightsPerformance(database, { showStatus })
+    database.batch([
+      ['UPDATE shows SET age_guidance = ? WHERE id = ?', 'Recommended 14 and over', seeded.showId],
+      ['INSERT INTO content_warnings (id, slug, title, kind, sort, archived) VALUES (?, ?, ?, ?, ?, ?)', 'cw-strobe', 'strobe-lighting', 'Strobe lighting', 'TECHNICAL', 0, 0],
+      ['INSERT INTO show_content_warnings (id, show_id, warning_id, level) VALUES (?, ?, ?, ?)', 'scw-1', seeded.showId, 'cw-strobe', null],
+      ['INSERT INTO reservations (id, reference, performance_id, status, source) VALUES (?, ?, ?, ?, ?)', 'r-1', 'ABCDEF', seeded.performanceId, 'PENDING', 'WEB'],
+    ])
+  }
+
+  test('a published show gives its lines and its page', async () => {
+    await withDatabase((database) => {
+      booked(database, 'PUBLISHED')
+      expect(guidanceFor(database, 'ABCDEF')).toEqual({
+        lines: ['Age guidance: Recommended 14 and over', 'Content warnings: Strobe lighting'],
+        slug: 'a-test-show-a',
+      })
+    })
+  })
+
+  test('a show no longer published gives the same lines and no page to link to', async () => {
+    await withDatabase((database) => {
+      booked(database, 'DRAFT')
+      expect(guidanceFor(database, 'ABCDEF')).toEqual({
+        lines: ['Age guidance: Recommended 14 and over', 'Content warnings: Strobe lighting'],
+        slug: null,
+      })
+    })
+  })
+
+  test('a reference nobody holds finds no show', async () => {
+    await withDatabase((database) => {
+      expect(guidanceFor(database, 'ZZZZZZ')).toBeNull()
     })
   })
 })
