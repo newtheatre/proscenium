@@ -308,7 +308,6 @@ describe('staffing (criterion 1)', () => {
       expect(found.find(row => row.shiftId === 's-confirmed')?.name).toBe('Someone holder')
     })
   })
-
 })
 
 // Every role an officer stood in for, naming the officer and whether a confirmed shift of that

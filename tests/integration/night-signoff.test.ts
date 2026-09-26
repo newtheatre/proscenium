@@ -53,6 +53,7 @@ const REPORT: NightReport = {
   ageChecks: { accepted: 0, refused: 0, notRequired: 0 },
   milestones: [],
   staffing: [],
+  bypasses: [],
   bar: { revenuePence: 0, itemsSold: 0 },
   access: { verified: 0 },
   checklist: [],
