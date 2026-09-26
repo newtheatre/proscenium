@@ -1,4 +1,4 @@
-import { closeTillSessionForm } from '#shared/utils/reconciliation'
+import { closeTillSessionForm, closeVariancePence, readerExpectation, saysExpectedOnTheReader } from '#shared/utils/reconciliation'
 import { saysMoney } from '#shared/utils/bar'
 
 // Close a till session, stamping who and when, and record the expected-versus-actual reader
@@ -14,9 +14,9 @@ export default defineEventHandler(async (event) => {
 
   const account = await closerFor(event, session)
 
-  // Money may still be arriving on the reader for a charge nobody has answered for; the Z cannot
-  // be reconciled around it (F-124 criterion 6, 0096). A mismatch is a fact, not a wait.
-  const waiting = await openAttemptCount(session.night, session.venueId)
+  // Money may still reach the one reader for a charge nobody has answered, at any bar tonight: the Z
+  // cannot be reconciled around it, but a mismatch is a fact, not a wait (F-124.6, 0096, issue 1308).
+  const waiting = await openAttemptCount(session.night)
   if (waiting > 0) {
     throw createError({
       statusCode: 409,
@@ -24,14 +24,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Recomputed here, never trusted from an earlier preview read, and scoped to this session, so
-  // a second bar open the same night stamps its own figure (F-202 criterion 3).
-  const bar = await barReconciliation(session.night, { sessionId: session.id })
-  const variancePence = actualZPence - bar.expectedPence
+  // Recomputed here, never trusted from an earlier preview read. One reader and one login serve
+  // the desk and the bar, so the Z is the whole night's, a single whole-day number (F-118.1, F-202.3).
+  const night = await nightReconciliation(session.night)
+  const expected = readerExpectation(night)
+  const variancePence = closeVariancePence(night, actualZPence)
   if (variancePence !== 0 && !varianceNote) {
     throw createError({
       statusCode: 400,
-      statusMessage: `The reader read ${saysMoney(actualZPence)}; we expect ${saysMoney(bar.expectedPence)}. `
+      statusMessage: `The reader read ${saysMoney(actualZPence)}; it should show ${saysExpectedOnTheReader(expected)}. `
         + 'That difference needs a note before it can be recorded.',
     })
   }
@@ -40,17 +41,24 @@ export default defineEventHandler(async (event) => {
     actorId: account.id,
     action: 'bar.till.closed',
     target: `till:${session.venueId}:${session.night}`,
-    detail: { venueId: session.venueId, night: session.night, expectedPence: bar.expectedPence, actualZPence, variancePence },
+    detail: {
+      venueId: session.venueId,
+      night: session.night,
+      expectedPence: expected.totalPence,
+      barPence: expected.barPence,
+      deskPence: expected.deskPence,
+      actualZPence,
+      variancePence,
+    },
   })
 
   // Both predicates ride the write, so a second close attempt and a hand-off started since the
   // count above change nothing and write no second audit row for one closure (0001, 0003).
   const closed = await auditedWrite(db.all(closeSessionStatement({
     id,
-    venueId: session.venueId,
     night: session.night,
     closedBy: account.id,
-    expectedPence: bar.expectedPence,
+    expectedPence: expected.totalPence,
     actualZPence,
     variancePence,
     varianceNote: varianceNote ?? null,

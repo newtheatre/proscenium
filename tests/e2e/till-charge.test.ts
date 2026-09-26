@@ -289,7 +289,9 @@ describe.skipIf(skip !== null)('a typed charge records nothing until the reader 
     expect(await message(held)).toContain('waiting for an answer')
 
     await answerCharge(app, attempt.id, 'declined', barManager.cookie)
-    expect((await send('POST', '/api/till/close', { id: sessionId, actualZPence: 0 }, barManager.cookie)).status).toBe(200)
+    // The one reader's Z is the whole night's, other tests' sales included (issue 1308).
+    const preview = await (await send('GET', `/api/till/${sessionId}/reconciliation`, undefined, barManager.cookie)).json() as { wholeNightExpectedPence: number }
+    expect((await send('POST', '/api/till/close', { id: sessionId, actualZPence: preview.wholeNightExpectedPence }, barManager.cookie)).status).toBe(200)
   })
 
   test('the SumUp app\'s answer never records a typed charge', async () => {

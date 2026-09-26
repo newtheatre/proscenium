@@ -7,14 +7,13 @@ import {
   tabSettlementsQuery,
   ticketsAtTheBarQuery,
 } from '#server/utils/reconciliation'
-import { closeSessionStatement } from '#server/utils/till'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// Two bars running one night each reconcile to their own figure, never the estate's combined one
-// (F-118 criterion 3, F-202 criterion 3). The scope is the session an entry was rung up against.
+// The itemised close lines narrow to the session an entry was rung up against (F-118 criterion 2);
+// the figure the close compares and stamps is the whole night's (issue 1308).
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
@@ -78,7 +77,7 @@ function line(database: TestDatabase, entryId: string, over: {
 const NIGHT = '2026-01-05'
 const FROM_AT = Math.floor(Date.UTC(2026, 0, 5, 4, 0, 0) / 1000)
 
-interface TwoBars { mainVenueId: string, studioVenueId: string, mainSessionId: string, studioSessionId: string }
+interface TwoBars { mainVenueId: string, mainSessionId: string, studioSessionId: string }
 
 // Two venues both selling over the bar the same night, each with its own open session.
 function twoBars(database: TestDatabase): TwoBars {
@@ -91,7 +90,7 @@ function twoBars(database: TestDatabase): TwoBars {
     ['INSERT INTO till_sessions (id, venue_id, night, opened_by, opened_at) VALUES (?, ?, ?, ?, ?)',
       'session-studio', studio.id, NIGHT, opener, FROM_AT],
   ])
-  return { mainVenueId: main.id, studioVenueId: studio.id, mainSessionId: 'session-main', studioSessionId: 'session-studio' }
+  return { mainVenueId: main.id, mainSessionId: 'session-main', studioSessionId: 'session-studio' }
 }
 
 describe('card sales scope to one session, or to one venue\'s sessions (F-202 criterion 3)', () => {
@@ -187,44 +186,6 @@ describe('every figure on the close screen narrows the same way (F-118 criterion
         .toMatchObject({ compsCount: 1, compsForegonePence: 700 })
       expect(read<{ discountsPence: number }>(database, discountsQuery(NIGHT, scope))[0]).toMatchObject({ discountsPence: 100 })
       expect(read<{ tabChargesPence: number }>(database, tabChargesQuery(NIGHT, scope))[0]).toMatchObject({ tabChargesPence: 600 })
-    })
-  })
-})
-
-describe('the close stamps the session\'s own figure (F-118 criterion 3)', () => {
-  test('two sessions at two venues on one night each record their own expected total', async () => {
-    await withDatabase((database) => {
-      const bars = twoBars(database)
-      const closer = person(database, 'closer')
-      const main = entry(database, { source: 'TILL', tender: 'CARD', happenedAt: FROM_AT + 60, sessionId: bars.mainSessionId })
-      line(database, main, { kind: 'BAR_ITEM', amountPence: 500 })
-      const studio = entry(database, { source: 'TILL', tender: 'CARD', happenedAt: FROM_AT + 120, sessionId: bars.studioSessionId })
-      line(database, studio, { kind: 'BAR_ITEM', amountPence: 300 })
-
-      const expectedFor = (sessionId: string): number =>
-        read<{ cardSalesPence: number }>(database, cardSalesQuery(NIGHT, { sessionId }))[0]!.cardSalesPence
-
-      for (const [sessionId, venueId] of [[bars.mainSessionId, bars.mainVenueId], [bars.studioSessionId, bars.studioVenueId]] as const) {
-        const expectedPence = expectedFor(sessionId)
-        const statement = closeSessionStatement({
-          id: sessionId,
-          venueId,
-          night: NIGHT,
-          closedBy: closer,
-          expectedPence,
-          actualZPence: expectedPence,
-          variancePence: 0,
-          varianceNote: null,
-        })
-        expect(read<{ id: string }>(database, statement)).toEqual([{ id: sessionId }])
-      }
-
-      const closed = rows<{ id: string, expected_total_pence: number }>(
-        database, 'SELECT id, expected_total_pence FROM till_sessions ORDER BY id')
-      expect(closed).toEqual([
-        { id: bars.mainSessionId, expected_total_pence: 500 },
-        { id: bars.studioSessionId, expected_total_pence: 300 },
-      ])
     })
   })
 })

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
+import { closeBreakdown, readerExpectation, saysWhereItWasTaken } from '#shared/utils/reconciliation'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
 
-// What the till took, and what the reader shows (F-102 criterion 4, F-118 criterion 3):
+// What the till took, and what the reader shows (F-102 criterion 4, F-118 criteria 1 to 3):
 // closing mid-service is not a per-sale action, so this stays behind a modal.
 
 const props = defineProps<{
@@ -25,6 +26,10 @@ const varianceNote = defineModel<string>('varianceNote', { required: true })
 const hasReading = computed(() => typeof actualZPounds.value === 'number' && Number.isFinite(actualZPounds.value))
 // No reading yet means no variance to explain, whatever the untyped field would compute to.
 const needsVarianceNote = computed(() => hasReading.value && props.variancePreviewPence !== 0)
+
+const expected = computed(() => (props.reconciliation ? readerExpectation(props.reconciliation) : null))
+const where = computed(() => (expected.value ? saysWhereItWasTaken(expected.value) : ''))
+const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconciliation.bar) : []))
 </script>
 
 <template>
@@ -49,49 +54,48 @@ const needsVarianceNote = computed(() => hasReading.value && props.variancePrevi
         :description="reconciliationFailure"
       />
       <div
-        v-else-if="reconciliation"
+        v-else-if="expected"
         class="space-y-4"
         :class="{ 'opacity-50': refreshing }"
       >
-        <dl
+        <div
+          class="rounded-xl bg-elevated px-4 py-4"
+          data-test="reader-should-show"
+        >
+          <p class="text-lg font-semibold">
+            The reader should show <span
+              class="font-mono tabular-nums"
+              data-test="expected-pence"
+            >{{ saysMoney(expected.totalPence) }}</span>
+          </p>
+          <p
+            v-if="where"
+            class="mt-1 text-sm text-muted"
+            data-test="expected-split"
+          >
+            {{ where }}
+          </p>
+        </div>
+
+        <div
+          v-if="lines.length"
           data-test="reconciliation-breakdown"
           class="space-y-1 text-sm"
         >
-          <div class="flex justify-between">
-            <dt>Card sales</dt>
-            <dd>{{ saysMoney(reconciliation.bar.cardSalesPence) }}</dd>
-          </div>
-          <div class="flex justify-between">
-            <dt>Tab settlements</dt>
-            <dd>{{ saysMoney(reconciliation.bar.tabSettlementsPence) }}</dd>
-          </div>
-          <div class="flex justify-between">
-            <dt>Comps ({{ reconciliation.bar.compsCount }})</dt>
-            <dd>{{ saysMoney(reconciliation.bar.compsForegonePence) }} forgone</dd>
-          </div>
-          <div class="flex justify-between">
-            <dt>Discounts given</dt>
-            <dd>{{ saysMoney(reconciliation.bar.discountsPence) }}</dd>
-          </div>
-          <div class="flex justify-between">
-            <dt>Refunds</dt>
-            <dd>{{ saysMoney(reconciliation.bar.refundsPence) }}</dd>
-          </div>
-          <div class="flex justify-between">
-            <dt>Tab charges (credit extended)</dt>
-            <dd>{{ saysMoney(reconciliation.bar.tabChargesPence) }}</dd>
-          </div>
-          <div class="flex justify-between font-medium">
-            <dt>Expected on the reader, this bar</dt>
-            <dd data-test="expected-pence">
-              {{ saysMoney(reconciliation.bar.expectedPence) }}
-            </dd>
-          </div>
-          <div class="flex justify-between text-muted">
-            <dt>Desk takings, alongside</dt>
-            <dd>{{ saysMoney(reconciliation.deskTakingsPence) }}</dd>
-          </div>
-        </dl>
+          <p class="text-xs text-muted">
+            This bar tonight
+          </p>
+          <dl class="space-y-1">
+            <div
+              v-for="line in lines"
+              :key="line.label"
+              class="flex justify-between"
+            >
+              <dt>{{ line.label }}</dt>
+              <dd>{{ saysMoney(line.pence) }}</dd>
+            </div>
+          </dl>
+        </div>
 
         <UFormField label="What the reader's Z actually reads">
           <UInputNumber
@@ -108,7 +112,7 @@ const needsVarianceNote = computed(() => hasReading.value && props.variancePrevi
           data-test="variance-preview"
           color="warning"
           variant="subtle"
-          :description="`${saysMoney(Math.abs(variancePreviewPence))} ${variancePreviewPence > 0 ? 'over' : 'under'} what the till took. Say why before closing.`"
+          :description="`${saysMoney(Math.abs(variancePreviewPence))} ${variancePreviewPence > 0 ? 'over' : 'under'} what the reader should show. Say why before closing.`"
         />
 
         <UFormField

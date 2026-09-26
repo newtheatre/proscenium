@@ -88,7 +88,7 @@ function programme(suffix: string): { venueId: string, performanceId: string } {
 
 const today = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 
-const openTill = (venueId: string): Promise<Response> => send('POST', '/api/till', { venueId }, barManager.cookie)
+const openTill = (venueId: string, as = barManager.cookie): Promise<Response> => send('POST', '/api/till', { venueId }, as)
 
 async function aSellableProduct(): Promise<{ variantId: string }> {
   const categoryId = await created(await send('POST', '/api/admin/bar/categories', { name: named('Soft') }))
@@ -346,6 +346,15 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     expect(swept.status).toBe(200)
 
     expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', started.id)!.status).toBe('COMPLETING')
+
+    // Settled, since every bar's open charge holds the one reader's close later in this suite (issue 1308).
+    const settling = new Database(app.databaseFile)
+    try {
+      settling.query('UPDATE sumup_attempts SET status = ?, resolved_at = ? WHERE id = ?').run('ABANDONED', now, started.id)
+    }
+    finally {
+      settling.close()
+    }
   })
 
   test('a failure restores nothing but the basket; a booking collected meanwhile makes a mismatch; the close waits for an open attempt', async () => {
@@ -379,8 +388,41 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     const abandoned = await send('POST', `/api/till/payments/${started.id}/resolve`, { outcome: 'abandoned', note: 'refunded on the reader' }, barManager.cookie)
     expect((await abandoned.json() as { status: string }).status).toBe('ABANDONED')
 
-    const closed = await send('POST', '/api/till/close', { id: sessionId, actualZPence: 0 }, barManager.cookie)
+    // The one reader's Z is the whole night's, desk collection included (issue 1308).
+    const preview = await (await send('GET', `/api/till/${sessionId}/reconciliation`, undefined, barManager.cookie)).json() as { wholeNightExpectedPence: number }
+    const closed = await send('POST', '/api/till/close', { id: sessionId, actualZPence: preview.wholeNightExpectedPence }, barManager.cookie)
     expect(closed.status).toBe(200)
+  })
+
+  // Every bar shares the one reader, so anyone holding bar authority tonight may answer another
+  // bar's charge from their own till (F-124 criterion 3, issue 1308).
+  test('a bar shift at one venue answers a card charge started at another venue tonight', async () => {
+    const here = programme('sumup-answer-here')
+    const there = programme('sumup-answer-there')
+    const ticketTypeId = await aTicketType()
+    const booking = await pendingBooking(there.performanceId, ticketTypeId)
+    await openTill(there.venueId)
+
+    const volunteer = await registerMember(app, 'sumup-answer-shift', generatePassword())
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`${here.performanceId}-BAR`, here.performanceId, 'BAR', 1, volunteer.id, 'CONFIRMED')
+    }
+    finally {
+      database.close()
+    }
+    expect((await openTill(here.venueId, volunteer.cookie)).status).toBe(200)
+
+    const started = await (await startTypedCharge(app, { venueId: there.venueId, lines: [], tickets: [{ reservationId: booking.id }], expectedTotalPence: 900 }, barManager.cookie)).json() as { id: string }
+    const listed = await (await send('GET', `/api/till/payments?venueId=${here.venueId}`, undefined, volunteer.cookie)).json() as { attempts: { id: string }[] }
+    expect(listed.attempts.map(attempt => attempt.id)).toContain(started.id)
+
+    // Named by the other bar alone, the volunteer holds no authority there.
+    expect((await send('POST', `/api/till/payments/${started.id}/resolve`, { outcome: 'declined' }, volunteer.cookie)).status).toBe(403)
+    const answered = await send('POST', `/api/till/payments/${started.id}/resolve?venueId=${here.venueId}`, { outcome: 'declined' }, volunteer.cookie)
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { status: string }).status).toBe('FAILED')
   })
 })
 

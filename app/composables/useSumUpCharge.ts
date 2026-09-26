@@ -230,6 +230,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       const answered = await request<{ status: SumupAttemptStatus, error: string | null, receipt?: SaleReceipt | null }>(`/api/till/payments/${id}/resolve`, {
         method: 'POST',
         body: { outcome, smpTxCode: smpTxCodeTyped.value.trim() || null, note },
+        ...(venueId.value ? { query: { venueId: venueId.value } } : {}),
       })
       smpTxCodeTyped.value = ''
       const pending = sumup.pending.value

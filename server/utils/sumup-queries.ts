@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { SUMUP_STUCK_COMPLETING_MINUTES } from '#shared/utils/sumup'
+import { OPEN_ATTEMPT_STATUSES, SUMUP_STUCK_COMPLETING_MINUTES } from '#shared/utils/sumup'
 import type { SQL } from 'drizzle-orm'
 
 // Split out of sumup-attempts.ts so a test naming these statements never pulls the sale path into
@@ -14,6 +14,10 @@ export const ATTEMPT_COLUMNS = sql`
   a.resolution_note AS resolutionNote, a.callback_at AS callbackAt, a.entry_id AS entryId, a.error AS error,
   coalesce(a.kind, 'SUMUP') AS kind
 `
+
+// Any bar's hand-off whose money may still reach the one reader (F-124.6, issue 1308).
+export const openAttemptsOn = (night: string): SQL =>
+  sql`night = ${night} AND status IN (${sql.join(OPEN_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})`
 
 // How long a row has gone without a word, measured from the answer that began the recording
 // rather than from the hand-off, which may have been keyed in an hour before (F-124 criterion 5).
