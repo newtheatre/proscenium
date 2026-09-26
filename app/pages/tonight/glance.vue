@@ -29,9 +29,9 @@ interface Performance {
   contentNotes: string | null
   house: HubHouse
   passesCovering: number
-  access: AccessTonight[]
+  access: AccessTonight[] | null
   warnings: Warning[]
-  team: TeamMember[]
+  team?: TeamMember[]
 }
 interface DutyManagerTonight { night: string, venueId: string, performances: Performance[] }
 
@@ -79,18 +79,39 @@ async function loadComps(performanceId: string): Promise<void> {
   barComps.value = bar?.requests.filter(one => !one.request.expired) ?? null
 }
 
+// A door or bar shift reads the same house and show information with none of the duty manager's
+// controls, and the access wording only at the door (issue 1307, D-127 criterion 3).
+const dutyManager = ref(false)
+
 async function load(): Promise<void> {
   try {
     data.value = await request<DutyManagerTonight>('/api/tonight/duty-manager', { query: { access: 1 } })
+    dutyManager.value = true
     syncedAt.value = new Date()
     failure.value = null
   }
   catch (refused) {
+    if (refusalStatus(refused) === 403) {
+      await loadReadOnly()
+      return
+    }
     // The last-fetched values stay on screen; NightStale says they are no longer current.
     failure.value = refusalText(refused)
   }
   finally {
     asked.value = true
+  }
+}
+
+async function loadReadOnly(): Promise<void> {
+  try {
+    data.value = await request<DutyManagerTonight>('/api/tonight/house', { query: { access: 1 } })
+    dutyManager.value = false
+    syncedAt.value = new Date()
+    failure.value = null
+  }
+  catch (refused) {
+    failure.value = refusalText(refused)
   }
 }
 
@@ -178,10 +199,6 @@ setNightSubject(() => ({
   meta: selected.value ? nightHeaderLine(selected.value.startsAt, selected.value.venueName) : null,
 }))
 
-// `/api/tonight/duty-manager` answers only a duty manager, so an answer is the fact that this
-// viewer can close tonight; a door or bar shift gets the screen's own action instead (0009).
-const canClose = computed(() => data.value !== null)
-
 const guidance = computed(() => {
   const performance = selected.value
   if (!performance) return 'Not yet stated'
@@ -224,11 +241,11 @@ function hideCode(): void {
 // without the duty manager reloading anything.
 async function refresh(): Promise<void> {
   await load()
-  if (selectedId.value) await loadComps(selectedId.value)
+  if (selectedId.value && dutyManager.value) await loadComps(selectedId.value)
 }
 
 watch(selectedId, (id) => {
-  if (id) loadComps(id)
+  if (id && dutyManager.value) loadComps(id)
 })
 
 onMounted(() => {
@@ -469,7 +486,7 @@ onUnmounted(() => {
         <!-- First name, party size and the wording the officer agreed: the flags themselves never
              leave the encrypted payload, whatever a mockup shows (D-127 criterion 3). -->
         <NightBlock
-          v-if="selected.access.length"
+          v-if="selected.access?.length"
           title="Access tonight"
           data-test="glance-access"
         >
@@ -489,6 +506,7 @@ onUnmounted(() => {
         </NightBlock>
 
         <NightBlock
+          v-if="selected.team"
           title="On tonight"
           data-test="glance-team"
         >
@@ -530,6 +548,7 @@ onUnmounted(() => {
         <!-- Shown only on request, never polled or cached: a code sitting on screen is a code
              anyone walking past has read (E-120 criteria 2, 5). -->
         <NightBlock
+          v-if="dutyManager"
           title="Backstage code"
           data-test="board-code"
         >
@@ -679,8 +698,9 @@ onUnmounted(() => {
     </UModal>
 
     <template #actions>
+      <!-- The duty manager's route answering is the fact this viewer can close tonight (0009). -->
       <NightAction
-        v-if="canClose"
+        v-if="dutyManager"
         label="Close the night"
         icon="i-lucide-moon-star"
         color="neutral"

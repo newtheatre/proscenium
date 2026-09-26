@@ -211,7 +211,8 @@ export interface DoorPassCard {
   refusal: string | null
 }
 
-export interface DoorAdmission { reference: string, verdict: DoorVerdict, holderName: string | null, partySize: number }
+// `accessWording` is the agreed wording for a booking holding an access ticket (D-128 criterion 4).
+export interface DoorAdmission { reference: string, verdict: DoorVerdict, holderName: string | null, partySize: number, accessWording?: string | null }
 
 // A pass admits its holder and nobody else, and costs nothing, so it admits in its own word
 // rather than PAID (issue 1301). The holder's name belongs to the pass card, not to this one.

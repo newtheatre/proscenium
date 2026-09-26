@@ -154,7 +154,8 @@ describe('the bypass is recorded when the officer acts, not when a screen opens 
   test('the glance\'s request for the access wording records, and only it decrypts', async () => {
     const route = await Bun.file('server/api/tonight/duty-manager.get.ts').text()
     expect(route).toContain('{ recordsRead: withAccess }')
-    expect(route).toContain('withAccess ? accessTonight(performanceId)')
+    expect(route).toContain('tonightView(performanceId, withAccess)')
+    expect(await Bun.file('server/utils/tonight-house.ts').text()).toContain('withAccess ? accessTonight(performanceId)')
     expect(route).not.toContain('z.coerce.boolean')
     expect(await Bun.file('app/pages/tonight/glance.vue').text()).toContain('{ query: { access: 1 } }')
     expect(await Bun.file('app/pages/tonight/index.vue').text()).not.toContain('access: 1')
