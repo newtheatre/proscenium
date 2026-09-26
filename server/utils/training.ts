@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, not, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, not, or, sql } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
 import { saysRole } from '#shared/utils/roles'
 import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, mayRecordByAddress, missingPrerequisites, saysGaps } from '#shared/utils/training'
@@ -82,7 +82,7 @@ export async function listSessions(filter: { status?: string, trainerId?: string
     filter.trainerId ? eq(schema.trainingSessions.trainerId, filter.trainerId) : undefined,
     filter.stillToRun
       ? and(
-          not(eq(schema.trainingSessions.status, 'CANCELLED')),
+          ne(schema.trainingSessions.status, 'CANCELLED'),
           isNull(schema.trainingSessions.markedAt),
           or(gte(schema.trainingSessions.heldOn, filter.stillToRun), isNotNull(schema.trainingSessions.registerOpenedAt)),
         )
@@ -668,10 +668,10 @@ export interface TeachableModule {
   expiryMonths: number | null
 }
 
-// The trainer a scheduler named, or null when it is the scheduler (G-112 as amended, issue 1336).
+// The trainer a scheduler named, or undefined when it is the scheduler (G-112 as amended, issue 1336).
 // A trainer schedules their own sessions; only the training officer names somebody else.
-export async function namedTeacher(resolved: Authority, trainerId: string | null, today: string): Promise<{ id: string, name: string } | null> {
-  if (trainerId === null || trainerId === resolved.account.id) return null
+export async function namedTeacher(resolved: Authority, trainerId: string | null, today: string): Promise<{ id: string, name: string } | undefined> {
+  if (trainerId === null || trainerId === resolved.account.id) return undefined
   if (!resolved.permissions.has('training.write')) {
     throw createError({ statusCode: 403, statusMessage: `A trainer schedules their own sessions; the ${saysRole('TRAINING_MANAGER')} names somebody else` })
   }

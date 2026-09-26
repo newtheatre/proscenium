@@ -41,11 +41,13 @@ const recordsFailure = useListFailure(recordsError, 'Your training records could
 // The sessions this member teaches that still need them, each a tap from its register (issue
 // 1336). Empty for everybody who teaches nothing, so the section simply does not show.
 interface Taught { id: string, heldOn: string, startsAt: string, place: string | null, modules: { id: string, name: string }[] }
-const { data: teaching } = await useAsyncData(
+const { data: teaching, error: teachingError, refresh: refreshTeaching } = await useAsyncData(
   'training-teaching',
   () => request<{ items: Taught[] }>('/api/training/teaching'),
   { default: () => ({ items: [] as Taught[] }) },
 )
+// A failed read is shown, never taken for teaching nothing: it is a trainer's way to their register.
+const teachingFailure = useListFailure(teachingError, 'The sessions you teach could not be read.')
 
 // Grouped by department, which is how a member thinks about what they are allowed to do
 // (G-101 criterion 1). Order follows the server's, newest award first inside each group.
@@ -350,14 +352,23 @@ const standings = computed(() => [
     </div>
 
     <section
-      v-if="teaching.items.length > 0"
+      v-if="teachingFailure || teaching.items.length > 0"
       class="mt-12"
       data-test="sessions-you-teach"
     >
       <h2 class="text-lg font-semibold">
         Sessions you teach
       </h2>
-      <ul class="mt-3 space-y-3">
+      <ReadFailure
+        v-if="teachingFailure"
+        :failure="teachingFailure"
+        class="mt-3"
+        @retry="refreshTeaching()"
+      />
+      <ul
+        v-else
+        class="mt-3 space-y-3"
+      >
         <li
           v-for="session in teaching.items"
           :key="session.id"

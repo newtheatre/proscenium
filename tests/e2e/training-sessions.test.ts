@@ -665,6 +665,106 @@ describe.skipIf(skip !== null)('the scheduler names the trainer (G-112)', () => 
   })
 })
 
+// Issue 1336: the Taught by picker's list names people (0011), so who reads it and what it holds
+// are pinned; so are the refusals a named trainer and a colleague meet.
+describe.skipIf(skip !== null)('who may be named, and who is told what', () => {
+  interface Trainer { id: string, name: string }
+
+  test('a trainer with no training.write is refused the list of trainers', async () => {
+    const person = await adminSession(app, { roles: [] })
+    award(person.id, trainerCert)
+    expect((await send('GET', '/api/admin/training/trainers', undefined, person.cookie)).status).toBe(403)
+  })
+
+  test('the list holds a current trainer as an id and a name only, and leaves out a revoked or disabled one', async () => {
+    const current = await adminSession(app, { roles: [] })
+    award(current.id, trainerCert)
+    const revoked = await adminSession(app, { roles: [] })
+    const cert = award(revoked.id, trainerCert)
+    write('UPDATE training_records SET revoked_at = ?, revoked_by = ?, revoke_reason = ? WHERE id = ?',
+      Math.floor(Date.now() / 1000), revoked.id, 'Stood down', cert)
+    const disabled = await adminSession(app, { roles: [] })
+    award(disabled.id, trainerCert)
+    write('UPDATE users SET disabled = 1 WHERE id = ?', disabled.id)
+
+    const answered = await send('GET', '/api/admin/training/trainers')
+    expect(answered.status).toBe(200)
+    const { items } = await answered.json() as { items: Trainer[] }
+    const found = items.find(one => one.id === current.id)
+    expect(found).toBeDefined()
+    expect(Object.keys(found!).sort()).toEqual(['id', 'name'])
+    expect(items.some(one => one.id === revoked.id)).toBe(false)
+    expect(items.some(one => one.id === disabled.id)).toBe(false)
+  })
+
+  test('naming a disabled account is not found', async () => {
+    const module = await addModule()
+    const gone = await adminSession(app, { roles: [] })
+    award(gone.id, trainerCert)
+    award(gone.id, module)
+    write('UPDATE users SET disabled = 1 WHERE id = ?', gone.id)
+    expect((await schedule({ moduleIds: [module], trainerId: gone.id })).status).toBe(404)
+  })
+
+  test('a colleague opening the session itself is told the Training Manager can change who teaches it', async () => {
+    const module = await addModule()
+    const teacher = await adminSession(app, { roles: [] })
+    award(teacher.id, trainerCert)
+    award(teacher.id, module)
+    const colleague = await adminSession(app, { roles: [] })
+    award(colleague.id, trainerCert)
+    const { id } = await (await schedule({ moduleIds: [module], trainerId: teacher.id })).json() as { id: string }
+
+    const refused = await send('GET', `/api/admin/training/sessions/${id}`, undefined, colleague.cookie)
+    expect(refused.status).toBe(403)
+    expect(await said(refused)).toContain('Training Manager')
+  })
+})
+
+// Issue 1336 review: a trainer with no role reaches the sessions screen, and its module picker
+// offers what they hold, so they can schedule their own session from it.
+describe.skipIf(skip !== null)('a trainer with no role schedules from the screen', () => {
+  test('the picker offers the modules they hold, and the session is theirs', async () => {
+    const module = await addModule({ name: 'Rigging basics' })
+    const unheld = await addModule()
+    const person = { ...syntheticPerson(97), email: registrableAddress('screen-trainer') }
+    const personPassword = generatePassword()
+    await send('POST', '/api/auth/register', { email: person.email, name: person.name, password: personPassword }, '')
+    markVerified(app, person.email)
+    const personId = read<{ id: string }>('SELECT id FROM users WHERE email = ?', person.email)!.id
+    award(personId, trainerCert)
+    award(personId, module)
+    const day = daysFrom(24)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', person.email)
+      await fill(view, 'form input[type="password"]', personPassword)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+
+      await visit(view, `${app.baseURL}/training/manage/sessions`, '[data-test="sessions-table"]')
+      await click(view, '[data-test="add-session"]')
+      await waitFor(view, `document.querySelector('[data-test="session-starts"]')`, 30_000)
+      const offered = await menuOptions(view, '[data-test="session-modules"]')
+      expect(offered.some(option => option.includes(module))).toBe(true)
+      expect(offered.some(option => option.includes(unheld))).toBe(false)
+
+      await fillDate(view, '[data-test="session-day"]', day)
+      await fillNumber(view, '[data-test="session-capacity"]', '8')
+      await pickOptions(view, '[data-test="session-modules"]', [module])
+      await click(view, '[data-test="session-submit"]')
+      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(shortDay(day))})`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ trainer: string }>('SELECT trainer_id trainer FROM training_sessions WHERE held_on = ?', day)?.trainer).toBe(personId)
+  }, CASE_TIMEOUT_MS)
+})
+
 // Issue 1336: a trainer's own sessions are where they look for them, with the register one tap away.
 describe.skipIf(skip !== null)('the sessions a trainer teaches (G-111 criterion 3)', () => {
   interface Taught { items: { id: string, heldOn: string, modules: { id: string }[] }[] }

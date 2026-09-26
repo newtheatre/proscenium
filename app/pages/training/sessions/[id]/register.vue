@@ -45,8 +45,8 @@ const { data, status, error, refresh } = await useAsyncData(
 const readFailure = useListFailure(error, 'The register could not be read.')
 const refused = computed(() => refusalStatus(error.value) === 403)
 
-// The session this register belongs to, named by what it teaches and when, in the shell's header
-// as well as the page's own: a bare date told a trainer nothing (issue 1336).
+// The session this register belongs to, named in the shell's header by what it teaches and when:
+// a bare date under "Tonight" told a trainer nothing (issue 1336).
 const sessionTitle = computed(() => data.value?.modules.map(module => module.name).join(', ') || 'Register')
 const sessionWhen = computed(() => (data.value
   ? `${saysDay(data.value.heldOn)}, ${data.value.startsAt} to ${data.value.endsAt}${data.value.place ? ` · ${data.value.place}` : ''}`
@@ -221,7 +221,8 @@ async function submit(): Promise<void> {
       color="error"
       variant="subtle"
       :icon="refused ? 'i-lucide-lock' : 'i-lucide-unplug'"
-      data-test="register-refused"
+      data-test="register-read-failed"
+      :data-refused="refused"
       :title="readFailure.message"
       :description="refused ? undefined : 'This is not the same as nobody being on it. Try again before you start marking.'"
     />
@@ -238,28 +239,19 @@ async function submit(): Promise<void> {
     </div>
 
     <template v-else-if="data">
-      <header class="space-y-1">
-        <h1
-          class="nnt-headline text-2xl"
-          data-test="register-title"
+      <!-- The shell's header names the session; the badges carry each module in full, since the
+        header truncates a long title. -->
+      <div class="flex flex-wrap gap-1">
+        <UBadge
+          v-for="module in data.modules"
+          :key="module.id"
+          color="neutral"
+          variant="subtle"
+          size="sm"
         >
-          {{ sessionTitle }}
-        </h1>
-        <p class="text-sm text-muted">
-          {{ sessionWhen }}
-        </p>
-        <div class="flex flex-wrap gap-1 pt-1">
-          <UBadge
-            v-for="module in data.modules"
-            :key="module.id"
-            color="neutral"
-            variant="subtle"
-            size="sm"
-          >
-            {{ module.id }}
-          </UBadge>
-        </div>
-      </header>
+          {{ module.id }} {{ module.name }}
+        </UBadge>
+      </div>
 
       <UAlert
         v-if="marked"

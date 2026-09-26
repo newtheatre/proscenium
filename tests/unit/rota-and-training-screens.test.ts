@@ -129,16 +129,29 @@ describe('a trainer reaches the register of their own session', () => {
     expect(source).toContain('Open the register')
   })
 
-  test('the register\'s header names the session, not a bare date', async () => {
+  test('the register\'s header names the session, not a bare date, and only once', async () => {
     const source = await read(REGISTER)
-    expect(source).toContain('data-test="register-title"')
-    expect(source).not.toMatch(/<h1[^>]*>\s*\{\{ data\.heldOn \}\}\s*<\/h1>/)
+    expect(source).toContain('setNightSubject(() => ({ title: sessionTitle.value')
+    expect(source).not.toContain('<h1')
   })
 
   test('a refused read shows the refusal it was given', async () => {
     const source = await read(REGISTER)
     expect(source).toContain('useListFailure(error')
-    expect(source).toContain('data-test="register-refused"')
+    expect(source).toContain('data-test="register-read-failed"')
+  })
+
+  test('the session page shows the refusal it was given too', async () => {
+    const source = await read('app/pages/training/manage/sessions/[id].vue')
+    expect(source).toContain('useListFailure(error')
+    expect(source).toContain(':title="readFailure.message"')
+    expect(source).not.toContain('title="That session could not be read"')
+  })
+
+  test('a failed read of the sessions you teach is shown, not taken for none', async () => {
+    const source = await read(MY_TRAINING)
+    expect(source).toContain('useListFailure(teachingError')
+    expect(source).toContain('v-if="teachingFailure || teaching.items.length > 0"')
   })
 })
 

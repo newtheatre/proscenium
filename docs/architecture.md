@@ -224,9 +224,10 @@ becomes interactive.
      `training.write` holder name somebody other than the scheduler, who must hold trainer
      standing and everything the session teaches; `currentTrainers` answers the Taught by picker
      (`GET /api/admin/training/trainers`) and `GET /api/training/teaching` lists a member's own
-     sessions still to run (G-112 criterion 7, issue 1336). Membership resolves the same way: `hasCurrentMembership`
-     (`server/utils/bookings.ts`) reads the longest-running term against today and the grace
-     window, never a grant (0009, 0031). Show-night authority resolves in
+     sessions still to run (G-112 criterion 7, issue 1336).
+     Membership resolves the same way: `hasCurrentMembership` (`server/utils/bookings.ts`) reads
+     the longest-running term against today and the grace window, never a grant (0009, 0031).
+     Show-night authority resolves in
      `server/utils/night-authority.ts` behind `requireNightAuthority`, and has a section of its
      own below.
   3. **Ownership**: the row's own user id.

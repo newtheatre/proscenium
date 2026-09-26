@@ -21,7 +21,8 @@ export default defineEventHandler(async (event) => {
 
   // Criteria 3 and 4, and question 4's answer. Shared with the retrospective log, which refuses
   // the same modules for the same reasons (G-118).
-  await assertTeachable(resolved, input.moduleIds, today, teacher ?? undefined)
+  await assertTeachable(resolved, input.moduleIds, today, teacher)
+  const trainerId = teacher?.id ?? resolved.account.id
 
   const id = newId()
   await db.batch([
@@ -37,7 +38,7 @@ export default defineEventHandler(async (event) => {
       status: input.opensAt === null ? 'OPEN' : 'PLANNED',
       description: input.description,
       notes: input.notes,
-      trainerId: teacher?.id ?? resolved.account.id,
+      trainerId,
     }),
     ...input.moduleIds.map(moduleId => db.insert(schema.sessionModules).values({
       id: newId(),
@@ -48,7 +49,7 @@ export default defineEventHandler(async (event) => {
       actorId: resolved.account.id,
       action: 'session.scheduled',
       target: `session:${id}`,
-      detail: { heldOn: input.heldOn, modules: input.moduleIds, capacity: input.capacity, trainer: teacher?.id ?? resolved.account.id },
+      detail: { heldOn: input.heldOn, modules: input.moduleIds, capacity: input.capacity, trainer: trainerId },
     })),
   ])
 

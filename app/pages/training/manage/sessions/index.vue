@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { can, nameTrainers } from '#shared/utils/abilities'
-import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
+import { can, nameTrainers, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { saysDay } from '#shared/utils/when'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
@@ -76,9 +75,12 @@ const { data, status, refresh, error } = await useAsyncData(
 )
 const listFailure = useListFailure(error, 'The sessions could not be read.')
 
+// A trainer with no role cannot read the admin catalogue, so reads the member one narrowed to what
+// they hold, which is all they may teach (G-112 criterion 4 answer, issue 1336).
+const readsCatalogue = computed(() => can(useViewer().value, viewTrainingCatalogue))
 const { data: catalogue } = await useAsyncData(
   'training-sessions-modules',
-  () => request<{ items: Module[] }>('/api/admin/training/modules', { query: { pageSize: MAX_PAGE_SIZE } }),
+  () => teachingCatalogue(request, readsCatalogue.value),
   { default: () => ({ items: [] as Module[] }) },
 )
 
@@ -512,7 +514,7 @@ const columns: TableColumn<Session>[] = [
     <UModal
       v-model:open="open"
       title="Schedule a session"
-      description="A future day, a London wall clock, and one or more modules you hold."
+      :description="namesTrainer ? 'A future day, a London wall clock, one or more modules, and who teaches it.' : 'A future day, a London wall clock, and one or more modules you hold.'"
     >
       <template #body>
         <UAlert
@@ -601,7 +603,7 @@ const columns: TableColumn<Session>[] = [
             label="What it teaches"
             name="moduleIds"
             required
-            description="You may teach only what you currently hold. Certifications are not taught by session."
+            :description="namesTrainer ? 'A trainer named under Taught by must hold everything it teaches. Certifications are not taught by session.' : 'You may teach only what you currently hold. Certifications are not taught by session.'"
           >
             <USelectMenu
               v-model="state.moduleIds"
@@ -621,14 +623,13 @@ const columns: TableColumn<Session>[] = [
             description="Somebody holding a current trainer certification and everything the session teaches. Left empty, you teach it."
           >
             <USelectMenu
-              :model-value="state.trainerId ?? undefined"
+              v-model="state.trainerId"
               :items="trainerOptions"
               value-key="value"
-              clearable
+              clear
               placeholder="You"
               class="w-full"
               data-test="session-trainer"
-              @update:model-value="value => state.trainerId = (value as string | undefined) ?? null"
             />
           </UFormField>
 

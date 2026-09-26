@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can, viewAuditTrail } from '#shared/utils/abilities'
 import { saysWhen } from '#shared/utils/when'
 
 definePageMeta({ layout: 'console', title: 'Overview', middleware: 'console', docs: '/docs/system' })
@@ -49,9 +50,13 @@ function saysWhy(entry: Trouble): string {
   return WHY[entry.error ?? ''] ?? WHY[entry.status] ?? entry.error ?? 'no reason recorded'
 }
 
+// Only somebody who may read the trail is shown it: a trainer or a lead reaches this screen too
+// now, and an empty card would tell them nothing had failed (issue 1336).
+const seesTrouble = computed(() => can(useViewer().value, viewAuditTrail))
+
 onMounted(() => {
   if (!account.value.signedIn) return
-  void refreshNuxtData('delivery-trouble')
+  if (seesTrouble.value) void refreshNuxtData('delivery-trouble')
   // Silently empty when the reader holds no ticketing permission, which is the same answer the
   // route gives: the card renders nothing rather than a refusal they cannot act on.
   void refreshNuxtData('unassessed-shows')
@@ -68,6 +73,7 @@ onMounted(() => {
     </p>
 
     <UPageCard
+      v-if="seesTrouble"
       title="Messages that did not arrive"
       description="Every send is logged, including the ones that never reached a provider. A failure here is a person who was not told something."
       data-test="delivery-trouble"

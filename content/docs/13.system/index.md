@@ -3,7 +3,7 @@ title: System
 description: The console overview, the settings, the audit trail, backups and restore, and how this documentation is kept.
 module: Platform
 audience: committee
-updatedOn: 2026-09-22
+updatedOn: 2026-09-26
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -45,9 +45,9 @@ June is gone in August unless the incoming committee grants it again.
 1. **Help for this screen** opens the documentation page for the screen you are on. Every
    console, member and show-night screen carries one.
 2. **Messages that did not arrive** lists every send that never reached a person, newest first,
-   with why. It is for whoever reads the audit trail, and reads as empty ("Nothing has failed
-   or been suppressed")
-   rather than as a refusal when you hold something else.
+   with why. It is for whoever reads the audit trail, and is not shown to anybody who does not:
+   a trainer or a department lead reaches this screen on their standing alone, and an empty
+   card would wrongly tell them nothing had failed.
 
 Each line carries a badge saying what happened: **The provider refused it** (the email or
 push provider returned a failure), **Not sent** (the message was suppressed before it went), or
