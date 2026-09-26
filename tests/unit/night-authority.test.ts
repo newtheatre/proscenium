@@ -5,11 +5,13 @@ import { isAuditAction } from '#shared/utils/audit-actions'
 import { AUDIT_COVERAGE } from '#shared/utils/audit-coverage'
 import { OPERATIONAL_PERMISSIONS, PERMISSION_MAP } from '#shared/utils/roles'
 import {
+  CLAIM_CONFIRMER,
   NIGHT_ROLES,
   NIGHT_ROLE_OFFICER,
   NIGHT_ROLE_PERMISSION,
   NIGHT_ROLE_WORDS,
   OFFICER_BYPASS_ACTION,
+  claimedShiftRefusal,
   nightAuthorityRefusal,
   officerBypassEntry,
   officerBypassTarget,
@@ -107,6 +109,25 @@ describe('a refusal names what would unlock it (E-111, F-101 criterion 5)', () =
     expect(refusal.statusCode).toBe(403)
     expect(refusal.statusMessage).toContain('18:00 to 22:30')
     expect(refusal.statusMessage).not.toContain('bar manager')
+  })
+
+  // A claim waiting for an officer is not a shift, but it is not nothing either: the refusal says
+  // so and names who confirms it (E-112 criterion 2, E-104, issue 1303).
+  test('a claimed shift is refused as claimed, naming who confirms it', () => {
+    for (const role of NIGHT_ROLES) {
+      const refusal = claimedShiftRefusal(role)
+      expect(refusal.statusCode).toBe(403)
+      expect(refusal.statusMessage).toContain('claimed')
+      expect(refusal.statusMessage).toContain('not confirmed')
+      expect(refusal.statusMessage).toContain(CLAIM_CONFIRMER.words)
+      expect(refusal.statusMessage).not.toContain(role)
+    }
+    expect(claimedShiftRefusal('DOOR').statusMessage)
+      .toBe('Your door shift tonight is claimed, not confirmed yet: the Front of House Manager confirms it on the rota')
+  })
+
+  test('whoever the claimed refusal names can confirm a claim (E-105)', () => {
+    expect(PERMISSION_MAP[CLAIM_CONFIRMER.role] as readonly string[]).toContain('rota.write')
   })
 })
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { readTeamRow } from '#server/utils/tonight'
-import { activePerformanceId, contactRoster, saysPerformanceChoice, telHref } from '#shared/utils/tonight'
+import { activePerformanceId, contactRoster, saysPerformanceChoice, saysTeamHolder, telHref } from '#shared/utils/tonight'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
 // The duty manager's tonight screen (E-112). What the database returns is proved against the
@@ -22,13 +22,22 @@ describe('an unfilled slot never shows a blank name (E-112 criterion 2)', () => 
     expect(readTeamRow(row('CONFIRMED'))).toMatchObject({ filled: true, name: 'Someone' })
   })
 
-  test('a claimed but unconfirmed shift is filled too', () => {
-    expect(readTeamRow(row('CLAIMED'))).toMatchObject({ filled: true, name: 'Someone' })
+  test('a claimed but unconfirmed shift is not filled: it names the claimant as claimed (issue 1303)', () => {
+    expect(readTeamRow(row('CLAIMED'))).toMatchObject({ filled: false, claimed: true, name: 'Someone' })
+    expect(readTeamRow(row('CONFIRMED'))).toMatchObject({ filled: true, claimed: false })
   })
 
   test('open, declined shows as unfilled, with no name', () => {
-    expect(readTeamRow(row('OPEN', { userId: null, name: null, phone: null, visible: null }))).toMatchObject({ filled: false, name: null })
-    expect(readTeamRow(row('DECLINED'))).toMatchObject({ filled: false, name: null })
+    expect(readTeamRow(row('OPEN', { userId: null, name: null, phone: null, visible: null }))).toMatchObject({ filled: false, claimed: false, name: null })
+    expect(readTeamRow(row('DECLINED'))).toMatchObject({ filled: false, claimed: false, name: null })
+  })
+})
+
+describe('a slot reads as its holder, a claim or a gap (E-112 criterion 2, issue 1303)', () => {
+  test('confirmed reads as the name, a claim says it is not confirmed, and a gap is unfilled', () => {
+    expect(saysTeamHolder({ filled: true, claimed: false, name: 'Tomasz Nowak' })).toBe('Tomasz Nowak')
+    expect(saysTeamHolder({ filled: false, claimed: true, name: 'Tomasz Nowak' })).toBe('Tomasz Nowak, claimed, not confirmed')
+    expect(saysTeamHolder({ filled: false, claimed: false, name: null })).toBe('Unfilled')
   })
 })
 
@@ -43,6 +52,10 @@ describe('the phone shows only where consent is currently set', () => {
 
   test('never a phone for an unfilled slot, even if the column carries one', () => {
     expect(readTeamRow(row('DECLINED', { visible: 1 }))?.phone).toBeNull()
+  })
+
+  test('never a phone for a claim waiting to be confirmed, consent or not', () => {
+    expect(readTeamRow(row('CLAIMED', { visible: 1 }))?.phone).toBeNull()
   })
 })
 
@@ -112,6 +125,12 @@ describe('who is on tonight, for the contacts block (E-112 criterion 2)', () => 
   test('a row carrying the consented number wins over one that does not', () => {
     const listed = contactRoster([slot('DOOR', 'Little John', null), slot('DOOR', 'Little John', '07700 900123')])
     expect(listed[0]?.phone).toBe('07700 900123')
+  })
+
+  test('a claim is its own row, never folded into a gap or into the same person confirmed', () => {
+    const claim = { role: 'DOOR' as const, filled: false, claimed: true, name: 'Little John', phone: null }
+    const listed = contactRoster([slot('DOOR', null, null), claim, slot('DOOR', 'Little John', null)])
+    expect(listed.map(one => [one.filled, one.claimed ?? false])).toEqual([[false, false], [false, true], [true, false]])
   })
 
   test('an unfilled slot stays in the list as unfilled, never as a blank name', () => {

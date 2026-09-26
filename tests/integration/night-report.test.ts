@@ -308,6 +308,19 @@ describe('staffing (criterion 1)', () => {
     })
   })
 
+  test('a claim names its claimant as claimed, and a decline names nobody (E-112 criterion 2, issue 1303)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      shift(database, 's-claimed', tonight.performanceId, 'CLAIMED', person(database, 'claimant'), 1)
+      shift(database, 's-declined', tonight.performanceId, 'DECLINED', person(database, 'declined'), 2)
+
+      const found = read<{ shiftId: string, status: string, name: string | null }>(
+        database, reportStaffingQuery(tonight.performanceId, tonight.venueId, tonight.night))
+      expect(found.find(row => row.shiftId === 's-claimed')).toMatchObject({ status: 'CLAIMED', name: 'Someone claimant' })
+      expect(found.find(row => row.shiftId === 's-declined')).toMatchObject({ status: 'DECLINED', name: null })
+    })
+  })
+
   test('an officer bypass for this performance flags the shift; a bypass for another night does not', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
