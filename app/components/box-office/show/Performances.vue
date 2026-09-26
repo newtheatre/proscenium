@@ -6,10 +6,12 @@ import {
   addPerformanceRefusal,
   bookingWindowSource,
   performanceScreenForm,
+  preselectedVenueId,
   resolveBookingClosesHours,
   runningTimeRefusal,
   saysBookingWindow,
   saysPerformanceStatus,
+  saysVenueOption,
 } from '#shared/utils/programme'
 import { performancesList } from '#shared/utils/performances-list'
 import type { FormError, TableColumn } from '@nuxt/ui'
@@ -113,7 +115,7 @@ function editPerformance(one: AdminPerformance | null): void {
   editingPerformance.value = one
   failure.value = null
   Object.assign(form, {
-    venueId: one?.venueId ?? bookableVenues.value[0]?.id ?? '',
+    venueId: one?.venueId ?? preselectedVenueId(props.venues, props.show.lastVenueId),
     day: one ? dayOf(one.startsAt) : '',
     clock: one ? clockOf(one.startsAt) : '19:30',
     doorsClock: one?.doorsAt ? clockOf(one.doorsAt) : '',
@@ -235,7 +237,7 @@ async function deletePerformance(): Promise<void> {
 // showing so the picker never blanks out from under an existing edit (D-131 criterion 5).
 const venueOptions = computed(() => props.venues
   .filter(one => !one.archived || one.id === editingPerformance.value?.venueId)
-  .map(one => ({ label: one.name, value: one.id })))
+  .map(one => ({ label: saysVenueOption(one), value: one.id })))
 const bookableVenues = computed(() => props.venues.filter(one => !one.archived))
 const addRefusal = computed(() => addPerformanceRefusal(bookableVenues.value.length))
 

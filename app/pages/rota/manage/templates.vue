@@ -88,10 +88,13 @@ async function save(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    await $fetch(`/api/admin/rota/templates/${venue.venueId}`, { method: 'PUT', body: { slots: chosen.value } })
+    const answer = await $fetch<{ stamped: number }>(`/api/admin/rota/templates/${venue.venueId}`, { method: 'PUT', body: { slots: chosen.value } })
     toast.add({
       title: 'Template saved',
-      description: 'Performances added from now on are staffed from it. Stamp it to reach the ones already in the diary.',
+      description: (answer.stamped === 0
+        ? 'Performances added from now on are staffed from it.'
+        : `${plural(answer.stamped, 'shift')} stamped onto the performances that had none.`)
+      + ' Nights already stamped keep their shifts: Stamp the diary adds any slot they miss.',
       icon: 'i-lucide-check',
       color: 'success',
     })

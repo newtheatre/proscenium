@@ -19,6 +19,8 @@ import {
   replaceTemplateStatements,
   stampableSlotsQuery,
   stampPerformanceStatement,
+  stampUnstampedStatement,
+  unstaffedPerformancesQuery,
 } from '#server/utils/rota'
 import { venueInUseQuery } from '#server/utils/venues'
 import { auditEntry } from '#shared/utils/audit'
@@ -1397,6 +1399,86 @@ describe('onShiftTonight is a confirmed shift inside tonight, and nothing else',
       shift(database, late.performanceId, holder, 'CONFIRMED')
 
       expect(onShift(database, holder)).toBe(true)
+    })
+  })
+})
+
+// A venue's first template left the imported diary unstamped until somebody found "Stamp the
+// diary"; saving one now stamps what was never stamped, and nothing else (issue 1319, E-101 criterion 3).
+describe('saving a template stamps the future performances never stamped before (issue 1319)', () => {
+  const fromTonight = (): number => Math.floor(showNightBounds(currentShowNight()).from.getTime() / 1000)
+
+  test('a never-stamped performance is stamped; one holding any shift and one already past are left alone', async () => {
+    await withDatabase(async (database) => {
+      testVenue(database, { suffix: 'a' })
+      const bare = tonightsPerformance(database, { suffix: 'bare', night: daysAfter(currentShowNight(), 3), venueId: 'venue-a' })
+      const held = tonightsPerformance(database, { suffix: 'held', night: daysAfter(currentShowNight(), 4), venueId: 'venue-a' })
+      const past = tonightsPerformance(database, { suffix: 'past', night: daysAfter(currentShowNight(), -2), venueId: 'venue-a' })
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', 'held-door', held.performanceId, 'DOOR', 1, 'OPEN']])
+      template(database, 'venue-a')
+
+      run(database, stampUnstampedStatement('venue-a', fromTonight(), OFFSETS))
+
+      expect(shiftsOn(database, bare.performanceId).map(one => `${one.role}:${one.slot}:${one.status}`)).toEqual([
+        'BAR:1:OPEN', 'DOOR:1:OPEN', 'DOOR:2:OPEN', 'DUTY_MANAGER:1:OPEN',
+      ])
+      expect(shiftsOn(database, held.performanceId).map(one => one.id)).toEqual(['held-door'])
+      expect(shiftsOn(database, past.performanceId)).toEqual([])
+    })
+  })
+
+  // A performance moved here from another venue keeps only the cancelled shifts the move left, and
+  // the board shows it as nobody rostered, so the save reaches it (issue 1319).
+  test('a performance holding only cancelled shifts is stamped, around the slot a cancelled row still holds', async () => {
+    await withDatabase(async (database) => {
+      testVenue(database, { suffix: 'a' })
+      const moved = tonightsPerformance(database, { suffix: 'moved', night: daysAfter(currentShowNight(), 3), venueId: 'venue-a' })
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', 'gone-bar', moved.performanceId, 'BAR', 1, 'CANCELLED']])
+      template(database, 'venue-a')
+
+      run(database, stampUnstampedStatement('venue-a', fromTonight(), OFFSETS))
+
+      expect(shiftsOn(database, moved.performanceId).map(one => `${one.role}:${one.slot}:${one.status}`)).toEqual([
+        'BAR:1:CANCELLED', 'DOOR:1:OPEN', 'DOOR:2:OPEN', 'DUTY_MANAGER:1:OPEN',
+      ])
+    })
+  })
+
+  test('another venue\'s performance is untouched, and the statement binds only the venue and the night', async () => {
+    await withDatabase(async (database) => {
+      testVenue(database, { suffix: 'a' })
+      testVenue(database, { suffix: 'b' })
+      const elsewhere = tonightsPerformance(database, { suffix: 'elsewhere', night: daysAfter(currentShowNight(), 3), venueId: 'venue-b' })
+      template(database, 'venue-a')
+      template(database, 'venue-b')
+
+      const statement = stampUnstampedStatement('venue-a', fromTonight(), OFFSETS)
+      run(database, statement)
+      expect(shiftsOn(database, elsewhere.performanceId)).toEqual([])
+      expect(boundStatement(database, statement).length - 1).toBeLessThan(MAX_BOUND_PARAMETERS)
+    })
+  })
+})
+
+// An external night nobody rostered is not a gap to chase every morning; one of ours still is
+// (issue 1319, E-108 criterion 1, E-101 criterion 4).
+describe('the unstaffed digest leaves out an external night with no shifts (issue 1319)', () => {
+  test('ours with no shifts and an external night with an open shift are chased; an external night with none is not', async () => {
+    await withDatabase(async (database) => {
+      const soon = daysAfter(currentShowNight(), 3)
+      testVenue(database, { suffix: 'a' })
+      testVenue(database, { suffix: 'away', isExternal: true })
+      const ours = tonightsPerformance(database, { suffix: 'ours', night: soon, venueId: 'venue-a' })
+      const bare = tonightsPerformance(database, { suffix: 'bare', night: soon, venueId: 'venue-away' })
+      const adHoc = tonightsPerformance(database, { suffix: 'adhoc', night: soon, venueId: 'venue-away' })
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', 'adhoc-dm', adHoc.performanceId, 'DUTY_MANAGER', 1, 'OPEN']])
+
+      const from = Math.floor(Date.now() / 1000)
+      const chased = (run(database, unstaffedPerformancesQuery(from, from + 7 * 86_400)) as { performanceId: string }[])
+        .map(row => row.performanceId)
+      expect(chased).toContain(ours.performanceId)
+      expect(chased).toContain(adHoc.performanceId)
+      expect(chased).not.toContain(bare.performanceId)
     })
   })
 })

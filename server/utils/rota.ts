@@ -270,6 +270,40 @@ export function backfillVenueStatement(venueId: string, from: number, defaults: 
   return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from}`, defaults)
 }
 
+// The seven-day digest's rows (E-108): an open or declined shift, an unconfirmed duty manager, or no
+// shifts at a venue we run. An external night nobody rostered is staffed ad hoc (issue 1319).
+export function unstaffedPerformancesQuery(from: number, to: number): SQL {
+  return sql`
+    SELECT p.id AS performanceId, s.title AS showTitle, v.name AS venueName, p.starts_at AS startsAt,
+           group_concat(DISTINCT CASE WHEN sh.status IN ('OPEN', 'DECLINED') THEN sh.role END) AS openRoles,
+           max(CASE WHEN sh.role = 'DUTY_MANAGER' AND sh.status NOT IN ('CONFIRMED', 'CANCELLED')
+                    THEN 1 ELSE 0 END) AS dutyManagerGap,
+           count(sh.id) AS shiftCount
+    FROM performances p
+    JOIN shows s ON s.id = p.show_id
+    JOIN venues v ON v.id = p.venue_id
+    LEFT JOIN shifts sh ON sh.performance_id = p.id AND sh.status <> 'CANCELLED'
+    WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${from} AND p.starts_at < ${to}
+    GROUP BY p.id
+    HAVING openRoles IS NOT NULL OR dutyManagerGap = 1 OR (shiftCount = 0 AND max(v.is_external) = 0)
+    ORDER BY p.starts_at
+  `
+}
+
+// Saving a template reaches the diary it was missing: every performance at the venue from `from`
+// holding no live shift. One holding a live shift, even by hand, is left alone (issue 1319, E-101).
+export function stampUnstampedStatement(venueId: string, from: number, defaults: ShiftOffsets): SQL {
+  return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from}
+    AND NOT EXISTS (SELECT 1 FROM shifts held WHERE held.performance_id = p.id AND held.status <> 'CANCELLED')`, defaults)
+}
+
+// Tonight is still tonight's work, so a stamp reaches from its 04:00 (0014, E-110).
+export function stampWindow(): { night: string, from: number } {
+  const night = currentShowNight()
+  const from = Math.floor(showNightBounds(night).from.getTime() / 1000)
+  return { night, from }
+}
+
 // The fill for shifts stamped before a shift had times. Idempotent because it writes only where a
 // column is null, so a window already stamped is never recomputed (E-131 criterion 3).
 export function backfillShiftTimesStatement(defaults: ShiftOffsets, venueId?: string): SQL {
@@ -616,11 +650,16 @@ export function unconfirmShiftStatement(shiftId: string): SQL {
   `
 }
 
-export interface RosterPerformance {
+// The three flags are SQLite 0 or 1; the board route turns them into booleans.
+export interface RosterPerformanceRow {
   performanceId: string
   showTitle: string
+  venueId: string
   venueName: string
   startsAt: number
+  isExternal: number
+  hasTemplate: number
+  isRetired: number
 }
 
 export interface RosterShiftRow {
@@ -644,7 +683,9 @@ const rosterScope = (bounds: BoardBounds): SQL => sql`
 // the way `myShiftsQuery` bounds a member's own list (E-107 criterion 7, 0003).
 export function rosterPerformancesQuery(bounds: BoardBounds): SQL {
   return sql`
-    SELECT p.id AS performanceId, sh.title AS showTitle, v.name AS venueName, p.starts_at AS startsAt
+    SELECT p.id AS performanceId, sh.title AS showTitle, v.id AS venueId, v.name AS venueName,
+           p.starts_at AS startsAt, v.is_external AS isExternal, v.archived AS isRetired,
+           (v.is_external = 0 AND EXISTS (SELECT 1 FROM shift_templates t WHERE t.venue_id = v.id)) AS hasTemplate
     FROM performances p
     JOIN shows sh ON sh.id = p.show_id
     JOIN venues v ON v.id = p.venue_id

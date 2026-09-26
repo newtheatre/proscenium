@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysDay, saysClock, saysDayLong } from '#shared/utils/when'
-import { defaultBoardWindow, openingsOnNightHref } from '#shared/utils/rota-board'
+import { defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { BoardEntry } from '#shared/utils/rota-board'
@@ -19,8 +19,12 @@ interface RosterShift {
 interface RosterPerformance {
   performanceId: string
   showTitle: string
+  venueId: string
   venueName: string
   startsAt: number
+  isExternal: boolean
+  hasTemplate: boolean
+  isRetired: boolean
   shifts: RosterShift[]
 }
 
@@ -77,8 +81,19 @@ function confirmedCount(entry: Staffed): number {
   return entry.shifts.filter(shift => shift.status === 'CONFIRMED').length
 }
 
-function staffingLabel(entry: Staffed): string {
-  return confirmedCount(entry) === entry.shifts.length ? 'Fully staffed' : 'Needs people'
+const toneClass = { success: 'text-success', warning: 'text-warning', neutral: 'text-muted' } as const
+
+// Stamps the venue's template onto every night there from tonight that misses a slot (issue 1319).
+async function addMissing(entry: RosterPerformance): Promise<void> {
+  failure.value = null
+  try {
+    const answer = await $fetch<{ stamped: number }>(`/api/admin/rota/templates/${entry.venueId}/stamp`, { method: 'POST' })
+    toast.add({ title: `${plural(answer.stamped, 'shift')} added`, icon: 'i-lucide-check', color: 'success' })
+    await refresh()
+  }
+  catch (error) {
+    failure.value = refusalText(error)
+  }
 }
 
 function hoursOf(opening: RosterOpening): string {
@@ -356,9 +371,9 @@ watch(modalOpen, (nowOpen) => {
               </p>
               <p
                 class="text-sm"
-                :class="staffingLabel(entry) === 'Fully staffed' ? 'text-success' : 'text-warning'"
+                :class="toneClass[saysStaffing(entry).tone]"
               >
-                {{ staffingLabel(entry) }}
+                {{ saysStaffing(entry).says }}
               </p>
             </div>
             <UButton
@@ -457,6 +472,7 @@ watch(modalOpen, (nowOpen) => {
           <template #footer>
             <div class="flex items-center justify-between">
               <p
+                v-if="entry.shifts.length"
                 class="text-sm text-muted"
                 :data-test="`confirmed-count-${entry.performanceId}`"
               >
@@ -464,11 +480,37 @@ watch(modalOpen, (nowOpen) => {
               </p>
               <p
                 class="text-sm"
-                :class="staffingLabel(entry) === 'Fully staffed' ? 'text-success' : 'text-warning'"
+                :class="toneClass[saysStaffing(entry).tone]"
               >
-                {{ staffingLabel(entry) }}
+                {{ saysStaffing(entry).says }}
               </p>
             </div>
+            <template v-if="entry.shifts.length === 0 && !entry.isExternal">
+              <UButton
+                v-if="entry.hasTemplate"
+                block
+                size="sm"
+                class="mt-3"
+                icon="i-lucide-list-plus"
+                :data-test="`add-missing-${entry.performanceId}`"
+                @click="addMissing(entry)"
+              >
+                Add missing shifts
+              </UButton>
+              <UButton
+                v-else-if="!entry.isRetired"
+                block
+                size="sm"
+                variant="outline"
+                class="mt-3"
+                icon="i-lucide-arrow-right"
+                trailing
+                to="/rota/manage/templates"
+                :data-test="`set-up-template-${entry.performanceId}`"
+              >
+                Set up the venue's template
+              </UButton>
+            </template>
             <UButton
               block
               size="sm"

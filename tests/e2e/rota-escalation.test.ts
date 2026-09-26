@@ -112,6 +112,22 @@ describe.skipIf(skip !== null)('the seven-day unstaffed digest (E-108)', () => {
     expect(after.performances).toBe(before.performances + 1)
   })
 
+  // An external night is staffed ad hoc: nobody rostered there is not a gap to chase (issue 1319).
+  test('a night at an external venue with no shifts is not chased', async () => {
+    const before = await escalate()
+    const house = performanceInDays(3, 'external-bare')
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('UPDATE venues SET is_external = 1 WHERE id = ?').run(house.venueId)
+    }
+    finally {
+      database.close()
+    }
+
+    const after = await escalate()
+    expect(after.performances).toBe(before.performances)
+  })
+
   test('a fully confirmed performance sends nothing about itself (criterion 3)', async () => {
     const before = await escalate()
     const house = performanceInDays(4, 'fully-staffed')
