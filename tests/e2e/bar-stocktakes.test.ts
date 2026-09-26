@@ -83,6 +83,10 @@ const view = async (id: string): Promise<{ stocktake: Stocktake, lines: Stocktak
   return answered.json() as Promise<{ stocktake: Stocktake, lines: StocktakeLine[] }>
 }
 
+// The count the register holds for one line, read back through the route rather than the screen.
+const countedOf = async (stocktakeId: string, itemId: string): Promise<number | null | undefined> =>
+  (await view(stocktakeId)).lines.find(line => line.itemId === itemId)?.countedQty
+
 const count = async (id: string, counts: { itemId: string, counted: number | null }[], as = barManager.cookie): Promise<Response> =>
   send('PUT', `/api/admin/bar/stocktakes/${id}/counts`, { counts }, as)
 
@@ -264,7 +268,8 @@ describe.skipIf(skip !== null)('who may run a stocktake', () => {
 })
 
 describe.skipIf(skip !== null)('the screen', () => {
-  test('Apply saves what was typed and never posted, and names it first (F-115 criteria 3, 4)', async () => {
+  // Issue 1321: a count is saved line by line as it is typed, so Apply has nothing left to lose.
+  test('a typed count saves on its own, and Apply names what it will post (F-115 criteria 3, 4)', async () => {
     const item = await anItem()
     await deliver(item.id, 10, 480)
     const opened = await open()
@@ -281,8 +286,9 @@ describe.skipIf(skip !== null)('the screen', () => {
 
     await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
     await fillNumber(view, `[data-test="counted-${item.id}"]`, '7')
+    await waitFor(view, `document.querySelector('[data-test="line-state-${item.id}"]')?.textContent.includes('Saved')`)
+    expect(await countedOf(opened.stocktake.id, item.id)).toBe(7)
 
-    // Apply without ever pressing Save counts: the typed figure must still reach the register.
     await click(view, '[data-test="open-apply"]')
     await waitFor(view, `document.querySelector('[data-test="apply-summary"]')`)
     expect(await textOf(view, '[data-test="apply-counted"]')).toContain('1')
@@ -325,7 +331,7 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
 
     // A count of 750 or 1750 needs more than thirty pixels: no steppers, filling the cell.
     await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]').getAttribute('placeholder') === 'Uncounted'`)
-    await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]').closest('td').querySelectorAll('button').length === 0`)
+    await waitFor(view, `document.querySelector('[data-test="count-fields-${first.id}"]').querySelectorAll('button').length === 0`)
     expect(await textOf(view, `[data-test="uncounted-badge-${first.id}"]`)).toContain('Uncounted')
 
     await fillNumber(view, `[data-test="counted-${first.id}"]`, '7')
@@ -348,7 +354,7 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
     // filter now puts first: typing drops that row out of the filtered list before Enter runs.
     await click(view, '[data-test="uncounted-only-filter"]')
     const beforeTyping = await view.evaluate(
-      `[...document.querySelectorAll('[data-test^="counted-"]')].map(el => el.getAttribute('data-test'))`,
+      `[...document.querySelectorAll('[data-test^="counted-"]:not([data-test^="counted-part-"])')].map(el => el.getAttribute('data-test'))`,
     ) as string[]
     expect(beforeTyping.length).toBeGreaterThanOrEqual(3)
     const [, typedInto, expectedNext] = beforeTyping
@@ -381,6 +387,197 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
 
     view.close()
     await apply(opened.stocktake.id)
+  }, 120_000)
+})
+
+// Issue 1321 (F-115): the count asked for millilitres in 32 px fields, lost what was not saved,
+// showed the expected figure before counting and ordered the lines by name alone.
+describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (issue 1321)', () => {
+  async function signedIn(width = 375): Promise<Bun.WebView> {
+    const screen = await openSignedOutView(app.baseURL, { width, height: 812 })
+    await visit(screen, `${app.baseURL}/sign-in`)
+    await fill(screen, 'form input[type="email"]', barManager.email)
+    await fill(screen, 'form input[type="password"]', barPassword)
+    await click(screen, 'form button[type="submit"]')
+    await waitFor(screen, `document.querySelector('[data-test="account-menu"]')`)
+    return screen
+  }
+
+  test('a bottle is counted as full ones plus the open one, and kept in millilitres', async () => {
+    const item = await anItem({ containerMl: 750 })
+    await deliver(item.id, 3000)
+    const opened = await open()
+
+    const screen = await signedIn()
+    try {
+      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      await fillNumber(screen, `[data-test="counted-${item.id}"]`, '3')
+      await fillNumber(screen, `[data-test="counted-part-${item.id}"]`, '375')
+      await waitFor(screen, `document.querySelector('[data-test="line-state-${item.id}"]')?.textContent.includes('Saved')`)
+      expect(await countedOf(opened.stocktake.id, item.id)).toBe(2625)
+      expect(await textOf(screen, `[data-test="line-${item.id}"]`)).toContain('2625 ml')
+    }
+    finally {
+      screen.close()
+    }
+    await apply(opened.stocktake.id)
+  }, 120_000)
+
+  test('the expected figure stays hidden until the line is counted', async () => {
+    const item = await anItem()
+    await deliver(item.id, 40)
+    const opened = await open()
+
+    const screen = await signedIn()
+    try {
+      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      expect(await textOf(screen, `[data-test="line-${item.id}"]`)).not.toContain('40 ml')
+      await fillNumber(screen, `[data-test="counted-${item.id}"]`, '38')
+      await waitFor(screen, `document.querySelector('[data-test="expected-${item.id}"]')`)
+      expect(await textOf(screen, `[data-test="expected-${item.id}"]`)).toContain('40 ml')
+      expect(await textOf(screen, `[data-test="variance-${item.id}"]`)).toContain('-2 ml')
+    }
+    finally {
+      screen.close()
+    }
+    await apply(opened.stocktake.id)
+  }, 120_000)
+
+  test('a count typed and left is still there on the next visit', async () => {
+    const item = await anItem()
+    await deliver(item.id, 10)
+    const opened = await open()
+
+    const screen = await signedIn()
+    try {
+      const page = `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`
+      await visit(screen, page, `[data-test="counted-${item.id}"]`)
+      await fillNumber(screen, `[data-test="counted-${item.id}"]`, '9')
+      await waitFor(screen, `document.querySelector('[data-test="line-state-${item.id}"]')?.textContent.includes('Saved')`)
+      await visit(screen, page, `[data-test="counted-${item.id}"]`)
+      expect(await screen.evaluate<string>(`document.querySelector('[data-test="counted-${item.id}"]').value`)).toBe('9')
+    }
+    finally {
+      screen.close()
+    }
+    await apply(opened.stocktake.id)
+  }, 120_000)
+
+  test('lines sit under their stock group, in 48 px rows, over a footer that stays in view', async () => {
+    const group = named('Spirits')
+    const item = await anItem({ category: group, containerMl: 700 })
+    await deliver(item.id, 700)
+    const opened = await open()
+
+    const screen = await signedIn()
+    try {
+      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      const heading = await screen.evaluate<string>(
+        `document.querySelector('[data-test="line-${item.id}"]').closest('section').querySelector('h3').textContent`,
+      )
+      expect(heading).toContain(group)
+      for (const field of [`counted-${item.id}`, `counted-part-${item.id}`]) {
+        expect(await screen.evaluate<number>(`document.querySelector('[data-test="${field}"]').getBoundingClientRect().height`))
+          .toBeGreaterThanOrEqual(48)
+      }
+      expect(await screen.evaluate<string>(`getComputedStyle(document.querySelector('[data-test="stocktake-footer"]')).position`))
+        .toBe('sticky')
+      expect(await textOf(screen, '[data-test="stocktake-footer"]')).toContain('counted')
+      expect(await screen.evaluate<number>(`document.querySelector('[data-test="open-apply"]').getBoundingClientRect().height`))
+        .toBeGreaterThanOrEqual(48)
+    }
+    finally {
+      screen.close()
+    }
+    await apply(opened.stocktake.id)
+  }, 120_000)
+
+  // F-115 criteria 2 and 6: a cleared line is uncounted again, never a counted nought.
+  test('clearing both halves of a measured count puts the line back to blank', async () => {
+    const item = await anItem({ containerMl: 750 })
+    const opened = await open()
+
+    const screen = await signedIn()
+    try {
+      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      await fillNumber(screen, `[data-test="counted-${item.id}"]`, '3')
+      await fillNumber(screen, `[data-test="counted-part-${item.id}"]`, '375')
+      await waitFor(screen, `document.querySelector('[data-test="line-state-${item.id}"]')?.textContent.includes('Saved')`)
+      expect(await countedOf(opened.stocktake.id, item.id)).toBe(2625)
+
+      await fillNumber(screen, `[data-test="counted-${item.id}"]`, '')
+      await fillNumber(screen, `[data-test="counted-part-${item.id}"]`, '')
+      await waitFor(screen, `document.querySelector('[data-test="uncounted-badge-${item.id}"]')`)
+      await waitFor(screen, `document.querySelector('[data-test="line-state-${item.id}"]')?.textContent.includes('Saved')`)
+      expect(await countedOf(opened.stocktake.id, item.id)).toBeNull()
+    }
+    finally {
+      screen.close()
+    }
+    await apply(opened.stocktake.id)
+  }, 120_000)
+
+  test('with only uncounted lines shown, a measured line stays until its open container is in', async () => {
+    const item = await anItem({ containerMl: 750 })
+    const opened = await open()
+
+    const screen = await signedIn()
+    try {
+      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      await click(screen, '[data-test="uncounted-only-filter"]')
+      await screen.evaluate(`document.querySelector('[data-test="counted-${item.id}"]').focus()`)
+      await fill(screen, `[data-test="counted-${item.id}"]`, '3')
+      await screen.evaluate(`document.querySelector('[data-test="counted-${item.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
+      await waitFor(screen, `document.activeElement?.getAttribute('data-test') === 'counted-part-${item.id}'`)
+
+      // Leaving the open container at the nought worked out for it still releases the line.
+      await screen.evaluate(`document.querySelector('[data-test="counted-part-${item.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
+      await screen.evaluate(`document.querySelector('[data-test="counted-part-${item.id}"]')?.blur()`)
+      await waitFor(screen, `!document.querySelector('[data-test="line-${item.id}"]')`)
+    }
+    finally {
+      screen.close()
+    }
+    await apply(opened.stocktake.id)
+  }, 120_000)
+
+  test('a count is whole millilitres, so a fraction of a bottle is not kept as one', async () => {
+    const item = await anItem({ containerMl: 700 })
+    const opened = await open()
+
+    const screen = await signedIn()
+    try {
+      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      await fillNumber(screen, `[data-test="counted-${item.id}"]`, '0.7')
+      await waitFor(screen, `document.querySelector('[data-test="line-state-${item.id}"]')?.textContent.includes('Saved')`)
+      expect(await countedOf(opened.stocktake.id, item.id)).toBe(700)
+    }
+    finally {
+      screen.close()
+    }
+    await apply(opened.stocktake.id)
+  }, 120_000)
+
+  // F-115 criteria 3 and 4: Apply never confirms over a line the register does not hold.
+  test('a line that did not save stops Apply, which says so and asks nothing', async () => {
+    const item = await anItem()
+    const opened = await open()
+
+    const screen = await signedIn()
+    try {
+      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      // Applied behind the screen's back, so the page still shows it open and every save is refused.
+      await apply(opened.stocktake.id)
+      await fillNumber(screen, `[data-test="counted-${item.id}"]`, '4')
+      await waitFor(screen, `document.querySelector('[data-test="line-state-${item.id}"]')?.textContent.includes('Not saved')`)
+
+      await click(screen, '[data-test="open-apply"]')
+      await waitFor(screen, `document.querySelector('[data-test="stocktake-failure"]')?.textContent.includes('Some counts did not save')`)
+      expect(await screen.evaluate<boolean>(`Boolean(document.querySelector('[data-test="apply-summary"]'))`)).toBe(false)
+    }
+    finally {
+      screen.close()
+    }
   }, 120_000)
 })
 
