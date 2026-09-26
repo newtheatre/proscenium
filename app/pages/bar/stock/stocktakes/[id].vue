@@ -114,7 +114,8 @@ const applyNetVarianceCostPence = computed(() =>
           v-if="open"
           class="mt-1 text-sm text-muted"
         >
-          Each count saves as you type it. What each line was expected to hold shows once it is counted.
+          Each count saves when you leave its field or press Enter. What each line was expected to hold
+          shows once it is counted.
         </p>
       </div>
 
@@ -138,6 +139,7 @@ const applyNetVarianceCostPence = computed(() =>
           <UButton
             data-test="open-apply"
             size="xl"
+            class="min-h-12"
             :loading="preparing"
             @click="openApply"
           >

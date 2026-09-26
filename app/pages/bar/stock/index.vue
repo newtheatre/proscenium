@@ -551,7 +551,7 @@ const columns: TableColumn<StockItem>[] = [
             label="Stock group"
             name="category"
             hint="Optional"
-            description="Free text, for grouping the order list, and not a product category."
+            description="Free text, for grouping the order list and a stocktake's lines, and not a product category."
           >
             <UInput
               v-model="state.category"

@@ -54,6 +54,14 @@ describe('the lines are grouped the way the bar is stocked', () => {
     expect(groups.map(group => group.name)).toEqual(['Spirits', 'Wine', NO_STOCK_GROUP])
     expect(groups[0]?.lines.map(one => one.itemId)).toEqual(['gin', 'rum'])
   })
+
+  // The query orders stock groups ignoring case, so a spelling differing only in case sits beside
+  // the first and joins it rather than repeating the heading.
+  test('spellings that differ only in case are one group, under the first spelling', () => {
+    const groups = stocktakeGroups([line('gin', 'spirits'), line('rum', 'Spirits'), line('vodka', 'spirits')])
+    expect(groups.map(group => group.name)).toEqual(['spirits'])
+    expect(groups[0]?.lines.map(one => one.itemId)).toEqual(['gin', 'rum', 'vodka'])
+  })
 })
 
 // Saved line by line: one count a submission is the ordinary case now, not a batch of every line.

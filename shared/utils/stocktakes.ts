@@ -77,13 +77,14 @@ export interface StocktakeGroup {
   lines: StocktakeLine[]
 }
 
-// One section per stock group, in the order the lines arrive (grouped already by the query).
+// One section per stock group, in the order the lines arrive (grouped already by the query). A
+// group is free text, so spellings differing only in case are one group under the first spelling.
 export function stocktakeGroups(lines: readonly StocktakeLine[]): StocktakeGroup[] {
   const groups: StocktakeGroup[] = []
   for (const line of lines) {
     const name = line.category ?? NO_STOCK_GROUP
     const last = groups.at(-1)
-    if (last?.name === name) last.lines.push(line)
+    if (last && last.name.toLowerCase() === name.toLowerCase()) last.lines.push(line)
     else groups.push({ name, lines: [line] })
   }
   return groups

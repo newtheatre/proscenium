@@ -3,8 +3,8 @@ import { saysMoney, saysQuantity } from '#shared/utils/bar'
 import { joinCount, saysCount, splitCount, stocktakeGroups } from '#shared/utils/stocktakes'
 import type { StocktakeLine } from '#shared/utils/stocktakes'
 
-// The count itself, shelf by shelf (issue 1321, F-115): each line saves as it is typed, so a
-// phone that sleeps loses nothing, and the expected figure waits until the line is counted.
+// The count itself, shelf by shelf (issue 1321, F-115): each line saves as its field commits, and
+// the expected figure waits until the line is counted.
 const props = defineProps<{
   stocktakeId: string
   lines: StocktakeLine[]
@@ -21,15 +21,16 @@ const state = ref<Record<string, 'saving' | 'saved' | 'failed'>>({})
 const errors = ref<Record<string, string>>({})
 const sequence: Record<string, number> = {}
 const inFlight = new Set<Promise<unknown>>()
+// One request a line at a time: a later edit must land after an earlier one, never race it.
+const queue: Record<string, Promise<unknown>> = {}
 
 const dirty = (line: StocktakeLine): boolean => (drafts.value[line.itemId] ?? null) !== line.countedQty
 
-// A fresh read of the lines never overwrites a figure still being typed or saved on this screen.
+// A fresh read shows the register, except where this screen still holds a figure it has not saved.
 watch(() => props.lines, (lines) => {
   for (const line of lines) {
-    if (!(line.itemId in drafts.value) || (!dirty(line) && state.value[line.itemId] !== 'saving')) {
-      drafts.value[line.itemId] = line.countedQty ?? undefined
-    }
+    const local = state.value[line.itemId]
+    if (local !== 'saving' && local !== 'failed') drafts.value[line.itemId] = line.countedQty ?? undefined
   }
 }, { immediate: true })
 
@@ -42,10 +43,12 @@ async function save(line: StocktakeLine): Promise<boolean> {
   const seq = (sequence[itemId] ?? 0) + 1
   sequence[itemId] = seq
   state.value[itemId] = 'saving'
-  const pending = $fetch<{ lines: StocktakeLine[] }>(`/api/admin/bar/stocktakes/${props.stocktakeId}/counts`, {
-    method: 'PUT',
-    body: { counts: [{ itemId, counted: drafts.value[itemId] ?? null }] },
-  })
+  const pending = (queue[itemId] ?? Promise.resolve()).catch(() => undefined).then(() =>
+    $fetch<{ lines: StocktakeLine[] }>(`/api/admin/bar/stocktakes/${props.stocktakeId}/counts`, {
+      method: 'PUT',
+      body: { counts: [{ itemId, counted: drafts.value[itemId] ?? null }] },
+    }))
+  queue[itemId] = pending
   inFlight.add(pending)
   try {
     const answered = await pending
@@ -68,24 +71,30 @@ async function save(line: StocktakeLine): Promise<boolean> {
   }
 }
 
+// A measured line stays in view under "Only uncounted" until its open container is in too.
+const opening = ref<string | null>(null)
+
+// An unchanged figure is not a count: a field re-applies its value on every blur and Enter.
 function commit(line: StocktakeLine, value: number | null): void {
+  opening.value = null
+  if ((drafts.value[line.itemId] ?? null) === value && state.value[line.itemId] !== 'failed') return
   drafts.value[line.itemId] = value ?? undefined
   void save(line)
 }
 
-function commitFull(line: StocktakeLine & { containerMl: number }, full: number | undefined): void {
-  const part = counted(line) ? splitCount(drafts.value[line.itemId]!, line.containerMl).part : undefined
-  commit(line, joinCount(full, part, line.containerMl))
-}
-
-function commitPart(line: StocktakeLine & { containerMl: number }, part: number | undefined): void {
-  const full = counted(line) ? splitCount(drafts.value[line.itemId]!, line.containerMl).full : undefined
-  commit(line, joinCount(full, part, line.containerMl))
-}
-
-const shown = (line: StocktakeLine, half: 'full' | 'part'): number | undefined => {
+// A worked-out nought is not a typed one, so clearing the only half with a figure goes back to
+// blank rather than saving a counted nought (F-115 criterion 2).
+function commitHalf(line: StocktakeLine & { containerMl: number }, half: 'full' | 'part', value: number | undefined): void {
   const qty = drafts.value[line.itemId]
-  return qty === undefined || !line.containerMl ? undefined : splitCount(qty, line.containerMl)[half]
+  const held = qty === undefined ? { full: 0, part: 0 } : splitCount(qty, line.containerMl)
+  const next = { full: held.full || undefined, part: held.part || undefined, [half]: value }
+  commit(line, joinCount(next.full, next.part, line.containerMl))
+  if (half === 'full') opening.value = line.itemId
+}
+
+const shown = (line: StocktakeLine & { containerMl: number }, half: 'full' | 'part'): number | undefined => {
+  const qty = drafts.value[line.itemId]
+  return qty === undefined ? undefined : splitCount(qty, line.containerMl)[half]
 }
 
 // Apply reads the register, so everything typed here is on it first (F-115 criterion 3).
@@ -101,7 +110,7 @@ defineExpose({ flush })
 const uncountedOnly = ref(false)
 
 const visibleGroups = computed(() => stocktakeGroups(uncountedOnly.value
-  ? props.lines.filter(line => !counted(line))
+  ? props.lines.filter(line => !counted(line) || line.itemId === opening.value)
   : props.lines))
 
 const countedTotal = computed(() => props.lines.filter(counted).length)
@@ -134,13 +143,16 @@ function focusNext(line: StocktakeLine, from: 'full' | 'part' | 'single'): void 
   if (next) document.querySelector<HTMLInputElement>(`[data-test="counted-${next.itemId}"]`)?.focus()
 }
 
-function onEnter(event: KeyboardEvent, line: StocktakeLine, from: 'full' | 'part' | 'single'): void {
-  if (event.key !== 'Enter') return
-  event.preventDefault()
-  focusNext(line, from)
-}
-
-const FIELD_UI = { base: 'h-12 text-base' }
+// Every count field: whole numbers only, since a count is whole millilitres or items; no steppers.
+const FIELD = {
+  min: 0,
+  increment: false,
+  decrement: false,
+  inputmode: 'numeric',
+  class: 'w-full',
+  ui: { base: 'h-12 text-base' },
+  formatOptions: { maximumFractionDigits: 0 },
+} as const
 </script>
 
 <template>
@@ -186,49 +198,34 @@ const FIELD_UI = { base: 'h-12 text-base' }
             >
               <template v-if="open && byContainer(line)">
                 <UInputNumber
+                  v-bind="FIELD"
                   :model-value="shown(line, 'full')"
-                  :min="0"
-                  :increment="false"
-                  :decrement="false"
                   placeholder="Full"
-                  inputmode="numeric"
-                  class="w-full"
-                  :ui="FIELD_UI"
                   :aria-label="`Full containers, ${line.itemName}`"
                   :data-test="`counted-${line.itemId}`"
-                  @update:model-value="value => commitFull(line, value ?? undefined)"
-                  @keydown="(event: KeyboardEvent) => onEnter(event, line, 'full')"
+                  @update:model-value="value => commitHalf(line, 'full', value ?? undefined)"
+                  @keydown.enter.prevent="focusNext(line, 'full')"
                 />
                 <UInputNumber
+                  v-bind="FIELD"
                   :model-value="shown(line, 'part')"
-                  :min="0"
                   :max="line.containerMl"
-                  :increment="false"
-                  :decrement="false"
                   placeholder="Open, ml"
-                  inputmode="numeric"
-                  class="w-full"
-                  :ui="FIELD_UI"
                   :aria-label="`Millilitres left in the open one, ${line.itemName}`"
                   :data-test="`counted-part-${line.itemId}`"
-                  @update:model-value="value => commitPart(line, value ?? undefined)"
-                  @keydown="(event: KeyboardEvent) => onEnter(event, line, 'part')"
+                  @update:model-value="value => commitHalf(line, 'part', value ?? undefined)"
+                  @keydown.enter.prevent="focusNext(line, 'part')"
                 />
               </template>
               <UInputNumber
                 v-else-if="open"
+                v-bind="FIELD"
                 :model-value="drafts[line.itemId]"
-                :min="0"
-                :increment="false"
-                :decrement="false"
                 placeholder="Uncounted"
-                inputmode="numeric"
-                class="w-full"
-                :ui="FIELD_UI"
                 :aria-label="`Counted, ${line.itemName}`"
                 :data-test="`counted-${line.itemId}`"
                 @update:model-value="value => commit(line, value ?? null)"
-                @keydown="(event: KeyboardEvent) => onEnter(event, line, 'single')"
+                @keydown.enter.prevent="focusNext(line, 'single')"
               />
               <span v-else>
                 {{ line.countedQty === null ? 'Uncounted' : saysCount(line.countedQty, line.unit, line.containerMl) }}
@@ -303,6 +300,7 @@ const FIELD_UI = { base: 'h-12 text-base' }
         v-model="uncountedOnly"
         data-test="uncounted-only-filter"
         label="Only uncounted"
+        :ui="{ root: 'items-center', label: 'py-3.5' }"
       />
       <div class="ml-auto flex gap-2">
         <slot name="actions" />
