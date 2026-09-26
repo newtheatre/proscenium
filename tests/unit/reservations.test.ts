@@ -11,6 +11,7 @@ import {
   nothingToCollect,
   otherBookingReason,
   overCapReason,
+  passBookingReason,
   pastCurtainReason,
   qrStatusDisplay,
   reservationEditForm,
@@ -163,6 +164,12 @@ describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', (
     expect(nothingToCollect(1_900_000_000, 700)).toBe(false)
   })
 
+  // Issue 1390: a pass booking has a pass admission behind it, which only the box office unpicks.
+  test('a booking made with a pass is changed or cancelled only at the box office', () => {
+    expect(passBookingReason(false)).toBeNull()
+    expect(passBookingReason(true)).toContain('box office')
+  })
+
   // Issue 1329: one cookie names one booking, so a page showing another is refused, not obeyed.
   test('a write naming no booking, or a different one from the one the cookie holds, is refused', () => {
     expect(otherBookingReason(undefined, 'ABCDEF')).toBe('This page is out of date. Reload it, then try again.')
@@ -214,6 +221,14 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
   test('wrong performance takes priority over an unpaid ticket: the door only owes one answer', () => {
     const outcome = doorTicketOutcome('PENDING', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', '£9.00')
     expect(outcome.headline).toBe('Wrong performance')
+  })
+
+  // Issue 1390: a booking made with a pass owes nothing and holds nothing, so the door admits it.
+  test('a booking with nothing to collect admits for its own performance, and still refuses at another', () => {
+    const own = doorTicketOutcome('PENDING', null, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', null, null, true)
+    expect(own).toEqual({ headline: 'Admit', detail: null, admit: true })
+    const other = doorTicketOutcome('PENDING', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null, null, true)
+    expect(other.headline).toBe('Wrong performance')
   })
 
   test('a cancelled or lapsed ticket explains itself regardless of performance, and one already in says so', () => {

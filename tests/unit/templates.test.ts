@@ -262,6 +262,15 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(html).not.toContain('UNPAID')
   })
 
+  // Issue 1390: a booking made with a pass owes nothing, so it never reads "£0.00 is due".
+  test('a booking with nothing to collect says there is nothing to pay', () => {
+    const { html, text } = render('reservation-confirmed', { ...EVERYTHING, nothingDue: true })
+    for (const part of [flat(html), flat(text)]) {
+      expect(part).toContain('Nothing to pay: this booking was made with your pass.')
+      expect(part).not.toContain('Not yet paid')
+    }
+  })
+
   test('the cancellation is a booking that was still unpaid', () => {
     const { subject, html } = render('reservation-cancelled', EVERYTHING)
     expect(subject).toBe('Your booking for The Tempest is cancelled')

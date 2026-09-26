@@ -229,11 +229,52 @@ describe.skipIf(skip !== null)('using a pass lands on its booking, and signing o
       expect(await view.evaluate<string>('location.pathname')).toBe('/qr')
       expect(await textOf(view, '[data-test="booking-status"]')).toBe('Booked')
 
+      // Issue 1390: a pass booking offers nothing to change here; the box office handles it.
+      expect(await textOf(view, '[data-test="booking-pass-note"]')).toContain('box office')
+      for (const control of ['booking-edit-start', 'booking-exchange-start', 'booking-cancel-start']) {
+        expect(await view.evaluate<boolean>(`document.querySelector('[data-test="${control}"]') === null`)).toBe(true)
+      }
+
       expect(await view.evaluate<number>(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)).toBe(200)
       expect(await view.evaluate<number>(`fetch('/api/qr/current').then(response => response.status)`)).toBe(401)
     }
     finally {
       view.close()
     }
+  }, CASE_TIMEOUT_MS)
+})
+
+// Issue 1390: the admission behind a pass booking is append-only and once per night, so a cancel
+// would lose the use and an edit would leave paid seats with no hold. The box office does it.
+describe.skipIf(skip !== null)('a pass booking is changed or cancelled only at the box office (issue 1390)', () => {
+  test('cancel, change and exchange, and the reads behind them, all refuse and change nothing', async () => {
+    const { performanceId, passTypeId, priceId } = await coveredPerformance()
+    const { holder, passId } = await holderWithPass(passTypeId, priceId)
+    const redeemed = await send('POST', `/api/passes/${passId}/redeem`, { performanceId }, holder.cookie)
+    expect(redeemed.status).toBe(200)
+    const { reference, qrToken } = await redeemed.json() as { reference: string, qrToken: string }
+
+    const opened = await fetch(`${app.baseURL}/qr/${qrToken}`, { redirect: 'manual' })
+    const cookie = (opened.headers.get('set-cookie') ?? '').split(';')[0]!
+
+    const current = await send('GET', '/api/qr/current', undefined, cookie)
+    expect((await current.json() as { passBooking: boolean }).passBooking).toBe(true)
+
+    const attempts = [
+      send('POST', '/api/qr/cancel', { reference }, cookie),
+      send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: 'anything', quantity: 2 }], reference }, cookie),
+      send('POST', '/api/qr/exchange', { performanceId, reference }, cookie),
+      send('GET', `/api/qr/edit-options?reference=${reference}`, undefined, cookie),
+      send('GET', `/api/qr/exchange-options?reference=${reference}`, undefined, cookie),
+    ]
+    for (const answered of await Promise.all(attempts)) {
+      expect(answered.status).toBe(409)
+      expect(await answered.text()).toContain('box office')
+    }
+
+    const row = query<{ status: string }>('SELECT status FROM reservations WHERE reference = ?', reference)
+    expect(row?.status).toBe('PENDING')
+    const admissions = query<{ total: number }>('SELECT count(*) AS total FROM pass_admissions WHERE pass_id = ?', passId)
+    expect(admissions?.total).toBe(1)
   }, CASE_TIMEOUT_MS)
 })
