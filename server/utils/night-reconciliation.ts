@@ -105,7 +105,6 @@ export async function readingHistory(night: string): Promise<ZReading[]> {
 }
 
 export interface TakingsDay {
-  day: string
   firstAt: number
   lastAt: number
 }
@@ -114,7 +113,7 @@ export interface TakingsDay {
 // day from the floor: a whole season, never the ledger back to 2014 (I-104 criteria 5 and 6).
 export function takingsDaysQuery(): SQL {
   return sql`
-    SELECT london_day AS day, min(happened_at) AS firstAt, max(happened_at) AS lastAt
+    SELECT min(happened_at) AS firstAt, max(happened_at) AS lastAt
     FROM ledger_entries
     WHERE tender = 'CARD' AND source IN ('DESK', 'TILL') AND london_day >= ${FIRST_RECONCILED_NIGHT}
     GROUP BY london_day

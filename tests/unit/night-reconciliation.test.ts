@@ -93,28 +93,28 @@ describe('only nights since the first reconciled night are outstanding (criterio
 // Issue #1359: a London day's first and last takings name the show nights it holds money for,
 // since the night runs 04:00 to 04:00 (0014) and the ledger groups by calendar day.
 describe('the nights a London day of takings belongs to', () => {
-  const at = (day: string, hour: number): number => {
+  const at = (day: string, hour: number, minute = 0): number => {
     const [year, month, date] = day.split('-').map(Number) as [number, number, number]
-    return Math.floor(fromLondonWallClock(year, month, date, hour).getTime() / 1000)
+    return Math.floor(fromLondonWallClock(year, month, date, hour, minute).getTime() / 1000)
   }
 
   test('takings after 04:00 are that night\'s', () => {
-    expect(nightsWithTakings([{ day: '2026-09-05', firstAt: at('2026-09-05', 14), lastAt: at('2026-09-05', 23) }])).toEqual(['2026-09-05'])
+    expect(nightsWithTakings([{ firstAt: at('2026-09-05', 14), lastAt: at('2026-09-05', 23) }])).toEqual(['2026-09-05'])
   })
 
   test('takings before 04:00 are the night before\'s', () => {
-    expect(nightsWithTakings([{ day: '2026-09-24', firstAt: at('2026-09-24', 0), lastAt: at('2026-09-24', 3) }])).toEqual(['2026-09-23'])
+    expect(nightsWithTakings([{ firstAt: at('2026-09-24', 0), lastAt: at('2026-09-24', 3) }])).toEqual(['2026-09-23'])
   })
 
   test('a day with both is money for two nights, and a night is named once', () => {
     expect(nightsWithTakings([
-      { day: '2026-09-23', firstAt: at('2026-09-23', 20), lastAt: at('2026-09-23', 22) },
-      { day: '2026-09-24', firstAt: at('2026-09-24', 1), lastAt: at('2026-09-24', 19) },
+      { firstAt: at('2026-09-23', 20), lastAt: at('2026-09-23', 22) },
+      { firstAt: at('2026-09-24', 1), lastAt: at('2026-09-24', 19) },
     ])).toEqual(['2026-09-23', '2026-09-24'])
   })
 
-  test('the boundary is 04:00 London across the clock change', () => {
-    expect(nightsWithTakings([{ day: '2026-10-25', firstAt: at('2026-10-25', 4), lastAt: at('2026-10-25', 4) }])).toEqual(['2026-10-25'])
-    expect(nightsWithTakings([{ day: '2026-03-29', firstAt: at('2026-03-29', 3), lastAt: at('2026-03-29', 3) }])).toEqual(['2026-03-28'])
+  test('the boundary is 04:00 London on both clock-change days', () => {
+    expect(nightsWithTakings([{ firstAt: at('2026-10-25', 3, 59), lastAt: at('2026-10-25', 4) }])).toEqual(['2026-10-24', '2026-10-25'])
+    expect(nightsWithTakings([{ firstAt: at('2026-03-29', 3, 59), lastAt: at('2026-03-29', 4) }])).toEqual(['2026-03-28', '2026-03-29'])
   })
 })

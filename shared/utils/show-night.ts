@@ -9,8 +9,8 @@ export const SHOW_NIGHT_START_HOUR = 4
 // never had one. Set by the IT Manager and quoted in docs/roadmap.md Phase 3.
 export const FIRST_RECONCILED_NIGHT = '2026-09-01'
 
-// Deliberately not the ledger's day. I-104 reconciles the SumUp Z by London calendar day
-// (`ledger_entries.london_day`), so a 01:00 bar sale is tonight's takings but tomorrow's Z.
+// Deliberately not the ledger's day (`ledger_entries.london_day`): I-104 reconciles the SumUp Z
+// by this night, so a 01:00 bar sale is tonight's takings and tonight's Z, on tomorrow's date.
 
 const LABEL = /^(\d{4})-(\d{2})-(\d{2})$/
 

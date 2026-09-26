@@ -10,8 +10,9 @@ import {
   takingsDaysQuery,
   zReadingStatement,
 } from '#server/utils/night-reconciliation'
+import { londonDayOf } from '#shared/utils/ledger'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { londonDay } from '#shared/utils/membership'
+import { FIRST_RECONCILED_NIGHT } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TakingsDay } from '#server/utils/night-reconciliation'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -51,7 +52,7 @@ let lineSeq = 0
 function entry(database: TestDatabase, source: string, tender: string, happenedAt: number, reverses: string | null = null, totalPence = 0): string {
   const id = `e-${++entrySeq}`
   database.batch([['INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, reverses_entry_id, total_pence) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    id, '2026-01-01', source, tender, happenedAt, reverses, totalPence]])
+    id, londonDayOf(new Date(happenedAt * 1000)), source, tender, happenedAt, reverses, totalPence]])
   return id
 }
 
@@ -209,12 +210,8 @@ describe('every night with reader takings needs a reading (criterion 5)', () => 
     return Math.floor(fromLondonWallClock(year, month, date, hour).getTime() / 1000)
   }
 
-  function taking(database: TestDatabase, source: string, tender: string, happenedAt: number, kind: string, amountPence: number): void {
-    const id = `t-${++entrySeq}`
-    database.batch([['INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence) VALUES (?, ?, ?, ?, ?, ?)',
-      id, londonDay(new Date(happenedAt * 1000)), source, tender, happenedAt, amountPence]])
-    line(database, id, kind, amountPence)
-  }
+  const taking = (database: TestDatabase, source: string, tender: string, happenedAt: number, kind: string, amountPence: number): void =>
+    line(database, entry(database, source, tender, happenedAt, null, amountPence), kind, amountPence)
 
   function missing(database: TestDatabase, recorded: string[] = []): string[] {
     const nights = nightsWithTakings(read<TakingsDay>(database, takingsDaysQuery()))
@@ -250,8 +247,9 @@ describe('every night with reader takings needs a reading (criterion 5)', () => 
   test('takings before the first reconciled night are never walked', async () => {
     await withDatabase(async (database) => {
       taking(database, 'DESK', 'CARD', at('2026-08-20', 19), 'WALK_UP', 900)
-      const [text] = boundStatement(database, takingsDaysQuery())
+      const [text, ...parameters] = boundStatement(database, takingsDaysQuery())
       expect(text.toLowerCase()).toContain('group by')
+      expect(parameters).toEqual([FIRST_RECONCILED_NIGHT])
       expect(read(database, takingsDaysQuery())).toEqual([])
     })
   })
