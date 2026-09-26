@@ -260,5 +260,5 @@ export async function requireAnyNightAuthority(
   }
   // The refusal about the caller's own position, never merely the last role asked (issue 1303).
   for (const { role, held } of short) refusals.push(await shiftRefusal(caller, role, scope, held))
-  throw mostSpecificRefusal(refusals)?.error ?? createError(nightAuthorityRefusal(roles[0] ?? 'DUTY_MANAGER'))
+  throw mostSpecificRefusal(refusals)?.error ?? createError(nightAuthorityRefusal('DUTY_MANAGER'))
 }

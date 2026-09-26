@@ -213,6 +213,15 @@ describe('several roles at once carry the single-role guard\'s options (0098)', 
     expect(source).toMatch(/export async function requireAnyNightAuthority\([^)]*options: NightAuthorityOptions = \{\}/)
   })
 
+  // An officer on a door shift resolves the log as DOOR, yet the review route still takes their duty
+  // manager bypass, so the action follows the layout's check of that role, not the log's answer.
+  test('the incident review is offered from the duty manager role check, not from the log\'s one answer', async () => {
+    const source = await Bun.file('app/pages/tonight/incidents/index.vue').text()
+    expect(source).toContain('nightAuthority.value.roles.includes(\'DUTY_MANAGER\')')
+    expect(source).toContain('v-if="offersReview && !entry.reviewed"')
+    expect(source).not.toContain('resolvedRole')
+  })
+
   test('the screens more than one role reaches ask once, with no role, and show what comes back', async () => {
     for (const page of ['app/pages/tonight/incidents/index.vue', 'app/pages/tonight/age-checks/index.vue']) {
       const source = await Bun.file(page).text()

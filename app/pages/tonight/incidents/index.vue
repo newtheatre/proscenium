@@ -38,18 +38,18 @@ const performanceIds = ref<string[]>([])
 // resolve a performance the route did not label.
 const performances = ref<{ id: string, showTitle: string, startsAt: number }[]>([])
 const authorityFailure = ref<string | null>(null)
-// The role this screen actually resolved, which is what decides whether the review action is
-// offered: the route behind it takes a duty manager and nobody else (E-114 criterion 3).
-const resolvedRole = ref<NightRole | null>(null)
+// The review route takes a duty manager and nobody else (E-114 criterion 3), so the action follows
+// the layout's own check of that role, asked of the server and never a standing grant (0044).
+const nightAuthority = useNightAuthority()
+const offersReview = computed(() => nightAuthority.value.roles.includes('DUTY_MANAGER'))
 
 // One question for any of tonight's roles: the server tries a shift before a bypass and answers a
 // refusal about the caller's own position, never the last role's (E-111).
 async function resolveAuthority(): Promise<void> {
   try {
-    const resolved = await request<{ role: NightRole, performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }>('/api/tonight/authority')
+    const resolved = await request<{ performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }>('/api/tonight/authority')
     performanceIds.value = resolved.performanceIds
     performances.value = resolved.performances ?? []
-    resolvedRole.value = resolved.role
     authorityFailure.value = null
   }
   catch (refused) {
@@ -330,7 +330,7 @@ async function submitCorrect(): Promise<void> {
                 <!-- Offered to the duty manager alone, because the route takes that authority and
                      nothing here re-derives it from a standing grant (0009). -->
                 <UButton
-                  v-if="resolvedRole === 'DUTY_MANAGER' && !entry.reviewed"
+                  v-if="offersReview && !entry.reviewed"
                   color="secondary"
                   variant="outline"
                   class="min-h-12"
