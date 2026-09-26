@@ -504,8 +504,8 @@ export function claimShiftStatement(shiftId: string, userId: string, status: Shi
 // The role's gating module and London's today, as the claim itself was checked (E-104 criterion 1).
 export interface ApprovalGate { moduleId: string | null, today: string }
 
-// `heldNow` in SQL, for the claimant named on the row being written. An unset rule holds for
-// nobody, as it lets nobody claim (E-103 criterion 4).
+// `heldNow` repeated, not imported: training.ts leans on ambient imports Bun cannot typecheck, so
+// change both together. An unset rule holds for nobody, as it lets nobody claim (E-103 criterion 4).
 function claimantHoldsGate(gate: ApprovalGate): SQL {
   if (gate.moduleId === null) return sql`0`
   return sql`EXISTS (

@@ -21,14 +21,15 @@ export interface LapsedClaim { statusMessage: string, declineReason: string }
 // which the claimant reads word for word (E-105 criterion 3).
 export function noLongerQualifies(role: ShiftRole, claimantName: string, moduleName: string | null): LapsedClaim {
   const said = saysShiftRole(role)
+  const lower = said.toLowerCase()
   if (moduleName === null) {
     return {
-      statusMessage: `No longer qualifies: no training is named for ${said.toLowerCase()} shifts, so nobody can be confirmed on one`,
+      statusMessage: `No longer qualifies: no training is named for ${lower} shifts, so nobody can be confirmed on one`,
       declineReason: `${said} shifts cannot be confirmed until the committee names the training they need.`,
     }
   }
   return {
-    statusMessage: `No longer qualifies: ${claimantName} no longer holds ${moduleName}, which a ${said.toLowerCase()} shift needs`,
-    declineReason: `You no longer hold ${moduleName}, which a ${said.toLowerCase()} shift needs. Renew it and claim again.`,
+    statusMessage: `No longer qualifies: ${claimantName} no longer holds ${moduleName}, which a ${lower} shift needs`,
+    declineReason: `You no longer hold ${moduleName}, which a ${lower} shift needs. Renew it and claim again.`,
   }
 }

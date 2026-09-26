@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm'
-import { eligibilityRefusal, UNCONFIGURED_ELIGIBILITY_RULE } from '#shared/utils/rota-eligibility'
+import { createError } from 'h3'
+import { eligibilityRefusal, noLongerQualifies, UNCONFIGURED_ELIGIBILITY_RULE } from '#shared/utils/rota-eligibility'
 import { SHIFT_ROLES } from '#shared/utils/rota'
 import type { ShiftRole } from '#shared/utils/rota'
-import type { H3Event } from 'h3'
+import type { H3Error, H3Event } from 'h3'
 
 // The committee's mapping, read once per request and reused for every shift on the page: no
 // per-row query and no cache window (E-103 criteria 1 and 4).
@@ -30,14 +31,13 @@ async function moduleNames(ids: string[]): Promise<Map<string, string>> {
   return new Map(rows.map(row => [row.id, row.name]))
 }
 
-export interface ShiftRoleGate { moduleId: string | null, moduleName: string | null }
-
-// One role's rule and its module's name: an approval re-runs the gate at its write and names what
-// lapsed when the write refuses (E-105 criterion 3).
-export async function shiftRoleGate(event: H3Event, role: ShiftRole): Promise<ShiftRoleGate> {
-  const moduleId = (await shiftRoleRules(event))[role]
-  if (moduleId === null) return { moduleId, moduleName: null }
-  return { moduleId, moduleName: (await moduleNames([moduleId])).get(moduleId) ?? moduleId }
+// The 409 an approval raises when its write's training gate refused the claimant: it names what
+// lapsed, and its data carries the decline reason the screen offers (E-105 criterion 3).
+export async function lapsedClaimRefusal(role: ShiftRole, userId: string, moduleId: string | null): Promise<H3Error> {
+  const claimant = await findById(userId)
+  const moduleName = moduleId === null ? null : (await moduleNames([moduleId])).get(moduleId) ?? moduleId
+  const lapsed = noLongerQualifies(role, claimant?.name ?? 'the claimant', moduleName)
+  return createError({ statusCode: 409, statusMessage: lapsed.statusMessage, data: { declineReason: lapsed.declineReason } })
 }
 
 // Held modules come from `modulesHeldBy()`, never a copy of it: an EXPIRING record counts as

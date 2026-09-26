@@ -51,6 +51,12 @@ function spanOf(startsAt: number): string {
   return saysWhenLong(startsAt)
 }
 
+// Every opening sets the reason, so one claimant's text never carries into another's dialogue.
+function openDecline(row: PendingApproval, reason?: string): void {
+  declining.value = row
+  decline.reason = reason
+}
+
 async function approve(row: PendingApproval): Promise<void> {
   failure.value = null
   deciding.value = row.shiftId
@@ -65,12 +71,9 @@ async function approve(row: PendingApproval): Promise<void> {
     await refresh()
   }
   catch (error) {
-    // A claimant who no longer qualifies is declined instead, with the route's reason filled in.
-    const declineReason = refusalData<{ declineReason?: string }>(error)?.declineReason
-    if (declineReason) {
-      declining.value = row
-      decline.reason = declineReason
-    }
+    // A claimant who no longer qualifies is offered the decline, its reason already written.
+    const offered = refusalData<{ declineReason?: string }>(error)?.declineReason
+    if (offered) openDecline(row, offered)
     failure.value = refusalText(error)
   }
   finally {
@@ -90,7 +93,6 @@ async function submitDecline(event: FormSubmitEvent<{ reason: string }>): Promis
       icon: 'i-lucide-x',
     })
     declining.value = null
-    decline.reason = undefined
     await refresh()
   }
   catch (error) {
@@ -126,10 +128,7 @@ const columns: TableColumn<PendingApproval>[] = [
         'color': 'error',
         'variant': 'ghost',
         'data-test': `decline-${row.original.shiftId}`,
-        'onClick': () => {
-          declining.value = row.original
-          decline.reason = undefined
-        },
+        'onClick': () => openDecline(row.original),
       }, () => 'Decline'),
     ]),
   },

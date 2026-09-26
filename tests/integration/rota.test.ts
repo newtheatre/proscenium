@@ -1048,7 +1048,7 @@ describe('answering a queued claim (E-105)', () => {
     })
   })
 
-  test('the gate binds the same parameters whoever claimed and whatever they hold (0006)', async () => {
+  test('approving binds a fixed three parameters, whoever claimed (0006)', async () => {
     await withDatabase(async (database) => {
       const [, ...parameters] = boundStatement(database, approveShiftStatement('shift-queued', GATE))
       expect(parameters).toHaveLength(3)
