@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { isOpen, requireOpenSession } from '#server/utils/till'
 import { closeTillSessionForm } from '#shared/utils/reconciliation'
-import { TILL_VENUE_DEVICE_KEY, chargePaths, recallTillVenue, rememberTillVenue, rememberedBarAnswers, tillScopeForm } from '#shared/utils/till'
+import { TILL_VENUE_DEVICE_KEY, chargePaths, recallTillVenue, rememberTillVenue, rememberedBarAnswers, saysTillLeftOpen, tillScopeForm } from '#shared/utils/till'
 import type { TillSession } from '#shared/utils/till'
 
 // F-102's write-path rules over a session object, with no database beneath them: the schema's
@@ -158,5 +158,24 @@ describe('the remembered bar answers only the guard\'s own question (F-125, issu
   test('a bar named in the link, or nothing remembered, leaves the question to the picker', () => {
     expect(rememberedBarAnswers(400, 'venue-2', 'venue-1')).toBe(false)
     expect(rememberedBarAnswers(400, undefined, undefined)).toBe(false)
+  })
+})
+
+// F-102 criterion 5, E-114 criterion 3, issue 1316: the close-night checklist says what the bar has
+// left open, tonight's till or an earlier night's, and who closes it.
+describe('the checklist line for the till', () => {
+  test('nothing left open is the line ticked, with nothing to say', () => {
+    expect(saysTillLeftOpen({ tonight: 0, earlier: 0, unanswered: 0 })).toBeNull()
+  })
+
+  test('tonight\'s till still open is the bar\'s to close', () => {
+    expect(saysTillLeftOpen({ tonight: 1, earlier: 0, unanswered: 0 })).toContain('Tonight\'s till is still open')
+  })
+
+  test('an earlier night\'s till or charge is the Bar Manager\'s', () => {
+    const said = saysTillLeftOpen({ tonight: 0, earlier: 2, unanswered: 1 })!
+    expect(said).toContain('2 tills from an earlier night')
+    expect(said).toContain('1 card charge from an earlier night')
+    expect(said).toContain('Bar Manager')
   })
 })

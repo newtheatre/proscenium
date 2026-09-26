@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { closeSessionStatement, openSessionForQuery, sessionByIdQuery, staleUnclosedSessionsQuery } from '#server/utils/till'
+import { closeSessionStatement, earlierOpenSessionsQuery, openSessionForQuery, sessionByIdQuery, staleUnclosedSessionsQuery, tillLeftOpenQuery } from '#server/utils/till'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 import type { TillSession } from '#shared/utils/till'
@@ -326,6 +326,38 @@ describe('the query builders read what the write path wrote', () => {
 
       const found = rows<TillSession>(database, ...boundStatement(database, staleUnclosedSessionsQuery('2026-09-04')))
       expect(found.map(session => session.id)).toEqual(['t-stale'])
+    })
+  })
+
+  // Issue 1316: the till's own list for the Bar Manager, earlier nights only, each with its bar.
+  test('earlierOpenSessionsQuery names each unclosed session from an earlier night with its venue', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const houseId = venue(database, '1')
+      insert(database, 'till_sessions', { id: 't-stale', venue_id: houseId, night: '2026-09-03', opened_by: opener, opened_at: 1000 })
+      insert(database, 'till_sessions', { id: 't-tonight', venue_id: houseId, night: '2026-09-04', opened_by: opener, opened_at: 1000 })
+
+      const found = rows<{ id: string, venueName: string, night: string }>(database, ...boundStatement(database, earlierOpenSessionsQuery('2026-09-04')))
+      expect(found).toEqual([expect.objectContaining({ id: 't-stale', venueName: 'The House 1', night: '2026-09-03' })])
+    })
+  })
+
+  // Issue 1316: what the close-night checklist reads for one venue, tonight's and earlier nights'.
+  test('tillLeftOpenQuery counts tonight\'s open till, earlier nights\' and their unanswered charges at the venue', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const houseId = venue(database, '1')
+      const studioId = venue(database, '2')
+      insert(database, 'till_sessions', { id: 't-tonight', venue_id: houseId, night: '2026-09-04', opened_by: opener, opened_at: 1000 })
+      insert(database, 'till_sessions', { id: 't-stale', venue_id: houseId, night: '2026-09-03', opened_by: opener, opened_at: 1000 })
+      insert(database, 'till_sessions', { id: 't-elsewhere', venue_id: studioId, night: '2026-09-03', opened_by: opener, opened_at: 1000 })
+      insert(database, 'sumup_attempts', {
+        id: 'att-stale', till_session_id: 't-stale', venue_id: houseId, night: '2026-09-03', created_by: opener,
+        basket: '{}', expected_total_pence: 250, status: 'MISMATCH',
+      })
+
+      const [left] = rows<{ tonight: number, earlier: number, unanswered: number }>(database, ...boundStatement(database, tillLeftOpenQuery(houseId, '2026-09-04')))
+      expect(left).toEqual({ tonight: 1, earlier: 1, unanswered: 1 })
     })
   })
 })

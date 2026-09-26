@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { recordPostedSaleStatement, stuckAttemptsQuery } from '#server/utils/sumup-queries'
+import { earlierUnresolvedAttemptsQuery, recordPostedSaleStatement, stuckAttemptsQuery } from '#server/utils/sumup-queries'
 import { tillBookingByIdQuery, tillBookingByReferenceQuery } from '#server/utils/till-bookings'
 import { SUMUP_STUCK_COMPLETING_MINUTES } from '#shared/utils/sumup'
 import { sql } from 'drizzle-orm'
@@ -322,6 +322,28 @@ describe('the recording rides the sale\'s own batch (F-124 criterion 5, F-105 cr
       expect(move(database, 'att-1', 'COMPLETING', 'MISMATCH')).toBe(1)
       saleBatch(database, 'entry-1')
       expect(state(database)).toEqual({ status: 'SUCCEEDED', entryId: 'entry-1' })
+    })
+  })
+})
+
+// Issue 1316: an earlier night's charge nobody answered, or one taken and not recorded, is listed
+// for the Bar Manager on the till, since no shift reaches back into that night (F-102 criterion 5).
+describe('what an earlier night left unanswered', () => {
+  test('earlier nights\' waiting and mismatched charges are listed; settled ones and tonight\'s are not', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const { venueId } = tonightsPerformance(database, { suffix: 'earlier' })
+      insert(database, 'till_sessions', { id: 't-1', venue_id: venueId, night: '2026-09-14', opened_by: opener, opened_at: 1000 })
+      const at = (id: string, night: string, status: string): void => insert(database, 'sumup_attempts', {
+        id, till_session_id: 't-1', venue_id: venueId, night, created_by: opener, basket: '{}', expected_total_pence: 250, status,
+      })
+      at('att-waiting', '2026-09-13', 'STARTED')
+      at('att-mismatch', '2026-09-12', 'MISMATCH')
+      at('att-settled', '2026-09-13', 'FAILED')
+      at('att-tonight', '2026-09-14', 'STARTED')
+
+      const found = read<{ id: string }>(database, earlierUnresolvedAttemptsQuery('2026-09-14')).map(row => row.id)
+      expect(found.sort()).toEqual(['att-mismatch', 'att-waiting'])
     })
   })
 })

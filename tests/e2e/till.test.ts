@@ -485,6 +485,58 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     expect(response.status).toBe(403)
     expect(await message(response)).toContain('Bar Manager\'s role')
   })
+
+  // Issue 1316: the till lists what an earlier night left open, for the one role that can act on it.
+  test('the bar manager\'s till lists an earlier night\'s open session and unanswered charge; nobody else\'s does', async () => {
+    const stale = programme('till-stale-listed')
+    const id = insertStaleSession(stale.venueId, '2020-01-02', bar.id)
+    const database = new Database(app.databaseFile)
+    try {
+      database.query(`INSERT INTO sumup_attempts (id, till_session_id, venue_id, night, created_by, basket, expected_total_pence, status, kind)
+        VALUES (?, ?, ?, '2020-01-02', ?, '{}', 250, 'STARTED', 'TYPED')`).run(`earlier-${id}`, id, stale.venueId, bar.id)
+    }
+    finally {
+      database.close()
+    }
+
+    const listed = await request(app, 'GET', '/api/till/earlier', undefined, bar.cookie)
+    expect(listed.status).toBe(200)
+    const body = await listed.json() as { sessions: { id: string, venueName: string, night: string }[], attempts: { id: string }[] }
+    expect(body.sessions.find(session => session.id === id)).toMatchObject({ night: '2020-01-02' })
+    expect(body.sessions.find(session => session.id === id)?.venueName).toBeTruthy()
+    expect(body.attempts.map(attempt => attempt.id)).toContain(`earlier-${id}`)
+
+    expect((await request(app, 'GET', '/api/till/earlier', undefined, foh.cookie)).status).toBe(403)
+  })
+
+  test('the bar manager closes last night\'s till from tonight\'s', async () => {
+    const screenPassword = generatePassword()
+    const screenBar = await registerMember(app, 'till-screen-earlier', screenPassword)
+    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    const tonight = programme('till-screen-earlier')
+    await openTill(tonight.venueId, screenBar.cookie)
+    const id = insertStaleSession(tonight.venueId, '2020-01-03', screenBar.id)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', screenBar.email)
+    await fill(view, 'form input[type="password"]', screenPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${tonight.venueId}`, `[data-test="till-open"]`)
+    await waitFor(view, `document.querySelector('[data-test="earlier-close-${id}"]')`)
+    expect(await textOf(view, '[data-test="till-earlier"]')).toContain('still open')
+
+    await click(view, `[data-test="earlier-close-${id}"]`)
+    await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
+    await fillNumber(view, '[data-test="actual-z-input"]', '0')
+    await click(view, '[data-test="confirm-close-till"]')
+    await waitFor(view, `!document.querySelector('[data-test="earlier-close-${id}"]')`)
+    // Tonight's session is untouched by closing last night's.
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="till-open"]')`)).toBe(true)
+    view.close()
+  }, 120_000)
 })
 
 // 0040, issue 897: a permission held without its second factor names the way out, same as every
