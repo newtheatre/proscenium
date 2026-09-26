@@ -220,6 +220,11 @@ describe('the old-site redirect map (K-125 criterion 5)', () => {
     expect(redundant).toEqual([])
   })
 
+  test('the old account addresses land on My NNT and the bar tab (K-127 criterion 4, issue 1341)', () => {
+    expect(OLD_SITE_REDIRECTS['/account']).toBe('/my')
+    expect(OLD_SITE_REDIRECTS['/account/tab']).toBe('/account/bar-tab')
+  })
+
   test('the old show family lands on the show, and a receipt on ticket retrieval', () => {
     expect(oldShowRedirect('the-seagull')).toBe('/shows/the-seagull')
     expect(oldShowRedirect('the-seagull', ['book'])).toBe('/shows/the-seagull')
