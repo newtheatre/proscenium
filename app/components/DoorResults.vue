@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { saysDoorParty } from '#shared/utils/door'
-import type { DoorFoundState, DoorPassCard, DoorTicketFound } from '#shared/utils/door'
+import { saysDoorParty, saysUncheckedHalf } from '#shared/utils/door'
+import type { DoorFoundState, DoorPassCard, DoorTicketFound, LookUpHalf } from '#shared/utils/door'
 
 // What the door's one field found (issue 1301): tonight's tickets as a first name, a count and
 // paid or unpaid, and passes as their card (D-126). Admitting, and its verdict, are the page's.
-const props = defineProps<{ tickets: DoorTicketFound[], passes: DoorPassCard[], busy: boolean }>()
+const props = defineProps<{ tickets: DoorTicketFound[], passes: DoorPassCard[], unchecked: LookUpHalf | null, busy: boolean }>()
 const emit = defineEmits<{ admitTicket: [reference: string], admitPass: [reference: string, holderName: string] }>()
 
 const ticketBadge: Record<DoorFoundState, { label: string, color: 'success' | 'secondary' | 'warning' }> = {
@@ -33,6 +33,16 @@ function admitPass(pass: DoorPassCard): void {
     class="space-y-3"
     data-test="door-results"
   >
+    <!-- Half the lookup gave no answer: what is listed is not everything (issue 1145). -->
+    <UAlert
+      v-if="unchecked"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-wifi-off"
+      :description="saysUncheckedHalf(unchecked)"
+      data-test="door-results-unchecked"
+    />
+
     <div
       v-for="ticket in tickets"
       :key="ticket.reference"

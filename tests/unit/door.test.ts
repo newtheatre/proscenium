@@ -2,13 +2,13 @@ import { describe, expect, test } from 'bun:test'
 import {
   admittedPassVerdict,
   CAMERA_FALLBACK_SAYS,
-  DOOR_MISS_LINE,
   DOOR_SEARCH_MAX,
   doorFailureVerdict,
   doorMissVerdict,
   doorNameTerm,
   doorTicketFound,
   lookUpOutcome,
+  saysUncheckedHalf,
   doorVerdict,
   isRepeatScan,
   readScannedCode,
@@ -199,7 +199,6 @@ describe('no answer is not a refusal (E-129 criterion 7, issue 1145)', () => {
   test('nothing found, by the lookup or by the code itself, is the miss with its own next step', () => {
     expect(doorFailureVerdict(404, 'That reference is not recognised.')).toEqual(doorMissVerdict())
     expect(doorFailureVerdict(422, 'That code is not one of ours')).toEqual(doorMissVerdict())
-    expect(doorMissVerdict().line).toBe(DOOR_MISS_LINE)
   })
 })
 
@@ -216,9 +215,15 @@ describe('a lookup that failed is never read as nothing found (issue 1145, issue
     expect(lookUpOutcome(empty, refused)).toEqual({ kind: 'FAILED', reason: refused.reason })
   })
 
-  test('whatever one half found is listed, even when the other half failed', () => {
+  test('whatever one half found is listed, and the half that failed is named above it', () => {
     expect(lookUpOutcome({ status: 'fulfilled', value: { items: ['K7M4PQ'] } }, refused))
-      .toEqual({ kind: 'FOUND', tickets: ['K7M4PQ'], passes: [] })
+      .toEqual({ kind: 'FOUND', tickets: ['K7M4PQ'], passes: [], unchecked: 'PASSES' })
+    expect(saysUncheckedHalf('PASSES')).toBe('Passes did not answer. Check again.')
+  })
+
+  test('a lookup both halves answered names nothing unchecked', () => {
+    expect(lookUpOutcome({ status: 'fulfilled', value: { items: ['K7M4PQ'] } }, empty))
+      .toEqual({ kind: 'FOUND', tickets: ['K7M4PQ'], passes: [], unchecked: null })
   })
 })
 

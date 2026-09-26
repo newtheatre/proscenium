@@ -2,6 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { heldSeatsForReservation } from './capacity'
 import { auditedWrite } from './audit'
+import { containsPattern } from './list-filters'
 import { auditEntry } from '#shared/utils/audit'
 import type { SQL } from 'drizzle-orm'
 
@@ -65,7 +66,6 @@ const DOOR_PASS_SEARCH_LIMIT = 10
 // The door's pass lookup (D-126): a holder is found by name or by the reference on their pass,
 // never by an id. Bound to a fixed six parameters however many passes the search matches (0006).
 export function doorPassSearchQuery(term: string, performanceId: string, showId: string): SQL {
-  const like = `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
   return sql`
     SELECT p.id AS id, p.reference AS reference, u.name AS holderName,
            t.name AS passTypeName, t.slug AS passTypeSlug, p.status AS status,
@@ -91,7 +91,7 @@ export function doorPassSearchQuery(term: string, performanceId: string, showId:
     FROM passes p
     JOIN pass_types t ON t.id = p.pass_type_id
     JOIN users u ON u.id = p.user_id
-    WHERE p.reference = ${term.toUpperCase()} OR u.name LIKE ${like} ESCAPE '\\'
+    WHERE p.reference = ${term.toUpperCase()} OR u.name LIKE ${containsPattern(term)} ESCAPE '\\'
     ORDER BY u.name COLLATE NOCASE
     LIMIT ${DOOR_PASS_SEARCH_LIMIT}
   `

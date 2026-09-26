@@ -194,10 +194,10 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
     expect(outcome.headline).toBe('Wrong performance')
   })
 
-  test('a cancelled, lapsed or already-admitted ticket explains itself regardless of performance', () => {
+  test('a cancelled or lapsed ticket explains itself regardless of performance, and one already in says so', () => {
     expect(doorTicketOutcome('CANCELLED', 'CUSTOMER', 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Cancelled')
     expect(doorTicketOutcome('EXPIRED', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Lapsed')
-    expect(doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Already in')
+    expect(doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Already in')
   })
 
   // Issue 1301: the door's own words, each ending in the next step, never the booker's QR page copy.
@@ -211,7 +211,7 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
   // The matinee's ticket shown at the evening was admitted to the matinee, not to this house.
   test('a ticket admitted to another performance names that performance, never a re-entry', () => {
     const outcome = doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null)
-    expect(outcome.headline).toBe('Already in')
+    expect(outcome.headline).toBe('Wrong performance')
     expect(outcome.detail).toBe('Admitted for The Seagull, Friday, 2pm. Ask the Front of House Manager.')
   })
 

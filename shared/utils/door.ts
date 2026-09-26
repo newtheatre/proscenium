@@ -112,11 +112,11 @@ export function doorVerdict(
   return { state: 'REFUSED', headline: outcome.headline.toUpperCase(), line: outcome.detail ?? outcome.headline, note: null }
 }
 
-export const DOOR_MISS_LINE = 'Nothing tonight matches. Check the spelling or the reference.'
+const DOOR_MISS_LINE = 'Nothing tonight matches. Check the spelling or the reference.'
 
 // Nothing found is amber, never red: no booking or pass stands behind it to refuse (issue 1301).
-export function doorMissVerdict(line = DOOR_MISS_LINE): DoorVerdict {
-  return { state: 'MISS', headline: 'NOT FOUND', line, note: null }
+export function doorMissVerdict(): DoorVerdict {
+  return { state: 'MISS', headline: 'NOT FOUND', line: DOOR_MISS_LINE, note: null }
 }
 
 // A request that never got an answer is not a refusal: the ticket may be perfectly good, and a
@@ -129,7 +129,12 @@ export function doorFailureVerdict(status: number | undefined, line: string): Do
   return { state: 'REFUSED', headline: 'REFUSED', line, note: null }
 }
 
-export type LookUpOutcome<T, P> = { kind: 'FOUND', tickets: T[], passes: P[] } | { kind: 'MISS' } | { kind: 'FAILED', reason: unknown }
+export type LookUpHalf = 'TICKETS' | 'PASSES'
+
+export type LookUpOutcome<T, P>
+  = | { kind: 'FOUND', tickets: T[], passes: P[], unchecked: LookUpHalf | null }
+    | { kind: 'MISS' }
+    | { kind: 'FAILED', reason: unknown }
 
 // What the door's lookup answers: the list, nothing found, or the half that failed. A failed half
 // is never read as nothing found, which would send a real booking to the bar (issue 1145).
@@ -138,9 +143,17 @@ export function lookUpOutcome<T, P>(tickets: PromiseSettledResult<{ items: T[] }
     tickets: tickets.status === 'fulfilled' ? tickets.value.items : [],
     passes: passes.status === 'fulfilled' ? passes.value.items : [],
   }
-  if (listed.tickets.length > 0 || listed.passes.length > 0) return { kind: 'FOUND', ...listed }
-  const failed = [tickets, passes].find(one => one.status === 'rejected')
-  return failed?.status === 'rejected' ? { kind: 'FAILED', reason: failed.reason } : { kind: 'MISS' }
+  if (listed.tickets.length > 0 || listed.passes.length > 0) {
+    const unchecked = tickets.status === 'rejected' ? 'TICKETS' : passes.status === 'rejected' ? 'PASSES' : null
+    return { kind: 'FOUND', ...listed, unchecked }
+  }
+  const failed = [tickets, passes].find((one): one is PromiseRejectedResult => one.status === 'rejected')
+  return failed ? { kind: 'FAILED', reason: failed.reason } : { kind: 'MISS' }
+}
+
+// The one line above a list when half the lookup gave no answer (issue 1145, issue 1301).
+export function saysUncheckedHalf(half: LookUpHalf): string {
+  return `${half === 'TICKETS' ? 'Tickets' : 'Passes'} did not answer. Check again.`
 }
 
 // How long the overlay holds before clearing itself. A tap or the next different code clears it
@@ -221,7 +234,7 @@ export function saysDoorParty(holderName: string | null, partySize: number): str
 
 // The one door field's name lookup (issue 1301). D1 counts its LIKE limit in bytes, so the cap is
 // on the contains pattern as UTF-8, escapes and the two wildcards included (0081).
-export const DOOR_SEARCH_MIN = 2
+const DOOR_SEARCH_MIN = 2
 export const DOOR_SEARCH_MAX = MAX_LIKE_PATTERN - 2
 
 export function fitsDoorLookUp(term: string): boolean {

@@ -1220,16 +1220,18 @@ building `/tonight/door` at all, corrected onto this story's own dependency line
 it; D-126 itself only ever scanned a pass. `POST /api/tonight/door/tickets/scan` is the ordinary
 ticket half: `reservationForDoorQuery()` reads a reservation by reference alone, not scoped to a
 performance, and `doorTicketOutcome()` (`shared/utils/reservations.ts`) asks whether it matches
-the door's own `performanceId` only when the reservation is still live (`PENDING` or
-`COLLECTED`); every other state, cancelled, lapsed, no-show or already admitted, explains itself
-regardless of which door asked. A mismatch answers `This ticket is for <show>, <when>.` and who to
-ask (`DOOR_REFERRAL`), reusing the reservation's own joined columns rather than a second lookup.
+the door's own `performanceId` whenever the booking holds a seat (`PENDING`, `COLLECTED` or
+`DOOR`). A booking for another performance answers "Wrong performance": `This ticket is for
+<show>, <when>.` when it is live, or `Admitted for <show>, <when>.` when it was already admitted
+there, each with who to ask (`DOOR_REFERRAL`), reusing the reservation's own joined columns
+rather than a second lookup. Cancelled, lapsed and no-show explain themselves whichever door asks.
 This is also D-108 criterion 5's own fifth state, "wrong night", built at the door as that
 criterion always named it. Unpaid reuses `qrStatusDisplay()`, so the desk still reads the amount
 due; lapsed, cancelled, exchanged and already admitted read in the door's own words, each ending
-in the next step, with the admission's clock time from `admittedAtColumn()` (issue 1301). `/tonight/door` tries the reference as a ticket first and falls back to
-a pass only on "no such booking", since the two share one reference alphabet and a scanner cannot
-tell them apart before asking. `tests/e2e/door-ticket-scan.test.ts` covers admission, the wrong-
+in the next step, with the admission's clock time from `admittedAtColumn()` (issue 1301).
+`/tonight/door` tries the reference as a ticket first and falls back to a pass only on "no such
+booking", since the two share one reference alphabet and a scanner cannot tell them apart before
+asking. `tests/e2e/door-ticket-scan.test.ts` covers admission, the wrong-
 performance refusal (including against an unpaid ticket, where wrong performance still answers
 first), unpaid, cancelled, an unknown reference and the door role itself.
 

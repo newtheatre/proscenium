@@ -265,8 +265,8 @@ function doorStatusWording(status: string, cancelledBy: string | null, exchanged
   }
 }
 
-// D-108 criterion 5's fifth state, and E-127 criterion 3's refusal: only PENDING or COLLECTED
-// is ever asked whether it matches the door's own performance; every other state explains itself.
+// D-108 criterion 5's fifth state, and E-127 criterion 3's refusal: a booking that holds a seat is
+// asked whether it matches the door's own performance; every other state explains itself.
 export function doorTicketOutcome(
   status: string,
   cancelledBy: string | null,
@@ -278,15 +278,13 @@ export function doorTicketOutcome(
   exchangedTo: QrExchangedTo | null = null,
   admittedAt: number | null = null,
 ): DoorTicketOutcome {
-  if (performanceId !== selectedPerformanceId && (status === 'PENDING' || status === 'COLLECTED')) {
-    return { headline: 'Wrong performance', detail: `This ticket is for ${showTitle}, ${when}. Ask ${DOOR_REFERRAL}.`, admit: false }
+  // Admitted to another house is not a re-entry to this one: the matinee's ticket at the evening.
+  if (performanceId !== selectedPerformanceId && (status === 'PENDING' || status === 'COLLECTED' || status === 'DOOR')) {
+    const said = status === 'DOOR' ? `Admitted for ${showTitle}, ${when}.` : `This ticket is for ${showTitle}, ${when}.`
+    return { headline: 'Wrong performance', detail: `${said} Ask ${DOOR_REFERRAL}.`, admit: false }
   }
   if (status === 'COLLECTED') return { headline: 'Admit', detail: null, admit: true }
   if (status === 'PENDING') return { ...qrStatusDisplay(status, cancelledBy, totalDue, exchangedTo), admit: false }
-  // Admitted to another house is not a re-entry to this one: the matinee's ticket at the evening.
-  if (status === 'DOOR' && performanceId !== selectedPerformanceId) {
-    return { headline: 'Already in', detail: `Admitted for ${showTitle}, ${when}. Ask ${DOOR_REFERRAL}.`, admit: false }
-  }
   return { ...doorStatusWording(status, cancelledBy, exchangedTo, admittedAt), admit: false }
 }
 

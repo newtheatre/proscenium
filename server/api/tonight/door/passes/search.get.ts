@@ -1,12 +1,12 @@
 import { z } from 'zod'
 import { formatLondon } from '#shared/utils/london'
 import { passRedemptionRefusal } from '#shared/utils/passes'
-import { saysPassCoverage, saysPassTonight } from '#shared/utils/door'
+import { fitsDoorLookUp, saysPassCoverage, saysPassTonight } from '#shared/utils/door'
 
 // The door's pass lookup (D-126): a holder found by name or by the reference on their pass, with
 // everything the card shows and the refusal it would meet, read live rather than guessed.
 const form = z.object({
-  q: z.string().trim().min(2).max(120),
+  q: z.string().trim().refine(fitsDoorLookUp, 'Type a name or a reference that fits the lookup'),
   performanceId: z.string().trim().min(1),
 })
 

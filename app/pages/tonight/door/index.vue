@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { CAMERA_FALLBACK_SAYS, doorFailureVerdict, doorMissVerdict, doorNameTerm, lookUpOutcome, readScannedCode, saysDoorParty, verdictBuzz, verdictHoldMs } from '#shared/utils/door'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
-import type { DoorAdmission, DoorPassCard, DoorTicketFound, DoorVerdict, ScannerFailure } from '#shared/utils/door'
+import type { DoorAdmission, DoorPassCard, DoorTicketFound, DoorVerdict, LookUpHalf, ScannerFailure } from '#shared/utils/door'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/door' })
 useSeoMeta({ title: 'Door' })
@@ -53,7 +53,7 @@ const cameraNote = ref<string | null>(null)
 const field = ref('')
 const scanning = ref(false)
 
-interface Found { tickets: DoorTicketFound[], passes: DoorPassCard[] }
+interface Found { tickets: DoorTicketFound[], passes: DoorPassCard[], unchecked: LookUpHalf | null }
 const found = ref<Found | null>(null)
 
 interface Shown { verdict: DoorVerdict, reference: string, party: string | null }
@@ -121,9 +121,8 @@ async function oneAtATime(work: () => Promise<void>): Promise<void> {
   }
 }
 
-// A signed booking or pass URL, or the `/t/<ref>` form, checked server-side (criterion 2); `name`
-// is tried when no booking or pass carries a typed entry as a reference.
-function checkCode(scanned: string, name: string | null = null): Promise<void> {
+// A signed booking or pass URL, or the `/t/<ref>` form, checked server-side (criterion 2).
+function checkCode(scanned: string): Promise<void> {
   return oneAtATime(async () => {
     found.value = null
     try {
@@ -134,7 +133,7 @@ function checkCode(scanned: string, name: string | null = null): Promise<void> {
       // A pass QR lists the holder's own card rather than admitting blind: the volunteer reads
       // what it covers and what tonight already holds before pressing Admit (D-126 criterion 1).
       if (resolved.kind === 'PASS_TOKEN') await lookUp(resolved.reference, { passesOnly: true })
-      else await admit(resolved.reference, name)
+      else await admit(resolved.reference)
     }
     catch (refused) {
       showRefusal(refused, '')
@@ -142,10 +141,21 @@ function checkCode(scanned: string, name: string | null = null): Promise<void> {
   })
 }
 
+async function scanPass(reference: string, holderName: string | null): Promise<void> {
+  const pass = await $fetch<DoorAdmission>('/api/tonight/door/passes/scan', {
+    method: 'POST',
+    body: { reference, performanceId: performanceId.value },
+  })
+  show(pass.verdict, pass.reference, holderName ?? pass.holderName, pass.partySize)
+}
+
+// `name` is what a typed entry is looked up as when no booking or pass carries it as a reference.
 async function admit(code: string, name: string | null = null): Promise<void> {
-  const body = { reference: code, performanceId: performanceId.value }
   try {
-    const ticket = await $fetch<DoorAdmission>('/api/tonight/door/tickets/scan', { method: 'POST', body })
+    const ticket = await $fetch<DoorAdmission>('/api/tonight/door/tickets/scan', {
+      method: 'POST',
+      body: { reference: code, performanceId: performanceId.value },
+    })
     show(ticket.verdict, ticket.reference, ticket.holderName, ticket.partySize)
   }
   catch (ticketRefused) {
@@ -156,8 +166,7 @@ async function admit(code: string, name: string | null = null): Promise<void> {
       return
     }
     try {
-      const pass = await $fetch<DoorAdmission>('/api/tonight/door/passes/scan', { method: 'POST', body })
-      show(pass.verdict, pass.reference, pass.holderName, pass.partySize)
+      await scanPass(code, null)
     }
     catch (passRefused) {
       if (refusalStatus(passRefused) !== 404) showRefusal(passRefused, code)
@@ -170,21 +179,23 @@ async function admit(code: string, name: string | null = null): Promise<void> {
 // Tickets and passes are asked together. Nothing found is amber, but a lookup that failed is
 // never read as nothing found: its own refusal or no answer is shown (issue 1145, issue 1301).
 async function lookUp(term: string, options: { passesOnly?: boolean } = {}): Promise<void> {
-  const query = { q: term, performanceId: performanceId.value }
+  const asked = performanceId.value
+  const query = { q: term, performanceId: asked }
   const [tickets, passes] = await Promise.allSettled([
     options.passesOnly ? Promise.resolve({ items: [] as DoorTicketFound[] }) : $fetch<{ items: DoorTicketFound[] }>('/api/tonight/door/tickets/search', { query }),
     $fetch<{ items: DoorPassCard[] }>('/api/tonight/door/passes/search', { query }),
   ])
+  // The picker moved while the lookup was out: its answer is about a house nobody is looking at.
+  if (performanceId.value !== asked) return
   const outcome = lookUpOutcome(tickets, passes)
   if (outcome.kind === 'FAILED') showRefusal(outcome.reason, '')
   else if (outcome.kind === 'MISS') show(doorMissVerdict(), '', null, 0)
   else {
     clearVerdict()
-    found.value = { tickets: outcome.tickets, passes: outcome.passes }
+    found.value = { tickets: outcome.tickets, passes: outcome.passes, unchecked: outcome.unchecked }
     bringIntoView(resultsArea.value)
   }
 }
-
 // A route that carries its own door wording is trusted with it; anything else is refused with
 // the message it gave (criterion 7), unless no answer came at all, which is not a refusal.
 function showRefusal(refused: unknown, code: string): void {
@@ -205,7 +216,7 @@ async function checkTyped(): Promise<void> {
   const name = doorNameTerm(typed)
   const code = readScannedCode(typed)
   if (code?.kind === 'REFERENCE') await oneAtATime(() => admit(code.value, name))
-  else if (code) await checkCode(typed, name)
+  else if (code) await checkCode(typed)
   else if (name) await oneAtATime(() => lookUp(name))
   else show(doorMissVerdict(), '', null, 0)
 }
@@ -216,18 +227,7 @@ function admitFound(reference: string): Promise<void> {
 
 // A pass card's Admit, through the same one-at-a-time runner as every other check.
 function admitFoundPass(reference: string, holderName: string): Promise<void> {
-  return oneAtATime(async () => {
-    try {
-      const pass = await $fetch<DoorAdmission>('/api/tonight/door/passes/scan', {
-        method: 'POST',
-        body: { reference, performanceId: performanceId.value },
-      })
-      show(pass.verdict, pass.reference, holderName, pass.partySize)
-    }
-    catch (refused) {
-      showRefusal(refused, reference)
-    }
-  })
+  return oneAtATime(() => scanPass(reference, holderName).catch(refused => showRefusal(refused, reference)))
 }
 </script>
 
@@ -332,6 +332,7 @@ function admitFoundPass(reference: string, holderName: string): Promise<void> {
           v-if="found"
           :tickets="found.tickets"
           :passes="found.passes"
+          :unchecked="found.unchecked"
           :busy="scanning"
           @admit-ticket="admitFound"
           @admit-pass="admitFoundPass"

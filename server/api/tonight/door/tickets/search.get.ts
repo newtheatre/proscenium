@@ -13,5 +13,5 @@ export default defineEventHandler(async (event) => {
   await requireNightAuthority(event, 'DOOR', { performanceId: input.performanceId })
 
   const found = await doorTicketSearch(input.q, input.performanceId)
-  return { items: found.map(row => doorTicketFound(row)) }
+  return { items: found.map(doorTicketFound) }
 })
