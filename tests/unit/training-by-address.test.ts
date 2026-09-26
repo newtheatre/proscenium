@@ -54,6 +54,7 @@ describe('who may make the account (criterion 4)', () => {
     onShiftTonight: false,
     leadsDepartment,
     isTrainer: false,
+    keepsBarTab: false,
     membershipState: { kind: 'none' },
   })
 

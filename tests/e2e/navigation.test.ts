@@ -108,8 +108,34 @@ describe.skipIf(skip !== null)('the members area and account settings split (K-1
     const answer = await fetch(`${app.baseURL}/my`, { headers: { cookie: member.cookie } })
     expect(answer.status).toBe(200)
     const html = await answer.text()
-    for (const href of ['/my', '/rota', '/rooms', '/rooms/mine', '/training', '/training/sessions', '/account/passes', '/account/access', '/account/membership']) {
+    for (const href of ['/my', '/rota', '/rooms', '/training', '/account/passes', '/account/membership']) {
       expect(html).toContain(`href="${href}"`)
     }
+  })
+
+  // Tab holders ship unnamed, so a tab in the nav of everybody promised a page for nobody (F-108,
+  // issue 1342); a named holder, or anybody still owing, is offered it.
+  test('the bar tab is offered to an authorised holder and to nobody else', async () => {
+    const tab = 'href="/account/bar-tab"'
+    const session = async (): Promise<{ keepsBarTab?: boolean }> =>
+      (await fetch(`${app.baseURL}/api/auth/session`, { headers: { cookie: member.cookie } })).json() as Promise<{ keepsBarTab?: boolean }>
+
+    expect(await (await fetch(`${app.baseURL}/my`, { headers: { cookie: member.cookie } })).text()).not.toContain(tab)
+    expect((await session()).keepsBarTab).toBe(false)
+
+    const named = await request(app, 'PUT', '/api/admin/config/BAR_AUTHORISED_TAB_HOLDERS', { value: [member.id] }, officer.cookie)
+    expect(named.status).toBe(200)
+    try {
+      expect((await session()).keepsBarTab).toBe(true)
+      expect(await (await fetch(`${app.baseURL}/my`, { headers: { cookie: member.cookie } })).text()).toContain(tab)
+    }
+    finally {
+      await request(app, 'PUT', '/api/admin/config/BAR_AUTHORISED_TAB_HOLDERS', { value: [] }, officer.cookie)
+    }
+  })
+
+  test('access requirements sit with the account settings', async () => {
+    const html = await (await fetch(`${app.baseURL}/account/profile`, { headers: { cookie: member.cookie } })).text()
+    expect(html).toContain('href="/account/access"')
   })
 })

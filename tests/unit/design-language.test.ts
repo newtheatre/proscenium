@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+import { MEMBER_PAGE_HEADER, MEMBER_PAGE_READING, MEMBER_PAGE_WIDE, MEMBER_PAGE_WORKING } from '../../app/utils/member-shell'
+import { signedIn } from '#shared/utils/abilities'
+import { ACCOUNT_NAV, MY_NAV } from '#shared/utils/site-nav'
 
 // The design language's own rule: if it is not a token, it is not in the system (0021).
 // theme.css is the one file allowed raw values, because it defines the tokens.
@@ -317,6 +320,77 @@ describe('the member shell is calm (0084, K-127, issue 1153 item 1)', () => {
       }
     }
     expect(offenders).toEqual([])
+  })
+})
+
+// 0104: below the small breakpoint a member page's header is compact, so the content starts in the
+// first screen of a phone; the widths and heading voice of 0084 are otherwise unchanged.
+const PAGE_HEADER = /<UPageHeader\b([\s\S]*?)\/?>/g
+
+// The page file a route is served from, by Nuxt's own conventions.
+async function pageFor(to: string): Promise<string> {
+  for (const file of [`app/pages${to}.vue`, `app/pages${to}/index.vue`]) {
+    if (await Bun.file(file).exists()) return file
+  }
+  throw new Error(`no page for ${to}`)
+}
+
+// The title a page gives its own header, whether it draws UPageHeader or hands AccountSettings one.
+function headerTitle(source: string): string | null {
+  return /<(?:UPageHeader|AccountSettings)\b[\s\S]*?\stitle="([^"]*)"/.exec(templateOf(source))?.[1] ?? null
+}
+
+describe('a member page is compact on a phone (0104, issue 1342)', () => {
+  test('each width pads less below the small breakpoint and as before above it', () => {
+    expect(MEMBER_PAGE_READING).toBe('max-w-3xl py-6 sm:py-16')
+    expect(MEMBER_PAGE_WORKING).toBe('max-w-xl py-6 sm:py-16')
+    expect(MEMBER_PAGE_WIDE).toBe('max-w-5xl py-6 sm:py-10')
+  })
+
+  test('the header is a text-2xl title and one line of description below sm, and as before above it', () => {
+    expect(MEMBER_PAGE_HEADER.title).toContain('text-2xl')
+    expect(MEMBER_PAGE_HEADER.title).toContain('sm:text-4xl')
+    expect(MEMBER_PAGE_HEADER.description).toContain('line-clamp-1')
+    expect(MEMBER_PAGE_HEADER.description).toContain('sm:line-clamp-none')
+  })
+
+  test('every member page header takes the compact header', async () => {
+    const offenders: string[] = []
+    for (const file of [...await memberPages(), ...MEMBER_SHELL]) {
+      for (const header of templateOf(await Bun.file(file).text()).matchAll(PAGE_HEADER)) {
+        if (!(header[1] ?? '').includes(':ui="MEMBER_PAGE_HEADER"')) offenders.push(file)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('the strip of member links is not drawn below sm, where the menu holds the same list', async () => {
+    const layout = templateOf(await Bun.file('app/layouts/member.vue').text())
+    const strip = /<UContainer\b[^>]*class="([^"]*)"[^>]*>\s*<UNavigationMenu\b[\s\S]*?aria-label="My theatre"/.exec(layout)
+    expect(strip?.[1]).toContain('hidden')
+    expect(strip?.[1]).toContain('sm:block')
+  })
+
+  // Nuxt UI names the header's menu dialogue with a locale key the app does not define, so a
+  // screen reader announced "header.title".
+  test('the phone menu is named in words', async () => {
+    const layout = templateOf(await Bun.file('app/layouts/member.vue').text())
+    expect(layout).toMatch(/:menu="\{\s*title:\s*'[A-Z][^']*'/)
+  })
+})
+
+// Security's heading is #1344's to settle, with the rest of that page.
+const HEADING_SETTLED_ELSEWHERE = new Set(['/account/security'])
+
+describe('a member nav label is the heading of the page it opens (issue 1342)', () => {
+  test('every standing entry, every account entry and the bar tab', async () => {
+    const entries = [...MY_NAV.filter(one => one.ability === signedIn || one.to === '/account/bar-tab'), ...ACCOUNT_NAV]
+    const wrong: string[] = []
+    for (const entry of entries.filter(one => !HEADING_SETTLED_ELSEWHERE.has(one.to))) {
+      const title = headerTitle(await Bun.file(await pageFor(entry.to)).text())
+      if (title !== entry.label) wrong.push(`${entry.to}: "${entry.label}" opens "${title}"`)
+    }
+    expect(wrong).toEqual([])
   })
 })
 

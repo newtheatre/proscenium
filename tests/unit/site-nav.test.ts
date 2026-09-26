@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
-import { ABILITY_PERMISSIONS, viewReports } from '#shared/utils/abilities'
+import { ABILITY_PERMISSIONS, keepBarTab, signedIn, viewReports, workTonight } from '#shared/utils/abilities'
 import { contentPathOf } from '#shared/utils/docs-paths'
 import { PERMISSIONS } from '#shared/utils/roles'
 import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor, navCount } from '#shared/utils/site-nav'
@@ -212,13 +212,38 @@ describe('the vocabulary has not drifted from the permission map (0009)', () => 
   })
 })
 
-describe('the members area and the account settings never overlap (K-127 criterion 2)', () => {
+describe('the members area and the account settings never overlap (K-127 criteria 2 and 3)', () => {
   test('MY_NAV opens on /my', () => {
     expect(MY_NAV[0]?.to).toBe('/my')
   })
 
-  test('ACCOUNT_NAV is exactly the three account routes', () => {
-    expect(ACCOUNT_NAV.map(entry => entry.to)).toEqual(['/account/profile', '/account/security', '/account/notifications'])
+  // Six destinations for everybody, a job each: the rooms and training pairs are one entry apiece
+  // and reach their second page from their own screen (issue 1342).
+  test('every member sees the same six entries', () => {
+    expect(MY_NAV.filter(entry => entry.ability === signedIn).map(entry => [entry.label, entry.to])).toEqual([
+      ['My NNT', '/my'],
+      ['Rota', '/rota'],
+      ['Rooms', '/rooms'],
+      ['Training', '/training'],
+      ['Passes', '/account/passes'],
+      ['Membership', '/account/membership'],
+    ])
+  })
+
+  test('Tonight is there while the member works tonight, and the bar tab only for somebody who keeps one', () => {
+    const conditional = MY_NAV.filter(entry => entry.ability !== signedIn)
+    expect(conditional.map(entry => entry.to)).toEqual(['/tonight', '/account/bar-tab'])
+    expect(conditional.find(entry => entry.to === '/tonight')?.ability).toBe(workTonight)
+    expect(conditional.find(entry => entry.to === '/account/bar-tab')).toMatchObject({ label: 'Bar tab', ability: keepBarTab })
+  })
+
+  // A second page lights its entry: My bookings is Rooms' and Training sessions is Training's.
+  test('Rooms and Training stay lit on the pages beneath them', () => {
+    for (const to of ['/rooms', '/training']) expect(MY_NAV.find(entry => entry.to === to)?.exact).toBeUndefined()
+  })
+
+  test('ACCOUNT_NAV is exactly the four account routes, access requirements among them', () => {
+    expect(ACCOUNT_NAV.map(entry => entry.to)).toEqual(['/account/profile', '/account/access', '/account/security', '/account/notifications'])
   })
 
   test('no destination sits in both lists', () => {
@@ -267,6 +292,12 @@ describe('a waiting count rides the entry that opens it', () => {
     expect(entry?.section).toBe('Every day')
     expect(entry?.count).toBe('access-profiles')
     expect(navCount(boxOffice.items, { 'access-profiles': 2 })).toBe(2)
+  })
+
+  // Tab holders ship unnamed, so the register is set-up work until somebody holds a tab (issue 1342).
+  test('Tabs sits under the bar's Set-up', () => {
+    const bar = CONSOLE_NAV.find(group => group.key === 'bar')!
+    expect(bar.items.find(item => item.to === '/bar/tabs')?.section).toBe('Set-up')
   })
 
   test('a group reads the sum of what its entries carry, and nothing when nothing waits', () => {

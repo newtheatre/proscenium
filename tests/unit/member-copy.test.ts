@@ -144,10 +144,16 @@ describe('one word for one thing on the member shell (K-128 criterion 2)', () =>
     expect(offending(await memberCopy(), /Sort out your membership/)).toEqual([])
   })
 
-  test('the nav says room bookings where it means rooms', async () => {
+  // "Bookings" on its own is the reader's word for tickets, so it is never a nav label; room
+  // bookings are reached from Rooms, where the page around the link says which (issue 1342).
+  test('the nav never says bookings on its own, and Rooms links My bookings', async () => {
     const nav = await Bun.file('shared/utils/site-nav.ts').text()
     expect(nav).not.toContain('label: \'My bookings\'')
-    expect(nav).toContain('My room bookings')
+    expect(await Bun.file('app/pages/rooms/index.vue').text()).toMatch(/label: 'My bookings', to: '\/rooms\/mine'/)
+  })
+
+  test('Training links its sessions', async () => {
+    expect(await Bun.file('app/pages/training/index.vue').text()).toMatch(/label: 'Training sessions', to: '\/training\/sessions'/)
   })
 
   test('a notification is a notification, never a message', async () => {
