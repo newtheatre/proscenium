@@ -1,4 +1,4 @@
-import { SERIES_EDIT_REFUSAL, maskConflicts, refusalToEdit } from '#shared/utils/bookings'
+import { SERIES_EDIT_REFUSAL, bookingTier, maskConflicts, refusalToEdit } from '#shared/utils/bookings'
 import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { editDiff, editRequestForm, othersHeld, restartsTheClock } from '#shared/utils/requests'
@@ -64,14 +64,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const purpose = await requirePurpose(event, input.purpose)
   const after = {
     roomId: room.id,
     title: input.title,
     attendees: input.attendees,
     startsAt,
     endsAt,
-    tier: input.tier,
-    purpose: await requirePurpose(event, input.purpose),
+    tier: bookingTier(purpose, input.tier, permissions.has('rooms.write')),
+    purpose,
     notes: input.notes,
     reason: input.reason,
   }

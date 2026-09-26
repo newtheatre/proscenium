@@ -1,6 +1,6 @@
 import { expand, seriesForm } from '#shared/utils/series'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
-import { maskConflicts } from '#shared/utils/bookings'
+import { bookingTier, maskConflicts } from '#shared/utils/bookings'
 import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { formatLondon } from '#shared/utils/london'
 import type { OccurrenceRefusal } from '#server/utils/series'
@@ -105,6 +105,7 @@ export default defineEventHandler(async (event) => {
   // The whole series confirms or the whole series queues: an occurrence is never a different
   // kind of thing from its siblings (criterion 6).
   const status = needsApproval ? 'PENDING_APPROVAL' as const : 'CONFIRMED' as const
+  const purpose = await requirePurpose(event, input.purpose)
 
   try {
     await writeSeries({
@@ -113,8 +114,8 @@ export default defineEventHandler(async (event) => {
       roomId: room.id,
       title: input.title,
       attendees: input.attendees,
-      tier: input.tier,
-      purpose: await requirePurpose(event, input.purpose),
+      tier: bookingTier(purpose, input.tier, permissions.has('rooms.write')),
+      purpose,
       notes: input.notes,
       status,
       recurrence,

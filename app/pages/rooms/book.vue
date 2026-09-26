@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import { TIERS, describePurpose } from '#shared/utils/bookings'
 import { FREQUENCIES, saysRecurrence } from '#shared/utils/series'
 import { overCapacity } from '#shared/utils/rooms'
@@ -25,6 +26,9 @@ interface Failure { reason: string, says: string }
 const route = useRoute()
 const toast = useToast()
 const request = useRequestFetch()
+// The server derives a member's tier from the purpose and ignores one sent, so only an officer
+// is asked (C-115 criterion 1, issue 1337).
+const namesTier = computed(() => can(useViewer().value, manageRoomsEstate))
 
 // The screen mirrors the rules; the API is the authority, so what comes back is what is shown
 // rather than a second copy of the policy (C-106 criterion 3).
@@ -35,7 +39,7 @@ const fields = z.object({
   from: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a start time'),
   to: z.string().regex(/^\d{2}:\d{2}$/, 'Choose an end time'),
   attendees: z.number().int().positive().nullish(),
-  tier: z.enum(TIERS),
+  tier: z.enum(TIERS).optional(),
   purpose: z.string().min(1, 'Say what the room is for'),
   repeats: z.boolean(),
   frequency: z.enum(FREQUENCIES),
@@ -55,7 +59,7 @@ const state = reactive<BookingForm>({
   // A drag across the calendar arrives with both ends; a single click brings one and an hour.
   to: String(route.query.until ?? addMinutes(String(route.query.at ?? '10:00'), 60)),
   attendees: undefined,
-  tier: 'GENERAL',
+  tier: undefined,
   // Never defaulted, but taken from the link: a QR code an officer made says what the room is for,
   // and a value nobody chose is the failure the notes exist to remove (C-119).
   purpose: String(route.query.purpose ?? ''),
@@ -143,7 +147,7 @@ function seriesBody(skip: string[]): Record<string, unknown> {
     roomId: state.roomId,
     title: state.title,
     attendees: state.attendees ?? null,
-    tier: state.tier,
+    tier: namesTier.value ? state.tier : undefined,
     purpose: state.purpose,
     ...recurrence.value,
     skip,
@@ -298,7 +302,7 @@ async function book(event: FormSubmitEvent<BookingForm>): Promise<void> {
         startsAt: instantOf(event.data.day, event.data.from),
         endsAt: instantOf(event.data.day, event.data.to),
         attendees: event.data.attendees ?? null,
-        tier: event.data.tier,
+        tier: namesTier.value ? state.tier : undefined,
         purpose: event.data.purpose,
       },
     })
@@ -335,7 +339,7 @@ async function ask(): Promise<void> {
         startsAt: instantOf(state.day, state.from),
         endsAt: instantOf(state.day, state.to),
         attendees: state.attendees ?? null,
-        tier: state.tier,
+        tier: namesTier.value ? state.tier : undefined,
         purpose: state.purpose,
         reason: state.reason,
       },
@@ -481,13 +485,15 @@ useSeoMeta({ title: 'Book a room' })
         </UFormField>
 
         <UFormField
+          v-if="namesTier"
           label="Priority if the slot is contested"
           name="tier"
-          description="An officer may change this. It decides who keeps the room, not what it is used for."
+          description="Only an officer sets this. It decides who keeps the room, not what it is used for; left alone, a rehearsal is Rehearsal and anything else General."
         >
           <USelect
             v-model="state.tier"
             :items="TIERS.map(tier => ({ label: tier.charAt(0) + tier.slice(1).toLowerCase(), value: tier }))"
+            placeholder="From what it is for"
             class="w-full"
             data-test="booking-tier"
           />
