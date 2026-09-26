@@ -63,6 +63,40 @@ export function protectedHoldersStatement(now: number): SQL {
     where ${usableHolderWhere(PROTECTED_ROLE, now)}`
 }
 
+// Some usable IT Manager, narrowed by `also`. Its own FROM, so a statement on role_grants or
+// users can carry it without its columns meaning the outer row.
+function anItManager(now: number, also: SQL): SQL {
+  return sql`exists (select 1 from ${schema.roleGrants}
+    join ${schema.users} on ${schema.users.id} = ${schema.roleGrants.userId}
+    where ${usableHolderWhere(PROTECTED_ROLE, now)} and ${also})`
+}
+
+// strandingBy's rule for a statement to carry: taking this account's IT Manager standing away
+// still leaves a usable one whose grant cannot lapse, or, if it holds none, any usable one.
+export function keepsAnItManagerWhere(userId: string, now: number): SQL {
+  const other = sql`${schema.roleGrants.userId} <> ${userId}`
+  return sql`(${anItManager(now, sql`${other} and ${schema.roleGrants.expiresAt} is null`)}
+    or (${anItManager(now, other)} and not ${anItManager(now, sql`${schema.roleGrants.userId} = ${userId}`)}))`
+}
+
+// protectedGrantRefusal's rule: another usable IT Manager holds a permanent grant, or this one is
+// permanent on a usable account. A null account is one the grant's own batch creates.
+export function grantKeepsAnItManagerWhere(grant: { userId: string | null, expiresAt: number | null }, now: number): SQL {
+  const permanent = sql`${schema.roleGrants.expiresAt} is null`
+  const another = anItManager(now, grant.userId === null ? permanent : sql`${schema.roleGrants.userId} <> ${grant.userId} and ${permanent}`)
+  if (grant.userId === null || grant.expiresAt !== null) return another
+  return sql`(${another} or exists (select 1 from ${schema.users} where ${schema.users.id} = ${grant.userId} and ${usableAccountWhere()}))`
+}
+
+// The constraint a refused assertion trips, which the caller turns back into the guard's words.
+export const IT_MANAGER_ASSERTION = 'role_grants.id'
+
+// First in a batch, it inserts nothing while the guard holds and fails the whole batch otherwise,
+// so the guard and its write are one transaction (A-120 criterion 5, 0035).
+export function itManagerAssertion(holds: SQL): SQL {
+  return sql`insert into ${schema.roleGrants} (id, user_id, role) select null, null, ${PROTECTED_ROLE} where not (${holds})`
+}
+
 export interface RolesQuery extends ListQuery {
   // Asks for lapsed grants without filtering to them, the way includeShadow does (0071).
   includeLapsed?: boolean

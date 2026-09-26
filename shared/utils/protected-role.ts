@@ -19,6 +19,9 @@ export function strandingBy(holders: readonly ProtectedHolder[], userId: string)
   return others.some(holder => holder.expiresAt === null) ? null : 'dated'
 }
 
+// The write refused what the read had allowed: another officer changed the IT Managers between.
+export const IT_MANAGERS_CHANGED = 'The IT Managers changed while this was being done. Look again, then try once more.'
+
 export function strandingRefusal(stranding: Stranding, act: StrandingAct): string {
   const doing = act === 'merging' ? 'merging this one away' : `${act} this one`
   return stranding === 'last'

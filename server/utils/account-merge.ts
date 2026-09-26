@@ -129,7 +129,8 @@ export async function executeMerge(winnerId: string, loserId: string, actorId: s
   const writes = [...moves, ...retireCredentials].map(statement => db.run(statement))
   const tombstoneWrite = db.all<{ id: string }>(tombstone)
 
-  const results = await db.batch([writes[0]!, ...writes.slice(1), tombstoneWrite, auditInsert])
+  // guardMergeable read the guard for the preview; the batch carries it too (A-120 criterion 5).
+  const results = await batchKeepingAnItManager(keepsAnItManagerWhere(loserId, now), [...writes, tombstoneWrite, auditInsert], () => refuseStranding(PROTECTED_ROLE, loserId, 'merging'))
 
   const tombstoned = results[results.length - 2]
   if (!Array.isArray(tombstoned) || tombstoned.length === 0) {

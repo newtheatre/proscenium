@@ -12,8 +12,6 @@ export async function eraseAccount(userId: string, actorId: string | null): Prom
 
   if (account.anonymisedAt !== null) return { erased: false, alreadyErased: true }
 
-  await refuseStranding(PROTECTED_ROLE, userId, 'erasing')
-
   const now = Math.floor(Date.now() / 1000)
   const statements = erasureStatements(userId, now)
 
@@ -26,9 +24,9 @@ export async function eraseAccount(userId: string, actorId: string | null): Prom
     detail: { tables: PERSONAL_TABLES.length },
   }))
 
-  // erasureStatements always returns at least the redaction and the tombstone, so the first is
-  // there to give the batch its non-empty head.
-  await db.batch([writes[0]!, ...writes.slice(1), record])
+  // The last IT Manager is guarded on the batch itself, so an erasure racing a revoke cannot
+  // leave the system without one (A-120 criterion 5).
+  await batchKeepingAnItManager(keepsAnItManagerWhere(userId, now), [...writes, record], () => refuseStranding(PROTECTED_ROLE, userId, 'erasing'))
 
   return { erased: true, alreadyErased: false }
 }
