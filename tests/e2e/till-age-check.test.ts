@@ -600,4 +600,36 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     expect(shown.size).toBeGreaterThanOrEqual(36)
     view.close()
   }, 120_000)
+
+  // Issue 1299: the server decides, so a catalogue the till loaded before an item was switched on
+  // is read again at the charge, and the prompt opens rather than the till refusing every charge.
+  test('an item switched on after the till loaded asks at the charge, and the sale then goes through', async () => {
+    const itemName = named('Cider base')
+    const itemId = await created(await send('POST', '/api/admin/bar/items', { name: itemName, unit: 'ML', containerMl: 1000, ageRestricted: false }))
+    expect((await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 5000, unitCostPence: 1 })).status).toBe(200)
+    const productId = await aProductIn(await aCategory(), { name: named('Cider'), ageRestricted: false })
+    const variantId = await addVariant(productId)
+    expect((await priceVariant(variantId, 400)).status).toBe(200)
+    expect((await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 25 }] })).status).toBe(200)
+    expect((await activate(productId)).status).toBe(200)
+    const { venueId } = programme(`age-check-late-${crypto.randomUUID().slice(0, 6)}`)
+    await openTill(venueId)
+
+    const view = await atTheTill(venueId, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£4.00')`)
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="age-check-id-PASSPORT"]') === null`)).toBe(true)
+
+    expect((await send('PUT', `/api/admin/bar/items/${itemId}`, { name: itemName, unit: 'ML', containerMl: 1000, ageRestricted: true })).status).toBe(200)
+
+    const before = counts()
+    await click(view, `[aria-label="Charge £4.00"]`)
+    await waitFor(view, `document.querySelector('[data-test="age-check-id-PASSPORT"]')`)
+    await click(view, '[data-test="age-check-id-PASSPORT"]')
+    await waitFor(view, `document.querySelector('[data-test="reader-took-it"]')`)
+    await click(view, '[data-test="reader-took-it"]')
+    await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
+    expect(counts().ageChecks).toBe(before.ageChecks + 1)
+    view.close()
+  }, 120_000)
 })

@@ -37,8 +37,8 @@ const filterOptions = computed<Record<string, FilterOption[]>>(() => ({ category
 // Search, filters, sort and page live in the URL (K-129).
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(barProductsList, { options: filterOptions })
 
-// The correction list's size whatever the page shows: a product pouring restricted stock that
-// sells without Check ID is the Bar Manager's to fix (F-106, issue 1299).
+// The tidy-up list's size whatever the page shows: a product pouring restricted stock with its
+// switch off is the Bar Manager's to correct, though the till asks anyway (F-106, issue 1299).
 const WITHOUT_CHECK_ID: FilterCondition = { key: 'withoutCheckId', operator: 'is', values: ['true'] }
 
 const [{ data, status, error, refresh }, { data: unchecked, refresh: recount }] = await Promise.all([
@@ -226,7 +226,7 @@ const columns: TableColumn<BarProduct>[] = [
           ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Age restricted')
           : null,
         sellsWithoutCheckId(row.original)
-          ? h(UBadge, { 'color': 'error', 'variant': 'subtle', 'size': 'sm', 'data-test': `no-check-id-${row.original.id}` }, () => 'Switched off')
+          ? h(UBadge, { 'color': 'error', 'variant': 'subtle', 'size': 'sm', 'data-test': `no-check-id-${row.original.id}` }, () => 'Age restricted off')
           : null,
         row.original.staffedOnly
           ? h(UBadge, { color: 'neutral', variant: 'outline', size: 'sm' }, () => 'Staffed only')

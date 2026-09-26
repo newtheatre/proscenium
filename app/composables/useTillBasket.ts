@@ -215,10 +215,7 @@ export function useTillBasket(deps: TillBasketDeps) {
   function isLineRestricted(line: RestrictableLine): boolean {
     return lineNeedsCheckId(products.value, line)
   }
-  function isRestricted(line: BasketLine): boolean {
-    return isLineRestricted(line)
-  }
-  const needsAgeCheck = computed(() => basket.value.some(isRestricted))
+  const needsAgeCheck = computed(() => basket.value.some(isLineRestricted))
 
   // What this sale has already settled, what it is asking about now, and what a refusal left
   // behind for the screen to say (F-106 criterion 6).
@@ -235,9 +232,9 @@ export function useTillBasket(deps: TillBasketDeps) {
   // The lines go at once, and the register entry is written here rather than riding on a sale
   // that may never be made: a basket left with nothing in it still owes the licence a record.
   async function refuseAgeCheck(outcome: InlineAgeCheckInput): Promise<void> {
-    const removed = basket.value.filter(isRestricted)
+    const removed = basket.value.filter(isLineRestricted)
     const names = [...new Set(removed.map(line => line.productName))].join(', ')
-    basket.value = basket.value.filter(line => !isRestricted(line))
+    basket.value = basket.value.filter(line => !isLineRestricted(line))
     askingAgeCheckFor.value = null
     refusedLinesNote.value = names ? `ID refused. Not sold: ${names}` : null
     refusalRecordFailure.value = null
@@ -306,7 +303,6 @@ export function useTillBasket(deps: TillBasketDeps) {
     offline,
     recomputeTotal,
     grandTotalPence,
-    isRestricted,
     isLineRestricted,
     needsAgeCheck,
     passedAgeCheck,

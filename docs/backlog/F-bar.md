@@ -291,11 +291,11 @@ Open questions:
      with a from/to diff.
   6. One way to create a product, not two side by side. A new product's age-restricted flag and a
      new stocked item's each start from one stated default, read by every screen that offers
-     either rather than spelled again per screen.
+     either rather than spelled again per screen. A picker over the stock register reaches the
+     whole register, by searching it where it is longer than one page (K-123).
      Amended by issue 1299: a product's Check ID follows what it pours (F-106 criterion 1), so
      only a stocked item keeps a stated default; a new product's own switch, "restricted anyway",
-     starts off. A picker over the stock register reaches the
-     whole register, by searching it where it is longer than one page (K-123).
+     starts off.
 - Source: Prompt Book F-2; audit PR-12, PR-7 (archive-not-delete judgment); criterion 6 from
   issue 1151 item 10, 21 September 2026.
 

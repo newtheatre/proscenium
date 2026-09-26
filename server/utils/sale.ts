@@ -81,8 +81,6 @@ interface OptionRow {
   itemId: string
   itemName: string
   qty: number
-  // Set here from the register, not read off the row (issue 1299).
-  ageRestricted?: boolean
 }
 
 // One resolved ingredient a sale line depletes: an item and how much of it, in the item's own
@@ -132,7 +130,6 @@ export async function activeVariantsWithChoices(on: string): Promise<Resolvable>
   const nameOf = new Map(groupNames.map(group => [group.id, group.name]))
   // Read whole, binding nothing per item: Check ID follows what a line pours (issue 1299, 0006).
   const restrictedItems = new Set((await db.all<{ id: string }>(sql`SELECT id FROM bar_items WHERE age_restricted = 1`)).map(item => item.id))
-  for (const option of options) option.ageRestricted = restrictedItems.has(option.itemId)
 
   const choiceOf = new Map<string, SaleChoice>()
   const recipeOf = new Map<string, Depletion[]>()
@@ -149,7 +146,7 @@ export async function activeVariantsWithChoices(on: string): Promise<Resolvable>
       name: nameOf.get(component.choiceGroupId) ?? '',
       options: options
         .filter(option => option.choiceGroupId === component.choiceGroupId)
-        .map(option => ({ id: option.id, itemName: option.itemName, ageRestricted: option.ageRestricted === true })),
+        .map(option => ({ id: option.id, itemName: option.itemName, ageRestricted: restrictedItems.has(option.itemId) })),
     })
   }
   const optionById = new Map(options.map(option => [option.id, option]))
@@ -206,8 +203,7 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
         name: row.name,
         categoryId: row.categoryId,
         // The tile's mark: any size, or any option offered, that asks (issue 1299, F-106.6).
-        ageRestricted: row.ageRestricted === 1
-          || sizes.some(size => size.ageRestricted || (size.choice?.options.some(option => option.ageRestricted) ?? false)),
+        ageRestricted: sizes.some(size => size.ageRestricted || size.choice?.options.some(option => option.ageRestricted) === true),
         allergenState: row.allergenState,
         allergenNote: row.allergenNote,
         variants: sizes,
@@ -250,7 +246,7 @@ function resolveLines(lines: BasketLineInput[], { variants, optionById }: Resolv
       }
       choiceItemId = chosen.id
       choiceItemName = chosen.itemName
-      ageRestricted ||= option.ageRestricted === true
+      ageRestricted ||= chosen.ageRestricted === true
       depletion.push({ itemId: option.itemId, qty: option.qty })
     }
     else if (line.choiceItemId) {
@@ -574,6 +570,8 @@ async function prepareSale(
     throw createError({
       statusCode: 409,
       statusMessage: `${names.join(' and ')} ${names.length === 1 ? 'needs' : 'need'} a Challenge 25 outcome before this can be charged`,
+      // A till holding a catalogue from before an item was switched on reads it again and asks.
+      data: { ageCheckFor: names },
     })
   }
 
@@ -875,6 +873,40 @@ export async function commitSale(
   }
 }
 
+// A comp's Challenge 25 row and its audit, whether a sale follows it or not (F-106 criteria 3, 6).
+function ageCheckStatements(
+  ageCheck: InlineAgeCheckInput,
+  restricted: number[],
+  priced: PricedLine[],
+  performanceId: string | null,
+  actorId: string,
+): { statements: BatchItem<'sqlite'>[], result: NonNullable<SaleReceipt['ageCheck']> } {
+  const id = newId()
+  const write = recordAgeCheck(actorId, {
+    performanceId,
+    outcome: ageCheck.outcome,
+    idType: ageCheck.idType,
+    reason: ageCheck.reason,
+    description: ageCheck.description,
+    product: [...new Set(restricted.map(index => priced[index]!.productName))].join(', '),
+    notes: ageCheck.notes,
+  }, id)
+  const audit = db.insert(schema.auditLog).values(auditEntry({ actorId, action: 'age-check.logged', target: `age-check:${id}`, detail: { outcome: ageCheck.outcome } }))
+  return { statements: [db.run(write.statement), audit], result: { id, outcome: ageCheck.outcome } }
+}
+
+// The register row alone, its constraint's refusal said in words, as the sale's own batch says it.
+async function runAgeCheckBatch(statements: BatchItem<'sqlite'>[]): Promise<void> {
+  try {
+    await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+  }
+  catch (error) {
+    const refusal = error instanceof Error ? ageCheckConstraintRefusal(error) : null
+    if (refusal) throw createError(refusal)
+    throw error
+  }
+}
+
 // Spends an already-approved comp request (F-110): the basket it names, never one resubmitted by
 // the till, so an approval can never be stretched to cover a bigger round than was asked for.
 export async function commitCompSale(
@@ -935,8 +967,11 @@ export async function commitCompSale(
     })
   }
 
+  // Nothing left to give, but a refusal still reaches the register, as the card path's does (F-106.3).
   if (soldResolved.length === 0) {
-    return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: null, refusedLines: refusedPriced, tab: null, discount: null, comp: null, tickets: [], walkUps: [] }
+    const check = ageCheck && restricted.length > 0 ? ageCheckStatements(ageCheck, restricted, priced, performanceId, context.actorId) : null
+    if (check) await runAgeCheckBatch(check.statements)
+    return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: check?.result ?? null, refusedLines: refusedPriced, tab: null, discount: null, comp: null, tickets: [], walkUps: [] }
   }
 
   const entryId = newId()
@@ -990,28 +1025,9 @@ export async function commitCompSale(
     detail: { venueId: context.venueId, night: context.night, lines: soldResolved.length, tender: 'COMP', compRequestId: requestId },
   })))
 
-  let ageCheckResult: SaleReceipt['ageCheck'] = null
-  if (ageCheck && restricted.length > 0) {
-    const id = newId()
-    const restrictedNames = [...new Set(restricted.map(index => priced[index]!.productName))]
-    const write = recordAgeCheck(context.actorId, {
-      performanceId: performanceId,
-      outcome: ageCheck.outcome,
-      idType: ageCheck.idType,
-      reason: ageCheck.reason,
-      description: ageCheck.description,
-      product: restrictedNames.join(', '),
-      notes: ageCheck.notes,
-    }, id)
-    statements.push(db.run(write.statement))
-    statements.push(db.insert(schema.auditLog).values(auditEntry({
-      actorId: context.actorId,
-      action: 'age-check.logged',
-      target: `age-check:${id}`,
-      detail: { outcome: ageCheck.outcome },
-    })))
-    ageCheckResult = { id, outcome: ageCheck.outcome }
-  }
+  const check = ageCheck && restricted.length > 0 ? ageCheckStatements(ageCheck, restricted, priced, performanceId, context.actorId) : null
+  if (check) statements.push(...check.statements)
+  const ageCheckResult: SaleReceipt['ageCheck'] = check?.result ?? null
 
   try {
     await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])

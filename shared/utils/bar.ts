@@ -36,7 +36,8 @@ export function checkIdRefusal(product: { name: string, ageRestricted: boolean }
     + 'or switch it off on any stocked item that is not alcohol'
 }
 
-// The row the correction list holds, read the way withoutCheckIdPredicate reads it on the server.
+// The row the tidy-up list holds (switch off, restricted stock poured), read the way
+// withoutCheckIdPredicate reads it on the server.
 export const sellsWithoutCheckId = (product: Pick<BarProduct, 'ageRestricted' | 'restrictedPours'>): boolean =>
   !product.ageRestricted && product.restrictedPours.length > 0
 
@@ -518,7 +519,7 @@ export interface BarProduct {
   allergenNote: string | null
   everSold: boolean
   // The age-restricted stocked items its live sizes pour, choices included, derived rather than
-  // stored; unrestricted with any here is a product selling without Check ID (issue 1299).
+  // stored; switched off with any here is a product on the tidy-up list (issue 1299).
   restrictedPours: string[]
 }
 

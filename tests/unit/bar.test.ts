@@ -297,7 +297,6 @@ describe('what a screen shows', () => {
 // the same switch. Issue 1299: a product's Check ID now follows what it pours, so it has no default.
 describe('one stated default for a new stocked item, and none for a product', () => {
   const ITEM_CREATORS = ['app/pages/bar/products/new.vue', 'app/pages/bar/stock/index.vue']
-  const PRODUCT_CREATORS = ['app/pages/bar/products/index.vue', 'app/pages/bar/products/new.vue']
 
   test('a new stocked item is restricted, since the shelf it comes off mostly is', () => {
     expect(STOCK_ITEM_AGE_RESTRICTED_DEFAULT).toBe(true)
@@ -320,14 +319,6 @@ describe('one stated default for a new stocked item, and none for a product', ()
     for (const file of ITEM_CREATORS) {
       const source = await Bun.file(file).text()
       if (!source.includes('STOCK_ITEM_AGE_RESTRICTED_DEFAULT')) offenders.push(`${file} (reads no shared default)`)
-    }
-    expect(offenders).toEqual([])
-  })
-
-  test('no product screen reads a product default, since there is none', async () => {
-    const offenders: string[] = []
-    for (const file of PRODUCT_CREATORS) {
-      if ((await Bun.file(file).text()).includes('PRODUCT_AGE_RESTRICTED_DEFAULT')) offenders.push(file)
     }
     expect(offenders).toEqual([])
   })

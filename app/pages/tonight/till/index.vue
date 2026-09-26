@@ -315,6 +315,7 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
     ageCheckStep.value = 'closed'
   }
   catch (refused) {
+    if (await askedForAnAgeCheck(refused, 'reader')) return
     // K-103 protects reads, not writes: a transport failure needs different words from an
     // ordinary refusal, since whether the sale landed is unknown rather than settled (finding 16).
     chargeFailure.value = writeFailureText(refused, typed ? UNANSWERED_FIRST : 'Check the tab before charging it again.')
@@ -353,6 +354,7 @@ async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = passedAgeChe
     sumup.launch(started.launchUrl)
   }
   catch (refused) {
+    if (await askedForAnAgeCheck(refused, 'sumup')) return
     // This only starts a hand-off, not a sale, so the ambiguity is whether that start landed.
     chargeFailure.value = writeFailureText(refused, UNANSWERED_FIRST)
     ageCheckStep.value = 'closed'
@@ -362,6 +364,16 @@ async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = passedAgeChe
   finally {
     charging.value = false
   }
+}
+
+// A stocked item switched on after this till loaded: the server knows and the catalogue held here
+// does not, so it is read again and the prompt opens, as for any unchecked line (issue 1299).
+async function askedForAnAgeCheck(refused: unknown, via: 'reader' | 'sumup'): Promise<boolean> {
+  if (!refusalData<{ ageCheckFor?: string[] }>(refused)?.ageCheckFor?.length) return false
+  await catalogue.refresh()
+  chargeVia.value = via
+  ageCheckStep.value = 'choose'
+  return true
 }
 
 function timeOf(at: number): string {
