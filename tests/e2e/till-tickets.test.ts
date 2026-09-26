@@ -346,6 +346,15 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     expect(swept.status).toBe(200)
 
     expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', started.id)!.status).toBe('COMPLETING')
+
+    // Settled, since every bar's open charge holds the one reader's close later in this suite (issue 1308).
+    const settling = new Database(app.databaseFile)
+    try {
+      settling.query('UPDATE sumup_attempts SET status = ?, resolved_at = ? WHERE id = ?').run('ABANDONED', now, started.id)
+    }
+    finally {
+      settling.close()
+    }
   })
 
   test('a failure restores nothing but the basket; a booking collected meanwhile makes a mismatch; the close waits for an open attempt', async () => {
