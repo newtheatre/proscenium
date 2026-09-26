@@ -10,10 +10,12 @@ import {
   NIGHT_ROLE_PERMISSION,
   NIGHT_ROLE_WORDS,
   OFFICER_BYPASS_ACTION,
+  bypassIsRecorded,
   nightAuthorityRefusal,
   officerBypassEntry,
   officerBypassTarget,
   outsideWindowRefusal,
+  saysOfficerBypass,
 } from '#shared/utils/night-authority'
 import type { Viewer } from '#shared/utils/abilities'
 import type { NightRole } from '#shared/utils/night-authority'
@@ -107,6 +109,51 @@ describe('a refusal names what would unlock it (E-111, F-101 criterion 5)', () =
     expect(refusal.statusCode).toBe(403)
     expect(refusal.statusMessage).toContain('18:00 to 22:30')
     expect(refusal.statusMessage).not.toContain('bar manager')
+  })
+})
+
+// 0098: looking is not standing in, so a read records nothing; a write records as 0044 says, and
+// the one read that shows what only tonight's team may see asks to be recorded.
+describe('the bypass is recorded when the officer acts, not when a screen opens (0098)', () => {
+  test('a read records nothing', () => {
+    expect(bypassIsRecorded('GET')).toBe(false)
+    expect(bypassIsRecorded('HEAD')).toBe(false)
+    expect(bypassIsRecorded('get')).toBe(false)
+  })
+
+  test('every write records', () => {
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) expect(bypassIsRecorded(method)).toBe(true)
+  })
+
+  test('a read that asks to be recorded is', () => {
+    expect(bypassIsRecorded('GET', true)).toBe(true)
+  })
+
+  test('the glance, which reads the agreed access wording, asks to be recorded', async () => {
+    const source = await Bun.file('server/api/tonight/duty-manager.get.ts').text()
+    expect(source).toContain('{ recordsRead: true }')
+  })
+
+  test('the role check the hub makes records nothing, since it is a read', async () => {
+    const source = await Bun.file('server/api/tonight/authority.get.ts').text()
+    expect(source).not.toContain('recordsRead')
+  })
+})
+
+describe('the night report says who stood in for which role, and beside what (0098, E-123)', () => {
+  test('an officer with no confirmed shift of that role is said plainly', () => {
+    expect(saysOfficerBypass({ role: 'DOOR', officerName: 'Fen Foh', confirmedShift: false }))
+      .toBe('Door: Fen Foh stood in by officer role, with no confirmed door shift')
+  })
+
+  test('an officer beside a confirmed shift is said so, since that is a rota question of its own', () => {
+    expect(saysOfficerBypass({ role: 'DUTY_MANAGER', officerName: 'Fen Foh', confirmedShift: true }))
+      .toBe('Duty manager: Fen Foh stood in by officer role, beside a confirmed duty manager shift')
+  })
+
+  test('an officer whose account has gone is still a bypass, named as an officer', () => {
+    expect(saysOfficerBypass({ role: 'BAR', officerName: null, confirmedShift: false }))
+      .toBe('Bar: an officer stood in by officer role, with no confirmed bar shift')
   })
 })
 

@@ -7,6 +7,7 @@ import {
   reportForegoneQuery,
   reportIncidentsQuery,
   reportMilestonesQuery,
+  reportOfficerBypassesQuery,
   reportStaffingQuery,
   reportTakingsQuery,
 } from '#server/utils/night-report'
@@ -308,18 +309,71 @@ describe('staffing (criterion 1)', () => {
     })
   })
 
-  test('an officer bypass for this performance flags the shift; a bypass for another night does not', async () => {
+})
+
+// Every role an officer stood in for, naming the officer and whether a confirmed shift of that
+// role was on the performance (E-123 criterion 1 as amended, 0098).
+describe('officer bypasses (criterion 1, 0098)', () => {
+  function bypass(database: TestDatabase, id: string, officer: string, night: string, venueId: string, role: string, performanceIds: string[]): void {
+    database.batch([['INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (?, ?, ?, ?, ?)',
+      id, officer, 'night.officer-bypass', `night:${night}:${venueId}:${role}`,
+      JSON.stringify({ role, night, venueId, performanceIds })]])
+  }
+
+  function shift(database: TestDatabase, id: string, performanceId: string, role: string, userId: string): void {
+    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+      id, performanceId, role, userId, 'CONFIRMED']])
+  }
+
+  interface Found { role: string, officerName: string | null, confirmedShift: number }
+
+  test('each role an officer stood in for is listed, in role order, naming the officer', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
-      shift(database, 's-bypassed', tonight.performanceId, 'OPEN', null)
       const officer = person(database, 'officer')
-      database.batch([['INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (?, ?, ?, ?, ?)',
-        'audit-1', officer, 'night.officer-bypass', `night:${tonight.night}:${tonight.venueId}:DUTY_MANAGER`,
-        JSON.stringify({ role: 'DUTY_MANAGER', night: tonight.night, venueId: tonight.venueId, performanceIds: [tonight.performanceId] })]])
+      for (const role of ['BAR', 'DOOR', 'DUTY_MANAGER']) {
+        bypass(database, `audit-${role}`, officer, tonight.night, tonight.venueId, role, [tonight.performanceId])
+      }
 
-      const found = read<{ shiftId: string, officerBypass: number }>(
-        database, reportStaffingQuery(tonight.performanceId, tonight.venueId, tonight.night))
-      expect(found.find(row => row.shiftId === 's-bypassed')?.officerBypass).toBe(1)
+      const found = read<Found>(database, reportOfficerBypassesQuery(tonight.performanceId, tonight.venueId, tonight.night))
+      expect(found).toEqual([
+        { role: 'DUTY_MANAGER', officerName: 'Someone officer', confirmedShift: 0 },
+        { role: 'DOOR', officerName: 'Someone officer', confirmedShift: 0 },
+        { role: 'BAR', officerName: 'Someone officer', confirmedShift: 0 },
+      ])
+    })
+  })
+
+  test('a bypass beside a confirmed shift of that role says so, and a shift of another role does not count', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = person(database, 'officer')
+      shift(database, 's-dm', tonight.performanceId, 'DUTY_MANAGER', person(database, 'rowan'))
+      bypass(database, 'audit-dm', officer, tonight.night, tonight.venueId, 'DUTY_MANAGER', [tonight.performanceId])
+      bypass(database, 'audit-door', officer, tonight.night, tonight.venueId, 'DOOR', [tonight.performanceId])
+
+      const found = read<Found>(database, reportOfficerBypassesQuery(tonight.performanceId, tonight.venueId, tonight.night))
+      expect(found.map(row => [row.role, row.confirmedShift])).toEqual([['DUTY_MANAGER', 1], ['DOOR', 0]])
+    })
+  })
+
+  test('another venue, another night and a night that did not cover this performance are not this report\'s', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = person(database, 'officer')
+      bypass(database, 'audit-venue', officer, tonight.night, 'venue-elsewhere', 'DOOR', [tonight.performanceId])
+      bypass(database, 'audit-night', officer, '2026-01-01', tonight.venueId, 'DOOR', [tonight.performanceId])
+      bypass(database, 'audit-other', officer, tonight.night, tonight.venueId, 'BAR', ['performance-other'])
+
+      expect(read(database, reportOfficerBypassesQuery(tonight.performanceId, tonight.venueId, tonight.night))).toEqual([])
+    })
+  })
+
+  test('binds a fixed number of parameters whatever the night holds (0006)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const [, ...parameters] = boundStatement(database, reportOfficerBypassesQuery(tonight.performanceId, tonight.venueId, tonight.night))
+      expect(parameters.length).toBeLessThanOrEqual(8)
     })
   })
 })
