@@ -918,7 +918,9 @@ houses gets, because resolving both at once would be inventing authority nobody 
 released or reassigned shift stops resolving on its very next request, because the query reads
 `shifts.status` live rather than a snapshot taken at sign-in (E-111 criterion 3).
 
-`GET /api/tonight/authority?role=&night=&venueId=&performanceId=` is that resolution as a route. It
+`GET /api/tonight/authority?role=&night=&venueId=&performanceId=` is that resolution as a route; with
+no `role` it asks `requireAnyNightAuthority` over all three and answers with the `role` that
+resolved, which is what the contacts and incidents screen and the Challenge 25 register ask. It
 returns the allow-listed shape above and is the pattern every other `/api/tonight/**` and
 `/api/till/**` route follows; `tests/unit/night-authority.test.ts` fails when a route under either
 namespace does not call the guard. Beside the ids it answers with
@@ -1336,10 +1338,15 @@ check commit in one `db.batch` or not at all. It is safe to consume now, ahead o
 E-117: nothing in it depends on either, and the only story it depends on is E-111, already
 merged. `POST /api/tonight/age-checks`, `GET /api/tonight/age-checks` and
 `POST /api/tonight/age-checks/[id]/supersede` are guarded by the new
-`requireAnyNightAuthority(event, roles)` in `server/utils/night-authority.ts`, which tries each
-role in turn and returns the first that resolves, for the screens more than one role reaches
-(criterion 4: bar or door staff, and the duty manager's own tonight screen). A signed-out caller
-is told that on the first attempt rather than asked again for every role.
+`requireAnyNightAuthority(event, roles, scope?, options?)` in `server/utils/night-authority.ts`,
+for the screens more than one role reaches (criterion 4: bar or door staff, and the duty manager's
+own tonight screen). It tries every role's confirmed shift before any role's officer bypass, so an
+officer on a shift resolves as that shift and records no bypass (0044, 0098), and forwards
+`options` to each attempt, so a multi-role read that decrypts access wording passes `recordsRead`
+as the single-role guard does. A signed-out caller is told that once, before any role is tried.
+When every role refuses, the most specific refusal wins (`mostSpecificRefusal`): the hours of a
+shift held, then a refusal about the request or an officer's own standing, then a claim waiting,
+then no shift, and among equals the first role asked.
 
 The officer bypass still resolves against `coverage()`, which needs a venue running something
 tonight; an age check's own `performance_id` may be null regardless of what authority resolved

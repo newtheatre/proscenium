@@ -106,6 +106,21 @@ export function saysOfficerBypass(line: OfficerBypassLine): string {
   return `${words.charAt(0).toUpperCase()}${words.slice(1)}: ${who} stood in by officer role, ${beside}`
 }
 
+// Why one role refused a caller, most specific first: the hours of a shift they hold, then the
+// request or an officer's own standing, then a claim waiting, then no shift at all (E-111).
+export const NIGHT_REFUSAL_KINDS = ['OUTSIDE_WINDOW', 'ASKED', 'CLAIMED', 'NO_SHIFT'] as const
+export type NightRefusalKind = (typeof NIGHT_REFUSAL_KINDS)[number]
+
+// The refusal a screen more than one role reaches shows: the most specific, and among equals the
+// first role asked, so a door claimant is never answered in the bar's words.
+export function mostSpecificRefusal<T extends { kind: NightRefusalKind }>(refusals: readonly T[]): T | undefined {
+  let best: T | undefined
+  for (const refusal of refusals) {
+    if (!best || NIGHT_REFUSAL_KINDS.indexOf(refusal.kind) < NIGHT_REFUSAL_KINDS.indexOf(best.kind)) best = refusal
+  }
+  return best
+}
+
 // The dedupe key, carried in the audit row's target. Two venues may run one night and one venue
 // may run a matinee and an evening, so the venue is in the key and the performance is not (0044).
 export function officerBypassTarget(night: string, venueId: string, role: NightRole): string {

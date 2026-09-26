@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import type { NightRole } from '#shared/utils/night-authority'
 import { CATEGORIES, SEVERITIES, saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysClock } from '#shared/utils/when'
@@ -43,19 +42,18 @@ const authorityFailure = ref<string | null>(null)
 // offered: the route behind it takes a duty manager and nobody else (E-114 criterion 3).
 const resolvedRole = ref<NightRole | null>(null)
 
+// One question for any of tonight's roles: the server tries a shift before a bypass and answers a
+// refusal about the caller's own position, never the last role's (E-111).
 async function resolveAuthority(): Promise<void> {
-  for (const role of NIGHT_ROLES) {
-    try {
-      const resolved = await request<{ performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }>('/api/tonight/authority', { query: { role } })
-      performanceIds.value = resolved.performanceIds
-      performances.value = resolved.performances ?? []
-      resolvedRole.value = role
-      authorityFailure.value = null
-      return
-    }
-    catch (refused) {
-      authorityFailure.value = refusalText(refused)
-    }
+  try {
+    const resolved = await request<{ role: NightRole, performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }>('/api/tonight/authority')
+    performanceIds.value = resolved.performanceIds
+    performances.value = resolved.performances ?? []
+    resolvedRole.value = resolved.role
+    authorityFailure.value = null
+  }
+  catch (refused) {
+    authorityFailure.value = refusalText(refused)
   }
 }
 
