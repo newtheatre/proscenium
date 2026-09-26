@@ -379,7 +379,9 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     const abandoned = await send('POST', `/api/till/payments/${started.id}/resolve`, { outcome: 'abandoned', note: 'refunded on the reader' }, barManager.cookie)
     expect((await abandoned.json() as { status: string }).status).toBe('ABANDONED')
 
-    const closed = await send('POST', '/api/till/close', { id: sessionId, actualZPence: 0 }, barManager.cookie)
+    // The one reader's Z is the whole night's, desk collection included (issue 1308).
+    const preview = await (await send('GET', `/api/till/${sessionId}/reconciliation`, undefined, barManager.cookie)).json() as { wholeNightExpectedPence: number }
+    const closed = await send('POST', '/api/till/close', { id: sessionId, actualZPence: preview.wholeNightExpectedPence }, barManager.cookie)
     expect(closed.status).toBe(200)
   })
 })
