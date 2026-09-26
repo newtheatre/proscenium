@@ -202,13 +202,13 @@ describe('the file itself (criteria 2, 3, 4)', () => {
     expect(shaped[0]).toMatchObject({ category: 'Bar item on a tab', tender: 'Tab', amountPence: 600 })
     expect(shaped[1]).toMatchObject({ category: 'Tab settlement', tender: 'Card', amountPence: 600 })
     expect(shaped[2]).toMatchObject({ category: 'Bar item', tender: 'Comp', amountPence: 0 })
-    expect(shaped.at(-1)).toEqual({ date: '', category: SU_EXPORT_CARD_TOTAL, tender: 'Card', nominalCode: '', amountPence: 600, amountPounds: '6.00' })
+    expect(shaped.at(-1)).toEqual({ date: '', category: SU_EXPORT_CARD_TOTAL, tender: '', nominalCode: '', amountPence: 600, amountPounds: '6.00' })
   })
 
   test('the closing line is always there, the card lines summed with their signs', () => {
     expect(suExportCsvRows(lines).at(-1)).toMatchObject({ category: SU_EXPORT_CARD_TOTAL, amountPence: 400, amountPounds: '4.00' })
     expect(suExportCsvRows([])).toEqual([
-      { date: '', category: SU_EXPORT_CARD_TOTAL, tender: 'Card', nominalCode: '', amountPence: 0, amountPounds: '0.00' },
+      { date: '', category: SU_EXPORT_CARD_TOTAL, tender: '', nominalCode: '', amountPence: 0, amountPounds: '0.00' },
     ])
     expect(SU_EXPORT_CARD_TOTAL).toBe('Card total, the same as the money dashboard\'s revenue')
   })

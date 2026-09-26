@@ -42,12 +42,12 @@ function atNoonOn(day: string): number {
   return Math.floor(Date.UTC(year, month - 1, date, 12, 0, 0) / 1000)
 }
 
-function entry(database: TestDatabase, day: string, source = 'DESK', tender = 'CARD'): string {
+function entry(database: TestDatabase, day: string, source = 'DESK', tender = 'CARD', at = atNoonOn(day)): string {
   const id = `e-${++entrySeq}`
   database.batch([[
     `INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence)
      VALUES (?, ?, ?, ?, ?, ?, 0)`,
-    id, atNoonOn(day), day, source, tender, ACTOR,
+    id, at, day, source, tender, ACTOR,
   ]])
   return id
 }
@@ -220,9 +220,12 @@ describe('the export agrees with the money dashboard (I-105, I-108 criterion 2)'
       line(database, entry(database, '2026-09-21', 'TILL', 'COMP'), 'BAR_ITEM', 0)
       line(database, entry(database, '2026-09-23', 'TILL'), 'TAB_SETTLEMENT', 600)
       line(database, entry(database, '2026-09-23', 'TILL'), 'BAR_ITEM', 350)
+      // 00:30 London on each edge (0014): 1 September is in the period, 1 October is not.
+      line(database, entry(database, '2026-09-01', 'TILL', 'CARD', Date.UTC(2026, 7, 31, 23, 30) / 1000), 'BAR_ITEM', 125)
+      line(database, entry(database, '2026-10-01', 'TILL', 'CARD', Date.UTC(2026, 8, 30, 23, 30) / 1000), 'BAR_ITEM', 900)
 
       const exported = read<SuExportRow>(database, suExportQuery('2026-09-01', '2026-09-30'))
-      expect(exported.map(row => row.tender)).toEqual(['CARD', 'TAB', 'COMP', 'CARD', 'CARD'])
+      expect(exported.map(row => row.tender)).toEqual(['CARD', 'CARD', 'TAB', 'COMP', 'CARD', 'CARD'])
 
       const shaped = suExportCsvRows(exported)
       expect(shaped.find(row => row.tender === 'Tab')).toMatchObject({ category: 'Bar item on a tab', amountPence: 600 })
@@ -230,7 +233,7 @@ describe('the export agrees with the money dashboard (I-105, I-108 criterion 2)'
       const bounds = periodBounds({ kind: 'TERM', fromDay: '2026-09-01', toDay: '2026-09-30' })
       const revenue = read<{ totalPence: number }>(database, revenueBySourceQuery(bounds.fromAt, bounds.toAt))
         .reduce((sum, row) => sum + row.totalPence, 0)
-      expect(revenue).toBe(4450)
+      expect(revenue).toBe(4450 + 125)
       expect(shaped.at(-1)).toMatchObject({ category: SU_EXPORT_CARD_TOTAL, amountPence: revenue })
     })
   })

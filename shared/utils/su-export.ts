@@ -1,9 +1,9 @@
 import { z } from 'zod'
-import { describeKind, ENTRY_SOURCES, LINE_KINDS, saysTender } from './ledger'
+import { describeKind, ENTRY_SOURCES, LINE_KINDS, saysTender, totalOf } from './ledger'
 import type { EntrySource, LineKind, Tender } from './ledger'
 
-// I-108. A period export categorised for the SU's own accounting, never a total this module
-// invents: every figure is a ledger line's own signed pence, read straight off the row (I-106).
+// I-108. A period export categorised for the SU's own accounting: every row but the last is a
+// ledger line's own signed pence (I-106), and the last totals the file's card lines (I-105).
 
 const londonDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A day is YYYY-MM-DD')
 
@@ -120,7 +120,7 @@ function exportCategory(row: SuExportRow): string {
 
 // The file's rows, shaped once so every run of the same lines is the same bytes (criterion 4).
 export function suExportCsvRows(rows: SuExportRow[]): Record<string, unknown>[] {
-  const cardPence = rows.filter(row => row.tender === 'CARD').reduce((sum, row) => sum + row.amountPence, 0)
+  const cardPence = totalOf(rows.filter(row => row.tender === 'CARD'))
   return [
     ...rows.map(row => ({
       date: row.londonDay,
@@ -132,10 +132,11 @@ export function suExportCsvRows(rows: SuExportRow[]): Record<string, unknown>[] 
       amountPence: row.amountPence,
       amountPounds: formatPoundsForExport(row.amountPence),
     })),
+    // No tender, so a filter on Card leaves the total out rather than counting it twice.
     {
       date: '',
       category: SU_EXPORT_CARD_TOTAL,
-      tender: saysTender('CARD'),
+      tender: '',
       nominalCode: '',
       amountPence: cardPence,
       amountPounds: formatPoundsForExport(cardPence),

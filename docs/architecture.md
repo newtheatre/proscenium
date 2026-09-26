@@ -373,8 +373,8 @@ CI rather than exporting as `UNMAPPED` with no way to map it (issue #1283). A ne
 therefore adds its pair to the list and a migration seeding it, in the same pull request as its
 row below.
 
-Every row but the last carries a ledger line's own signed
-`amount_pence`, exactly as `ledger_lines` stores it, with its entry's tender beside it; a refund line is already negative at the
+Every row but the last carries a ledger line's own signed `amount_pence`, exactly as
+`ledger_lines` stores it, with its entry's tender beside it; a refund line is already negative at the
 source (`server/utils/refunds.ts`), so summing a category's rows reaches the same net figure
 I-106 reports for the same lines without this route deriving it a second way. A line whose pair
 has no mapping still exports, on its own row with an explicit `UNMAPPED` code (criterion 3),

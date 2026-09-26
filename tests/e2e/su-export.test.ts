@@ -103,7 +103,7 @@ describe.skipIf(skip !== null)('the CSV export (criteria 2, 3)', () => {
     expect(header).toBe('"date","category","tender","nominalCode","amountPence","amountPounds"')
     expect(body).toContain('"2026-09-15","Walk-up sale","Card","4100","900","9.00"')
     // Issue #1363: the file closes on the card total, the figure the money dashboard calls revenue.
-    expect(body.trim().split('\r\n').at(-1)).toMatch(/^"","Card total, the same as the money dashboard's revenue","Card","","-?\d+","-?\d+\.\d{2}"$/)
+    expect(body.trim().split('\r\n').at(-1)).toMatch(/^"","Card total, the same as the money dashboard's revenue","","","-?\d+","-?\d+\.\d{2}"$/)
   })
 
   test('a line whose pair has no mapping exports on its own explicit unmapped line', async () => {
