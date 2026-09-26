@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { saysWhen } from './when'
+import { saysClock, saysWhen } from './when'
+import { saysRole } from './roles'
 import { plural } from './text'
 
 // The booking flow (D-104): a guest or a signed-in account holds seats online, the box office
@@ -242,8 +243,30 @@ export interface DoorTicketOutcome {
   admit: boolean
 }
 
-// D-108 criterion 5's fifth state, and E-127 criterion 3's refusal: only PENDING or COLLECTED
-// is ever asked whether it matches the door's own performance; every other state explains itself.
+// Who the door sends a question it cannot answer to; the duty manager once 0095 lets that shift
+// cover the door (issue 1306).
+export const DOOR_REFERRAL = `the ${saysRole('FOH_MANAGER')}`
+
+// The door's own words for a booking that cannot come in, each ending in what to do next; the
+// booker's own QR page keeps `qrStatusDisplay()` (issue 1301).
+function doorStatusWording(status: string, cancelledBy: string | null, exchangedTo: QrExchangedTo | null, admittedAt: number | null): QrStatusDisplay {
+  switch (status) {
+    case 'DOOR':
+      return { headline: 'Already in', detail: saysAlreadyAdmitted(admittedAt) }
+    case 'EXPIRED':
+      return { headline: 'Lapsed', detail: 'The hold was released. Send to the bar for a ticket.' }
+    case 'CANCELLED':
+      if (exchangedTo) return { headline: 'Exchanged', detail: `Moved to ${exchangedTo.showTitle}, ${exchangedTo.when}. Ask for the new booking.` }
+      return { headline: 'Cancelled', detail: `${cancelledBy === 'CUSTOMER' ? 'Cancelled by the booker' : 'Cancelled by the theatre'}. Send to the bar for a ticket.` }
+    case 'NO_SHOW':
+      return { headline: 'No-show', detail: `Recorded as not attended. Ask ${DOOR_REFERRAL}.` }
+    default:
+      return { headline: status, detail: null }
+  }
+}
+
+// D-108 criterion 5's fifth state, and E-127 criterion 3's refusal: a booking that holds a seat is
+// asked whether it matches the door's own performance; every other state explains itself.
 export function doorTicketOutcome(
   status: string,
   cancelledBy: string | null,
@@ -253,10 +276,19 @@ export function doorTicketOutcome(
   when: string,
   totalDue: string | null,
   exchangedTo: QrExchangedTo | null = null,
+  admittedAt: number | null = null,
 ): DoorTicketOutcome {
-  if (performanceId !== selectedPerformanceId && (status === 'PENDING' || status === 'COLLECTED')) {
-    return { headline: 'Wrong performance', detail: `This ticket is for ${showTitle}, ${when}.`, admit: false }
+  // Admitted to another house is not a re-entry to this one: the matinee's ticket at the evening.
+  if (performanceId !== selectedPerformanceId && (status === 'PENDING' || status === 'COLLECTED' || status === 'DOOR')) {
+    const said = status === 'DOOR' ? `Admitted for ${showTitle}, ${when}.` : `This ticket is for ${showTitle}, ${when}.`
+    return { headline: 'Wrong performance', detail: `${said} Ask ${DOOR_REFERRAL}.`, admit: false }
   }
   if (status === 'COLLECTED') return { headline: 'Admit', detail: null, admit: true }
-  return { ...qrStatusDisplay(status, cancelledBy, totalDue, exchangedTo), admit: false }
+  if (status === 'PENDING') return { ...qrStatusDisplay(status, cancelledBy, totalDue, exchangedTo), admit: false }
+  return { ...doorStatusWording(status, cancelledBy, exchangedTo, admittedAt), admit: false }
+}
+
+// When a booking came through the door, in the door's own words (issue 1301).
+export function saysAlreadyAdmitted(admittedAt: number | null): string {
+  return admittedAt === null ? 'Already admitted tonight' : `Already admitted at ${saysClock(admittedAt)}`
 }

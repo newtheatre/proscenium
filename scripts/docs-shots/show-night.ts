@@ -17,8 +17,7 @@ export const showNight: Shot[] = [
       { selector: '[data-test="night-shift-badge"]', label: 'How you got in' },
       { selector: '[data-test="performance-switcher"]', label: 'Which performance' },
       { selector: '[data-test="tonight-kpis"]', label: 'House numbers' },
-      { selector: '[data-test="tile-scan"]', label: 'Scan ticket' },
-      { selector: '[data-test="tile-passes"]', label: 'Admit pass holder' },
+      { selector: '[data-test="tile-door"]', label: 'Door' },
       { selector: '[data-test="tile-emergency"]', label: 'Emergency' },
     ],
   },
@@ -30,21 +29,26 @@ export const showNight: Shot[] = [
     width: PHONE_WIDTH,
     annotations: [
       { selector: '[data-test="door-performance"]', label: 'Performance' },
-      // The camera where the device has one, the typed field where it does not.
-      { selector: '[data-test="qr-scanner"], [data-test="door-reference"]', label: 'The camera, or the reference' },
-      { selector: '[data-test="link-age-checks"]', label: 'Challenge 25' },
+      // The camera where the device has one, the line saying why not where it does not.
+      { selector: '[data-test="qr-scanner"], [data-test="door-camera-note"]', label: 'The camera' },
+      { selector: '[data-test="door-reference"]', label: 'QR, reference or name' },
       { selector: '[data-test="night-back"]', label: 'Back to tonight' },
     ],
   },
   {
-    name: 'show-night/door-pass-mode',
+    // A name held by a seeded pass holder, so the card shows whichever performance the door is on.
+    name: 'show-night/door-search',
     persona: foh,
-    url: '/tonight/door?mode=pass',
-    marker: '[data-test="door-pass-mode"]',
+    url: '/tonight/door',
+    marker: '[data-test="door-reference"]',
     width: PHONE_WIDTH,
+    after: 'const field = document.querySelector(\'[data-test="door-reference"]\'); field.value = \'Devon\'; '
+      + 'field.dispatchEvent(new Event(\'input\', { bubbles: true })); '
+      + 'setTimeout(() => document.querySelector(\'[data-test="door-scan"]\')?.click(), 200)',
     annotations: [
-      { selector: '[data-test="pass-search"]', label: 'Find the holder' },
-      { selector: '[data-test="door-performance"]', label: 'Performance' },
+      { selector: '[data-test="door-reference"]', label: 'The field' },
+      { selector: '[data-test="door-results"]', label: 'What it found' },
+      { selector: '[data-test^="pass-admit-"], [data-test^="door-ticket-admit-"]', label: 'Admit' },
     ],
   },
   {

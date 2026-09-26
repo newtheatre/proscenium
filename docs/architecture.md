@@ -921,8 +921,9 @@ id and a screen opening cold starts on the house running now (E-127 criterion 2)
 `/tonight/door` is door mode and nothing else: admit or redirect, with no price, no email address
 and no booking history on screen (the show-night screen design, section 2.1). It opens the rear
 camera through `app/components/QrScanner.vue`, decoding with `BarcodeDetector` where the browser
-has it and jsQR everywhere else, and falls back to the typed reference field with one line when
-there is no camera or the permission is refused. The box office desk opens the same component
+has it and jsQR everywhere else, and keeps it running beside one field that takes a QR's text, a
+reference or a name (issue 1301); with no camera, or the permission refused, one line says which
+and the field is the whole door. The box office desk opens the same component
 behind its "Scan with the camera" button (D-114 criterion 8); `shared/utils/desk.ts`'s
 `readDeskScan()` wraps `readScannedCode()` there, refusing a pass and accepting the bare token a
 wedge scanner types.
@@ -944,17 +945,25 @@ zlib) of exactly the URL the email links to, sized in the email to the bitmap's 
 | `/t/<ref>` | The form the show-night design names | the reference itself |
 | `K7M4PQ` | A reference read aloud, or typed by a hardware scanner | itself |
 
-A decoded pass URL opens pass mode rather than admitting blind: `/tonight/door?mode=pass` finds a
-holder by name or reference through `GET /api/tonight/door/passes/search`, and its card carries
-what the pass covers, what tonight already holds, when it was last used, and the refusal the scan
-would give, so the volunteer reads the answer off the card before pressing Admit (D-126).
+A decoded pass URL lists the holder's card rather than admitting blind: the page asks
+`GET /api/tonight/door/passes/search` by the pass's reference, and the card carries what the pass
+covers, what tonight already holds, when it was last used, and the refusal the scan would give, so
+the volunteer reads the answer off the card before pressing Admit (D-126). A typed name asks that
+route and `GET /api/tonight/door/tickets/search` together (`server/utils/door-search.ts`): tonight's
+live bookings for the chosen performance by the booker's name or the reference, each as a first
+name, a party size and paid, unpaid or in (`doorTicketFound()`), with an erased booker found by
+reference only and a redeemed pass's seat left to its card. A six-letter name is a reference shape
+too, so a typed entry that no booking or pass carries as a reference is looked up as a name before
+the door answers NOT FOUND.
 
 The reference then goes through `/api/tonight/door/tickets/scan` and `/api/tonight/door/passes/scan`
 as it always did, so a signed token is never unpacked in the browser and there is exactly one
 admission state machine. `shared/utils/door.ts` holds the pure half: `readScannedCode()`,
 `isRepeatScan()` (one code in front of the lens admits once), and `doorVerdict()`, which turns an
 outcome into the PAID, UNPAID or refused card the screen paints and is where the box office's
-"amount due" wording is dropped for "Send to the bar to pay".
+"amount due" wording is dropped for "Send to the bar with this ticket". A pass admits as PASS, and
+nothing found (a 404 or a code that is not ours) is the amber MISS card, never a red refusal,
+since no booking stands behind it (issue 1301).
 
 In camera mode the card is drawn over the live view through `QrScanner`'s `overlay` slot rather
 than in place of it, so the component is never unmounted between two patrons and the camera never
@@ -1253,16 +1262,18 @@ building `/tonight/door` at all, corrected onto this story's own dependency line
 it; D-126 itself only ever scanned a pass. `POST /api/tonight/door/tickets/scan` is the ordinary
 ticket half: `reservationForDoorQuery()` reads a reservation by reference alone, not scoped to a
 performance, and `doorTicketOutcome()` (`shared/utils/reservations.ts`) asks whether it matches
-the door's own `performanceId` only when the reservation is still live (`PENDING` or
-`COLLECTED`); every other state, cancelled, lapsed, no-show or already admitted, explains itself
-regardless of which door asked. A mismatch answers `This ticket is for <show>, <when>.`, reusing
-the reservation's own joined columns rather than a second lookup. This is also D-108 criterion
-5's own fifth state, "wrong night", built at the door as that criterion always named it: four of
-its five states now read distinctly there, reusing `qrStatusDisplay()` for cancelled, unpaid and
-already-admitted; "exchanged" still reads as an ordinary cancellation until D-111 lands
-(`docs/known-issues.md`). `/tonight/door` tries the reference as a ticket first and falls back to
-a pass only on "no such booking", since the two share one reference alphabet and a scanner cannot
-tell them apart before asking. `tests/e2e/door-ticket-scan.test.ts` covers admission, the wrong-
+the door's own `performanceId` whenever the booking holds a seat (`PENDING`, `COLLECTED` or
+`DOOR`). A booking for another performance answers "Wrong performance": `This ticket is for
+<show>, <when>.` when it is live, or `Admitted for <show>, <when>.` when it was already admitted
+there, each with who to ask (`DOOR_REFERRAL`), reusing the reservation's own joined columns
+rather than a second lookup. Cancelled, lapsed and no-show explain themselves whichever door asks.
+This is also D-108 criterion 5's own fifth state, "wrong night", built at the door as that
+criterion always named it. Unpaid reuses `qrStatusDisplay()`, so the desk still reads the amount
+due; lapsed, cancelled, exchanged and already admitted read in the door's own words, each ending
+in the next step, with the admission's clock time from `admittedAtColumn()` (issue 1301).
+`/tonight/door` tries the reference as a ticket first and falls back to a pass only on "no such
+booking", since the two share one reference alphabet and a scanner cannot tell them apart before
+asking. `tests/e2e/door-ticket-scan.test.ts` covers admission, the wrong-
 performance refusal (including against an unpaid ticket, where wrong performance still answers
 first), unpaid, cancelled, an unknown reference and the door role itself.
 

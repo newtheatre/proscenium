@@ -134,7 +134,7 @@ describe.skipIf(skip !== null)('the verdict the door shows (criterion 7)', () =>
 
     const refused = await answered.json() as { data: { verdict: { state: string, line: string }, partySize: number } }
     expect(refused.data.verdict.state).toBe('UNPAID')
-    expect(refused.data.verdict.line).toBe('Send to the bar to pay')
+    expect(refused.data.verdict.line).toBe('Send to the bar with this ticket')
     expect(JSON.stringify(refused.data.verdict)).not.toContain('£')
     expect(refused.data.partySize).toBe(2)
   }, CASE_TIMEOUT_MS)
@@ -221,7 +221,8 @@ describe.skipIf(skip !== null)('the screen, with no camera to open (criteria 5, 
         }
       })()`)
 
-      expect(attributes.autocapitalize).toBe('characters')
+      // Words, not characters: the field takes a name too, and a reference is upper-cased anyway (issue 1301).
+      expect(attributes.autocapitalize).toBe('words')
       expect(attributes.autocomplete).toBe('off')
       expect(attributes.autocorrect).toBe('off')
       expect(attributes.spellcheck).toBe('false')

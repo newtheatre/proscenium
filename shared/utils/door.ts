@@ -1,4 +1,6 @@
-import { RESERVATION_REFERENCE_LENGTH } from './reservations'
+import { firstNameOf } from './night-hub'
+import { MAX_LIKE_PATTERN } from './migrations'
+import { RESERVATION_REFERENCE_LENGTH, saysAlreadyAdmitted } from './reservations'
 import { plural } from './text'
 
 // Door mode's own pure logic (E-129): what a camera hands the door, and what the verdict card is
@@ -29,9 +31,9 @@ export const VERDICT_HOLD_REASON_MS = 8000
 export type ScannerFailure = 'NO_CAMERA' | 'REFUSED' | 'BROKEN'
 
 export const CAMERA_FALLBACK_SAYS: Record<ScannerFailure, string> = {
-  NO_CAMERA: 'No camera. Type the reference.',
-  REFUSED: 'Camera not allowed. Type the reference.',
-  BROKEN: 'Camera did not start. Type the reference.',
+  NO_CAMERA: 'No camera. Type the reference or a name.',
+  REFUSED: 'Camera not allowed. Type the reference or a name.',
+  BROKEN: 'Camera did not start. Type the reference or a name.',
 }
 
 // The path of an absolute or a relative URL, or null when the text is not one at all. A bare
@@ -84,11 +86,13 @@ export function isRepeatScan(
   return last !== null && last.value === value && at - last.at < windowMs
 }
 
-// The three answers door mode gives. Admit, send to the bar, or refuse with the reason named;
-// none of them carries a figure (show-night design 2.1). UNANSWERED is no answer at all.
-export type DoorVerdictState = 'PAID' | 'UNPAID' | 'REFUSED' | 'UNANSWERED'
+// The three answers door mode gives: admit, send to the bar, or refuse naming the reason, never a
+// figure (show-night design 2.1). UNANSWERED is no answer at all; MISS is nothing found (issue 1301).
+export type DoorVerdictState = 'PAID' | 'UNPAID' | 'REFUSED' | 'UNANSWERED' | 'MISS'
 
 export interface DoorVerdict { state: DoorVerdictState, headline: string, line: string, note: string | null }
+
+export const DOOR_TO_THE_BAR = 'Send to the bar with this ticket'
 
 // `unpaid` is the caller's own read of the booking, not a guess from wording: the box office's
 // copy names the amount due, which the door may never show (E-129 criterion 7).
@@ -101,26 +105,61 @@ export function doorVerdict(
     return {
       state: 'UNPAID',
       headline: 'UNPAID',
-      line: 'Send to the bar to pay',
+      line: DOOR_TO_THE_BAR,
       note: 'The bar takes card and marks the booking paid.',
     }
   }
   return { state: 'REFUSED', headline: outcome.headline.toUpperCase(), line: outcome.detail ?? outcome.headline, note: null }
 }
 
+const DOOR_MISS_LINE = 'Nothing tonight matches. Check the spelling or the reference.'
+
+// Nothing found is amber, never red: no booking or pass stands behind it to refuse (issue 1301).
+export function doorMissVerdict(): DoorVerdict {
+  return { state: 'MISS', headline: 'NOT FOUND', line: DOOR_MISS_LINE, note: null }
+}
+
 // A request that never got an answer is not a refusal: the ticket may be perfectly good, and a
-// red card would send its holder to the bar for nothing (issue 1145).
-export function doorFailureVerdict(status: number | undefined, line: string, refusedHeadline = 'REFUSED'): DoorVerdict {
+// red card would send its holder to the bar for nothing (issue 1145). Nor is a lookup that missed.
+export function doorFailureVerdict(status: number | undefined, line: string): DoorVerdict {
   if (status === undefined) {
     return { state: 'UNANSWERED', headline: 'NO ANSWER', line: 'The connection dropped, so nothing was checked. Try again.', note: null }
   }
-  return { state: 'REFUSED', headline: refusedHeadline, line, note: null }
+  if (status === 404 || status === 422) return doorMissVerdict()
+  return { state: 'REFUSED', headline: 'REFUSED', line, note: null }
+}
+
+export type LookUpHalf = 'TICKETS' | 'PASSES'
+
+export type LookUpOutcome<T, P>
+  = | { kind: 'FOUND', tickets: T[], passes: P[], unchecked: LookUpHalf | null }
+    | { kind: 'MISS' }
+    | { kind: 'FAILED', reason: unknown }
+
+// What the door's lookup answers: the list, nothing found, or the half that failed. A failed half
+// is never read as nothing found, which would send a real booking to the bar (issue 1145).
+export function lookUpOutcome<T, P>(tickets: PromiseSettledResult<{ items: T[] }>, passes: PromiseSettledResult<{ items: P[] }>): LookUpOutcome<T, P> {
+  const listed = {
+    tickets: tickets.status === 'fulfilled' ? tickets.value.items : [],
+    passes: passes.status === 'fulfilled' ? passes.value.items : [],
+  }
+  if (listed.tickets.length > 0 || listed.passes.length > 0) {
+    const unchecked = tickets.status === 'rejected' ? 'TICKETS' : passes.status === 'rejected' ? 'PASSES' : null
+    return { kind: 'FOUND', ...listed, unchecked }
+  }
+  const failed = [tickets, passes].find((one): one is PromiseRejectedResult => one.status === 'rejected')
+  return failed ? { kind: 'FAILED', reason: failed.reason } : { kind: 'MISS' }
+}
+
+// The one line above a list when half the lookup gave no answer (issue 1145, issue 1301).
+export function saysUncheckedHalf(half: LookUpHalf): string {
+  return `${half === 'TICKETS' ? 'Tickets' : 'Passes'} did not answer. Check again.`
 }
 
 // How long the overlay holds before clearing itself. A tap or the next different code clears it
 // sooner; nothing holds for ever, because the queue is the point (issue 1150 item 1).
 export function verdictHoldMs(state: DoorVerdictState): number {
-  return state === 'REFUSED' || state === 'UNANSWERED' ? VERDICT_HOLD_REASON_MS : VERDICT_HOLD_MS
+  return state === 'PAID' || state === 'UNPAID' ? VERDICT_HOLD_MS : VERDICT_HOLD_REASON_MS
 }
 
 // What the phone buzzes, in `navigator.vibrate`'s own on-off milliseconds, so a verdict reaches a
@@ -130,6 +169,7 @@ export const VERDICT_BUZZ: Record<DoorVerdictState, number[]> = {
   UNPAID: [40, 120, 40],
   REFUSED: [400],
   UNANSWERED: [],
+  MISS: [150, 100, 150],
 }
 
 export function verdictBuzz(state: DoorVerdictState): number[] {
@@ -157,17 +197,28 @@ export function saysPassTonight(tonightAt: number | null, tonightStatus: string 
   return { line: 'Tonight\'s admission was cancelled', admitted: true }
 }
 
-// A pass admits its holder and nobody else, and costs nothing, so its admitted verdict has one
-// shape. The holder's own name belongs to pass mode's card, not to this one (D-126).
-export function admittedPassVerdict(reference: string): {
+// One card of `GET /api/tonight/door/passes/search`, read by the door's results (D-126).
+export interface DoorPassCard {
+  id: string
   reference: string
-  verdict: DoorVerdict
-  holderName: string | null
-  partySize: number
-} {
+  holderName: string
+  passTypeName: string
+  covers: string
+  active: boolean
+  tonight: string
+  admittedTonight: boolean
+  lastUsed: string | null
+  refusal: string | null
+}
+
+export interface DoorAdmission { reference: string, verdict: DoorVerdict, holderName: string | null, partySize: number }
+
+// A pass admits its holder and nobody else, and costs nothing, so it admits in its own word
+// rather than PAID (issue 1301). The holder's name belongs to the pass card, not to this one.
+export function admittedPassVerdict(reference: string): DoorAdmission {
   return {
     reference: reference.toUpperCase(),
-    verdict: doorVerdict({ headline: 'Admit', detail: null, admit: true }, false),
+    verdict: { state: 'PAID', headline: 'PASS', line: 'Pass, admit', note: null },
     holderName: null,
     partySize: 1,
   }
@@ -176,7 +227,49 @@ export function admittedPassVerdict(reference: string): {
 // The pill on the verdict card: who the door is expecting and how many of them. A first name and
 // a count is the whole of what door mode may show about a person (show-night design 2.1, 4).
 export function saysDoorParty(holderName: string | null, partySize: number): string {
-  const first = holderName?.trim().split(/\s+/)[0]
+  const first = firstNameOf(holderName)
   const party = `party of ${partySize}`
   return first ? `${first} · ${party}` : party[0]!.toUpperCase() + party.slice(1)
+}
+
+// The one door field's name lookup (issue 1301). D1 counts its LIKE limit in bytes, so the cap is
+// on the contains pattern as UTF-8, escapes and the two wildcards included (0081).
+const DOOR_SEARCH_MIN = 2
+export const DOOR_SEARCH_MAX = MAX_LIKE_PATTERN - 2
+
+export function fitsDoorLookUp(term: string): boolean {
+  const escapes = term.match(/[\\%_]/g)?.length ?? 0
+  return term.length >= DOOR_SEARCH_MIN && new TextEncoder().encode(term).length + escapes <= DOOR_SEARCH_MAX
+}
+
+// A typed entry may also be a name: a six-letter one is a reference shape too. A URL never is,
+// and a term outside the lookup's bounds is not sent.
+export function doorNameTerm(typed: string): string | null {
+  const term = typed.trim()
+  return !term.includes('/') && fitsDoorLookUp(term) ? term : null
+}
+
+export type DoorFoundState = 'PAID' | 'UNPAID' | 'ADMITTED'
+
+export interface DoorTicketFound {
+  reference: string
+  firstName: string | null
+  partySize: number
+  state: DoorFoundState
+  line: string
+}
+
+// A ticket the name lookup found: a first name, a count, and paid, unpaid or in (E-129 criterion
+// 7). `admittedAt` is epoch seconds, or null for a booking not yet in.
+export function doorTicketFound(row: {
+  reference: string
+  holderName: string | null
+  partySize: number
+  status: string
+  admittedAt: number | null
+}): DoorTicketFound {
+  const found = { reference: row.reference, firstName: firstNameOf(row.holderName), partySize: row.partySize }
+  if (row.status === 'DOOR') return { ...found, state: 'ADMITTED', line: saysAlreadyAdmitted(row.admittedAt) }
+  if (row.status === 'PENDING') return { ...found, state: 'UNPAID', line: DOOR_TO_THE_BAR }
+  return { ...found, state: 'PAID', line: 'Paid, admit' }
 }

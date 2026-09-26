@@ -679,11 +679,12 @@ Open questions:
 - Acceptance criteria:
   1. The door screen scans a pass QR: a valid pass with a redemption for tonight admits in one
      gesture; a valid pass without one offers to redeem on the spot, capacity-checked, recorded
-     as source DOOR. Pass mode is `/tonight/door?mode=pass`, reached from the show-night hub or by
-     scanning a pass QR, and finds a holder by name or by the reference on the pass. Its card
-     carries the holder, the reference, the product, what the pass covers, what tonight already
-     holds and when it was last used, above one "Admit, party of 1" button saying that admitting
-     creates tonight's £0 pass-admission ticket.
+     as source DOOR. The door's one field finds a holder by name or by the reference on the
+     pass, and a scanned pass QR lists that pass's card under the camera, which keeps running.
+     Its card carries the holder, the reference, the product, what the pass covers, what tonight
+     already holds and when it was last used, above one "Admit, party of 1" button saying that
+     admitting creates tonight's £0 pass-admission ticket. Trimmed 26 September 2026 to one door
+     screen (issue 1301): the separate pass mode at `/tonight/door?mode=pass` is gone.
   2. An invalid state is refused loudly and specifically: expired validity window, performance
      not covered, already admitted tonight, or product archived. The card carries the refusal
      before the volunteer presses Admit, in the same words the scan would answer with, and the
