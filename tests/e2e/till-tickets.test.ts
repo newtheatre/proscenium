@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
+import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { answerCharge, sellOnTheTill, startTypedCharge } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -452,5 +453,93 @@ describe.skipIf(skip !== null)('a booking in a typed charge is collected only on
     expect(retried.status).toBe(200)
     expect(bookingStatus()).toBe('COLLECTED')
     expect(entries()).toBe(before + 1)
+  })
+})
+
+// F-102 criterion 5, issue 1308: an ended night has no shift left to answer for it, so a charge
+// from one waits for the Bar Manager's standing role, exactly as its till session does.
+describe.skipIf(skip !== null)('a charge from an earlier night is answered by the Bar Manager, not tonight\'s shift', () => {
+  const EARLIER = '2020-01-01'
+
+  // Started by somebody else, so the answer's actor is plainly whoever answered it.
+  function anEarlierCharge(venueId: string, suffix: string, kind: 'TYPED' | 'SUMUP' = 'TYPED'): string {
+    const database = new Database(app.databaseFile)
+    try {
+      const sessionId = `earlier-${suffix}`
+      database.query('INSERT INTO till_sessions (id, venue_id, night, opened_by, opened_at) VALUES (?, ?, ?, ?, 1000)')
+        .run(sessionId, venueId, EARLIER, officer.id)
+      const id = `earlier-charge-${suffix}`
+      database.query(`INSERT INTO sumup_attempts (id, till_session_id, venue_id, night, created_by, basket, expected_total_pence, status, kind)
+        VALUES (?, ?, ?, ?, ?, '{}', 250, 'STARTED', ?)`)
+        .run(id, sessionId, venueId, EARLIER, officer.id, kind)
+      return id
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  async function tonightsBarShift(performanceId: string, suffix: string): Promise<TestMember> {
+    const volunteer = await registerMember(app, suffix, generatePassword())
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`${performanceId}-BAR`, performanceId, 'BAR', 1, volunteer.id, 'CONFIRMED')
+    }
+    finally {
+      database.close()
+    }
+    return volunteer
+  }
+
+  test('tonight\'s bar shift at the same bar is refused, and nothing moves', async () => {
+    const { venueId, performanceId } = programme('earlier-night-shift')
+    const volunteer = await tonightsBarShift(performanceId, 'earlier-night-shift')
+    const id = anEarlierCharge(venueId, 'shift')
+
+    const refused = await answerCharge(app, id, 'declined', volunteer.cookie)
+    expect(refused.status).toBe(403)
+    expect(await message(refused)).toContain('earlier night')
+    expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', id)!.status).toBe('STARTED')
+  })
+
+  test('the Bar Manager answers it', async () => {
+    const { venueId } = programme('earlier-night-manager')
+    const id = anEarlierCharge(venueId, 'manager')
+
+    const answered = await answerCharge(app, id, 'declined', barManager.cookie)
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { status: string }).status).toBe('FAILED')
+    // Recorded as the officer's own standing act, not the shift's or the starter's.
+    expect(query<{ resolved_by: string, resolution: string }>('SELECT resolved_by, resolution FROM sumup_attempts WHERE id = ?', id))
+      .toEqual({ resolved_by: barManager.id, resolution: 'STAFF' })
+  })
+
+  test('the SumUp app\'s answer, sent unkeyed by tonight\'s shift, is refused the same way', async () => {
+    const { venueId, performanceId } = programme('earlier-night-callback')
+    const volunteer = await tonightsBarShift(performanceId, 'earlier-night-callback')
+    const id = anEarlierCharge(venueId, 'callback', 'SUMUP')
+
+    const refused = await send('POST', `/api/till/payments/${id}/complete`, { smpStatus: 'failed' }, volunteer.cookie)
+    expect(refused.status).toBe(403)
+    expect(await message(refused)).toContain('earlier night')
+    expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', id)!.status).toBe('STARTED')
+  })
+
+  // A privileged role answers only with its second factor, as it closes the session (A-112).
+  test('the Bar Manager without an authenticator is sent to set one up, and nothing moves', async () => {
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['BAR_MANAGER'])
+    try {
+      const { venueId } = programme('earlier-night-factor')
+      const id = anEarlierCharge(venueId, 'factor')
+
+      const refused = await answerCharge(app, id, 'declined', barManager.cookie)
+      expect(refused.status).toBe(403)
+      expect(await message(refused)).toMatch(/authenticator/i)
+      expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', id)!.status).toBe('STARTED')
+    }
+    finally {
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
+    }
   })
 })
