@@ -331,6 +331,11 @@ export interface OpenOpeningShiftRow {
   endsAt: number
 }
 
+// An open slot on an opening still to come; the list and its count share it so they cannot drift.
+function openSlotTerms(notBefore: number): SQL {
+  return sql`s.status = 'OPEN' AND o.status <> 'CANCELLED' AND o.starts_at >= ${notBefore}`
+}
+
 // The open slots an opening still has, offered beside the rota's own open shifts (criterion 4).
 // Bounded by count rather than paged: a night holds a handful of openings, not a page of them.
 export function openOpeningShiftsQuery(window: { from?: number, to?: number }, now: number, limit: number, notWorkedBy?: string): SQL {
@@ -349,7 +354,7 @@ export function openOpeningShiftsQuery(window: { from?: number, to?: number }, n
     FROM bar_opening_shifts s
     JOIN bar_openings o ON o.id = s.opening_id
     JOIN venues v ON v.id = o.venue_id
-    WHERE s.status = 'OPEN' AND o.status <> 'CANCELLED' AND o.starts_at >= ${notBefore}${notAfter}${notWorked}
+    WHERE ${openSlotTerms(notBefore)}${notAfter}${notWorked}
     ORDER BY o.starts_at, s.slot
     LIMIT ${limit}
   `
@@ -361,7 +366,7 @@ export function countOpenOpeningShiftsQuery(now: number): SQL {
     SELECT count(*) AS total
     FROM bar_opening_shifts s
     JOIN bar_openings o ON o.id = s.opening_id
-    WHERE s.status = 'OPEN' AND o.status <> 'CANCELLED' AND o.starts_at >= ${now}
+    WHERE ${openSlotTerms(now)}
   `
 }
 

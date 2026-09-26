@@ -8,6 +8,8 @@ const props = defineProps<{
   moduleId: string
   moduleName: string
   requested: boolean
+  // A 48px target where a phone is the likely reader (docs/design-language.md).
+  large?: boolean
 }>()
 
 const emit = defineEmits<{ requested: [] }>()
@@ -51,7 +53,8 @@ async function submit(): Promise<void> {
   </UBadge>
   <UButton
     v-else
-    size="sm"
+    :size="large ? 'lg' : 'sm'"
+    :class="large ? 'min-h-12' : undefined"
     data-test="request-module"
     @click.stop.prevent="open = true"
   >

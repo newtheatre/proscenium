@@ -68,7 +68,7 @@ hold, request and record; they never charge.
 
 ::card-group
   ::card{icon="i-lucide-clipboard-list" title="My rota" to="/docs/my-nnt/my-rota"}
-  Claiming an open shift, releasing one and what "Locked" means.
+  Claiming a shift you can take, releasing one, and what opens a role you cannot take yet.
   ::
   ::card{icon="i-lucide-graduation-cap" title="My training" to="/docs/my-nnt/my-training"}
   Your records, what is expiring, signing up for sessions and asking for a module.

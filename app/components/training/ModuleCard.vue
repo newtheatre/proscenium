@@ -28,7 +28,7 @@ const props = defineProps<{
   action: TrainingAction | null
 }>()
 
-const emit = defineEmits<{ requested: [] }>()
+const emit = defineEmits<{ changed: [] }>()
 
 const nextSessionLine = computed(() => {
   if (!props.nextSession) return 'No session scheduled'
@@ -119,27 +119,23 @@ const nextSessionLine = computed(() => {
       </div>
     </dl>
 
-    <template #footer>
+    <template
+      v-if="(signedIn && action) || !signedIn"
+      #footer
+    >
       <TrainingModuleAction
         v-if="signedIn && action"
         :module-id="id"
         :module-name="name"
         :action="action"
-        @changed="emit('requested')"
+        @changed="emit('changed')"
       />
-      <UBadge
-        v-else-if="signedIn"
-        color="success"
-        variant="subtle"
-      >
-        You hold this
-      </UBadge>
       <ULink
-        v-else
+        v-else-if="!signedIn"
         to="/sign-in"
         class="text-sm"
       >
-        Sign in to request
+        Sign in to take it
       </ULink>
     </template>
   </UPageCard>

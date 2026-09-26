@@ -107,6 +107,7 @@ interface RecordItem {
   state: string | null
   held: boolean
   expiresOn: string | null
+  action: { kind: string } | null
 }
 
 async function mine(): Promise<RecordItem[]> {
@@ -144,6 +145,19 @@ describe.skipIf(skip !== null)('a record\'s state is derived from its dates (G-1
     const items = await mine()
     expect(items.find(one => one.moduleId === soon)?.held).toBe(true)
     expect(items.find(one => one.moduleId === past)?.held).toBe(false)
+  })
+
+  // Issue 1335: an expired or expiring record carries the one action that renews it; a valid one
+  // carries none. No session teaches these modules, so the action is to ask.
+  test('an expired record offers the ask that renews it, and a valid one offers nothing', async () => {
+    const valid = await seedModule()
+    const past = await seedModule()
+    awardTo(memberId, valid, { expires_on: '2099-01-01' })
+    awardTo(memberId, past, { awarded_on: '2024-01-01', expires_on: '2025-01-01' })
+
+    const items = await mine()
+    expect(items.find(one => one.moduleId === past)?.action).toEqual({ kind: 'ASK' })
+    expect(items.find(one => one.moduleId === valid)?.action).toBeNull()
   })
 
   test('a brief shows its attendance and no state (criterion 5)', async () => {

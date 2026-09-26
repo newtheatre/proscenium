@@ -9,6 +9,8 @@ const ROTA = 'app/pages/rota/index.vue'
 const MY_TRAINING = 'app/pages/training/index.vue'
 const MODULE = 'app/pages/training/modules/[id].vue'
 const CARD = 'app/components/training/ModuleCard.vue'
+const ASK = 'app/components/training/RequestModule.vue'
+const ACTION = 'app/components/training/ModuleAction.vue'
 
 describe('My rota (E-103 criterion 2 as trimmed)', () => {
   test('lists the shifts you can take, and a card for each role you could take', async () => {
@@ -43,5 +45,18 @@ describe('one derived action wherever a module meets a member (G-102 c6, G-129 c
 
   test('the module page shows it below the large breakpoint too, not only in the aside', async () => {
     expect(await read(MODULE)).toMatch(/lg:hidden[\s\S]{0,300}<TrainingModuleAction/)
+  })
+
+  test('signed out on a phone, the module page still offers the way in', async () => {
+    expect(await read(MODULE)).toMatch(/lg:hidden[\s\S]{0,600}Sign in to take it/)
+  })
+
+  test('an action taken on My training refreshes the records read, so an alert does not offer it again', async () => {
+    expect(await read(MY_TRAINING)).toMatch(/async function changedAction[\s\S]{0,200}refreshRecords\(\)/)
+  })
+
+  test('Ask is as large a target as Sign up wherever the action is large', async () => {
+    expect(await read(ACTION)).toMatch(/<TrainingRequestModule[\s\S]{0,300}:large="large"/)
+    expect(await read(ASK)).toContain('min-h-12')
   })
 })

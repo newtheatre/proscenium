@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { byNight, rotaWeekSpan, saysRotaWeek } from '#shared/utils/my-rota'
+import { byNight, rotaNightBounds, rotaWeekSpan, saysRotaWeek } from '#shared/utils/my-rota'
+import { showNightOf } from '#shared/utils/show-night'
 
 // Issue 1335: "Shifts you can take" is chosen by week and read by night (0014: a night runs
 // 04:00 to 04:00 London, so a matinee and the evening show share one).
@@ -28,6 +29,28 @@ describe('the week chips', () => {
   test('on a Sunday, this week is that one day', () => {
     expect(rotaWeekSpan('THIS_WEEK', '2026-10-11')).toEqual({ from: '2026-10-11', to: '2026-10-11' })
     expect(rotaWeekSpan('NEXT_WEEK', '2026-10-11')).toEqual({ from: '2026-10-12', to: '2026-10-18' })
+  })
+
+  test('a week is held in show nights, so 00:30 on a Monday is in the week of Sunday night', () => {
+    const halfPastMidnight = Math.floor(fromLondonWallClock(2026, 10, 12, 0, 30).getTime() / 1000)
+    const thisWeek = rotaNightBounds(rotaWeekSpan('THIS_WEEK', today))
+    const nextWeek = rotaNightBounds(rotaWeekSpan('NEXT_WEEK', today))
+    expect(thisWeek.to).toBeGreaterThan(halfPastMidnight)
+    expect(nextWeek.from).toBeGreaterThan(halfPastMidnight)
+    expect(byNight([{ startsAt: halfPastMidnight }])[0]?.night).toBe('2026-10-11')
+  })
+
+  test('at 00:30 on a Monday the night in progress is still Sunday, and this week is that night', () => {
+    const tonight = showNightOf(fromLondonWallClock(2026, 10, 12, 0, 30))
+    expect(rotaWeekSpan('THIS_WEEK', tonight)).toEqual({ from: '2026-10-11', to: '2026-10-11' })
+  })
+
+  test('the bounds run from 04:00 on the first night to the last second before 04:00 after the last', () => {
+    expect(rotaNightBounds({ from: '2026-10-12', to: '2026-10-18' })).toEqual({
+      from: Math.floor(fromLondonWallClock(2026, 10, 12, 4).getTime() / 1000),
+      to: Math.floor(fromLondonWallClock(2026, 10, 19, 4).getTime() / 1000) - 1,
+    })
+    expect(rotaNightBounds({})).toEqual({ from: undefined, to: undefined })
   })
 
   test('each chip names itself', () => {

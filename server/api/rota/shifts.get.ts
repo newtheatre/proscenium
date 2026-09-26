@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { rotaNightBounds } from '#shared/utils/my-rota'
 import { SHIFT_ROLES } from '#shared/utils/rota'
 import type { OpenOpeningShiftRow } from '#server/utils/bar-openings'
 import type { OpenShiftFilters, OpenShiftRow } from '#server/utils/rota'
@@ -10,8 +11,8 @@ const OPENING_SLOT_CAP = 50
 
 const query = pageQuery.extend({
   role: z.enum(SHIFT_ROLES).optional(),
-  from: z.string().regex(LONDON_DATE, 'Give the date as YYYY-MM-DD').optional(),
-  to: z.string().regex(LONDON_DATE, 'Give the date as YYYY-MM-DD').optional(),
+  from: z.string().regex(LONDON_DATE, 'Give the night as YYYY-MM-DD').optional(),
+  to: z.string().regex(LONDON_DATE, 'Give the night as YYYY-MM-DD').optional(),
   // "Shifts you can take": only roles the caller qualifies for, never a performance they already
   // work (issue 1335). Absent lists every open shift, each with its own gate.
   claimable: z.enum(['true', 'false']).optional().transform(value => value === 'true'),
@@ -30,8 +31,8 @@ export default defineEventHandler(async (event) => {
     role,
     roles: claimable ? SHIFT_ROLES.filter(one => eligibilities[one].eligible) : undefined,
     notWorkedBy: claimable ? account.id : undefined,
-    from: from ? Math.floor(startOfLondonDay(from).getTime() / 1000) : undefined,
-    to: to ? Math.floor(endOfLondonDay(to).getTime() / 1000) : undefined,
+    // Show nights, held whole from 04:00 to 04:00 as the rota board's window is (0014).
+    ...rotaNightBounds({ from, to }),
   }
   // Every slot on a bar opening is a bar slot, so they ride the bar role's filter and the bar
   // role's gate; they are their own list because an opening names no show to page alongside one.
@@ -45,8 +46,9 @@ export default defineEventHandler(async (event) => {
       : Promise.resolve([] as OpenOpeningShiftRow[]),
   ])
 
-  // Whom a member asks about a role nobody can claim yet (issue 1318).
-  const officers = Object.values(eligibilities).some(one => !one.eligible && one.unlockedBy === null)
+  // Whom a member asks about a role nobody can claim yet (issue 1318); the claimable list holds
+  // no such role, and My rota reads them from the roles endpoint.
+  const officers = !claimable && Object.values(eligibilities).some(one => !one.eligible && one.unlockedBy === null)
     ? await fohManagerNames()
     : []
 

@@ -8,6 +8,7 @@ import {
   cancelOpeningStatement,
   claimOpeningShiftStatement,
   confirmedOpeningShiftsTonightQuery,
+  countOpenOpeningShiftsQuery,
   createOpeningStatement,
   declineOpeningShiftStatement,
   openOpeningShiftsQuery,
@@ -514,6 +515,37 @@ describe('the open-slot list for somebody who already works the opening', () => 
       const now = OPENS_AT - 3600
       expect(run(database, openOpeningShiftsQuery({}, now, 50, 'me'))).toEqual([])
       expect(run(database, openOpeningShiftsQuery({}, now, 50, 'somebody-else'))).toHaveLength(1)
+    })
+  })
+})
+
+// Issue 1335: the bar's role card counts the open slots on openings still to come with its own
+// open shifts, and the count reads the same terms as the list so the two cannot disagree.
+describe('the open-slot count on the bar card', () => {
+  const counted = (database: TestDatabase, now: number): number =>
+    (run(database, countOpenOpeningShiftsQuery(now))[0] as { total: number }).total
+
+  test('open slots on a coming opening count; a claimed one does not', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      const now = OPENS_AT - 3600
+      expect(counted(database, now)).toBe(2)
+
+      const [first] = slotsOn(database, openingId)
+      person(database, 'me')
+      run(database, claimOpeningShiftStatement(first!.id, 'me', 'CONFIRMED'))
+      expect(counted(database, now)).toBe(1)
+      expect(run(database, openOpeningShiftsQuery({}, now, 50))).toHaveLength(1)
+    })
+  })
+
+  test('an opening already under way, or cancelled, counts nothing', async () => {
+    await withDatabase(async (database) => {
+      opening(database)
+      expect(counted(database, OPENS_AT + 60)).toBe(0)
+
+      run(database, cancelOpeningStatement('opening-a'))
+      expect(counted(database, OPENS_AT - 3600)).toBe(0)
     })
   })
 })

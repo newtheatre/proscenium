@@ -165,17 +165,25 @@ useSeoMeta({
 
       <!-- The aside is hidden below lg, so on a phone the one action sits here instead (issue 1335). -->
       <div
-        v-if="module.action"
+        v-if="module.action || !data.signedIn"
         class="mt-6 lg:hidden"
         data-test="module-action-phone"
       >
         <TrainingModuleAction
+          v-if="module.action"
           :module-id="module.id"
           :module-name="module.name"
           :action="module.action"
           large
           @changed="refresh"
         />
+        <ULink
+          v-else
+          to="/sign-in"
+          class="text-sm"
+        >
+          Sign in to take it
+        </ULink>
       </div>
 
       <p

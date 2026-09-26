@@ -27,15 +27,13 @@ export type TrainingAction
 const refOf = (session: ActionSession): SessionRef =>
   ({ id: session.id, heldOn: session.heldOn, startsAt: session.startsAt, place: session.place })
 
-// `sessions` are those teaching the module, soonest first. A sign-up already made wins, then the
-// soonest session open to them, then the ask.
+// `sessions` are those teaching the module, soonest first. A held place wins over a waiting one on
+// an earlier session, then the soonest session open to them, then the ask.
 export function trainingAction(sessions: readonly ActionSession[], requested: boolean): TrainingAction {
-  const mine = sessions.find(session => session.placed !== null)
-  if (mine) {
-    return mine.placed
-      ? { kind: 'PLACED', session: refOf(mine) }
-      : { kind: 'WAITING', session: refOf(mine), position: mine.waitlistPosition ?? 0 }
-  }
+  const placed = sessions.find(session => session.placed === true)
+  if (placed) return { kind: 'PLACED', session: refOf(placed) }
+  const waiting = sessions.find(session => session.placed === false)
+  if (waiting) return { kind: 'WAITING', session: refOf(waiting), position: waiting.waitlistPosition ?? 0 }
   const open = sessions.find(session => session.open)
   if (open) return { kind: open.full ? 'JOIN_WAITING_LIST' : 'SIGN_UP', session: refOf(open) }
   return requested ? { kind: 'ASKED' } : { kind: 'ASK' }

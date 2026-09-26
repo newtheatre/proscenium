@@ -72,6 +72,7 @@ async function signUp(): Promise<void> {
       :module-id="moduleId"
       :module-name="moduleName"
       :requested="action.kind === 'ASKED'"
+      :large="large"
       @requested="emit('changed')"
     />
     <span

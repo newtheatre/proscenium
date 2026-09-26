@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { saysDay, saysWhenLong } from '#shared/utils/when'
-import { londonDay } from '#shared/utils/membership'
 import { ROTA_WEEKS, byNight, rotaWeekSpan, saysRotaWeek } from '#shared/utils/my-rota'
 import { saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import { saysNotOpenYet } from '#shared/utils/rota-readiness'
+import { showNightOf } from '#shared/utils/show-night'
 import type { RotaWeek } from '#shared/utils/my-rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { Page } from '#shared/utils/pagination'
@@ -43,8 +43,6 @@ interface OpenOpeningShift {
   venueName: string
   startsAt: number
   endsAt: number
-  eligible: boolean
-  unlockedBy: { moduleId: string, moduleName: string } | null
 }
 
 interface OpenShift {
@@ -55,8 +53,6 @@ interface OpenShift {
   venueName: string
   showTitle: string
   startsAt: number
-  eligible: boolean
-  unlockedBy: { moduleId: string, moduleName: string } | null
 }
 
 const toast = useToast()
@@ -70,14 +66,14 @@ const mineFailure = useListFailure(mineError, 'The shifts you hold could not be 
 const week = ref<RotaWeek>('ALL')
 const page = ref(1)
 
-type OpenShifts = Page<OpenShift> & { openings: OpenOpeningShift[], officers: string[] }
+type OpenShifts = Page<OpenShift> & { openings: OpenOpeningShift[] }
 
 // Only what this member can take: the roles they qualify for, and never a performance they already
 // work, chosen by week and read by night (issue 1335, E-103 criterion 2 as trimmed).
 const { data, status, error, refresh } = await useFetch<OpenShifts>('/api/rota/shifts', {
-  query: computed(() => ({ claimable: 'true', page: page.value, ...rotaWeekSpan(week.value, londonDay(new Date())) })),
+  query: computed(() => ({ claimable: 'true', page: page.value, ...rotaWeekSpan(week.value, showNightOf(new Date())) })),
   watch: [week, page],
-  default: (): OpenShifts => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1, openings: [], officers: [] }),
+  default: (): OpenShifts => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1, openings: [] }),
 })
 
 const openFailure = useListFailure(error, 'The shifts you can take could not be read.')

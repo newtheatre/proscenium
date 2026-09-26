@@ -143,7 +143,7 @@ const asideLinks = computed<PageLink[]>(() => data.value.departments.map(one => 
                 :key="module.id"
                 v-bind="module"
                 :signed-in="data.signedIn"
-                @requested="refresh"
+                @changed="refresh"
               />
             </UPageGrid>
           </UPageSection>

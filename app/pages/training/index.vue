@@ -142,7 +142,7 @@ const { data: next, refresh: refreshNext } = await useAsyncData(
 
 // A sign-up or an ask made from a suggestion shows everywhere it belongs on the page at once.
 async function changedAction(): Promise<void> {
-  await Promise.all([refreshNext(), refreshSessions(), refreshAsks()])
+  await Promise.all([refreshRecords(), refreshNext(), refreshSessions(), refreshAsks()])
 }
 
 const badge = (state: RecordState): 'success' | 'warning' | 'neutral' =>

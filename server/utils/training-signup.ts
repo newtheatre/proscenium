@@ -235,9 +235,9 @@ export async function sessionsForMember(
 }
 
 // The one action each module offers this member (issue 1335), from one read of the sessions they
-// can see and one of their asks, whatever the catalogue holds: never a query per module (0003).
-export async function trainingActionsFor(userId: string, today: string, closesHours: number): Promise<(moduleId: string) => TrainingAction> {
-  const [sessions, requested] = await Promise.all([sessionsForMember(userId, today, closesHours), openRequestsOf(userId)])
+// can see and one of their asks (`asked`, if already read): never a query per module (0003).
+export async function trainingActionsFor(userId: string, today: string, closesHours: number, asked?: ReadonlySet<string>): Promise<(moduleId: string) => TrainingAction> {
+  const [sessions, requested] = await Promise.all([sessionsForMember(userId, today, closesHours), asked ?? openRequestsOf(userId)])
 
   const byModule = new Map<string, ActionSession[]>()
   for (const session of sessions) {

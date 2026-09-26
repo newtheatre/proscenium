@@ -112,7 +112,28 @@ interface OpenShift {
   unlockedBy: { moduleId: string, moduleName: string } | null
 }
 
-interface Listed { items: OpenShift[], page: number, pageSize: number, total: number, pages: number }
+interface Listed { items: OpenShift[], openings: { slotId: string }[], page: number, pageSize: number, total: number, pages: number }
+
+// A bar opening a week out with its slots open, planned straight into the database: the openings
+// suite proves planning, and these cases need only the slots.
+function barOpening(suffix: string, slots: number): string[] {
+  const { venueId } = programme(`opening-${suffix}`)
+  const night = showNightOf(new Date(Date.now() + 7 * 86_400_000))
+  const startsAt = Math.floor(Date.now() / 1000) + 7 * 86_400
+  const openingId = `opening-${suffix}-${crypto.randomUUID().slice(0, 6)}`
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(`INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status)
+      VALUES (?, ?, ?, 'A society social', ?, ?, 'PLANNED')`).run(openingId, venueId, night, startsAt, startsAt + 5 * 3600)
+    const ids = Array.from({ length: slots }, (_, index) => `${openingId}-${index + 1}`)
+    ids.forEach((id, index) => database.query(`INSERT INTO bar_opening_shifts (id, opening_id, slot, status) VALUES (?, ?, ?, 'OPEN')`)
+      .run(id, openingId, index + 1))
+    return ids
+  }
+  finally {
+    database.close()
+  }
+}
 
 async function shiftsFor(as: string, query: Record<string, string> = {}): Promise<Listed> {
   const search = new URLSearchParams(query).toString()
@@ -301,6 +322,35 @@ describe.skipIf(skip !== null)('shifts you can take, and roles you could take', 
       expect(bar?.openShifts).toBeGreaterThanOrEqual(2)
       // No session teaches it, so the one thing to do is ask.
       expect(bar?.action).toEqual({ kind: 'ASK' })
+    }
+    finally {
+      await gate('BAR', null)
+    }
+  })
+
+  test('the bar card counts the open slots on bar openings with its own open shifts', async () => {
+    const module = await addModule()
+    await gate('BAR', module)
+    try {
+      const barCard = async (): Promise<RoleCard | undefined> =>
+        ((await (await send('GET', '/api/rota/roles', undefined, member.cookie)).json()) as { roles: RoleCard[] }).roles
+          .find(card => card.role === 'BAR')
+      const before = (await barCard())?.openShifts ?? 0
+      barOpening('card', 3)
+      expect((await barCard())?.openShifts).toBe(before + 3)
+    }
+    finally {
+      await gate('BAR', null)
+    }
+  })
+
+  test('the claimable list offers no opening slot to a member who does not hold the bar module', async () => {
+    const module = await addModule()
+    await gate('BAR', module)
+    try {
+      const [slot] = barOpening('unqualified', 1)
+      expect((await shiftsFor(member.cookie)).openings.map(one => one.slotId)).toContain(slot)
+      expect((await shiftsFor(member.cookie, { claimable: 'true' })).openings).toEqual([])
     }
     finally {
       await gate('BAR', null)

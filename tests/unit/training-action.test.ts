@@ -32,6 +32,11 @@ describe('the one action a member is offered for a module', () => {
     expect(action).toMatchObject({ kind: 'PLACED', session: { id: 's-2' } })
   })
 
+  test('a place held on a later session beats a waiting place on an earlier one', () => {
+    const action = trainingAction([session({ id: 's-0', placed: false, waitlistPosition: 1 }), session({ id: 's-2', placed: true })], false)
+    expect(action).toMatchObject({ kind: 'PLACED', session: { id: 's-2' } })
+  })
+
   test('a waiting place says its number', () => {
     expect(trainingAction([session({ placed: false, waitlistPosition: 3 })], false)).toMatchObject({ kind: 'WAITING', position: 3 })
   })
