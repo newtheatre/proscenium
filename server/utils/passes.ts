@@ -135,6 +135,7 @@ export async function passRequestById(id: string): Promise<PassRequestRow | unde
 export interface HeldPass {
   id: string
   reference: string
+  passTypeId: string
   passTypeName: string
   priceLabel: string
   pricePaid: number
@@ -146,8 +147,8 @@ export interface HeldPass {
 // request is not a pass, so the two never share one row.
 export function heldPassesQuery(userId: string): SQL {
   return sql`
-    SELECT p.id AS id, p.reference AS reference, t.name AS passTypeName, pr.label AS priceLabel,
-           p.price_paid AS pricePaid, p.status AS status, p.created_at AS createdAt
+    SELECT p.id AS id, p.reference AS reference, p.pass_type_id AS passTypeId, t.name AS passTypeName,
+           pr.label AS priceLabel, p.price_paid AS pricePaid, p.status AS status, p.created_at AS createdAt
     FROM passes p
     JOIN pass_types t ON t.id = p.pass_type_id
     JOIN pass_type_prices pr ON pr.id = p.pass_type_price_id
@@ -162,6 +163,7 @@ export async function heldPasses(userId: string): Promise<HeldPass[]> {
 
 export interface OwnPassRequest {
   id: string
+  passTypeId: string
   passTypeName: string
   status: string
   createdAt: number
@@ -169,7 +171,7 @@ export interface OwnPassRequest {
 
 export function ownPassRequestsQuery(userId: string): SQL {
   return sql`
-    SELECT r.id AS id, t.name AS passTypeName, r.status AS status, r.created_at AS createdAt
+    SELECT r.id AS id, r.pass_type_id AS passTypeId, t.name AS passTypeName, r.status AS status, r.created_at AS createdAt
     FROM pass_requests r
     JOIN pass_types t ON t.id = r.pass_type_id
     WHERE r.user_id = ${userId}

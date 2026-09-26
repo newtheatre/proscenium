@@ -121,3 +121,11 @@ export function saysPassPrices(prices: readonly { label: string, price: number }
   if (prices.length === 0) return 'Price set when it is issued'
   return prices.map(one => `${saysPrice(one.price)} ${one.label.toLowerCase()}`).join(', ')
 }
+
+// A request is paid for and collected at the desk on the reader (D-124 criterion 3, 0005), so a
+// member is told that and the figure, never that an officer grants it (issue 1331).
+export function saysPayAtDesk(prices: readonly { price: number }[]): string {
+  if (prices.length === 0) return 'Pay at the box office desk; the price is set when it is issued'
+  const figures = [...new Set([...prices].sort((a, b) => a.price - b.price).map(one => saysPrice(one.price)))]
+  return `Pay ${figures.join(' or ')} at the box office desk`
+}

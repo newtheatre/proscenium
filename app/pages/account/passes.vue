@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysPrice } from '#shared/utils/ticket-types'
-import { saysPassPrices, saysPassStatus } from '#shared/utils/passes'
+import { saysPassPrices, saysPassStatus, saysPayAtDesk } from '#shared/utils/passes'
 import type { PassRequestStatus, PassStatus } from '#shared/utils/passes'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/passes' })
@@ -10,6 +10,9 @@ interface SellablePassType {
   name: string
   description: string | null
   prices: { id: string, label: string, price: number }[]
+  // Held already, or already asked for: either way Request is not offered (issue 1331).
+  held: boolean
+  openRequestId: string | null
 }
 
 interface HeldPass {
@@ -64,6 +67,23 @@ async function requestPass(passTypeId: string): Promise<void> {
   }
 }
 
+async function withdrawRequest(passTypeId: string, requestId: string): Promise<void> {
+  requesting.value = passTypeId
+  requestFailure.value = null
+  try {
+    await $fetch(`/api/account/passes/requests/${requestId}`, { method: 'DELETE' })
+    toast.add({ title: 'Request withdrawn', icon: 'i-lucide-check', color: 'neutral' })
+    await refresh()
+  }
+  catch (error) {
+    requestFailure.value = refusalText(error)
+    await refresh()
+  }
+  finally {
+    requesting.value = null
+  }
+}
+
 const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> = {
   ACTIVE: 'success',
   CANCELLED: 'error',
@@ -81,7 +101,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
   >
     <UPageHeader
       title="Passes"
-      description="Passes you hold, and any request still with an officer."
+      description="Passes you hold, and any you have asked for and not yet paid for at the box office desk."
     />
 
     <ReadFailure
@@ -119,7 +139,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
           v-else
           class="py-4 text-center text-sm text-muted"
         >
-          You hold no passes. Ask for one below and it appears here once an officer grants it.
+          You hold no passes. Ask for one below, pay for it at the box office desk, and it appears here.
         </p>
       </UCard>
 
@@ -185,15 +205,45 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
                 {{ type.description }}
               </p>
             </div>
-            <UButton
-              size="sm"
-              variant="subtle"
-              :loading="requesting === type.id"
-              :data-test="`account-pass-request-${type.id}`"
-              @click="requestPass(type.id)"
+            <p
+              v-if="type.held"
+              class="text-muted"
+              :data-test="`account-pass-held-${type.id}`"
             >
-              Request
-            </UButton>
+              You hold this pass.
+            </p>
+            <div
+              v-else-if="type.openRequestId"
+              class="flex flex-wrap items-center gap-2"
+              :data-test="`account-pass-requested-${type.id}`"
+            >
+              <span class="text-muted">Requested. {{ saysPayAtDesk(type.prices) }} to collect it.</span>
+              <UButton
+                size="sm"
+                color="neutral"
+                variant="subtle"
+                :loading="requesting === type.id"
+                :data-test="`account-pass-withdraw-${type.id}`"
+                @click="withdrawRequest(type.id, type.openRequestId)"
+              >
+                Withdraw
+              </UButton>
+            </div>
+            <div
+              v-else
+              class="flex flex-wrap items-center gap-2"
+            >
+              <span class="text-muted">{{ saysPayAtDesk(type.prices) }}.</span>
+              <UButton
+                size="sm"
+                variant="subtle"
+                :loading="requesting === type.id"
+                :data-test="`account-pass-request-${type.id}`"
+                @click="requestPass(type.id)"
+              >
+                Request
+              </UButton>
+            </div>
           </li>
         </ul>
       </UCard>
