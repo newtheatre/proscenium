@@ -46,7 +46,7 @@ export const showNight: Shot[] = [
       + 'field.dispatchEvent(new Event(\'input\', { bubbles: true })); '
       + 'setTimeout(() => document.querySelector(\'[data-test="door-scan"]\')?.click(), 200)',
     annotations: [
-      { selector: '[data-test="door-reference"]', label: 'A name' },
+      { selector: '[data-test="door-reference"]', label: 'The field' },
       { selector: '[data-test="door-results"]', label: 'What it found' },
       { selector: '[data-test^="pass-admit-"], [data-test^="door-ticket-admit-"]', label: 'Admit' },
     ],
