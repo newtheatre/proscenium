@@ -56,7 +56,6 @@ export default defineEventHandler(async (event) => {
   // count above change nothing and write no second audit row for one closure (0001, 0003).
   const closed = await auditedWrite(db.all(closeSessionStatement({
     id,
-    venueId: session.venueId,
     night: session.night,
     closedBy: account.id,
     expectedPence: expected.totalPence,

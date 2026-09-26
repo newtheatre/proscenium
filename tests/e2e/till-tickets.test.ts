@@ -384,6 +384,38 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     const closed = await send('POST', '/api/till/close', { id: sessionId, actualZPence: preview.wholeNightExpectedPence }, barManager.cookie)
     expect(closed.status).toBe(200)
   })
+
+  // Every bar shares the one reader, so another bar's open hand-off holds this close, and anyone
+  // holding bar authority tonight may answer it from their own till (F-124 criterion 3, issue 1308).
+  test('a bar shift at one venue answers a hand-off started at another venue tonight', async () => {
+    const here = programme('sumup-answer-here')
+    const there = programme('sumup-answer-there')
+    if (!await sumupOn(there.venueId)) return
+    const ticketTypeId = await aTicketType()
+    const booking = await pendingBooking(there.performanceId, ticketTypeId)
+    await openTill(there.venueId)
+
+    const volunteer = await registerMember(app, 'sumup-answer-shift', generatePassword())
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`${here.performanceId}-BAR`, here.performanceId, 'BAR', 1, volunteer.id, 'CONFIRMED')
+    }
+    finally {
+      database.close()
+    }
+    expect((await send('POST', '/api/till', { venueId: here.venueId }, volunteer.cookie)).status).toBe(200)
+
+    const started = await (await send('POST', '/api/till/payments', { venueId: there.venueId, lines: [], tickets: [{ reservationId: booking.id }], expectedTotalPence: 900 }, barManager.cookie)).json() as AttemptAnswer
+    const listed = await (await send('GET', `/api/till/payments?venueId=${here.venueId}`, undefined, volunteer.cookie)).json() as { attempts: { id: string }[] }
+    expect(listed.attempts.map(attempt => attempt.id)).toContain(started.id)
+
+    // Named by the other bar alone, the volunteer holds no authority there.
+    expect((await send('POST', `/api/till/payments/${started.id}/resolve`, { outcome: 'abandoned' }, volunteer.cookie)).status).toBe(403)
+    const answered = await send('POST', `/api/till/payments/${started.id}/resolve?venueId=${here.venueId}`, { outcome: 'abandoned' }, volunteer.cookie)
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { status: string }).status).toBe('ABANDONED')
+  })
 })
 
 // Decision 0096: a declined card at the bar never leaves a PAID booking behind it.

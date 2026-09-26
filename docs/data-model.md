@@ -1062,10 +1062,9 @@ unique where not null so a charge voids once · `void_reason` NULL, free text, o
 and off the audit trail (0011) · `till_session_id` NULL, bare (no foreign key: one would rebuild
 this table), the session an entry was rung up against, so the close itemises its own session's
 takings while the figure it compares is the whole night's (F-105.1, F-118, F-202.3, issue 1308);
-every till write path sets it (a sale, a
-comp given, a tab settlement, and a tab-charge void, which carries the session of the charge it
-corrects so the pair still nets), and rows from before the column, the desk's own money and any
-import read NULL · `created_at`.
+every till write path sets it (a sale, a comp given, a tab settlement, and a tab-charge void,
+which carries the session of the charge it corrects so the pair still nets), and rows from
+before the column, the desk's own money and any import read NULL · `created_at`.
 Indexed on `london_day` (every report groups by day), `happened_at` (the GP period filter reads
 this column directly, #1094), `reverses_entry_id` and `tab_debtor_id`.
 The F-108 cap is a condition on the charge's own insert (`tabCapGuard`), re-summing the holder's

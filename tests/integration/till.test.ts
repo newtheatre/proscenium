@@ -195,10 +195,9 @@ describe('a close is refused while a hand-off is open, on the write (F-124 crite
     return { venueId, night }
   }
 
-  const close = (database: TestDatabase, venueId: string, night: string, closedBy: string): number =>
+  const close = (database: TestDatabase, night: string, closedBy: string): number =>
     rows<{ id: string }>(database, ...boundStatement(database, closeSessionStatement({
       id: 't-1',
-      venueId,
       night,
       closedBy,
       expectedPence: 0,
@@ -212,9 +211,9 @@ describe('a close is refused while a hand-off is open, on the write (F-124 crite
 
   test('a session with nothing waiting closes', async () => {
     await withDatabase((database) => {
-      const { venueId, night } = sessionWithAttempt(database, null)
+      const { night } = sessionWithAttempt(database, null)
 
-      expect(close(database, venueId, night, 'u-1')).toBe(1)
+      expect(close(database, night, 'u-1')).toBe(1)
       expect(closedAt(database)).not.toBeNull()
     })
   })
@@ -222,9 +221,9 @@ describe('a close is refused while a hand-off is open, on the write (F-124 crite
   for (const status of ['STARTED', 'COMPLETING']) {
     test(`a hand-off sitting at ${status} refuses the close, and nothing is written`, async () => {
       await withDatabase((database) => {
-        const { venueId, night } = sessionWithAttempt(database, status)
+        const { night } = sessionWithAttempt(database, status)
 
-        expect(close(database, venueId, night, 'u-1')).toBe(0)
+        expect(close(database, night, 'u-1')).toBe(0)
         expect(closedAt(database)).toBeNull()
       })
     })
@@ -234,9 +233,9 @@ describe('a close is refused while a hand-off is open, on the write (F-124 crite
   for (const status of ['MISMATCH', 'SUCCEEDED', 'FAILED', 'ABANDONED']) {
     test(`a hand-off already ${status} does not hold the close up`, async () => {
       await withDatabase((database) => {
-        const { venueId, night } = sessionWithAttempt(database, status)
+        const { night } = sessionWithAttempt(database, status)
 
-        expect(close(database, venueId, night, 'u-1')).toBe(1)
+        expect(close(database, night, 'u-1')).toBe(1)
       })
     })
   }
@@ -252,14 +251,14 @@ describe('a close is refused while a hand-off is open, on the write (F-124 crite
         basket: '{}', expected_total_pence: 250, status: 'STARTED',
       })
 
-      expect(close(database, venueId, night, 'u-1')).toBe(0)
+      expect(close(database, night, 'u-1')).toBe(0)
       expect(closedAt(database)).toBeNull()
     })
   })
 
   test('a hand-off at another venue on the same night holds the close: its money is on the one reader (issue 1308)', async () => {
     await withDatabase((database) => {
-      const { venueId, night } = sessionWithAttempt(database, null)
+      const { night } = sessionWithAttempt(database, null)
       const other = venue(database, '2')
       insert(database, 'till_sessions', { id: 't-2', venue_id: other, night, opened_by: 'u-1', opened_at: 1000 })
       insert(database, 'sumup_attempts', {
@@ -267,7 +266,7 @@ describe('a close is refused while a hand-off is open, on the write (F-124 crite
         basket: '{}', expected_total_pence: 250, status: 'STARTED',
       })
 
-      expect(close(database, venueId, night, 'u-1')).toBe(0)
+      expect(close(database, night, 'u-1')).toBe(0)
       expect(closedAt(database)).toBeNull()
     })
   })

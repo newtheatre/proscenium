@@ -14,6 +14,6 @@ export default defineEventHandler(async (event) => {
 
   await closerFor(event, session)
 
-  // Scoped to this session for the itemised lines; the whole-night figure the close compares ignores the scope.
+  // This session's own lines; the whole-night figure beside them ignores the scope.
   return nightReconciliation(session.night, { sessionId: session.id })
 })

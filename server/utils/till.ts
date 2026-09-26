@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { OPEN_ATTEMPT_STATUSES } from '#shared/utils/sumup'
+import { openAttemptsOn } from './sumup-queries'
 import type { SQL } from 'drizzle-orm'
 import type { TillSession } from '#shared/utils/till'
 
@@ -27,7 +27,6 @@ export function openSessionForQuery(venueId: string, night: string): SQL {
 
 export interface SessionClose {
   id: string
-  venueId: string
   night: string
   closedBy: string
   expectedPence: number
@@ -44,11 +43,7 @@ export function closeSessionStatement(close: SessionClose): SQL {
       expected_total_pence = ${close.expectedPence}, actual_z_pence = ${close.actualZPence},
       variance_pence = ${close.variancePence}, variance_note = ${close.varianceNote}
     WHERE id = ${close.id} AND closed_at IS NULL
-      AND NOT EXISTS (
-        SELECT 1 FROM sumup_attempts
-        WHERE night = ${close.night}
-          AND status IN (${sql.join(OPEN_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})
-      )
+      AND NOT EXISTS (SELECT 1 FROM sumup_attempts WHERE ${openAttemptsOn(close.night)})
     RETURNING id
   `
 }
