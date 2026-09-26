@@ -74,9 +74,8 @@ export interface SessionRow {
   modules: { id: string, name: string }[]
 }
 
-// Sessions with what each teaches. Soonest first, because a trainer's next one is the one they
-// came to look at.
-// `stillToRun` is today: a session still needing its trainer, coming or opened but not yet marked.
+// Sessions with what each teaches, soonest first. `stillToRun` is today: a session still needing
+// its trainer, coming or opened but not yet marked (issue 1336).
 export async function listSessions(filter: { status?: string, trainerId?: string, stillToRun?: string }): Promise<SessionRow[]> {
   const wanted = and(
     filter.status ? eq(schema.trainingSessions.status, filter.status) : undefined,
