@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { endOfTerm, londonDay } from '#shared/utils/membership'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
+import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -128,6 +129,16 @@ describe.skipIf(skip !== null)('recording a membership (A-117, 0031)', () => {
       'SELECT confirmed_at AS at, confirmed_by AS by FROM memberships WHERE id = ?', id)!
     expect(held.at).not.toBeNull()
     expect(held.by).not.toBeNull()
+  })
+
+  // 0003: the "not yet confirmed" check rides the update, so two officers at once confirm once.
+  test('two confirmations at once confirm it once, and the trail says so once', async () => {
+    const member = await registerMember(app, 'raced', password, { signIn: false })
+    const { id } = await (await grant(member.id)).json() as { id: string }
+
+    const answers = await race(3, () => send('POST', `/api/admin/memberships/${id}/confirm`, {}, cookie))
+    expectOneWinner(answers)
+    expect(read<{ n: number }>(`SELECT count(*) AS n FROM audit_log WHERE action = 'membership.confirmed' AND detail LIKE ?`, `%${id}%`)!.n).toBe(1)
   })
 
   test('a purchase date in the future and an erased account are both refused', async () => {

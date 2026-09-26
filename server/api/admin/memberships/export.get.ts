@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { MEMBER_FILTERS, registerPredicate } from './index.get'
+import { MEMBER_FILTERS, registerExportWhere } from '#server/utils/membership'
 
 // A technical bound rather than a policy one, so it is a constant and not a setting (0012).
 const EXPORT_LIMIT = 5000
@@ -19,7 +19,7 @@ const cell = (value: unknown): string => `"${String(value ?? '').replaceAll('"',
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'members.read')
   const input = await getValidatedQueryOrThrow(event, query)
-  const where = registerPredicate(input.filter, input.search, await configValue(event, 'MEMBERSHIP_GRACE_DAYS'))
+  const where = registerExportWhere(input.filter, input.search, await configValue(event, 'MEMBERSHIP_GRACE_DAYS'))
 
   const rows = await db.select({
     name: schema.users.name,

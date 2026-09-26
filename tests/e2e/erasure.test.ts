@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { TOMBSTONE_NAME, tombstoneEmail } from '#shared/utils/erasure'
+import { londonDay } from '#shared/utils/membership'
 import { PERSONAL_TABLES } from '#shared/utils/personal-data'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -219,6 +220,49 @@ describe.skipIf(skip !== null)('erasing somebody else (A-125 criterion 6)', () =
 
     const tombstones = await (await send('GET', '/api/admin/accounts?anonymised=true', null, cookie)).json() as { items: { id: string }[] }
     expect(tombstones.items.map(item => item.id)).toContain(person.id)
+  })
+
+  // Issue #1364 and A-121 criterion 4: a tombstone is nobody's membership, so the register, its
+  // count and the SU's export leave it out, and the register says how many it hid (0071).
+  test('an erased member leaves the membership register and its export, counted as hidden', async () => {
+    const person = await member('erased-member')
+    const recorded = await send('POST', '/api/admin/memberships', { userId: person.id, startsOn: londonDay(new Date()), years: 1 }, cookie)
+    expect(recorded.status).toBe(200)
+
+    const before = await (await send('GET', '/api/admin/memberships?filter=everyone', null, cookie)).json() as { items: { userId: string }[], total: number, erasedHidden: number }
+    expect(before.items.map(item => item.userId)).toContain(person.id)
+
+    await send('POST', `/api/admin/accounts/${person.id}/security`, { operation: 'erase' }, cookie)
+
+    const after = await (await send('GET', '/api/admin/memberships?filter=everyone', null, cookie)).json() as { items: { userId: string }[], total: number, erasedHidden: number }
+    expect(after.items.map(item => item.userId)).not.toContain(person.id)
+    expect(after.total).toBe(before.total - 1)
+    expect(after.erasedHidden).toBe(before.erasedHidden + 1)
+
+    const exported = await (await send('GET', '/api/admin/memberships/export?filter=everyone', null, cookie)).text()
+    expect(exported).not.toContain(TOMBSTONE_NAME)
+    expect(exported).not.toContain(tombstoneEmail(person.id))
+  })
+
+  // Issue #1364: the record is read-only at the routes too, not only on the page, and who held
+  // which office stays as governance history (0011).
+  test('an erased account\'s grant cannot be revoked, nor its membership confirmed', async () => {
+    const person = await member('erased-record')
+    expect((await send('POST', '/api/admin/roles', { userId: person.id, role: 'COMMITTEE' }, cookie)).status).toBe(200)
+    expect((await send('POST', '/api/admin/memberships', { userId: person.id, startsOn: londonDay(new Date()), years: 1 }, cookie)).status).toBe(200)
+    const membershipId = read<{ id: string }>('SELECT id FROM memberships WHERE user_id = ?', person.id)!.id
+
+    expect((await send('POST', `/api/admin/accounts/${person.id}/security`, { operation: 'erase' }, cookie)).status).toBe(200)
+
+    const revoke = await send('DELETE', `/api/admin/roles?userId=${person.id}&role=COMMITTEE`, undefined, cookie)
+    expect(revoke.status).toBe(409)
+    expect((await revoke.json() as { statusMessage: string }).statusMessage).toBe('That account has been erased')
+    expect(read('SELECT id FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'COMMITTEE')).toBeDefined()
+
+    const confirm = await send('POST', `/api/admin/memberships/${membershipId}/confirm`, {}, cookie)
+    expect(confirm.status).toBe(409)
+    expect((await confirm.json() as { statusMessage: string }).statusMessage).toBe('That account has been erased')
+    expect(read<{ confirmed_at: number | null }>('SELECT confirmed_at FROM memberships WHERE id = ?', membershipId)!.confirmed_at).toBeNull()
   })
 
   // The bundle is the definition of completeness, so it is the thing worth checking twice.

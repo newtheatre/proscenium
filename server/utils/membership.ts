@@ -1,15 +1,15 @@
 import { db, schema } from '@nuxthub/db'
-import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm'
+import { and, asc, eq, isNotNull, isNull, lte, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { studentIdConstraintRefusal } from '#shared/utils/membership-claims'
 import { membershipsList } from '#shared/utils/memberships-list'
 import { configValue, configValueIfSet } from './configuration'
-import { tableColumns, whereFrom } from './list-filters'
+import { searchAcross, tableColumns, whereFrom } from './list-filters'
 import { notify } from './notify'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { ListClause } from './list-filters'
+import type { ListClause, Reference } from './list-filters'
 import type { H3Event } from 'h3'
 import type { SQL } from 'drizzle-orm'
 
@@ -39,12 +39,25 @@ export function notRenewed(): SQL {
     where later.user_id = ${schema.memberships.userId} and later.expires_on > ${schema.memberships.expiresOn})`
 }
 
+// An erased account's term is statistics, not somebody on the register: no view of it or its
+// export shows one, and the listing counts what it left out (A-121 criterion 4, 0071).
+const notErased = (): SQL => isNull(schema.users.anonymisedAt)
+
+// One list for the screen and its export, so a search reads the same rows in both.
+const registerSearch = (): Reference[] => [schema.users.name, schema.users.email, sql`coalesce(${schema.users.studentId}, '')`]
+
+export interface MembershipsClause extends ListClause {
+  where: SQL
+  // The same filter and search, over the erased rows the register leaves out.
+  hiddenErased: SQL
+}
+
 // The register's own declaration, read through one predicate (K-129): current is the hidden
 // default, the same shape the accounts directory gives anonymised rows.
-export function membershipsClause(query: ListQuery, grace: number): ListClause {
+export function membershipsClause(query: ListQuery, grace: number): MembershipsClause {
   const clause = whereFrom(membershipsList, query, {
     column: tableColumns(schema.memberships),
-    search: [schema.users.name, schema.users.email, sql`coalesce(${schema.users.studentId}, '')`],
+    search: registerSearch(),
     fields: {
       filter: (condition) => {
         const value = condition.values[0]!
@@ -56,7 +69,17 @@ export function membershipsClause(query: ListQuery, grace: number): ListClause {
     },
   })
   const asked = conditionsOf(membershipsList, query).some(condition => condition.key === 'filter')
-  return asked ? clause : { ...clause, where: and(registerFilterPredicate('current', grace)!, clause.where) }
+  const where = asked ? clause.where : and(registerFilterPredicate('current', grace)!, clause.where)
+  return { ...clause, where: and(notErased(), where)!, hiddenErased: and(isNotNull(schema.users.anonymisedAt), where)! }
+}
+
+// The CSV export's own predicate, without paging, sorting or search in the URL (A-117 criterion 5).
+export function registerExportWhere(filter: typeof MEMBER_FILTERS[number], search: string | undefined, grace: number): SQL {
+  const terms: SQL[] = [notErased()]
+  const filterTerm = registerFilterPredicate(filter, grace)
+  if (filterTerm) terms.push(filterTerm)
+  if (search) terms.push(searchAcross(search, registerSearch()))
+  return and(...terms)!
 }
 
 // Either membership route's statements as one batch. A number another account holds fails it on
@@ -79,6 +102,18 @@ export interface RenewalSweep { due: number, sent: number, cap: number }
 // purchases in one night.
 const RENEWAL_CAP = 200
 
+// Unsent, not renewed, ending inside the notice window, and on somebody still there to tell: an
+// erased holder is nobody's reminder (issue #1364). Read joined to users.
+export function renewalDueWhere(today: string, horizon: string): SQL {
+  return and(
+    isNull(schema.memberships.renewalNoticeAt),
+    notErased(),
+    notRenewed(),
+    lte(schema.memberships.expiresOn, horizon),
+    sql`${schema.memberships.expiresOn} >= ${today}`,
+  )!
+}
+
 // One notice per membership, recorded on the row, so a sweep that missed a night catches up
 // rather than sending twice (A-117 criterion 3).
 export async function remindExpiringMemberships(event: H3Event | undefined, now = new Date()): Promise<RenewalSweep> {
@@ -93,12 +128,8 @@ export async function remindExpiringMemberships(event: H3Event | undefined, now 
     expiresOn: schema.memberships.expiresOn,
   })
     .from(schema.memberships)
-    .where(and(
-      isNull(schema.memberships.renewalNoticeAt),
-      notRenewed(),
-      lte(schema.memberships.expiresOn, horizon),
-      sql`${schema.memberships.expiresOn} >= ${today}`,
-    ))
+    .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
+    .where(renewalDueWhere(today, horizon))
     .orderBy(asc(schema.memberships.expiresOn))
     .limit(RENEWAL_CAP)
 
