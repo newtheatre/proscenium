@@ -223,10 +223,21 @@ const UNTIMED_PERFORMANCES = sql`
     AND p.duration_minutes IS NULL AND p.starts_at >= unixepoch()
 `
 
+// A pass on sale valid on one of the show's nights that does not cover it yet: the same test as
+// `coveringPassesQuery` in pass-types.ts, which the publish sheet lists (issue 1323, D-123).
+const UNCOVERING_PASSES = sql`
+  FROM pass_types pt
+  WHERE pt.status = 'ON_SALE'
+    AND EXISTS (SELECT 1 FROM performances cp WHERE cp.show_id = s.id AND cp.status <> 'CANCELLED'
+      AND cp.starts_at BETWEEN pt.valid_from AND pt.valid_until)
+    AND NOT EXISTS (SELECT 1 FROM pass_type_shows c WHERE c.pass_type_id = pt.id AND c.show_id = s.id)
+`
+
 // Counted rather than stored, so the console cannot show a figure the rows disagree with.
 const SHOW_COUNTS = sql`
   (SELECT count(*) FROM performances p WHERE p.show_id = s.id) AS performanceCount,
   (SELECT count(*) ${UNTIMED_PERFORMANCES}) AS untimedPerformanceCount,
+  (SELECT count(*) ${UNCOVERING_PASSES}) AS uncoveredPassCount,
   (SELECT count(*) FROM performances p WHERE p.show_id = s.id AND p.status = 'ON_SALE') AS onSaleCount,
   (SELECT count(*) FROM show_content_warnings w WHERE w.show_id = s.id) AS warningCount,
   (SELECT count(*) FROM ticket_types t

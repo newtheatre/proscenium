@@ -5,7 +5,7 @@ import { passTypesList } from '#shared/utils/pass-types-list'
 import type { SQL } from 'drizzle-orm'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { PassType, PassTypeStatus } from '#shared/utils/pass-types'
+import type { CoveringPass, PassType, PassTypeStatus } from '#shared/utils/pass-types'
 
 // "Ever issued" and "live coverage" (D-123 criteria 3 and 4) have no real answer until D-124
 // builds `passes`, so both read an empty registry until then (as ticket-types.ts did for D-119).
@@ -88,6 +88,29 @@ export function liveCoverageQuery(passTypeId: string, showId: string, references
   if (references.length === 0) return sql`SELECT 0 AS live`
   const terms = references.map(reference => reference.liveCount(sql`${passTypeId}`, sql`${showId}`))
   return sql`SELECT ${sql.join(terms, sql` + `)} AS live`
+}
+
+// A pass on sale whose validity holds one of the show's uncancelled nights: what the publish sheet
+// offers to cover the show. The show id is bound once however many passes exist (0006, issue 1323).
+export function coveringPassesQuery(showId: string): SQL {
+  return sql`
+    WITH target(id) AS (SELECT ${showId})
+    SELECT pt.id AS passTypeId, pt.name AS name,
+           EXISTS (SELECT 1 FROM pass_type_shows c WHERE c.pass_type_id = pt.id AND c.show_id = target.id) AS covered
+    FROM pass_types pt, target
+    WHERE pt.status = 'ON_SALE'
+      AND EXISTS (
+        SELECT 1 FROM performances p
+        WHERE p.show_id = target.id AND p.status <> 'CANCELLED'
+          AND p.starts_at BETWEEN pt.valid_from AND pt.valid_until
+      )
+    ORDER BY pt.name COLLATE NOCASE
+  `
+}
+
+export async function coveringPasses(showId: string): Promise<CoveringPass[]> {
+  const found = await db.all<{ passTypeId: string, name: string, covered: number }>(coveringPassesQuery(showId))
+  return found.map(row => ({ id: row.passTypeId, name: row.name, covered: row.covered === 1 }))
 }
 
 interface PassTypeRow {

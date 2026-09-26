@@ -91,10 +91,15 @@ export const showForm = z.object({
 })
 
 // Publishing is its own action, so saving the copy can never change the status by accident.
+// A cap on the request, not a policy: a season has a handful of passes on sale at once.
+export const MAX_COVER_PASSES = 20
+
 export const publishShowForm = z.object({
   published: z.boolean(),
   // Publishing may take the show's draft performances on sale with it, cancelled ones excepted.
   cascadePerformances: z.boolean().default(false),
+  // Passes to add the show to as it is published, additively; read only when publishing (D-123).
+  coverPassTypeIds: z.array(z.string().trim().min(1)).max(MAX_COVER_PASSES).default([]),
 })
 
 // Everything about a performance that is not a moment. The request and the screen take the same
@@ -192,6 +197,8 @@ export interface AdminShow {
   activePriceCount: number
   // Upcoming, uncancelled performances at a venue we run with no running time (D-121 criterion 6).
   untimedPerformanceCount: number
+  // Passes on sale whose validity holds one of its nights and that do not cover it yet (D-123).
+  uncoveredPassCount: number
 }
 
 // What may be attached as a show's artwork (D-132 criterion 6). Stated here rather than beside the
@@ -232,11 +239,12 @@ export interface PublishReadiness {
   posterUrl: string | null
   performanceCount: number
   untimedPerformanceCount: number
+  uncoveredPassCount: number
   activePriceCount: number
 }
 
 export interface PublishCheck {
-  key: 'poster' | 'performances' | 'running-time' | 'pricing'
+  key: 'poster' | 'performances' | 'running-time' | 'passes' | 'pricing'
   says: string
   done: boolean
 }
@@ -248,6 +256,7 @@ export function publishChecklist(show: PublishReadiness): PublishCheck[] {
     { key: 'poster', says: 'Poster uploaded', done: show.posterUrl !== null },
     { key: 'performances', says: 'Performances scheduled', done: show.performanceCount > 0 },
     { key: 'running-time', says: 'Running time set for every performance', done: show.untimedPerformanceCount === 0 },
+    { key: 'passes', says: 'Covered by every pass on sale for its dates', done: show.uncoveredPassCount === 0 },
     { key: 'pricing', says: 'Pricing set', done: show.activePriceCount > 0 },
   ]
 }

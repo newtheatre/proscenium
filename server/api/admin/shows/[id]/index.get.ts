@@ -13,6 +13,8 @@ export default defineEventHandler(async (event) => {
     categories: await listShowCategoryOptions(),
     seasons: await listSeasonOptions(),
     warnings: await showWarnings(id),
+    // What the publish sheet offers to add the show to (D-123 criterion 4, issue 1323).
+    coveringPasses: await coveringPasses(id),
     // A bounded vocabulary to pick from, not a list to browse: archived entries are left out
     // except where this show already carries one (D-102 criterion 1).
     vocabulary: [...(await warningKinds(id)).values()],

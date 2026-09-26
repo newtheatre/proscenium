@@ -53,6 +53,8 @@ export const boxOffice: Shot[] = [
     url: '/box-office/shows',
     marker: '[data-test="shows-table"]',
     width: CONSOLE_WIDTH,
+    // The rail's checklist and danger zone reach past the default height (issue 1323).
+    height: 1400,
     after: 'document.querySelector(\'[data-test^="open-"]\')?.click()',
     annotations: [
       { selector: '[data-test="show-strip"]', label: 'Status strip' },
