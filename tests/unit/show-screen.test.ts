@@ -45,6 +45,16 @@ describe('the show screen is split into sections (criterion 1)', () => {
     ]
     for (const marker of markers) expect(all).toContain(marker)
   })
+
+  // Issue 1351: the run form adds nights, the rare overrides wait under More on Edit, and the
+  // publish sheet is its own component so the page keeps its ceiling.
+  test('the run form, the overrides under More and the publish sheet carry their markers', async () => {
+    const performances = await read(`${SECTIONS}/Performances.vue`)
+    for (const marker of ['run-add-night', 'performance-more', `label: 'Duplicate'`]) expect(performances).toContain(marker)
+    const sheet = await read(`${SECTIONS}/PublishSheet.vue`)
+    for (const marker of ['publish-sheet', 'publish-night-', 'publish-prices', 'publish-warnings', 'publish-poster']) expect(sheet).toContain(marker)
+    expect(await read(PAGE)).toContain('Put on sale')
+  })
 })
 
 describe('the status strip states each figure in words (criterion 2)', () => {

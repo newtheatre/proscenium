@@ -439,6 +439,26 @@ describe('a show\'s performances filter by their declaration (D-132, K-129)', ()
   })
 })
 
+// The review sheet names the shifts stamped for each night, so a night nobody rosters shows before
+// it goes on sale (D-132 criterion 7, issue 1351).
+describe('a performance counts the live shifts stamped for it (issue 1351)', () => {
+  test('open, claimed and confirmed shifts count; a cancelled one does not', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { night: '2099-01-01' })
+      const shift = 'INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)'
+      database.batch([
+        [shift, 's-1', seeded.performanceId, 'DUTY_MANAGER', 1, 'OPEN'],
+        [shift, 's-2', seeded.performanceId, 'DOOR', 1, 'OPEN'],
+        [shift, 's-3', seeded.performanceId, 'BAR', 1, 'CANCELLED'],
+      ])
+      const rows = read<{ id: string, shiftCount: number }>(database, showPerformancesQuery(seeded.showId))
+      expect(rows.map(row => `${row.id}:${row.shiftCount}`)).toEqual([`${seeded.performanceId}:2`])
+      const paged = read<{ shiftCount: number }>(database, pagedPerformancesQuery(seeded.showId, performancesClause(filterQuerySchema(performancesList).parse({})), 25, 0))
+      expect(paged[0]?.shiftCount).toBe(2)
+    })
+  })
+})
+
 describe('the unpaid queue is counted from open holds (D-132 criterion 2)', () => {
   function hold(database: TestDatabase, id: string, performanceId: string, status: string): void {
     database.batch([

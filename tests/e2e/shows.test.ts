@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, fillDate, fillNumber, fillTime, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { chooseAction, click, fill, fillDate, fillNumber, fillTime, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -101,6 +101,7 @@ interface ListedPerformance {
   id: string
   venueId: string
   startsAt: number
+  durationMinutes: number | null
   status: string
   bookingClosesHoursBefore: number | null
   externalBookingUrl: string | null
@@ -398,6 +399,54 @@ describe.skipIf(skip !== null)('the booking window is per performance and inheri
 
 // Every shift's window ends from the running time, so one left empty at a venue we run strands
 // the whole rota at curtain plus the offset (0078).
+// D-132 criterion 10: a run is one transaction, every night or none.
+describe.skipIf(skip !== null)('performances are added as a run (D-132 criterion 10)', () => {
+  const nights = (count: number): { startsAt: number, doorsAt: number }[] =>
+    Array.from({ length: count }, (_, index) => ({ startsAt: nextWeek(index * 24), doorsAt: nextWeek(index * 24) - 1800 }))
+
+  test('a run of three adds three draft performances with the same venue and running time, each on the trail', async () => {
+    const id = await newShow()
+    const answered = await send('POST', `/api/admin/shows/${id}/runs`, { venueId, durationMinutes: 130, intervalCount: 1, intervalMinutes: 15, nights: nights(3) })
+    expect(answered.status).toBe(200)
+    const { ids } = await answered.json() as { ids: string[] }
+    expect(ids).toHaveLength(3)
+
+    const found = (await detail(id)).performances
+    expect(found.map(one => `${one.venueId}:${one.durationMinutes}:${one.status}`)).toEqual(Array.from({ length: 3 }, () => `${venueId}:130:DRAFT`))
+    for (const performance of ids) expect(trail('performance.created', `performance:${performance}`)).toBeDefined()
+  })
+
+  test('a run at a venue we run with no running time adds none of its nights', async () => {
+    const id = await newShow()
+    const refused = await send('POST', `/api/admin/shows/${id}/runs`, { venueId, nights: nights(2) })
+    expect(refused.status).toBe(400)
+    expect(await refused.text()).toContain('running time')
+    expect((await detail(id)).performances).toHaveLength(0)
+  })
+
+  test('one night with its doors after its curtain refuses the whole run', async () => {
+    const id = await newShow()
+    const bad = [...nights(1), { startsAt: nextWeek(48), doorsAt: nextWeek(49) }]
+    expect((await send('POST', `/api/admin/shows/${id}/runs`, { venueId, durationMinutes: 120, nights: bad })).status).toBe(400)
+    expect((await detail(id)).performances).toHaveLength(0)
+  })
+
+  test('a retired venue refuses the run, and a signed-out caller is refused', async () => {
+    const id = await newShow()
+    const retired = venue()
+    const database = new Database(app.databaseFile)
+    try {
+      database.run('UPDATE venues SET archived = 1 WHERE id = ?', [retired])
+    }
+    finally {
+      database.close()
+    }
+    expect((await send('POST', `/api/admin/shows/${id}/runs`, { venueId: retired, durationMinutes: 120, nights: nights(1) })).status).toBe(409)
+    expect([401, 403]).toContain((await send('POST', `/api/admin/shows/${id}/runs`, { venueId, durationMinutes: 120, nights: nights(1) }, '')).status)
+    expect((await detail(id)).performances).toHaveLength(0)
+  })
+})
+
 describe.skipIf(skip !== null)('a performance at a venue we run carries its running time (D-121 criterion 6)', () => {
   test('adding one without it is refused, naming the venue, and nothing is written', async () => {
     const id = await newShow()
@@ -673,10 +722,68 @@ describe.skipIf(skip !== null)('the screen', () => {
 
     await click(view, '[data-test^="edit-performance-"]')
     await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)
+    // The rare overrides wait under More on Edit (D-132 criterion 10).
+    expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="performance-external-url"]')`)).toBe(true)
+    await click(view, '[data-test="performance-more"]')
     await fill(view, '[data-test="performance-external-url"]', 'https://tickets.example.org/seagull')
     await click(view, '[data-test="performance-submit"]')
 
     await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('Externally ticketed')`)
+    view.close()
+  }, 120_000)
+
+  // D-132 criterion 10: one form adds a run, with no overrides on it.
+  test('a run of two nights is added from one form, and Duplicate starts the next from a row', async () => {
+    const id = await newShow({ title: named('A run on screen') })
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, '[data-test="performances-table"]')
+
+    await click(view, '[data-test="add-performance"]')
+    await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)
+    expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="performance-external-url"]') && !document.querySelector('[data-test="performance-capacity"]')`)).toBe(true)
+    await fillDate(view, '[data-test="performance-day"]', '2027-03-04')
+    await click(view, '[data-test="run-add-night"]')
+    await fillDate(view, '[data-test="performance-day-2"]', '2027-03-05')
+    await fillTime(view, '[data-test="performance-clock"]', '19:45')
+    await fillNumber(view, '[data-test="performance-duration"]', '140')
+    await click(view, '[data-test="performance-submit"]')
+
+    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('5 Mar 2027')`)
+    const added = (await detail(id)).performances
+    expect(added).toHaveLength(2)
+
+    // Duplicate keeps the venue, the clocks and the running time; only the night is new.
+    await chooseAction(view, `[data-test="more-${added[0]!.id}"]`, 'Duplicate')
+    await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)
+    await fillDate(view, '[data-test="performance-day"]', '2027-03-06')
+    await click(view, '[data-test="performance-submit"]')
+    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('6 Mar 2027')`)
+    const third = (await detail(id)).performances.find(one => !added.some(earlier => earlier.id === one.id))
+    expect(third?.venueId).toBe(added[0]!.venueId)
+    expect(third?.durationMinutes).toBe(140)
+    expect((third!.startsAt - added[0]!.startsAt) % 86_400).toBe(0)
+    view.close()
+  }, 120_000)
+
+  // D-132 criterion 7: the sheet reads each night's facts back before anything goes on sale.
+  test('publishing opens a sheet naming each night, its running time and shifts, and puts the show on sale', async () => {
+    const id = await newShow({ title: named('Reviewed on screen') })
+    const performance = await addPerformance(id, { durationMinutes: 135, intervalCount: 1, intervalMinutes: 15 })
+
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="publish"]')
+    await click(view, '[data-test="publish"]')
+    await waitFor(view, `document.querySelector('[data-test="publish-night-${performance}"]')`)
+    const night = await textOf(view, `[data-test="publish-night-${performance}"]`)
+    expect(night).toContain('The Test House')
+    expect(night).toContain('2h 15')
+    expect(night).toContain('No shifts')
+    expect(await textOf(view, '[data-test="publish-warnings"]')).toContain('Not yet assessed')
+    expect(await textOf(view, '[data-test="publish-poster"]')).toContain('No poster')
+    expect(await textOf(view, '[data-test="confirm-publish"]')).toContain('Put on sale')
+
+    await click(view, '[data-test="confirm-publish"]')
+    await waitFor(view, `document.querySelector('[data-test="show-status"]')?.textContent.includes('Published')`)
     view.close()
   }, 120_000)
 

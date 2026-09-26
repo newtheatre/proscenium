@@ -883,7 +883,10 @@ Open questions:
      (D-121 criterion 6), every pass on sale for its dates covers it (D-123 criterion 4) and the
      pricing is set. It reports readiness and gates nothing:
      publishing is still D-121's own action. Cast list and rights are not on it, having no schema
-     behind them yet.
+     behind them yet. Amended 26 September 2026 (issue 1351): publishing opens a review sheet that
+     lists each performance with its venue, running time and the shifts stamped for it, then the
+     prices a booker pays, the passes on sale for its dates, what the content warnings say and the
+     poster, above one "Put on sale". The sheet gates nothing either.
   8. The editor's copy is grouped as the mockup groups it: a basics card (title, address, tagline
      with its helper line, category, season), a show info card (age guidance, latecomer policy,
      booking window, and what the content warnings say with a link to assess them), a pricing card
@@ -894,6 +897,12 @@ Open questions:
      silently: leaving details with a change on it asks first, and going back leaves the change
      where it was. Where a section cannot offer its own action, the reason is on screen beside
      the control and named by it, not left to a control that does nothing when pressed.
+  10. Added 26 September 2026 (issue 1351): performances are added as a run. One form takes the
+     venue, one or more nights, the curtain and doors times, the running time and the intervals
+     once, and adds every night in one transaction or none of them. The rare overrides (capacity,
+     booking window, hold release, external ticketing, notes) are not on it; they sit under More
+     when one performance is edited. Duplicate on a performance opens the run form holding its
+     venue, times and running time.
 - Source: Pre-cutover review, 10 September 2026. The detail page is the largest in the app at
   over a thousand lines. Criteria 6 to 8 added 13 September 2026 from the committee's
   `admin-show-editor` mockup; criterion 9 from issue 1151 item 10, 21 September 2026.

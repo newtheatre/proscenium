@@ -3,11 +3,15 @@ import { fromLondonWallClock } from '#shared/utils/london'
 import {
   bookingClosesAt,
   bookingWindowSource,
+  MAX_RUN_NIGHTS,
   isPublicPerformance,
+  nightInstants,
   onlineClosesAt,
   performanceClosesAt,
   performanceForm,
+  performanceRunForm,
   performanceScreenForm,
+  runScreenForm,
   preselectedVenueId,
   publicPerformance,
   publicShow,
@@ -407,5 +411,41 @@ describe('the venue a new performance starts at (issue 1319)', () => {
   test('an external venue says in the picker that it has no rota', () => {
     expect(saysVenueOption({ name: 'Arts Centre', isExternal: true })).toBe('Arts Centre (external: no rota)')
     expect(saysVenueOption({ name: 'The Studio', isExternal: false })).toBe('The Studio')
+  })
+})
+
+// A run is typed as London days and wall clocks once, and becomes one instant per night, each
+// read on its own day so a run across a clock change keeps its 19:30 (0014, issue 1351).
+describe('a run of nights becomes one instant per night (D-132 criterion 10)', () => {
+  const at = (year: number, month: number, day: number, hour: number, minute: number): number =>
+    Math.floor(fromLondonWallClock(year, month, day, hour, minute).getTime() / 1000)
+
+  test('each night keeps its wall clock across the night the clocks go back', () => {
+    expect(nightInstants('2026-10-24', '19:30', '19:00')).toEqual({ startsAt: at(2026, 10, 24, 19, 30), doorsAt: at(2026, 10, 24, 19, 0) })
+    expect(nightInstants('2026-10-26', '19:30', '')).toEqual({ startsAt: at(2026, 10, 26, 19, 30), doorsAt: null })
+    expect(nightInstants('2026-10-26', '19:30', '').startsAt - nightInstants('2026-10-24', '19:30', '').startsAt).toBe(2 * 86_400 + 3600)
+  })
+
+  test('doors after the curtain\'s clock belong to the evening before, for a curtain after midnight', () => {
+    expect(nightInstants('2026-11-07', '00:30', '23:45')).toEqual({ startsAt: at(2026, 11, 7, 0, 30), doorsAt: at(2026, 11, 6, 23, 45) })
+  })
+
+  const run = (nights: { startsAt: number, doorsAt?: number | null }[], over: Record<string, unknown> = {}) =>
+    performanceRunForm.safeParse({ venueId: 'venue-a', durationMinutes: 120, nights, ...over })
+
+  test('a run takes one to the cap of nights, each curtain once, doors never after its curtain', () => {
+    expect(run([{ startsAt: 2_000_000_000 }]).success).toBe(true)
+    expect(run([]).success).toBe(false)
+    expect(run(Array.from({ length: MAX_RUN_NIGHTS + 1 }, (_, index) => ({ startsAt: 2_000_000_000 + index * 86_400 }))).success).toBe(false)
+    expect(run([{ startsAt: 2_000_000_000 }, { startsAt: 2_000_000_000 }]).success).toBe(false)
+    expect(run([{ startsAt: 2_000_000_000, doorsAt: 2_000_000_600 }]).success).toBe(false)
+  })
+
+  test('the screen holds London days, at least one and each once', () => {
+    const screen = (days: string[]) => runScreenForm.safeParse({ venueId: 'venue-a', days, clock: '19:30', doorsClock: '', durationMinutes: 120 })
+    expect(screen(['2026-10-24', '2026-10-25']).success).toBe(true)
+    expect(screen([]).success).toBe(false)
+    expect(screen(['2026-10-24', '2026-10-24']).success).toBe(false)
+    expect(screen(['24/10/2026']).success).toBe(false)
   })
 })
