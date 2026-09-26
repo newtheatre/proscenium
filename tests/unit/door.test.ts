@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  admittedPassVerdict,
   CAMERA_FALLBACK_SAYS,
+  DOOR_SEARCH_MAX,
   doorFailureVerdict,
+  doorMissVerdict,
+  doorNameTerm,
+  doorTicketFound,
   doorVerdict,
   isRepeatScan,
   readScannedCode,
@@ -106,7 +111,7 @@ describe('door mode answers admit or redirect, and never with a figure (criterio
   test('an unpaid booking points at the bar, and the amount due never reaches the screen', () => {
     const verdict = doorVerdict({ headline: 'Unpaid', detail: '£9.00 due at the box office on the night.', admit: false }, true)
     expect(verdict.state).toBe('UNPAID')
-    expect(verdict.line).toBe('Send to the bar to pay')
+    expect(verdict.line).toBe('Send to the bar with this ticket')
     expect(`${verdict.headline}${verdict.line}${verdict.note}`).not.toContain('£')
     expect(verdict.note).not.toMatch(/cash/i)
   })
@@ -188,7 +193,79 @@ describe('no answer is not a refusal (E-129 criterion 7, issue 1145)', () => {
   })
 
   test('the refused headline is what the caller asks for, REFUSED when it asks for nothing', () => {
-    expect(doorFailureVerdict(422, 'No.').headline).toBe('REFUSED')
+    expect(doorFailureVerdict(409, 'No.').headline).toBe('REFUSED')
+  })
+
+  // Issue 1301: nothing found is amber, since no booking or pass stands behind it to refuse.
+  test('nothing found, by the lookup or by the code itself, is a miss rather than a refusal', () => {
+    expect(doorFailureVerdict(404, 'That reference is not recognised.').state).toBe('MISS')
+    expect(doorFailureVerdict(422, 'That code is not one of ours').state).toBe('MISS')
+    expect(doorFailureVerdict(409, 'This pass has expired.').state).toBe('REFUSED')
+  })
+})
+
+describe('a miss is amber and says what to try next (issue 1301)', () => {
+  test('the miss names nothing found and points at the spelling or the reference', () => {
+    const verdict = doorMissVerdict()
+    expect(verdict.state).toBe('MISS')
+    expect(verdict.headline).toBe('NOT FOUND')
+    expect(verdict.line.toLowerCase()).toContain('spelling')
+  })
+
+  test('a miss holds long enough to read, and buzzes unlike any other verdict', () => {
+    expect(verdictHoldMs('MISS')).toBe(verdictHoldMs('REFUSED'))
+    expect(verdictBuzz('MISS').join(',')).not.toBe(verdictBuzz('REFUSED').join(','))
+  })
+})
+
+describe('a pass admits in its own word, never PAID (issue 1301)', () => {
+  test('the card reads PASS, admit, for the holder alone', () => {
+    const admitted = admittedPassVerdict('gj877s')
+    expect(admitted.verdict).toEqual({ state: 'PAID', headline: 'PASS', line: 'Pass, admit', note: null })
+    expect(admitted.reference).toBe('GJ877S')
+    expect(admitted.partySize).toBe(1)
+  })
+})
+
+describe('the one door field reads a code, and a name when it could be one (issue 1301)', () => {
+  test('a name is looked up as typed', () => {
+    expect(doorNameTerm('  Mira ')).toBe('Mira')
+  })
+
+  test('a six-letter name is a reference shape too, so it may still be looked up as a name', () => {
+    expect(readScannedCode('HANNAH')).not.toBeNull()
+    expect(doorNameTerm('Hannah')).toBe('Hannah')
+  })
+
+  test('a URL is never a name, and nor is anything outside the search\'s bounds', () => {
+    expect(doorNameTerm('https://newtheatre.org.uk/t/K7M4PQ')).toBeNull()
+    expect(doorNameTerm('M')).toBeNull()
+    expect(doorNameTerm('M'.repeat(DOOR_SEARCH_MAX + 1))).toBeNull()
+  })
+})
+
+describe('a ticket found by name says paid, unpaid or in, with a first name only (issue 1301)', () => {
+  const row = { reference: 'K7M4PQ', holderName: 'Mira Halvorsen', partySize: 2, admittedAt: null }
+
+  test('a paid booking is there to admit', () => {
+    expect(doorTicketFound({ ...row, status: 'COLLECTED' }))
+      .toEqual({ reference: 'K7M4PQ', firstName: 'Mira', partySize: 2, state: 'PAID', line: 'Paid, admit' })
+  })
+
+  test('an unpaid one is sent to the bar, and names no amount', () => {
+    const found = doorTicketFound({ ...row, status: 'PENDING' })
+    expect(found.state).toBe('UNPAID')
+    expect(found.line).toBe('Send to the bar with this ticket')
+  })
+
+  test('one already through the door says when', () => {
+    const found = doorTicketFound({ ...row, status: 'DOOR', admittedAt: '19:12' })
+    expect(found.state).toBe('ADMITTED')
+    expect(found.line).toBe('Already admitted at 19:12')
+  })
+
+  test('the surname never leaves the lookup', () => {
+    expect(JSON.stringify(doorTicketFound({ ...row, status: 'COLLECTED' }))).not.toContain('Halvorsen')
   })
 })
 
@@ -227,7 +304,7 @@ describe('each verdict buzzes differently, so a phone held at arm\'s length is r
   })
 
   test('no two verdicts share a pattern', () => {
-    const patterns = (['PAID', 'UNPAID', 'REFUSED', 'UNANSWERED'] as const).map(state => verdictBuzz(state).join(','))
+    const patterns = (['PAID', 'UNPAID', 'REFUSED', 'UNANSWERED', 'MISS'] as const).map(state => verdictBuzz(state).join(','))
     expect(new Set(patterns).size).toBe(patterns.length)
   })
 })

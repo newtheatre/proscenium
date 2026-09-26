@@ -179,7 +179,7 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
     const outcome = doorTicketOutcome('COLLECTED', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null)
     expect(outcome.admit).toBe(false)
     expect(outcome.headline).toBe('Wrong performance')
-    expect(outcome.detail).toBe('This ticket is for The Seagull, Friday, 2pm.')
+    expect(outcome.detail).toBe('This ticket is for The Seagull, Friday, 2pm. Ask the Front of House Manager.')
   })
 
   test('an unpaid ticket for the right performance still refuses, quoting the amount due', () => {
@@ -196,7 +196,21 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
   test('a cancelled, lapsed or already-admitted ticket explains itself regardless of performance', () => {
     expect(doorTicketOutcome('CANCELLED', 'CUSTOMER', 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Cancelled')
     expect(doorTicketOutcome('EXPIRED', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Lapsed')
-    expect(doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Admitted')
+    expect(doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null).headline).toBe('Already in')
+  })
+
+  // Issue 1301: the door's own words, each ending in the next step, never the booker's QR page copy.
+  test('an admitted ticket says when it came in', () => {
+    const outcome = doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', null, null, '19:12')
+    expect(outcome.detail).toBe('Already admitted at 19:12')
+  })
+
+  test('a lapsed or cancelled ticket sends its holder to the bar, never to the box office', () => {
+    for (const [status, cancelledBy] of [['EXPIRED', null], ['CANCELLED', 'CUSTOMER'], ['CANCELLED', 'STAFF']] as const) {
+      const outcome = doorTicketOutcome(status, cancelledBy, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', null)
+      expect(outcome.detail).toContain('Send to the bar')
+      expect(outcome.detail).not.toMatch(/box office|contact/i)
+    }
   })
 
   test('an exchanged ticket points at where it went, not a plain cancellation (D-111)', () => {
