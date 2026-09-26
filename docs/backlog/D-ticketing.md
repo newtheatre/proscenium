@@ -169,8 +169,11 @@ Open questions:
   1. Every unpaid reservation carries an expiry timestamp, defaulting to 15 minutes before
      curtain; the default is configurable per show through the settings surface (module J), and
      the e-ticket and confirmation email state the expiry plainly.
-  2. On expiry, a scheduled job releases the tickets: capacity returns to sale, the door screen
-     reflects the release, and the waiting list (D-113) is offered the freed tickets in order.
+  2. On expiry, a scheduled job releases the tickets: capacity returns to sale at the door and the
+     door screen reflects the release. The release is also where online booking stops (D-112
+     criterion 1), so tickets it frees are sold at the door and never offered to the waiting list
+     (D-113); tickets freed before the cut-off are offered to the list in order. Amended 26
+     September 2026 (issue 1328): an offer made at the release could never be claimed.
   3. An expired reservation is recorded as expired with its timestamp, never deleted, so no-show
      and expiry statistics can be reported per show and per season.
   4. Collection (D-114) clears the expiry: a paid reservation never expires.
@@ -307,7 +310,11 @@ Open questions:
 - Depends on: D-121
 - Acceptance criteria:
   1. Each performance carries a booking-closes offset (hours before curtain), inherited from a
-     show-level default where unset, editable by box office staff and audited.
+     show-level default where unset, editable by box office staff and audited. Online booking
+     stops at this window or at the hold release (D-106), whichever comes first: one cut-off,
+     which the listing, the booking screen, the write path and the waiting list all read. Amended
+     26 September 2026 (issue 1328): the listing asked the window alone while the write path
+     refused at the release, so What's on offered tickets that Book then refused.
   2. After the window closes, online reservation is refused with the closing time quoted in
      Europe/London and the door directed as the alternative.
   3. Desk reservations may bypass the customer window; the bypass is recorded on the reservation.
@@ -329,8 +336,11 @@ Open questions:
      outright rather than leaving an entry nobody holds a link to; a confirmation that cannot be
      sent past that point says so on the page and never fails the join that already happened.
   2. When tickets free (expiry, cancellation, refund, capacity raise), the list is offered in
-     join order: an offer email carries a claim link valid for a configurable window, and the
-     claim converts to an ordinary reservation through D-104's write path, capacity-checked.
+     join order: an offer email gives first refusal through a claim link valid for a configurable
+     window, never past the online cut-off (D-112 criterion 1), and the claim converts to an
+     ordinary reservation through D-104's write path, capacity-checked. An offer reserves nothing
+     until it is claimed, and says so; after the cut-off nothing is offered or claimed online and
+     a join is refused, because the door sells what frees. Amended 26 September 2026 (issue 1328).
   3. An unclaimed offer lapses on its window and the next entry is offered; each offer and lapse
      is recorded, and the claim is race-safe so one freed ticket can never be claimed twice.
   4. Waiting-list entries for a performance are purged after that performance's night; the booker
