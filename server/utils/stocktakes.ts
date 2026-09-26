@@ -80,12 +80,13 @@ function readLine(row: StocktakeLineRow): StocktakeLine {
 export function stocktakeLinesQuery(stocktakeId: string): SQL {
   return sql`
     SELECT l.id AS id, l.item_id AS itemId, i.name AS itemName, i.unit AS unit,
+           i.container_ml AS containerMl, i.category AS category,
            l.expected_qty AS expectedQty, l.counted_qty AS countedQty,
            CASE WHEN l.counted_qty IS NULL THEN NULL ELSE l.counted_qty - l.expected_qty END AS variance,
            ${unitCostPence} AS unitCostPence
     FROM stocktake_lines l JOIN bar_items i ON i.id = l.item_id
     WHERE l.stocktake_id = ${stocktakeId}
-    ORDER BY i.name COLLATE NOCASE
+    ORDER BY i.category IS NULL, i.category COLLATE NOCASE, i.name COLLATE NOCASE
   `
 }
 
