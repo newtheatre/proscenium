@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
-import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -67,6 +67,81 @@ async function twoNightRun(): Promise<{ first: string, second: string }> {
 
   return { first: nights[0]!, second: nights[1]! }
 }
+
+// A show carrying age guidance and one staging warning, so every place the guidance travels has
+// something to say (issue 1330).
+async function guidedShow(): Promise<{ performanceId: string, ticketTypeId: string, slug: string, warning: string }> {
+  const title = named('Macbeth')
+  const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title), ageGuidance: 'Recommended 14 and over' })
+  const showId = (await show.json() as { id: string }).id
+
+  const warning = named('Strobe lighting')
+  const created = await send('POST', '/api/admin/content-warnings', { title: warning, slug: slugged(warning), kind: 'TECHNICAL' })
+  const warningId = (await created.json() as { id: string }).id
+  expect((await send('PUT', `/api/admin/shows/${showId}/warnings`, {
+    confirmedNone: false,
+    warnings: [{ warningId, level: null }],
+  })).status).toBe(200)
+
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: nextWeek() })
+  const performanceId = (await performance.json() as { id: string }).id
+  const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
+  const ticketTypeId = (await type.json() as { id: string }).id
+  expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
+
+  return { performanceId, ticketTypeId, slug: slugged(title), warning }
+}
+
+// D-102 criterion 4: what's on goes straight to the booking form, so the form, the booking page
+// and the email each carry the guidance from the show's own rows, never re-entered.
+describe.skipIf(skip !== null)('age guidance and warnings travel with the booking (D-102 criterion 4)', () => {
+  test('the booking form says them before you book, with the show page one tap away', async () => {
+    const { performanceId, slug, warning } = await guidedShow()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/book/${performanceId}`, '[data-test="book-page"]')
+      await waitFor(view, `document.querySelector('[data-test="before-you-book"]')`)
+      const said = await textOf(view, '[data-test="before-you-book"]')
+      expect(said).toContain('Before you book')
+      expect(said).toContain('Age guidance: Recommended 14 and over')
+      expect(said).toContain(warning)
+      expect(await view.evaluate<string>(`document.querySelector('[data-test="before-you-book"] a')?.getAttribute('href') ?? ''`)).toBe(`/shows/${slug}`)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the booking page and the confirmation email say them too', async () => {
+    const { performanceId, ticketTypeId, warning } = await guidedShow()
+    const email = `macduff-${crypto.randomUUID().slice(0, 8)}@example.com`
+    const answered = await send('POST', '/api/reservations', {
+      performanceId,
+      lines: [{ ticketTypeId, quantity: 1 }],
+      guest: { name: 'Lady Macduff', email },
+    }, '')
+    expect(answered.status).toBe(200)
+    const { reference, qrToken } = await answered.json() as { reference: string, qrToken: string }
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/qr/${qrToken}`, '[data-test="booking-found"]')
+      await waitFor(view, `document.querySelector('[data-test="before-you-book"]')`)
+      const said = await textOf(view, '[data-test="before-you-book"]')
+      expect(said).toContain('Age guidance: Recommended 14 and over')
+      expect(said).toContain(warning)
+    }
+    finally {
+      view.close()
+    }
+
+    const letter = (await letters(app)).find(text => text.includes(reference))
+    expect(letter).toBeDefined()
+    expect(letter).toContain('Age guidance: Recommended 14 and over')
+    expect(letter).toContain(warning)
+  }, CASE_TIMEOUT_MS)
+})
 
 describe.skipIf(skip !== null)('the booking screen is three numbered steps (criterion 7)', () => {
   test('the picker lists the run and moves the address to the night chosen', async () => {

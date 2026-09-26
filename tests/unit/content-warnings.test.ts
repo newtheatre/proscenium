@@ -8,6 +8,7 @@ import {
   levelProblem,
   publicContentWarnings,
   saysAssessment,
+  saysShowGuidance,
   saysWarningLevel,
   showWarningsForm,
   ungradedWarnings,
@@ -273,5 +274,31 @@ describe('the vocabulary form offers an icon from a shortlist, never typed', () 
   test('the shortlist is what the picker offers', () => {
     expect(CONTENT_WARNING_ICONS).toContain('i-lucide-zap')
     expect(CONTENT_WARNING_CATEGORIES[0]).toBe('Violence and death')
+  })
+})
+
+// Issue 1330: the booking form, the booking page and the confirmation email all say this, in the
+// same words, from the show's own rows.
+describe('the guidance a booker is told before they come (D-102 criterion 4)', () => {
+  const strobe = { title: 'Strobe lighting', level: null }
+  const violence = { title: 'Gun violence', level: 'DEPICTED' as const }
+
+  test('age guidance comes first, then each warning with its level', () => {
+    expect(saysShowGuidance({ ageGuidance: 'Recommended 14 and over', assessment: 'WARNED', warnings: [strobe, violence] })).toEqual([
+      'Age guidance: Recommended 14 and over',
+      'Content warnings: Strobe lighting; Gun violence: depicted',
+    ])
+  })
+
+  test('unset age guidance says so in the house words', () => {
+    expect(saysShowGuidance({ ageGuidance: null, assessment: 'WARNED', warnings: [strobe] })[0]).toBe('Age guidance: To be confirmed')
+  })
+
+  // Nobody having looked is not the same answer as somebody having found nothing (criterion 2).
+  test('a show with no warnings says whether it was assessed', () => {
+    expect(saysShowGuidance({ ageGuidance: null, assessment: 'CONFIRMED_NONE', warnings: [] })[1])
+      .toBe('No content warnings; this show has been assessed.')
+    expect(saysShowGuidance({ ageGuidance: null, assessment: 'NOT_ASSESSED', warnings: [] })[1])
+      .toBe('Content warnings have not been assessed yet. Ask the box office if it matters to you.')
   })
 })
