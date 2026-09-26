@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { CAMERA_FALLBACK_SAYS, doorFailureVerdict, saysDoorParty, verdictBuzz, verdictHoldMs } from '#shared/utils/door'
+import { CAMERA_FALLBACK_SAYS, doorFailureVerdict, doorMissVerdict, doorNameTerm, readScannedCode, saysDoorParty, verdictBuzz, verdictHoldMs } from '#shared/utils/door'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
-import type { DoorVerdict, ScannerFailure } from '#shared/utils/door'
+import type { DoorAdmission, DoorPassCard, DoorTicketFound, DoorVerdict, ScannerFailure } from '#shared/utils/door'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/door' })
 useSeoMeta({ title: 'Door' })
 
 interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
 interface Authority { performanceIds: string[], performances: CoveredPerformance[] }
-interface ScanResult { decision: 'ADMIT', reference: string, verdict: DoorVerdict, holderName: string | null, partySize: number }
 interface RefusalData { verdict?: DoorVerdict, reference?: string, holderName?: string | null, partySize?: number }
 
 const request = useRequestFetch()
@@ -48,39 +47,45 @@ const performanceOptions = computed(() => performances.value.map(one => ({
   value: one.id,
 })))
 
-// The camera is the door's default, the typed field its fallback for no camera (E-129 1, 5).
-// Pass mode arrives via `?mode=pass` from the hub, or a scanned pass QR (D-126).
-type Mode = 'CAMERA' | 'TYPING' | 'PASS'
-const route = useRoute()
-const mode = ref<Mode>(route.query.mode === 'pass' ? 'PASS' : 'CAMERA')
-const passPrefill = ref('')
+// One screen: the camera stays open, and the one field under it takes a QR's text, a reference
+// or a name (issue 1301). A device with no camera keeps the field alone (E-129 criterion 5).
 const cameraNote = ref<string | null>(null)
-
-// The hub links straight to `?mode=pass`, and the route is the same one, so the query is watched
-// rather than read once at setup.
-watch(() => route.query.mode, (wanted) => {
-  if (wanted === 'pass') mode.value = 'PASS'
-})
-
-const reference = ref('')
+const field = ref('')
 const scanning = ref(false)
+
+interface Found { tickets: DoorTicketFound[], passes: DoorPassCard[] }
+const found = ref<Found | null>(null)
+const admittingReference = ref<string | null>(null)
 
 interface Shown { verdict: DoorVerdict, reference: string, party: string | null }
 const shown = ref<Shown | null>(null)
 let holdTimer: ReturnType<typeof setTimeout> | undefined
 
+const fieldInput = useTemplateRef<{ inputRef: HTMLInputElement | null }>('fieldInput')
+const answerArea = useTemplateRef<HTMLElement>('answerArea')
+const resultsArea = useTemplateRef<HTMLElement>('resultsArea')
+
+// With no camera the field is the whole door, so it takes the cursor, ready for a scanner that
+// types (E-129 criterion 5).
 function fallBackToTyping(failure: ScannerFailure): void {
   cameraNote.value = CAMERA_FALLBACK_SAYS[failure]
-  mode.value = 'TYPING'
+  nextTick(() => fieldInput.value?.inputRef?.focus())
 }
 
-// The card clears itself so the queue keeps moving; a refusal holds longer, because the reason
-// is what the volunteer has to read out (issue 1150 item 1).
+// A verdict or a list can land off screen on a phone once somebody has scrolled to a result.
+function bringIntoView(area: HTMLElement | null): void {
+  nextTick(() => area?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+}
+
+// Over the camera the card clears itself so the queue keeps moving, holding longer for a reason
+// that has to be read out; with no camera it stays until the next check (issue 1150 item 1).
 function show(verdict: DoorVerdict, reference: string, holderName: string | null, partySize: number): void {
   clearVerdict()
+  found.value = null
   shown.value = { verdict, reference, party: partySize > 0 ? saysDoorParty(holderName, partySize) : null }
   buzz(verdict)
-  if (mode.value === 'CAMERA') holdTimer = setTimeout(clearVerdict, verdictHoldMs(verdict.state))
+  bringIntoView(answerArea.value)
+  if (!cameraNote.value) holdTimer = setTimeout(clearVerdict, verdictHoldMs(verdict.state))
 }
 
 function clearVerdict(): void {
@@ -90,6 +95,10 @@ function clearVerdict(): void {
 }
 
 onBeforeUnmount(clearVerdict)
+watch(performanceId, () => {
+  found.value = null
+  clearVerdict()
+})
 
 // A pattern per verdict, for a volunteer whose eyes are on the patron. Older browsers and iOS
 // have no `vibrate` at all, so nothing here may assume one.
@@ -100,38 +109,35 @@ function buzz(verdict: DoorVerdict): void {
   }
 }
 
-// Whatever the lens read: this build's signed booking and pass URLs, the `/t/<ref>` form, or a
-// bare reference. The signature is checked server-side, never here (criterion 2).
-async function admitScanned(scanned: string): Promise<void> {
+// This build's signed booking and pass URLs, the `/t/<ref>` form or a bare reference, checked
+// server-side (criterion 2); `name` is tried when no booking or pass carries it as a reference.
+async function checkCode(scanned: string, name: string | null): Promise<void> {
   if (scanning.value || !performanceId.value) return
   scanning.value = true
+  found.value = null
   try {
     const resolved = await $fetch<{ kind: string, reference: string }>('/api/tonight/door/resolve', {
       method: 'POST',
       body: { scanned, performanceId: performanceId.value },
     })
-    // A pass QR opens the holder's own card rather than admitting blind: the volunteer reads what
+    // A pass QR lists the holder's own card rather than admitting blind: the volunteer reads what
     // it covers and what tonight already holds before pressing Admit (D-126 criterion 1).
-    if (resolved.kind === 'PASS_TOKEN') {
-      clearVerdict()
-      passPrefill.value = resolved.reference
-      mode.value = 'PASS'
-      return
-    }
-    await admit(resolved.reference)
+    if (resolved.kind === 'PASS_TOKEN') await lookUp(resolved.reference)
+    else await admit(resolved.reference, name)
   }
   catch (refused) {
-    showRefusal(refused, '', 'NOT OURS')
+    showRefusal(refused, '')
   }
   finally {
     scanning.value = false
   }
 }
 
-async function admit(code: string): Promise<void> {
+async function admit(code: string, name: string | null = null): Promise<void> {
   const body = { reference: code, performanceId: performanceId.value }
+  admittingReference.value = code
   try {
-    const ticket = await $fetch<ScanResult>('/api/tonight/door/tickets/scan', { method: 'POST', body })
+    const ticket = await $fetch<DoorAdmission>('/api/tonight/door/tickets/scan', { method: 'POST', body })
     show(ticket.verdict, ticket.reference, ticket.holderName, ticket.partySize)
   }
   catch (ticketRefused) {
@@ -142,63 +148,93 @@ async function admit(code: string): Promise<void> {
       return
     }
     try {
-      const pass = await $fetch<ScanResult>('/api/tonight/door/passes/scan', { method: 'POST', body })
+      const pass = await $fetch<DoorAdmission>('/api/tonight/door/passes/scan', { method: 'POST', body })
       show(pass.verdict, pass.reference, pass.holderName, pass.partySize)
     }
     catch (passRefused) {
-      if (refusalStatus(passRefused) === 404) {
-        show({ state: 'REFUSED', headline: 'NOT FOUND', line: 'That reference is not recognised.', note: null }, code, null, 0)
-        return
-      }
-      showRefusal(passRefused, code)
+      if (refusalStatus(passRefused) !== 404) showRefusal(passRefused, code)
+      else if (name) await lookUp(name)
+      else show(doorMissVerdict(), code, null, 0)
     }
   }
+  finally {
+    admittingReference.value = null
+  }
+}
+
+// Tickets and passes are asked together; a lookup neither answered is no answer, and one that
+// found nothing is amber, never red (issue 1301).
+async function lookUp(term: string): Promise<void> {
+  const query = { q: term, performanceId: performanceId.value }
+  const [tickets, passes] = await Promise.allSettled([
+    $fetch<{ items: DoorTicketFound[] }>('/api/tonight/door/tickets/search', { query }),
+    $fetch<{ items: DoorPassCard[] }>('/api/tonight/door/passes/search', { query }),
+  ])
+  if (tickets.status === 'rejected' && passes.status === 'rejected') {
+    showRefusal(tickets.reason, '')
+    return
+  }
+  const listed = {
+    tickets: tickets.status === 'fulfilled' ? tickets.value.items : [],
+    passes: passes.status === 'fulfilled' ? passes.value.items : [],
+  }
+  if (listed.tickets.length === 0 && listed.passes.length === 0) {
+    show(doorMissVerdict(), '', null, 0)
+    return
+  }
+  clearVerdict()
+  found.value = listed
+  bringIntoView(resultsArea.value)
 }
 
 // A route that carries its own door wording is trusted with it; anything else is refused with
 // the message it gave (criterion 7), unless no answer came at all, which is not a refusal.
-function showRefusal(refused: unknown, code: string, headline = 'REFUSED'): void {
+function showRefusal(refused: unknown, code: string): void {
   const carried = (refused as { data?: { data?: RefusalData } }).data?.data
   if (carried?.verdict) {
     show(carried.verdict, carried.reference ?? code, carried.holderName ?? null, carried.partySize ?? 0)
     return
   }
-  show(doorFailureVerdict(refusalStatus(refused), refusalText(refused), headline), code, null, 0)
+  show(doorFailureVerdict(refusalStatus(refused), refusalText(refused)), code, null, 0)
 }
 
-// The typed field takes the same four forms the camera does: a hardware scanner acting as a
-// keyboard types the whole URL out of a QR, not the reference inside it (criterion 2).
+function admitScanned(scanned: string): Promise<void> {
+  return checkCode(scanned, null)
+}
+
+// A hardware scanner acting as a keyboard types the whole URL out of a QR, so the field takes
+// every form the camera does, and a name besides (criterion 2, issue 1301).
 async function checkTyped(): Promise<void> {
-  if (!reference.value.trim() || !performanceId.value) return
-  const typed = reference.value.trim()
-  reference.value = ''
-  await admitScanned(typed)
+  const typed = field.value.trim()
+  if (!typed || !performanceId.value) return
+  field.value = ''
+  const name = doorNameTerm(typed)
+  if (readScannedCode(typed)) {
+    await checkCode(typed, name)
+    return
+  }
+  if (!name) {
+    show(doorMissVerdict(), '', null, 0)
+    return
+  }
+  scanning.value = true
+  try {
+    await lookUp(name)
+  }
+  finally {
+    scanning.value = false
+  }
 }
 
-function useTheCamera(): void {
-  clearVerdict()
-  mode.value = 'CAMERA'
-}
-
-function typeInstead(): void {
-  clearVerdict()
-  mode.value = 'TYPING'
-}
-
-function showPassAdmission(result: { reference: string, verdict: DoorVerdict, holderName: string | null, partySize: number }): void {
+function showAdmission(result: DoorAdmission): void {
   show(result.verdict, result.reference, result.holderName, result.partySize)
 }
-
-const hint = computed(() => {
-  if (mode.value === 'PASS') return 'Find the holder, or the reference on the pass. Refused? Send them to the bar.'
-  return 'Point the camera at the code, or type the reference.'
-})
 </script>
 
 <template>
   <NightScreen
-    :title="mode === 'PASS' && !shown ? 'Admit pass holder' : 'Door'"
-    :hint="hint"
+    title="Door"
+    hint="Scan the code, or type the reference or a name. Refused? Send them to the bar."
     :stale="syncedAt"
     :busy="busy"
     data-test="door-screen"
@@ -232,90 +268,76 @@ const hint = computed(() => {
         />
       </UFormField>
 
-      <template v-if="mode === 'PASS'">
-        <DoorVerdictCard
-          v-if="shown"
-          :verdict="shown.verdict"
-          :reference="shown.reference"
-          :party="shown.party"
-          @dismiss="clearVerdict"
-        />
-        <DoorPassMode
-          v-else
-          :performance-id="performanceId"
-          :prefill="passPrefill"
-          @admitted="showPassAdmission"
-        />
-      </template>
-
-      <!-- The camera stays open behind the verdict: a queue of two hundred is two hundred taps
-           and two hundred cold starts otherwise (E-129, issue 1150 item 1). -->
-      <QrScanner
-        v-else-if="mode === 'CAMERA'"
-        @decoded="admitScanned"
-        @unavailable="fallBackToTyping"
+      <!-- The camera stays open behind the verdict and beside the field: a queue of two hundred is
+           two hundred taps and two hundred cold starts otherwise (E-129, issue 1150 item 1). -->
+      <div
+        ref="answerArea"
+        class="space-y-4"
       >
-        <template #overlay>
+        <QrScanner
+          v-if="!cameraNote"
+          @decoded="admitScanned"
+          @unavailable="fallBackToTyping"
+        >
+          <template #overlay>
+            <DoorVerdictCard
+              v-if="shown"
+              overlay
+              :verdict="shown.verdict"
+              :reference="shown.reference"
+              :party="shown.party"
+              @dismiss="clearVerdict"
+            />
+          </template>
+        </QrScanner>
+
+        <template v-else>
           <DoorVerdictCard
             v-if="shown"
-            overlay
             :verdict="shown.verdict"
             :reference="shown.reference"
             :party="shown.party"
             @dismiss="clearVerdict"
           />
-        </template>
-      </QrScanner>
 
-      <template v-else>
-        <DoorVerdictCard
-          v-if="shown"
-          :verdict="shown.verdict"
-          :reference="shown.reference"
-          :party="shown.party"
-          @dismiss="clearVerdict"
-        />
-
-        <UAlert
-          v-if="cameraNote"
-          color="neutral"
-          variant="subtle"
-          icon="i-lucide-camera-off"
-          :description="cameraNote"
-          data-test="door-camera-note"
-        />
-
-        <UFormField label="Ticket or pass reference">
-          <UInput
-            v-model="reference"
-            class="w-full"
-            size="xl"
-            autofocus
-            autocapitalize="characters"
-            autocorrect="off"
-            autocomplete="off"
-            inputmode="text"
-            :spellcheck="false"
-            placeholder="e.g. K7M4PQ"
-            data-test="door-reference"
-            @keyup.enter="checkTyped"
+          <UAlert
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-camera-off"
+            :description="cameraNote"
+            data-test="door-camera-note"
           />
-        </UFormField>
-      </template>
+        </template>
+      </div>
 
-      <!-- Standalone reachability from the door, the half E-118 criterion 4 was still missing
-           until this screen existed (issue 457). -->
-      <UButton
-        to="/tonight/age-checks"
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-id-card"
-        size="lg"
-        class="min-h-12 w-full"
-        data-test="link-age-checks"
-      >
-        Challenge 25
-      </UButton>
+      <UFormField label="QR, reference or name">
+        <UInput
+          ref="fieldInput"
+          v-model="field"
+          class="w-full"
+          size="xl"
+          autocapitalize="characters"
+          autocorrect="off"
+          autocomplete="off"
+          inputmode="text"
+          :spellcheck="false"
+          placeholder="e.g. K7M4PQ or Mira"
+          data-test="door-reference"
+          @keyup.enter="checkTyped"
+        />
+      </UFormField>
+
+      <div ref="resultsArea">
+        <DoorResults
+          v-if="found"
+          :performance-id="performanceId"
+          :tickets="found.tickets"
+          :passes="found.passes"
+          :admitting-reference="admittingReference"
+          @admit-ticket="admit($event)"
+          @admitted="showAdmission"
+        />
+      </div>
 
       <p class="text-center text-xs text-muted">
         Admit, or send to the bar.
@@ -324,40 +346,14 @@ const hint = computed(() => {
 
     <template #actions>
       <NightAction
-        v-if="authorised && mode === 'TYPING'"
+        v-if="authorised"
         label="Check"
         icon="i-lucide-search"
         :loading="scanning"
-        :disabled="!reference.trim() || !performanceId"
+        :disabled="!field.trim() || !performanceId"
         data-test="door-scan"
         @press="checkTyped"
       />
-
-      <UButton
-        v-if="authorised && mode === 'TYPING' && !cameraNote"
-        color="neutral"
-        variant="ghost"
-        icon="i-lucide-scan-line"
-        size="lg"
-        class="min-h-12 w-full justify-center"
-        data-test="door-use-camera"
-        @click="useTheCamera"
-      >
-        Use the camera
-      </UButton>
-
-      <UButton
-        v-else-if="authorised && mode === 'CAMERA'"
-        color="neutral"
-        variant="ghost"
-        icon="i-lucide-keyboard"
-        size="lg"
-        class="min-h-12 w-full justify-center"
-        data-test="door-type-a-ref"
-        @click="typeInstead"
-      >
-        Type a reference
-      </UButton>
     </template>
   </NightScreen>
 </template>

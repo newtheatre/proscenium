@@ -45,7 +45,11 @@ Four shells, one posture each (0040):
   "Room requests", "Revenue by show". Buttons match: "Delete", "Revoke".
 - **`tonight`** (standing up, on a phone): two or three words per control, no sentences on a
   button. `app/pages/tonight/index.vue` labels its actions "Door", "Till", "Backstage board",
-  "Emergency card".
+  "Emergency card". A tile's hint names what is behind it in two or three words joined by a
+  middle dot, never a sentence: the Door tile's is "QR · ref · name". A verdict ends in the next
+  step ("Send to the bar with this ticket", "Already admitted at 19:12"), and its colour is the
+  answer: red is a real booking or pass refused, amber is nothing found or no answer, so a typed
+  miss is amber and never reads as a refusal (issue 1301).
 
 A string written for one shell reads wrong in another: "Ledger entries" is cold on a public page,
 and a full sentence costs a duty manager time they do not have mid-interval on a till screen.

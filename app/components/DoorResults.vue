@@ -1,63 +1,29 @@
 <script setup lang="ts">
-import { doorFailureVerdict } from '#shared/utils/door'
-import type { DoorVerdict } from '#shared/utils/door'
+import { doorFailureVerdict, saysDoorParty } from '#shared/utils/door'
+import type { DoorAdmission, DoorFoundState, DoorPassCard, DoorTicketFound } from '#shared/utils/door'
 
-// Admitting a pass holder (D-126). The search and the card; the verdict afterwards is the door
-// screen's own, so one admission reads the same whichever way the reference arrived.
-const props = defineProps<{ performanceId: string, prefill?: string }>()
-const emit = defineEmits<{ admitted: [result: PassAdmission] }>()
+// What the door's one field found (issue 1301): tonight's tickets as a first name, a count and
+// paid or unpaid, and passes as their card (D-126). Every verdict afterwards is the page's own.
+const props = defineProps<{
+  performanceId: string
+  tickets: DoorTicketFound[]
+  passes: DoorPassCard[]
+  admittingReference: string | null
+}>()
+const emit = defineEmits<{ admitTicket: [reference: string], admitted: [result: DoorAdmission] }>()
 
-interface PassCard {
-  id: string
-  reference: string
-  holderName: string
-  passTypeName: string
-  covers: string
-  active: boolean
-  tonight: string
-  admittedTonight: boolean
-  lastUsed: string | null
-  refusal: string | null
+const ticketBadge: Record<DoorFoundState, { label: string, color: 'success' | 'secondary' | 'warning' }> = {
+  PAID: { label: 'Paid', color: 'success' },
+  UNPAID: { label: 'Unpaid', color: 'secondary' },
+  ADMITTED: { label: 'In', color: 'warning' },
 }
 
-interface PassAdmission { reference: string, verdict: DoorVerdict, holderName: string | null, partySize: number }
+const admittingPass = ref<string | null>(null)
 
-const term = ref(props.prefill ?? '')
-const settled = useDebounced(term, 300)
-const items = ref<PassCard[]>([])
-const searching = ref(false)
-const failure = ref<string | null>(null)
-const admitting = ref<string | null>(null)
-
-async function search(): Promise<void> {
-  const q = settled.value.trim()
-  if (q.length < 2) {
-    items.value = []
-    return
-  }
-  searching.value = true
-  failure.value = null
+async function admitPass(pass: DoorPassCard): Promise<void> {
+  admittingPass.value = pass.id
   try {
-    const found = await $fetch<{ items: PassCard[] }>('/api/tonight/door/passes/search', {
-      query: { q, performanceId: props.performanceId },
-    })
-    items.value = found.items
-  }
-  catch (refused) {
-    failure.value = refusalText(refused)
-    items.value = []
-  }
-  finally {
-    searching.value = false
-  }
-}
-
-watch(settled, search, { immediate: true })
-
-async function admit(pass: PassCard): Promise<void> {
-  admitting.value = pass.id
-  try {
-    const result = await $fetch<PassAdmission>('/api/tonight/door/passes/scan', {
+    const result = await $fetch<DoorAdmission>('/api/tonight/door/passes/scan', {
       method: 'POST',
       body: { reference: pass.reference, performanceId: props.performanceId },
     })
@@ -72,44 +38,64 @@ async function admit(pass: PassCard): Promise<void> {
     })
   }
   finally {
-    admitting.value = null
+    admittingPass.value = null
   }
 }
 </script>
 
 <template>
   <div
-    class="space-y-4"
-    data-test="door-pass-mode"
+    class="space-y-3"
+    data-test="door-results"
   >
-    <UInput
-      v-model="term"
-      class="w-full"
-      size="xl"
-      icon="i-lucide-search"
-      placeholder="Holder's name, or the reference on the pass"
-      aria-label="Search pass holders"
-      data-test="pass-search"
-    />
-
-    <UAlert
-      v-if="failure"
-      color="error"
-      variant="subtle"
-      :description="failure"
-      data-test="pass-search-failure"
-    />
-
-    <p
-      v-else-if="settled.trim().length >= 2 && items.length === 0 && !searching"
-      class="text-muted"
-      data-test="pass-search-empty"
+    <div
+      v-for="ticket in tickets"
+      :key="ticket.reference"
+      class="space-y-3 rounded-xl border border-default bg-elevated p-4"
+      :data-test="`door-ticket-${ticket.reference}`"
     >
-      No pass matches that. Try the holder's name, or the reference printed on the pass.
-    </p>
+      <div class="flex items-start justify-between gap-3">
+        <p class="nnt-headline text-xl">
+          {{ saysDoorParty(ticket.firstName, ticket.partySize) }}
+        </p>
+        <UBadge
+          :color="ticketBadge[ticket.state].color"
+          variant="subtle"
+          size="sm"
+        >
+          {{ ticketBadge[ticket.state].label }}
+        </UBadge>
+      </div>
+
+      <p class="font-mono text-sm text-muted">
+        {{ ticket.reference }}
+      </p>
+
+      <UButton
+        v-if="ticket.state === 'PAID'"
+        size="xl"
+        block
+        color="secondary"
+        icon="i-lucide-check"
+        :loading="admittingReference === ticket.reference"
+        class="min-h-12"
+        :data-test="`door-ticket-admit-${ticket.reference}`"
+        @click="emit('admitTicket', ticket.reference)"
+      >
+        Admit
+      </UButton>
+      <p
+        v-else
+        class="font-semibold"
+        :class="ticket.state === 'UNPAID' ? 'text-secondary' : 'text-warning'"
+        :data-test="`door-ticket-line-${ticket.reference}`"
+      >
+        {{ ticket.line }}
+      </p>
+    </div>
 
     <div
-      v-for="pass in items"
+      v-for="pass in passes"
       :key="pass.id"
       class="space-y-3 rounded-xl border border-default bg-elevated p-4"
       :data-test="`pass-card-${pass.reference}`"
@@ -182,10 +168,10 @@ async function admit(pass: PassCard): Promise<void> {
         block
         color="secondary"
         icon="i-lucide-check"
-        :loading="admitting === pass.id"
+        :loading="admittingPass === pass.id"
         class="min-h-12"
         :data-test="`pass-admit-${pass.reference}`"
-        @click="admit(pass)"
+        @click="admitPass(pass)"
       >
         Admit one
       </UButton>

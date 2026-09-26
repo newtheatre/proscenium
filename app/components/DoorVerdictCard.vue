@@ -11,6 +11,7 @@ const cardClass: Record<DoorVerdict['state'], string> = {
   UNPAID: 'border-secondary bg-secondary/10 text-secondary',
   REFUSED: 'border-error bg-error/10 text-error',
   UNANSWERED: 'border-warning bg-warning/10 text-warning',
+  MISS: 'border-warning bg-warning/10 text-warning',
 }
 
 const cardIcon: Record<DoorVerdict['state'], string> = {
@@ -18,6 +19,7 @@ const cardIcon: Record<DoorVerdict['state'], string> = {
   UNPAID: 'i-lucide-circle-alert',
   REFUSED: 'i-lucide-circle-x',
   UNANSWERED: 'i-lucide-wifi-off',
+  MISS: 'i-lucide-search-x',
 }
 </script>
 

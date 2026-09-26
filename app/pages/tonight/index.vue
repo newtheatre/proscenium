@@ -168,20 +168,14 @@ onUnmounted(() => {
     >
       <!-- Ordered by how often a tile is tapped on a night, with Emergency last and red so a
            thumb reaching for it in the dark never lands on it by accident (E-112 criterion 1). -->
+      <!-- One door for tickets and passes alike, found by QR, reference or name (issue 1301). -->
       <NightTile
-        label="Scan ticket"
+        label="Door"
         hint="QR · ref · name"
         icon="i-lucide-scan-line"
         tone="gold"
         to="/tonight/door"
-        data-test="tile-scan"
-      />
-      <NightTile
-        label="Admit pass holder"
-        hint="Season and comp passes"
-        icon="i-lucide-contact"
-        to="/tonight/door?mode=pass"
-        data-test="tile-passes"
+        data-test="tile-door"
       />
       <!-- A bar shift works the till from here rather than from a menu it cannot see (F-101). -->
       <NightTile

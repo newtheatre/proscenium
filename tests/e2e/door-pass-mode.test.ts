@@ -8,7 +8,7 @@ import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, wa
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// D-126 pass mode: the holder is found by name or reference, the card says what the pass covers
+// D-126 at the door: the holder is found by name or reference, the card says what the pass covers
 // and what tonight already holds, and Admit is refused with the reason read off the card.
 
 const skip = skipReason()
@@ -150,8 +150,8 @@ describe.skipIf(skip !== null)('the card carries the refusal the scan would give
   }, CASE_TIMEOUT_MS)
 })
 
-describe.skipIf(skip !== null)('the screen at /tonight/door?mode=pass', () => {
-  test('a search finds the holder, and Admit shows the verdict card', async () => {
+describe.skipIf(skip !== null)('a pass found through the door\'s one field (issue 1301)', () => {
+  test('the holder\'s name finds the card, and Admit shows the PASS verdict', async () => {
     const { reference, holder } = await aPass()
     const view = await openSignedOutView(app.baseURL)
     try {
@@ -161,12 +161,14 @@ describe.skipIf(skip !== null)('the screen at /tonight/door?mode=pass', () => {
       await click(view, 'form button[type="submit"]')
       await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-      await visit(view, `${app.baseURL}/tonight/door?mode=pass`, '[data-test="door-pass-mode"]')
+      await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')
       // D-126 criterion 2's wording stands whether or not a card is on screen, as one line in
       // the screen's own hint rather than a panel taking a third of a phone (issue 1150 item 2).
       expect(await textOf(view, '[data-test="door-screen"]')).toContain('Send them to the bar')
 
-      await fill(view, '[data-test="pass-search"]', reference)
+      await waitFor(view, `document.querySelector('[data-test="door-reference"]')`)
+      await fill(view, '[data-test="door-reference"]', holder.name)
+      await click(view, '[data-test="door-scan"]')
       await waitFor(view, `document.querySelector('[data-test="pass-card-${reference}"]')`)
 
       const card = await textOf(view, `[data-test="pass-card-${reference}"]`)
@@ -180,7 +182,8 @@ describe.skipIf(skip !== null)('the screen at /tonight/door?mode=pass', () => {
       await waitFor(view, `document.querySelector('[data-test="door-verdict-paid"]')`)
       const verdict = await textOf(view, '[data-test="door-verdict"]')
       expect(verdict).toContain(reference)
-      expect(verdict).toContain('PAID')
+      expect(verdict).toContain('PASS')
+      expect(verdict).not.toContain('PAID')
       expect(verdict).not.toContain('£')
     }
     finally {

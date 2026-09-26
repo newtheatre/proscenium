@@ -4,6 +4,7 @@ import { findByEmail, newId } from './accounts'
 import { auditedWrite } from './audit'
 import { capacityAllows, heldSeatsQuery, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
 import { configValue } from './configuration'
+import { admittedAtColumn } from './door-search'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
 import { HOLDING_STATUSES, capacityRefusal } from '#shared/utils/capacity'
@@ -277,6 +278,7 @@ export interface ReservationCurrentState {
   totalPence: number
   exchangedToShowTitle: string | null
   exchangedToStartsAt: number | null
+  admittedAt: number | null
 }
 
 // What the QR answers when it is presented: live, from this row, never from anything saved
@@ -286,7 +288,8 @@ export function reservationCurrentStateQuery(id: string): SQL {
     SELECT r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
            s.title AS showTitle, p.starts_at AS startsAt,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
-           xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt
+           xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt,
+           ${admittedAtColumn('r')} AS admittedAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
     JOIN shows s ON s.id = p.show_id
@@ -313,6 +316,7 @@ export interface DoorReservationRow {
   totalPence: number
   exchangedToShowTitle: string | null
   exchangedToStartsAt: number | null
+  admittedAt: number | null
 }
 
 // By reference alone, not scoped to the performance selected at the door (E-127 criterion 3): a
@@ -322,7 +326,8 @@ export function reservationForDoorQuery(reference: string): SQL {
     SELECT r.id AS id, r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
            r.performance_id AS performanceId, s.title AS showTitle, p.starts_at AS startsAt,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
-           xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt
+           xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt,
+           ${admittedAtColumn('r')} AS admittedAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
     JOIN shows s ON s.id = p.show_id

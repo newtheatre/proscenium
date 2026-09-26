@@ -225,6 +225,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     exempt: 'turns a decoded code into the reference the scan routes take; nothing is admitted here',
   },
   { route: 'server/api/tonight/door/passes/search.get.ts', exempt: 'reads tonight\'s pass holders for the door to choose from' },
+  { route: 'server/api/tonight/door/tickets/search.get.ts', exempt: 'reads tonight\'s tickets by name or reference for the door to choose from' },
   {
     route: 'server/api/tonight/door/passes/scan.post.ts',
     actions: ['pass.redeemed', 'reservation.admitted'],

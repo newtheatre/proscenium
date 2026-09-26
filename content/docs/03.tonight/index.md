@@ -3,7 +3,7 @@ title: Tonight
 description: The phone screens a show night runs on, who they open for, and the hub they all start from.
 module: Show night
 audience: member
-updatedOn: 2026-09-23
+updatedOn: 2026-09-26
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -46,7 +46,7 @@ which is how the committee sees a rota that is not being kept.
 
 | Screen | A shift of | Or the role |
 | --- | --- | --- |
-| The door, Admit pass holder | Door | Front of house manager |
+| The door | Door | Front of house manager |
 | Tonight at a glance, Checklist, Night report, Backstage, house numbers on the hub | Duty manager | Front of house manager |
 | The till | Bar | Bar manager |
 | Contacts and incidents, Challenge 25, Emergency | Any of the three | Either |
@@ -58,7 +58,7 @@ quietly moved on to the next night.
 
 ## The hub
 
-![The hub with the on-shift badge (1), the performance switcher (2), the house numbers (3), the Scan ticket tile (4), the Admit pass holder tile (5) and the Emergency tile (6)](/images/docs/show-night/hub.png)
+![The hub with the on-shift badge (1), the performance switcher (2), the house numbers (3), the Door tile (4) and the Emergency tile (5)](/images/docs/show-night/hub.png)
 
 1. **The badge** says how you got in: **On shift** with your first name, or **Officer** when a
    role opened the screen with no shift behind it.
@@ -72,15 +72,14 @@ quietly moved on to the next night.
    screen with a warning rather than a spinner, and the **Last synced** line at the top of every
    screen says how old what you are looking at is. The numbers need duty manager authority; a
    door or bar shift sees the tiles without them.
-4. **Scan ticket** opens [the door](/docs/tonight/door).
-5. **Admit pass holder** opens the door in pass mode.
-6. **Emergency** opens [the emergency card](/docs/tonight/emergency), which is cached on
+4. **Door** opens [the door](/docs/tonight/door), for tickets and passes alike.
+5. **Emergency** opens [the emergency card](/docs/tonight/emergency), which is cached on
    the phone the moment any show-night screen opens.
 
-Every destination of the night is a tile, in the order they are pressed on a night: **Scan
-ticket**, **Admit pass holder**, **Till** (for a bar shift or the Bar manager only), **Tonight at
-a glance**, **Checklist**, **Night report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, and
-**Emergency** last. The **Checklist** tile says what is left on it: **3 pre-show items left**
+Every destination of the night is a tile, in the order they are pressed on a night: **Door**,
+**Till** (for a bar shift or the Bar manager only), **Tonight at a glance**, **Checklist**,
+**Night report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, and **Emergency**
+last. The **Checklist** tile says what is left on it: **3 pre-show items left**
 before the house opens, **2 post-show items left** after, **All ticked** when nothing is
 outstanding. On a matinee day the **Tonight at a glance**, **Checklist**, **Night report** and
 **Contacts and incidents** tiles carry the house you chose on the switcher, so each opens on it. The line at the

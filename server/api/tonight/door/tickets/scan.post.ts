@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
     reservation.exchangedToShowTitle && reservation.exchangedToStartsAt
       ? { showTitle: reservation.exchangedToShowTitle, when: formatLondon(new Date(reservation.exchangedToStartsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }) }
       : null,
+    reservation.admittedAt === null ? null : formatLondon(new Date(reservation.admittedAt * 1000), { timeStyle: 'short' }),
   )
 
   // The door's own card reads `data`; the message is unchanged, so the desk still gets the

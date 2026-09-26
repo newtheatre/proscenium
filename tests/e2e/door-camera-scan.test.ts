@@ -134,7 +134,7 @@ describe.skipIf(skip !== null)('the verdict the door shows (criterion 7)', () =>
 
     const refused = await answered.json() as { data: { verdict: { state: string, line: string }, partySize: number } }
     expect(refused.data.verdict.state).toBe('UNPAID')
-    expect(refused.data.verdict.line).toBe('Send to the bar to pay')
+    expect(refused.data.verdict.line).toBe('Send to the bar with this ticket')
     expect(JSON.stringify(refused.data.verdict)).not.toContain('£')
     expect(refused.data.partySize).toBe(2)
   }, CASE_TIMEOUT_MS)

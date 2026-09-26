@@ -15,7 +15,7 @@ const SHOW_NIGHT_FILES = [
   // Where the SumUp app returns: it wears the tonight layout, so it takes the tonight register.
   'app/pages/pay/return/[token].vue',
   'app/components/BoardFeed.vue',
-  'app/components/DoorPassMode.vue',
+  'app/components/DoorResults.vue',
   'app/components/DoorVerdictCard.vue',
   'app/components/NightAction.vue',
   'app/components/NightBlock.vue',
