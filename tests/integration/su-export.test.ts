@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { seasonTicketRevenueQuery } from '#server/utils/revenue-by-show'
 import { toCsv } from '#server/utils/csv'
-import { periodBounds, seasonRangeQuery } from '#server/utils/season-dashboard'
+import { periodBounds, revenueBySourceQuery, seasonRangeQuery } from '#server/utils/season-dashboard'
 import { rangeClosedQuery } from '#server/utils/period-locks'
 import { nominalMappingsQuery, suExportCountQuery, suExportQuery } from '#server/utils/su-export'
-import { LEDGER_POSTING_PAIRS, suExportCsvRows } from '#shared/utils/su-export'
+import { LEDGER_POSTING_PAIRS, SU_EXPORT_CARD_TOTAL, suExportCsvRows } from '#shared/utils/su-export'
 import type { SuExportRow } from '#shared/utils/su-export'
 import { createTestDatabase, boundStatement, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -42,12 +42,12 @@ function atNoonOn(day: string): number {
   return Math.floor(Date.UTC(year, month - 1, date, 12, 0, 0) / 1000)
 }
 
-function entry(database: TestDatabase, day: string, source = 'DESK'): string {
+function entry(database: TestDatabase, day: string, source = 'DESK', tender = 'CARD'): string {
   const id = `e-${++entrySeq}`
   database.batch([[
     `INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence)
-     VALUES (?, ?, ?, ?, 'CARD', ?, 0)`,
-    id, atNoonOn(day), day, source, ACTOR,
+     VALUES (?, ?, ?, ?, ?, ?, 0)`,
+    id, atNoonOn(day), day, source, tender, ACTOR,
   ]])
   return id
 }
@@ -209,6 +209,33 @@ describe('never disagreeing with I-106 for the same money (shared query, not a s
   })
 })
 
+// Issue #1363: the file carries every line whatever its tender, so a drink on a tab is there when
+// charged and again when settled; the closing card total is what agrees with the dashboard.
+describe('the export agrees with the money dashboard (I-105, I-108 criterion 2)', () => {
+  test('the closing card total is the dashboard\'s revenue for the same days, tabs and comps apart', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      line(database, entry(database, '2026-09-05'), 'PASS_SALE', 3500)
+      line(database, entry(database, '2026-09-20', 'TILL', 'TAB'), 'BAR_ITEM', 600)
+      line(database, entry(database, '2026-09-21', 'TILL', 'COMP'), 'BAR_ITEM', 0)
+      line(database, entry(database, '2026-09-23', 'TILL'), 'TAB_SETTLEMENT', 600)
+      line(database, entry(database, '2026-09-23', 'TILL'), 'BAR_ITEM', 350)
+
+      const exported = read<SuExportRow>(database, suExportQuery('2026-09-01', '2026-09-30'))
+      expect(exported.map(row => row.tender)).toEqual(['CARD', 'TAB', 'COMP', 'CARD', 'CARD'])
+
+      const shaped = suExportCsvRows(exported)
+      expect(shaped.find(row => row.tender === 'Tab')).toMatchObject({ category: 'Bar item on a tab', amountPence: 600 })
+
+      const bounds = periodBounds({ kind: 'TERM', fromDay: '2026-09-01', toDay: '2026-09-30' })
+      const revenue = read<{ totalPence: number }>(database, revenueBySourceQuery(bounds.fromAt, bounds.toAt))
+        .reduce((sum, row) => sum + row.totalPence, 0)
+      expect(revenue).toBe(4450)
+      expect(shaped.at(-1)).toMatchObject({ category: SU_EXPORT_CARD_TOTAL, amountPence: revenue })
+    })
+  })
+})
+
 describe('whether an exported range is still open to a correction (I-108)', () => {
   test('no lock at all is open', () => {
     return withDatabase((database) => {
@@ -317,7 +344,7 @@ describe('the yearly return, re-runnable identically (criterion 4)', () => {
       const second = exportFile(database, '2025-08-01', '2026-07-31')
 
       expect(rangeClosed(database, '2025-08-01', '2026-07-31')).toBe(true)
-      expect(first.split('\r\n').length).toBe(6)
+      expect(first.split('\r\n').length).toBe(7)
       expect(second).toBe(first)
     })
   })
