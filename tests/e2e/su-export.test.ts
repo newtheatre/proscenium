@@ -100,8 +100,10 @@ describe.skipIf(skip !== null)('the CSV export (criteria 2, 3)', () => {
 
     const body = await answered.text()
     const header = body.trim().split('\r\n')[0]
-    expect(header).toBe('"date","category","nominalCode","amountPence","amountPounds"')
-    expect(body).toContain('"2026-09-15","Walk-up sale","4100","900","9.00"')
+    expect(header).toBe('"date","category","tender","nominalCode","amountPence","amountPounds"')
+    expect(body).toContain('"2026-09-15","Walk-up sale","Card","4100","900","9.00"')
+    // Issue #1363: the file closes on the card total, the figure the money dashboard calls revenue.
+    expect(body.trim().split('\r\n').at(-1)).toMatch(/^"","Card total, the same as the money dashboard's revenue","Card","","-?\d+","-?\d+\.\d{2}"$/)
   })
 
   test('a line whose pair has no mapping exports on its own explicit unmapped line', async () => {
@@ -121,7 +123,7 @@ describe.skipIf(skip !== null)('the CSV export (criteria 2, 3)', () => {
 
     const answered = await send('GET', '/api/admin/finance/export?fromDay=2026-09-01&toDay=2026-09-30', undefined, treasurer.cookie)
     const body = await answered.text()
-    expect(body).toContain('"2026-09-16","Bar item","UNMAPPED","500","5.00"')
+    expect(body).toContain('"2026-09-16","Bar item","Card","UNMAPPED","500","5.00"')
   })
 
   test('a nominal code shaped like a formula is guarded, not left to execute when the file opens', async () => {

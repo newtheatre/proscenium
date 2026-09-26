@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { describeKind, ENTRY_SOURCES, LINE_KINDS } from './ledger'
-import type { EntrySource, LineKind } from './ledger'
+import { describeKind, ENTRY_SOURCES, LINE_KINDS, saysTender } from './ledger'
+import type { EntrySource, LineKind, Tender } from './ledger'
 
 // I-108. A period export categorised for the SU's own accounting, never a total this module
 // invents: every figure is a ledger line's own signed pence, read straight off the row (I-106).
@@ -98,6 +98,7 @@ export interface SuExportRow {
   londonDay: string
   kind: LineKind
   source: EntrySource
+  tender: Tender
   nominalCode: string | null
   amountPence: number
 }
@@ -108,15 +109,36 @@ export function formatPoundsForExport(pence: number): string {
   return (pence / 100).toFixed(2)
 }
 
+// The file's last line: card money only, the one figure the money dashboard calls revenue (I-105).
+export const SU_EXPORT_CARD_TOTAL = 'Card total, the same as the money dashboard\'s revenue'
+
+// A drink charged to a tab is credit, and the same money comes back as a tab settlement; its own
+// category keeps the two from reading as one sale made twice (issue #1363, F-109).
+function exportCategory(row: SuExportRow): string {
+  return row.kind === 'BAR_ITEM' && row.tender === 'TAB' ? 'Bar item on a tab' : describeKind(row.kind)
+}
+
 // The file's rows, shaped once so every run of the same lines is the same bytes (criterion 4).
 export function suExportCsvRows(rows: SuExportRow[]): Record<string, unknown>[] {
-  return rows.map(row => ({
-    date: row.londonDay,
-    category: describeKind(row.kind),
-    // The explicit unmapped line criterion 3 asks for, rather than a blank cell a spreadsheet
-    // would silently sort past.
-    nominalCode: row.nominalCode ?? 'UNMAPPED',
-    amountPence: row.amountPence,
-    amountPounds: formatPoundsForExport(row.amountPence),
-  }))
+  const cardPence = rows.filter(row => row.tender === 'CARD').reduce((sum, row) => sum + row.amountPence, 0)
+  return [
+    ...rows.map(row => ({
+      date: row.londonDay,
+      category: exportCategory(row),
+      tender: saysTender(row.tender),
+      // The explicit unmapped line criterion 3 asks for, rather than a blank cell a spreadsheet
+      // would silently sort past.
+      nominalCode: row.nominalCode ?? 'UNMAPPED',
+      amountPence: row.amountPence,
+      amountPounds: formatPoundsForExport(row.amountPence),
+    })),
+    {
+      date: '',
+      category: SU_EXPORT_CARD_TOTAL,
+      tender: saysTender('CARD'),
+      nominalCode: '',
+      amountPence: cardPence,
+      amountPounds: formatPoundsForExport(cardPence),
+    },
+  ]
 }
