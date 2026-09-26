@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { methodsOf, refusalToAddPassword, refusalToRemove } from '#shared/utils/sign-in-methods'
+import { methodsOf, refusalToAddPassword, refusalToRemove, securityNextStep } from '#shared/utils/sign-in-methods'
 import type { MethodSnapshot } from '#shared/utils/sign-in-methods'
 
 // A-113: an account follows how somebody actually signs in, and never locks them out. The
@@ -104,5 +104,26 @@ describe('a Workspace address is Google-only', () => {
   test('an ordinary address may add or replace one', () => {
     expect(refusalToAddPassword(snapshot({ passwordSetAt: null, passwordLastUsedAt: null }))).toBeNull()
     expect(refusalToAddPassword(snapshot())).toBeNull()
+  })
+})
+
+// Issue 1344, A-112, A-105: the security page leads with the one step this viewer should take
+// next, and a role's authenticator comes before anything a member merely might like.
+describe('the security page asks for one next step', () => {
+  const ordinary = { authenticatorRequired: false, authenticatorConfirmed: false, passkeySupported: true, holdsPasskey: false }
+
+  test('a role that needs an authenticator asks for it first, passkey or no passkey', () => {
+    expect(securityNextStep({ ...ordinary, authenticatorRequired: true })).toBe('authenticator')
+    expect(securityNextStep({ ...ordinary, authenticatorRequired: true, holdsPasskey: true })).toBe('authenticator')
+  })
+
+  test('once that authenticator is confirmed, the passkey is next', () => {
+    expect(securityNextStep({ ...ordinary, authenticatorRequired: true, authenticatorConfirmed: true })).toBe('passkey')
+  })
+
+  test('otherwise a passkey, where the browser can hold one and none is held', () => {
+    expect(securityNextStep(ordinary)).toBe('passkey')
+    expect(securityNextStep({ ...ordinary, holdsPasskey: true })).toBeNull()
+    expect(securityNextStep({ ...ordinary, passkeySupported: false })).toBeNull()
   })
 })
