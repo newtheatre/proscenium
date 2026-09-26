@@ -8,6 +8,7 @@ import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import { Database } from 'bun:sqlite'
+import { currentShowNight } from '#shared/utils/show-night'
 
 // F-118: reconciliation to the expected SumUp Z figure, at preview and at close, and the same
 // figure the night report's bar summary carries (criterion 4).
@@ -232,5 +233,41 @@ describe.skipIf(skip !== null)('the night report carries the same figure, never 
     const report = await reported.json() as { bar: { revenuePence: number, itemsSold: number } }
     expect(report.bar.revenuePence).toBe(reconciliation.bar.cardSalesPence)
     expect(report.bar.itemsSold).toBe(1)
+  })
+})
+
+// Decision 0097, issue 1309: the close records the night's reader total, so the Treasurer resolves
+// a difference rather than retyping the Z. Last in the file: it leaves a Treasurer's reading on tonight.
+describe.skipIf(skip !== null)('the close records the night\'s reading for the Treasurer (I-104 criterion 2)', () => {
+  interface Current { id: string, readerPence: number, expectedPence: number, variancePence: number, note: string | null, enteredBy: string }
+
+  async function current(): Promise<Current | null> {
+    const read = await send('GET', `/api/admin/finance/reconciliation?night=${currentShowNight()}`, undefined, officer.cookie)
+    expect(read.status).toBe(200)
+    return (await read.json() as { current: Current | null }).current
+  }
+
+  test('the closer\'s Z and note are the night\'s current reading, and a reading the Treasurer records stands', async () => {
+    const { venueId, performanceId } = programme(`reconcile-reading-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(700)
+    const opened = await (await openTill(venueId, performanceId)).json() as { session: { id: string } }
+    await sell(venueId, variantId, 700)
+    const expected = (await wholeNight(opened.session.id)).wholeNightExpectedPence
+
+    expect((await close(opened.session.id, expected + 20, 'A tip keyed as a sale')).status).toBe(200)
+    const recorded = await current()
+    expect(recorded).toMatchObject({ readerPence: expected + 20, expectedPence: expected, variancePence: 20, note: 'A tip keyed as a sale', enteredBy: bar.id })
+
+    const corrected = await send('POST', '/api/admin/finance/reconciliation', {
+      night: currentShowNight(), readerPence: expected, note: 'The tip was taken off the reader', supersedesId: recorded!.id, writtenOff: false,
+    }, officer.cookie)
+    expect(corrected.status).toBe(200)
+    const { id: correctionId } = await corrected.json() as { id: string }
+
+    const later = programme(`reconcile-reading-later-${crypto.randomUUID().slice(0, 6)}`)
+    const laterOpened = await (await openTill(later.venueId, later.performanceId)).json() as { session: { id: string } }
+    const laterExpected = (await wholeNight(laterOpened.session.id)).wholeNightExpectedPence
+    expect((await close(laterOpened.session.id, laterExpected)).status).toBe(200)
+    expect((await current())?.id).toBe(correctionId)
   })
 })
