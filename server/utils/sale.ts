@@ -211,7 +211,7 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
     })
     .filter(product => product.variants.length > 0)
 
-  return { on, categories, products }
+  return { on, categories, products, stockCounted: counted }
 }
 
 interface ResolvedLine {

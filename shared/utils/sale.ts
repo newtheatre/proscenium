@@ -187,6 +187,17 @@ export const sizeBlocked = (variant: Stocked): boolean => variant.stock?.blocks 
 export const productOutOfStock = (product: Pick<SaleProduct, 'variants'>): boolean => product.variants.every(sizeOutOfStock)
 export const productBlocked = (product: Pick<SaleProduct, 'variants'>): boolean => product.variants.every(sizeBlocked)
 
+// A size the till would refuse at the charge: nothing on hand, or none of its choices poured.
+const sizeHasNothing = (size: SaleVariant): boolean =>
+  sizeOutOfStock(size) || (size.choice !== null && size.choice.options.length > 0 && size.choice.options.every(sizeOutOfStock))
+
+// Before the bar's first count, drinks the till lets you press and then refuses; once a count is
+// applied it greys them out itself, so none are worth saying (issue 1297, 0080).
+export function uncountedProducts(catalogue: Pick<SaleCatalogue, 'products' | 'stockCounted'>): number {
+  if (catalogue.stockCounted !== false) return 0
+  return catalogue.products.filter(product => product.variants.some(sizeHasNothing)).length
+}
+
 // Each receipt the till can show, in a fixed order: one appearing where there was none is a sale
 // just completed, whichever path took it, and the grid's stock is read again (criterion 9).
 export function saleJustCompleted(receipts: readonly unknown[], before: readonly unknown[]): boolean {
@@ -221,6 +232,8 @@ export interface SaleCatalogue {
   on: string
   categories: SaleCategory[]
   products: SaleProduct[]
+  // Whether a stocktake has made on-hand a balance (0080); absent on a catalogue held from earlier.
+  stockCounted?: boolean
 }
 
 // One priced line, snapshotting what it resolved against so the total on screen is provably the
