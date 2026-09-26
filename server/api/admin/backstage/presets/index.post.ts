@@ -4,16 +4,16 @@ import { presetForm } from '#shared/utils/backstage'
 // changes nothing already on the board (E-121 criterion 2).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'board.write')
-  const { label, body, sort } = await readValidatedBodyOrThrow(event, presetForm)
+  const { label, body, sort, side } = await readValidatedBodyOrThrow(event, presetForm)
 
   const id = newId()
   await db.batch([
-    db.run(insertPresetStatement(label, body, sort, resolved.account.id, id)),
+    db.run(insertPresetStatement(label, body, sort, resolved.account.id, id, side)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'backstage-preset.created',
       target: `backstage-preset:${id}`,
-      detail: { label },
+      detail: { label, side },
     })),
   ])
 

@@ -371,33 +371,46 @@ async function seedBackstage(
   const officer = personIn(people, 'rowan').id
   const statements: BoundStatement[] = []
 
-  // The labels the migration already ships, adopted rather than duplicated: the unique index is
-  // on the label, so inventing a parallel vocabulary silently seeds nothing.
-  const milestones = ['Clearance', 'House open', 'Curtain up', 'Interval', 'Restart', 'End']
+  // The migrations' own labels on their own ends (issue 1313), adopted rather than duplicated: the
+  // unique index is on the label, so a parallel vocabulary silently seeds nothing.
+  const milestones: [string, number, 'FOH' | 'BACKSTAGE'][] = [
+    ['Clearance', 0, 'BACKSTAGE'],
+    ['House open', 1, 'FOH'],
+    ['Curtain up', 2, 'BACKSTAGE'],
+    ['Interval', 3, 'BACKSTAGE'],
+    ['Ready to restart', 4, 'FOH'],
+    ['Restart', 4, 'BACKSTAGE'],
+    ['End', 5, 'BACKSTAGE'],
+  ]
   const milestoneId = new Map<string, string>()
-  for (const [sort, label] of milestones.entries()) {
+  for (const [label, sort, side] of milestones) {
     milestoneId.set(label, ensure(target, 'backstage_milestone_types', { column: 'label', value: label }, {
       id: seedId('milestone', label),
       label,
       sort,
+      side,
       active: 1,
       updated_by: officer,
       updated_at: now - 200 * DAY,
     }).id)
   }
 
-  const presets: [string, string, number][] = [
-    ['Standby', 'Standby please.', 0],
-    ['Hold', 'Hold the show, front of house are dealing with something.', 1],
-    ['Clear', 'Clear to continue.', 2],
-    ['Ambulance', 'An ambulance has been called. Duty manager to the foyer.', 3],
+  // The wings post the seeded nights' milestones, so only their own calls are replayed.
+  const called = milestones.filter(([, , side]) => side === 'BACKSTAGE').map(([label]) => label)
+
+  const presets: [string, string, number, 'FOH' | 'BACKSTAGE'][] = [
+    ['Standby', 'Standby please.', 0, 'FOH'],
+    ['Hold', 'Hold the show, front of house are dealing with something.', 1, 'FOH'],
+    ['Clear', 'Clear to continue.', 2, 'FOH'],
+    ['Ambulance', 'An ambulance has been called. Duty manager to the foyer.', 3, 'BACKSTAGE'],
   ]
-  for (const [label, body, sort] of presets) {
+  for (const [label, body, sort, side] of presets) {
     ensure(target, 'backstage_presets', { column: 'label', value: label }, {
       id: seedId('preset', label),
       label,
       body,
       sort,
+      side,
       active: 1,
       updated_by: officer,
       updated_at: now - 200 * DAY,
@@ -442,7 +455,7 @@ async function seedBackstage(
       devices.push({ id: deviceId, label })
     }
 
-    for (const [index, label] of milestones.slice(0, reached).entries()) {
+    for (const [index, label] of called.slice(0, reached).entries()) {
       const messageId = seedId('backstagemessage', night, label)
       const at = now - hoursAgo * 3600 - (reached - index) * 900
       statements.push(insert('backstage_messages', {

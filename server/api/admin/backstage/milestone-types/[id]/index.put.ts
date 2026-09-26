@@ -1,22 +1,22 @@
 import { changes } from '#shared/utils/audit'
 import { milestoneTypeForm } from '#shared/utils/backstage'
 
-// Edit a milestone type's label or order.
+// Edit a milestone type's label, order or end (issue 1313).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const resolved = await requirePermission(event, 'board.write')
-  const { label, sort } = await readValidatedBodyOrThrow(event, milestoneTypeForm)
+  const { label, sort, side } = await readValidatedBodyOrThrow(event, milestoneTypeForm)
 
   const before = (await milestoneTypes(true)).find(type => type.id === id)
   if (!before) throw noSuch('milestone type')
 
   await db.batch([
-    db.run(updateMilestoneTypeStatement(id, label, sort, resolved.account.id)),
+    db.run(updateMilestoneTypeStatement(id, label, sort, resolved.account.id, side)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'backstage-milestone-type.updated',
       target: `backstage-milestone-type:${id}`,
-      detail: changes({ label: [before.label, label] }),
+      detail: changes({ label: [before.label, label], side: [before.side, side] }),
     })),
   ])
 

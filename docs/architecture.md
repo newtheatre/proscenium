@@ -1567,10 +1567,22 @@ polled (criterion 5).
 `POST /api/board/messages` is one route for all three of a milestone, a preset and free text,
 distinguished by `postMessageForm`'s own refinement (exactly one of `milestoneTypeId`,
 `presetId` or `body`), rather than three routes: the write is identical either way, only where
-the wording comes from differs. The wording itself is resolved server-side
-(`milestoneLabel()`/`presetBody()`), never trusted from the caller, so a message always carries
-the committee's current copy at the moment it was sent, and a retired or unknown id refuses
-before anything is written.
+the wording comes from differs. The wording itself is resolved server-side (`resolveCall()`),
+never trusted from the caller, so a message always carries the committee's current copy at the
+moment it was sent, and a retired or unknown id refuses before anything is written.
+
+Every call belongs to one end (issue 1313, E-121 criterion 7 as amended 26 September 2026).
+`backstage_milestone_types.side` and `backstage_presets.side` name it, read through
+`coalesce(side, …)` so a call nobody has placed is the wings' milestone or the foyer's preset, the
+defaults the forms and `MILESTONE_DEFAULT_SIDE`/`PRESET_DEFAULT_SIDE` share. `GET /api/board/config`
+offers the wings only theirs and `GET /api/tonight/board/messages` front of house only its own,
+and `resolveCall()` refuses the other end's call on either `POST`, so front of house now posts
+milestones (House open, Ready to restart) beside the wings'; both feed the night report's timeline.
+`nextCall()` is each end's **Next call**, the next of its own milestones after its latest live one
+in the committee's order, and `correctableMilestone()` offers **Wrong call? Change it** on an end's
+own latest milestone until anybody calls another. `GET /api/board/messages` returns the venue's
+name, so a phone whose cookie still works reopens its board on reload rather than joining again as
+a second device.
 
 `requireDevice()` is the board's own guard, `getCookie(event, 'nnt-backstage-token')` resolved
 against `backstage_devices` the same way a QR reservation cookie resolves against
@@ -1578,8 +1590,10 @@ against `backstage_devices` the same way a QR reservation cookie resolves agains
 revoked device (E-122) is refused at this one point rather than at every route that calls it.
 
 Only a milestone is ever corrected (`supersedeMessageStatement()`'s own predicate refuses
-anything else), matching criterion 5's own wording; free text and presets are not, since nothing
-in the story asks a "5 minutes please" tap to be retracted. Acknowledgement
+anything else, and refuses a correction across ends: the correcting device's side must match the
+poster's and the new milestone's), matching criterion 5's own wording; front of house corrects its
+own through `POST /api/tonight/board/messages/[id]/supersede`. Free text and presets are not,
+since nothing in the story asks a "5 minutes please" tap to be retracted. Acknowledgement
 (`backstage_acknowledgements`) is `INSERT ... ON CONFLICT DO NOTHING`, the same idempotent shape
 a repeated tap anywhere else in this codebase gets, and exempted from the audit trail: a
 high-volume presence fact is not the kind of privileged mutation the trail exists for.
@@ -1587,8 +1601,8 @@ high-volume presence fact is not the kind of privileged mutation the trail exist
 Both ends draw the same screen from `BoardFeed.vue` (`app/components/`): the current state
 (own last call, then the other end's, each with the time and whether the other end has seen it)
 and the side-tagged history with a tick per seen row, read from whichever `side` the page passes
-(criterion 7, amended 14 September 2026). What differs is slotted in: the FOH page's "Mark seen"
-and its presets, the crew page's milestone grid and its per-device "Seen" button, which shows only
+(criterion 7, amended 14 September 2026). What differs is slotted in: the FOH page's "Mark seen",
+its own milestones and presets and the backstage code above the history with the join address, the crew page's milestone grid and its per-device "Seen" button, which shows only
 on a call from front of house this device has not yet acknowledged (`deviceId` comes back with the
 crew's read for exactly that). `GET /api/board/messages` and `GET /api/tonight/board/messages`
 both answer `seen` from `seenAcross()`.

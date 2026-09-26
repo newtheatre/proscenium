@@ -5,7 +5,7 @@ import { createError, getCookie } from 'h3'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { newId } from './accounts'
 import { performancesOnNight } from './performances'
-import { MAX_FAILED_ATTEMPTS, MESSAGE_RETENTION_DAYS, deriveBoardCode, deriveFohCredential } from '#shared/utils/backstage'
+import { MAX_FAILED_ATTEMPTS, MESSAGE_RETENTION_DAYS, MILESTONE_DEFAULT_SIDE, PRESET_DEFAULT_SIDE, deriveBoardCode, deriveFohCredential, saysOtherEndsCall } from '#shared/utils/backstage'
 import type { BoardSide } from '#shared/utils/backstage'
 import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
 import type { SQL } from 'drizzle-orm'
@@ -245,15 +245,24 @@ export function postMessageStatement(
   `
 }
 
-// Only a milestone message is ever superseded (criterion 5); the predicate refuses a caller
-// trying it against free text or a preset, or against one already corrected.
+// Only a milestone message is ever superseded (criterion 5), by the end that called it and into a
+// call of that end (issue 1313); the predicate refuses anything else, or a second correction.
 export function supersedeMessageStatement(
   nightId: string, entryId: string, deviceId: string, milestoneTypeId: string, body: string, composedAt: number, id: string,
 ): SQL {
   return sql`
     INSERT INTO backstage_messages (id, night_id, device_id, milestone_type_id, body, supersedes_id, composed_at)
     SELECT ${id}, ${nightId}, ${deviceId}, ${milestoneTypeId}, ${body}, ${entryId}, ${composedAt}
-    WHERE EXISTS (SELECT 1 FROM backstage_messages WHERE id = ${entryId} AND night_id = ${nightId} AND milestone_type_id IS NOT NULL)
+    FROM backstage_devices corrector
+    WHERE corrector.id = ${deviceId}
+      AND EXISTS (
+        SELECT 1 FROM backstage_messages m JOIN backstage_devices poster ON poster.id = m.device_id
+        WHERE m.id = ${entryId} AND m.night_id = ${nightId} AND m.milestone_type_id IS NOT NULL AND poster.side = corrector.side
+      )
+      AND EXISTS (
+        SELECT 1 FROM backstage_milestone_types t
+        WHERE t.id = ${milestoneTypeId} AND coalesce(t.side, ${MILESTONE_DEFAULT_SIDE}) = corrector.side
+      )
       AND NOT EXISTS (SELECT 1 FROM backstage_messages WHERE supersedes_id = ${entryId})
     RETURNING id
   `
@@ -308,11 +317,12 @@ export function acknowledgeStatement(messageId: string, deviceId: string, id: st
 // The committee's own milestone types and presets (criteria 1, 2), mutable like
 // `checklist_items`: a message snapshots the label, so editing one changes nothing already sent.
 
-export interface MilestoneTypeRow { id: string, label: string, sort: number, active: boolean, updatedAt: number }
+export interface MilestoneTypeRow { id: string, label: string, sort: number, side: BoardSide, active: boolean, updatedAt: number }
 
+// Every call reads with its end, one the committee has not placed defaulting as the forms do.
 export function milestoneTypesQuery(includeRetired: boolean): SQL {
   const predicate = includeRetired ? sql`` : sql` WHERE active = 1`
-  return sql`SELECT id AS id, label AS label, sort AS sort, active AS active, updated_at AS updatedAt FROM backstage_milestone_types${predicate} ORDER BY sort, label COLLATE NOCASE`
+  return sql`SELECT id AS id, label AS label, sort AS sort, coalesce(side, ${MILESTONE_DEFAULT_SIDE}) AS side, active AS active, updated_at AS updatedAt FROM backstage_milestone_types${predicate} ORDER BY sort, label COLLATE NOCASE`
 }
 
 export async function milestoneTypes(includeRetired = false): Promise<MilestoneTypeRow[]> {
@@ -320,23 +330,23 @@ export async function milestoneTypes(includeRetired = false): Promise<MilestoneT
   return rows.map(row => ({ ...row, active: row.active === 1 }))
 }
 
-export function insertMilestoneTypeStatement(label: string, sort: number, updatedBy: string, id: string): SQL {
-  return sql`INSERT INTO backstage_milestone_types (id, label, sort, updated_by) VALUES (${id}, ${label}, ${sort}, ${updatedBy})`
+export function insertMilestoneTypeStatement(label: string, sort: number, updatedBy: string, id: string, side: BoardSide | null = MILESTONE_DEFAULT_SIDE): SQL {
+  return sql`INSERT INTO backstage_milestone_types (id, label, sort, side, updated_by) VALUES (${id}, ${label}, ${sort}, ${side}, ${updatedBy})`
 }
 
-export function updateMilestoneTypeStatement(id: string, label: string, sort: number, updatedBy: string): SQL {
-  return sql`UPDATE backstage_milestone_types SET label = ${label}, sort = ${sort}, updated_by = ${updatedBy}, updated_at = unixepoch() WHERE id = ${id}`
+export function updateMilestoneTypeStatement(id: string, label: string, sort: number, updatedBy: string, side: BoardSide = MILESTONE_DEFAULT_SIDE): SQL {
+  return sql`UPDATE backstage_milestone_types SET label = ${label}, sort = ${sort}, side = ${side}, updated_by = ${updatedBy}, updated_at = unixepoch() WHERE id = ${id}`
 }
 
 export function retireMilestoneTypeStatement(id: string, active: boolean, updatedBy: string): SQL {
   return sql`UPDATE backstage_milestone_types SET active = ${active ? 1 : 0}, updated_by = ${updatedBy}, updated_at = unixepoch() WHERE id = ${id}`
 }
 
-export interface PresetRow { id: string, label: string, body: string, sort: number, active: boolean, updatedAt: number }
+export interface PresetRow { id: string, label: string, body: string, sort: number, side: BoardSide, active: boolean, updatedAt: number }
 
 export function presetsQuery(includeRetired: boolean): SQL {
   const predicate = includeRetired ? sql`` : sql` WHERE active = 1`
-  return sql`SELECT id AS id, label AS label, body AS body, sort AS sort, active AS active, updated_at AS updatedAt FROM backstage_presets${predicate} ORDER BY sort, label COLLATE NOCASE`
+  return sql`SELECT id AS id, label AS label, body AS body, sort AS sort, coalesce(side, ${PRESET_DEFAULT_SIDE}) AS side, active AS active, updated_at AS updatedAt FROM backstage_presets${predicate} ORDER BY sort, label COLLATE NOCASE`
 }
 
 export async function presets(includeRetired = false): Promise<PresetRow[]> {
@@ -344,12 +354,12 @@ export async function presets(includeRetired = false): Promise<PresetRow[]> {
   return rows.map(row => ({ ...row, active: row.active === 1 }))
 }
 
-export function insertPresetStatement(label: string, body: string, sort: number, updatedBy: string, id: string): SQL {
-  return sql`INSERT INTO backstage_presets (id, label, body, sort, updated_by) VALUES (${id}, ${label}, ${body}, ${sort}, ${updatedBy})`
+export function insertPresetStatement(label: string, body: string, sort: number, updatedBy: string, id: string, side: BoardSide | null = PRESET_DEFAULT_SIDE): SQL {
+  return sql`INSERT INTO backstage_presets (id, label, body, sort, side, updated_by) VALUES (${id}, ${label}, ${body}, ${sort}, ${side}, ${updatedBy})`
 }
 
-export function updatePresetStatement(id: string, label: string, body: string, sort: number, updatedBy: string): SQL {
-  return sql`UPDATE backstage_presets SET label = ${label}, body = ${body}, sort = ${sort}, updated_by = ${updatedBy}, updated_at = unixepoch() WHERE id = ${id}`
+export function updatePresetStatement(id: string, label: string, body: string, sort: number, updatedBy: string, side: BoardSide = PRESET_DEFAULT_SIDE): SQL {
+  return sql`UPDATE backstage_presets SET label = ${label}, body = ${body}, sort = ${sort}, side = ${side}, updated_by = ${updatedBy}, updated_at = unixepoch() WHERE id = ${id}`
 }
 
 export function retirePresetStatement(id: string, active: boolean, updatedBy: string): SQL {
@@ -358,14 +368,33 @@ export function retirePresetStatement(id: string, active: boolean, updatedBy: st
 
 // A milestone type or a preset, resolved server-side rather than trusted from the client: what
 // gets snapshotted onto the message is the committee's own current wording (criteria 1, 2).
-export async function milestoneLabel(id: string): Promise<string | undefined> {
-  const [row] = await db.all<{ label: string }>(sql`SELECT label AS label FROM backstage_milestone_types WHERE id = ${id} AND active = 1`)
-  return row?.label
+export async function milestoneCall(id: string): Promise<{ label: string, side: BoardSide } | undefined> {
+  const [row] = await db.all<{ label: string, side: BoardSide }>(sql`SELECT label AS label, coalesce(side, ${MILESTONE_DEFAULT_SIDE}) AS side FROM backstage_milestone_types WHERE id = ${id} AND active = 1`)
+  return row
 }
 
-export async function presetBody(id: string): Promise<string | undefined> {
-  const [row] = await db.all<{ body: string }>(sql`SELECT body AS body FROM backstage_presets WHERE id = ${id} AND active = 1`)
-  return row?.body
+export async function presetCall(id: string): Promise<{ body: string, side: BoardSide } | undefined> {
+  const [row] = await db.all<{ body: string, side: BoardSide }>(sql`SELECT body AS body, coalesce(side, ${PRESET_DEFAULT_SIDE}) AS side FROM backstage_presets WHERE id = ${id} AND active = 1`)
+  return row
+}
+
+// What a message says, resolved from the committee's own current wording, or the refusal when the
+// call is retired or is the other end's to make (criteria 1, 2, issue 1313).
+export async function resolveCall(
+  side: BoardSide,
+  input: { milestoneTypeId: string | null, presetId: string | null, body: string | null },
+): Promise<{ body: string } | { refusal: string }> {
+  if (input.milestoneTypeId) {
+    const call = await milestoneCall(input.milestoneTypeId)
+    if (!call) return { refusal: 'That milestone is not configured, or has been retired' }
+    return call.side === side ? { body: call.label } : { refusal: saysOtherEndsCall(call.side) }
+  }
+  if (input.presetId) {
+    const call = await presetCall(input.presetId)
+    if (!call) return { refusal: 'That preset is not configured, or has been retired' }
+    return call.side === side ? { body: call.body } : { refusal: saysOtherEndsCall(call.side) }
+  }
+  return input.body ? { body: input.body } : { refusal: 'Say what the message is' }
 }
 
 // Free text and preset messages purge at 30 days; a milestone is night-report data and is

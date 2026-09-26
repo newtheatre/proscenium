@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { can, manageBoardConfig } from '#shared/utils/abilities'
+import { BOARD_SIDES, MILESTONE_DEFAULT_SIDE, PRESET_DEFAULT_SIDE, saysBoardSide } from '#shared/utils/backstage'
+import type { BoardSide } from '#shared/utils/backstage'
 import type { VNode } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Backstage board', middleware: 'console', docs: '/docs/rota/backstage-board' })
 
-interface MilestoneType { id: string, label: string, sort: number, active: boolean }
-interface Preset { id: string, label: string, body: string, sort: number, active: boolean }
+interface MilestoneType { id: string, label: string, sort: number, side: BoardSide, active: boolean }
+interface Preset { id: string, label: string, body: string, sort: number, side: BoardSide, active: boolean }
 
 const toast = useToast()
 const writes = computed(() => can(useViewer().value, manageBoardConfig))
@@ -31,18 +33,20 @@ const saving = ref(false)
 // Milestone types
 const editingType = ref<MilestoneType | null>(null)
 const typeOpen = ref(false)
-const typeState = reactive({ label: '', sort: 0 })
+const typeState = reactive<{ label: string, sort: number, side: BoardSide }>({ label: '', sort: 0, side: MILESTONE_DEFAULT_SIDE })
+// Which end makes a call (issue 1313): each end is offered only its own.
+const sideOptions = BOARD_SIDES.map(side => ({ label: saysBoardSide(side), value: side }))
 
 function addType(): void {
   editingType.value = null
-  Object.assign(typeState, { label: '', sort: typesData.value.types.length })
+  Object.assign(typeState, { label: '', sort: typesData.value.types.length, side: MILESTONE_DEFAULT_SIDE })
   failure.value = null
   typeOpen.value = true
 }
 
 function editType(type: MilestoneType): void {
   editingType.value = type
-  Object.assign(typeState, { label: type.label, sort: type.sort })
+  Object.assign(typeState, { label: type.label, sort: type.sort, side: type.side })
   failure.value = null
   typeOpen.value = true
 }
@@ -114,18 +118,18 @@ async function setTypeActive(type: MilestoneType, active: boolean): Promise<void
 // Presets
 const editingPreset = ref<Preset | null>(null)
 const presetOpen = ref(false)
-const presetState = reactive({ label: '', body: '', sort: 0 })
+const presetState = reactive<{ label: string, body: string, sort: number, side: BoardSide }>({ label: '', body: '', sort: 0, side: PRESET_DEFAULT_SIDE })
 
 function addPreset(): void {
   editingPreset.value = null
-  Object.assign(presetState, { label: '', body: '', sort: presetsData.value.presets.length })
+  Object.assign(presetState, { label: '', body: '', sort: presetsData.value.presets.length, side: PRESET_DEFAULT_SIDE })
   failure.value = null
   presetOpen.value = true
 }
 
 function editPreset(preset: Preset): void {
   editingPreset.value = preset
-  Object.assign(presetState, { label: preset.label, body: preset.body, sort: preset.sort })
+  Object.assign(presetState, { label: preset.label, body: preset.body, sort: preset.sort, side: preset.side })
   failure.value = null
   presetOpen.value = true
 }
@@ -200,6 +204,7 @@ const retiredNote = (active: boolean): VNode | null =>
 
 const typeColumns = computed<TableColumn<MilestoneType>[]>(() => [
   { id: 'label', header: 'Milestone type', cell: ({ row }) => h('span', { class: 'text-sm' }, [row.original.label, retiredNote(row.original.active)]) },
+  { id: 'side', header: 'Called by', cell: ({ row }) => h('span', { class: 'text-sm' }, saysBoardSide(row.original.side)) },
   ...(writes.value
     ? [{
         id: 'act',
@@ -234,6 +239,7 @@ const presetColumns = computed<TableColumn<Preset>[]>(() => [
       h('p', { class: 'text-xs text-muted' }, row.original.body),
     ]),
   },
+  { id: 'side', header: 'Sent by', cell: ({ row }) => h('span', { class: 'text-sm' }, saysBoardSide(row.original.side)) },
   ...(writes.value
     ? [{
         id: 'act',
@@ -378,6 +384,14 @@ watch(modalOpen, (nowOpen) => {
               data-test="type-sort"
             />
           </UFormField>
+          <UFormField label="Called by">
+            <USelect
+              v-model="typeState.side"
+              :items="sideOptions"
+              class="w-full"
+              data-test="type-side"
+            />
+          </UFormField>
         </div>
       </template>
       <template #footer>
@@ -442,6 +456,14 @@ watch(modalOpen, (nowOpen) => {
               :min="0"
               class="w-full"
               data-test="preset-sort"
+            />
+          </UFormField>
+          <UFormField label="Sent by">
+            <USelect
+              v-model="presetState.side"
+              :items="sideOptions"
+              class="w-full"
+              data-test="preset-side"
             />
           </UFormField>
         </div>

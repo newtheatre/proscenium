@@ -1441,15 +1441,18 @@ to a person, and none of the three has one. The 30-day purge above is ordinary d
 not GDPR erasure (0011), which governs a person's own record and does not engage here.
 
 ### backstage_milestone_types
-`id` PK · `label` UNIQUE · `sort` · `active` bool · `updated_by` set null · `updated_at`. The
-committee's own configuration, seeded with the six the story names (clearance, house open,
-curtain up, interval, restart, end) and extensible without a migration; mutable like
-`checklist_items`, since a message snapshots the label at send time (E-121 criterion 1).
+`id` PK · `label` UNIQUE · `sort` · `side` NULL (`FOH|BACKSTAGE`, unchecked, since a CHECK would
+rebuild a table messages reference; null reads as `BACKSTAGE`) · `active` bool · `updated_by` set
+null · `updated_at`. The committee's own configuration, seeded with the six the story names
+(clearance, house open, curtain up, interval, restart, end) and front of house's ready to restart,
+each placed on the end that calls it (issue 1313), and extensible without a migration; mutable
+like `checklist_items`, since a message snapshots the label at send time (E-121 criterion 1).
 
 ### backstage_presets
 `id` PK · `label` (the one-tap button's own text) · `body` (what is actually sent) · `sort` ·
-`active` bool · `updated_by` set null · `updated_at`. The committee's own routine-call texts,
-none seeded (E-121 criterion 2).
+`side` NULL (`FOH|BACKSTAGE`, unchecked for the same reason; null reads as `FOH`) · `active` bool ·
+`updated_by` set null · `updated_at`. The committee's own routine-call texts; migration 0119
+seeds four, which 0121 places by what each says (issue 1313, E-121 criterion 2).
 
 ### backstage_messages  APPEND-ONLY
 `id` PK · `night_id` → backstage_nights restrict · `device_id` → backstage_devices restrict (the

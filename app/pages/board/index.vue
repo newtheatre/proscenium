@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { boardJoinForm } from '#shared/utils/backstage'
+import { BOARD_LABELS, boardJoinForm, correctableMilestone, nextCall } from '#shared/utils/backstage'
 import type { BoardSide } from '#shared/utils/backstage'
 
 definePageMeta({ layout: 'backstage', docs: '/docs/tonight/backstage' })
@@ -11,6 +11,9 @@ const joining = ref(false)
 const failure = ref<string | null>(null)
 const joined = ref<{ venueName: string } | null>(null)
 const deviceToken = useCookie<string | null>('nnt-backstage-token', { maxAge: 60 * 60 * 24, sameSite: 'lax' })
+// A phone whose cookie still works reopens its board rather than joining again as a second
+// device (issue 1313); until that answer comes, neither the form nor the board is drawn.
+const resuming = ref(Boolean(deviceToken.value))
 
 // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 async function join(): Promise<void> {
@@ -36,7 +39,7 @@ useSeoMeta({ title: 'Backstage board' })
 
 // The board itself, once joined (E-121, E-122).
 
-interface MilestoneType { id: string, label: string }
+interface MilestoneType { id: string, label: string, sort: number }
 interface Preset { id: string, label: string, body: string }
 interface Message {
   id: string
@@ -50,6 +53,7 @@ interface Message {
 }
 interface Acknowledgement { messageId: string, deviceId: string }
 interface Seen { messageId: string, seenAt: number }
+interface BoardRead { messages: Message[], acknowledgements: Acknowledgement[], seen: Seen[], deviceId: string, venueName: string | null }
 
 const milestoneTypes = ref<MilestoneType[]>([])
 const presets = ref<Preset[]>([])
@@ -70,13 +74,16 @@ async function loadConfig(): Promise<void> {
   catch { /* the buttons below just stay empty; the feed still polls */ }
 }
 
+function take(answered: BoardRead): void {
+  messages.value = answered.messages
+  acknowledgements.value = answered.acknowledgements
+  seen.value = answered.seen
+  deviceId.value = answered.deviceId
+}
+
 async function loadMessages(): Promise<void> {
   try {
-    const answered = await $fetch<{ messages: Message[], acknowledgements: Acknowledgement[], seen: Seen[], deviceId: string }>('/api/board/messages')
-    messages.value = answered.messages
-    acknowledgements.value = answered.acknowledgements
-    seen.value = answered.seen
-    deviceId.value = answered.deviceId
+    take(await $fetch<BoardRead>('/api/board/messages'))
     boardFailure.value = null
   }
   catch (error) {
@@ -84,13 +91,32 @@ async function loadMessages(): Promise<void> {
   }
 }
 
+// A refused cookie (revoked by a reset, or last night's) goes, and the form takes its place.
+async function resume(): Promise<void> {
+  try {
+    const answered = await $fetch<BoardRead>('/api/board/messages')
+    take(answered)
+    joined.value = { venueName: answered.venueName ?? 'Tonight\'s board' }
+  }
+  catch {
+    deviceToken.value = null
+  }
+  finally {
+    resuming.value = false
+  }
+}
+
+onMounted(() => {
+  if (resuming.value) resume()
+})
+
 // Within five seconds, the contract this story states directly, not a configuration key
 // (criterion 3).
 const POLL_MS = 5_000
 let timer: ReturnType<typeof setInterval> | undefined
 
 watch(joined, (value) => {
-  if (!value) return
+  if (!value || timer) return
   loadConfig()
   loadMessages()
   timer = setInterval(loadMessages, POLL_MS)
@@ -138,6 +164,31 @@ function postFreeText(): void {
   freeText.value = ''
 }
 
+// The wings' own next call in the committee's order, and their latest milestone while nobody has
+// called another since, which is the one a mis-tap can still be changed on (issue 1313).
+const next = computed(() => nextCall(milestoneTypes.value, messages.value))
+const changeable = computed(() => correctableMilestone('BACKSTAGE', messages.value))
+const changing = ref(false)
+const changeFailure = ref<string | null>(null)
+
+async function changeTo(milestoneTypeId: string): Promise<void> {
+  const wrong = changeable.value
+  if (!wrong) return
+  changeFailure.value = null
+  try {
+    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
+    await $fetch<unknown>(`/api/board/messages/${wrong.id}/supersede`, {
+      method: 'POST',
+      body: { milestoneTypeId, composedAt: Math.floor(Date.now() / 1000) },
+    })
+    changing.value = false
+    await loadMessages()
+  }
+  catch (error) {
+    changeFailure.value = refusalText(error)
+  }
+}
+
 async function acknowledge(messageId: string): Promise<void> {
   try {
     // @ts-expect-error an options-carrying call has no working generic form yet (0053).
@@ -157,7 +208,15 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
 
 <template>
   <div class="mx-auto w-full max-w-md">
-    <UPageCard v-if="!joined">
+    <p
+      v-if="resuming"
+      class="text-center text-muted"
+      data-test="board-resuming"
+    >
+      Opening tonight's board…
+    </p>
+
+    <UPageCard v-else-if="!joined">
       <UForm
         :schema="boardJoinForm"
         :state="state"
@@ -193,13 +252,30 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
           />
         </UFormField>
 
+        <!-- Picked, not typed in the dark; still only a label the duty manager reads (issue 1313). -->
         <UFormField
-          label="Your name or role"
+          label="Who you are"
           name="label"
-          description="Shown to the duty manager, nothing else. Not validated against anything."
         >
+          <div
+            class="mb-2 flex flex-wrap gap-2"
+            data-test="board-label-chips"
+          >
+            <UButton
+              v-for="label in BOARD_LABELS"
+              :key="label"
+              :color="state.label === label ? 'primary' : 'neutral'"
+              :variant="state.label === label ? 'solid' : 'subtle'"
+              class="min-h-12"
+              :data-test="`board-label-${label}`"
+              @click="state.label = label"
+            >
+              {{ label }}
+            </UButton>
+          </div>
           <UInput
             v-model="state.label"
+            placeholder="Or type something else"
             class="w-full"
             data-test="board-label-input"
           />
@@ -262,6 +338,30 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
           <span v-else>· not seen yet</span>
         </template>
 
+        <UButton
+          v-if="changeable"
+          color="neutral"
+          variant="link"
+          class="min-h-12"
+          data-test="board-change-call"
+          @click="changing = true"
+        >
+          Wrong call? Change it
+        </UButton>
+
+        <UButton
+          v-if="next"
+          color="primary"
+          size="xl"
+          block
+          icon="i-lucide-arrow-right"
+          class="min-h-14"
+          data-test="board-next-call"
+          @click="postMilestone(next.id)"
+        >
+          Next call: {{ next.label }}
+        </UButton>
+
         <div
           v-if="milestoneTypes.length || presets.length"
           class="grid grid-cols-2 gap-2"
@@ -270,6 +370,7 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
             v-for="type in milestoneTypes"
             :key="type.id"
             color="primary"
+            variant="subtle"
             size="lg"
             class="min-h-12"
             :data-test="`milestone-${type.id}`"
@@ -325,5 +426,40 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
         </template>
       </BoardFeed>
     </div>
+
+    <UModal
+      v-model:open="changing"
+      title="Change the call"
+      :description="changeable ? `Sent as ${changeable.milestoneLabel}. Pick what it should have been.` : ''"
+    >
+      <template #body>
+        <div
+          class="space-y-3"
+          data-test="board-change-form"
+        >
+          <UAlert
+            v-if="changeFailure"
+            color="error"
+            variant="subtle"
+            :description="changeFailure"
+            data-test="board-change-failure"
+          />
+          <div class="grid grid-cols-2 gap-2">
+            <UButton
+              v-for="type in milestoneTypes.filter(one => one.id !== changeable?.milestoneTypeId)"
+              :key="type.id"
+              color="neutral"
+              variant="outline"
+              size="lg"
+              class="min-h-12"
+              :data-test="`board-change-to-${type.id}`"
+              @click="changeTo(type.id)"
+            >
+              {{ type.label }}
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
