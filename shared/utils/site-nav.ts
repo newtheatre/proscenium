@@ -264,8 +264,8 @@ export const CONSOLE_NAV: NavGroup[] = [
   },
 ]
 
-// The member's own screens: what is mine right now (K-127 criterion 2). Six for everybody, each a
-// job that reaches its own second page, and two that only some viewers hold (issue 1342).
+// What is mine right now (K-127 criterion 2): six entries for everybody, one a job, and two that
+// only some viewers hold. A job's second page is linked from its own screen (issue 1342).
 export const MY_NAV: NavEntry[] = [
   // Module K: platform
 
