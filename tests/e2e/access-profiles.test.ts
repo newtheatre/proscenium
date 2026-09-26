@@ -209,8 +209,8 @@ async function patronOnAccessPage(): Promise<Bun.WebView> {
   return view
 }
 
-function ticked(view: Bun.WebView, flag: string): Promise<string | null> {
-  return view.evaluate<string | null>(`document.querySelector('[data-test="flag-${flag}"]')?.getAttribute('aria-checked') ?? null`)
+function ticked(flag: string): string {
+  return `document.querySelector('[data-test="flag-${flag}"]')?.getAttribute('aria-checked') === 'true'`
 }
 
 describe.skipIf(skip !== null)('the screens', () => {
@@ -221,7 +221,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     view.close()
   }, 120_000)
 
-  test('each need has its own id, so tapping its words ticks that need and no other (issue 1333, K-101)', async () => {
+  test('each need is its own row, at least 48px tall with its own id, so tapping its words ticks that need and no other (issue 1333, K-101)', async () => {
     const view = await patronOnAccessPage()
     const ids = await view.evaluate<string[]>(
       `[...document.querySelectorAll('[data-test="access-needs"] [role="checkbox"]')].map(box => box.id)`,
@@ -229,22 +229,18 @@ describe.skipIf(skip !== null)('the screens', () => {
     expect(ids).toHaveLength(ACCESS_FLAGS.length)
     expect(new Set(ids).size).toBe(ACCESS_FLAGS.length)
 
-    expect(await ticked(view, 'standing')).toBe('false')
-    expect(await ticked(view, 'crowds')).toBe('false')
-    await view.evaluate(`[...document.querySelectorAll('[data-test="access-needs"] label')]
-      .find(label => label.innerText.trim() === ${JSON.stringify(ACCESS_FLAG_LABELS.crowds)}).click()`)
-    await waitFor(view, `document.querySelector('[data-test="flag-crowds"]')?.getAttribute('aria-checked') === 'true'`)
-    expect(await ticked(view, 'standing')).toBe('false')
-    view.close()
-  }, 120_000)
-
-  test('every need is a row a thumb can hit: at least 48px tall, words included (issue 1333, K-101)', async () => {
-    const view = await patronOnAccessPage()
     const heights = await view.evaluate<number[]>(
       `[...document.querySelectorAll('[data-test="access-needs"] label')].map(label => label.getBoundingClientRect().height)`,
     )
     expect(heights).toHaveLength(ACCESS_FLAGS.length)
     for (const height of heights) expect(height).toBeGreaterThanOrEqual(48)
+
+    expect(await view.evaluate<boolean>(ticked('standing'))).toBe(false)
+    expect(await view.evaluate<boolean>(ticked('crowds'))).toBe(false)
+    await view.evaluate(`[...document.querySelectorAll('[data-test="access-needs"] label')]
+      .find(label => label.innerText.trim() === ${JSON.stringify(ACCESS_FLAG_LABELS.crowds)}).click()`)
+    await waitFor(view, ticked('crowds'))
+    expect(await view.evaluate<boolean>(ticked('standing'))).toBe(false)
     view.close()
   }, 120_000)
 })

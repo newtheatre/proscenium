@@ -88,8 +88,8 @@ async function withdraw(): Promise<void> {
 
 const companionOptions = [0, 1, 2].map(value => ({ label: String(value), value }))
 
-// The label fills the row, so the whole 48px line is the target, words included (K-101).
-const NEED_ROW = { root: 'min-h-12 items-center', wrapper: 'flex self-stretch', label: 'flex flex-1 items-center py-2' }
+// The label is the whole row, at least 48px tall, so a tap anywhere on the line ticks its need (K-101).
+const NEED_ROW = { root: 'items-center', label: 'flex min-h-12 items-center py-2' }
 
 onMounted(load)
 
