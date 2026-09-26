@@ -19,9 +19,9 @@ export default defineEventHandler(async (event) => {
   // Guidance is for somebody still coming, from the rows the show page reads (D-102 criterion 4):
   // a cancelled, lapsed, exchanged or already admitted booking is told nothing.
   const coming = reservation.status === 'PENDING' || reservation.status === 'COLLECTED'
-  const [ticketLines, shown] = await Promise.all([
+  const [ticketLines, guidance] = await Promise.all([
     namedTicketLines(reservationId),
-    coming ? bookingGuidance(reservationShowScope(reservationId)) : null,
+    coming ? bookingGuidance(referenceShowScope(reservation.reference)) : null,
   ])
 
   return {
@@ -29,8 +29,7 @@ export default defineEventHandler(async (event) => {
     status: reservation.status,
     cancelledBy: reservation.cancelledBy,
     show: reservation.showTitle,
-    showSlug: shown?.slug ?? null,
-    guidance: shown?.lines ?? [],
+    guidance,
     when: formatLondon(new Date(reservation.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
     totalDue: reservation.status === 'PENDING' ? saysPrice(reservation.totalPence) : null,
     qrSvg: qrSvgBase64(url),

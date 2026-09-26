@@ -610,7 +610,7 @@ export interface ListedShow {
   categoryName: string | null
   assessment: WarningAssessment
   warnings: PublicContentWarning[]
-  // `saysShowGuidance` over the same rows, so the booking form quotes it rather than rebuilding it.
+  // `visitorWarnings` words it from the same rows, so the booking form quotes it, never rebuilds it.
   guidance: string[]
   // Notes qualify the warnings and travel with them, never inside the show projection.
   contentNotes: string | null
