@@ -303,7 +303,7 @@ describe('staffing (criterion 1)', () => {
       shift(database, 's-confirmed', tonight.performanceId, 'CONFIRMED', who, 2)
 
       const found = read<{ shiftId: string, name: string | null }>(
-        database, reportStaffingQuery(tonight.performanceId, tonight.venueId, tonight.night))
+        database, reportStaffingQuery(tonight.performanceId))
       expect(found.find(row => row.shiftId === 's-open')?.name).toBeNull()
       expect(found.find(row => row.shiftId === 's-confirmed')?.name).toBe('Someone holder')
     })
@@ -316,7 +316,7 @@ describe('staffing (criterion 1)', () => {
       shift(database, 's-declined', tonight.performanceId, 'DECLINED', person(database, 'declined'), 2)
 
       const found = read<{ shiftId: string, status: string, name: string | null }>(
-        database, reportStaffingQuery(tonight.performanceId, tonight.venueId, tonight.night))
+        database, reportStaffingQuery(tonight.performanceId))
       expect(found.find(row => row.shiftId === 's-claimed')).toMatchObject({ status: 'CLAIMED', name: 'Someone claimant' })
       expect(found.find(row => row.shiftId === 's-declined')).toMatchObject({ status: 'DECLINED', name: null })
     })

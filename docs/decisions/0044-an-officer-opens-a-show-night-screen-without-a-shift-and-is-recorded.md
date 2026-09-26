@@ -6,6 +6,8 @@
   bypass reaches refund approval for tonight's performance
 - Amended: 26 September 2026 by 0102, under which refund approval reads `money.refund` alone, so
   the bypass no longer reaches it
+- Amended: 26 September 2026 by 0098, under which a bypass is recorded when the officer acts, not
+  when a screen looks, and the night report lists every role an officer stood in for
 
 ## Context
 
