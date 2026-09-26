@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { outstandingNights, zReadingStatement } from '#server/utils/night-reconciliation'
+import { nightsWithTakings, outstandingNights, zReadingStatement } from '#server/utils/night-reconciliation'
+import { fromLondonWallClock } from '#shared/utils/london'
 import { recordZReadingForm } from '#shared/utils/night-reconciliation'
 import { FIRST_RECONCILED_NIGHT } from '#shared/utils/show-night'
 
@@ -86,5 +87,34 @@ describe('only nights since the first reconciled night are outstanding (criterio
     const listed = outstandingNights(ran, new Set(), TONIGHT).map(row => row.night)
     expect(listed).toHaveLength(22)
     expect(listed).toEqual([...listed].sort())
+  })
+})
+
+// Issue #1359: a London day's first and last takings name the show nights it holds money for,
+// since the night runs 04:00 to 04:00 (0014) and the ledger groups by calendar day.
+describe('the nights a London day of takings belongs to', () => {
+  const at = (day: string, hour: number, minute = 0): number => {
+    const [year, month, date] = day.split('-').map(Number) as [number, number, number]
+    return Math.floor(fromLondonWallClock(year, month, date, hour, minute).getTime() / 1000)
+  }
+
+  test('takings after 04:00 are that night\'s', () => {
+    expect(nightsWithTakings([{ firstAt: at('2026-09-05', 14), lastAt: at('2026-09-05', 23) }])).toEqual(['2026-09-05'])
+  })
+
+  test('takings before 04:00 are the night before\'s', () => {
+    expect(nightsWithTakings([{ firstAt: at('2026-09-24', 0), lastAt: at('2026-09-24', 3) }])).toEqual(['2026-09-23'])
+  })
+
+  test('a day with both is money for two nights, and a night is named once', () => {
+    expect(nightsWithTakings([
+      { firstAt: at('2026-09-23', 20), lastAt: at('2026-09-23', 22) },
+      { firstAt: at('2026-09-24', 1), lastAt: at('2026-09-24', 19) },
+    ])).toEqual(['2026-09-23', '2026-09-24'])
+  })
+
+  test('the boundary is 04:00 London on both clock-change days', () => {
+    expect(nightsWithTakings([{ firstAt: at('2026-10-25', 3, 59), lastAt: at('2026-10-25', 4) }])).toEqual(['2026-10-24', '2026-10-25'])
+    expect(nightsWithTakings([{ firstAt: at('2026-03-29', 3, 59), lastAt: at('2026-03-29', 4) }])).toEqual(['2026-03-28', '2026-03-29'])
   })
 })

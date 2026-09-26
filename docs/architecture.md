@@ -323,7 +323,10 @@ confirmation uses.
 
 Closing warns before it commits (criterion 5): `blockingConditionsFor()` lists nights in the
 range with no Z reading at all, and nights whose reading still carries an open variance, both
-read from I-104's own outstanding-night queries rather than reimplemented. Only the list of nights
+read from I-104's own outstanding-night queries rather than reimplemented. A night needs a reading
+when the ledger holds reader takings for it (`DESK` or `TILL` entries tendered `CARD`, the sources
+the expected figure is made of), never because a performance or a till session happened to be
+on it (issue #1359). Only the list of nights
 with no reading starts at `FIRST_RECONCILED_NIGHT` (I-104 criterion 6), so imported history never
 warns; the open-variance list is unfloored, since a recorded reading is a fact to
 resolve whatever its night. A warning is not a refusal; the treasurer closes past it if that is
