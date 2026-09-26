@@ -339,7 +339,10 @@ Open questions for the committee:
   1. Directory filters, designed for the questions the unified system actually raises: everyone; current members; lapsed members; guests who never signed in (claimable accounts); role holders, narrowable to one role; privileged accounts without a second factor; unverified addresses; disabled; anonymised placeholders; and accounts inside a retention warning window. Privileged-without-MFA and approaching-retention also surface as standing warning banners with counts. Workspace-with-password is deliberately not a filter: the user import wipes any password found on an @newtheatre.org.uk address (decision 0008), so the state cannot exist to be filtered for, and a test asserts the invariant instead. Amended 14 September 2026: a shadow account (no password, no Google link, no passkey: made from the console, as a ticket guest or by the import) is its own filter, and is hidden from the listing the way an anonymised row is until a search, its own filter, the never-signed-in filter or `includeShadow` asks for it; the total line says how many were hidden. It is badged Shadow rather than Unverified, because nobody ever registered it to verify (0071).
   2. Search and listing are paginated server-side and column allow-listed; no filter fetches the whole table to the browser.
   3. Creating an account from the console never generates a password: a 24-hour set-password link is emailed instead, and roles can be granted in the same action.
-  4. Anonymised rows are hidden unless explicitly requested.
+  4. Anonymised rows are hidden unless explicitly requested. Amended 26 September 2026 (issue
+     1364): the membership register, its counts and its export leave an erased account's
+     memberships out entirely, and say how many they left out (0071); an erased account's own
+     page is a read-only record, badged Erased, with nothing on it to act.
   5. Every account view links to that person's grants, sign-in methods, membership state and audit history.
   6. An account's own page is reached from the directory and says so: it carries the way back to
      the directory, and it draws a skeleton of the cards that are coming while it loads rather

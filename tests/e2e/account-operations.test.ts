@@ -400,6 +400,14 @@ describe.skipIf(skip !== null)('the account screen', () => {
       expect(read<{ anonymised_at: number | null }>(
         'SELECT anonymised_at FROM users WHERE id = ?', person.id,
       )?.anonymised_at).not.toBeNull()
+
+      // Issue #1364: the page says so and becomes a record, with nothing left to press.
+      await waitFor(view, 'document.body.innerText.includes(\'Account erased\')')
+      await waitFor(view, 'document.querySelector(\'[data-test="state-erased"]\')')
+      expect(await textOf(view, '[data-test="erased-line"]')).toMatch(/^Erased on .+\. Kept only for the theatre's statistics\.$/)
+      for (const gone of ['state-shadow', 'grant-form', 'sign-out-everywhere', 'disable', 'reset-mfa', 'erase-reveal', 'google-link']) {
+        expect(`${gone}: ${await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="${gone}"]'))`)}`).toBe(`${gone}: false`)
+      }
     }
     finally {
       view.close()

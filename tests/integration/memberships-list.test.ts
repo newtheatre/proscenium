@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import { conditionsOf, filterQuerySchema } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { membershipsList } from '#shared/utils/memberships-list'
-import { membershipsClause, notRenewed } from '#server/utils/membership'
+import { membershipsClause, notRenewed, registerExportWhere } from '#server/utils/membership'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
@@ -134,6 +134,51 @@ describe('a renewal that has not started yet', () => {
       const statement = sql`SELECT memberships.id AS id FROM memberships WHERE ${notRenewed()} ORDER BY memberships.id`
       const [text, ...parameters] = boundStatement(database, statement)
       expect(rows<{ id: string }>(database, text, ...parameters).map(row => row.id)).toEqual(['m-alone', 'm-renewal'])
+    })
+  })
+})
+
+// Issue #1364 and A-121 criterion 4: an erased account's membership is statistics, not somebody
+// on the register, so every view of it and the export leave it out, and the hiding is counted.
+describe('an erased member is off the register and its export, counted as hidden', () => {
+  function erased(database: TestDatabase, id: string): void {
+    database.batch([['INSERT INTO users (id, email, name, anonymised_at) VALUES (?, ?, ?, ?)', id, `deleted-${id}@anonymised.invalid`, 'Deleted user', 1_780_000_000]])
+  }
+
+  function hidden(database: TestDatabase, query: Record<string, string>): number {
+    const clause = membershipsClause(parsed(query), GRACE)
+    const [text, ...parameters] = boundStatement(database, sql`SELECT count(*) AS n FROM memberships
+      JOIN users ON users.id = memberships.user_id WHERE ${clause.hiddenErased}`)
+    return rows<{ n: number }>(database, text, ...parameters)[0]!.n
+  }
+
+  test('no filter or search reaches it, and each counts what it hid', async () => {
+    await withDatabase((database) => {
+      person(database, 'u-held', 'Hal Held')
+      erased(database, 'u-gone')
+      membership(database, 'm-held', 'u-held', daysAfter(TODAY, -30), daysAfter(TODAY, 30), true)
+      membership(database, 'm-gone', 'u-gone', daysAfter(TODAY, -30), daysAfter(TODAY, 30), false)
+
+      for (const filter of ['current', 'awaiting-check', 'everyone']) {
+        expect(`${filter}: ${ids(database, { filter })}`).not.toContain('m-gone')
+      }
+      expect(ids(database, { filter: 'everyone', search: 'deleted' })).toEqual([])
+      expect(hidden(database, {})).toBe(1)
+      expect(hidden(database, { filter: 'everyone' })).toBe(1)
+      expect(hidden(database, { filter: 'lapsed' })).toBe(0)
+    })
+  })
+
+  test('the export\'s predicate leaves it out too', async () => {
+    await withDatabase((database) => {
+      person(database, 'u-held', 'Hal Held')
+      erased(database, 'u-gone')
+      membership(database, 'm-held', 'u-held', daysAfter(TODAY, -30), daysAfter(TODAY, 30), true)
+      membership(database, 'm-gone', 'u-gone', daysAfter(TODAY, -30), daysAfter(TODAY, 30), true)
+
+      const [text, ...parameters] = boundStatement(database, sql`SELECT memberships.id AS id FROM memberships
+        JOIN users ON users.id = memberships.user_id WHERE ${registerExportWhere('everyone', undefined, GRACE)}`)
+      expect(rows<{ id: string }>(database, text, ...parameters).map(row => row.id)).toEqual(['m-held'])
     })
   })
 })
