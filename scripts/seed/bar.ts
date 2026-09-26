@@ -1,6 +1,7 @@
 // The bar: a catalogue with categories, variants and recipes, stock that has actually moved, a
 // stocktake applied and another open, and a till session for tonight and one already closed.
 
+import { deliveryCost } from '../../shared/utils/bar'
 import { londonDayOf } from '../../shared/utils/ledger'
 import { ensure, holds, insert, insertOnly, seedId } from './statements'
 import { personIn } from './people'
@@ -18,7 +19,8 @@ interface SeedItem {
   parQty: number | null
   ageRestricted: boolean
   allergenNotes: string | null
-  unitCostPence: number
+  // What one container of a measured item, or one whole item, was bought for (0100).
+  costPence: number
   caseSize: number
   status?: 'RETIRED'
 }
@@ -26,25 +28,25 @@ interface SeedItem {
 // What the cellar holds, in the measure it is bought in: a spirit by the bottle in millilitres, a
 // can by the case. The measure is fixed once stock has moved, which a trigger enforces (F-111).
 const ITEMS: SeedItem[] = [
-  { slug: 'gin', name: 'Gin', unit: 'ML', containerMl: 700, parQty: 2800, ageRestricted: true, allergenNotes: null, unitCostPence: 1400, caseSize: 6 },
-  { slug: 'vodka', name: 'Vodka', unit: 'ML', containerMl: 700, parQty: 2800, ageRestricted: true, allergenNotes: null, unitCostPence: 1300, caseSize: 6 },
-  { slug: 'rum', name: 'Dark rum', unit: 'ML', containerMl: 700, parQty: 1400, ageRestricted: true, allergenNotes: null, unitCostPence: 1500, caseSize: 6 },
-  { slug: 'whisky', name: 'Whisky', unit: 'ML', containerMl: 700, parQty: 1400, ageRestricted: true, allergenNotes: null, unitCostPence: 1800, caseSize: 6 },
-  { slug: 'tonic', name: 'Tonic water', unit: 'ML', containerMl: 1000, parQty: 6000, ageRestricted: false, allergenNotes: null, unitCostPence: 90, caseSize: 12 },
-  { slug: 'lemonade', name: 'Lemonade', unit: 'ML', containerMl: 1000, parQty: 6000, ageRestricted: false, allergenNotes: null, unitCostPence: 90, caseSize: 12 },
-  { slug: 'cola', name: 'Cola', unit: 'ML', containerMl: 1000, parQty: 6000, ageRestricted: false, allergenNotes: null, unitCostPence: 95, caseSize: 12 },
-  { slug: 'orange-juice', name: 'Orange juice', unit: 'ML', containerMl: 1000, parQty: 3000, ageRestricted: false, allergenNotes: null, unitCostPence: 120, caseSize: 8 },
-  { slug: 'house-red', name: 'House red', unit: 'ML', containerMl: 750, parQty: 3000, ageRestricted: true, allergenNotes: 'Contains sulphites.', unitCostPence: 650, caseSize: 6 },
-  { slug: 'house-white', name: 'House white', unit: 'ML', containerMl: 750, parQty: 3000, ageRestricted: true, allergenNotes: 'Contains sulphites.', unitCostPence: 650, caseSize: 6 },
-  { slug: 'prosecco', name: 'Prosecco', unit: 'ML', containerMl: 750, parQty: 1500, ageRestricted: true, allergenNotes: 'Contains sulphites.', unitCostPence: 800, caseSize: 6 },
-  { slug: 'lager', name: 'Lager', unit: 'ITEM', containerMl: null, parQty: 72, ageRestricted: true, allergenNotes: 'Contains barley (gluten).', unitCostPence: 90, caseSize: 24 },
-  { slug: 'ale', name: 'Pale ale', unit: 'ITEM', containerMl: null, parQty: 48, ageRestricted: true, allergenNotes: 'Contains barley (gluten).', unitCostPence: 130, caseSize: 24 },
-  { slug: 'cider', name: 'Cider', unit: 'ITEM', containerMl: null, parQty: 48, ageRestricted: true, allergenNotes: null, unitCostPence: 120, caseSize: 24 },
-  { slug: 'alcohol-free-lager', name: 'Alcohol-free lager', unit: 'ITEM', containerMl: null, parQty: 24, ageRestricted: false, allergenNotes: 'Contains barley (gluten).', unitCostPence: 100, caseSize: 24 },
-  { slug: 'crisps', name: 'Crisps', unit: 'ITEM', containerMl: null, parQty: 60, ageRestricted: false, allergenNotes: 'May contain milk.', unitCostPence: 30, caseSize: 48 },
-  { slug: 'chocolate', name: 'Chocolate bar', unit: 'ITEM', containerMl: null, parQty: 40, ageRestricted: false, allergenNotes: 'Contains milk, soya and may contain nuts.', unitCostPence: 45, caseSize: 48 },
+  { slug: 'gin', name: 'Gin', unit: 'ML', containerMl: 700, parQty: 2800, ageRestricted: true, allergenNotes: null, costPence: 1400, caseSize: 6 },
+  { slug: 'vodka', name: 'Vodka', unit: 'ML', containerMl: 700, parQty: 2800, ageRestricted: true, allergenNotes: null, costPence: 1300, caseSize: 6 },
+  { slug: 'rum', name: 'Dark rum', unit: 'ML', containerMl: 700, parQty: 1400, ageRestricted: true, allergenNotes: null, costPence: 1500, caseSize: 6 },
+  { slug: 'whisky', name: 'Whisky', unit: 'ML', containerMl: 700, parQty: 1400, ageRestricted: true, allergenNotes: null, costPence: 1800, caseSize: 6 },
+  { slug: 'tonic', name: 'Tonic water', unit: 'ML', containerMl: 1000, parQty: 6000, ageRestricted: false, allergenNotes: null, costPence: 90, caseSize: 12 },
+  { slug: 'lemonade', name: 'Lemonade', unit: 'ML', containerMl: 1000, parQty: 6000, ageRestricted: false, allergenNotes: null, costPence: 90, caseSize: 12 },
+  { slug: 'cola', name: 'Cola', unit: 'ML', containerMl: 1000, parQty: 6000, ageRestricted: false, allergenNotes: null, costPence: 95, caseSize: 12 },
+  { slug: 'orange-juice', name: 'Orange juice', unit: 'ML', containerMl: 1000, parQty: 3000, ageRestricted: false, allergenNotes: null, costPence: 120, caseSize: 8 },
+  { slug: 'house-red', name: 'House red', unit: 'ML', containerMl: 750, parQty: 3000, ageRestricted: true, allergenNotes: 'Contains sulphites.', costPence: 650, caseSize: 6 },
+  { slug: 'house-white', name: 'House white', unit: 'ML', containerMl: 750, parQty: 3000, ageRestricted: true, allergenNotes: 'Contains sulphites.', costPence: 650, caseSize: 6 },
+  { slug: 'prosecco', name: 'Prosecco', unit: 'ML', containerMl: 750, parQty: 1500, ageRestricted: true, allergenNotes: 'Contains sulphites.', costPence: 800, caseSize: 6 },
+  { slug: 'lager', name: 'Lager', unit: 'ITEM', containerMl: null, parQty: 72, ageRestricted: true, allergenNotes: 'Contains barley (gluten).', costPence: 90, caseSize: 24 },
+  { slug: 'ale', name: 'Pale ale', unit: 'ITEM', containerMl: null, parQty: 48, ageRestricted: true, allergenNotes: 'Contains barley (gluten).', costPence: 130, caseSize: 24 },
+  { slug: 'cider', name: 'Cider', unit: 'ITEM', containerMl: null, parQty: 48, ageRestricted: true, allergenNotes: null, costPence: 120, caseSize: 24 },
+  { slug: 'alcohol-free-lager', name: 'Alcohol-free lager', unit: 'ITEM', containerMl: null, parQty: 24, ageRestricted: false, allergenNotes: 'Contains barley (gluten).', costPence: 100, caseSize: 24 },
+  { slug: 'crisps', name: 'Crisps', unit: 'ITEM', containerMl: null, parQty: 60, ageRestricted: false, allergenNotes: 'May contain milk.', costPence: 30, caseSize: 48 },
+  { slug: 'chocolate', name: 'Chocolate bar', unit: 'ITEM', containerMl: null, parQty: 40, ageRestricted: false, allergenNotes: 'Contains milk, soya and may contain nuts.', costPence: 45, caseSize: 48 },
   // Retired, so the catalogue screen shows the state and the history that names it survives.
-  { slug: 'alcopop', name: 'Alcopop', unit: 'ITEM', containerMl: null, parQty: null, ageRestricted: true, allergenNotes: null, unitCostPence: 110, caseSize: 24, status: 'RETIRED' },
+  { slug: 'alcopop', name: 'Alcopop', unit: 'ITEM', containerMl: null, parQty: null, ageRestricted: true, allergenNotes: null, costPence: 110, caseSize: 24, status: 'RETIRED' },
 ]
 
 interface SeedVariant {
@@ -461,13 +463,17 @@ function seedStock(target: SeedTarget, items: Map<string, string>, keeper: strin
     const delivered = (item.unit === 'ML' ? item.containerMl! : 1) * item.caseSize
 
     const deliveryId = seedId('movement', item.slug, 'delivery')
+    // Kept the way the route keeps it: a measured item's cost is its container's, whole (0100).
+    const cost = deliveryCost(item, delivered, item.costPence)
     if (!holds(target, 'stock_movements', { id: deliveryId })) {
       statements.push(insertOnly('stock_movements', {
         id: deliveryId,
         item_id: itemId,
         qty: delivered,
         kind: 'DELIVERY',
-        unit_cost_pence: item.unitCostPence,
+        unit_cost_pence: cost.unitCostPence,
+        container_cost_pence: cost.containerCostPence,
+        container_qty: cost.containerQty,
         actor_id: keeper,
         created_at: now - 20 * DAY,
       }))

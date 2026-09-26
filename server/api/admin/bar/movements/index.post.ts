@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { HAND_ENTERED_KINDS, KINDS_NEEDING_A_REASON, MOVEMENT_WRITERS, movementForm, says } from '#shared/utils/bar'
+import { HAND_ENTERED_KINDS, KINDS_NEEDING_A_REASON, MOVEMENT_WRITERS, deliveryCost, movementForm, says } from '#shared/utils/bar'
 
 // Record a stock movement by hand: a delivery, wastage, an adjustment, or a reversal of one of
 // them. The row is the record, so nothing here writes a second one to the trail (0010).
@@ -25,10 +25,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: `${says(input.kind)} needs a reason` })
   }
 
-  const unitCostPence = input.unitCostPence ?? null
-  if (unitCostPence !== null && input.kind !== 'DELIVERY') {
+  const costPence = input.costPence ?? null
+  if (costPence !== null && input.kind !== 'DELIVERY') {
     throw createError({ statusCode: 400, statusMessage: 'A cost belongs to a delivery, which is what gross profit is measured against' })
   }
+  // Kept the way the item is bought, never divided into a price a millilitre (0100).
+  const cost = deliveryCost(item, input.qty, costPence)
   if (input.kind === 'DELIVERY' && input.qty < 0) {
     throw createError({ statusCode: 400, statusMessage: 'A delivery adds stock: record what left as wastage or an adjustment' })
   }
@@ -42,9 +44,10 @@ export default defineEventHandler(async (event) => {
   // The predicate rides the write, so two managers reversing the same movement at once produce
   // one reversal and a refusal rather than a constraint error (0003, 0006).
   const written = await db.all<{ id: string }>(sql`
-    INSERT INTO stock_movements (id, item_id, qty, kind, reason, unit_cost_pence, reverses_id, actor_id)
-    SELECT ${id}, ${input.itemId}, ${input.qty}, ${input.kind}, ${reason}, ${unitCostPence},
-           ${reverses?.id ?? null}, ${resolved.account.id}
+    INSERT INTO stock_movements (id, item_id, qty, kind, reason, unit_cost_pence, container_cost_pence, container_qty,
+                                 reverses_id, actor_id)
+    SELECT ${id}, ${input.itemId}, ${input.qty}, ${input.kind}, ${reason}, ${cost.unitCostPence}, ${cost.containerCostPence},
+           ${cost.containerQty}, ${reverses?.id ?? null}, ${resolved.account.id}
     WHERE ${reverses === null ? sql`1` : sql`NOT EXISTS (SELECT 1 FROM stock_movements WHERE reverses_id = ${reverses.id})`}
     RETURNING id
   `)

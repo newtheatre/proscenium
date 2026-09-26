@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { REASONS_BY_KIND, says, saysMoney, saysMovementSource, saysQuantity } from '#shared/utils/bar'
+import { REASONS_BY_KIND, says, saysDeliveryCost, saysMovementSource, saysQuantity } from '#shared/utils/bar'
 import { saysWhen } from '#shared/utils/when'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
 import type { FilterOption } from '#shared/utils/list-filters'
@@ -98,9 +98,8 @@ const columns: TableColumn<StockMovement>[] = [
         : null,
       // Below sm the when and the cost are hidden: shown here instead, so a phone keeps the row
       // actions in view without losing what they said (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.unitCostPence === null
-        ? saysWhen(row.original.createdAt)
-        : `${saysWhen(row.original.createdAt)}, ${saysMoney(row.original.unitCostPence)} a unit`),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, [saysWhen(row.original.createdAt), saysDeliveryCost(row.original)]
+        .filter(Boolean).join(', ')),
     ]),
   },
   {
@@ -119,9 +118,9 @@ const columns: TableColumn<StockMovement>[] = [
   },
   {
     id: 'cost',
-    header: 'Cost a unit',
+    header: 'Cost',
     meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
-    cell: ({ row }) => (row.original.unitCostPence === null ? '' : saysMoney(row.original.unitCostPence)),
+    cell: ({ row }) => saysDeliveryCost(row.original),
   },
   {
     id: 'act',

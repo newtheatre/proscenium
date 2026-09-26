@@ -4,7 +4,11 @@ import {
   MEASURE_PRESETS,
   PRODUCT_AGE_RESTRICTED_DEFAULT,
   STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
+  DELIVERY_COST_QUESTION,
   STOCK_UNITS,
+  asPence,
+  asPounds,
+  deliveryCostBasis,
   measurePreset,
   presetForCategory,
   restrictedStockOf,
@@ -118,7 +122,15 @@ const sizes = ref<SizeRow[]>([])
 const components = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 25 }])
 const choice = reactive({ offered: false, name: '', includedInPrice: false, qty: 1 })
 const choiceOptions = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 1 }])
-const opening = reactive({ offered: false, qty: 1, unitCostPounds: null as number | null })
+const opening = reactive({ offered: false, qty: 1, costPounds: null as number | null })
+
+// The opening delivery's cost is asked the way the stock it comes out of is bought (0100).
+const openingCost = computed(() => {
+  const held = itemMode.value === 'NEW'
+    ? { unit: newItem.unit, containerMl: newItem.containerMl }
+    : knownItems.value.find(item => item.id === existingItemId.value)
+  return DELIVERY_COST_QUESTION[deliveryCostBasis(held ?? { unit: 'ITEM', containerMl: null })]
+})
 
 // The product's switch follows what it pours, by the same rule the route refuses on (F-111
 // criterion 6, issue 1299).
@@ -141,11 +153,6 @@ const ageRestricted = computed({
     product.ageRestricted = value
   },
 })
-
-const asPounds = (pence: number | null | undefined): number | null =>
-  (pence === null || pence === undefined ? null : pence / 100)
-const asPence = (pounds: number | null | undefined): number | null =>
-  (pounds === null || pounds === undefined ? null : Math.round(pounds * 100))
 
 const defaults = ref<Map<ServingKind, number>>(new Map())
 
@@ -315,7 +322,9 @@ function productPayload(): Record<string, unknown> {
 }
 
 function body(): Record<string, unknown> {
-  const openingPayload = opening.offered ? { qty: opening.qty, unitCostPence: asPence(opening.unitCostPounds) } : null
+  const openingPayload = opening.offered
+    ? { qty: opening.qty, costPence: asPence(opening.costPounds) }
+    : null
 
   if (shape.value === 'SIMPLE') {
     const size = simpleSize.value
@@ -691,11 +700,11 @@ function moveFocus(step: number): void {
               />
             </UFormField>
             <UFormField
-              label="Unit cost in pounds"
-              description="What was paid for one, for gross profit reporting."
+              :label="openingCost.label"
+              :description="openingCost.description"
             >
               <UInputNumber
-                v-model="opening.unitCostPounds"
+                v-model="opening.costPounds"
                 :min="0"
                 :step="0.01"
                 class="w-full"

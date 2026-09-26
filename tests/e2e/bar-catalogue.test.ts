@@ -113,6 +113,8 @@ interface ListedMovement {
   kind: string
   reason: string | null
   unitCostPence: number | null
+  containerCostPence: number | null
+  containerQty: number | null
   actorId: string | null
   reversed: boolean
 }
@@ -547,7 +549,7 @@ describe.skipIf(skip !== null)('a stocked item is counted in its own unit (F-114
       itemId: id,
       kind: 'DELIVERY',
       qty: 750,
-      unitCostPence: 480,
+      costPence: 480,
     })).status).toBe(200)
 
     expect((await send('DELETE', `/api/admin/bar/items/${id}`)).status).toBe(409)
@@ -591,7 +593,7 @@ describe.skipIf(skip !== null)('on hand is the sum of the movements (F-114 crite
     const id = await addItem()
     expect(await onHand(id)).toBe(0)
 
-    await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 6000, unitCostPence: 480 })
+    await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 6000, costPence: 480 })
     expect(await onHand(id)).toBe(6000)
 
     await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'WASTAGE', qty: -750, reason: 'BREAKAGE' })
@@ -623,18 +625,32 @@ describe.skipIf(skip !== null)('on hand is the sum of the movements (F-114 crite
   })
 
   test('a delivery records its cost, and nothing else may carry one', async () => {
-    const id = await addItem()
-    await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 750, unitCostPence: 480 })
-    expect((await movements(`&itemId=${id}`))[0]).toMatchObject({ kind: 'DELIVERY', unitCostPence: 480 })
+    const id = await addItem({ unit: 'ITEM', containerMl: null })
+    await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 24, costPence: 95 })
+    expect((await movements(`&itemId=${id}`))[0]).toMatchObject({ kind: 'DELIVERY', unitCostPence: 95, containerCostPence: null })
 
     const refused = await send('POST', '/api/admin/bar/movements', {
       itemId: id,
       kind: 'WASTAGE',
-      qty: -750,
+      qty: -1,
       reason: 'BREAKAGE',
-      unitCostPence: 480,
+      costPence: 95,
     })
     expect(refused.status).toBe(400)
+  })
+
+  // Decision 0100 (issue 1320): one cost is sent, what the delivery was bought at, and the route
+  // keeps it the way the item is bought rather than as a rounded price a millilitre.
+  test('a measured delivery keeps what its container cost, or the whole delivery where it has no size', async () => {
+    const bottled = await addItem()
+    expect((await send('POST', '/api/admin/bar/movements', { itemId: bottled, kind: 'DELIVERY', qty: 4500, costPence: 650 })).status).toBe(200)
+    expect((await movements(`&itemId=${bottled}`))[0])
+      .toMatchObject({ kind: 'DELIVERY', unitCostPence: null, containerCostPence: 650, containerQty: 750 })
+
+    const kegged = await addItem({ containerMl: null })
+    expect((await send('POST', '/api/admin/bar/movements', { itemId: kegged, kind: 'DELIVERY', qty: 50_000, costPence: 12_000 })).status).toBe(200)
+    expect((await movements(`&itemId=${kegged}`))[0])
+      .toMatchObject({ kind: 'DELIVERY', unitCostPence: null, containerCostPence: 12_000, containerQty: 50_000 })
   })
 
   // The kinds the till and the stocktake own cannot be hand-posted, or a sale would exist with no
@@ -679,7 +695,7 @@ describe.skipIf(skip !== null)('a correction supersedes, and stamps who made it 
       itemId: id,
       kind: 'DELIVERY',
       qty: 7500,
-      unitCostPence: 480,
+      costPence: 480,
     }))
     expect(await onHand(id)).toBe(7500)
 
@@ -835,7 +851,7 @@ describe.skipIf(skip !== null)('the screens', () => {
 
     const itemName = named('On screen bottle')
     const itemId = await addItem({ name: itemName, parQty: 5000 })
-    await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 4500, unitCostPence: 480 })
+    await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 4500, costPence: 480 })
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -869,7 +885,7 @@ describe.skipIf(skip !== null)('the screens', () => {
   test('a wastage recorded through the modal reaches the register and moves on hand', async () => {
     const itemName = named('Modal bottle')
     const itemId = await addItem({ name: itemName })
-    await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 3000, unitCostPence: 480 })
+    await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 3000, costPence: 480 })
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -892,8 +908,8 @@ describe.skipIf(skip !== null)('the screens', () => {
   }, 120_000)
 
   // A ticket price is per container, not a per-ml sum nobody has ever priced by hand
-  // (F-114 criterion 6): asked that way, converted to the stored cost per ml.
-  test('a measured item asks a delivery cost per container, converted to a cost per ml', async () => {
+  // (F-114 criterion 6), and it is kept as the container's cost rather than divided (0100).
+  test('a measured item asks a delivery cost per container, and keeps it exactly', async () => {
     const itemName = named('Costed bottle')
     const itemId = await addItem({ name: itemName, containerMl: 700 })
 
@@ -907,15 +923,21 @@ describe.skipIf(skip !== null)('the screens', () => {
     await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="move-${itemId}"]`)
     await click(view, `[data-test="move-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
-    expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost a container')
+    expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost of one container')
 
-    await fillNumber(view, '[data-test="movement-qty"]', '700')
-    // £7 for a 700 ml container is exactly 1p a ml: a round number on both sides of the division.
-    await fillNumber(view, '[data-test="movement-cost"]', '7')
+    await fillNumber(view, '[data-test="movement-qty"]', '4200')
+    // £6.50 for 700 ml is 0.93p a ml, which a whole penny a ml kept as £7.00 a bottle (issue 1320).
+    await fillNumber(view, '[data-test="movement-cost"]', '6.5')
     await click(view, '[data-test="movement-submit"]')
     await waitFor(view, `!document.querySelector('[data-test="movement-form"]')`)
 
-    expect((await movements(`&itemId=${itemId}`))[0]).toMatchObject({ kind: 'DELIVERY', unitCostPence: 1 })
+    expect((await movements(`&itemId=${itemId}`))[0]).toMatchObject({
+      kind: 'DELIVERY',
+      qty: 4200,
+      unitCostPence: null,
+      containerCostPence: 650,
+      containerQty: 700,
+    })
     view.close()
   }, 120_000)
 
@@ -933,7 +955,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="move-${itemId}"]`)
     await click(view, `[data-test="move-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
-    expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost a unit')
+    expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost of one')
 
     view.close()
   }, 120_000)

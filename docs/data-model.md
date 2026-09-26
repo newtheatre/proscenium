@@ -1696,7 +1696,12 @@ posts no entry has none to name and is taken to `SUCCEEDED` afterwards, where th
 counting unit · `kind` CHECK `DELIVERY|SALE|COMP|STOCKTAKE|WASTAGE|TRANSFER|ADJUST|REVERSAL` ·
 `reason`, from `MOVEMENT_REASONS` in `shared/utils/bar.ts` rather than a CHECK, so a
 bar-manager-managed list (F-204) needs no rebuild · `unit_cost_pence`, delivery only (F-119's cost
-basis) · `ref_table` / `ref_id`, set together or not at all · `reverses_id` → stock_movements
+basis), the cost of one unit, which a whole item is bought by · `container_cost_pence` and
+`container_qty`, a delivery only, both or neither and never beside `unit_cost_pence`: what one
+container of a measured item cost in whole pence and what it held in the item's own unit (or the
+whole delivery, where the item has no one container size), added bare and held whole by the
+`stock_movements_container_cost_is_whole` trigger, because a CHECK would rebuild the table (0100) ·
+`ref_table` / `ref_id`, set together or not at all · `reverses_id` → stock_movements
 restrict · `actor_id` → users restrict, NULL being the system · `location_venue_id` NULL, bare
 (no foreign key: one would rebuild this table), the venue the movement happened at, set by the
 till's own write paths from the open session's venue, and by a void's credit from the movement it
@@ -1719,6 +1724,16 @@ wordings cannot drift apart. `SALE` and `COMP` are the whole of the guarded set:
 may take the sum below nothing, deliberately, because a bottle that has gone missing has gone
 missing and a wastage, an adjustment or a stocktake that says so is the point of recording it.
 
+A delivery's cost arrives as one figure, what was paid the way the item is bought, and the route
+keeps it by `deliveryCost` (`shared/utils/bar.ts`): a whole item's cost a unit, a measured item's
+container, or the whole delivery where the item has no one container size. It is divided only
+when it is read, by the one reading, `unitCostPence` (`server/utils/bar-reports.ts`): each
+unreversed delivery's cost per unit is `container_cost_pence / container_qty` or
+`unit_cost_pence`, weighted by quantity across the item's deliveries, and gross profit, the
+wastage report, the variance report and a stocktake's preview each round their own figure to
+whole pence once (0004). Whole pence a millilitre would keep a £6.50 bottle as £7.50 and
+a £1.20 mixer as nothing, so no row is rescaled and no measured cost is stored divided (0100).
+
 The kind vocabulary is complete from the first migration because widening a CHECK is a table
 rebuild, and a rebuild of an append-only table is refused (0010). `MOVEMENT_WRITERS` says which
 path writes each: the stock screen writes `DELIVERY`, `WASTAGE`, `ADJUST` and `REVERSAL`, and
@@ -1727,7 +1742,7 @@ Index on (`ref_table`, `ref_id`): a void looks movements up by their source docu
 only prior index on `ref_id` was the partial one on stocktake lines (0003).
 
 ### stocktakes / stocktake_lines
-A delivery is a `stock_movements` row on its own (`DELIVERY`, with `unit_cost_pence`); there is no
+A delivery is a `stock_movements` row on its own (`DELIVERY`, with its cost); there is no
 separate `stock_deliveries` header table, so what follows is stocktakes alone (F-115).
 
 `stocktakes`: `id` PK · `status` CHECK `OPEN|APPLIED`, default `OPEN` · `opened_by` / `opened_at` ·

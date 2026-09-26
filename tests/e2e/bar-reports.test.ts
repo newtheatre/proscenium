@@ -74,12 +74,12 @@ function openTill(venueId: string, performanceId: string, as: string = barStaff.
 }
 
 // A delivered, sellable item with a known cost, so GP is a figure the test can predict exactly.
-async function aStockedProduct(pricePence: number, unitCostPence: number): Promise<{ variantId: string, itemId: string }> {
+async function aStockedProduct(pricePence: number, bottlePence: number): Promise<{ variantId: string, itemId: string }> {
   const categoryAnswered = await send('POST', '/api/admin/bar/categories', { name: named('Spirits') })
   const { id: categoryId } = await categoryAnswered.json() as { id: string }
   const itemAnswered = await send('POST', '/api/admin/bar/items', { name: named('Gin'), unit: 'ML', containerMl: 700 })
   const { id: itemId } = await itemAnswered.json() as { id: string }
-  await send('POST', '/api/admin/bar/movements', { itemId, qty: 700, kind: 'DELIVERY', unitCostPence })
+  await send('POST', '/api/admin/bar/movements', { itemId, qty: 700, kind: 'DELIVERY', costPence: bottlePence })
   const productAnswered = await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId })
   const { id: productId } = await productAnswered.json() as { id: string }
   const variantAnswered = await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' })

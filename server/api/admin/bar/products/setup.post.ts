@@ -91,6 +91,7 @@ export default defineEventHandler(async (event) => {
     today,
     pricedKinds: defaults.map(row => row.servingKind),
     retiredItems: held.filter(item => item.status === 'RETIRED').map(item => item.name),
+    pouredItem: input.shape !== 'RECIPE' && input.item.mode === 'EXISTING' ? held[0] : undefined,
     newId,
   })
 

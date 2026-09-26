@@ -202,13 +202,29 @@ describe('one submission sets up a whole product (F-127 criterion 4)', () => {
     await withDatabase((database) => {
       bar(database)
       const plan = planProductSetup(
-        { ...CIDER, opening: { qty: 24, unitCostPence: 95 } } as ProductSetupInput,
+        { ...CIDER, opening: { qty: 24, costPence: 95 } } as ProductSetupInput,
         context(),
       )
       apply(database, plan)
 
       expect(rows(database, 'SELECT kind, qty, unit_cost_pence FROM stock_movements'))
         .toEqual([{ kind: 'DELIVERY', qty: 24, unit_cost_pence: 95 }])
+    })
+  })
+
+  // Decision 0100 (issue 1320): the set-up sent a bottle's price as the price of each millilitre,
+  // so a measured opening delivery keeps what its container cost.
+  test('a measured opening delivery keeps what one container cost and what it held', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      const plan = planProductSetup(
+        { ...HOUSE_RED, opening: { qty: 4500, costPence: 650 } } as ProductSetupInput,
+        context(),
+      )
+      apply(database, plan)
+
+      expect(rows(database, 'SELECT qty, unit_cost_pence, container_cost_pence, container_qty FROM stock_movements'))
+        .toEqual([{ qty: 4500, unit_cost_pence: null, container_cost_pence: 650, container_qty: 750 }])
     })
   })
 })
