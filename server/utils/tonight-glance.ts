@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { doorWordingFor } from './access-profiles'
-import { reservationSeatsSubquery } from './capacity'
+import { heldSeatsForReservation } from './capacity'
 import { HOLDING_STATUSES } from '#shared/utils/capacity'
 import type { SQL } from 'drizzle-orm'
 
@@ -48,7 +48,7 @@ export interface AccessTonight {
 // screen applies before it decrypts anything (D-127 criterion 3).
 export function accessBookingsQuery(performanceId: string): SQL {
   return sql`
-    SELECT r.user_id AS userId, u.name AS name, ${reservationSeatsSubquery(sql`r.id`)} AS party
+    SELECT r.user_id AS userId, u.name AS name, ${heldSeatsForReservation(sql`r.id`)} AS party
     FROM reservations r
     JOIN users u ON u.id = r.user_id
     WHERE r.performance_id = ${performanceId}
