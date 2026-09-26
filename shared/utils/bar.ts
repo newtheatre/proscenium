@@ -18,9 +18,8 @@ export type ProductStatus = (typeof PRODUCT_STATUSES)[number]
 export const ALLERGEN_STATES = ['UNKNOWN', 'NONE', 'RECORDED'] as const
 export type AllergenState = (typeof ALLERGEN_STATES)[number]
 
-// F-111 criterion 6: every screen that creates either reads its default from here. A product is
-// mostly not alcohol; a stocked item mostly is, and Challenge 25 is a refusal to get wrong.
-export const PRODUCT_AGE_RESTRICTED_DEFAULT = false
+// F-111 criterion 6: every screen that creates a stocked item reads its default from here; one
+// mostly is alcohol. A product has none: its Check ID follows what it pours (issue 1299).
 export const STOCK_ITEM_AGE_RESTRICTED_DEFAULT = true
 
 // "Gin and Campari, which are age restricted": what every Check ID notice says a product pours.
@@ -263,7 +262,8 @@ export const productForm = z.object({
   categoryId: z.string().trim().min(1, 'A product belongs to a category'),
   sort: z.number().int().min(0).max(999).default(0),
   staffedOnly: z.boolean().default(false),
-  ageRestricted: z.boolean().default(PRODUCT_AGE_RESTRICTED_DEFAULT),
+  // "Restricted anyway": Check ID even where nothing it pours is restricted (issue 1299).
+  ageRestricted: z.boolean().default(false),
   allergenState: z.enum(ALLERGEN_STATES).default('UNKNOWN'),
   allergenNote: z.string().trim().max(MAX_ALLERGEN_NOTE).nullish(),
 }).refine(

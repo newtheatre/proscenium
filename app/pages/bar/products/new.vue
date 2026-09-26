@@ -2,7 +2,6 @@
 import {
   ALLERGEN_STATES,
   MEASURE_PRESETS,
-  PRODUCT_AGE_RESTRICTED_DEFAULT,
   STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   STOCK_UNITS,
   measurePreset,
@@ -89,7 +88,8 @@ const product = reactive({
   categoryId: '',
   sort: 0,
   staffedOnly: false,
-  ageRestricted: PRODUCT_AGE_RESTRICTED_DEFAULT,
+  // Restricted anyway only: what it pours decides the rest (issue 1299).
+  ageRestricted: false,
   allergenState: 'UNKNOWN' as AllergenState,
   allergenNote: '',
 })

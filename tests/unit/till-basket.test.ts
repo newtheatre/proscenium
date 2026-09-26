@@ -17,10 +17,12 @@ function aVariant(over: Partial<SaleVariant> = {}): SaleVariant {
     priceSource: 'variant',
     choice: null,
     stock: null,
+    ageRestricted: false,
     ...over,
   }
 }
 
+// A product marked restricted holds a size that asks, as the catalogue derives it (issue 1299).
 function aProduct(over: Partial<SaleProduct> = {}): SaleProduct {
   return {
     id: 'product-1',
@@ -29,7 +31,7 @@ function aProduct(over: Partial<SaleProduct> = {}): SaleProduct {
     ageRestricted: false,
     allergenState: 'NONE',
     allergenNote: null,
-    variants: [aVariant()],
+    variants: [aVariant({ ageRestricted: over.ageRestricted ?? false })],
     ...over,
   }
 }
@@ -193,7 +195,7 @@ describe('a restricted line is read off the catalogue, never asked for twice (F-
   })
 
   test('one age-restricted product line needs a check even beside an unrestricted one', () => {
-    const restricted = aProduct({ id: 'p-2', name: 'Wine', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Small' })] })
+    const restricted = aProduct({ id: 'p-2', name: 'Wine', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Small', ageRestricted: true })] })
     const { basket, scope } = setup([aProduct(), restricted])
     basket.tapVariant('Lager', aVariant())
     basket.tapVariant('Wine', aVariant({ id: 'variant-2', label: 'Small' }))
@@ -267,7 +269,7 @@ describe('a restricted tap asks before the drink is poured (F-106 criterion 6)',
   })
 
   test('a basket that already passed does not ask again in the same sale', () => {
-    const second = aProduct({ id: 'p-2', name: 'Vodka', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Single' })] })
+    const second = aProduct({ id: 'p-2', name: 'Vodka', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Single', ageRestricted: true })] })
     const { basket, scope } = setup([aProduct({ name: 'Gin', ageRestricted: true }), second])
     basket.tapVariant('Gin', aVariant())
     basket.acceptAgeCheck({ outcome: 'ACCEPTED', idType: 'PASSPORT', reason: null, description: 'Checked at the till', notes: null })
@@ -302,7 +304,7 @@ describe('visibly over 25 settles the sale like a pass, with nothing to write (F
   const visiblyOver: InlineAgeCheckInput = { outcome: 'NOT_REQUIRED', idType: null, reason: null, description: '', notes: null }
 
   test('a later restricted tap in the same sale does not ask again', () => {
-    const second = aProduct({ id: 'p-2', name: 'Vodka', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Single' })] })
+    const second = aProduct({ id: 'p-2', name: 'Vodka', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Single', ageRestricted: true })] })
     const { basket, scope } = setup([aProduct({ name: 'Gin', ageRestricted: true }), second])
     basket.tapVariant('Gin', aVariant())
     basket.acceptAgeCheck(visiblyOver)
@@ -327,7 +329,7 @@ describe('a refusal at the tap takes the line back out and says so (F-106 criter
   const refused: InlineAgeCheckInput = { outcome: 'REFUSED', idType: null, reason: 'NO_ID_SHOWN', description: 'Declined to show ID', notes: null }
 
   function mixed(over: Partial<TillBasketDeps> = {}) {
-    const restricted = aProduct({ id: 'p-2', name: 'Gin', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Single', pricePence: 300 })] })
+    const restricted = aProduct({ id: 'p-2', name: 'Gin', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Single', pricePence: 300, ageRestricted: true })] })
     const made = setup([aProduct(), restricted], over)
     made.basket.tapVariant('Lager', aVariant())
     made.basket.tapVariant('Gin', aVariant({ id: 'variant-2', label: 'Single', pricePence: 300 }))
@@ -437,6 +439,40 @@ describe('pricing waits for the connection rather than hanging (K-103)', () => {
     await Promise.resolve()
     expect(asked).toHaveLength(1)
     expect(basket.offline.value).toBe(false)
+    scope.stop()
+  })
+})
+
+// Issue 1299: the tap asks for what the line pours, so neither the product's switch nor its tile
+// mark is the whole answer.
+describe('Check ID follows what the line pours, not the product switch alone (issue 1299)', () => {
+  test('a size pouring restricted stock asks at the tap, though its product is not switched on', () => {
+    const wine = aVariant({ id: 'variant-red', label: '175ml', ageRestricted: true })
+    const { basket, scope } = setup([aProduct({ id: 'p-red', name: 'House red', ageRestricted: false, variants: [wine] })])
+    basket.tapVariant('House red', wine)
+    expect(basket.askingAgeCheckFor.value).toBe('House red')
+    expect(basket.needsAgeCheck.value).toBe(true)
+    scope.stop()
+  })
+
+  test('a choice asks only when the option chosen is restricted', () => {
+    const glass = aVariant({
+      id: 'variant-glass',
+      label: 'Glass',
+      ageRestricted: false,
+      choice: { id: 'g-1', name: 'Mixer', options: [{ id: 'o-rum', itemName: 'Rum', ageRestricted: true }, { id: 'o-ice', itemName: 'Ice', ageRestricted: false }] },
+    })
+    const { basket, scope } = setup([aProduct({ id: 'p-cola', name: 'Cola', ageRestricted: true, variants: [glass] })])
+
+    basket.tapVariant('Cola', glass)
+    basket.chooseOption('o-ice', 'Ice')
+    expect(basket.askingAgeCheckFor.value).toBeNull()
+    expect(basket.needsAgeCheck.value).toBe(false)
+
+    basket.tapVariant('Cola', glass)
+    basket.chooseOption('o-rum', 'Rum')
+    expect(basket.askingAgeCheckFor.value).toBe('Cola')
+    expect(basket.needsAgeCheck.value).toBe(true)
     scope.stop()
   })
 })
