@@ -92,6 +92,11 @@ function commitHalf(line: StocktakeLine & { containerMl: number }, half: 'full' 
   if (half === 'full') opening.value = line.itemId
 }
 
+// Leaving a line's fields ends its hold on the filtered view, changed or not.
+function released(event: FocusEvent): void {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) opening.value = null
+}
+
 const shown = (line: StocktakeLine & { containerMl: number }, half: 'full' | 'part'): number | undefined => {
   const qty = drafts.value[line.itemId]
   return qty === undefined ? undefined : splitCount(qty, line.containerMl)[half]
@@ -148,7 +153,6 @@ const FIELD = {
   min: 0,
   increment: false,
   decrement: false,
-  inputmode: 'numeric',
   class: 'w-full',
   ui: { base: 'h-12 text-base' },
   formatOptions: { maximumFractionDigits: 0 },
@@ -195,6 +199,7 @@ const FIELD = {
             <div
               class="flex items-center gap-2"
               :data-test="`count-fields-${line.itemId}`"
+              @focusout="released"
             >
               <template v-if="open && byContainer(line)">
                 <UInputNumber

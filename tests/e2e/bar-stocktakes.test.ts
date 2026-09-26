@@ -529,6 +529,11 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
       await fill(screen, `[data-test="counted-${item.id}"]`, '3')
       await screen.evaluate(`document.querySelector('[data-test="counted-${item.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
       await waitFor(screen, `document.activeElement?.getAttribute('data-test') === 'counted-part-${item.id}'`)
+
+      // Leaving the open container at the nought worked out for it still releases the line.
+      await screen.evaluate(`document.querySelector('[data-test="counted-part-${item.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
+      await screen.evaluate(`document.querySelector('[data-test="counted-part-${item.id}"]')?.blur()`)
+      await waitFor(screen, `!document.querySelector('[data-test="line-${item.id}"]')`)
     }
     finally {
       screen.close()
