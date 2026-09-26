@@ -217,60 +217,59 @@ onMounted(load)
       </li>
     </ul>
 
-    <template #footer>
-      <div class="space-y-4">
-        <UFormField
-          v-if="passwordRefusal === null"
-          label="Password"
-          name="password"
-          description="Add one, or replace the one you have."
-        >
-          <div class="flex flex-wrap items-center gap-2">
-            <UInput
-              v-model="wantedPassword"
-              type="password"
-              placeholder="New password"
-              class="w-full sm:w-80"
-              data-test="new-password"
-            />
-            <UButton
-              color="neutral"
-              variant="subtle"
-              :disabled="!wantedPassword"
-              :loading="settingPassword"
-              data-test="set-password"
-              @click="setPassword"
-            >
-              Save the password
-            </UButton>
-          </div>
-        </UFormField>
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          Theatre addresses sign in with Google and cannot hold a password.
-        </p>
+    <!-- In the default slot, not #footer: a UPageCard footer draws above it, putting the forms before the ways in. -->
+    <div class="mt-6 space-y-4">
+      <UFormField
+        v-if="passwordRefusal === null"
+        label="Password"
+        name="password"
+        description="Add one, or replace the one you have."
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <UInput
+            v-model="wantedPassword"
+            type="password"
+            placeholder="New password"
+            class="w-full sm:w-80"
+            data-test="new-password"
+          />
+          <UButton
+            color="neutral"
+            variant="subtle"
+            :disabled="!wantedPassword"
+            :loading="settingPassword"
+            data-test="set-password"
+            @click="setPassword"
+          >
+            Save the password
+          </UButton>
+        </div>
+      </UFormField>
+      <p
+        v-else
+        class="text-sm text-muted"
+      >
+        Theatre addresses sign in with Google and cannot hold a password.
+      </p>
 
-        <UButton
-          v-if="isSupported && authenticatorFirst !== null && !passkeyNext && !loading"
-          icon="i-lucide-fingerprint"
-          color="neutral"
-          variant="subtle"
-          :loading="enrolling"
-          data-test="add-passkey"
-          @click="addPasskey"
-        >
-          Add a passkey
-        </UButton>
-        <p
-          v-else-if="!isSupported"
-          class="text-sm text-muted"
-        >
-          This browser cannot hold a passkey.
-        </p>
-      </div>
-    </template>
+      <UButton
+        v-if="isSupported && authenticatorFirst !== null && !passkeyNext && !loading"
+        icon="i-lucide-fingerprint"
+        color="neutral"
+        variant="subtle"
+        :loading="enrolling"
+        data-test="add-passkey"
+        @click="addPasskey"
+      >
+        Add a passkey
+      </UButton>
+      <p
+        v-else-if="!isSupported"
+        class="text-sm text-muted"
+      >
+        This browser cannot hold a passkey.
+      </p>
+    </div>
   </UPageCard>
 
   <UPageCard
