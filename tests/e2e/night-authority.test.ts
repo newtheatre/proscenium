@@ -268,7 +268,11 @@ describe.skipIf(skip !== null)('a confirmed shift is tonight\'s authority, tried
     const claimant = await registerMember(app, 'door-claimed', generatePassword())
     shiftFor(house.performanceId, 'DOOR', claimant.id, 'CLAIMED')
 
-    expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, claimant.cookie)).status).toBe(403)
+    const refused = await ask(`role=DOOR&performanceId=${house.performanceId}`, claimant.cookie)
+    expect(refused.status).toBe(403)
+    // The refusal names the claim and who confirms it, rather than "you hold nothing" (issue 1303).
+    expect((await refused.json() as { statusMessage: string }).statusMessage)
+      .toBe('Your door shift tonight is claimed, not confirmed yet: the Front of House Manager confirms it on the rota')
   })
 
   // Losing the shift loses the authority on the very next request, not at next login

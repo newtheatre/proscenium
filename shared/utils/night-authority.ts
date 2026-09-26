@@ -62,6 +62,21 @@ export function nightAuthorityRefusal(role: NightRole): { statusCode: 403, statu
   }
 }
 
+// Whoever confirms a queued claim (E-105): a unit test fails when this role stops holding
+// `rota.write`, so the refusal below cannot send a volunteer to somebody who cannot help.
+export const CLAIM_CONFIRMER: { role: Role, words: string } = { role: 'FOH_MANAGER', words: 'the Front of House Manager' }
+
+const CLAIMED_ROLE_WORDS: Record<NightRole, string> = { DUTY_MANAGER: 'duty manager', DOOR: 'door', BAR: 'bar' }
+
+// A claim waiting for an officer is not a shift yet, and not nothing: the refusal says which, and
+// who turns it into one (E-112 criterion 2, E-104).
+export function claimedShiftRefusal(role: NightRole): { statusCode: 403, statusMessage: string } {
+  return {
+    statusCode: 403,
+    statusMessage: `Your ${CLAIMED_ROLE_WORDS[role]} shift tonight is claimed, not confirmed yet: ${CLAIM_CONFIRMER.words} confirms it on the rota`,
+  }
+}
+
 // Somebody holding tonight's shift outside the hours they work it is not somebody without one, so
 // the refusal quotes the window in London wall clock rather than the ways in (0078, E-131).
 export function outsideWindowRefusal(window: string): { statusCode: 403, statusMessage: string } {

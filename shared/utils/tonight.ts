@@ -31,22 +31,31 @@ export function saysPerformanceChoice(performance: PerformanceChoice): string {
 
 // Who is on tonight, for the contacts block (E-112 criterion 2). A shift's own role order, so
 // the duty manager is always the first number somebody reaches for.
-export interface ContactSlot { role: NightRole, filled: boolean, name: string | null, phone: string | null }
+export interface ContactSlot { role: NightRole, filled: boolean, claimed?: boolean, name: string | null, phone: string | null }
 
 const ROLE_ORDER: NightRole[] = ['DUTY_MANAGER', 'DOOR', 'BAR']
 
 // The same person covering two of tonight's performances is one row, and an unfilled slot stays
-// in the list as unfilled rather than quietly vanishing from it.
+// in the list as unfilled rather than quietly vanishing from it; a claim is neither.
 export function contactRoster<T extends ContactSlot>(slots: T[]): T[] {
   const seen = new Map<string, T>()
   for (const slot of slots) {
-    const key = slot.filled ? `${slot.role}:${slot.name ?? ''}` : `${slot.role}:unfilled`
+    const standing = slot.filled ? 'on' : slot.claimed ? 'claimed' : 'unfilled'
+    const key = `${slot.role}:${standing}:${slot.filled || slot.claimed ? slot.name ?? '' : ''}`
     const held = seen.get(key)
     // A phone that one performance's row carries and another's does not is still a phone.
     if (!held) seen.set(key, slot)
     else if (held.phone === null && slot.phone !== null) seen.set(key, slot)
   }
   return [...seen.values()].sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role))
+}
+
+// Filled means confirmed: a claim reads as the claimant, marked, so nobody takes it for somebody
+// on shift (E-112 criterion 2, docs/copy-style.md section 4).
+export function saysTeamHolder(slot: { filled: boolean, claimed?: boolean, name: string | null }): string {
+  if (slot.filled && slot.name) return slot.name
+  if (slot.claimed && slot.name) return `${slot.name}, claimed, not confirmed`
+  return 'Unfilled'
 }
 
 // A number is dialled, never displayed as a link to somewhere else: a tap on a phone opens the

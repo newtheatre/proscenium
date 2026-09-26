@@ -3,6 +3,7 @@ import { saysMoney } from '#shared/utils/bar'
 import { saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { OFFICER_SIGN_OFF_NOTICE, saysSignedOff, tenderTotalPence } from '#shared/utils/night-signoff'
 import { saysShiftRole } from '#shared/utils/rota'
+import { saysTeamHolder } from '#shared/utils/tonight'
 import { saysClock } from '#shared/utils/when'
 import type { Category, Severity } from '#shared/utils/incidents'
 import type { NightReportSigner } from '#shared/utils/night-signoff'
@@ -19,7 +20,7 @@ interface Report {
   incidents: { id: string, category: Category, severity: Severity, body: string, happenedAt: number, supersededBy: string | null, followUpRequired: boolean }[]
   ageChecks: { accepted: number, refused: number }
   milestones: { id: string, label: string, composedAt: number, supersededBy: string | null }[]
-  staffing: { shiftId: string, role: ShiftRole, slot: number, name: string | null, officerBypass: boolean }[]
+  staffing: { shiftId: string, role: ShiftRole, slot: number, status: string, name: string | null, officerBypass: boolean }[]
   bar: { revenuePence: number, itemsSold: number }
   access: { verified: number }
   checklist: { id: string, label: string, exempted: boolean, exemptReason: string | null }[]
@@ -268,8 +269,8 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
             class="flex justify-between gap-2"
           >
             <span>{{ saysShiftRole(row.role) }}</span>
-            <span :class="row.name ? '' : 'text-muted'">
-              {{ row.name ?? 'Unfilled' }}
+            <span :class="row.status === 'CONFIRMED' ? '' : 'text-muted'">
+              {{ saysTeamHolder({ filled: row.status === 'CONFIRMED', claimed: row.status === 'CLAIMED', name: row.name }) }}
             </span>
           </li>
         </ul>

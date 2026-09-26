@@ -170,7 +170,10 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
   // Somebody holding tonight's shift at the wrong hour is told the hours, not sent to find an
   // officer they do not need; an officer holding one keeps their bypass all the same (0078).
   if (!resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) {
-    throw createError(held.outsideWindow ? outsideWindowRefusal(held.outsideWindow) : nightAuthorityRefusal(role))
+    if (held.outsideWindow) throw createError(outsideWindowRefusal(held.outsideWindow))
+    // A claim still waiting is named, with who confirms it, rather than refused as no shift at all.
+    if (await claimedShiftTonight(resolved.account.id, role, tonight)) throw createError(claimedShiftRefusal(role))
+    throw createError(nightAuthorityRefusal(role))
   }
   // A bypass is a standing grant being used, so it carries the gate that grant carries elsewhere
   // (A-112). A shift will not, because a shift is not a grant (0044).

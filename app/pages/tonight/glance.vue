@@ -5,7 +5,7 @@ import { HUB_KPI_LABELS, compApprovalLine, groupedBoardCode, housePercentLine, h
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { saysShiftRole } from '#shared/utils/rota'
 import { saysPrice } from '#shared/utils/ticket-types'
-import { activePerformanceId } from '#shared/utils/tonight'
+import { activePerformanceId, saysTeamHolder } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 import type { ShiftRole } from '#shared/utils/rota'
 
@@ -13,7 +13,7 @@ definePageMeta({ layout: 'tonight', docs: '/docs/tonight/tonight-at-a-glance' })
 useSeoMeta({ title: 'Tonight at a glance' })
 
 interface AccessTonight { firstName: string, party: number, wording: string }
-interface TeamMember { shiftId: string, role: ShiftRole, filled: boolean, name: string | null, phone: string | null }
+interface TeamMember { shiftId: string, role: ShiftRole, filled: boolean, claimed: boolean, name: string | null, phone: string | null }
 interface Warning { title: string, level: string | null }
 interface Performance {
   performanceId: string
@@ -521,7 +521,7 @@ onUnmounted(() => {
                 v-else
                 class="text-muted"
               >
-                Unfilled
+                {{ saysTeamHolder(member) }}
               </span>
             </li>
           </ul>
