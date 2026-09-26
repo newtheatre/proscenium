@@ -4,13 +4,16 @@ import { findByEmail, newId } from './accounts'
 import { auditedWrite } from './audit'
 import { capacityAllows, heldSeatsQuery, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
 import { configValue } from './configuration'
+import { showWarnings } from './content-warnings'
 import { auditEntry } from '#shared/utils/audit'
 import { normaliseEmail } from '#shared/utils/auth'
 import { HOLDING_STATUSES, capacityRefusal } from '#shared/utils/capacity'
+import { publicContentWarnings, warningAssessment } from '#shared/utils/content-warnings'
 import { generateReservationReference, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 import { resolvePrice } from '#shared/utils/ticket-types'
 import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
+import type { ShowGuidance } from '#shared/utils/content-warnings'
 import type { ReservationSource, TicketTypeCount } from '#shared/utils/reservations'
 import type { PriceSource, TicketTypeAccessKind, TicketTypeRestriction } from '#shared/utils/ticket-types'
 import type { SQL } from 'drizzle-orm'
@@ -244,6 +247,7 @@ export interface ReservationForResend {
   userId: string | null
   reference: string
   status: string
+  showId: string
   showTitle: string
   startsAt: number
   totalPence: number
@@ -254,7 +258,7 @@ export interface ReservationForResend {
 export function reservationForResendQuery(reference: string): SQL {
   return sql`
     SELECT r.id AS id, r.user_id AS userId, r.reference AS reference, r.status AS status,
-           s.title AS showTitle, p.starts_at AS startsAt,
+           s.id AS showId, s.title AS showTitle, p.starts_at AS startsAt,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
@@ -268,10 +272,34 @@ export async function reservationForResend(reference: string): Promise<Reservati
   return row
 }
 
+export interface GuidanceForShow {
+  slug: string
+  guidance: ShowGuidance
+}
+
+// The show's age guidance and warnings as the show page reads them, for the booking page and the
+// email, so neither re-enters them (D-102 criterion 4, issue 1330).
+export async function showGuidance(showId: string): Promise<GuidanceForShow | null> {
+  const [show] = await db.all<{ slug: string, ageGuidance: string | null, confirmedNone: number }>(sql`
+    SELECT slug, age_guidance AS ageGuidance, warnings_confirmed_none AS confirmedNone FROM shows WHERE id = ${showId}
+  `)
+  if (!show) return null
+  const warnings = publicContentWarnings(await showWarnings(showId))
+  return {
+    slug: show.slug,
+    guidance: {
+      ageGuidance: show.ageGuidance,
+      assessment: warningAssessment({ warningsConfirmedNone: show.confirmedNone === 1, warningCount: warnings.length }),
+      warnings: warnings.map(warning => ({ title: warning.title, level: warning.level })),
+    },
+  }
+}
+
 export interface ReservationCurrentState {
   reference: string
   status: string
   cancelledBy: string | null
+  showId: string
   showTitle: string
   startsAt: number
   totalPence: number
@@ -284,7 +312,7 @@ export interface ReservationCurrentState {
 export function reservationCurrentStateQuery(id: string): SQL {
   return sql`
     SELECT r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
-           s.title AS showTitle, p.starts_at AS startsAt,
+           s.id AS showId, s.title AS showTitle, p.starts_at AS startsAt,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
            xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt
     FROM reservations r

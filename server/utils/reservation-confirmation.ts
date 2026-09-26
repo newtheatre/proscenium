@@ -1,5 +1,7 @@
 import { notify } from './notify'
 import { qrPng } from './qr'
+import { showGuidance } from './reservations'
+import { saysShowGuidance } from '#shared/utils/content-warnings'
 import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { H3Event } from 'h3'
@@ -10,6 +12,7 @@ import type { H3Event } from 'h3'
 export interface ConfirmationContext {
   userId: string
   reference: string
+  showId: string
   showTitle: string
   startsAt: number
   totalPence: number
@@ -19,9 +22,12 @@ export interface ConfirmationContext {
 // Shared by the reservation write and the resend route, so a resend renders from the same
 // template with the same QR rather than a second, driftable copy (D-108 criteria 1, 2).
 export async function sendReservationConfirmation(event: H3Event | undefined, context: ConfirmationContext): Promise<void> {
-  const url = `${useRuntimeConfig(event).public.baseURL}/qr/${context.qrToken}`
+  const base = useRuntimeConfig(event).public.baseURL
+  const url = `${base}/qr/${context.qrToken}`
   // The width is the bitmap's own, so the email never scales the code and blurs the modules.
   const { width } = qrPng(url)
+  // The e-ticket carries the show's guidance from its own rows (D-102 criterion 4, issue 1330).
+  const shown = await showGuidance(context.showId)
   await notify(event, {
     userId: context.userId,
     type: 'reservation.confirmed',
@@ -34,6 +40,8 @@ export async function sendReservationConfirmation(event: H3Event | undefined, co
       url,
       imageUrl: `${url}/image.png`,
       qrWidth: width,
+      guidance: shown ? saysShowGuidance(shown.guidance) : [],
+      showUrl: shown ? `${base}/shows/${shown.slug}` : `${base}/whats-on`,
     },
   })
 }

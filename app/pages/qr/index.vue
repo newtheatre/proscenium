@@ -3,6 +3,7 @@ import type * as z from 'zod'
 import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
 import { qrStatusDisplay, reservationResendForm, saysExchangeNight } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
+import type { ShowGuidance } from '#shared/utils/content-warnings'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 
 type Outcome = 'working' | 'found' | 'resend' | 'sent'
@@ -18,6 +19,8 @@ interface Booking {
   status: string
   cancelledBy: string | null
   show: string
+  showSlug: string | null
+  guidance: ShowGuidance | null
   when: string
   totalDue: string | null
   qrSvg: string
@@ -270,6 +273,13 @@ useSeoMeta({ title: 'Your booking' })
           variant="subtle"
           title="Already paid"
           description="You have paid for this booking. Refunds are handled in person at the box office; bring your reference."
+        />
+
+        <BeforeYouBook
+          v-if="booking.guidance && booking.showSlug"
+          :guidance="booking.guidance"
+          :slug="booking.showSlug"
+          heading="Before you come"
         />
 
         <div

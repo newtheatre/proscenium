@@ -113,6 +113,7 @@ export default defineEventHandler(async (event) => {
   await sendReservationConfirmation(event, {
     userId: booker.id,
     reference: result.reference,
+    showId: performance.showId,
     showTitle: performance.showTitle,
     startsAt: performance.startsAt,
     totalPence: result.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0),

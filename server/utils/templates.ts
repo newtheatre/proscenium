@@ -1569,6 +1569,17 @@ The Nottingham New Theatre`,
     const url = String(context.url)
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
+    // The show's guidance, as the booking form said it (D-102 criterion 4, issue 1330). Age
+    // guidance is an officer's own words, so it is escaped like any other free text.
+    const guidance = Array.isArray(context.guidance) ? context.guidance.map(String) : []
+    const showUrl = String(context.showUrl)
+    const guidanceHtml = guidance.length === 0
+      ? ''
+      : `\n<p><strong>Before you come</strong><br>${guidance.map(escapeHtml).join('<br>')}<br>
+<a href="${showUrl}">What each warning means, on the show page</a></p>`
+    const guidanceText = guidance.length === 0
+      ? ''
+      : `\n\nBefore you come\n${guidance.join('\n')}\nWhat each warning means, on the show page: ${showUrl}`
     return {
       subject: `Your booking for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
@@ -1576,7 +1587,7 @@ The Nottingham New Theatre`,
 <p>Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats
 and is not a purchase until then.</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
-<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
+<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>${guidanceHtml}`),
       text: `Hello ${context.name},
 
 Reference ${reference} for ${show}, ${when}.
@@ -1584,7 +1595,7 @@ Reference ${reference} for ${show}, ${when}.
 Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats and
 is not a purchase until then.
 
-Open your booking: ${url}
+Open your booking: ${url}${guidanceText}
 
 The Nottingham New Theatre`,
     }

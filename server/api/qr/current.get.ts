@@ -16,12 +16,16 @@ export default defineEventHandler(async (event) => {
   // Rendered again rather than reusing the email's copy: the image carries the same stable
   // token either way (D-108 criteria 1, 3), and nothing here is cached across a request.
   const url = `${useRuntimeConfig(event).public.baseURL}/qr/${token}`
+  const shown = await showGuidance(reservation.showId)
 
   return {
     reference: reservation.reference,
     status: reservation.status,
     cancelledBy: reservation.cancelledBy,
     show: reservation.showTitle,
+    // The e-ticket carries the show's guidance from the rows the show page reads (D-102 criterion 4).
+    showSlug: shown?.slug ?? null,
+    guidance: shown?.guidance ?? null,
     when: formatLondon(new Date(reservation.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
     totalDue: reservation.status === 'PENDING' ? saysPrice(reservation.totalPence) : null,
     qrSvg: qrSvgBase64(url),
