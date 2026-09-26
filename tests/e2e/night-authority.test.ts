@@ -556,3 +556,52 @@ async function message(response: Response): Promise<string> {
   const body = await response.json() as { statusMessage?: string, message?: string }
   return body.statusMessage ?? body.message ?? ''
 }
+
+// A screen more than one role reaches asks once, with no role (0044, 0098). Every role's shift is
+// tried before any role's bypass, and the refusal that names the caller's own position wins.
+describe.skipIf(skip !== null)('any of tonight\'s roles: a shift before a bypass, the most specific refusal (E-111)', () => {
+  const askAny = (query: string, as: string): Promise<Response> =>
+    request(app, 'GET', `/api/tonight/authority?${query}`, undefined, as)
+
+  test('an officer on a confirmed door shift resolves through the shift, not the duty manager bypass', async () => {
+    const officer = await registerMember(app, 'any-foh-shift', generatePassword())
+    await request(app, 'POST', '/api/admin/roles', { userId: officer.id, role: 'FOH_MANAGER' }, admin.cookie)
+    shiftFor(house.performanceId, 'DOOR', officer.id)
+
+    const response = await askAny(`venueId=${house.venueId}`, officer.cookie)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ role: 'DOOR', via: 'SHIFT' })
+  })
+
+  test('an officer with no shift still resolves through the first role their bypass opens', async () => {
+    const response = await askAny(`venueId=${house.venueId}`, bar.cookie)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ role: 'BAR', via: 'OFFICER' })
+  })
+
+  test('a door claimant is told about the claim, not the bar\'s generic refusal', async () => {
+    const claimant = await registerMember(app, 'any-door-claim', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', claimant.id, 'CLAIMED')
+
+    const response = await askAny(`venueId=${house.venueId}`, claimant.cookie)
+    expect(response.status).toBe(403)
+    expect(await message(response)).toContain('door shift tonight is claimed')
+  })
+
+  test('a door holder outside their hours is told the hours, whichever role is asked last', async () => {
+    const holder = await registerMember(app, 'any-door-hours', generatePassword())
+    const shiftId = shiftFor(house.performanceId, 'DOOR', holder.id)
+    const now = Math.floor(Date.now() / 1000)
+    setShiftWindow(shiftId, now + 6 * 3600, now + 9 * 3600)
+
+    const response = await askAny(`venueId=${house.venueId}`, holder.cookie)
+    expect(response.status).toBe(403)
+    expect(await message(response)).toContain('Your shift opens this from')
+  })
+
+  test('somebody with nothing tonight is refused in the first role\'s words', async () => {
+    const response = await askAny(`venueId=${house.venueId}`, member.cookie)
+    expect(response.status).toBe(403)
+    expect(await message(response)).toContain('duty manager shift')
+  })
+})
