@@ -85,6 +85,8 @@ const EVERYTHING: TemplateContext = {
   passType: 'Season pass',
   priceLabel: '£25.00',
   qrWidth: 165,
+  guidance: ['Age guidance: Recommended 14 and over', 'Content warnings: Strobe lighting; Gun violence: depicted'],
+  showUrl: 'https://newtheatre.org.uk/shows/the-tempest',
   partySize: 2,
   expires: 'Friday 2 October 2026 at 18:00',
   since: 'Friday 2 October 2026 at 06:00',
@@ -220,6 +222,26 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(html).toContain('Your unpaid booking K7M4PQ')
     expect(html).toContain('may be sold to somebody else')
     expect(text).toContain('may be sold to somebody else')
+  })
+
+  // Issue 1330: the email is the e-ticket D-102 criterion 4 names, so the show's guidance travels
+  // with it, beside a link to the show page that carries the rest.
+  test('the confirmation carries the show\'s age guidance and warnings, and links the show page', () => {
+    const { html, text } = render('reservation-confirmed', EVERYTHING)
+    for (const part of [html, text]) {
+      expect(part).toContain('Before you come')
+      expect(part).toContain('Age guidance: Recommended 14 and over')
+      expect(part).toContain('Content warnings: Strobe lighting; Gun violence: depicted')
+    }
+    expect(html).toContain('href="https://newtheatre.org.uk/shows/the-tempest"')
+    expect(text).toContain('https://newtheatre.org.uk/shows/the-tempest')
+  })
+
+  // Age guidance is an officer's own words, so it never reaches the HTML part as markup.
+  test('the guidance is escaped in the HTML part', () => {
+    const { html } = render('reservation-confirmed', { ...EVERYTHING, guidance: ['Age guidance: <b>14+</b>'] })
+    expect(html).toContain('&lt;b&gt;14+&lt;/b&gt;')
+    expect(html).not.toContain('<b>14+</b>')
   })
 
   test('the confirmation says not yet paid in plain weight, and is a booking', () => {

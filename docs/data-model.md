@@ -756,7 +756,11 @@ a short-lived (60 minute) httpOnly cookie and redirects to `/qr`, so the token s
 the address bar or a referrer header after the first open. `GET /api/qr/current` reads that cookie
 and answers the booking's live state (unpaid with the amount due, paid, admitted, cancelled naming
 who, exchanged naming where, or lapsed), never anything saved earlier; "wrong night" has no state
-to report until D-126 exists (`docs/known-issues.md`). `POST /api/reservations/resend`
+to report until D-126 exists (`docs/known-issues.md`). While the booking is unpaid or paid it also
+carries the show's guidance, and so does the confirmation email: `bookingGuidance()` in
+`server/utils/whats-on.ts` reads the show by a subquery on the booking's reference through the
+same projection the listing's `guidance` comes from (`visitorWarnings()`), and names the show page
+only while the show is published (D-102 criterion 4, issue 1330). `POST /api/reservations/resend`
 re-sends the same confirmation, rate limited (`RESERVATION_RESEND_ATTEMPTS`,
 `RESERVATION_RESEND_WINDOW_MINUTES`, both by IP and by reference) and enumeration-safe: it answers
 identically whether or not the reference and address match, and only actually sends while the

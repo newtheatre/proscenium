@@ -1,4 +1,5 @@
 import { saysRole } from '#shared/utils/roles'
+import { SAYS_BEFORE_YOU_COME, SAYS_WARNINGS_LINK } from '#shared/utils/content-warnings'
 import { formatLondon } from '#shared/utils/london'
 import { PRODUCTION_SITE_URL } from '#shared/utils/seo'
 import { ordinal, plural } from '#shared/utils/text'
@@ -63,14 +64,27 @@ function expiry(at: Date): string {
   return formatLondon(at, { dateStyle: 'full', timeStyle: 'short' })
 }
 
-// Every other template's free text is a short, code-written phrase; an announcement's body is an
-// officer's own paragraphs, so this is the one place raw input reaches the HTML part at all.
+// Text somebody typed, such as an announcement's body or a show's age guidance, reaches the HTML
+// part only through this, so it can never become markup there.
 function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
 function paragraphs(body: string): string {
   return body.split(/\n{2,}/).map(part => `<p>${escapeHtml(part).replaceAll('\n', '<br>')}</p>`).join('\n')
+}
+
+// The show's guidance on a booking, as the booking form said it (D-102 criterion 4, issue 1330).
+function guidanceBlock(context: TemplateContext): { html: string, text: string } {
+  const lines = context.guidance as string[]
+  if (lines.length === 0) return { html: '', text: '' }
+  // Left out once the show is off the public site, rather than link to a page that 404s.
+  const showUrl = typeof context.showUrl === 'string' && context.showUrl ? context.showUrl : null
+  return {
+    html: `\n<p><strong>${SAYS_BEFORE_YOU_COME}</strong></p>\n<p>${lines.map(escapeHtml).join('<br>')}</p>`
+      + (showUrl ? `\n<p><a href="${escapeHtml(showUrl)}">${SAYS_WARNINGS_LINK}</a></p>` : ''),
+    text: `\n\n${SAYS_BEFORE_YOU_COME}\n${lines.join('\n')}${showUrl ? `\n${SAYS_WARNINGS_LINK}: ${showUrl}` : ''}`,
+  }
 }
 
 const TEMPLATES = {
@@ -1569,6 +1583,7 @@ The Nottingham New Theatre`,
     const url = String(context.url)
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
+    const guidance = guidanceBlock(context)
     return {
       subject: `Your booking for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
@@ -1576,7 +1591,7 @@ The Nottingham New Theatre`,
 <p>Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats
 and is not a purchase until then.</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
-<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
+<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>${guidance.html}`),
       text: `Hello ${context.name},
 
 Reference ${reference} for ${show}, ${when}.
@@ -1584,7 +1599,7 @@ Reference ${reference} for ${show}, ${when}.
 Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats and
 is not a purchase until then.
 
-Open your booking: ${url}
+Open your booking: ${url}${guidance.text}
 
 The Nottingham New Theatre`,
     }

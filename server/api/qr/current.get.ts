@@ -16,16 +16,24 @@ export default defineEventHandler(async (event) => {
   // Rendered again rather than reusing the email's copy: the image carries the same stable
   // token either way (D-108 criteria 1, 3), and nothing here is cached across a request.
   const url = `${useRuntimeConfig(event).public.baseURL}/qr/${token}`
+  // Guidance is for somebody still coming, from the rows the show page reads (D-102 criterion 4):
+  // a cancelled, lapsed, exchanged or already admitted booking is told nothing.
+  const coming = reservation.status === 'PENDING' || reservation.status === 'COLLECTED'
+  const [ticketLines, guidance] = await Promise.all([
+    namedTicketLines(reservationId),
+    coming ? bookingGuidance(referenceShowScope(reservation.reference)) : null,
+  ])
 
   return {
     reference: reservation.reference,
     status: reservation.status,
     cancelledBy: reservation.cancelledBy,
     show: reservation.showTitle,
+    guidance,
     when: formatLondon(new Date(reservation.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
     totalDue: reservation.status === 'PENDING' ? saysPrice(reservation.totalPence) : null,
     qrSvg: qrSvgBase64(url),
-    lines: await namedTicketLines(reservationId),
+    lines: ticketLines,
     exchangedTo: reservation.exchangedToShowTitle && reservation.exchangedToStartsAt
       ? { showTitle: reservation.exchangedToShowTitle, when: formatLondon(new Date(reservation.exchangedToStartsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }) }
       : null,

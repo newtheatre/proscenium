@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TO_BE_CONFIRMED } from './programme'
 
 // What a show warns about, from a vocabulary rather than from prose (D-102). A warning is a row
 // somebody chose, so two shows warning about the same thing say it in the same words.
@@ -205,6 +206,44 @@ export function publicContentWarnings(warnings: ShowContentWarning[]): PublicCon
       icon: warning.icon,
       level: warning.level,
     }))
+}
+
+// One show's warnings as a visitor reads them, wherever they are read: the show page, the listing
+// and a booking all project the same rows the same way, guidance included (D-102 criteria 2, 4).
+export function visitorWarnings(show: { ageGuidance: string | null, confirmedNone: boolean }, carried: ShowContentWarning[]): {
+  assessment: WarningAssessment
+  warnings: PublicContentWarning[]
+  guidance: string[]
+} {
+  const assessment = warningAssessment({ warningsConfirmedNone: show.confirmedNone, warningCount: carried.length })
+  const warnings = publicContentWarnings(carried)
+  return { assessment, warnings, guidance: saysShowGuidance({ ageGuidance: show.ageGuidance, assessment, warnings }) }
+}
+
+// The block's words, the same on the booking page and in the email (issue 1330).
+export const SAYS_BEFORE_YOU_COME = 'Before you come'
+export const SAYS_WARNINGS_LINK = 'What each warning means, on the show page'
+
+// What a booker is told before they come, from the show's own rows (D-102 criterion 4).
+export interface ShowGuidance {
+  ageGuidance: string | null
+  assessment: WarningAssessment
+  warnings: Pick<PublicContentWarning, 'title' | 'level' | 'kind'>[]
+}
+
+// In the same words on the booking form, the booking page and the email (issue 1330): the age
+// guidance first, then each warning in the show page's own grouping, or whether anybody has looked.
+export function saysShowGuidance(guidance: ShowGuidance): string[] {
+  const age = `Age guidance: ${guidance.ageGuidance ?? TO_BE_CONFIRMED}`
+  if (guidance.assessment === 'CONFIRMED_NONE') return [age, `${saysAssessment('CONFIRMED_NONE')}.`]
+  if (guidance.assessment === 'NOT_ASSESSED') {
+    return [age, `${saysAssessment('NOT_ASSESSED')}. Ask the box office if it matters to you.`]
+  }
+  const named = groupContentWarnings(guidance.warnings).flatMap(group => group.warnings).map((warning) => {
+    const level = saysWarningLevel(warning.level)
+    return level ? `${warning.title}: ${level.toLowerCase()}` : warning.title
+  })
+  return [age, `Content warnings: ${named.join('; ')}`]
 }
 
 export interface ContentWarningGroup<T> {

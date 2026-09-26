@@ -5,6 +5,7 @@ import { SAYS_PAYMENT, saysAvailability, saysNightLine } from '#shared/utils/pro
 import { overCapReason } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import { plural } from '#shared/utils/text'
+import type { ListedShow } from '#shared/utils/programme'
 
 // The reservation flow (D-104): a guest or a signed-in account holds seats online; the box
 // office takes payment in person, on the night. Nothing here ever moves money (0005).
@@ -47,18 +48,6 @@ interface Confirmation {
   qrToken: string
 }
 
-interface RunPerformance {
-  id: string
-  startsAt: number
-  venueName: string
-  availability: 'AVAILABLE' | 'LIMITED' | 'SOLD_OUT' | 'BOOKING_CLOSED'
-  remaining: number | null
-  says: string
-  cancelled: boolean
-  externalBookingUrl: string | null
-  prices: { name: string, price: number, restrictedTo: string | null }[]
-}
-
 const route = useRoute()
 const performanceId = computed(() => String(route.params.performanceId))
 
@@ -70,9 +59,9 @@ if (!data.value) {
 
 const { account } = useAccount()
 
-// The run's other nights, from the public listing the show page already reads: picking one is a
-// navigation, so the chosen night is always in the address (booking.png).
-const { data: run } = await useFetch<{ performances: RunPerformance[] }>(() => `/api/shows/${data.value?.show.slug ?? ''}`)
+// The run's nights from the show page's own payload, so the address always names the night picked
+// (booking.png); What's on skips the show page, so its guidance comes too (D-102 criterion 4).
+const { data: run } = await useFetch<ListedShow>(() => `/api/shows/${data.value?.show.slug ?? ''}`)
 
 const nights = computed(() => (run.value?.performances ?? []).filter(one => !one.cancelled && !one.externalBookingUrl))
 
@@ -546,122 +535,130 @@ useSeoMeta({
         </section>
       </div>
 
-      <!-- The order as a ticket stub, and the view's one marquee at the foot of it. Below lg it
-           follows the form, which is the order a phone reads in. -->
-      <UCard
-        variant="ticket"
-        class="self-start lg:sticky lg:top-24"
-        data-test="booking-summary"
-      >
-        <template #header>
-          <p class="font-mono text-xs uppercase tracking-wide text-muted">
-            Your order
-          </p>
-          <h2 class="mt-1 font-semibold">
-            {{ data!.show.title }}
-          </h2>
-          <p class="text-sm text-muted">
-            {{ when }} · {{ data!.performance.venueName }}
-          </p>
-        </template>
-
-        <ul
-          v-if="ordered.length"
-          class="space-y-2"
+      <!-- The show's guidance, then the order as a ticket stub with the view's one marquee at its
+           foot; only the stub is sticky, so Book stays on screen. A phone reads both after the form. -->
+      <div class="space-y-6">
+        <BeforeYouBook
+          v-if="run?.guidance.length"
+          :lines="run.guidance"
+          :slug="data!.show.slug"
+          heading="Before you book"
+        />
+        <UCard
+          variant="ticket"
+          class="lg:sticky lg:top-24"
+          data-test="booking-summary"
         >
-          <li
-            v-for="line in ordered"
-            :key="line.id"
-            class="flex items-baseline justify-between gap-4 font-mono text-sm"
-            :data-test="`order-line-${line.id}`"
-          >
-            <span>{{ line.name }} × {{ line.quantity }}</span>
-            <span>{{ saysPrice(line.pence) }}</span>
-          </li>
-        </ul>
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          Nothing chosen yet.
-        </p>
+          <template #header>
+            <p class="font-mono text-xs uppercase tracking-wide text-muted">
+              Your order
+            </p>
+            <h2 class="mt-1 font-semibold">
+              {{ data!.show.title }}
+            </h2>
+            <p class="text-sm text-muted">
+              {{ when }} · {{ data!.performance.venueName }}
+            </p>
+          </template>
 
-        <div class="mt-4 flex items-baseline justify-between gap-4">
-          <span class="font-medium">To pay at the theatre</span>
-          <span
-            class="font-mono text-lg"
-            data-test="booking-total"
-          >{{ saysPrice(totalPence) }}</span>
-        </div>
-        <p class="mt-1 text-sm text-muted">
-          {{ SAYS_PAYMENT }}
-        </p>
-
-        <template #footer>
-          <!-- Rendered whether or not it holds anything, so a refusal that appears later is
-               announced rather than arriving in a region the reader's software never saw. -->
-          <div
-            role="alert"
-            aria-live="polite"
-            data-test="booking-live"
+          <ul
+            v-if="ordered.length"
+            class="space-y-2"
           >
-            <div
-              v-if="notice"
-              id="booking-refusal"
-              data-test="booking-notice"
+            <li
+              v-for="line in ordered"
+              :key="line.id"
+              class="flex items-baseline justify-between gap-4 font-mono text-sm"
+              :data-test="`order-line-${line.id}`"
             >
-              <UAlert
-                class="mb-3"
-                color="error"
-                variant="subtle"
-                :description="notice"
-              />
-            </div>
-            <div
-              v-if="capReason"
-              id="booking-cap"
-              data-test="booking-over-cap"
-            >
-              <UAlert
-                class="mb-3"
-                color="warning"
-                variant="subtle"
-                :description="capReason"
-              />
-            </div>
-          </div>
-          <UButton
-            variant="marquee"
-            size="lg"
-            block
-            :loading="submitting"
-            :disabled="capReason !== null"
-            :aria-describedby="describedBy"
-            data-test="booking-submit"
-            @click="book"
-          >
-            {{ seats === 0 ? 'Book your seats' : `Book ${plural(seats, 'ticket')}` }}
-          </UButton>
-          <UButton
-            v-if="externalUrl"
-            class="mt-3"
-            :to="externalUrl"
-            target="_blank"
-            rel="noopener"
-            trailing-icon="i-lucide-external-link"
-            block
-          >
-            Book tickets elsewhere
-          </UButton>
+              <span>{{ line.name }} × {{ line.quantity }}</span>
+              <span>{{ saysPrice(line.pence) }}</span>
+            </li>
+          </ul>
           <p
-            class="mt-3 text-sm text-muted"
-            data-test="hold-release"
+            v-else
+            class="text-sm text-muted"
           >
-            An unpaid booking is released {{ data!.holdReleaseMinutes }} minutes before curtain, and
-            the seats go back on sale.
+            Nothing chosen yet.
           </p>
-        </template>
-      </UCard>
+
+          <div class="mt-4 flex items-baseline justify-between gap-4">
+            <span class="font-medium">To pay at the theatre</span>
+            <span
+              class="font-mono text-lg"
+              data-test="booking-total"
+            >{{ saysPrice(totalPence) }}</span>
+          </div>
+          <p class="mt-1 text-sm text-muted">
+            {{ SAYS_PAYMENT }}
+          </p>
+
+          <template #footer>
+            <!-- Rendered whether or not it holds anything, so a refusal that appears later is
+               announced rather than arriving in a region the reader's software never saw. -->
+            <div
+              role="alert"
+              aria-live="polite"
+              data-test="booking-live"
+            >
+              <div
+                v-if="notice"
+                id="booking-refusal"
+                data-test="booking-notice"
+              >
+                <UAlert
+                  class="mb-3"
+                  color="error"
+                  variant="subtle"
+                  :description="notice"
+                />
+              </div>
+              <div
+                v-if="capReason"
+                id="booking-cap"
+                data-test="booking-over-cap"
+              >
+                <UAlert
+                  class="mb-3"
+                  color="warning"
+                  variant="subtle"
+                  :description="capReason"
+                />
+              </div>
+            </div>
+            <UButton
+              variant="marquee"
+              size="lg"
+              block
+              :loading="submitting"
+              :disabled="capReason !== null"
+              :aria-describedby="describedBy"
+              data-test="booking-submit"
+              @click="book"
+            >
+              {{ seats === 0 ? 'Book your seats' : `Book ${plural(seats, 'ticket')}` }}
+            </UButton>
+            <UButton
+              v-if="externalUrl"
+              class="mt-3"
+              :to="externalUrl"
+              target="_blank"
+              rel="noopener"
+              trailing-icon="i-lucide-external-link"
+              block
+            >
+              Book tickets elsewhere
+            </UButton>
+            <p
+              class="mt-3 text-sm text-muted"
+              data-test="hold-release"
+            >
+              An unpaid booking is released {{ data!.holdReleaseMinutes }} minutes before curtain, and
+              the seats go back on sale.
+            </p>
+          </template>
+        </UCard>
+      </div>
     </div>
   </UContainer>
 </template>
