@@ -93,7 +93,7 @@ required pre-show checklist item that is still not done.
 
 ::card-group
   ::card{icon="i-lucide-scan-line" title="Door" to="/docs/tonight/door"}
-  Scan or type a reference; PAID, UNPAID or a named refusal; admitting a pass holder.
+  Scan the code, or type a reference or a name; PAID, UNPAID, PASS or a named refusal.
   ::
   ::card{icon="i-lucide-gauge" title="Tonight at a glance" to="/docs/tonight/tonight-at-a-glance"}
   The numbers, pass pressure, show information, who is on tonight and the backstage code.

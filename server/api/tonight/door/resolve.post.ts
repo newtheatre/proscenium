@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   const code = readScannedCode(input.scanned)
   if (!code) throw createError({ statusCode: 422, statusMessage: 'That code is not one of ours' })
 
-  // The kind travels back so a scanned pass lands in pass mode rather than in the ticket verdict
+  // The kind travels back so a scanned pass lists the pass's card rather than the ticket verdict
   // (D-126); a bare reference names neither, since both alphabets are the same.
   if (code.kind === 'REFERENCE') return { kind: code.kind, reference: code.value }
 

@@ -2,11 +2,13 @@ import { describe, expect, test } from 'bun:test'
 import {
   admittedPassVerdict,
   CAMERA_FALLBACK_SAYS,
+  DOOR_MISS_LINE,
   DOOR_SEARCH_MAX,
   doorFailureVerdict,
   doorMissVerdict,
   doorNameTerm,
   doorTicketFound,
+  lookUpOutcome,
   doorVerdict,
   isRepeatScan,
   readScannedCode,
@@ -187,20 +189,36 @@ describe('no answer is not a refusal (E-129 criterion 7, issue 1145)', () => {
     expect(verdict.line).toContain('Try again')
   })
 
-  test('a refusal the server actually gave keeps its own words and its own headline', () => {
-    const verdict = doorFailureVerdict(409, 'Already checked in at the door.', 'ADMITTED')
-    expect(verdict).toEqual({ state: 'REFUSED', headline: 'ADMITTED', line: 'Already checked in at the door.', note: null })
+  test('a refusal the server actually gave keeps its own words', () => {
+    const verdict = doorFailureVerdict(409, 'This pass has expired.')
+    expect(verdict).toEqual({ state: 'REFUSED', headline: 'REFUSED', line: 'This pass has expired.', note: null })
   })
 
-  test('the refused headline is what the caller asks for, REFUSED when it asks for nothing', () => {
-    expect(doorFailureVerdict(409, 'No.').headline).toBe('REFUSED')
+  // Issue 1301: nothing found is amber, since no booking or pass stands behind it to refuse, and
+  // it ends in the next step rather than the route's own sentence.
+  test('nothing found, by the lookup or by the code itself, is the miss with its own next step', () => {
+    expect(doorFailureVerdict(404, 'That reference is not recognised.')).toEqual(doorMissVerdict())
+    expect(doorFailureVerdict(422, 'That code is not one of ours')).toEqual(doorMissVerdict())
+    expect(doorMissVerdict().line).toBe(DOOR_MISS_LINE)
+  })
+})
+
+describe('a lookup that failed is never read as nothing found (issue 1145, issue 1301)', () => {
+  const empty = { status: 'fulfilled' as const, value: { items: [] as string[] } }
+  const refused = { status: 'rejected' as const, reason: new Error('refused') }
+
+  test('both halves empty is nothing found', () => {
+    expect(lookUpOutcome(empty, empty)).toEqual({ kind: 'MISS' })
   })
 
-  // Issue 1301: nothing found is amber, since no booking or pass stands behind it to refuse.
-  test('nothing found, by the lookup or by the code itself, is a miss rather than a refusal', () => {
-    expect(doorFailureVerdict(404, 'That reference is not recognised.').state).toBe('MISS')
-    expect(doorFailureVerdict(422, 'That code is not one of ours').state).toBe('MISS')
-    expect(doorFailureVerdict(409, 'This pass has expired.').state).toBe('REFUSED')
+  test('one half failed and the other empty is that half\'s failure, never a miss', () => {
+    expect(lookUpOutcome(refused, empty)).toEqual({ kind: 'FAILED', reason: refused.reason })
+    expect(lookUpOutcome(empty, refused)).toEqual({ kind: 'FAILED', reason: refused.reason })
+  })
+
+  test('whatever one half found is listed, even when the other half failed', () => {
+    expect(lookUpOutcome({ status: 'fulfilled', value: { items: ['K7M4PQ'] } }, refused))
+      .toEqual({ kind: 'FOUND', tickets: ['K7M4PQ'], passes: [] })
   })
 })
 
@@ -242,10 +260,19 @@ describe('the one door field reads a code, and a name when it could be one (issu
     expect(doorNameTerm('M')).toBeNull()
     expect(doorNameTerm('M'.repeat(DOOR_SEARCH_MAX + 1))).toBeNull()
   })
+
+  // D1 counts the LIKE limit in bytes, with escapes and the two wildcards (0081).
+  test('the bound is the pattern\'s bytes, so accents and escapes count', () => {
+    expect(doorNameTerm('M'.repeat(DOOR_SEARCH_MAX))).not.toBeNull()
+    expect(doorNameTerm('É'.repeat(DOOR_SEARCH_MAX / 2 + 1))).toBeNull()
+    expect(doorNameTerm('%'.repeat(DOOR_SEARCH_MAX / 2 + 1))).toBeNull()
+  })
 })
 
 describe('a ticket found by name says paid, unpaid or in, with a first name only (issue 1301)', () => {
   const row = { reference: 'K7M4PQ', holderName: 'Mira Halvorsen', partySize: 2, admittedAt: null }
+  // 19:12 on Thursday 5 November 2026, winter time, so London and UTC agree.
+  const admittedAt = Math.floor(Date.UTC(2026, 10, 5, 19, 12) / 1000)
 
   test('a paid booking is there to admit', () => {
     expect(doorTicketFound({ ...row, status: 'COLLECTED' }))
@@ -259,7 +286,7 @@ describe('a ticket found by name says paid, unpaid or in, with a first name only
   })
 
   test('one already through the door says when', () => {
-    const found = doorTicketFound({ ...row, status: 'DOOR', admittedAt: '19:12' })
+    const found = doorTicketFound({ ...row, status: 'DOOR', admittedAt })
     expect(found.state).toBe('ADMITTED')
     expect(found.line).toBe('Already admitted at 19:12')
   })

@@ -62,7 +62,7 @@ export interface DoorPassRow {
 
 const DOOR_PASS_SEARCH_LIMIT = 10
 
-// Pass mode's own lookup (D-126): a holder is found by name or by the reference on their pass,
+// The door's pass lookup (D-126): a holder is found by name or by the reference on their pass,
 // never by an id. Bound to a fixed six parameters however many passes the search matches (0006).
 export function doorPassSearchQuery(term: string, performanceId: string, showId: string): SQL {
   const like = `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`

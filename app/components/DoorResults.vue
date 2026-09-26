@@ -1,16 +1,11 @@
 <script setup lang="ts">
-import { doorFailureVerdict, saysDoorParty } from '#shared/utils/door'
-import type { DoorAdmission, DoorFoundState, DoorPassCard, DoorTicketFound } from '#shared/utils/door'
+import { saysDoorParty } from '#shared/utils/door'
+import type { DoorFoundState, DoorPassCard, DoorTicketFound } from '#shared/utils/door'
 
 // What the door's one field found (issue 1301): tonight's tickets as a first name, a count and
-// paid or unpaid, and passes as their card (D-126). Every verdict afterwards is the page's own.
-const props = defineProps<{
-  performanceId: string
-  tickets: DoorTicketFound[]
-  passes: DoorPassCard[]
-  admittingReference: string | null
-}>()
-const emit = defineEmits<{ admitTicket: [reference: string], admitted: [result: DoorAdmission] }>()
+// paid or unpaid, and passes as their card (D-126). Admitting, and its verdict, are the page's.
+const props = defineProps<{ tickets: DoorTicketFound[], passes: DoorPassCard[], busy: boolean }>()
+const emit = defineEmits<{ admitTicket: [reference: string], admitPass: [reference: string, holderName: string] }>()
 
 const ticketBadge: Record<DoorFoundState, { label: string, color: 'success' | 'secondary' | 'warning' }> = {
   PAID: { label: 'Paid', color: 'success' },
@@ -18,28 +13,18 @@ const ticketBadge: Record<DoorFoundState, { label: string, color: 'success' | 's
   ADMITTED: { label: 'In', color: 'warning' },
 }
 
-const admittingPass = ref<string | null>(null)
+// Which Admit was pressed, so only its own button spins while the page's check runs.
+const pressed = ref<string | null>(null)
+const spinning = (reference: string): boolean => props.busy && pressed.value === reference
 
-async function admitPass(pass: DoorPassCard): Promise<void> {
-  admittingPass.value = pass.id
-  try {
-    const result = await $fetch<DoorAdmission>('/api/tonight/door/passes/scan', {
-      method: 'POST',
-      body: { reference: pass.reference, performanceId: props.performanceId },
-    })
-    emit('admitted', { ...result, holderName: pass.holderName })
-  }
-  catch (refused) {
-    emit('admitted', {
-      reference: pass.reference,
-      verdict: doorFailureVerdict(refusalStatus(refused), refusalText(refused)),
-      holderName: pass.holderName,
-      partySize: 0,
-    })
-  }
-  finally {
-    admittingPass.value = null
-  }
+function admitTicket(reference: string): void {
+  pressed.value = reference
+  emit('admitTicket', reference)
+}
+
+function admitPass(pass: DoorPassCard): void {
+  pressed.value = pass.reference
+  emit('admitPass', pass.reference, pass.holderName)
 }
 </script>
 
@@ -77,10 +62,11 @@ async function admitPass(pass: DoorPassCard): Promise<void> {
         block
         color="secondary"
         icon="i-lucide-check"
-        :loading="admittingReference === ticket.reference"
+        :loading="spinning(ticket.reference)"
+        :disabled="busy"
         class="min-h-12"
         :data-test="`door-ticket-admit-${ticket.reference}`"
-        @click="emit('admitTicket', ticket.reference)"
+        @click="admitTicket(ticket.reference)"
       >
         Admit
       </UButton>
@@ -168,7 +154,8 @@ async function admitPass(pass: DoorPassCard): Promise<void> {
         block
         color="secondary"
         icon="i-lucide-check"
-        :loading="admittingPass === pass.id"
+        :loading="spinning(pass.reference)"
+        :disabled="busy"
         class="min-h-12"
         :data-test="`pass-admit-${pass.reference}`"
         @click="admitPass(pass)"

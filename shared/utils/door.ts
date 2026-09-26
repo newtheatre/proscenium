@@ -1,5 +1,6 @@
 import { firstNameOf } from './night-hub'
-import { RESERVATION_REFERENCE_LENGTH } from './reservations'
+import { MAX_LIKE_PATTERN } from './migrations'
+import { RESERVATION_REFERENCE_LENGTH, saysAlreadyAdmitted } from './reservations'
 import { plural } from './text'
 
 // Door mode's own pure logic (E-129): what a camera hands the door, and what the verdict card is
@@ -30,9 +31,9 @@ export const VERDICT_HOLD_REASON_MS = 8000
 export type ScannerFailure = 'NO_CAMERA' | 'REFUSED' | 'BROKEN'
 
 export const CAMERA_FALLBACK_SAYS: Record<ScannerFailure, string> = {
-  NO_CAMERA: 'No camera. Type the reference.',
-  REFUSED: 'Camera not allowed. Type the reference.',
-  BROKEN: 'Camera did not start. Type the reference.',
+  NO_CAMERA: 'No camera. Type the reference or a name.',
+  REFUSED: 'Camera not allowed. Type the reference or a name.',
+  BROKEN: 'Camera did not start. Type the reference or a name.',
 }
 
 // The path of an absolute or a relative URL, or null when the text is not one at all. A bare
@@ -120,12 +121,26 @@ export function doorMissVerdict(line = DOOR_MISS_LINE): DoorVerdict {
 
 // A request that never got an answer is not a refusal: the ticket may be perfectly good, and a
 // red card would send its holder to the bar for nothing (issue 1145). Nor is a lookup that missed.
-export function doorFailureVerdict(status: number | undefined, line: string, refusedHeadline = 'REFUSED'): DoorVerdict {
+export function doorFailureVerdict(status: number | undefined, line: string): DoorVerdict {
   if (status === undefined) {
     return { state: 'UNANSWERED', headline: 'NO ANSWER', line: 'The connection dropped, so nothing was checked. Try again.', note: null }
   }
-  if (status === 404 || status === 422) return doorMissVerdict(line)
-  return { state: 'REFUSED', headline: refusedHeadline, line, note: null }
+  if (status === 404 || status === 422) return doorMissVerdict()
+  return { state: 'REFUSED', headline: 'REFUSED', line, note: null }
+}
+
+export type LookUpOutcome<T, P> = { kind: 'FOUND', tickets: T[], passes: P[] } | { kind: 'MISS' } | { kind: 'FAILED', reason: unknown }
+
+// What the door's lookup answers: the list, nothing found, or the half that failed. A failed half
+// is never read as nothing found, which would send a real booking to the bar (issue 1145).
+export function lookUpOutcome<T, P>(tickets: PromiseSettledResult<{ items: T[] }>, passes: PromiseSettledResult<{ items: P[] }>): LookUpOutcome<T, P> {
+  const listed = {
+    tickets: tickets.status === 'fulfilled' ? tickets.value.items : [],
+    passes: passes.status === 'fulfilled' ? passes.value.items : [],
+  }
+  if (listed.tickets.length > 0 || listed.passes.length > 0) return { kind: 'FOUND', ...listed }
+  const failed = [tickets, passes].find(one => one.status === 'rejected')
+  return failed?.status === 'rejected' ? { kind: 'FAILED', reason: failed.reason } : { kind: 'MISS' }
 }
 
 // How long the overlay holds before clearing itself. A tap or the next different code clears it
@@ -187,12 +202,7 @@ export interface DoorAdmission { reference: string, verdict: DoorVerdict, holder
 
 // A pass admits its holder and nobody else, and costs nothing, so it admits in its own word
 // rather than PAID (issue 1301). The holder's name belongs to the pass card, not to this one.
-export function admittedPassVerdict(reference: string): {
-  reference: string
-  verdict: DoorVerdict
-  holderName: string | null
-  partySize: number
-} {
+export function admittedPassVerdict(reference: string): DoorAdmission {
   return {
     reference: reference.toUpperCase(),
     verdict: { state: 'PAID', headline: 'PASS', line: 'Pass, admit', note: null },
@@ -209,17 +219,21 @@ export function saysDoorParty(holderName: string | null, partySize: number): str
   return first ? `${first} · ${party}` : party[0]!.toUpperCase() + party.slice(1)
 }
 
-// The one door field's name lookup (issue 1301). The upper bound keeps the pattern inside D1's
-// fifty-character LIKE limit once it is wrapped for a contains match.
+// The one door field's name lookup (issue 1301). D1 counts its LIKE limit in bytes, so the cap is
+// on the contains pattern as UTF-8, escapes and the two wildcards included (0081).
 export const DOOR_SEARCH_MIN = 2
-export const DOOR_SEARCH_MAX = 40
+export const DOOR_SEARCH_MAX = MAX_LIKE_PATTERN - 2
+
+export function fitsDoorLookUp(term: string): boolean {
+  const escapes = term.match(/[\\%_]/g)?.length ?? 0
+  return term.length >= DOOR_SEARCH_MIN && new TextEncoder().encode(term).length + escapes <= DOOR_SEARCH_MAX
+}
 
 // A typed entry may also be a name: a six-letter one is a reference shape too. A URL never is,
 // and a term outside the lookup's bounds is not sent.
 export function doorNameTerm(typed: string): string | null {
   const term = typed.trim()
-  if (term.includes('/') || term.length < DOOR_SEARCH_MIN || term.length > DOOR_SEARCH_MAX) return null
-  return term
+  return !term.includes('/') && fitsDoorLookUp(term) ? term : null
 }
 
 export type DoorFoundState = 'PAID' | 'UNPAID' | 'ADMITTED'
@@ -233,18 +247,16 @@ export interface DoorTicketFound {
 }
 
 // A ticket the name lookup found: a first name, a count, and paid, unpaid or in (E-129 criterion
-// 7). `admittedAt` is already the door's own clock time, or null.
+// 7). `admittedAt` is epoch seconds, or null for a booking not yet in.
 export function doorTicketFound(row: {
   reference: string
   holderName: string | null
   partySize: number
   status: string
-  admittedAt: string | null
+  admittedAt: number | null
 }): DoorTicketFound {
   const found = { reference: row.reference, firstName: firstNameOf(row.holderName), partySize: row.partySize }
-  if (row.status === 'DOOR') {
-    return { ...found, state: 'ADMITTED', line: row.admittedAt ? `Already admitted at ${row.admittedAt}` : 'Already admitted tonight' }
-  }
+  if (row.status === 'DOOR') return { ...found, state: 'ADMITTED', line: saysAlreadyAdmitted(row.admittedAt) }
   if (row.status === 'PENDING') return { ...found, state: 'UNPAID', line: DOOR_TO_THE_BAR }
   return { ...found, state: 'PAID', line: 'Paid, admit' }
 }

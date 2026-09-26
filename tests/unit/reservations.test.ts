@@ -5,6 +5,7 @@ import {
   belowMinimumTicketsReason,
   differentShowReason,
   doorTicketOutcome,
+  saysAlreadyAdmitted,
   generateReservationReference,
   looksLikeReference,
   overCapReason,
@@ -201,8 +202,17 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
 
   // Issue 1301: the door's own words, each ending in the next step, never the booker's QR page copy.
   test('an admitted ticket says when it came in', () => {
-    const outcome = doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', null, null, '19:12')
+    const at = Math.floor(Date.UTC(2026, 10, 5, 19, 12) / 1000)
+    const outcome = doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-matinee', 'The Seagull', 'Friday, 2pm', null, null, at)
     expect(outcome.detail).toBe('Already admitted at 19:12')
+    expect(saysAlreadyAdmitted(null)).toBe('Already admitted tonight')
+  })
+
+  // The matinee's ticket shown at the evening was admitted to the matinee, not to this house.
+  test('a ticket admitted to another performance names that performance, never a re-entry', () => {
+    const outcome = doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null)
+    expect(outcome.headline).toBe('Already in')
+    expect(outcome.detail).toBe('Admitted for The Seagull, Friday, 2pm. Ask the Front of House Manager.')
   })
 
   test('a lapsed or cancelled ticket sends its holder to the bar, never to the box office', () => {

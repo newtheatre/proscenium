@@ -221,7 +221,8 @@ describe.skipIf(skip !== null)('the screen, with no camera to open (criteria 5, 
         }
       })()`)
 
-      expect(attributes.autocapitalize).toBe('characters')
+      // Words, not characters: the field takes a name too, and a reference is upper-cased anyway (issue 1301).
+      expect(attributes.autocapitalize).toBe('words')
       expect(attributes.autocomplete).toBe('off')
       expect(attributes.autocorrect).toBe('off')
       expect(attributes.spellcheck).toBe('false')
