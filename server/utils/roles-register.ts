@@ -94,7 +94,7 @@ export const IT_MANAGER_ASSERTION = 'role_grants.id'
 // First in a batch, it inserts nothing while the guard holds and fails the whole batch otherwise,
 // so the guard and its write are one transaction (A-120 criterion 5, 0035).
 export function itManagerAssertion(holds: SQL): SQL {
-  return sql`insert into ${schema.roleGrants} (id, user_id, role) select null, null, ${PROTECTED_ROLE} where not (${holds})`
+  return sql`insert into ${schema.roleGrants} (id) select null where not (${holds})`
 }
 
 export interface RolesQuery extends ListQuery {

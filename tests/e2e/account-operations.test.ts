@@ -188,6 +188,28 @@ describe.skipIf(skip !== null)('security operations on an account (A-122)', () =
     expect(read<{ disabled: number }>('SELECT disabled FROM users WHERE id = ?', me)!.disabled).toBe(0)
   })
 
+  // A-120 criterion 5: with the pre-read gone, the batch is the only guard, so this answers 409
+  // only while the disable carries it; the arrangement is undone whatever happens.
+  test('the only permanent IT Manager cannot be disabled while every other grant is dated', async () => {
+    const spare = await subject('permanent-spare')
+    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', spare.email, app.databaseFile, '--additional']).exitCode).toBe(0)
+    const me = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
+    try {
+      run('UPDATE role_grants SET expires_at = NULL WHERE user_id = ? AND role = ?', spare.id, 'ADMIN')
+      run('UPDATE role_grants SET expires_at = ? WHERE user_id = ? AND role = ?', Math.floor(Date.now() / 1000) + 24 * 60 * 60, me, 'ADMIN')
+
+      const refused = await operate(spare.id, 'disable')
+      expect(refused.status).toBe(409)
+      expect((await refused.json() as { statusMessage: string }).statusMessage)
+        .toBe('No other IT Manager grant is permanent: make one permanent before disabling this one')
+      expect(read<{ disabled: number }>('SELECT disabled FROM users WHERE id = ?', spare.id)!.disabled).toBe(0)
+    }
+    finally {
+      run('UPDATE role_grants SET expires_at = NULL WHERE user_id = ? AND role = ?', me, 'ADMIN')
+      run('DELETE FROM role_grants WHERE user_id = ? AND role = ?', spare.id, 'ADMIN')
+    }
+  })
+
   test('an unknown account and an unknown operation are refused', async () => {
     expect((await operate('nosuchaccount', 'disable')).status).toBe(404)
     expect((await operate(read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id, 'delete-everything')).status).toBe(400)

@@ -120,11 +120,7 @@ export async function executeMerge(winnerId: string, loserId: string, actorId: s
 
   // 0049's shape: the predicate rides the tombstone `UPDATE`, and the audit `INSERT` right after
   // it is conditional on that statement's own `changes()`, both in this one batch.
-  const auditInsert = db.run(sql`
-    INSERT INTO audit_log (id, actor_id, action, target, detail)
-    SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${entry.detail !== null ? JSON.stringify(entry.detail) : null}
-    WHERE changes() = 1
-  `)
+  const auditInsert = db.run(auditIfChanged(entry))
 
   const writes = [...moves, ...retireCredentials].map(statement => db.run(statement))
   const tombstoneWrite = db.all<{ id: string }>(tombstone)

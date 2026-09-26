@@ -178,6 +178,28 @@ describe.skipIf(skip !== null)('erasing somebody else (A-125 criterion 6)', () =
     expect(read<{ anonymised: number | null }>('SELECT anonymised_at AS anonymised FROM users WHERE id = ?', me)!.anonymised).toBeNull()
   })
 
+  // A-120 criterion 5: the erasure's batch is the only guard, so this answers 409 only while it
+  // carries it; the arrangement is undone whatever happens.
+  test('the only permanent IT Manager cannot be erased while every other grant is dated', async () => {
+    const spare = await member('permanent-spare')
+    expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', spare.email, app.databaseFile, '--additional']).exitCode).toBe(0)
+    const me = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
+    try {
+      write('UPDATE role_grants SET expires_at = NULL WHERE user_id = ? AND role = ?', spare.id, 'ADMIN')
+      write('UPDATE role_grants SET expires_at = ? WHERE user_id = ? AND role = ?', Math.floor(Date.now() / 1000) + 24 * 60 * 60, me, 'ADMIN')
+
+      const refused = await send('POST', `/api/admin/accounts/${spare.id}/security`, { operation: 'erase' }, cookie)
+      expect(refused.status).toBe(409)
+      expect((await refused.json() as { statusMessage: string }).statusMessage)
+        .toBe('No other IT Manager grant is permanent: make one permanent before erasing this one')
+      expect(read<{ anonymised: number | null }>('SELECT anonymised_at AS anonymised FROM users WHERE id = ?', spare.id)!.anonymised).toBeNull()
+    }
+    finally {
+      write('UPDATE role_grants SET expires_at = NULL WHERE user_id = ? AND role = ?', me, 'ADMIN')
+      write('DELETE FROM role_grants WHERE user_id = ? AND role = ?', spare.id, 'ADMIN')
+    }
+  })
+
   test('nothing else can be done to an erased account', async () => {
     const person = await member('finished')
     await send('POST', `/api/admin/accounts/${person.id}/security`, { operation: 'erase' }, cookie)

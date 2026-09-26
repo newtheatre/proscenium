@@ -8,13 +8,12 @@ const query = z.object({
   role: z.enum(ROLES),
 })
 
-// Revoke a role. The last administrator cannot be revoked (A-120).
+// Revoke a role; the last IT Manager cannot be revoked (A-120). Removing a factor is refused while
+// a role requires one, so revoking the role is the way out (A-112 criterion 3).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'roles.revoke')
   const input = await getValidatedQueryOrThrow(event, query)
 
-  // Removing a factor is refused while the account holds a role that requires one (A-112
-  // criterion 3); removing the role itself is the way out.
   const guard = input.role === PROTECTED_ROLE ? keepsAnItManagerWhere(input.userId, Math.floor(Date.now() / 1000)) : null
 
   // A role the account does not hold revokes nothing, so it records nothing either (0049).
