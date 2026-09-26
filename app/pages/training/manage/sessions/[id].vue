@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { can, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { saysDay } from '#shared/utils/when'
-import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysGaps, saysSessionStatus } from '#shared/utils/training'
 import type { MemberLacking } from '#shared/utils/training'
 
@@ -51,6 +51,9 @@ const { data, status, error, refresh } = await useAsyncData(
   () => request<Session>(`/api/admin/training/sessions/${route.params.id}`),
   { default: () => null as Session | null },
 )
+
+const readFailure = useListFailure(error, 'That session could not be read.')
+const refused = computed(() => refusalStatus(error.value) === 403)
 
 const registerOpen = computed(() => data.value?.registerOpenedAt !== null)
 const marked = computed(() => data.value?.markedAt !== null)
@@ -183,10 +186,7 @@ async function startChangingModules(): Promise<void> {
   modulesResult.value = null
   changingModules.value = true
   try {
-    catalogue.value = (await request<{ items: Module[] }>(
-      '/api/admin/training/modules',
-      { query: { pageSize: MAX_PAGE_SIZE } },
-    )).items
+    catalogue.value = (await teachingCatalogue(request, can(useViewer().value, viewTrainingCatalogue))).items
   }
   catch (caught) {
     modulesFailure.value = refusalText(caught)
@@ -250,14 +250,15 @@ const registerLabel = computed(() => {
 
 <template>
   <div class="space-y-6">
+    <!-- A refusal says who can change it, never that the session could not be read (issue 1336). -->
     <UAlert
-      v-if="error"
+      v-if="readFailure"
       color="error"
       variant="subtle"
-      icon="i-lucide-unplug"
+      :icon="refused ? 'i-lucide-lock' : 'i-lucide-unplug'"
       data-test="load-failed"
-      title="That session could not be read"
-      description="Try again before you rely on what is on this page."
+      :title="readFailure.message"
+      :description="refused ? undefined : 'Try again before you rely on what is on this page.'"
     />
 
     <div

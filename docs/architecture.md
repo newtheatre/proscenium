@@ -220,9 +220,14 @@ becomes interactive.
      the `requireTrainer` guard: somebody is a trainer if and only if they currently hold a
      record on a module marked trainer-granting, and expiring counts as held. It is never a role
      and never a flag, so revoking the certification is the whole of taking the standing away
-     (0037, G-111). Membership resolves the same way: `hasCurrentMembership`
-     (`server/utils/bookings.ts`) reads the longest-running term against today and the grace
-     window, never a grant (0009, 0031). Show-night authority resolves in
+     (0037, G-111). A session belongs to the trainer named on it: `namedTeacher` lets only a
+     `training.write` holder name somebody other than the scheduler, who must hold trainer
+     standing and everything the session teaches; `currentTrainers` answers the Taught by picker
+     (`GET /api/admin/training/trainers`) and `GET /api/training/teaching` lists a member's own
+     sessions still to run (G-112 criterion 7, issue 1336).
+     Membership resolves the same way: `hasCurrentMembership` (`server/utils/bookings.ts`) reads
+     the longest-running term against today and the grace window, never a grant (0009, 0031).
+     Show-night authority resolves in
      `server/utils/night-authority.ts` behind `requireNightAuthority`, and has a section of its
      own below.
   3. **Ownership**: the row's own user id.
@@ -900,7 +905,9 @@ before writing; the row's detail carries every performance that venue ran that n
 bar opening an empty list and the `openingId` the officer let themselves into (0077). Holding one
 of the three does not admit anybody to the console: `reachConsole` reads the standing permissions
 that are not in `OPERATIONAL_PERMISSIONS`, or an officer would be shown a sidebar in which every
-screen answers 403 (0040, 0044).
+screen answers 403 (0040, 0044). Derived standing whose screens live in the console does admit:
+a trainer (`isTrainer`) and a department lead (`leadsDepartment`) reach it with no permission at
+all, and see the training screens their standing opens (issue 1336).
 
 A shift's own coverage is never widened to the venue's whole night the way an unnarrowed officer
 request is: the shift already names its one performance (or, when the same account holds a second

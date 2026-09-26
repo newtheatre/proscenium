@@ -24,6 +24,8 @@ export default defineEventHandler(async (event) => {
     items: items.map(module => ({
       ...module,
       retired: module.status === 'RETIRED',
+      // Whether the reader holds it, which is what a trainer may teach (issue 1336).
+      held: held.has(module.id),
       // Each edge marked for the person reading it, which is what makes the list a path rather
       // than a description (G-103 criterion 2).
       prerequisites: (prerequisites.get(module.id) ?? []).map(edge => ({

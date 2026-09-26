@@ -1,5 +1,5 @@
 import { asc, eq } from 'drizzle-orm'
-import { daysBetween } from '#shared/utils/training'
+import { NOT_YOUR_SESSION, daysBetween } from '#shared/utils/training'
 
 // The register a trainer marks: who is on it, what it teaches, and whether it is open yet.
 export default defineEventHandler(async (event) => {
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
 
   // A register is a list of names, so it is the trainer running it and the officers, nobody else.
   if (session.trainerId !== resolved.account.id && !resolved.permissions.has('training.read')) {
-    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that' })
+    throw createError({ statusCode: 403, statusMessage: NOT_YOUR_SESSION })
   }
 
   const modules = await db.select({

@@ -173,6 +173,11 @@ A console list whose read did not finish says what could not be read in the aler
 happening, tell the IT Manager." Eight screens each carried their own paragraph before the K-128
 sweep; a screen that writes its own again fails `tests/unit/admin-conventions.test.ts`.
 
+A read that was refused is not a read that failed. It shows the refusal the route gave, which
+names who can change it, and never "could not be read": a trainer opening somebody else's register
+is told the Training Manager can make them its trainer, not that the register is unreadable
+(issue 1336). "Could not be read" is kept for a read that did not finish.
+
 ## 7. The shape of an empty state
 
 Say what would appear here, and the one action that makes it appear. Never "No data".
@@ -186,6 +191,9 @@ already does, and a bare "yet" leaves the reader guessing whether they may do an
 A screen still reading has not found nothing yet, so it never shows its empty state and never a
 bare "Loading…": a table carries its own loading state, and anything else holds its place with
 `USkeleton` until the first read finishes (issue 1151 item 7).
+
+A refused or failed read is not an empty state either: the refusal or the failure is shown in its
+place, never "nothing here" (section 6).
 
 ## 8. Buttons and labels
 

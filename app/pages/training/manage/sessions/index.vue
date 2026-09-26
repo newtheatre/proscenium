@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
+import { can, nameTrainers, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { saysDay } from '#shared/utils/when'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
@@ -75,9 +75,12 @@ const { data, status, refresh, error } = await useAsyncData(
 )
 const listFailure = useListFailure(error, 'The sessions could not be read.')
 
+// A trainer with no role cannot read the admin catalogue, so reads the member one narrowed to what
+// they hold, which is all they may teach (G-112 criterion 4 answer, issue 1336).
+const readsCatalogue = computed(() => can(useViewer().value, viewTrainingCatalogue))
 const { data: catalogue } = await useAsyncData(
   'training-sessions-modules',
-  () => request<{ items: Module[] }>('/api/admin/training/modules', { query: { pageSize: MAX_PAGE_SIZE } }),
+  () => teachingCatalogue(request, readsCatalogue.value),
   { default: () => ({ items: [] as Module[] }) },
 )
 
@@ -88,6 +91,18 @@ const teachable = computed(() => catalogue.value.items.filter(module =>
 // The catalogue runs to dozens, so this is searched rather than scanned.
 const teachableOptions = computed(() => teachable.value
   .map(module => ({ label: `${module.id} ${module.name}`, value: module.id })))
+
+// The training officer names who teaches; a trainer always teaches what they schedule, so they are
+// not offered the choice (G-112 as amended, issue 1336).
+const namesTrainer = computed(() => can(useViewer().value, nameTrainers))
+const { data: trainers } = await useAsyncData(
+  'training-sessions-trainers',
+  () => (namesTrainer.value
+    ? request<{ items: { id: string, name: string }[] }>('/api/admin/training/trainers')
+    : Promise.resolve({ items: [] as { id: string, name: string }[] })),
+  { default: () => ({ items: [] as { id: string, name: string }[] }) },
+)
+const trainerOptions = computed(() => trainers.value.items.map(one => ({ label: one.name, value: one.id })))
 
 const shown = computed(() => {
   const term = search.value.trim().toLowerCase()
@@ -108,7 +123,8 @@ const state = reactive<{
   notes?: string
   moduleIds: string[]
   opensAt?: number | null
-}>({ heldOn: '', startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [], opensAt: null })
+  trainerId?: string | null
+}>({ heldOn: '', startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [], opensAt: null, trainerId: null })
 
 // Scheduled ahead and logged behind: the write path refuses each the other way round, so the
 // pickers say so rather than letting somebody find out at the submit.
@@ -160,6 +176,7 @@ function begin(chosen: string[] = []): void {
     notes: undefined,
     moduleIds: chosen,
     opensAt: null,
+    trainerId: null,
   })
   opensNow.value = true
   opensOnDay.value = ''
@@ -497,7 +514,7 @@ const columns: TableColumn<Session>[] = [
     <UModal
       v-model:open="open"
       title="Schedule a session"
-      description="A future day, a London wall clock, and one or more modules you hold."
+      :description="namesTrainer ? 'A future day, a London wall clock, one or more modules, and who teaches it.' : 'A future day, a London wall clock, and one or more modules you hold.'"
     >
       <template #body>
         <UAlert
@@ -586,7 +603,7 @@ const columns: TableColumn<Session>[] = [
             label="What it teaches"
             name="moduleIds"
             required
-            description="You may teach only what you currently hold. Certifications are not taught by session."
+            :description="namesTrainer ? 'A trainer named under Taught by must hold everything it teaches. Certifications are not taught by session.' : 'You may teach only what you currently hold. Certifications are not taught by session.'"
           >
             <USelectMenu
               v-model="state.moduleIds"
@@ -596,6 +613,23 @@ const columns: TableColumn<Session>[] = [
               placeholder="Search the catalogue"
               class="w-full"
               data-test="session-modules"
+            />
+          </UFormField>
+
+          <UFormField
+            v-if="namesTrainer"
+            label="Taught by"
+            name="trainerId"
+            description="Somebody holding a current trainer certification and everything the session teaches. Left empty, you teach it."
+          >
+            <USelectMenu
+              v-model="state.trainerId"
+              :items="trainerOptions"
+              value-key="value"
+              clear
+              placeholder="You"
+              class="w-full"
+              data-test="session-trainer"
             />
           </UFormField>
 

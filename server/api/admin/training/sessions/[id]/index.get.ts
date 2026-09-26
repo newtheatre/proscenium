@@ -1,4 +1,5 @@
 import { asc, eq } from 'drizzle-orm'
+import { NOT_YOUR_SESSION } from '#shared/utils/training'
 
 // One session, everything a trainer needs before the day: what it teaches, who is coming and
 // whether they hold a place, and where it has got to.
@@ -31,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
   // A register is a list of names, so it is the trainer running it and the officers, nobody else.
   if (session.trainerId !== resolved.account.id && !resolved.permissions.has('training.read')) {
-    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that' })
+    throw createError({ statusCode: 403, statusMessage: NOT_YOUR_SESSION })
   }
 
   const [trainer] = await db.select({ name: schema.users.name })

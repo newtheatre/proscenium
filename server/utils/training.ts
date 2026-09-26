@@ -1,5 +1,6 @@
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, not, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, not, or, sql } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
+import { saysRole } from '#shared/utils/roles'
 import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, mayRecordByAddress, missingPrerequisites, saysGaps } from '#shared/utils/training'
 import type { AcademicYear, ExpiryMode, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
 import type { Authority } from '#server/utils/authorise'
@@ -73,12 +74,19 @@ export interface SessionRow {
   modules: { id: string, name: string }[]
 }
 
-// Sessions with what each teaches. Soonest first, because a trainer's next one is the one they
-// came to look at.
-export async function listSessions(filter: { status?: string, trainerId?: string }): Promise<SessionRow[]> {
+// Sessions with what each teaches, soonest first. `stillToRun` is today: a session still needing
+// its trainer, coming or opened but not yet marked (issue 1336).
+export async function listSessions(filter: { status?: string, trainerId?: string, stillToRun?: string }): Promise<SessionRow[]> {
   const wanted = and(
     filter.status ? eq(schema.trainingSessions.status, filter.status) : undefined,
     filter.trainerId ? eq(schema.trainingSessions.trainerId, filter.trainerId) : undefined,
+    filter.stillToRun
+      ? and(
+          ne(schema.trainingSessions.status, 'CANCELLED'),
+          isNull(schema.trainingSessions.markedAt),
+          or(gte(schema.trainingSessions.heldOn, filter.stillToRun), isNotNull(schema.trainingSessions.registerOpenedAt)),
+        )
+      : undefined,
   )
 
   const rows = await db.select({
@@ -136,6 +144,25 @@ export async function trainerStandingOf(userId: string, today: string): Promise<
     trainer: rows.some(row => row.trainer),
     supervisor: rows.some(row => row.supervisor),
   }
+}
+
+// Everybody with trainer standing today, for the Taught by picker (G-112 as amended, issue 1336).
+// Bounded: a handful of people teach, and a list this long is a catalogue mistake, not a page.
+const TRAINERS_LISTED = 200
+
+export async function currentTrainers(today: string): Promise<{ id: string, name: string }[]> {
+  return db.selectDistinct({ id: schema.users.id, name: schema.users.name })
+    .from(schema.trainingRecords)
+    .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.trainingRecords.moduleId))
+    .innerJoin(schema.users, eq(schema.users.id, schema.trainingRecords.userId))
+    .where(and(
+      heldNow(today),
+      eq(schema.trainingModules.grantsTrainer, true),
+      isNull(schema.users.anonymisedAt),
+      eq(schema.users.disabled, false),
+    ))
+    .orderBy(sql`${schema.users.name} collate nocase`)
+    .limit(TRAINERS_LISTED)
 }
 
 // A trainer surface. Standing dies the moment the record behind it expires or is revoked, so this
@@ -641,12 +668,33 @@ export interface TeachableModule {
   expiryMonths: number | null
 }
 
+// The trainer a scheduler named, or undefined when it is the scheduler (G-112 as amended, issue 1336).
+// A trainer schedules their own sessions; only the training officer names somebody else.
+export async function namedTeacher(resolved: Authority, trainerId: string | null, today: string): Promise<{ id: string, name: string } | undefined> {
+  if (trainerId === null || trainerId === resolved.account.id) return undefined
+  if (!resolved.permissions.has('training.write')) {
+    throw createError({ statusCode: 403, statusMessage: `A trainer schedules their own sessions; the ${saysRole('TRAINING_MANAGER')} names somebody else` })
+  }
+
+  const [person] = await db.select({ id: schema.users.id, name: schema.users.name })
+    .from(schema.users)
+    .where(and(eq(schema.users.id, trainerId), isNull(schema.users.anonymisedAt), eq(schema.users.disabled, false)))
+    .limit(1)
+  if (!person) throw noSuch('person', 'Choose who teaches it again')
+
+  if (!(await trainerStandingOf(person.id, today)).trainer) {
+    throw createError({ statusCode: 422, statusMessage: `${person.name} holds no current trainer certification, so cannot teach a session` })
+  }
+  return person
+}
+
 // What may be taught, and by whom: active, not proved by experience rather than by a room, and
 // held by whoever teaches it. The officer is exempt, acting on a trainer's behalf (G-112 c3, c4).
 export async function assertTeachable(
   resolved: Authority,
   moduleIds: string[],
   today: string,
+  teacher?: { id: string, name: string },
 ): Promise<TeachableModule[]> {
   const taught = await db.select({
     id: schema.trainingModules.id,
@@ -674,14 +722,16 @@ export async function assertTeachable(
     })
   }
 
-  // Question 4's answer: a trainer teaches what they hold, scoped by competence not department.
-  if (!resolved.permissions.has('training.write')) {
-    const held = await modulesHeldBy(resolved.account.id, today)
+  // Question 4's answer: a trainer teaches what they hold, scoped by competence not department. A
+  // trainer the Training Manager named is held to it too, whoever scheduled the session (G-112).
+  const teacherId = teacher?.id ?? (resolved.permissions.has('training.write') ? null : resolved.account.id)
+  if (teacherId !== null) {
+    const held = await modulesHeldBy(teacherId, today)
     const unheld = taught.filter(module => !held.has(module.id))
     if (unheld.length > 0) {
       throw createError({
         statusCode: 422,
-        statusMessage: `You do not yet hold ${unheld.map(module => `${module.id} ${module.name}`).join(', ')}, which this session needs first`,
+        statusMessage: `${teacher ? `${teacher.name} does` : 'You do'} not yet hold ${unheld.map(module => `${module.id} ${module.name}`).join(', ')}, which this session needs first`,
       })
     }
   }
