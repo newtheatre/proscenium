@@ -119,6 +119,7 @@ useSeoMeta({ title: 'Book a room not listed here' })
     <UPageHeader
       title="Book a room not listed here"
       description="For when nothing of ours suits. The Theatre Manager decides which room we get, and this is a request rather than a booking."
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <UAlert

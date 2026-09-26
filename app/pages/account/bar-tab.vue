@@ -55,8 +55,9 @@ function describe(charge: ItemisedTab['charges'][number]): string {
     data-test="account-tab-page"
   >
     <UPageHeader
-      title="Your bar tab"
+      title="Bar tab"
       description="A charge to a tab is owed, not taken. Settle it in person on the reader."
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <UAlert

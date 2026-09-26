@@ -156,7 +156,7 @@ several ways each, and put each of them in one place.
 | The membership state | "Current", "In grace", "Lapsed", "None" | `MEMBERSHIP_WORDING` and `saysMembershipState()` in `shared/utils/membership.ts`; the sentence beside the badge is `saysMembershipSentence()` in `shared/utils/my-summary.ts`, which the My NNT tile reads too. |
 | A membership a member needs | "Tell us about your membership" | The refusal links to `/account/membership`, which is where telling us happens. Never "Sort out your membership". |
 | What we send | "Notification" | The nav, the settings page and the inbox all say it. Never "message". |
-| Room bookings in the nav | "My room bookings" | `site-nav.ts`. "Bookings" on its own is the reader's word for tickets (section 4), and the notification topic keeps it. |
+| Room bookings | "My bookings", only as the link on Rooms | `rooms/index.vue`. "Bookings" on its own is the reader's word for tickets (section 4), so it is never a nav label; on Rooms the page around it says which. The notification topic keeps "Bookings". |
 | The officer who decides | The role in Title Case where one role decides ("the Theatre Manager", "the Accessibility Officer", "the department lead"); "an officer" where the permission decides and no one role holds it | Never "somebody". A room request has no approver role: whoever holds `rooms.write` may decide it, so "an officer" is the true word there. |
 | A declined training request | "Declined" | `saysRequestStatus()` in `shared/utils/training.ts`. "Answered" hid a refusal behind a softer word. |
 | The people working the door | "the people on the door", "anybody working the door" | Never "the door" as a shorthand for them: a member choosing what is shown is choosing who sees it. |

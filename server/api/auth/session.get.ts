@@ -6,11 +6,12 @@ export default defineEventHandler(async (event) => {
   const account = await currentAccount(event)
   if (!account) return { signedIn: false as const }
 
-  const [grants, term, graceDays, onShift] = await Promise.all([
+  const [grants, term, graceDays, onShift, keepsTab] = await Promise.all([
     liveGrants(account.id),
     longestTerm(account.id),
     configValue(event, 'MEMBERSHIP_GRACE_DAYS'),
     onShiftTonight(account.id),
+    keepsBarTab(event, account.id),
   ])
   return {
     signedIn: true as const,
@@ -22,6 +23,7 @@ export default defineEventHandler(async (event) => {
     onShiftTonight: onShift,
     leadsDepartment: (await liveLeads(account.id)).length > 0,
     isTrainer: (await trainerStandingOf(account.id, londonToday())).trainer,
+    keepsBarTab: keepsTab,
     membershipState: membershipState(term, londonDay(new Date()), graceDays),
   }
 })

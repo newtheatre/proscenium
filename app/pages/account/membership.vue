@@ -130,6 +130,7 @@ useSeoMeta({ title: 'Membership' })
     <UPageHeader
       title="Membership"
       description="What the theatre holds about your membership, and how to tell us about one you have bought."
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <div

@@ -14,6 +14,8 @@ export interface Viewer {
   // trainer runs a session without either holding a standing permission (0009, G-110, G-111).
   leadsDepartment: boolean
   isTrainer: boolean
+  // An authorised tab holder, or anybody still owing on a tab: read live, never granted (F-108).
+  keepsBarTab: boolean
   // A dated fact, never a grant (0009, 0031): one shape carries current, grace and lapsed rather
   // than two booleans that could disagree.
   membershipState: MembershipState
@@ -102,6 +104,9 @@ export const viewBarReports = defineAbility((viewer: Viewer) => holds(viewer, 'b
 // Voiding a tab charge is the manager's own call (F-109 criterion 4), so the register that does
 // it gates the same as the write, not the narrower catalogue or stock read.
 export const manageBarTabs = defineAbility((viewer: Viewer) => holds(viewer, 'bar.write'))
+
+// The member's own tab page is offered to somebody who keeps one (F-109, issue 1342).
+export const keepBarTab = defineAbility((viewer: Viewer) => viewer.keepsBarTab)
 
 // The treasurer's own read over the ledger, starting with foregone comp and discount value
 // (I-103); everything else module I builds on it gates the same way.

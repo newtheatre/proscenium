@@ -667,11 +667,18 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
      booking, training progress and next session, passes, membership state, recent
      notifications, the next show on sale. Each tile reads an existing endpoint; a summary
      endpoint is added only if the page would otherwise make more than five requests.
-  2. `MEMBER_NAV` becomes `MY_NAV` (the members area) and `ACCOUNT_NAV` (profile, sign-in and
-     security, notifications). The sub-nav renders the first, the account menu the second, the
-     footer both, and `tests/unit/site-nav.test.ts` covers both (0040).
-  3. The three account pages share one settings layout: a side list on wide screens, stacked on
-     narrow. `security.vue`'s fields sit inside a `UForm`.
+  2. `MEMBER_NAV` becomes `MY_NAV` (the members area) and `ACCOUNT_NAV` (profile, access
+     requirements, sign-in and security, notifications). The sub-nav renders the first, the
+     account menu the second, the footer both, and `tests/unit/site-nav.test.ts` covers both
+     (0040). Amended 26 September 2026 (issue 1342): `MY_NAV` is six entries for everybody (My
+     NNT, Rota, Rooms, Training, Passes, Membership), plus Tonight while the member works tonight
+     and Bar tab for an authorised tab holder or anybody still owing on a tab. A job's second
+     page (My bookings, Training sessions) is linked from its own screen rather than listed, each
+     label is the heading of the page it opens, and no strip is drawn below `sm`, where the
+     header's menu holds the same list.
+  3. The account pages share one settings layout: a side list on wide screens, stacked on
+     narrow. `security.vue`'s fields sit inside a `UForm`. Amended 26 September 2026 (issue
+     1342): access requirements, declared once and kept, is one of them.
   4. `/account` redirects to `/my`. Member surfaces stay calm: nothing from the expressive kit.
   5. `scripts/shots.ts` captures the member screens too, and before-and-after captures are
      attached to the pull request.
@@ -684,7 +691,8 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
      the read fails, never its empty state: the empty state's words promise there is nothing,
      which is untrue of a read that did not finish.
 - Source: Pre-cutover review, 10 September 2026; 0040 named the member's own pages as needing
-  shaping and left it to do.
+  shaping and left it to do; issue 1342 (criteria 2 and 3, from the MVP flow review of 25
+  September 2026).
 
 ## K-128: One voice across every screen
 

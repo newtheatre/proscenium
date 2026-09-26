@@ -45,6 +45,7 @@ const greeting = computed(() => {
     <UPageHeader
       title="My NNT"
       :description="failure ? undefined : greeting"
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <ReadFailure

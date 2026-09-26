@@ -2,6 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-09-21
+- Amended by: 0104 (the header and the widths below the small breakpoint)
 
 ## Context
 

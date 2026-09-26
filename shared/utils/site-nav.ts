@@ -2,6 +2,7 @@ import {
   anybody,
   decideRoomRequests,
   exportAgeChecks,
+  keepBarTab,
   manageBarTabs,
   reachConsole,
   runTrainingSessions,
@@ -150,11 +151,12 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Movements', icon: 'i-lucide-arrow-left-right', to: '/bar/stock/movements', ability: viewBarStock, section: 'Every day' },
       { label: 'Stocktakes', icon: 'i-lucide-clipboard-list', to: '/bar/stock/stocktakes', ability: viewBarStock, section: 'Every day' },
       { label: 'Order list', icon: 'i-lucide-truck', to: '/bar/stock/order-list', ability: viewBarStock, section: 'Every day' },
-      { label: 'Tabs', icon: 'i-lucide-receipt', to: '/bar/tabs', ability: manageBarTabs, section: 'Every day' },
       { label: 'Bar reports', icon: 'i-lucide-bar-chart-3', to: '/bar/reports', ability: viewBarReports, section: 'Every day' },
       { label: 'Products', icon: 'i-lucide-cup-soda', to: '/bar/products', ability: viewBarCatalogue, section: 'Set-up' },
       { label: 'Product categories', icon: 'i-lucide-layout-grid', to: '/bar/categories', ability: viewBarCatalogue, section: 'Set-up' },
       { label: 'Discounts', icon: 'i-lucide-percent', to: '/bar/discounts', ability: viewBarCatalogue, section: 'Set-up' },
+      // Set-up while no tab holder is named, which is how the keys ship (F-108, issue 1342).
+      { label: 'Tabs', icon: 'i-lucide-receipt', to: '/bar/tabs', ability: manageBarTabs, section: 'Set-up' },
     ],
   },
 
@@ -262,8 +264,8 @@ export const CONSOLE_NAV: NavGroup[] = [
   },
 ]
 
-// The member's own screens: what is mine right now (K-127 criterion 2). A signed-out visitor
-// who followed a link is sent through /sign-in?next= to arrive where they meant to.
+// The member's own screens: what is mine right now (K-127 criterion 2). Six for everybody, each a
+// job that reaches its own second page, and two that only some viewers hold (issue 1342).
 export const MY_NAV: NavEntry[] = [
   // Module K: platform
 
@@ -271,36 +273,36 @@ export const MY_NAV: NavEntry[] = [
 
   // Module E: show night
 
-  { label: 'My rota', icon: 'i-lucide-clipboard-list', to: '/rota', ability: signedIn, exact: true },
+  { label: 'Tonight', icon: 'i-lucide-moon-star', to: '/tonight', ability: workTonight },
+  { label: 'Rota', icon: 'i-lucide-clipboard-list', to: '/rota', ability: signedIn, exact: true },
 
-  // Module C: spaces
+  // Module C: spaces. Not exact, so My bookings and the booking form light it too.
 
-  { label: 'Book a room', icon: 'i-lucide-door-open', to: '/rooms', ability: signedIn, exact: true },
-  { label: 'My room bookings', icon: 'i-lucide-calendar-check', to: '/rooms/mine', ability: signedIn },
+  { label: 'Rooms', icon: 'i-lucide-door-open', to: '/rooms', ability: signedIn },
 
-  // Module G: training
+  // Module G: training. Not exact, so Training sessions lights it too.
 
-  { label: 'My training', icon: 'i-lucide-graduation-cap', to: '/training', ability: signedIn, exact: true },
-  { label: 'Training sessions', icon: 'i-lucide-calendar-days', to: '/training/sessions', ability: signedIn },
+  { label: 'Training', icon: 'i-lucide-graduation-cap', to: '/training', ability: signedIn },
 
-  // Module F: bar
+  // Module F: bar. Tab holders ship unnamed, so the tab is offered only to somebody keeping one.
 
-  { label: 'My tab', icon: 'i-lucide-receipt', to: '/account/bar-tab', ability: signedIn },
+  { label: 'Bar tab', icon: 'i-lucide-receipt', to: '/account/bar-tab', ability: keepBarTab },
 
   // Module D: ticketing
 
   { label: 'Passes', icon: 'i-lucide-wallet-cards', to: '/account/passes', ability: signedIn },
-  { label: 'Access requirements', icon: 'i-lucide-accessibility', to: '/account/access', ability: signedIn },
 
   // Module A: identity. A membership refusal always lands here (A-129), so it reads as "mine
   // right now" rather than a setting, and sits in this list rather than ACCOUNT_NAV.
   { label: 'Membership', icon: 'i-lucide-badge-check', to: '/account/membership', ability: signedIn },
 ]
 
-// The three account settings pages: how somebody is known to the system, not what they are doing
+// The account settings pages: how somebody is known to the system, not what they are doing
 // tonight (K-127 criterion 3). `AccountSettings.vue` renders these as the settings side list.
 export const ACCOUNT_NAV: NavEntry[] = [
   { label: 'Profile', icon: 'i-lucide-user', to: '/account/profile', ability: signedIn },
+  // Declared once and kept, like a profile, so it is a setting rather than a job (issue 1342).
+  { label: 'Access requirements', icon: 'i-lucide-accessibility', to: '/account/access', ability: signedIn },
   // Shortened from "Sign-in and security": truncated in the settings aside at 1280 (issue 921).
   { label: 'Security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
   { label: 'Notifications', icon: 'i-lucide-bell', to: '/account/notifications', ability: signedIn },

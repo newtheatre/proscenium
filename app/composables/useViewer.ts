@@ -13,6 +13,7 @@ export function useViewer(): ComputedRef<Viewer | null> {
       onShiftTonight: account.value.onShiftTonight,
       leadsDepartment: account.value.leadsDepartment,
       isTrainer: account.value.isTrainer,
+      keepsBarTab: account.value.keepsBarTab,
       membershipState: account.value.membershipState,
     }
   })

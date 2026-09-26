@@ -139,6 +139,7 @@ const sessionDay = (session: Session): string =>
     <UPageHeader
       title="Training sessions"
       description="What is being taught, and where you stand on each one. Past the last place you join the waiting list rather than being turned away."
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <UAlert

@@ -9,10 +9,11 @@ export default defineNitroPlugin((nitroApp) => {
       resolveServerUser: async <User extends Record<string, unknown>>(): Promise<User | null> => {
         const account = await currentAccount(event)
         if (!account) return null
-        const [term, graceDays, onShift] = await Promise.all([
+        const [term, graceDays, onShift, keepsTab] = await Promise.all([
           longestTerm(account.id),
           configValue(event, 'MEMBERSHIP_GRACE_DAYS'),
           onShiftTonight(account.id),
+          keepsBarTab(event, account.id),
         ])
         const viewer: Viewer = {
           id: account.id,
@@ -20,6 +21,7 @@ export default defineNitroPlugin((nitroApp) => {
           onShiftTonight: onShift,
           leadsDepartment: (await liveLeads(account.id)).length > 0,
           isTrainer: (await trainerStandingOf(account.id, londonToday())).trainer,
+          keepsBarTab: keepsTab,
           membershipState: membershipState(term, londonDay(new Date()), graceDays),
         }
         return viewer as unknown as User

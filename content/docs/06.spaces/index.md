@@ -3,16 +3,16 @@ title: Spaces
 description: The rooms we control, the request queue, every booking, closures, the rooms we do not manage and the utilisation report.
 module: Spaces
 audience: committee
-updatedOn: 2026-09-23
+updatedOn: 2026-09-26
 updatedBy: Matt Adcock
 navigation:
   title: Overview
   icon: i-lucide-door-open
 ---
 
-Spaces is the console side of room booking. Members book from **Book a room** in the My NNT
-strip; these screens are where the list of rooms is kept true, requests are answered, a room is shut
-for a get-in, and the year's use is counted. They sit under **Manage, Spaces**.
+Spaces is the console side of room booking. Members book from **Rooms** under My NNT; these
+screens are where the list of rooms is kept true, requests are answered, a room is shut for a
+get-in, and the year's use is counted. They sit under **Manage, Spaces**.
 
 The Manager and the Theatre Manager read every screen here and change anything on it: adding
 or editing a room, answering a request, closing a room, listing a room we do not manage. The

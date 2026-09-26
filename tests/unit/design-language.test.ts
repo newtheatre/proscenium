@@ -347,11 +347,17 @@ describe('a member page is compact on a phone (0104, issue 1342)', () => {
     expect(MEMBER_PAGE_WIDE).toBe('max-w-5xl py-6 sm:py-10')
   })
 
-  test('the header is a text-2xl title and one line of description below sm, and as before above it', () => {
-    expect(MEMBER_PAGE_HEADER.title).toContain('text-2xl')
-    expect(MEMBER_PAGE_HEADER.title).toContain('sm:text-4xl')
-    expect(MEMBER_PAGE_HEADER.description).toContain('line-clamp-1')
-    expect(MEMBER_PAGE_HEADER.description).toContain('sm:line-clamp-none')
+  test('the header is a text-2xl title over a text-base description below sm, and as before above it', () => {
+    expect(MEMBER_PAGE_HEADER.root).toBe('py-4 sm:py-8')
+    expect(MEMBER_PAGE_HEADER.title).toBe('text-2xl sm:text-4xl')
+    expect(MEMBER_PAGE_HEADER.description).toContain('text-base sm:text-lg')
+  })
+
+  // Rooms tells a phone how to choose a slot by touch in its description, so a clamp would hide
+  // the one instruction on the screen it is for.
+  test('the description is never clamped', () => {
+    expect(MEMBER_PAGE_HEADER.description).not.toContain('line-clamp')
+    expect(MEMBER_PAGE_HEADER.description).not.toContain('truncate')
   })
 
   test('every member page header takes the compact header', async () => {

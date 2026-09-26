@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ACCOUNT_NAV } from '#shared/utils/site-nav'
 
-// The shared shell for the three account pages (K-127 criterion 3): a side list on wide screens,
+// The shared shell for the account settings pages (K-127 criterion 3): a side list on wide screens,
 // a horizontal strip below `lg`, both reading the same declaration as the account menu and footer.
 defineProps<{ title: string, description?: string }>()
 
@@ -24,6 +24,7 @@ const links = ACCOUNT_NAV.map(entry => ({ label: entry.label, icon: entry.icon, 
       <UPageHeader
         :title="title"
         :description="description"
+        :ui="MEMBER_PAGE_HEADER"
       />
 
       <UNavigationMenu
