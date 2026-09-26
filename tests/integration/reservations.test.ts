@@ -4,6 +4,7 @@ import {
   currentTicketLinesQuery,
   heldAccessCountsQuery,
   namedTicketLinesQuery,
+  ownBookingsQuery,
   reservationCurrentStateQuery,
   reservationForDoorQuery,
   reservationForResendQuery,
@@ -283,6 +284,31 @@ describe('the named ticket lines a screen reads (D-110)', () => {
 
       const [found] = read<{ ticketTypeId: string, ticketTypeName: string, quantity: number }>(database, namedTicketLinesQuery('r-1'))
       expect(found).toEqual({ ticketTypeId: 'tt-standard', ticketTypeName: 'Standard', quantity: 1 })
+    })
+  })
+})
+
+// Issue 1332: a signed-in person's own bookings still to come, the soonest first, bound by a
+// limit rather than by how many they hold (0006).
+describe('a member reads their own bookings still to come (issue 1332)', () => {
+  test('their live bookings from tonight on come back soonest first; nobody else\'s, and nothing settled or past', async () => {
+    await withDatabase((database) => {
+      const tonight = tonightsPerformance(database, { suffix: 'tonight' })
+      const earlier = tonightsPerformance(database, { suffix: 'earlier', night: '2026-01-10' })
+      user(database, 'u-1', 'one@example.invalid')
+      user(database, 'u-2', 'two@example.invalid')
+      database.batch([
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)', 'r-paid', 'PAIDAA', tonight.performanceId, 'u-1', 'COLLECTED', 'WEB'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)', 'r-held', 'HELDAA', tonight.performanceId, 'u-1', 'PENDING', 'WEB'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)', 'r-gone', 'GONEAA', tonight.performanceId, 'u-1', 'CANCELLED', 'WEB'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)', 'r-past', 'PASTAA', earlier.performanceId, 'u-1', 'COLLECTED', 'WEB'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)', 'r-other', 'OTHRAA', tonight.performanceId, 'u-2', 'PENDING', 'WEB'],
+      ])
+
+      const found = read<{ reference: string, showTitle: string }>(database, ownBookingsQuery('u-1', tonight.startsAt - 3_600, 10))
+      expect(found.map(row => row.reference).sort()).toEqual(['HELDAA', 'PAIDAA'])
+      expect(found[0]?.showTitle).toBe('A Test Show')
+      expect(read(database, ownBookingsQuery('u-1', tonight.startsAt - 3_600, 1))).toHaveLength(1)
     })
   })
 })
