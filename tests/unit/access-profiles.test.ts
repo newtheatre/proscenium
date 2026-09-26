@@ -9,11 +9,13 @@ import {
   changesDeclaration,
   declareAccessProfileForm,
   declineAccessProfileForm,
+  declineAccessProfileRequest,
   doorWording,
   effectiveStatus,
   isEntitledToAccessTickets,
   saveRepends,
   saysAccessProfileStatus,
+  verifyAccessProfileRequest,
 } from '#shared/utils/access-profiles'
 
 const NOW = 1_800_000_000
@@ -219,5 +221,18 @@ describe('a decline says why, for the owner alone (issue 1334, 0050)', () => {
 
   test('a reason is trimmed and kept', () => {
     expect(declineAccessProfileForm.parse({ reason: ' The card number did not match ' }).reason).toBe('The card number did not match')
+  })
+})
+
+describe('a decision names the declaration it was made on (issue 1383, 0003)', () => {
+  test('verifying and declining each carry the version the officer read', () => {
+    expect(verifyAccessProfileRequest.parse({ fohNote: 'Aisle seat', version: 'iv-1' }).version).toBe('iv-1')
+    expect(declineAccessProfileRequest.parse({ reason: 'Could not check the card', version: 'iv-1' }).version).toBe('iv-1')
+  })
+
+  test('a declaration never encrypted has no version, and says so rather than leaving it out', () => {
+    expect(verifyAccessProfileRequest.parse({ fohNote: 'Aisle seat', version: null }).version).toBeNull()
+    expect(() => verifyAccessProfileRequest.parse({ fohNote: 'Aisle seat' })).toThrow()
+    expect(() => declineAccessProfileRequest.parse({ reason: 'Could not check the card' })).toThrow()
   })
 })

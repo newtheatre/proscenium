@@ -71,6 +71,18 @@ function row<T>(sql: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
+// The officer decides on the declaration they read, so a decision sends back the version it saw
+// (issue 1383, 0003).
+async function versionOf(userId: string): Promise<string | null> {
+  const answered = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${userId}`, undefined, accessOfficer.cookie))
+  return (await answered.json() as { profile: { version: string | null } }).profile.version
+}
+
+async function decide(userId: string, decision: 'verify' | 'decline', body: Record<string, unknown>): Promise<Response> {
+  const version = await versionOf(userId)
+  return withoutSecondFactor(() => send('POST', `/api/admin/access-profiles/${userId}/${decision}`, { ...body, version }, accessOfficer.cookie))
+}
+
 const BLANK_FLAGS = {
   standing: false, crowds: false, levelAccess: false, distance: false, urgentToilet: false,
   essentialCompanion: false, visualInformation: false, audibleInformation: false, other: false,
@@ -131,8 +143,7 @@ describe.skipIf(skip !== null)('only a named accessibility officer verifies (cri
   })
 
   test('verifying sets the agreed wording and clears the evidence reference', async () => {
-    const verified = await withoutSecondFactor(() =>
-      send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote: 'Aisle seat, own wheelchair' }, accessOfficer.cookie))
+    const verified = await decide(patron.id, 'verify', { fohNote: 'Aisle seat, own wheelchair' })
     expect(verified.status).toBe(200)
 
     const answered = await send('GET', '/api/account/access-profile', undefined, patron.cookie)
@@ -215,8 +226,7 @@ describe.skipIf(skip !== null)('a save re-pends only on a real change (criterion
     expect(await changed.json()).toMatchObject({ repended: true })
     expect(await own()).toMatchObject({ status: 'PENDING', fohNote: null, expiresAt: null })
 
-    const verified = await withoutSecondFactor(() =>
-      send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote: 'Aisle seat, own wheelchair' }, accessOfficer.cookie))
+    const verified = await decide(patron.id, 'verify', { fohNote: 'Aisle seat, own wheelchair' })
     expect(verified.status).toBe(200)
     expect((await own()).status).toBe('VERIFIED')
   })
@@ -241,7 +251,7 @@ describe.skipIf(skip !== null)('the owner is told, and told nothing declared or 
 
     const bare = await withoutSecondFactor(() => send('POST', `/api/admin/access-profiles/${declined.id}/decline`, {}, accessOfficer.cookie))
     expect(bare.status).toBe(400)
-    const answered = await withoutSecondFactor(() => send('POST', `/api/admin/access-profiles/${declined.id}/decline`, { reason }, accessOfficer.cookie))
+    const answered = await decide(declined.id, 'decline', { reason })
     expect(answered.status).toBe(200)
 
     expect(await own(declined)).toMatchObject({ status: 'DECLINED', declineReason: reason })
@@ -268,6 +278,81 @@ describe.skipIf(skip !== null)('the owner is told, and told nothing declared or 
     const saved = await send('PUT', '/api/account/access-profile', declaration({ accessCardNumber: null }), declined.cookie)
     expect(await saved.json()).toMatchObject({ repended: true })
     expect(await own(declined)).toMatchObject({ status: 'PENDING', declineReason: null })
+  })
+})
+
+describe.skipIf(skip !== null)('a decision holds only for the declaration the officer read (issue 1383, 0003)', () => {
+  const CHANGED = 'This declaration has changed since you opened it. Reload to see the latest.'
+
+  async function declared(prefix: string): Promise<TestMember> {
+    const member = await registerMember(app, prefix, generatePassword())
+    expect((await send('PUT', '/api/account/access-profile', declaration(), member.cookie)).status).toBe(200)
+    return member
+  }
+
+  const decisionsRecorded = (member: TestMember): number => count(
+    `SELECT count(*) AS n FROM audit_log WHERE target = ? AND action IN ('access-profile.verified', 'access-profile.declined')`, `user:${member.id}`,
+  )
+
+  const verifyAs = (userId: string, version: string | null): Promise<Response> => withoutSecondFactor(() =>
+    send('POST', `/api/admin/access-profiles/${userId}/verify`, { fohNote: 'Aisle seat', version }, accessOfficer.cookie))
+
+  test('the officer reads a version, and a decision without one is refused', async () => {
+    const member = await declared('versioned')
+    expect(typeof await versionOf(member.id)).toBe('string')
+    const unversioned = await withoutSecondFactor(() =>
+      send('POST', `/api/admin/access-profiles/${member.id}/verify`, { fohNote: 'Aisle seat' }, accessOfficer.cookie))
+    expect(unversioned.status).toBe(400)
+  })
+
+  test('a member\'s change after the officer read refuses the verification, and the change stands', async () => {
+    const member = await declared('changed-under')
+    const seen = await versionOf(member.id)
+    expect((await send('PUT', '/api/account/access-profile', declaration({ companions: 2, requesterNote: 'Uses a wheelchair and a stick' }), member.cookie)).status).toBe(200)
+
+    const stale = await verifyAs(member.id, seen)
+    expect(stale.status).toBe(409)
+    expect((await stale.json() as { statusMessage?: string }).statusMessage).toBe(CHANGED)
+    expect(await own(member)).toMatchObject({ status: 'PENDING', companions: 2, requesterNote: 'Uses a wheelchair and a stick' })
+    expect(count(`SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type = 'access-profile.verified'`, member.id)).toBe(0)
+    expect(decisionsRecorded(member)).toBe(0)
+  })
+
+  test('the same holds for a decline', async () => {
+    const member = await declared('declined-under')
+    const seen = await versionOf(member.id)
+    expect((await send('PUT', '/api/account/access-profile', declaration({ companions: 0 }), member.cookie)).status).toBe(200)
+
+    const stale = await withoutSecondFactor(() =>
+      send('POST', `/api/admin/access-profiles/${member.id}/decline`, { reason: 'Could not check the card', version: seen }, accessOfficer.cookie))
+    expect(stale.status).toBe(409)
+    expect(await own(member)).toMatchObject({ status: 'PENDING', companions: 0, declineReason: null })
+    expect(count(`SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type = 'access-profile.declined'`, member.id)).toBe(0)
+    expect(decisionsRecorded(member)).toBe(0)
+  })
+
+  test('a consent switch is not a change to the declaration, so the officer\'s read still stands', async () => {
+    const member = await declared('switched-under')
+    const seen = await versionOf(member.id)
+    expect((await send('PUT', '/api/account/access-profile/consent', { consent: false }, member.cookie)).status).toBe(200)
+    expect(await versionOf(member.id)).toBe(seen)
+    expect((await verifyAs(member.id, seen)).status).toBe(200)
+  })
+
+  test('a member\'s save racing an officer\'s verify: the save is never lost, and a verify on the old declaration never lands after it', async () => {
+    for (let round = 0; round < 4; round++) {
+      const member = await declared(`raced-${round}`)
+      const seen = await versionOf(member.id)
+      const [saved, verified] = await Promise.all([
+        send('PUT', '/api/account/access-profile', declaration({ companions: 2, requesterNote: `Round ${round}` }), member.cookie),
+        verifyAs(member.id, seen),
+      ])
+      expect(saved.status).toBe(200)
+      expect([200, 409]).toContain(verified.status)
+
+      // Either the verify landed first and the save re-pended it, or the save landed first and the verify was refused.
+      expect(await own(member)).toMatchObject({ status: 'PENDING', companions: 2, requesterNote: `Round ${round}`, fohNote: null })
+    }
   })
 })
 
@@ -306,8 +391,7 @@ describe.skipIf(skip !== null)('withdrawal and reinstatement (criterion 5)', () 
   })
 
   test('a withdrawn profile cannot be verified: only the owner reinstates it', async () => {
-    const attempt = await withoutSecondFactor(() =>
-      send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote: 'Should not apply' }, accessOfficer.cookie))
+    const attempt = await decide(patron.id, 'verify', { fohNote: 'Should not apply' })
     expect(attempt.status).toBe(409)
   })
 

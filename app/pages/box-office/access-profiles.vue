@@ -82,10 +82,10 @@ async function review(row: Summary): Promise<void> {
 }
 
 async function verify(event: FormSubmitEvent<{ fohNote: string }>): Promise<void> {
-  if (!reviewing.value) return
+  if (!reviewing.value || !detail.value) return
   deciding.value = true
   try {
-    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/verify`, { method: 'POST', body: event.data })
+    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/verify`, { method: 'POST', body: { ...event.data, version: detail.value.version } })
     toast.add({ title: `${reviewing.value.name}'s access profile verified`, icon: 'i-lucide-check', color: 'success' })
     reviewing.value = null
     await load()
@@ -110,11 +110,11 @@ function askToDecline(): void {
 }
 
 async function decline(event: FormSubmitEvent<DeclineAccessProfileInput>): Promise<void> {
-  if (!reviewing.value) return
+  if (!reviewing.value || !detail.value) return
   deciding.value = true
   declineFailure.value = null
   try {
-    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/decline`, { method: 'POST', body: event.data })
+    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/decline`, { method: 'POST', body: { ...event.data, version: detail.value.version } })
     toast.add({ title: `${reviewing.value.name}'s access profile declined`, icon: 'i-lucide-x', color: 'neutral' })
     declining.value = false
     reviewing.value = null
@@ -364,6 +364,7 @@ watch(modalOpen, (nowOpen) => {
           type="submit"
           form="verify-form"
           :loading="deciding"
+          :disabled="!detail"
           data-test="verify"
         >
           Verify the declaration
@@ -372,6 +373,7 @@ watch(modalOpen, (nowOpen) => {
           variant="subtle"
           color="error"
           data-test="decline"
+          :disabled="!detail"
           @click="askToDecline"
         >
           Decline the declaration
