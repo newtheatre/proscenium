@@ -24,6 +24,7 @@ interface RosterPerformance {
   startsAt: number
   isExternal: boolean
   hasTemplate: boolean
+  isRetired: boolean
   shifts: RosterShift[]
 }
 
@@ -82,7 +83,7 @@ function confirmedCount(entry: Staffed): number {
 
 const toneClass = { success: 'text-success', warning: 'text-warning', neutral: 'text-muted' } as const
 
-// Nobody rostered at a venue with a template: stamp its missing slots from this card (issue 1319).
+// Stamps the venue's template onto every night there from tonight that misses a slot (issue 1319).
 async function addMissing(entry: RosterPerformance): Promise<void> {
   failure.value = null
   try {
@@ -497,7 +498,7 @@ watch(modalOpen, (nowOpen) => {
                 Add missing shifts
               </UButton>
               <UButton
-                v-else
+                v-else-if="!entry.isRetired"
                 block
                 size="sm"
                 variant="outline"

@@ -291,10 +291,17 @@ export function unstaffedPerformancesQuery(from: number, to: number): SQL {
 }
 
 // Saving a template reaches the diary it was missing: every performance at the venue from `from`
-// that holds no shift at all. One stamped before, even by hand, is left alone (issue 1319, E-101).
+// holding no live shift. One holding a live shift, even by hand, is left alone (issue 1319, E-101).
 export function stampUnstampedStatement(venueId: string, from: number, defaults: ShiftOffsets): SQL {
   return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from}
-    AND NOT EXISTS (SELECT 1 FROM shifts held WHERE held.performance_id = p.id)`, defaults)
+    AND NOT EXISTS (SELECT 1 FROM shifts held WHERE held.performance_id = p.id AND held.status <> 'CANCELLED')`, defaults)
+}
+
+// Tonight is still tonight's work, so a stamp reaches from its 04:00 (0014, E-110).
+export function stampWindow(): { night: string, from: number } {
+  const night = currentShowNight()
+  const from = Math.floor(showNightBounds(night).from.getTime() / 1000)
+  return { night, from }
 }
 
 // The fill for shifts stamped before a shift had times. Idempotent because it writes only where a
@@ -643,19 +650,16 @@ export function unconfirmShiftStatement(shiftId: string): SQL {
   `
 }
 
-export interface RosterPerformance {
+// The three flags are SQLite 0 or 1; the board route turns them into booleans.
+export interface RosterPerformanceRow {
   performanceId: string
   showTitle: string
   venueId: string
   venueName: string
   startsAt: number
-  isExternal: boolean
-  hasTemplate: boolean
-}
-
-export interface RosterPerformanceRow extends Omit<RosterPerformance, 'isExternal' | 'hasTemplate'> {
   isExternal: number
   hasTemplate: number
+  isRetired: number
 }
 
 export interface RosterShiftRow {
@@ -680,7 +684,7 @@ const rosterScope = (bounds: BoardBounds): SQL => sql`
 export function rosterPerformancesQuery(bounds: BoardBounds): SQL {
   return sql`
     SELECT p.id AS performanceId, sh.title AS showTitle, v.id AS venueId, v.name AS venueName,
-           p.starts_at AS startsAt, v.is_external AS isExternal,
+           p.starts_at AS startsAt, v.is_external AS isExternal, v.archived AS isRetired,
            (v.is_external = 0 AND EXISTS (SELECT 1 FROM shift_templates t WHERE t.venue_id = v.id)) AS hasTemplate
     FROM performances p
     JOIN shows sh ON sh.id = p.show_id

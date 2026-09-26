@@ -1427,6 +1427,23 @@ describe('saving a template stamps the future performances never stamped before 
     })
   })
 
+  // A performance moved here from another venue keeps only the cancelled shifts the move left, and
+  // the board shows it as nobody rostered, so the save reaches it (issue 1319).
+  test('a performance holding only cancelled shifts is stamped, around the slot a cancelled row still holds', async () => {
+    await withDatabase(async (database) => {
+      testVenue(database, { suffix: 'a' })
+      const moved = tonightsPerformance(database, { suffix: 'moved', night: daysAfter(currentShowNight(), 3), venueId: 'venue-a' })
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', 'gone-bar', moved.performanceId, 'BAR', 1, 'CANCELLED']])
+      template(database, 'venue-a')
+
+      run(database, stampUnstampedStatement('venue-a', fromTonight(), OFFSETS))
+
+      expect(shiftsOn(database, moved.performanceId).map(one => `${one.role}:${one.slot}:${one.status}`)).toEqual([
+        'BAR:1:CANCELLED', 'DOOR:1:OPEN', 'DOOR:2:OPEN', 'DUTY_MANAGER:1:OPEN',
+      ])
+    })
+  })
+
   test('another venue\'s performance is untouched, and the statement binds only the venue and the night', async () => {
     await withDatabase(async (database) => {
       testVenue(database, { suffix: 'a' })

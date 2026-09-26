@@ -299,6 +299,7 @@ describe.skipIf(skip !== null)('a performance is stamped from its venue\'s templ
     expect((await saved.json() as { stamped: number }).stamped).toBe(4)
     expect(shiftsOn(fresh.performanceId).map(shift => `${shift.role}:${shift.slot}:${shift.status}`).sort())
       .toEqual(['BAR:1:OPEN', 'DOOR:1:OPEN', 'DOOR:2:OPEN', 'DUTY_MANAGER:1:OPEN'])
+    expect(trail('shift-template.created', `venue:${fresh.venueId}`)?.detail).toMatchObject({ stampedFrom: currentShowNight() })
   })
 
   test('saving a template again stamps nothing onto a rota it already stamped (E-101 criterion 3)', async () => {

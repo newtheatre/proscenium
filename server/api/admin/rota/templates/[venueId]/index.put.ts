@@ -1,6 +1,5 @@
 import { changes } from '#shared/utils/audit'
 import { externalVenueTemplateRefusal, orderedSlots, shiftTemplateForm, templateRefusal } from '#shared/utils/rota'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import type { TemplateSlot } from '#shared/utils/rota'
 
 // Set a venue's shift template. Editing one changes nothing already stamped: the backfill is what
@@ -27,9 +26,7 @@ export default defineEventHandler(async (event) => {
 
   const [cleared, ...written] = replaceTemplateStatements(venueId, input.slots, resolved.account.id)
 
-  // Tonight's night is still tonight's work, so the stamp reaches from its 04:00 (0014, E-110).
-  const night = currentShowNight()
-  const from = Math.floor(showNightBounds(night).from.getTime() / 1000)
+  const { night, from } = stampWindow()
   const defaults = await shiftOffsetDefaults(event)
 
   // In the same batch, after the template rows, so a first template never leaves the imported
@@ -37,15 +34,15 @@ export default defineEventHandler(async (event) => {
   const results = await withShiftConstraints(() => db.batch([
     db.run(cleared),
     ...written.map(statement => db.run(statement)),
-    db.all<{ id: string }>(stampUnstampedStatement(venueId, from, defaults)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: held.length === 0 ? 'shift-template.created' : 'shift-template.updated',
       target: `venue:${venueId}`,
       detail: { ...changes({ slots: [said(held), said(input.slots)] }), stampedFrom: night },
     })),
+    db.all<{ id: string }>(stampUnstampedStatement(venueId, from, defaults)),
   ]))
-  const stamped = results[written.length + 1] as { id: string }[]
+  const stamped = results.at(-1) as { id: string }[]
 
   return { ok: true, slots: orderedSlots(input.slots), stamped: stamped.length }
 })
