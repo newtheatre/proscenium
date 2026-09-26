@@ -50,7 +50,7 @@ the screens are for.
   The rooms, room requests, closures, other rooms and utilisation.
   ::
   ::card{icon="i-lucide-clipboard-list" title="Rota" to="/docs/rota"}
-  Shift templates, approvals, the rota board, checklists, emergency cards, safety, the Challenge 25 register and the backstage board.
+  Shift templates, the rota board and the claims waiting on it, checklists, emergency cards, safety, the Challenge 25 register and the backstage board.
   ::
   ::card{icon="i-lucide-graduation-cap" title="Training" to="/docs/training"}
   The catalogue, departments, records, requests and sessions.
