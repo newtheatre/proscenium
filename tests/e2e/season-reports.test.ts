@@ -165,7 +165,8 @@ describe.skipIf(skip !== null)('/reports, the screen (criterion 5, #1042)', () =
   test('the incidents tab shows this year\'s fixture incident and links its export', async () => {
     const view = await signedInAsFoh()
     await visit(view, `${app.baseURL}/reports`, '[data-test="period-kind"]')
-    expect(await navLabels(view)).toContain('Reports')
+    // A group of one is drawn as its entry, so the sidebar says the screen's own name (0105).
+    expect(await navLabels(view)).toContain('Night reports')
     await waitFor(view, `document.querySelector('[data-test="incidents-table"]')?.textContent.includes('Safety')`)
     const href = await view.evaluate<string>(`document.querySelector('[data-test="export-incidents"]').getAttribute('href')`)
     expect(href).toStartWith('/api/admin/reports/incidents/export?kind=YEAR')

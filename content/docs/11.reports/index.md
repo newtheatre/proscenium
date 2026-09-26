@@ -10,10 +10,11 @@ navigation:
   icon: i-lucide-chart-no-axes-combined
 ---
 
-Reports at **Manage, Reports** looks back over many show nights at once: which kinds of incident
-keep happening and where, and how each performance went for attendance and staffing. The Front of
-House Manager, the Safety Officer, the Committee and the IT Manager read it. It is its own group
-in the sidebar, not part of Rota, Box office or Money, and holding it opens nothing in those.
+**Night reports**, near the foot of the Manage sidebar, looks back over many show nights at once:
+which kinds of incident keep happening and where, and how each performance went for attendance
+and staffing. The Front of House Manager, the Safety Officer, the Committee and the IT Manager
+read it. It is its own entry in the sidebar, not part of Rota, Box office or Money, and holding
+it opens nothing in those.
 
 ## If something goes wrong
 

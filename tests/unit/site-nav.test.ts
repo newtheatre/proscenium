@@ -133,6 +133,27 @@ describe('a sidebar label is the title the page gives itself (0082)', () => {
   })
 })
 
+// Three screens were called Reports, and two names were one register (issue #1365).
+describe('no two console screens share a name', () => {
+  const items = CONSOLE_NAV.flatMap(group => group.items)
+  const labelOf = (to: string): string | undefined => items.find(item => item.to === to)?.label
+
+  test('every console label is used once', () => {
+    const labels = [CONSOLE_HOME.label, ...items.map(item => item.label)]
+    expect([...new Set(labels.filter((label, index) => labels.indexOf(label) !== index))]).toEqual([])
+  })
+
+  test('each report screen says whose reports it holds', () => {
+    expect(labelOf('/reports')).toBe('Night reports')
+    expect(labelOf('/bar/reports')).toBe('Bar reports')
+    expect(labelOf('/money/reports')).toBe('Comps and discounts')
+  })
+
+  test('the Challenge 25 register is called what the door calls it', () => {
+    expect(labelOf('/rota/manage/age-checks')).toBe('Challenge 25 register')
+  })
+})
+
 // An icon that marks two screens marks neither: the column stops carrying information, and
 // i-lucide-beer stood for the Bar group, its products and a bar opening at once (0082).
 describe('an icon belongs to one entry', () => {

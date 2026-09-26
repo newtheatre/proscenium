@@ -200,7 +200,12 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    and not review's job (0082): a group is ordered as Every day then Set-up, or names no section
    at all; an icon belongs to one entry across the whole sidebar; and a nav label is character for
    character the `title` its page sets in `definePageMeta`, with the shorter noun winning, because
-   the sidebar truncates at its default width and the navbar does not (issue 921).
+   the sidebar truncates at its default width and the navbar does not (issue 921). A console
+   label fits the sidebar at its default width: `SIDEBAR_LABEL_MAX` in
+   `shared/utils/console-sidebar.ts` is the budget, the layout opens at `SIDEBAR_DEFAULT_SIZE`,
+   and no two console screens share a name. How a group is drawn is decided there as well
+   (0105): a group whose viewer sees one entry is drawn as that entry, and a sidebar holding one
+   group opens it on arrival. `tests/unit/console-sidebar.test.ts` holds all of it.
 6. **Every console list is a `UTable` with column definitions, and it stays usable below `sm`.**
    Table markup written by hand takes none of the shell's behaviour, so it arrives with no empty
    state, no loading state and no column rules; a list of rows on the console is a `UTable` or it

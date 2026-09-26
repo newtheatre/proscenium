@@ -8,7 +8,7 @@ import { DEFAULT_PAGE_SIZE } from '#shared/utils/pagination'
 import type { Page } from '#shared/utils/pagination'
 import type { TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Reports', middleware: 'console', docs: '/docs/reports' })
+definePageMeta({ layout: 'console', title: 'Night reports', middleware: 'console', docs: '/docs/reports' })
 
 type Report = 'incidents' | 'performances'
 

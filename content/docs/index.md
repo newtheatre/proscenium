@@ -3,7 +3,7 @@ title: Documentation
 description: How each part of the theatre is run, kept by the people who run it.
 module: Governance
 audience: member
-updatedOn: 2026-09-24
+updatedOn: 2026-09-26
 updatedBy: Matt Adcock
 ---
 
@@ -50,7 +50,7 @@ the screens are for.
   The rooms, room requests, closures, other rooms and utilisation.
   ::
   ::card{icon="i-lucide-clipboard-list" title="Rota" to="/docs/rota"}
-  Shift templates, approvals, the rota board, checklists, emergency cards, safety, the age-check register and the backstage board.
+  Shift templates, approvals, the rota board, checklists, emergency cards, safety, the Challenge 25 register and the backstage board.
   ::
   ::card{icon="i-lucide-graduation-cap" title="Training" to="/docs/training"}
   The catalogue, departments, records, requests and sessions.
