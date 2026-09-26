@@ -3,11 +3,14 @@ import {
   DESK_SALE_LINE_QUANTITY_CAP,
   DESK_SCAN_PASS_REFUSAL,
   DESK_SCAN_UNKNOWN_REFUSAL,
+  DESK_STATUS_FILTERS,
+  DESK_STATUS_LABELS,
   REINSTATE_REASON_LIMIT,
   amountDueFor,
   collectForm,
   compBlockedSays,
   deskEmptySays,
+  deskFigures,
   deskSaleForm,
   deskSearchForm,
   readDeskScan,
@@ -24,6 +27,43 @@ import { RESERVATION_STATUSES } from '#shared/utils/capacity'
 
 // D-114 as pure rules. The database enforcement (the ticket-collection-once guard) is in
 // tests/integration/desk.test.ts; the full desk flow is tests/e2e/desk.test.ts.
+
+// The desk counts the house in the night's words, in seats, not its own (D-114 criterion 7,
+// E-112 criterion 1, issue 1326).
+describe('the desk states the house in the night\'s words (issue 1326)', () => {
+  const house = { capacity: 120, sold: 42, admitted: 12, walkUps: 3, unpaidCount: 4, unpaidOwedPence: 3600 }
+
+  test('sold against capacity, in, seats left, unpaid with its amount, and walk-ups, in that order', () => {
+    expect(deskFigures(house).map(figure => [figure.key, figure.label, figure.value])).toEqual([
+      ['sold', 'Sold', '42 of 120'],
+      ['in', 'In', '12'],
+      ['seats-left', 'Seats left', '78'],
+      ['unpaid', 'Unpaid', '4 · £36.00'],
+      ['walk-ups', 'Walk-ups', '3'],
+    ])
+  })
+
+  test('an uncapped house has no cap and sells without a denominator; nothing unpaid says so', () => {
+    const said = Object.fromEntries(deskFigures({ ...house, capacity: null, unpaidCount: 0, unpaidOwedPence: 0 }).map(figure => [figure.key, figure.value]))
+    expect(said.sold).toBe('42')
+    expect(said['seats-left']).toBe('No cap')
+    expect(said.unpaid).toBe('None')
+  })
+
+  test('an oversold house has no seats left, never a negative number', () => {
+    const said = Object.fromEntries(deskFigures({ ...house, capacity: 40 }).map(figure => [figure.key, figure.value]))
+    expect(said['seats-left']).toBe('0')
+  })
+
+  test('the pills say all, unpaid, paid and in, never the stored state', () => {
+    expect(DESK_STATUS_FILTERS.map(filter => DESK_STATUS_LABELS[filter])).toEqual(['All', 'Unpaid', 'Paid', 'In'])
+  })
+
+  test('the old words are gone from the screen', async () => {
+    const source = await Bun.file('app/pages/box-office/desk.vue').text()
+    expect(source).not.toMatch(/Walk-up headroom|'Reserved'|'Pending'|label: 'Door'/)
+  })
+})
 
 describe('a booking is collectable only while PENDING (criterion 2)', () => {
   test('PENDING has nothing to refuse', () => {

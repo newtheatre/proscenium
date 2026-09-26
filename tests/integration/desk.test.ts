@@ -118,17 +118,23 @@ describe('the desk status pills filter on pending, collected and door', () => {
   })
 })
 
-describe('deskSummaryQuery reads the five KPI tiles for one performance (D-132)', () => {
-  test('reserved is pending plus collected, door is its own figure, and unpaid owes what is still due', async () => {
+// The house in the night's words, counted in seats (D-114 criterion 7, issue 1326). Admission
+// sets DOOR on any booking, so a walk-up is known by its source and never by that status.
+describe('deskSummaryQuery reads the house in seats for one performance (D-114 criterion 7)', () => {
+  test('sold holds every seat, in the admitted ones, walk-ups the door-source ones, and unpaid owes what is due', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'a@example.invalid', 'A Pending')
       user(database, 'u-2', 'b@example.invalid', 'B Collected')
-      user(database, 'u-3', 'c@example.invalid', 'C Walkup')
+      user(database, 'u-3', 'c@example.invalid', 'C Booked And In')
+      user(database, 'u-4', 'd@example.invalid', 'D Walkup')
       reservation(database, 'r-1', seeded.performanceId, 'u-1', 'PENDING', 'AAA111')
       reservation(database, 'r-2', seeded.performanceId, 'u-2', 'COLLECTED', 'BBB222')
       reservation(database, 'r-3', seeded.performanceId, 'u-3', 'DOOR', 'CCC333')
+      reservation(database, 'r-4', seeded.performanceId, 'u-4', 'DOOR', 'DDD444')
+      reservation(database, 'r-5', seeded.performanceId, 'u-1', 'EXPIRED', 'EEE555')
       database.batch([
+        ['UPDATE reservations SET source = ? WHERE id = ?', 'DOOR', 'r-4'],
         ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
         ['INSERT INTO ticket_types (id, name, price, kind, access_kind) VALUES (?, ?, ?, ?, ?)', 'tt-access', 'Access', 0, 'SINGLE', 'ACCESS'],
         ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-pass', 'Pass admission', 0, 'PASS_ADMISSION'],
@@ -137,25 +143,28 @@ describe('deskSummaryQuery reads the five KPI tiles for one performance (D-132)'
       ticket(database, 't-2', 'r-2', seeded.performanceId, 'tt-standard', 900)
       ticket(database, 't-3', 'r-3', seeded.performanceId, 'tt-access', 0)
       ticket(database, 't-4', 'r-3', seeded.performanceId, 'tt-pass', 0)
+      ticket(database, 't-5', 'r-4', seeded.performanceId, 'tt-standard', 900)
+      ticket(database, 't-6', 'r-4', seeded.performanceId, 'tt-standard', 900)
+      ticket(database, 't-7', 'r-5', seeded.performanceId, 'tt-standard', 900)
 
       interface SummaryRow {
         capacity: number
-        reserved: number
-        collected: number
-        door: number
+        sold: number
+        admitted: number
+        walkUps: number
         unpaidCount: number
         unpaidOwedPence: number
         accessBookings: number
         passAdmissions: number
       }
       const [row] = read<SummaryRow>(database, deskSummaryQuery(seeded.performanceId))
-      // Reserved and door count tickets, not reservations: r-3's two tickets both count
-      // towards door, since neither was reserved ahead of the night.
+      // r-3 was booked ahead and admitted, so its two seats are in but are not walk-ups; r-4's two
+      // are both; the expired hold holds no seat at all.
       expect(row).toMatchObject({
         capacity: 120,
-        reserved: 2,
-        collected: 1,
-        door: 2,
+        sold: 6,
+        admitted: 4,
+        walkUps: 2,
         unpaidCount: 1,
         unpaidOwedPence: 900,
         accessBookings: 1,

@@ -382,10 +382,12 @@ Open questions:
      one atomic write.
   7. A reservation is pending (reserved and unpaid), collected (reserved in advance and now
      paid for) or door (a walk-up sale with no reservation); pending moves to collected or to
-     door and nowhere else. The screen shows five figures for the performance on screen:
-     capacity, reserved (pending plus collected), collected, door and walk-up headroom
-     (capacity less reserved and door, uncapped where the house is). Status pills (all,
-     pending, collected, door) narrow the search results the same way. A side card names
+     door and nowhere else. Trimmed 27 September 2026 (issue 1326): the screen shows the house
+     for the performance on screen in the night's words (E-112 criterion 1), counted in seats:
+     sold against capacity, in (admitted through the door), seats left (capacity less sold, or
+     no cap), unpaid (the count and the amount still owed) and walk-ups (sold at the door,
+     counted by the booking's source, never by the status admission sets). Status pills (all,
+     unpaid, paid, in) narrow the search results by the same states. A side card names
      tonight's access booking count (with a pointer to the door screen), pass admissions, the
      reservations release time (D-106, from configuration) and the confirmed duty manager; an
      unpaid-owed alert quotes the count, the amount and the release time once anything is
