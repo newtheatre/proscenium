@@ -1,4 +1,5 @@
 import { boardEntries, boardWindowBounds, boardWindowQuery } from '#shared/utils/rota-board'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import type { RosterOpening, RosterOpeningShiftRow, RosterPerformanceRow, RosterShiftRow } from '#server/utils/rota'
 
 // Every non-cancelled shift on the nights the window names, whole rather than paged (E-107
@@ -8,15 +9,16 @@ export default defineEventHandler(async (event) => {
   await requirePermission(event, 'rota.write')
   const window = await getValidatedQueryOrThrow(event, boardWindowQuery)
   const bounds = boardWindowBounds(window)
-  // The approvals queue: performances holding a claim to confirm, whatever the window (issue 1365).
-  const scope = window.waiting ? 'waiting' : bounds
+  // The approvals queue: claims to confirm from tonight's show night on, whatever the window.
+  const tonight = Math.floor(showNightBounds(currentShowNight()).from.getTime() / 1000)
+  const scope = window.waiting ? { waitingFrom: tonight } : bounds
 
   const [performances, shifts, openings, openingShifts, [claims]] = await Promise.all([
     db.all<RosterPerformanceRow>(rosterPerformancesQuery(scope)),
     db.all<RosterShiftRow>(rosterShiftsQuery(scope)),
     window.waiting ? Promise.resolve([]) : db.all<RosterOpening>(rosterOpeningsQuery(bounds)),
     window.waiting ? Promise.resolve([]) : db.all<RosterOpeningShiftRow>(rosterOpeningShiftsQuery(bounds)),
-    db.all<{ waiting: number }>(waitingClaimsQuery()),
+    db.all<{ waiting: number }>(waitingClaimsQuery(tonight)),
   ])
 
   return {

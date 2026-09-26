@@ -312,7 +312,6 @@ const SHOTS: Shot[] = [
   { name: '10k-bar-movements', path: '/bar/stock/movements', marker: '[data-test="bar-movements-table"]' },
   { name: '10l-bar-stocktakes', path: '/bar/stock/stocktakes', marker: '[data-test="bar-stocktakes-table"]' },
   { name: '16a-rota-shifts', path: '/rota/manage/shifts', marker: '[data-test="rota-board"]' },
-  { name: '16c-rota-approvals', path: '/rota/manage/approvals', marker: '[data-test="approvals-table"]' },
   { name: '16d-rota-templates', path: '/rota/manage/templates', marker: '[data-test="templates-table"]' },
   { name: '16e-rota-templates-filters', path: '/rota/manage/templates', marker: '[data-test="templates-table"]', after: `document.querySelector('[data-test="toolbar-filters"]').click()` },
   { name: '16f-rota-checklists', path: '/rota/manage/checklists', marker: '[data-test="checklists-table"]' },

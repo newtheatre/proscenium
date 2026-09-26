@@ -53,7 +53,7 @@ const failure = ref<string | null>(null)
 const window = reactive(defaultBoardWindow(new Date()))
 
 // The approvals queue is this filter, and it lives in the URL so the old address can land on it
-// (E-105 criterion 2, issue 1365). It reads every claim still to confirm, whatever the window.
+// (E-105 criterion 2). It reads every claim to confirm from tonight on, whatever the window.
 const route = useRoute()
 const waiting = computed<boolean>({
   get: () => route.query.waiting === 'true',
@@ -65,7 +65,7 @@ const waiting = computed<boolean>({
 const { data, status, refresh } = await useAsyncData(
   'rota-shifts-board',
   () => request<Board>('/api/admin/rota/shifts/board', {
-    query: { from: window.from, to: window.to, ...(waiting.value ? { waiting: 'true' } : {}) },
+    query: { from: window.from, to: window.to, waiting: waiting.value || undefined },
   }),
   { watch: [() => window.from, () => window.to, waiting], default: (): Board => ({ items: [], waiting: 0 }) },
 )
@@ -191,8 +191,13 @@ async function submitAssign(): Promise<void> {
   }
 }
 
-// Confirming a claim inline, the same route the approvals queue answers with.
+// Confirming a claim, through E-105's approval route; the waiting filter is where the queue is worked.
+// One at a time, so a second press is ignored rather than meeting a 409.
+const confirmingId = ref<string | null>(null)
+
 async function confirm(shift: RosterShift): Promise<void> {
+  if (confirmingId.value) return
+  confirmingId.value = shift.shiftId
   failure.value = null
   try {
     await $fetch(`/api/admin/rota/approvals/${shift.shiftId}/approve`, { method: 'POST' })
@@ -201,7 +206,7 @@ async function confirm(shift: RosterShift): Promise<void> {
   }
   catch (error) {
     // A claimant who no longer qualifies is offered the decline, its reason already written, and
-    // the refusal is said inside that dialogue rather than behind it (#1302's offer).
+    // the refusal is said inside that dialogue rather than behind it (issue 1302).
     const offered = refusalData<{ declineReason?: string }>(error)?.declineReason
     if (offered) {
       openDecline(shift, offered)
@@ -211,11 +216,15 @@ async function confirm(shift: RosterShift): Promise<void> {
       failure.value = refusalText(error)
     }
   }
+  finally {
+    confirmingId.value = null
+  }
 }
 
 // Declining a claim carries a reason the claimant reads word for word (E-105 criterion 3).
 const declining = ref<RosterShift | null>(null)
 const declineFailure = ref<string | null>(null)
+const declineWorking = ref(false)
 const decline = reactive<{ reason?: string }>({})
 
 // Every opening sets the reason, so one claimant's text never carries into another's dialogue.
@@ -227,7 +236,8 @@ function openDecline(shift: RosterShift, reason?: string): void {
 
 async function submitDecline(event: FormSubmitEvent<{ reason: string }>): Promise<void> {
   const shift = declining.value
-  if (!shift) return
+  if (!shift || declineWorking.value) return
+  declineWorking.value = true
   declineFailure.value = null
   try {
     await $fetch(`/api/admin/rota/approvals/${shift.shiftId}/decline`, { method: 'POST', body: event.data })
@@ -241,6 +251,9 @@ async function submitDecline(event: FormSubmitEvent<{ reason: string }>): Promis
   }
   catch (error) {
     declineFailure.value = refusalText(error)
+  }
+  finally {
+    declineWorking.value = false
   }
 }
 
@@ -522,28 +535,31 @@ watch(modalOpen, (nowOpen) => {
                 >
                   Assign
                 </UButton>
-                <UButton
-                  v-else-if="shift.status === 'CLAIMED'"
-                  size="xs"
-                  color="secondary"
-                  variant="subtle"
-                  icon="i-lucide-check"
-                  :data-test="`confirm-${shift.shiftId}`"
-                  @click="confirm(shift)"
-                >
-                  Confirm
-                </UButton>
-                <UButton
-                  v-if="shift.status === 'CLAIMED'"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-x"
-                  :data-test="`decline-${shift.shiftId}`"
-                  @click="openDecline(shift)"
-                >
-                  Decline
-                </UButton>
+                <template v-else-if="shift.status === 'CLAIMED'">
+                  <UButton
+                    size="xs"
+                    color="secondary"
+                    variant="subtle"
+                    icon="i-lucide-check"
+                    :loading="confirmingId === shift.shiftId"
+                    :disabled="confirmingId !== null && confirmingId !== shift.shiftId"
+                    :data-test="`confirm-${shift.shiftId}`"
+                    @click="confirm(shift)"
+                  >
+                    Confirm
+                  </UButton>
+                  <UButton
+                    size="xs"
+                    color="error"
+                    variant="ghost"
+                    icon="i-lucide-x"
+                    :disabled="confirmingId === shift.shiftId"
+                    :data-test="`decline-${shift.shiftId}`"
+                    @click="openDecline(shift)"
+                  >
+                    Decline
+                  </UButton>
+                </template>
                 <UButton
                   v-else-if="shift.status === 'CONFIRMED'"
                   size="xs"
@@ -790,6 +806,7 @@ watch(modalOpen, (nowOpen) => {
       verb="Decline the claim"
       consequence="Say why: the claimant sees this word for word, and the shift stays off the open list until an officer reassigns it."
       form="decline-form"
+      :loading="declineWorking"
       :failure="declineFailure"
       @update:open="value => { if (!value) { declining = null; declineFailure = null } }"
     >

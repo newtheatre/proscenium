@@ -32,8 +32,7 @@ describe('each rota screen names the step after it (K-123 criterion 12)', () => 
   })
 })
 
-// Issue #1365: the approvals screen duplicated the board's Confirm, so the queue became a board
-// filter and the old address forwards to it; Decline, and #1302's offer of it, moved with it.
+// E-105 criteria 2 and 3: claims are confirmed and declined on the board; the old address forwards.
 describe('the claims waiting for confirmation are worked on the board (E-105 criteria 2 and 3)', () => {
   test('the old approvals address forwards to the board\'s filter, and draws nothing of its own', async () => {
     const source = await read(APPROVALS)
@@ -58,6 +57,12 @@ describe('the claims waiting for confirmation are worked on the board (E-105 cri
     expect(source).toContain('refusalData<{ declineReason?: string }>(error)?.declineReason')
     expect(source).toContain('openDecline(shift, offered)')
     expect(source).toContain('@click="openDecline(shift)"')
+  })
+
+  test('Confirm and Decline each work one at a time, so a double press never meets a 409', async () => {
+    const source = await read(BOARD)
+    expect(source).toContain(':loading="confirmingId === shift.shiftId"')
+    expect(source).toContain(':loading="declineWorking"')
   })
 })
 

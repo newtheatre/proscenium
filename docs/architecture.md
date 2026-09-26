@@ -1058,8 +1058,9 @@ the row's resulting state, which a winner has already set, the same shape `perfo
 `rota.write`, the audience E-101 already gave the templates to (module E open question 1). The
 queue is not a list of its own any more: it is the rota board's "Waiting for confirmation" filter,
 `GET /api/admin/rota/shifts/board?waiting=true`, which reads every performance holding a claim
-whatever the window and carries the count, and `/rota/manage/approvals` forwards there (issue
-1365). Approving and declining both ride the same `changes() = 1` shape. Approving also re-runs E-104's
+from the start of tonight's show night on, whatever the window, and carries the count (a claim
+on a night already past can no longer be staffed, so it waits on nobody), and
+`/rota/manage/approvals` forwards there (issue 1365). Approving and declining both ride the same `changes() = 1` shape. Approving also re-runs E-104's
 eligibility gate on the confirming `UPDATE` itself: the role's `SHIFT_ELIGIBILITY_*_MODULE` and
 London's today are bound into an `EXISTS` over the claimant's unrevoked, unexpired
 `training_records` (the SQL twin of `heldNow`), so a claimant whose record lapsed after claiming is
@@ -1070,7 +1071,7 @@ same under the bar's rule. A decline's reason lands on `shifts.decline_reason`, 
 is emailed, never in the audit trail, which keeps only that the status changed (0011). A declined
 shift still stays off the open list rather than reopening itself, but it is no longer invisible:
 `GET /api/admin/rota/shifts` lists every `OPEN` or `DECLINED` shift on a performance still to
-come, filtered by role, status and night through `shared/utils/unfilled-shifts-list.ts`, the same
+come, filtered by role, status and night through `shared/utils/unfilled-shifts-list.ts`, on the
 `dateAs: 'night'` extension (K-129, 0014). No screen reads that paged
 list any more. `/rota/manage/shifts` is the Rota board (E-107 criterion 6, issue 933): it reads
 `GET /api/admin/rota/shifts/board`, which returns the next `BOARD_WINDOW` performances whole,

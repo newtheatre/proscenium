@@ -678,24 +678,26 @@ const rosterScope = (bounds: BoardBounds): SQL => sql`
   ORDER BY p.starts_at
 `
 
-// The board's waiting filter: every performance holding a claim still to confirm, whatever its
-// night, which is what the approvals queue listed (E-105 criterion 2, issue 1365).
-const waitingScope = (): SQL => sql`
+// The board's waiting filter, which is the approvals queue: every performance from the start of
+// tonight's show night on holding a claim still to confirm, whatever the window (E-105, 0014).
+const waitingScope = (from: number): SQL => sql`
   SELECT p.id FROM performances p
-  WHERE p.status <> 'CANCELLED'
+  WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${from}
     AND EXISTS (SELECT 1 FROM shifts c WHERE c.performance_id = p.id AND c.status = 'CLAIMED')
 `
 
-export type RosterScope = BoardBounds | 'waiting'
+// A claim on a night already past can no longer be staffed, so it waits on nobody.
+export interface WaitingScope { waitingFrom: number }
+export type RosterScope = BoardBounds | WaitingScope
 
-const scopeOf = (scope: RosterScope): SQL => scope === 'waiting' ? waitingScope() : rosterScope(scope)
+const scopeOf = (scope: RosterScope): SQL => 'waitingFrom' in scope ? waitingScope(scope.waitingFrom) : rosterScope(scope)
 
 // How many claims wait on the board's filter, which is the count its label carries.
-export function waitingClaimsQuery(): SQL {
+export function waitingClaimsQuery(from: number): SQL {
   return sql`
     SELECT count(*) AS waiting FROM shifts s
     JOIN performances p ON p.id = s.performance_id
-    WHERE s.status = 'CLAIMED' AND p.status <> 'CANCELLED'
+    WHERE s.status = 'CLAIMED' AND p.status <> 'CANCELLED' AND p.starts_at >= ${from}
   `
 }
 
