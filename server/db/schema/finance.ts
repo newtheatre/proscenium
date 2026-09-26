@@ -24,6 +24,9 @@ export const zReadings = sqliteTable('z_readings', {
   // as every other append-only self-reference (ledger.ts): both rows stay (criterion 4).
   supersedesId: text('supersedes_id'),
   writtenOff: integer('written_off', { mode: 'boolean' }).notNull().default(false),
+  // The till close that recorded this reading, NULL for finance's own (0097). No foreign key:
+  // adding one here would rebuild this append-only table (0010).
+  tillSessionId: text('till_session_id'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   index('z_readings_night').on(table.night),

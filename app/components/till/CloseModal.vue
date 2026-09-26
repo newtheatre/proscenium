@@ -106,6 +106,14 @@ const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconc
             data-test="actual-z-input"
           />
         </UFormField>
+        <!-- The close is the night's reading, so the Treasurer resolves a difference rather than
+             retyping it (0097). -->
+        <p
+          class="text-xs text-muted"
+          data-test="reading-goes-to-treasurer"
+        >
+          The Treasurer gets this figure, and any note, as the night's reader total.
+        </p>
 
         <UAlert
           v-if="needsVarianceNote"
