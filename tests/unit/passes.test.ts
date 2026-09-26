@@ -9,6 +9,7 @@ import {
   passSaleRefusal,
   requestPassForm,
   saysPassStatus,
+  saysPayAtDesk,
 } from '#shared/utils/passes'
 
 // D-124 as pure rules. The database enforcement (the cap, the race) is in
@@ -107,5 +108,22 @@ describe('a pass or a request status reads as a sentence, never the raw enum (is
     for (const status of PASS_REQUEST_STATUSES) {
       expect(saysPassStatus(status)).not.toBe(status)
     }
+  })
+})
+
+// Issue 1331: a request is paid for and collected at the desk, so the member is told that and the
+// figure, never that an officer grants it.
+describe('a request says where it is paid for, and what it costs', () => {
+  test('one price is quoted alone', () => {
+    expect(saysPayAtDesk([{ label: 'Standard', price: 2500 }])).toBe('Pay £25.00 at the box office desk')
+  })
+
+  test('several prices are offered as alternatives, cheapest first', () => {
+    expect(saysPayAtDesk([{ label: 'Standard', price: 3500 }, { label: 'Member', price: 2500 }]))
+      .toBe('Pay £25.00 or £35.00 at the box office desk')
+  })
+
+  test('a pass with no price yet says so', () => {
+    expect(saysPayAtDesk([])).toBe('Pay at the box office desk; the price is set when it is issued')
   })
 })

@@ -242,6 +242,71 @@ describe.skipIf(skip !== null)('requesting online, and fulfilling at the desk (c
   }, CASE_TIMEOUT_MS)
 })
 
+// Issue 1331: one open request per pass type, none for a pass held, and a way to take one back.
+describe.skipIf(skip !== null)('a request is asked once, never for a pass held, and can be withdrawn (criterion 3)', () => {
+  test('a second request for the same pass is refused, saying it is already asked for', async () => {
+    const { id: passTypeId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+
+    expect((await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)).status).toBe(200)
+    const again = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    expect(again.status).toBe(409)
+    expect(await again.text()).toContain('already asked')
+
+    const open = query<{ total: number }>(
+      'SELECT count(*) AS total FROM pass_requests WHERE user_id = ? AND pass_type_id = ? AND status = ?', requester.id, passTypeId, 'PENDING',
+    )
+    expect(open?.total).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
+  test('a member holding the pass is not offered it again, and a request is refused', async () => {
+    const { id: passTypeId, priceId } = await onSalePassType()
+    const holder = await registerMember(app, 'holder', generatePassword())
+    expect((await send('POST', '/api/box-office/desk/passes', {
+      passTypeId, passTypePriceId: priceId, userId: holder.id, expectedTotalPence: 4500,
+    })).status).toBe(200)
+
+    const refused = await send('POST', '/api/account/passes/request', { passTypeId }, holder.cookie)
+    expect(refused.status).toBe(409)
+    expect(await refused.text()).toContain('already hold')
+
+    const listed = await send('GET', '/api/account/passes', undefined, holder.cookie)
+    const { sellable } = await listed.json() as { sellable: { id: string, held: boolean }[] }
+    expect(sellable.find(one => one.id === passTypeId)?.held).toBe(true)
+  }, CASE_TIMEOUT_MS)
+
+  test('withdrawing takes the request back, the desk no longer sees it, and asking again works', async () => {
+    const { id: passTypeId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+
+    const listed = await send('GET', '/api/account/passes', undefined, requester.cookie)
+    const { sellable } = await listed.json() as { sellable: { id: string, openRequestId: string | null }[] }
+    expect(sellable.find(one => one.id === passTypeId)?.openRequestId).toBe(requestId)
+
+    expect((await send('DELETE', `/api/account/passes/requests/${requestId}`, undefined, requester.cookie)).status).toBe(200)
+
+    const pending = await send('GET', `/api/box-office/desk/passes/${passTypeId}/requests`)
+    const { items } = await pending.json() as { items: { userId: string }[] }
+    expect(items.some(item => item.userId === requester.id)).toBe(false)
+
+    expect((await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)).status).toBe(200)
+  }, CASE_TIMEOUT_MS)
+
+  test('somebody else\'s request answers as though it does not exist', async () => {
+    const { id: passTypeId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+    const stranger = await registerMember(app, 'stranger', generatePassword())
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+
+    expect((await send('DELETE', `/api/account/passes/requests/${requestId}`, undefined, stranger.cookie)).status).toBe(404)
+    const row = query<{ status: string }>('SELECT status FROM pass_requests WHERE id = ?', requestId)
+    expect(row?.status).toBe('PENDING')
+  }, CASE_TIMEOUT_MS)
+})
+
 describe.skipIf(skip !== null)('a member views what they hold, and receives a scannable QR (criterion 5)', () => {
   test('the held pass appears in the account listing', async () => {
     const { id: passTypeId, priceId } = await onSalePassType()
