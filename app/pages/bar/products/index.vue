@@ -329,7 +329,7 @@ const columns: TableColumn<BarProduct>[] = [
       icon="i-lucide-id-card"
       :title="`${plural(unchecked.total, 'product')} ${unchecked.total === 1 ? 'pours' : 'pour'} age-restricted stock without Check ID`"
       description="Edit each one and switch Age restricted on, or switch the stocked item off on the stock register if it is not alcohol."
-      :actions="[{ 'label': 'Show them', 'color': 'warning', 'data-test': 'show-without-check-id', 'onClick': showUnchecked }]"
+      :actions="[{ label: 'Show them', color: 'warning', onClick: showUnchecked }]"
     />
 
     <p class="text-sm text-muted">

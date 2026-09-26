@@ -59,7 +59,7 @@ export function restrictedStockOf(input: ProductSetupInput, held: readonly HeldI
   }
   const ids = input.shape === 'RECIPE'
     ? [...input.components.map(component => component.itemId), ...(input.choice?.group.options.map(option => option.itemId) ?? [])]
-    : [input.item.itemId]
+    : input.item.mode === 'EXISTING' ? [input.item.itemId] : []
   const names = ids.map(id => held.find(item => item.id === id)).filter(item => item?.ageRestricted).map(item => item!.name)
   return [...new Set(names)]
 }
