@@ -56,7 +56,6 @@ export function boardEntries<P extends { startsAt: number }, O extends { startsA
 export interface Staffing {
   says: string
   tone: 'success' | 'warning' | 'neutral'
-  empty: boolean
 }
 
 // Nought of nought is nobody rostered, never "Fully staffed"; an external night is rostered ad hoc,
@@ -64,12 +63,12 @@ export interface Staffing {
 export function saysStaffing(entry: { shifts: { status: string }[], isExternal?: boolean }): Staffing {
   if (entry.shifts.length === 0) {
     return entry.isExternal
-      ? { says: 'Not rostered', tone: 'neutral', empty: true }
-      : { says: 'No shifts: nobody is rostered', tone: 'warning', empty: true }
+      ? { says: 'Not rostered', tone: 'neutral' }
+      : { says: 'No shifts: nobody is rostered', tone: 'warning' }
   }
   return entry.shifts.every(shift => shift.status === 'CONFIRMED')
-    ? { says: 'Fully staffed', tone: 'success', empty: false }
-    : { says: 'Needs people', tone: 'warning', empty: false }
+    ? { says: 'Fully staffed', tone: 'success' }
+    : { says: 'Needs people', tone: 'warning' }
 }
 
 // A bare day is read as "is" by the openings list's night filter, so the link lands on that night.

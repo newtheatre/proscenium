@@ -24,6 +24,7 @@ export default defineEventHandler(async (event) => {
         ...performance,
         isExternal: performance.isExternal === 1,
         hasTemplate: performance.hasTemplate === 1,
+        isRetired: performance.isRetired === 1,
         shifts: shifts.filter(shift => shift.performanceId === performance.performanceId),
       })),
       openings.map(opening => ({

@@ -1208,9 +1208,9 @@ performances stamp nothing, which is what E-101 criterion 4 asks to be visible r
 silent; a nullable `venue_id` would have made that state unreachable. That the duty manager
 slot is present at all correlates rows, so it is refused at the write path (E-101 criterion 1).
 Saving a template (`PUT /api/admin/rota/templates/[venueId]`) stamps, in the same batch, every
-performance at the venue from tonight's 04:00 that holds no shift at all, and answers with how
-many shifts it stamped; a performance holding any shift, even one added by hand, is left to the
-backfill (issue 1319, E-101 criterion 3).
+performance at the venue from tonight's 04:00 that holds no live (uncancelled) shift, and answers
+with how many shifts it stamped; a performance holding a live shift, even one added by hand, is
+left to the backfill (issue 1319, E-101 criterion 3).
 
 ### shifts
 `id` PK · `performance_id` → performances cascade · `role` CHECK as above · `slot` (the

@@ -108,24 +108,30 @@ describe('the rows the board reads are ordered by when the night starts', () => 
   })
 })
 
-// A card with no shifts says whether nobody is rostered at our venue or the night is external,
-// and whether a template can fill it, so the card needs its venue and both facts (issue 1319).
-describe('a card knows its venue, whether we run it and whether it has a template (issue 1319)', () => {
-  test('the row carries the venue id, the external flag and the template flag', async () => {
+// An empty card says whether our venue or an external one, and whether a template fills it or can
+// be set up; a retired venue takes no new template (issue 1319, D-131).
+describe('a card knows its venue, whether we run it, and whether it has or can take a template (issue 1319)', () => {
+  test('the row carries the venue id, the external flag, the template flag and the retired flag', async () => {
     await withDatabase((database) => {
       testVenue(database, { suffix: 'a' })
       testVenue(database, { suffix: 'b' })
+      testVenue(database, { suffix: 'old' })
       testVenue(database, { suffix: 'away', isExternal: true })
-      database.batch([['INSERT INTO shift_templates (id, venue_id, role, count) VALUES (?, ?, ?, ?)', 'template-a-dm', 'venue-a', 'DUTY_MANAGER', 1]])
+      database.batch([
+        ['INSERT INTO shift_templates (id, venue_id, role, count) VALUES (?, ?, ?, ?)', 'template-a-dm', 'venue-a', 'DUTY_MANAGER', 1],
+        ['UPDATE venues SET archived = 1 WHERE id = ?', 'venue-old'],
+      ])
       tonightsPerformance(database, { suffix: 'ours', night: tonight, venueId: 'venue-a' })
       tonightsPerformance(database, { suffix: 'bare', night: daysAfter(tonight, 1), venueId: 'venue-b' })
       tonightsPerformance(database, { suffix: 'theirs', night: daysAfter(tonight, 2), venueId: 'venue-away' })
+      tonightsPerformance(database, { suffix: 'retired', night: daysAfter(tonight, 3), venueId: 'venue-old' })
 
-      const rows = run<{ performanceId: string, venueId: string, isExternal: number, hasTemplate: number }>(
+      const rows = run<{ performanceId: string, venueId: string, isExternal: number, hasTemplate: number, isRetired: number }>(
         database, rosterPerformancesQuery(boardWindowBounds({ from: tonight, to: daysAfter(tonight, 13) })),
       )
-      expect(rows.map(row => `${row.performanceId}:${row.venueId}:${row.isExternal}:${row.hasTemplate}`)).toEqual([
-        'performance-ours:venue-a:0:1', 'performance-bare:venue-b:0:0', 'performance-theirs:venue-away:1:0',
+      expect(rows.map(row => `${row.performanceId}:${row.venueId}:${row.isExternal}:${row.hasTemplate}:${row.isRetired}`)).toEqual([
+        'performance-ours:venue-a:0:1:0', 'performance-bare:venue-b:0:0:0', 'performance-theirs:venue-away:1:0:0',
+        'performance-retired:venue-old:0:0:1',
       ])
     })
   })

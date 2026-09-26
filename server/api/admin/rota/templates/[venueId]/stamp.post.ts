@@ -1,5 +1,4 @@
 import { externalVenueTemplateRefusal } from '#shared/utils/rota'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 
 // Stamp a venue's template onto every performance from tonight onwards that is missing a slot.
 // Running it twice adds nothing the second time (E-102 criterion 2).
@@ -17,10 +16,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'This venue has no template, so there is nothing to stamp' })
   }
 
-  // A night that has already begun is still tonight's work, so the window opens at 04:00 rather
-  // than at this moment (0014, E-110).
-  const night = currentShowNight()
-  const from = Math.floor(showNightBounds(night).from.getTime() / 1000)
+  const { night, from } = stampWindow()
 
   // The same action fills the window of any shift stamped before a shift had one (E-131).
   const defaults = await shiftOffsetDefaults(event)

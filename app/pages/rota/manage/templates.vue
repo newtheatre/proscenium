@@ -91,9 +91,10 @@ async function save(): Promise<void> {
     const answer = await $fetch<{ stamped: number }>(`/api/admin/rota/templates/${venue.venueId}`, { method: 'PUT', body: { slots: chosen.value } })
     toast.add({
       title: 'Template saved',
-      description: answer.stamped === 0
-        ? 'Performances added from now on are staffed from it. Nights already stamped keep their shifts.'
-        : `${plural(answer.stamped, 'shift')} stamped onto the performances that had none. Nights already stamped keep their shifts.`,
+      description: (answer.stamped === 0
+        ? 'Performances added from now on are staffed from it.'
+        : `${plural(answer.stamped, 'shift')} stamped onto the performances that had none.`)
+      + ' Nights already stamped keep their shifts: Stamp the diary adds any slot they miss.',
       icon: 'i-lucide-check',
       color: 'success',
     })

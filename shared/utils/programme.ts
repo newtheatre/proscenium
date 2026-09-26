@@ -172,7 +172,7 @@ export interface AdminShow {
   capacity: number
   nextPerformanceAt: number | null
   nextPerformanceVenue: string | null
-  // Where the latest performance was added, which the next one is offered first (issue 1319).
+  // The venue the latest performance was added at: the next one is offered it first (issue 1319).
   lastVenueId: string | null
   // The run, and the venues it plays, so the list states both without a second query (D-132
   // criterion 3). Cancelled performances are left out of all three.

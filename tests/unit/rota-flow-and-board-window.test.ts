@@ -89,17 +89,17 @@ describe('a card states its staffing in words, and nobody rostered is not fully 
   const shifts = (...statuses: ('OPEN' | 'CLAIMED' | 'CONFIRMED')[]) => statuses.map(status => ({ status }))
 
   test('no shifts at a venue we run is the gap it is, and says what to do', () => {
-    expect(saysStaffing({ shifts: [], isExternal: false })).toEqual({ says: 'No shifts: nobody is rostered', tone: 'warning', empty: true })
+    expect(saysStaffing({ shifts: [], isExternal: false })).toEqual({ says: 'No shifts: nobody is rostered', tone: 'warning' })
   })
 
   test('no shifts at an external venue is a fact, not a gap', () => {
-    expect(saysStaffing({ shifts: [], isExternal: true })).toEqual({ says: 'Not rostered', tone: 'neutral', empty: true })
+    expect(saysStaffing({ shifts: [], isExternal: true })).toEqual({ says: 'Not rostered', tone: 'neutral' })
   })
 
   test('every shift confirmed is fully staffed, and any other is short', () => {
-    expect(saysStaffing({ shifts: shifts('CONFIRMED', 'CONFIRMED'), isExternal: false })).toEqual({ says: 'Fully staffed', tone: 'success', empty: false })
-    expect(saysStaffing({ shifts: shifts('CONFIRMED', 'OPEN'), isExternal: false })).toEqual({ says: 'Needs people', tone: 'warning', empty: false })
-    expect(saysStaffing({ shifts: shifts('CLAIMED'), isExternal: true })).toEqual({ says: 'Needs people', tone: 'warning', empty: false })
+    expect(saysStaffing({ shifts: shifts('CONFIRMED', 'CONFIRMED'), isExternal: false })).toEqual({ says: 'Fully staffed', tone: 'success' })
+    expect(saysStaffing({ shifts: shifts('CONFIRMED', 'OPEN'), isExternal: false })).toEqual({ says: 'Needs people', tone: 'warning' })
+    expect(saysStaffing({ shifts: shifts('CLAIMED'), isExternal: true })).toEqual({ says: 'Needs people', tone: 'warning' })
   })
 
   test('a bar opening carries no venue flag and reads as one of ours', () => {
