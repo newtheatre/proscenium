@@ -5,7 +5,10 @@ import { formatLondon } from '#shared/utils/london'
 import { isSustainedlyUnhealthy } from '#shared/utils/health'
 import { pendingMigrations } from '#shared/utils/migrations'
 import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
+import { eligibilityHealth } from '#shared/utils/rota-readiness'
+import { roleEligibilities } from './rota-readiness'
 import type { SyncStanding } from '#shared/utils/bank-holidays'
+import type { EligibilityHealth } from '#shared/utils/rota-readiness'
 import type { H3Event } from 'h3'
 
 export interface HealthStatus {
@@ -13,6 +16,7 @@ export interface HealthStatus {
   pendingMigrations: string[]
   sessionKey: 'ok' | 'missing'
   bankHolidays: HolidayHealth
+  shiftEligibility: EligibilityHealth | null
 }
 
 // `ok` is coverage alone; the sync is reported beside it, never folded in (C-121 criterion 8).
@@ -45,9 +49,21 @@ export async function healthStatus(event?: H3Event): Promise<HealthStatus> {
     pending = expected
   }
 
-  const bankHolidays = await holidayCoverage(event)
+  const [bankHolidays, shiftEligibility] = await Promise.all([holidayCoverage(event), eligibilityCoverage(event)])
 
-  return { ok: pending.length === 0 && sessionKey === 'ok', pendingMigrations: pending, sessionKey, bankHolidays }
+  return { ok: pending.length === 0 && sessionKey === 'ok', pendingMigrations: pending, sessionKey, bankHolidays, shiftEligibility }
+}
+
+// Reported like the bank holidays, never failing `ok`: a gating module unset or unpublished refuses
+// every claim for its role, which is a committee decision to chase, not the site down (issue 1318).
+async function eligibilityCoverage(event?: H3Event): Promise<EligibilityHealth | null> {
+  try {
+    return eligibilityHealth(await roleEligibilities(event))
+  }
+  catch (error) {
+    console.error('[health] could not read the shift eligibility modules:', error)
+    return null
+  }
 }
 
 // Reported, never what fails the check: a calendar running out, or gov.uk not answering, is said

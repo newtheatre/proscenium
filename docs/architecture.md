@@ -1089,14 +1089,36 @@ falling open on failure, is exactly what this replaces (criterion 1).
 
 Which training module gates which role is committee configuration, three keys,
 `SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE`, `SHIFT_ELIGIBILITY_DOOR_MODULE` and
-`SHIFT_ELIGIBILITY_BAR_MODULE`, each nullable and shipping null (`docs/workshops.md`). Reading
-`eligibilityRefusal(requiredModuleId, held)` against a null rule refuses eligibility rather than
-granting it to everyone: an unnamed or unreadable rule is the safer failure (criterion 4).
+`SHIFT_ELIGIBILITY_BAR_MODULE`, each nullable and shipping the module the committee named
+(`docs/workshops.md`, issue 1318). Reading `eligibilityRefusal(requiredModuleId, held)` against a
+null rule refuses eligibility rather than granting it to everyone: an unnamed or unreadable rule is
+the safer failure (criterion 4).
 
 `GET /api/rota/shifts?role=&from=&to=&page=` is the open-shift list, paged in SQL and gated live;
-each locked row carries the module id and name that would unlock it, or neither when the
-committee has not named one yet (criterion 2). `GET /api/rota/mine` is a member's own shifts. Both
-are member-facing reads with no write and so carry no audit row (`shared/utils/audit-coverage.ts`).
+each locked row carries the module id and name that would unlock it, or neither when nothing a
+member can act on is named: no module, or one that is a draft, retired or not in the catalogue
+(criterion 2). Where any role is in that state the list also carries `officers`, the names of the
+live Front of House Manager grants (at most three), which the screen names as the person to ask.
+`GET /api/rota/mine` is a member's own shifts. Both are member-facing reads with no write and so
+carry no audit row (`shared/utils/audit-coverage.ts`).
+
+### Show-night readiness (issue 1318)
+
+`GET /api/admin/rota/readiness` (`rota.read`) answers the readiness card on **Shift templates**
+from `server/utils/rota-readiness.ts`: each role's gating module with its standing (`SET`, `UNSET`,
+`DRAFT`, `RETIRED` or `MISSING`, from `shared/utils/rota-readiness.ts`), every venue we run (not
+external, not retired) with its template's slot count, the active system checks on its checklist
+and whether its emergency card is filed, and the board's active preset and milestone counts. The
+same standings are `/api/health`'s `shiftEligibility` line, `{ ok, roles }`, reported beside `ok`
+and never failing it, as the bank holiday coverage is: the line names no module, since the route
+is public. `shiftRoleRules()` and `gatingModules()` there are the one reader of the three keys and
+their modules, which `shiftEligibilities()` shares. The migration `the_show_night_basics_are_seeded`
+gave the two system-verified checklist items to every venue we run that lacked them, the checklist
+items each audited with no actor, and the board its four routine calls (Standby, Hold, Clear,
+Ambulance), seeded unaudited as the milestones were. An external venue is listed on **Checklists**
+and **Emergency cards** only once a performance there from tonight onwards carries a shift, or
+while it already holds an item or a card (`listedVenue()` in `server/utils/venues.ts`, folded into
+each listing's clause).
 
 `server/utils/rota-escalation.ts` is `shifts:escalate`'s query: every performance inside seven
 days of a run with an open shift or a `DUTY_MANAGER` shift that is not `CONFIRMED`, the second

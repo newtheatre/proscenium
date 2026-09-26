@@ -176,18 +176,24 @@ describe('the six named milestone types are seeded, committee-configurable from 
   })
 })
 
-describe('presets are committee configuration, none seeded (criterion 2)', () => {
+describe('presets are committee configuration over four seeded calls (criterion 2, issue 1318)', () => {
+  test('the four routine calls are there from the first night', async () => {
+    await withDatabase((database) => {
+      expect(run(database, presetsQuery(false)).map(row => row.label)).toEqual(['Standby', 'Hold', 'Clear', 'Ambulance'])
+    })
+  })
+
   test('added, read, and retired without disappearing', async () => {
     await withDatabase((database) => {
       const officer = person(database, 'officer')
-      expect(run(database, presetsQuery(false))).toHaveLength(0)
+      const seeded = run(database, presetsQuery(false)).length
 
       run(database, insertPresetStatement('5 minutes', 'Five minutes please', 0, officer, 'p-1'))
-      expect(run(database, presetsQuery(false))).toHaveLength(1)
+      expect(run(database, presetsQuery(false))).toHaveLength(seeded + 1)
 
       run(database, retirePresetStatement('p-1', false, officer))
-      expect(run(database, presetsQuery(false))).toHaveLength(0)
-      expect(run(database, presetsQuery(true))).toHaveLength(1)
+      expect(run(database, presetsQuery(false))).toHaveLength(seeded)
+      expect(run(database, presetsQuery(true))).toHaveLength(seeded + 1)
     })
   })
 })

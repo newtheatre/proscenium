@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { adminSession, forgetSpentStep, markVerified, registerMember, request } from '#tests/helpers/accounts'
+import { clearConfigOverride } from '#tests/helpers/config'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -402,8 +403,8 @@ describe.skipIf(skip !== null)('the screen the officer works from', () => {
 // DECISION #933, K-129 for the picker: the mapping from shift role to gating module is
 // configuration, and this is where a training officer looks for it, labelled per role.
 describe.skipIf(skip !== null)('shift eligibility is set from the templates screen', () => {
-  afterAll(async () => {
-    await request(app, 'PUT', '/api/admin/config/SHIFT_ELIGIBILITY_BAR_MODULE', { value: null }, admin.cookie)
+  afterAll(() => {
+    clearConfigOverride(app, 'SHIFT_ELIGIBILITY_BAR_MODULE')
   })
 
   test('an administrator names the module that unlocks a bar shift, and it holds after a reload', async () => {
@@ -421,16 +422,54 @@ describe.skipIf(skip !== null)('shift eligibility is set from the templates scre
     }
   }, 120_000)
 
-  test('a front of house manager, who holds no config permission, sees no such card', async () => {
+  // Issue 1318: the rota's owner holds no config permission, and is still the person who has to
+  // know what gates each role, so the lines are there to read and there is nothing to change.
+  test('a front of house manager reads each role\'s gate on the readiness card, with nothing to change', async () => {
     const view = await visitAsFoh('/rota/manage/templates')
     try {
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="templates-table"]\')')).toBe(true)
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="shift-eligibility"]\')')).toBe(false)
+      await waitFor(view, `!!document.querySelector('[data-test="readiness-eligibility-DOOR"]')`)
+      expect(await textOf(view, '[data-test="shift-eligibility"]')).toContain('Door')
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="eligibility-DOOR"]\')')).toBe(false)
     }
     finally {
       view.close()
     }
   }, 120_000)
+})
+
+// Issue 1318: one card for what a show night needs set up, read by the rota's owner.
+describe.skipIf(skip !== null)('the show-night readiness card', () => {
+  interface Readiness {
+    eligibility: { role: string, moduleId: string | null, standing: string }[]
+    venues: { venueId: string, templateSlots: number, systemChecks: string[], emergencyFiled: boolean }[]
+    board: { presets: number, milestones: number }
+  }
+
+  test('the front of house manager reads it; a member is refused', async () => {
+    expect((await send('GET', '/api/admin/rota/readiness', undefined, member.cookie)).status).toBe(403)
+
+    const answered = await send('GET', '/api/admin/rota/readiness', undefined, foh.cookie)
+    expect(answered.status).toBe(200)
+    const readiness = await answered.json() as Readiness
+    expect(readiness.eligibility.map(line => line.role)).toEqual(['DUTY_MANAGER', 'DOOR', 'BAR'])
+    expect(readiness.venues.some(venue => venue.venueId === house.venueId)).toBe(true)
+    expect(readiness.board).toMatchObject({ presets: expect.any(Number), milestones: expect.any(Number) })
+  })
+
+  test('a gating module the catalogue does not hold reads as missing, and a published one as set', async () => {
+    await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_BAR_MODULE', { value: gatingModule })
+    await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_DOOR_MODULE', { value: 'NOPE-999' })
+    try {
+      const readiness = await (await send('GET', '/api/admin/rota/readiness', undefined, foh.cookie)).json() as Readiness
+      const standing = Object.fromEntries(readiness.eligibility.map(line => [line.role, line.standing]))
+      expect(standing.BAR).toBe('SET')
+      expect(standing.DOOR).toBe('MISSING')
+    }
+    finally {
+      clearConfigOverride(app, 'SHIFT_ELIGIBILITY_BAR_MODULE')
+      clearConfigOverride(app, 'SHIFT_ELIGIBILITY_DOOR_MODULE')
+    }
+  })
 })
 
 // K-123 criterion 12: the rota is one workflow across four sidebar entries, and a screen names

@@ -1,41 +1,21 @@
-import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
-import { eligibilityRefusal, noLongerQualifies, UNCONFIGURED_ELIGIBILITY_RULE } from '#shared/utils/rota-eligibility'
-import { SHIFT_ROLES } from '#shared/utils/rota'
+import { gatingModules, roleEligibilities } from './rota-readiness'
+import { eligibilityRefusal, noLongerQualifies } from '#shared/utils/rota-eligibility'
 import type { ShiftRole } from '#shared/utils/rota'
 import type { H3Error, H3Event } from 'h3'
 
-// The committee's mapping, read once per request and reused for every shift on the page: no
-// per-row query and no cache window (E-103 criteria 1 and 4).
-export async function shiftRoleRules(event: H3Event): Promise<Record<ShiftRole, string | null>> {
-  const [DUTY_MANAGER, DOOR, BAR] = await Promise.all([
-    configValue(event, 'SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE'),
-    configValue(event, 'SHIFT_ELIGIBILITY_DOOR_MODULE'),
-    configValue(event, 'SHIFT_ELIGIBILITY_BAR_MODULE'),
-  ])
-  return { DUTY_MANAGER, DOOR, BAR }
-}
-
 export interface ShiftEligibility {
   eligible: boolean
-  // What would unlock it, for a role the member does not qualify for. Null both when eligible
-  // and when the committee has not named a module yet: there is nothing to link to either way.
+  // What would unlock it, for a role the member does not qualify for. Null when eligible, and
+  // when nothing a member can act on is named: no module, or one that is not published (issue 1318).
   unlockedBy: { moduleId: string, moduleName: string } | null
-}
-
-async function moduleNames(ids: string[]): Promise<Map<string, string>> {
-  if (ids.length === 0) return new Map()
-  const rows = await db.all<{ id: string, name: string }>(sql`
-    SELECT id, name FROM modules WHERE id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
-  `)
-  return new Map(rows.map(row => [row.id, row.name]))
 }
 
 // The 409 an approval raises when its write's training gate refused the claimant: it names what
 // lapsed, and its data carries the decline reason the screen offers (E-105 criterion 3).
 export async function lapsedClaimRefusal(role: ShiftRole, userId: string, moduleId: string | null): Promise<H3Error> {
   const claimant = await findById(userId)
-  const moduleName = moduleId === null ? null : (await moduleNames([moduleId])).get(moduleId) ?? moduleId
+  const moduleName = moduleId === null ? null : (await gatingModules([moduleId])).get(moduleId)?.name ?? moduleId
   const lapsed = noLongerQualifies(role, claimant?.name ?? 'the claimant', moduleName)
   return createError({ statusCode: 409, statusMessage: lapsed.statusMessage, data: { declineReason: lapsed.declineReason } })
 }
@@ -47,23 +27,15 @@ export async function shiftEligibilities(
   userId: string,
   today: string,
 ): Promise<Record<ShiftRole, ShiftEligibility>> {
-  const rules = await shiftRoleRules(event)
-  const held = await modulesHeldBy(userId, today)
-
-  const named = [...new Set(SHIFT_ROLES.map(role => rules[role]).filter((id): id is string => id !== null))]
-  const names = await moduleNames(named)
+  const [lines, held] = await Promise.all([roleEligibilities(event), modulesHeldBy(userId, today)])
 
   const result = {} as Record<ShiftRole, ShiftEligibility>
-  for (const role of SHIFT_ROLES) {
-    const refusal = eligibilityRefusal(rules[role], held)
-    result[role] = refusal === null
-      ? { eligible: true, unlockedBy: null }
-      : {
-          eligible: false,
-          unlockedBy: refusal === UNCONFIGURED_ELIGIBILITY_RULE
-            ? null
-            : { moduleId: refusal, moduleName: names.get(refusal) ?? refusal },
-        }
+  for (const line of lines) {
+    const refusal = eligibilityRefusal(line.moduleId, held)
+    result[line.role] = {
+      eligible: refusal === null,
+      unlockedBy: refusal !== null && line.standing === 'SET' ? { moduleId: refusal, moduleName: line.moduleName ?? refusal } : null,
+    }
   }
   return result
 }

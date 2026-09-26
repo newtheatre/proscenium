@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
-import { sql } from 'drizzle-orm'
-import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { and, sql } from 'drizzle-orm'
+import { aliasColumns, predicate, whereFrom, yesNo } from './list-filters'
+import { listedVenue } from './venues'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
@@ -9,8 +10,6 @@ import type { SQL } from 'drizzle-orm'
 
 // The venue emergency card (E-113), append-only like `incidents`: an edit is a new row, and the
 // latest one per venue is the current card.
-
-const predicateOf = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
 export interface RecordedCard { id: string, statement: SQL }
 
@@ -85,23 +84,29 @@ export type VenueCardRow = Omit<EmergencyCard, 'id' | 'updatedByName' | 'updated
   updatedAt: number | null
 }
 
+// A card with no address is not one anybody can read to a 999 handler, so "filed" means the
+// latest version carries one (issue 902). `alias` names the venues row it is correlated with.
+export function cardFiled(alias: string): SQL {
+  const venue = sql.raw(alias)
+  return sql`exists (
+    select 1 from venue_emergency_info ei
+    where ei.venue_id = ${venue}.id
+      and ei.address is not null
+      and ei.updated_at = (select max(updated_at) from venue_emergency_info em where em.venue_id = ${venue}.id)
+  )`
+}
+
 // Search and "filed" through the declaration (K-129); paging scopes the outer join by a
 // subquery over the venues it covers, never by an id list read back from a result set (0006).
 export function emergencyCardsClause(query: ListQuery): ListClause {
-  return whereFrom(emergencyCardsList, query, {
+  const clause = whereFrom(emergencyCardsList, query, {
     column: aliasColumns('vp'),
     search: [sql`vp.name`],
     fields: {
-      // A card with no address is not one anybody can read to a 999 handler, so "filed" means
-      // the latest version carries one (issue 902).
-      filed: yesNo(sql`exists (
-        select 1 from venue_emergency_info ei
-        where ei.venue_id = vp.id
-          and ei.address is not null
-          and ei.updated_at = (select max(updated_at) from venue_emergency_info em where em.venue_id = vp.id)
-      )`),
+      filed: yesNo(cardFiled('vp')),
     },
   })
+  return { ...clause, where: and(listedVenue(sql`exists (select 1 from venue_emergency_info carded where carded.venue_id = vp.id)`), clause.where) }
 }
 
 // Every matching venue's current card in one query, for the committee's own overview screen,
@@ -115,7 +120,7 @@ export function currentCardsQuery(clause: ListClause, limit: number, offset: num
     )
     LEFT JOIN users u ON u.id = e.updated_by
     WHERE v.id IN (
-      SELECT vp.id FROM venues vp${predicateOf(clause)}
+      SELECT vp.id FROM venues vp${predicate(clause)}
       ORDER BY ${sql.join(clause.orderBy, sql`, `)}
       LIMIT ${limit} OFFSET ${offset}
     )
@@ -128,6 +133,6 @@ export async function currentCards(clause: ListClause, limit: number, offset: nu
 }
 
 export async function countVenuesForCards(clause: ListClause): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues vp${predicateOf(clause)}`)
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues vp${predicate(clause)}`)
   return row?.total ?? 0
 }

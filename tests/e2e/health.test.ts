@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession } from '#tests/helpers/accounts'
+import { clearConfigOverride } from '#tests/helpers/config'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -83,7 +84,7 @@ describe.skipIf(skip !== null)('the health endpoint (J-106, K-107)', () => {
     const response = await fetch(`${app.baseURL}/api/health`)
     const body = await response.json() as { ok: boolean, sessionKey: string }
 
-    expect(Object.keys(body).sort()).toEqual(['bankHolidays', 'ok', 'sessionKey'])
+    expect(Object.keys(body).sort()).toEqual(['bankHolidays', 'ok', 'sessionKey', 'shiftEligibility'])
     // A flag, never the secret itself: this is what stands between the session password and
     // the public internet, since the route is deliberately unauthenticated.
     expect(['ok', 'missing']).toContain(body.sessionKey)
@@ -113,6 +114,33 @@ describe.skipIf(skip !== null)('the health endpoint (J-106, K-107)', () => {
     expect(body.bankHolidays.coveredTo).not.toBeNull()
     expect(body.bankHolidays.sync).toMatchObject({ ok: false, status: 'failed', failure: 'timeout' })
     expect(typeof body.bankHolidays.sync.failedAt).toBe('number')
+  })
+
+  // Issue 1318: an unset gating key, or one naming a module nobody can hold, refuses every claim
+  // for its role. Reported beside `ok` rather than failing it, as the bank holidays are.
+  test('each shift role\'s gating module is reported by its standing, without failing the check', async () => {
+    const department = `HLT${crypto.randomUUID().slice(0, 5).toUpperCase().replace(/[^A-Z0-9]/g, 'X')}`
+    expect((await send('POST', '/api/admin/training/departments', { code: department, name: 'Health gating' })).status).toBe(200)
+    for (const [suffix, status] of [['101', 'ACTIVE'], ['102', 'DRAFT']] as const) {
+      const made = await send('POST', '/api/admin/training/modules', { id: `${department}-${suffix}`, department, kind: 'MODULE', name: `Gate ${suffix}`, status })
+      expect(made.status).toBe(200)
+    }
+
+    try {
+      expect((await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE', { value: null })).status).toBe(200)
+      expect((await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_DOOR_MODULE', { value: `${department}-101` })).status).toBe(200)
+      expect((await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_BAR_MODULE', { value: `${department}-102` })).status).toBe(200)
+
+      const response = await fetch(`${app.baseURL}/api/health`)
+      const body = await response.json() as { ok: boolean, shiftEligibility: { ok: boolean, roles: Record<string, string> } }
+      expect(response.status).toBe(200)
+      expect(body.ok).toBe(true)
+      expect(body.shiftEligibility).toEqual({ ok: false, roles: { DUTY_MANAGER: 'UNSET', DOOR: 'SET', BAR: 'DRAFT' } })
+      expect(JSON.stringify(body)).not.toContain(department)
+    }
+    finally {
+      for (const role of ['DUTY_MANAGER', 'DOOR', 'BAR']) clearConfigOverride(app, `SHIFT_ELIGIBILITY_${role}_MODULE`)
+    }
   })
 })
 
