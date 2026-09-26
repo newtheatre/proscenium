@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { doorWordingFor } from './access-profiles'
-import { admittedSeatsSubquery, heldAccessSeatsSubquery, heldSeatsOfKindSubquery, heldSeatsSubquery, unpaidSeatsSubquery, walkUpSeatsSubquery } from './capacity'
+import { admittedSeatsSubquery, heldAccessSeatsSubquery, heldSeatsOfKindSubquery, heldSeatsSubquery, passBookingColumn, ticketOnPass, unpaidSeatsSubquery, walkUpSeatsSubquery } from './capacity'
 import { configValue } from './configuration'
 import { pendingTicketCompRequestForReservation } from './ticket-comps'
 import { holdExpiresAt, looksLikeReference, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
@@ -48,6 +48,8 @@ export interface DeskSearchRow {
   status: string
   bookerName: string
   totalPence: number
+  // With the total, tells a pass booking, which owes nothing, from an unpaid one (issue 1390).
+  holdExpiresAt: number | null
 }
 
 // Reference, an exact match on the no-look-alike code, or a name, a partial one on the booker's
@@ -62,9 +64,10 @@ function searchPredicate(q: string | undefined): SQL {
 }
 
 // One stored state per pill (D-114 criterion 7): unpaid, paid and not yet in, and in, a walk-up included.
+// Unpaid is never a pass booking, which owes nothing (issue 1390).
 function statusPredicate(status: DeskStatusFilter): SQL {
   switch (status) {
-    case 'PENDING': return sql` AND r.status = 'PENDING'`
+    case 'PENDING': return sql` AND r.status = 'PENDING' AND NOT ${passBookingColumn('r')}`
     case 'COLLECTED': return sql` AND r.status = 'COLLECTED'`
     case 'DOOR': return sql` AND r.status = 'DOOR'`
     default: return sql``
@@ -74,7 +77,8 @@ function statusPredicate(status: DeskStatusFilter): SQL {
 export function deskSearchQuery(performanceId: string, q: string | undefined, status: DeskStatusFilter, limit: number, offset: number): SQL {
   return sql`
     SELECT r.id AS id, r.reference AS reference, r.status AS status, u.name AS bookerName,
-           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id AND t.refunded_at IS NULL) AS totalPence
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id AND t.refunded_at IS NULL) AS totalPence,
+           r.hold_expires_at AS holdExpiresAt
     FROM reservations r
     LEFT JOIN users u ON u.id = r.user_id
     WHERE r.performance_id = ${performanceId}${searchPredicate(q)}${statusPredicate(status)}
@@ -174,7 +178,8 @@ export function deskSummaryQuery(performanceId: string): SQL {
            ${walkUpSeatsSubquery(sql`p.id`)} AS walkUps,
            ${unpaidSeatsSubquery(sql`p.id`)} AS unpaidCount,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t JOIN reservations r ON r.id = t.reservation_id
-              WHERE t.performance_id = p.id AND t.refunded_at IS NULL AND r.status = 'PENDING') AS unpaidOwedPence,
+              WHERE t.performance_id = p.id AND t.refunded_at IS NULL AND r.status = 'PENDING'
+                AND NOT ${ticketOnPass(sql`t.id`)}) AS unpaidOwedPence,
            ${heldAccessSeatsSubquery(sql`p.id`)} AS accessBookings,
            ${heldSeatsOfKindSubquery(sql`p.id`, 'PASS_ADMISSION')} AS passAdmissions
     FROM performances p

@@ -229,6 +229,7 @@ Open questions:
      images nor SVG at all, so the code must be a real `https` PNG. The image route answers a
      forged or unknown token with the same 404, and the token is the credential the email
      already carries, so the route exposes nothing the link did not.
+     A pass booking's email says it owes nothing instead of UNPAID (D-125 criterion 4).
   3. The QR can be saved to Apple Wallet and Google Wallet from the email and from the booking
      page.
   4. Opening the QR link in a browser exchanges its signed token for a short-lived httpOnly
@@ -272,6 +273,7 @@ Open questions:
      the whole edit fails atomically if capacity is short.
   3. Self-cancel works while unpaid and before curtain-up; it records who cancelled (customer),
      frees capacity immediately and sends a confirmation email.
+     A pass booking is the exception: only the box office changes or cancels it (D-125 criterion 4).
   4. All unpaid changes are free, because no money has moved; after collection, the self-service
      surface offers only the refund policy text and the box office contact (D-116).
   5. The booking's QR is unchanged by any edit (D-108): it retrieves the booking's current

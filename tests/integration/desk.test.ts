@@ -187,8 +187,8 @@ describe('deskSummaryQuery reads the house in seats for one performance (D-114 c
 
 // Issue 1390: a pass booking stays PENDING with nothing to collect, so no count or pill that
 // means "still owes the desk" may include it.
-describe('a pass booking owes nothing, so it is neither unpaid nor pending at the desk', () => {
-  test('the unpaid tile, the unpaid alert, the programme\'s unpaid count and the Pending pill leave it out', async () => {
+describe('a pass booking owes nothing, so the desk never counts or lists it as unpaid', () => {
+  test('the unpaid tile, the unpaid notice, the programme\'s unpaid count and the Unpaid pill leave it out', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'a@example.invalid', 'A Pending')
@@ -208,9 +208,9 @@ describe('a pass booking owes nothing, so it is neither unpaid nor pending at th
       database.batch([['INSERT INTO pass_admissions (id, pass_id, performance_id, ticket_id) VALUES (?, ?, ?, ?)',
         'admission-1', 'pass-1', seeded.performanceId, 't-2']])
 
-      const [summary] = read<{ reserved: number, unpaidCount: number, unpaidOwedPence: number, passAdmissions: number }>(
+      const [summary] = read<{ sold: number, unpaidCount: number, unpaidOwedPence: number, passAdmissions: number }>(
         database, deskSummaryQuery(seeded.performanceId))
-      expect(summary).toMatchObject({ reserved: 2, unpaidCount: 1, unpaidOwedPence: 900, passAdmissions: 1 })
+      expect(summary).toMatchObject({ sold: 2, unpaidCount: 1, unpaidOwedPence: 900, passAdmissions: 1 })
 
       const [programme] = read<{ unpaid: number }>(database, sql`SELECT ${unpaidSeatsColumn('p')} AS unpaid FROM performances p WHERE p.id = ${seeded.performanceId}`)
       expect(programme?.unpaid).toBe(1)

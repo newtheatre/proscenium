@@ -2,6 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { DESK_SALE_LINE_QUANTITY_CAP, DESK_STATUS_FILTERS, DESK_STATUS_LABELS, DESK_TENDERS, REINSTATE_REASON_LIMIT, compBlockedSays, deskEmptySays, deskFigures, reinstateRefusal, saysDeskStatus, saysDeskNight, uncollectableReason, walkUpRefusal, walkUpTotalPence } from '#shared/utils/desk'
 import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
+import { nothingToCollect, passCollectReason } from '#shared/utils/reservations'
 import { saysClock } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskHouse, DeskStatusFilter, DeskTender } from '#shared/utils/desk'
@@ -35,6 +36,7 @@ interface SearchRow {
   status: string
   bookerName: string
   totalPence: number
+  holdExpiresAt: number | null
 }
 
 interface TicketLine {
@@ -59,6 +61,7 @@ interface ReservationDetail {
   // Null except on a cancelled booking: a staff cancellation only ever follows a refund, and
   // that is what decides whether this screen may offer to bring the hold back (D-118).
   cancelledBy: string | null
+  holdExpiresAt: number | null
   showTitle: string
   startsAt: number
   bookerName: string
@@ -278,6 +281,9 @@ async function reinstate(): Promise<void> {
 }
 
 const ticketTotalPence = computed(() => selected.value?.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0) ?? 0)
+const passBookingSays = computed(() => (selected.value?.status === 'PENDING'
+  ? passCollectReason(selected.value.holdExpiresAt, ticketTotalPence.value)
+  : null))
 const dueNow = computed(() => (tender.value === 'COMP' ? 0 : ticketTotalPence.value))
 // D-117: only an approved, unexpired, unspent request lets a comp be collected.
 const compApproved = computed(() => selected.value?.compRequest?.status === 'APPROVED' && !selected.value.compRequest.expired)
@@ -463,6 +469,12 @@ async function cancelCollected(): Promise<void> {
   }
 }
 
+const BY_PASS = 'Booked with a pass'
+
+function byPass(booking: { status: string, holdExpiresAt: number | null, totalPence: number }): boolean {
+  return booking.status === 'PENDING' && nothingToCollect(booking.holdExpiresAt, booking.totalPence)
+}
+
 const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> = {
   PENDING: 'warning',
   COLLECTED: 'success',
@@ -490,10 +502,13 @@ const resultColumns: TableColumn<SearchRow>[] = [
   {
     id: 'status',
     header: 'State',
-    cell: ({ row }) => h(UBadge, {
-      color: statusColor[row.original.status] ?? 'neutral',
-      variant: 'subtle',
-    }, () => saysDeskStatus(row.original.status)),
+    // A pass booking owes nothing, so it reads as settled rather than unpaid (issue 1390).
+    cell: ({ row }) => byPass(row.original)
+      ? h(UBadge, { color: 'success', variant: 'subtle' }, () => BY_PASS)
+      : h(UBadge, {
+          color: statusColor[row.original.status] ?? 'neutral',
+          variant: 'subtle',
+        }, () => saysDeskStatus(row.original.status)),
   },
   { id: 'total', header: 'Total', meta: RIGHT_ALIGNED, cell: ({ row }) => saysPrice(row.original.totalPence) },
   {
@@ -921,7 +936,15 @@ const resultColumns: TableColumn<SearchRow>[] = [
             </li>
           </ul>
 
-          <template v-if="selected.status === 'PENDING'">
+          <UAlert
+            v-if="passBookingSays"
+            color="success"
+            variant="subtle"
+            icon="i-lucide-wallet-cards"
+            :description="passBookingSays"
+            data-test="desk-pass-booking"
+          />
+          <template v-else-if="selected.status === 'PENDING'">
             <UFormField label="Tender">
               <!-- A URadioGroup, not USelect: choosing a value inside a select nested in this modal
                    left its own backdrop swallowing clicks after close (a Nuxt UI defect). -->

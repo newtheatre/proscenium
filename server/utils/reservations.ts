@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
 import { auditedWrite } from './audit'
-import { capacityAllows, heldSeatsQuery, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
+import { capacityAllows, heldSeatsQuery, passBookingColumn, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
 import { configValue } from './configuration'
 import { admittedAtColumn } from './door-search'
 import { auditEntry } from '#shared/utils/audit'
@@ -310,11 +310,6 @@ export async function reservationCurrentState(id: string): Promise<ReservationCu
 export async function holdExpiresAtByReference(reference: string): Promise<number | null> {
   const [row] = await db.all<{ holdExpiresAt: number | null }>(sql`SELECT hold_expires_at AS holdExpiresAt FROM reservations WHERE reference = ${reference}`)
   return row?.holdExpiresAt ?? null
-}
-
-// A booking made with a pass (D-125): one of its tickets stands on a pass admission (issue 1390).
-export function passBookingColumn(alias: string): SQL {
-  return sql`EXISTS (SELECT 1 FROM tickets pt JOIN pass_admissions pa ON pa.ticket_id = pt.id WHERE pt.reservation_id = ${sql.raw(alias)}.id)`
 }
 
 export interface DoorReservationRow {

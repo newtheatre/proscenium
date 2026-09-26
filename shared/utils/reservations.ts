@@ -114,6 +114,13 @@ export function passBookingReason(passBooking: boolean): string | null {
   return 'A booking made with a pass is changed or cancelled at the box office. Contact the box office directly.'
 }
 
+// The desk's side of the same fact: a pass booking owes nothing, so collecting it would only write
+// a zero card sale into the ledger (issue 1390, 0004).
+export function passCollectReason(holdExpiresAt: number | null, totalPence: number): string | null {
+  if (!nothingToCollect(holdExpiresAt, totalPence)) return null
+  return 'This booking was made with a pass, so there is nothing to collect. The door admits it.'
+}
+
 export function otherBookingReason(showing: string | undefined, held: string): string | null {
   if (showing === undefined) return 'This page is out of date. Reload it, then try again.'
   if (showing.toUpperCase() === held.toUpperCase()) return null

@@ -865,20 +865,23 @@ the forms, `GET /api/qr/edit-options` and `GET /api/qr/exchange-options`, make t
 taking `reference` from the query string instead. All five refuse a pass booking
 (`passBookingColumn()`: a ticket standing on a `pass_admissions` row), which only the box office
 changes, since its admission is append-only and unique per pass and performance (issue 1390).
-Editing sends desired totals per type,
-the same line shape a fresh booking uses (`reservationEditForm`); `ticketEditDelta()` (pure,
-`shared/utils/reservations.ts`) turns that into additions and removals against what is currently
-held. Every added and removed line, in the same request, shares one guard computed once
-(`capacityAllows` against the *desired total*, not the delta, `AND` a fresh `status = 'PENDING'`
-check): capacity is asked for the shape the booking ends up in, and a short house refuses the
-whole edit, decreases included, not just the increase that would not fit (criterion 2). A desired
-total under one ticket is refused before anything is written; cancel is the route for emptying a
-booking. Cancelling reuses `cancelled_by = 'CUSTOMER'`, the same column D-114's desk flow already
-checks, sets `hold_expires_at` to `NULL` and is refused once the performance has started
-(criterion 3) or once anything but `PENDING` has been reached (criterion 4: a collected booking's
-`/qr` page offers only a refund note, since D-116 owns the actual refund). Both routes read the
-reservation back afterwards rather than trusting their own statements, since the guard is
-identical everywhere and either the whole request landed or none of it did.
+`ticketOnPass()`, the ticket-level half of that test, keeps a pass seat out of every unpaid count
+(`unpaidSeatsSubquery()`: the desk's tile and notice, the programme screens) and a pass booking
+out of the desk's **Unpaid** pill; the desk's collect route refuses one, since it owes nothing.
+Editing sends desired totals per type, the same line shape a fresh booking uses
+(`reservationEditForm`); `ticketEditDelta()` (pure, `shared/utils/reservations.ts`) turns that into
+additions and removals against what is currently held. Every added and removed line, in the same
+request, shares one guard computed once (`capacityAllows` against the *desired total*, not the
+delta, `AND` a fresh `status = 'PENDING'` check): capacity is asked for the shape the booking ends
+up in, and a short house refuses the whole edit, decreases included, not just the increase that
+would not fit (criterion 2). A desired total under one ticket is refused before anything is
+written; cancel is the route for emptying a booking. Cancelling reuses `cancelled_by = 'CUSTOMER'`,
+the same column D-114's desk flow already checks, sets `hold_expires_at` to `NULL` and is refused
+once the performance has started (criterion 3) or once anything but `PENDING` has been reached
+(criterion 4: a collected booking's `/qr` page offers only a refund note, since D-116 owns the
+actual refund). Both routes read the reservation back afterwards rather than trusting their own
+statements, since the guard is identical everywhere and either the whole request landed or none
+of it did.
 
 **Exchange to another performance of the same show, while unpaid (D-111).** `GET
 /api/qr/exchange-options` lists the show's other on-sale performances, the same honest
