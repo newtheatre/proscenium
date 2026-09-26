@@ -6,5 +6,5 @@ export default defineEventHandler(async (event) => {
   const scope = await getValidatedQueryOrThrow(event, tillScopeForm)
   const resolved = await requireNightAuthority(event, 'BAR', scope)
 
-  return { attempts: await unresolvedAttempts(resolved.night, resolved.venueId) }
+  return { attempts: await unresolvedAttempts(resolved.night) }
 })

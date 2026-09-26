@@ -338,7 +338,7 @@ describe.skipIf(skip !== null)('a sold variant reads as sold, everywhere that gu
 })
 
 // F-105 criterion 1 and F-202: the entry names the session it was rung up against and every
-// movement names the bar it was poured at, so a close figure can be that session's own.
+// movement names the bar it was poured at, so the close can itemise that session's own takings.
 describe.skipIf(skip !== null)('a sale names its session and its bar (F-105 criterion 1, F-202)', () => {
   test('the entry carries the session and every movement carries the venue', async () => {
     const { venueId } = programme('commit-session-venue')

@@ -456,6 +456,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="close-failure"]')`)
     await waitFor(view, `document.querySelector('[data-test="variance-note"]')`)
     expect(await textOf(view, '[data-test="expected-pence"]')).toContain('£2.50')
+    // The close leads with the whole night's figure for the one reader (issue 1308).
+    expect(await textOf(view, '[data-test="reader-should-show"]')).toContain('The reader should show £2.50')
 
     await fill(view, '[data-test="variance-note"]', 'A sale landed while the till was closing')
     await click(view, '[data-test="confirm-close-till"]')

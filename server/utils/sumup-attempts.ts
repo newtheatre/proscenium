@@ -8,10 +8,10 @@ import { auditedWrite } from './audit'
 import { commitSale } from './sale'
 import { openSessionFor, requireOpenSession } from './till'
 import { qrTokenFor, verifyQrToken } from './qr-tokens'
-import { ATTEMPT_COLUMNS, recordPostedSaleStatement, stuckAttemptsQuery } from './sumup-queries'
+import { ATTEMPT_COLUMNS, openAttemptsOn, recordPostedSaleStatement, stuckAttemptsQuery } from './sumup-queries'
 import { auditEntry } from '#shared/utils/audit'
 import { londonDayOf } from '#shared/utils/ledger'
-import { ATTEMPT_KEY_DOMAIN, OPEN_ATTEMPT_STATUSES, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, UNRESOLVED_ATTEMPT_STATUSES, attemptMayMove, isTerminalAttempt, sumupLaunchUrl } from '#shared/utils/sumup'
+import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, UNRESOLVED_ATTEMPT_STATUSES, attemptMayMove, isTerminalAttempt, sumupLaunchUrl } from '#shared/utils/sumup'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { SaleInput, SaleReceipt } from '#shared/utils/sale'
@@ -77,11 +77,12 @@ export function attemptByIdQuery(id: string): SQL {
   return sql`SELECT ${ATTEMPT_COLUMNS} FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by WHERE a.id = ${id}`
 }
 
-// Bounded by the night, never by a list of ids (0003): a night's hand-offs are a few dozen at most.
-export function unresolvedAttemptsQuery(night: string, venueId: string): SQL {
+// Every bar's, since they share the one reader (issue 1308); bounded by the night, never an
+// id list (0003): a night's hand-offs are a few dozen at most.
+export function unresolvedAttemptsQuery(night: string): SQL {
   return sql`
     SELECT ${ATTEMPT_COLUMNS} FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by
-    WHERE a.night = ${night} AND a.venue_id = ${venueId}
+    WHERE a.night = ${night}
       AND a.status IN (${sql.join(UNRESOLVED_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})
     ORDER BY a.created_at DESC
   `
@@ -109,8 +110,8 @@ export async function attemptById(id: string): Promise<AttemptRow | undefined> {
   return row
 }
 
-export async function unresolvedAttempts(night: string, venueId: string): Promise<SumupAttemptView[]> {
-  return (await db.all<AttemptRow>(unresolvedAttemptsQuery(night, venueId))).map(view)
+export async function unresolvedAttempts(night: string): Promise<SumupAttemptView[]> {
+  return (await db.all<AttemptRow>(unresolvedAttemptsQuery(night))).map(view)
 }
 
 export function basketOf(row: AttemptRow): AttemptBasket {
@@ -121,10 +122,7 @@ export function basketOf(row: AttemptRow): AttemptBasket {
 // hand-off (criterion 7). Scanned in memory over the night's open rows, never an IN list.
 export async function refuseBookingsInOpenAttempts(night: string, reservationIds: string[]): Promise<void> {
   if (reservationIds.length === 0) return
-  const rows = await db.all<{ basket: string }>(sql`
-    SELECT basket FROM sumup_attempts
-    WHERE night = ${night} AND status IN (${sql.join(OPEN_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})
-  `)
+  const rows = await db.all<{ basket: string }>(sql`SELECT basket FROM sumup_attempts WHERE ${openAttemptsOn(night)}`)
   for (const row of rows) {
     const basket = JSON.parse(row.basket) as AttemptBasket
     const held = basket.sale.tickets.map(ticket => ticket.reservationId)
@@ -361,11 +359,7 @@ export async function sweepAttempts(timeoutMinutes: number, now = new Date()): P
   return { abandoned, mismatched }
 }
 
-export async function openAttemptCount(night: string, venueId: string): Promise<number> {
-  const [row] = await db.all<{ n: number }>(sql`
-    SELECT count(*) AS n FROM sumup_attempts
-    WHERE night = ${night} AND venue_id = ${venueId}
-      AND status IN (${sql.join(OPEN_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})
-  `)
+export async function openAttemptCount(night: string): Promise<number> {
+  const [row] = await db.all<{ n: number }>(sql`SELECT count(*) AS n FROM sumup_attempts WHERE ${openAttemptsOn(night)}`)
   return Number(row?.n ?? 0)
 }
