@@ -488,3 +488,25 @@ describe('the unpaid queue is counted from open holds (D-132 criterion 2)', () =
     })
   })
 })
+
+// The next performance is added where the last one went, so a run lands at one venue without
+// the picker falling back to the first by name (issue 1319).
+describe('a show names the venue its latest performance was added at (issue 1319)', () => {
+  test('the most recently added uncancelled performance, and null with none', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { night: '2099-01-01' })
+      testVenue(database, { suffix: 'studio' })
+      testVenue(database, { suffix: 'hall' })
+      const add = 'INSERT INTO performances (id, show_id, venue_id, starts_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      database.batch([
+        [add, 'p-studio', seeded.showId, 'venue-studio', seeded.startsAt - 86_400, 'DRAFT', 2_000_000_000],
+        [add, 'p-hall', seeded.showId, 'venue-hall', seeded.startsAt + 86_400, 'CANCELLED', 2_000_000_100],
+        ['INSERT INTO shows (id, slug, title, status) VALUES (?, ?, ?, ?)', 'show-empty', 'empty', 'Nothing yet', 'DRAFT'],
+      ])
+
+      const rows = read<{ id: string, lastVenueId: string | null }>(database, showsQuery(everyShow(), 25, 0))
+      expect(rows.find(one => one.id === seeded.showId)?.lastVenueId).toBe('venue-studio')
+      expect(rows.find(one => one.id === 'show-empty')?.lastVenueId).toBeNull()
+    })
+  })
+})

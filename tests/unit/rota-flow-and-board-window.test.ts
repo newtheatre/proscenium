@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { boardWindowBounds, boardWindowQuery, BOARD_WINDOW_NIGHTS, defaultBoardWindow } from '#shared/utils/rota-board'
+import { boardWindowBounds, boardWindowQuery, BOARD_WINDOW_NIGHTS, defaultBoardWindow, saysStaffing } from '#shared/utils/rota-board'
 import { ROTA_FLOW, rotaStepAfter } from '#shared/utils/rota-flow'
 import { showNightBounds } from '#shared/utils/show-night'
 
@@ -81,5 +81,28 @@ describe('the board refuses a window it cannot read (K-129 criterion 5)', () => 
 
   test('a window longer than a season is refused rather than read whole', () => {
     expect(boardWindowQuery.safeParse({ from: '2026-09-21', to: '2028-09-21' }).success).toBe(false)
+  })
+})
+
+// Nought confirmed of nought read "Fully staffed" on a night nobody was rostered for (issue 1319).
+describe('a card states its staffing in words, and nobody rostered is not fully staffed (issue 1319)', () => {
+  const shifts = (...statuses: ('OPEN' | 'CLAIMED' | 'CONFIRMED')[]) => statuses.map(status => ({ status }))
+
+  test('no shifts at a venue we run is the gap it is, and says what to do', () => {
+    expect(saysStaffing({ shifts: [], isExternal: false })).toEqual({ says: 'No shifts: nobody is rostered', tone: 'warning', empty: true })
+  })
+
+  test('no shifts at an external venue is a fact, not a gap', () => {
+    expect(saysStaffing({ shifts: [], isExternal: true })).toEqual({ says: 'Not rostered', tone: 'neutral', empty: true })
+  })
+
+  test('every shift confirmed is fully staffed, and any other is short', () => {
+    expect(saysStaffing({ shifts: shifts('CONFIRMED', 'CONFIRMED'), isExternal: false })).toEqual({ says: 'Fully staffed', tone: 'success', empty: false })
+    expect(saysStaffing({ shifts: shifts('CONFIRMED', 'OPEN'), isExternal: false })).toEqual({ says: 'Needs people', tone: 'warning', empty: false })
+    expect(saysStaffing({ shifts: shifts('CLAIMED'), isExternal: true })).toEqual({ says: 'Needs people', tone: 'warning', empty: false })
+  })
+
+  test('a bar opening carries no venue flag and reads as one of ours', () => {
+    expect(saysStaffing({ shifts: [] }).says).toBe('No shifts: nobody is rostered')
   })
 })
