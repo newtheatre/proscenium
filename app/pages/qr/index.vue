@@ -46,6 +46,14 @@ const outcome = ref<Outcome>('working')
 const booking = ref<Booking | null>(null)
 const notice = ref('')
 
+// Read once and let go, so only the arrival straight from booking is headed "Booking made"
+// (issue 1329, D-104 criterion 8); a reload or a later visit shows the booking plainly.
+const made = useBookingMade()
+const justMade = ref(made.value)
+onMounted(() => {
+  made.value = null
+})
+
 const resendFields: AuthFormField[] = [
   { name: 'reference', type: 'text', label: 'Booking reference', autocomplete: 'off', required: true },
   { name: 'email', type: 'email', label: 'Email address', autocomplete: 'email', required: true },
@@ -213,9 +221,25 @@ useSeoMeta({ title: 'Your booking' })
         data-test="booking-found"
         class="space-y-3"
       >
-        <h1 class="nnt-headline text-xl">
+        <div
+          v-if="justMade"
+          class="space-y-1 border-b border-default pb-3"
+          data-test="booking-made"
+        >
+          <h1 class="nnt-headline text-2xl">
+            Booking made
+          </h1>
+          <p class="text-sm text-muted">
+            We have emailed the reference and your QR code to {{ justMade.emailedTo ?? 'the address this booking was made with' }}.
+            Bring either one to the box office.
+          </p>
+        </div>
+        <component
+          :is="justMade ? 'h2' : 'h1'"
+          class="nnt-headline text-xl"
+        >
           {{ booking.show }}
-        </h1>
+        </component>
         <p class="text-muted">
           {{ booking.when }}
         </p>
@@ -250,16 +274,20 @@ useSeoMeta({ title: 'Your booking' })
           </li>
         </ul>
 
-        <img
-          :src="`data:image/svg+xml;base64,${booking.qrSvg}`"
-          alt="Booking QR code"
-          width="200"
-          height="200"
-          data-test="booking-qr"
-        >
-        <p class="text-xs text-muted">
-          Save this image to keep the code, or show this page at the door.
-        </p>
+        <!-- A cancelled booking admits nobody, so its code is not offered to be saved (issue
+             1329); the door still answers a scan of an old copy with the reason (D-108). -->
+        <template v-if="booking.status !== 'CANCELLED'">
+          <img
+            :src="`data:image/svg+xml;base64,${booking.qrSvg}`"
+            alt="Booking QR code"
+            width="200"
+            height="200"
+            data-test="booking-qr"
+          >
+          <p class="text-xs text-muted">
+            Save this image to keep the code, or show this page at the door.
+          </p>
+        </template>
 
         <!-- Criterion 4: nothing self-service left to offer once money has moved; a refund is a
              box office conversation, not a form (D-116). -->
@@ -373,6 +401,8 @@ useSeoMeta({ title: 'Your booking' })
             <span class="text-sm">{{ type.name }} <span class="font-mono text-muted">{{ saysPrice(type.price) }}</span></span>
             <UInputNumber
               v-model="quantities[type.id]"
+              v-bind="TOUCH_STEPPER"
+              class="w-36 shrink-0"
               :min="0"
               :max="editCap"
               :aria-label="`${type.name} tickets`"

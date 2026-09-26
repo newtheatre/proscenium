@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const qrToken = await qrTokenFor(result.reservation.id)
+  rememberQrToken(event, qrToken)
 
   // The batch committed, so the booking is real: send after, never before (0003).
   await sendReservationConfirmation(event, {

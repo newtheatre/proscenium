@@ -2,10 +2,18 @@ import { notify } from './notify'
 import { qrPng } from './qr'
 import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
+import type { BookingLink } from './holds'
 import type { H3Event } from 'h3'
 
 // Kept apart from server/utils/reservations.ts, which `tests/` imports directly under Bun:
 // `useRuntimeConfig()` needs a real Nitro runtime, so nothing reachable from a unit test may call it.
+
+// What every booking email links to: the booking page and its QR as a hosted PNG, never an SVG,
+// which Gmail will not render (D-108 criterion 2). The width is the bitmap's own.
+export async function bookingLinkFor(event: H3Event | undefined, reservationId: string): Promise<BookingLink> {
+  const url = `${useRuntimeConfig(event).public.baseURL}/qr/${await qrTokenFor(reservationId)}`
+  return { url, imageUrl: `${url}/image.png`, qrWidth: qrPng(url).width }
+}
 
 export interface ConfirmationContext {
   userId: string

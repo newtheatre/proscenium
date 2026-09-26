@@ -68,12 +68,7 @@ export default defineEventHandler(async (event) => {
 
   // The old token still verifies, but names a row that now reads Exchanged: this page's own
   // cookie has to move to the new booking, or the booker would be looking at the old one.
-  setCookie(event, QR_COOKIE_NAME, qrToken, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: QR_COOKIE_MAX_AGE_SECONDS,
-  })
+  rememberQrToken(event, qrToken)
 
   // The batch committed, so the exchange is real: send after, never before (0003). The new QR
   // is the e-ticket re-issue criterion 4 asks for; the old one now reads Exchanged when presented.

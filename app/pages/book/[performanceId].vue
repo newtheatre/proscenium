@@ -41,12 +41,6 @@ interface BookingInfo {
   redeemablePass: RedeemablePass | null
 }
 
-interface Confirmation {
-  reference: string
-  totalPence: number
-  qrToken: string
-}
-
 interface RunPerformance {
   id: string
   startsAt: number
@@ -132,14 +126,13 @@ const nightWhen = (at: number): string => saysWhen(at)
 const guestName = ref('')
 const guestEmail = ref('')
 
-// Where the confirmation went, kept from the request rather than read back, so the screen names
-// the same address the email was addressed to (D-108 criterion 2).
-const sentTo = ref<string | null>(null)
+// The booking page is the confirmation (issue 1329). The address comes from the request rather
+// than being read back, so the page names the one the email went to (D-104 criterion 8).
+const made = useBookingMade()
 
 const submitting = ref(false)
 const notice = ref<string | null>(null)
 const externalUrl = ref<string | null>(null)
-const confirmation = ref<Confirmation | null>(null)
 
 // The reserve button owns both refusals, so a reader who lands on it hears why it will not do
 // what it says rather than finding the sentence in a card footer they never reach (K-101).
@@ -193,9 +186,9 @@ async function book(): Promise<void> {
     }
     if (!account.value.signedIn) body.guest = { name: guestName.value.trim(), email: guestEmail.value.trim() }
 
-    const result = await $fetch<Confirmation>('/api/reservations', { method: 'POST', body })
-    sentTo.value = body.guest?.email ?? account.value.user?.email ?? null
-    confirmation.value = result
+    await $fetch('/api/reservations', { method: 'POST', body })
+    made.value = { emailedTo: body.guest?.email ?? account.value.user?.email ?? null }
+    await navigateTo('/qr')
   }
   catch (error) {
     if (!mapFieldRefusal(error)) notice.value = refusalText(error)
@@ -210,18 +203,18 @@ async function book(): Promise<void> {
 // never a quantity in `lines` (a pass admits, it is not a ticket type on sale, criterion 1).
 const redeeming = ref(false)
 const redeemNotice = ref<string | null>(null)
-const redemption = ref<Confirmation | null>(null)
 
 async function redeemPass(): Promise<void> {
   if (!data.value?.redeemablePass) return
   redeemNotice.value = null
   redeeming.value = true
   try {
-    const result = await $fetch<Confirmation>(`/api/passes/${data.value.redeemablePass.id}/redeem`, {
+    await $fetch(`/api/passes/${data.value.redeemablePass.id}/redeem`, {
       method: 'POST',
       body: { performanceId: performanceId.value },
     })
-    redemption.value = result
+    made.value = { emailedTo: account.value.user?.email ?? null }
+    await navigateTo('/qr')
   }
   catch (error) {
     redeemNotice.value = refusalText(error)
@@ -257,71 +250,7 @@ useSeoMeta({
       :ui="{ title: 'nnt-headline' }"
     />
 
-    <div
-      v-if="confirmation"
-      class="mt-8 space-y-3"
-      data-test="booking-confirmed"
-    >
-      <UAlert
-        color="success"
-        variant="subtle"
-        icon="i-lucide-ticket"
-        title="Booking made"
-        :description="`Reference ${confirmation.reference}. ${SAYS_PAYMENT} ${saysPrice(confirmation.totalPence)} is due.`"
-      />
-      <p
-        v-if="sentTo"
-        class="text-sm text-muted"
-        data-test="booking-emailed"
-      >
-        We have emailed the reference and your QR code to {{ sentTo }}. Bring either one to the
-        box office.
-      </p>
-      <div class="flex flex-wrap gap-2">
-        <UButton
-          :to="`/qr/${confirmation.qrToken}`"
-          data-test="view-booking"
-        >
-          View your booking
-        </UButton>
-        <UButton
-          to="/whats-on"
-          variant="link"
-        >
-          Back to what's on
-        </UButton>
-      </div>
-    </div>
-
-    <div
-      v-else-if="redemption"
-      class="mt-8 space-y-3"
-      data-test="pass-redeemed"
-    >
-      <UAlert
-        color="success"
-        variant="subtle"
-        icon="i-lucide-ticket"
-        title="Pass redeemed"
-        :description="`Reference ${redemption.reference}. Your pass admits you to this performance; nothing further is due.`"
-      />
-      <div class="flex flex-wrap gap-2">
-        <UButton
-          :to="`/qr/${redemption.qrToken}`"
-          data-test="view-redemption"
-        >
-          View your booking
-        </UButton>
-        <UButton
-          to="/whats-on"
-          variant="link"
-        >
-          Back to what's on
-        </UButton>
-      </div>
-    </div>
-
-    <div v-else-if="data!.refusal">
+    <div v-if="data!.refusal">
       <UAlert
         class="mt-8"
         color="neutral"
@@ -490,10 +419,11 @@ useSeoMeta({
                 <span class="font-mono">{{ saysPrice(type.price) }}</span>
                 <UInputNumber
                   v-model="quantities[type.id]"
+                  v-bind="TOUCH_STEPPER"
                   :min="0"
                   :max="maxFor(type)"
                   :aria-label="`${type.name} tickets`"
-                  class="w-28"
+                  class="w-36"
                   :data-test="`quantity-${type.id}`"
                 />
               </div>
