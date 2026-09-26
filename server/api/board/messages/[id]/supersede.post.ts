@@ -7,8 +7,9 @@ export default defineEventHandler(async (event) => {
   const device = await requireDevice(event)
   const input = await readValidatedBodyOrThrow(event, supersedeMessageForm)
 
-  const body = await milestoneLabel(input.milestoneTypeId)
-  if (!body) throw createError({ statusCode: 400, statusMessage: 'That milestone is not configured, or has been retired' })
+  const resolved = await resolveCall('BACKSTAGE', { milestoneTypeId: input.milestoneTypeId, presetId: null, body: null })
+  if ('refusal' in resolved) throw createError({ statusCode: 400, statusMessage: resolved.refusal })
+  const body = resolved.body
 
   const id = newId()
   const entry = auditEntry({
