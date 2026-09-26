@@ -93,6 +93,12 @@ describe('one rule for a local path, wherever a next is read (0094)', () => {
     expect(localPath('/')).toBe('/')
   })
 
+  test('a next the URL parser cannot read is nothing, never a thrown error', () => {
+    expect(localPath('//[')).toBeNull()
+    expect(localPath('//x:99999')).toBeNull()
+    expect(landingAfterSignIn('//[', true)).toBe('/tonight')
+  })
+
   test('anything that would leave the site is nothing', () => {
     for (const next of ['//evil.example/', '/\\evil.example', '/\t/evil.example', 'https://evil.example/', 'rooms', '', undefined, ['/rooms']]) {
       expect(localPath(next)).toBeNull()
