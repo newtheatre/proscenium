@@ -86,8 +86,6 @@ async function setPublished(published: boolean, refuse?: (message: string) => vo
       icon: 'i-lucide-check',
       color: 'success',
     })
-    publishing.value = false
-    await refresh()
   }
   catch (refused) {
     if (refuse) refuse(refusalText(refused))
@@ -95,6 +93,8 @@ async function setPublished(published: boolean, refuse?: (message: string) => vo
   }
   finally {
     saving.value = false
+    publishing.value = false
+    await refresh()
   }
 }
 

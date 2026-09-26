@@ -113,11 +113,6 @@ describe('the covered shows have one name (issue 1323)', () => {
     const source = await Bun.file(SCREEN).text()
     expect(source).not.toMatch(/label="Covers"|header: 'Covers'|\(\) => 'Shows'|aria-label="Shows"/)
   })
-
-  test('the footer counts passes, never "passs"', async () => {
-    const source = await Bun.file(SCREEN).text()
-    expect(source).not.toMatch(/plural\([^,]+, 'pass'\)/)
-  })
 })
 
 // A word ending in s, x, ch or sh takes "es", which plural() cannot guess, so every such call names

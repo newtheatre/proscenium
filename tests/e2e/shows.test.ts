@@ -143,20 +143,18 @@ async function detail(showId: string, as = officer.cookie): Promise<{ show: List
 
 // A pass valid for half a year from now, so a performance a week out falls inside it. A pass has
 // to cover one show to exist, so it starts with a show of its own unless told which.
-async function passOnSale(over: { status?: string, covering?: string } = {}): Promise<{ id: string, name: string }> {
+async function passOnSale(over: { status?: string, covering?: string } = {}): Promise<{ id: string, name: string, withdraw: () => Promise<void> }> {
   const name = named('Season pass')
   const now = Math.floor(Date.now() / 1000)
-  const window = { validFrom: now, validUntil: now + 180 * 86_400 }
-  const showIds = [over.covering ?? await newShow()]
-  const created = await send('POST', '/api/admin/pass-types', {
-    name, slug: slugged(name), ...window, prices: [{ label: 'Standard', price: 4500 }], showIds,
-  })
+  const fields = { name, slug: slugged(name), validFrom: now, validUntil: now + 180 * 86_400, prices: [{ label: 'Standard', price: 4500 }] }
+  const created = await send('POST', '/api/admin/pass-types', { ...fields, showIds: [over.covering ?? await newShow()] })
   expect(created.status).toBe(200)
   const { id } = await created.json() as { id: string }
-  expect((await send('PUT', `/api/admin/pass-types/${id}`, {
-    name, slug: slugged(name), ...window, prices: [{ label: 'Standard', price: 4500 }], status: over.status ?? 'ON_SALE',
-  })).status).toBe(200)
-  return { id, name }
+  const setStatus = async (status: string): Promise<void> => {
+    expect((await send('PUT', `/api/admin/pass-types/${id}`, { ...fields, status })).status).toBe(200)
+  }
+  await setStatus(over.status ?? 'ON_SALE')
+  return { id, name, withdraw: () => setStatus('CLOSED') }
 }
 
 async function coveredShows(passTypeId: string): Promise<string[]> {
@@ -699,6 +697,31 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, '[data-test="confirm-publish"]')
     await waitFor(view, `document.querySelector('[data-test="show-status"]')?.textContent.includes('Published')`)
     expect(await coveredShows(pass.id)).toContain(id)
+    view.close()
+  }, 120_000)
+
+  // A pass withdrawn while the sheet is open is refused once, and never offered again (issue 1323).
+  test('a refused publish closes the sheet, and reopening it offers only the passes still on sale', async () => {
+    const id = await newShow({ title: named('Withdrawn pass') })
+    await addPerformance(id)
+    const pass = await passOnSale()
+
+    const view = await signedIn()
+    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="publish"]')
+    await click(view, '[data-test="publish"]')
+    await waitFor(view, `document.querySelector('[data-test="cover-pass-${pass.id}"]')`)
+    await pass.withdraw()
+
+    await click(view, '[data-test="confirm-publish"]')
+    await waitFor(view, `!document.querySelector('[data-test="confirm-publish"]')`)
+    expect(await textOf(view, '[data-test="failure"]')).toContain(pass.name)
+    expect((await detail(id)).show.status).toBe('DRAFT')
+
+    await click(view, '[data-test="publish"]')
+    await waitFor(view, `document.querySelector('[data-test="confirm-publish"]')`)
+    expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="cover-pass-${pass.id}"]')`)).toBe(true)
+    await click(view, '[data-test="confirm-publish"]')
+    await waitFor(view, `document.querySelector('[data-test="show-status"]')?.textContent.includes('Published')`)
     view.close()
   }, 120_000)
 })

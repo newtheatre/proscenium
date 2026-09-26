@@ -34,14 +34,15 @@ export default defineEventHandler(async (event) => {
 
   // Only a pass the sheet could offer may be ticked, and one already covering is left alone: the
   // additive action of D-123 criterion 4, never a removal (issue 1323).
-  const offered = published && coverPassTypeIds.length ? await coveringPasses(id) : []
-  for (const passTypeId of new Set(published ? coverPassTypeIds : [])) {
-    if (offered.some(one => one.id === passTypeId)) continue
-    const pass = await passTypeById(passTypeId)
+  const asked = published ? coverPassTypeIds : []
+  const offered = asked.length ? await coveringPasses(id) : []
+  const stray = asked.find(passTypeId => !offered.some(one => one.id === passTypeId))
+  if (stray) {
+    const pass = await passTypeById(stray)
     if (!pass) throw createError({ statusCode: 400, statusMessage: saysNoSuch('pass') })
     throw createError({ statusCode: 409, statusMessage: `${pass.name} is not on sale for ${held.title}'s dates, so it cannot cover it. Nothing has been published.` })
   }
-  const covering = offered.filter(one => !one.covered && coverPassTypeIds.includes(one.id))
+  const covering = offered.filter(one => !one.covered && asked.includes(one.id))
 
   // Draft performances only, so a cancelled one is never quietly put back on sale. Counted before
   // the batch because the statement's own row count is not read back.
@@ -61,16 +62,18 @@ export default defineEventHandler(async (event) => {
       // Recorded on the unpublish too: it is what tells a reader the act left sold seats alone.
       detail: { performancesTakenOnSale: cascaded, soldTickets: held.soldTickets },
     })),
+    // Audited only where the row went in, so a cover added meanwhile by the pass's own route is not
+    // credited twice (0049).
     ...covering.flatMap(pass => [
       db.insert(schema.passTypeShows).values({ id: newId(), passTypeId: pass.id, showId: id }).onConflictDoNothing(),
-      db.insert(schema.auditLog).values(auditEntry({
+      db.run(auditIfChanged(auditEntry({
         actorId: resolved.account.id,
         action: 'pass-type.shows.updated',
         target: `pass-type:${pass.id}`,
         detail: { added: [id], removed: [] },
-      })),
+      }))),
     ]),
   ])
 
-  return { ok: true, status, performancesTakenOnSale: cascaded, passesCovering: covering.length }
+  return { ok: true, status, performancesTakenOnSale: cascaded }
 })
