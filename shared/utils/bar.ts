@@ -240,7 +240,10 @@ export const MAX_VARIANT_PRICE_PENCE = 100_000
 // A crate of mixers is hundreds, not millions, so this is what catches a quantity typed into the
 // wrong field.
 export const MAX_MOVEMENT_QTY = 1_000_000
-export const MAX_UNIT_COST_PENCE = 1_000_000
+// A delivery costs pounds or hundreds of pounds, so this catches a figure typed ten times over.
+export const MAX_DELIVERY_COST_PENCE = 1_000_000
+
+const deliveryCostField = z.number().int().nonnegative().max(MAX_DELIVERY_COST_PENCE).nullish()
 
 const label = (what: string) => z.string().trim().min(1, `A ${what} needs a name`).max(MAX_BAR_NAME)
   // A name is a label, so it holds no address: the audit detail carries both names (0011).
@@ -305,8 +308,8 @@ const movementFields = z.object({
     .refine(value => Math.abs(value) <= MAX_MOVEMENT_QTY, 'That quantity is larger than the bar holds'),
   reason: z.enum(MOVEMENT_REASONS).nullish(),
   // What the delivery was bought at, the way the screen asked for it; the route decides how it is
-  // kept from the item itself (deliveryCostBasis, 0100).
-  costPence: z.number().int().nonnegative().max(MAX_UNIT_COST_PENCE).nullish(),
+  // kept from the item itself (deliveryCost, 0100).
+  costPence: deliveryCostField,
   reversesId: z.string().trim().min(1, 'Say which movement it reverses').nullish(),
 })
 
@@ -325,7 +328,8 @@ function refuseUnpairedReason(value: { kind: StockMovementKind, reason?: Movemen
   }
 }
 
-export const movementForm = movementFields.superRefine(refuseUnpairedReason)
+// Strict, so a caller still sending the old per-unit cost is refused rather than recorded costless.
+export const movementForm = movementFields.strict().superRefine(refuseUnpairedReason)
 
 // What the stock screen's own modal holds: not the item, which it is about, nor the cost, which
 // it asks in pounds beside the form. A form validates its whole state, so these stay out.
@@ -423,9 +427,9 @@ const setupItemForm = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('NEW'), item: stockItemForm }),
 ])
 
-const setupDeliveryForm = z.object({
+const setupDeliveryForm = z.strictObject({
   qty: z.number().int().positive('A delivery is a quantity of something').max(MAX_MOVEMENT_QTY),
-  costPence: z.number().int().nonnegative().max(MAX_UNIT_COST_PENCE).nullish(),
+  costPence: deliveryCostField,
 })
 
 const setupChoiceForm = z.object({
@@ -777,7 +781,7 @@ export const asPounds = (pence: number | null | undefined): number | null =>
 // by its container, or by the whole delivery where it has no one container size.
 export type DeliveryCostBasis = 'UNIT' | 'CONTAINER' | 'DELIVERY'
 
-export function deliveryCostBasis(item: { unit: StockUnit, containerMl: number | null }): DeliveryCostBasis {
+export function deliveryCostBasis(item: Pick<StockItem, 'unit' | 'containerMl'>): DeliveryCostBasis {
   if (item.unit === 'ITEM') return 'UNIT'
   return item.containerMl ? 'CONTAINER' : 'DELIVERY'
 }
@@ -799,7 +803,7 @@ export const DELIVERY_COST_QUESTION: Record<DeliveryCostBasis, { label: string, 
 }
 
 // What a route keeps a delivery's cost as, from the one figure the screen asked for.
-export function deliveryCost(item: { unit: StockUnit, containerMl: number | null }, qty: number, pence: number | null): DeliveryCost {
+export function deliveryCost(item: Pick<StockItem, 'unit' | 'containerMl'>, qty: number, pence: number | null): DeliveryCost {
   if (pence === null) return { unitCostPence: null, containerCostPence: null, containerQty: null }
   switch (deliveryCostBasis(item)) {
     case 'UNIT': return { unitCostPence: pence, containerCostPence: null, containerQty: null }
@@ -808,7 +812,7 @@ export function deliveryCost(item: { unit: StockUnit, containerMl: number | null
   }
 }
 
-// The history reads a cost back in the terms it was bought in, never as a divided figure.
+// The history reads a cost back in the terms it was bought in; an older unit-cost row reads as it was kept.
 export function saysDeliveryCost(movement: DeliveryCost & { unit: StockUnit }): string {
   if (movement.containerCostPence !== null && movement.containerQty !== null) {
     return `${saysMoney(movement.containerCostPence)} for ${saysQuantity(movement.containerQty, movement.unit)}`

@@ -27,10 +27,12 @@ export default defineEventHandler(async (event) => {
     throw noSuch('stocked item')
   }
 
+  const poured = input.shape !== 'RECIPE' && input.item.mode === 'EXISTING' ? held[0]! : null
+
   // The form checks these for an item created here; an item chosen from the list carries its unit
   // in the database rather than in the payload, so the same two rules are re-applied against it.
-  if (input.shape !== 'RECIPE' && input.item.mode === 'EXISTING') {
-    const item = held[0]!
+  if (poured && input.shape !== 'RECIPE') {
+    const item = poured
     const servings = input.shape === 'SIMPLE' ? [input.serving] : input.sizes
     if (item.unit === 'ML' && servings.some(serving => serving.servingKind === 'item')) {
       throw createError({
@@ -91,7 +93,7 @@ export default defineEventHandler(async (event) => {
     today,
     pricedKinds: defaults.map(row => row.servingKind),
     retiredItems: held.filter(item => item.status === 'RETIRED').map(item => item.name),
-    pouredItem: input.shape !== 'RECIPE' && input.item.mode === 'EXISTING' ? held[0] : undefined,
+    pouredItem: poured,
     newId,
   })
 

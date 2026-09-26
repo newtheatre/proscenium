@@ -88,8 +88,7 @@ watch(() => movement.kind, () => {
 })
 const directionOptions = [{ label: 'Add to stock', value: true }, { label: 'Take off stock', value: false }]
 
-// Undefined stays undefined: a delivery whose cost nobody entered records none rather than nought.
-const costPounds = ref<number | undefined>(undefined)
+const costPounds = ref<number>()
 
 // Asked the way the item is bought, never per millilitre (F-114 criterion 6); the route keeps it
 // that way and a report divides it only when read (0100).

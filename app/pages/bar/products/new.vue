@@ -126,9 +126,7 @@ const opening = reactive({ offered: false, qty: 1, costPounds: null as number | 
 
 // The opening delivery's cost is asked the way the stock it comes out of is bought (0100).
 const openingCost = computed(() => {
-  const held = itemMode.value === 'NEW'
-    ? { unit: newItem.unit, containerMl: newItem.containerMl }
-    : knownItems.value.find(item => item.id === existingItemId.value)
+  const held = itemMode.value === 'NEW' ? newItem : knownItems.value.find(item => item.id === existingItemId.value)
   return DELIVERY_COST_QUESTION[deliveryCostBasis(held ?? { unit: 'ITEM', containerMl: null })]
 })
 

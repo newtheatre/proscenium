@@ -955,7 +955,9 @@ describe.skipIf(skip !== null)('the screens', () => {
     await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="move-${itemId}"]`)
     await click(view, `[data-test="move-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
-    expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost of one')
+    const form = await textOf(view, '[data-test="movement-form"]')
+    expect(form).toContain('Cost of one')
+    expect(form).not.toContain('Cost of one container')
 
     view.close()
   }, 120_000)

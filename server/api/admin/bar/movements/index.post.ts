@@ -29,8 +29,6 @@ export default defineEventHandler(async (event) => {
   if (costPence !== null && input.kind !== 'DELIVERY') {
     throw createError({ statusCode: 400, statusMessage: 'A cost belongs to a delivery, which is what gross profit is measured against' })
   }
-  // Kept the way the item is bought, never divided into a price a millilitre (0100).
-  const cost = deliveryCost(item, input.qty, costPence)
   if (input.kind === 'DELIVERY' && input.qty < 0) {
     throw createError({ statusCode: 400, statusMessage: 'A delivery adds stock: record what left as wastage or an adjustment' })
   }
@@ -40,6 +38,8 @@ export default defineEventHandler(async (event) => {
 
   const reverses = await reversalTarget(input)
   const id = newId()
+  // Kept the way the item is bought, never divided into a price a millilitre (0100).
+  const cost = deliveryCost(item, input.qty, costPence)
 
   // The predicate rides the write, so two managers reversing the same movement at once produce
   // one reversal and a refusal rather than a constraint error (0003, 0006).

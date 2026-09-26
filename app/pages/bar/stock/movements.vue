@@ -98,8 +98,8 @@ const columns: TableColumn<StockMovement>[] = [
         : null,
       // Below sm the when and the cost are hidden: shown here instead, so a phone keeps the row
       // actions in view without losing what they said (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, [saysWhen(row.original.createdAt), saysDeliveryCost(row.original)]
-        .filter(Boolean).join(', ')),
+      h('div', { class: 'sm:hidden text-xs text-muted' },
+        [saysWhen(row.original.createdAt), saysDeliveryCost(row.original)].filter(Boolean).join(', ')),
     ]),
   },
   {

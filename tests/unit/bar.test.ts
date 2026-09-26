@@ -103,10 +103,9 @@ describe('a movement is signed, explained and costed where it should be', () => 
 
   // Decision 0100 (issue 1320): the screen sends one figure, what was paid, and the route decides
   // how it is kept, so no caller can send a price a millilitre any more.
-  test('a delivery sends one cost, never a unit or a container cost of its own', () => {
-    const parsed = movementForm.safeParse({ itemId: 'item-1', kind: 'DELIVERY', qty: 750, unitCostPence: 1, containerCostPence: 650 })
-    expect(parsed.success && Object.keys(parsed.data)).not.toContain('unitCostPence')
-    expect(parsed.success && Object.keys(parsed.data)).not.toContain('containerCostPence')
+  test('a delivery sends one cost, and a unit or a container cost of its own is refused', () => {
+    expect(aMovement({ unitCostPence: 1 }).success).toBe(false)
+    expect(aMovement({ containerCostPence: 650 }).success).toBe(false)
   })
 
   // A form validates its whole state, so a modal about one item cannot be held to the schema that
