@@ -288,6 +288,8 @@ describe.skipIf(skip !== null)('the server decides a series\' tier', () => {
     const tiers = all<{ tier: string }>('SELECT tier FROM room_bookings WHERE series_id = ?', id).map(row => row.tier)
     expect(tiers).toHaveLength(4)
     expect(new Set(tiers)).toEqual(new Set(['REHEARSAL']))
+    expect(read<{ detail: string }>('SELECT detail FROM audit_log WHERE action = \'room.series.booked\' AND target = ?', `series:${id}`)?.detail)
+      .toContain('"tier":"REHEARSAL"')
   })
 })
 

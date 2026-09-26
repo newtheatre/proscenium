@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
+import { bookingTier } from '#shared/utils/bookings'
 import { refusalToRelist } from '#shared/utils/external-requests'
 import { relistForm } from '#shared/utils/approvals'
 import { formatLondon } from '#shared/utils/london'
@@ -44,7 +45,8 @@ export default defineEventHandler(async (event) => {
     attendees: request.attendees,
     startsAt: request.startsAt,
     endsAt: request.endsAt,
-    tier: 'GENERAL',
+    // The member asked, so the tier is theirs as any member booking's is (C-115 criterion 1).
+    tier: bookingTier(request.purpose, undefined, false),
     purpose: request.purpose,
     status: verdict.needsApproval ? 'PENDING_APPROVAL' : 'CONFIRMED',
     notes: request.notes,

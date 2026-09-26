@@ -87,8 +87,9 @@ function span(daysAhead: number, hour = 14, hours = 2): { startsAt: string, ends
   return { startsAt: start.toISOString(), endsAt: new Date(start.getTime() + hours * 3_600_000).toISOString() }
 }
 
-async function bookAs(roomId: string, when: { startsAt: string, endsAt: string }, who: TestMember, tier = 'GENERAL'): Promise<string> {
-  const answered = await send('POST', '/api/rooms/bookings', { roomId, title: 'Rehearsal', purpose: 'REHEARSAL', tier, ...when }, who.cookie)
+// A member's booking: its tier follows from the purpose, so this is always a rehearsal (C-115 c1).
+async function bookAs(roomId: string, when: { startsAt: string, endsAt: string }, who: TestMember): Promise<string> {
+  const answered = await send('POST', '/api/rooms/bookings', { roomId, title: 'Rehearsal', purpose: 'REHEARSAL', ...when }, who.cookie)
   expect(answered.status).toBe(200)
   return (await answered.json() as { id: string }).id
 }
@@ -104,7 +105,7 @@ const bump = (id: string, over: Record<string, unknown> = {}, as = officer): Pro
   }, as)
 
 describe.skipIf(skip !== null)('only a higher tier may bump (criterion 2)', () => {
-  test('a production takes a general booking, and the room changes hands', async () => {
+  test('a production takes a rehearsal, and the room changes hands', async () => {
     const room = await makeRoom()
     const when = span(30)
     const booking = await bookAs(room, when, member)
@@ -123,17 +124,21 @@ describe.skipIf(skip !== null)('only a higher tier may bump (criterion 2)', () =
 
   test('an equal tier is refused, and the booking stands', async () => {
     const room = await makeRoom()
-    const booking = await bookAs(room, span(31), member, 'REHEARSAL')
+    const booking = await bookAs(room, span(31), member)
 
     const answered = await bump(booking, { tier: 'REHEARSAL' })
     expect(answered.status).toBe(422)
     expect(read<{ status: string }>('SELECT status FROM room_bookings WHERE id = ?', booking)?.status).toBe('CONFIRMED')
   })
 
+  // Only an officer names Production, so the booking to bump is the officer's own.
   test('a lower tier is refused', async () => {
     const room = await makeRoom()
-    const booking = await bookAs(room, span(32), member, 'PRODUCTION')
-    expect((await bump(booking, { tier: 'GENERAL' })).status).toBe(422)
+    const answered = await send('POST', '/api/rooms/bookings',
+      { roomId: room, title: 'Get-in', purpose: 'GET_IN', tier: 'PRODUCTION', ...span(32) }, officer)
+    expect(answered.status).toBe(200)
+    const { id } = await answered.json() as { id: string }
+    expect((await bump(id, { tier: 'GENERAL' })).status).toBe(422)
   })
 
   test('a pending request cannot be bumped', async () => {
@@ -166,13 +171,13 @@ describe.skipIf(skip !== null)('only a higher tier may bump (criterion 2)', () =
     expect(read<{ status: string }>('SELECT status FROM room_bookings WHERE id = ?', booking)?.status).toBe('CONFIRMED')
   })
 
-  test('nothing bumps automatically: a member booking over one is still refused', async () => {
+  test('nothing bumps automatically: an officer\'s Production over a booking is still refused', async () => {
     const room = await makeRoom()
     const when = span(36)
     await bookAs(room, when, member)
 
     const over = await send('POST', '/api/rooms/bookings',
-      { roomId: room, title: 'Higher claim', purpose: 'REHEARSAL', tier: 'PRODUCTION', ...when }, claimant.cookie)
+      { roomId: room, title: 'Higher claim', purpose: 'GET_IN', tier: 'PRODUCTION', ...when }, officer)
     expect(over.status).toBe(409)
   })
 

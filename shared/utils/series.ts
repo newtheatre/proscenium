@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TIERS } from './bookings'
 import { fromLondonWallClock, londonWeekday } from './london'
 
 // A term of rehearsals as one action (C-110). The arithmetic walks calendar days, never
@@ -85,7 +86,7 @@ export const seriesForm = z.object({
   title: z.string().trim().min(1, 'Give the booking a title').max(200),
   attendees: z.number().int().positive().nullish().transform(value => value ?? null),
   // Read only from an officer; `bookingTier()` decides everybody else's (issue 1337).
-  tier: z.enum(['PRODUCTION', 'COMMITTEE', 'REHEARSAL', 'GENERAL']).optional(),
+  tier: z.enum(TIERS).optional(),
   purpose: z.string().trim().min(1, 'Say what the room is for').max(32),
   notes: z.string().trim().max(1000).nullish().transform(value => (value ?? '').trim() || null),
   frequency: z.enum(FREQUENCIES),

@@ -279,7 +279,10 @@ describe.skipIf(skip !== null)('the server decides a booking\'s tier (C-115 crit
       roomId: room, title: 'Rehearsal', purpose: 'REHEARSAL', tier: 'PRODUCTION', reason: 'Show week', ...soon(17),
     }, booker)
     expect(answered.status).toBe(200)
-    expect(tierOf((await answered.json() as { id: string }).id)).toBe('REHEARSAL')
+    const { id } = await answered.json() as { id: string }
+    expect(tierOf(id)).toBe('REHEARSAL')
+    expect(read<{ detail: string }>('SELECT detail FROM audit_log WHERE action = \'room.requested\' AND target = ?', `booking:${id}`)?.detail)
+      .toContain('"tier":"REHEARSAL"')
   })
 
   test('an officer\'s Production stands', async () => {

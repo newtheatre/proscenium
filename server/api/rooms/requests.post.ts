@@ -82,7 +82,7 @@ export default defineEventHandler(async (event) => {
     action: 'room.requested',
     target: `booking:${claimed.id}`,
     // The rules it broke, never the reason: that is the member's own words (0011).
-    detail: { room: room.id, failed: verdict.failures.map(failure => failure.reason) },
+    detail: { room: room.id, tier, failed: verdict.failures.map(failure => failure.reason) },
   }))
 
   await notify(event, {

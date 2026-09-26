@@ -106,6 +106,7 @@ export default defineEventHandler(async (event) => {
   // kind of thing from its siblings (criterion 6).
   const status = needsApproval ? 'PENDING_APPROVAL' as const : 'CONFIRMED' as const
   const purpose = await requirePurpose(event, input.purpose)
+  const tier = bookingTier(purpose, input.tier, isAdmin)
 
   try {
     await writeSeries({
@@ -114,7 +115,7 @@ export default defineEventHandler(async (event) => {
       roomId: room.id,
       title: input.title,
       attendees: input.attendees,
-      tier: bookingTier(purpose, input.tier, permissions.has('rooms.write')),
+      tier,
       purpose,
       notes: input.notes,
       status,
@@ -135,7 +136,7 @@ export default defineEventHandler(async (event) => {
     actorId: account.id,
     action: status === 'CONFIRMED' ? 'room.series.booked' : 'room.series.requested',
     target: `series:${seriesId}`,
-    detail: { room: room.id, occurrences: occurrences.length, frequency: input.frequency },
+    detail: { room: room.id, tier, occurrences: occurrences.length, frequency: input.frequency },
   }))
 
   await notify(event, {
