@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   const claimant = await findById(input.userId)
   if (!claimant) throw createError({ statusCode: 422, statusMessage: 'That account does not exist' })
 
-  const offer = nearestTo(displaced, await alternativesFor(displaced))
+  const offer = nearestTo(displaced, await alternativesFor(displaced, event))
 
   const outcome = await performBump({
     displaced,

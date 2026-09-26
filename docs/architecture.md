@@ -1766,6 +1766,20 @@ A venue is its own row, never a flagged room (0043). It may point at a room thro
 `room_id`, and the only effect of that attachment is that the venue's performances apply blackouts
 to that room. Nothing else about a room is inferred from a venue or the reverse.
 
+Those closures are derived, never written to `room_blackouts` (issue 1347, C-114 criterion 6). A
+performance that is not cancelled, draft included, closes its venue's room over `shiftWindow()`
+with the house's default offsets (0078): from `SHIFT_START_BEFORE_DOORS_MINUTES` before doors to
+`SHIFT_END_AFTER_CURTAIN_DOWN_MINUTES` after the curtain comes down. `performancesOnRoomsQuery()`
+in `server/utils/performance-closures.ts` reads the performances for a span in one statement,
+padded a day either side of it, and the exact overlap is tested on the computed windows.
+`closuresAcross()` in `server/utils/blackouts.ts` joins them to an officer's closures, and every
+reader that refuses or shows a closure calls it: availability, a booking, a request, a series, a
+change to a pending request and a bump's alternatives. A booking made before the room was attached
+or the performance scheduled is not cancelled; `GET /api/admin/rooms/blackouts/performances`
+(`rooms.read`) lists each closure to the booking horizon with the bookings it overlaps, and the
+Closures screen shows them read-only. Cancelling the performance, or detaching the room, is what
+reopens it.
+
 | Function | Answers |
 | --- | --- |
 | `performanceNight(curtain: Date \| number): string` | Which show night a performance belongs to. Derived from `showNightOf(curtain)`, so a curtain before 04:00 belongs to the night that began the London day before. A stored curtain is integer seconds; both spellings are accepted. |
