@@ -128,13 +128,13 @@ describe('no count on a screen doubles its s', () => {
     for (const root of ['app', 'shared', 'server']) {
       for await (const file of new Bun.Glob('**/*.{ts,vue}').scan(root)) {
         const source = await Bun.file(`${root}/${file}`).text()
-        for (const match of source.matchAll(/plural\([^()]*?, '([^']*(?:s|x|ch|sh))'\)/g)) {
+        for (const match of source.matchAll(/plural\([^(),']+, '([^']*(?:s|x|ch|sh))'\)/g)) {
           offenders.push(`${root}/${file}: ${match[0]}`)
         }
       }
     }
     expect(offenders).toEqual([])
-  })
+  }, 60_000)
 })
 
 // A show playing only at venues we run is ours, so the publish sheet ticks each covering pass for

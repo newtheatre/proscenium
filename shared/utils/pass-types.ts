@@ -119,3 +119,17 @@ export function saysPassTypeStatus(status: string): string {
   if (status === 'CLOSED') return 'Closed'
   return 'Draft'
 }
+
+// A pass on sale for a show's dates, as the publish sheet lists it (issue 1323).
+export interface CoveringPass {
+  id: string
+  name: string
+  covered: boolean
+}
+
+// A show playing only at venues we run is ours, so the publish sheet ticks each pass for it; one
+// with an external night starts unticked, and the officer decides (issue 1323, D-123 criterion 4).
+export function coverPresetOn(performances: { status: string, isExternal: boolean }[]): boolean {
+  const playing = performances.filter(one => one.status !== 'CANCELLED')
+  return playing.length > 0 && playing.every(one => !one.isExternal)
+}

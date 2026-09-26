@@ -3,6 +3,7 @@ import { SHOW_TABS, showTab } from '#shared/utils/show-tabs'
 import { saysShowStatus } from '#shared/utils/programme'
 import type { AdminPerformance, AdminShow, ShowReference, ShowVenue } from '#shared/utils/programme'
 import type { ContentWarning, ShowContentWarning } from '#shared/utils/content-warnings'
+import type { CoveringPass } from '#shared/utils/pass-types'
 
 definePageMeta({ layout: 'console', title: 'Show', middleware: 'console', docs: '/docs/box-office/shows' })
 
@@ -20,6 +21,7 @@ interface Detail {
   seasons: ShowReference[]
   warnings: ShowContentWarning[]
   vocabulary: ContentWarning[]
+  coveringPasses: CoveringPass[]
 }
 
 const failure = ref<string | null>(null)
@@ -53,6 +55,7 @@ const active = computed({
 
 const publishing = ref(false)
 const cascade = ref(true)
+const coverTicked = ref<string[]>([])
 
 // Taking a show off sale is not destruction, so the confirmation is primary rather than error
 // (K-123 criterion 7). Its refusal stays in the dialogue, not on the page behind it.
@@ -73,7 +76,7 @@ async function setPublished(published: boolean, refuse?: (message: string) => vo
   try {
     const answer = await $fetch<{ performancesTakenOnSale: number }>(`/api/admin/shows/${id.value}/publish`, {
       method: 'POST',
-      body: { published, cascadePerformances: published && cascade.value },
+      body: { published, cascadePerformances: published && cascade.value, coverPassTypeIds: published ? coverTicked.value : [] },
     })
     toast.add({
       title: published ? 'Show published' : 'Show taken off the public site',
@@ -254,6 +257,10 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
             label="Put its performances on sale too"
             description="Cancelled performances are left alone."
             data-test="cascade"
+          />
+          <BoxOfficeShowPublishPasses
+            v-model="coverTicked"
+            :detail="data"
           />
         </div>
       </template>

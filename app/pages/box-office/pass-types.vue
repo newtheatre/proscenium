@@ -250,7 +250,7 @@ const columns: TableColumn<PassType>[] = [
   },
   {
     id: 'shows',
-    header: 'Covers',
+    header: 'Covered shows',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('span', { class: 'text-sm text-muted' }, plural(row.original.showIds.length, 'show')),
   },
@@ -272,7 +272,7 @@ const columns: TableColumn<PassType>[] = [
         'variant': 'ghost',
         'data-test': `shows-${row.original.id}`,
         'onClick': () => openShows(row.original),
-      }, () => 'Shows'),
+      }, () => 'Covered shows'),
       row.original.everIssued
         ? null
         : h(UButton, {
@@ -358,7 +358,7 @@ const columns: TableColumn<PassType>[] = [
         data-test="pass-types-total"
         class="text-sm text-muted"
       >
-        {{ plural(data.total, 'pass') }}
+        {{ plural(data.total, 'pass', 'passes') }}
       </p>
       <UPagination
         v-if="data.pages > 1"
@@ -544,7 +544,7 @@ const columns: TableColumn<PassType>[] = [
 
           <UFormField
             v-if="!editing"
-            label="Covers"
+            label="Covered shows"
             name="showIds"
             required
             description="Which shows a pass of this type admits to."
@@ -562,7 +562,7 @@ const columns: TableColumn<PassType>[] = [
 
           <UFormField
             v-else
-            label="Covers"
+            label="Covered shows"
             description="Change these with Covered shows, beside the pass in the list."
           >
             <p
@@ -626,7 +626,7 @@ const columns: TableColumn<PassType>[] = [
           value-key="value"
           multiple
           placeholder="Search the programme"
-          aria-label="Shows"
+          aria-label="Covered shows"
           class="w-full"
           data-test="pass-type-shows-editor"
         />
@@ -638,7 +638,7 @@ const columns: TableColumn<PassType>[] = [
           data-test="save-shows"
           @click="saveShows"
         >
-          Save the shows
+          Save the covered shows
         </UButton>
         <UButton
           color="neutral"
