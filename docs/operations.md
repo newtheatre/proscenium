@@ -440,7 +440,8 @@ hits every row. As it stands:
 | `/mailing-list` | the Mailchimp sign-up form |
 | `/get-involved/creatives` | `/get-involved` |
 | `/get-involved/stagecraft` | `/training/modules` |
-| `/account`, `/account/tab` | `/account/profile` |
+| `/account` | `/my` |
+| `/account/tab` | `/account/bar-tab` |
 | `/account/reservations` | `/qr` |
 | `/account/shifts` | `/rota` |
 | `/backstage` | `/board` |
@@ -996,7 +997,7 @@ rather than writing anything itself. That is what lets the same builders back th
 
 | Not seeded | Why |
 | --- | --- |
-| `totp_secrets`, `recovery_codes`, `passkeys`, `passkey_challenges`, `auth_tokens` | Credential material. A committed secret in a fixture is still a committed secret, and a passkey needs a real authenticator. Enrol a second factor through `/account` instead. |
+| `totp_secrets`, `recovery_codes`, `passkeys`, `passkey_challenges`, `auth_tokens` | Credential material. A committed secret in a fixture is still a committed secret, and a passkey needs a real authenticator. Enrol a second factor through `/account/security` instead. |
 | `rate_limits`, `mfa_attempts` | Transient counters the runtime writes. Seeding them fakes throttling state a developer then has to wait out. |
 | `module_materials` | Every row would be a URL nobody has supplied. `data/catalogue.csv` carries none, and inventing them would put fiction on a training page. |
 
