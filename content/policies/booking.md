@@ -19,7 +19,8 @@ details of yours at any point.
 
 A booking is held unpaid until you pay for it at the desk. An unpaid booking is released
 {{HOLD_RELEASE_MINUTES_BEFORE}} before curtain, and the seats go back on sale. You are reminded
-{{HOLD_REMINDER_MINUTES_BEFORE}} before that happens.
+{{HOLD_REMINDER_MINUTES_BEFORE}} before that happens. Online booking closes at the same moment,
+or earlier if the performance says so; after that, tickets are on the door.
 
 ## Changing your mind
 

@@ -30,31 +30,34 @@ const onSale = (over: Partial<PerformanceSaleState> = {}): PerformanceSaleState 
 // A tenth of the house, which is what the workshop register proposes (docs/workshops.md).
 const LIMITED_PERCENT = 10
 
+// The proposed hold release (docs/workshops.md), which is also where online booking stops.
+const RELEASE = 15
+
 describe('a performance states one of four availabilities (D-101 criterion 2)', () => {
   const morning = new Date(CURTAIN.getTime() - 6 * 3600 * 1000)
 
   test('an empty house with seats left is available', () => {
-    const state = performanceAvailability(onSale(), { capacity: 100, sold: 0 }, LIMITED_PERCENT, morning)
+    const state = performanceAvailability(onSale(), { capacity: 100, sold: 0 }, LIMITED_PERCENT, RELEASE, morning)
     expect(state).toBe('AVAILABLE')
   })
 
   test('the last tenth of the house is limited', () => {
-    expect(performanceAvailability(onSale(), { capacity: 100, sold: 90 }, LIMITED_PERCENT, morning)).toBe('LIMITED')
-    expect(performanceAvailability(onSale(), { capacity: 100, sold: 89 }, LIMITED_PERCENT, morning)).toBe('AVAILABLE')
+    expect(performanceAvailability(onSale(), { capacity: 100, sold: 90 }, LIMITED_PERCENT, RELEASE, morning)).toBe('LIMITED')
+    expect(performanceAvailability(onSale(), { capacity: 100, sold: 89 }, LIMITED_PERCENT, RELEASE, morning)).toBe('AVAILABLE')
   })
 
   test('a full house is sold out, and so is one sold past its capacity', () => {
-    expect(performanceAvailability(onSale(), { capacity: 100, sold: 100 }, LIMITED_PERCENT, morning)).toBe('SOLD_OUT')
-    expect(performanceAvailability(onSale(), { capacity: 100, sold: 104 }, LIMITED_PERCENT, morning)).toBe('SOLD_OUT')
+    expect(performanceAvailability(onSale(), { capacity: 100, sold: 100 }, LIMITED_PERCENT, RELEASE, morning)).toBe('SOLD_OUT')
+    expect(performanceAvailability(onSale(), { capacity: 100, sold: 104 }, LIMITED_PERCENT, RELEASE, morning)).toBe('SOLD_OUT')
   })
 
   test('an uncapped venue is never limited and never sold out', () => {
-    expect(performanceAvailability(onSale(), { capacity: null, sold: 4000 }, LIMITED_PERCENT, morning)).toBe('AVAILABLE')
+    expect(performanceAvailability(onSale(), { capacity: null, sold: 4000 }, LIMITED_PERCENT, RELEASE, morning)).toBe('AVAILABLE')
     expect(remainingSeats({ capacity: null, sold: 4000 })).toBeNull()
   })
 
   test('a closed house sells nothing, however few have bought', () => {
-    expect(performanceAvailability(onSale(), { capacity: 0, sold: 0 }, LIMITED_PERCENT, morning)).toBe('SOLD_OUT')
+    expect(performanceAvailability(onSale(), { capacity: 0, sold: 0 }, LIMITED_PERCENT, RELEASE, morning)).toBe('SOLD_OUT')
   })
 
   // Whatever the seats say, a refusal is the honest answer: the visitor cannot book this one, so
@@ -67,15 +70,22 @@ describe('a performance states one of four availabilities (D-101 criterion 2)', 
       { externalBookingUrl: 'https://tickets.example.org/seagull' },
     ]
     for (const over of refused) {
-      expect(performanceAvailability(onSale(over), { capacity: 100, sold: 0 }, LIMITED_PERCENT, morning)).toBe('BOOKING_CLOSED')
+      expect(performanceAvailability(onSale(over), { capacity: 100, sold: 0 }, LIMITED_PERCENT, RELEASE, morning)).toBe('BOOKING_CLOSED')
     }
   })
 
   test('a performance past its window is booking closed rather than available', () => {
     const performance = onSale({ bookingClosesHoursBefore: 2 })
     const twoHoursBefore = new Date(CURTAIN.getTime() - 2 * 3600 * 1000)
-    expect(performanceAvailability(performance, { capacity: 100, sold: 0 }, LIMITED_PERCENT, twoHoursBefore)).toBe('BOOKING_CLOSED')
-    expect(performanceAvailability(performance, { capacity: 100, sold: 0 }, LIMITED_PERCENT, new Date(twoHoursBefore.getTime() - 1000))).toBe('AVAILABLE')
+    expect(performanceAvailability(performance, { capacity: 100, sold: 0 }, LIMITED_PERCENT, RELEASE, twoHoursBefore)).toBe('BOOKING_CLOSED')
+    expect(performanceAvailability(performance, { capacity: 100, sold: 0 }, LIMITED_PERCENT, RELEASE, new Date(twoHoursBefore.getTime() - 1000))).toBe('AVAILABLE')
+  })
+
+  // Issue 1328: an unset window means curtain, but nothing can be held after the release.
+  test('a performance past its hold release is booking closed although its window is open', () => {
+    const release = new Date(CURTAIN.getTime() - RELEASE * 60_000)
+    expect(performanceAvailability(onSale(), { capacity: 100, sold: 0 }, LIMITED_PERCENT, RELEASE, release)).toBe('BOOKING_CLOSED')
+    expect(performanceAvailability(onSale(), { capacity: 100, sold: 0 }, LIMITED_PERCENT, RELEASE, new Date(release.getTime() - 1000))).toBe('AVAILABLE')
   })
 
   test('each state says something a visitor can act on', () => {

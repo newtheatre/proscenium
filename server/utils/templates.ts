@@ -1665,6 +1665,8 @@ Leave the waiting list: ${removeUrl}
 The Nottingham New Theatre`,
     }
   },
+  // First refusal, never "held": an offer reserves nothing until it is claimed, and it ends at the
+  // online cut-off, after which the door sells the seat (D-113 criterion 2, issue 1328).
   'waiting-list-offered': (context: TemplateContext): Rendered => {
     const show = String(context.show)
     const when = String(context.when)
@@ -1676,15 +1678,16 @@ The Nottingham New Theatre`,
     return {
       subject: one ? `A seat has come free for ${show}` : `Seats have come free for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>${plural(partySize, 'seat')} for ${show}, ${when}, ${one ? 'is' : 'are'} held for you until
-<strong>${expires}</strong>; after that ${one ? 'it passes' : 'they pass'} to the next person on
-the list.</p>
+<p>${plural(partySize, 'seat')} for ${show}, ${when}, ${one ? 'has' : 'have'} come free, and you
+have first refusal until <strong>${expires}</strong>. Nothing is kept for you until you claim;
+after that time ${one ? 'it passes' : 'they pass'} to the next person on the list, or to the door.</p>
 <p><a href="${claimUrl}">Claim my ${one ? 'seat' : 'seats'}</a></p>
 <p>Not coming after all? <a href="${removeUrl}">Leave the waiting list</a>.</p>`),
       text: `Hello ${context.name},
 
-${plural(partySize, 'seat')} for ${show}, ${when}, ${one ? 'is' : 'are'} held for you until
-${expires}; after that ${one ? 'it passes' : 'they pass'} to the next person on the list.
+${plural(partySize, 'seat')} for ${show}, ${when}, ${one ? 'has' : 'have'} come free, and you
+have first refusal until ${expires}. Nothing is kept for you until you claim; after that time
+${one ? 'it passes' : 'they pass'} to the next person on the list, or to the door.
 
 Claim your ${one ? 'seat' : 'seats'}: ${claimUrl}
 

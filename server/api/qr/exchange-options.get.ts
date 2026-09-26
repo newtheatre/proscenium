@@ -8,8 +8,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'This booking can no longer be exchanged here' })
   }
 
-  const limited = await configValue(event, 'LISTING_LIMITED_THRESHOLD_PERCENT')
-  const show = await publicShowBySlug(limited, reservation.showSlug)
+  const show = await publicShowBySlug(await listingRules(event), reservation.showSlug)
   if (!show) throw noSuch('show')
 
   return {

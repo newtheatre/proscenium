@@ -1,7 +1,6 @@
 import { db } from '@nuxthub/db'
 import { MAX_ACCESS_TICKETS_PER_PERFORMANCE, isEntitledToAccessTickets } from '#shared/utils/access-profiles'
 import { remainingSeats, saleRefusal } from '#shared/utils/programme'
-import { resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 
 // Deliberately public: what the booking form needs before it asks for a name and an email
 // (D-104). This route, never the cacheable public listing, is where entitlement is read (D-109 criterion 2).
@@ -10,7 +9,9 @@ export default defineEventHandler(async (event) => {
   const performance = await performanceById(id)
   if (!performance) throw noSuch('performance')
 
-  const saleState = saleRefusal(performance, new Date(), 'CUSTOMER')
+  // The same cut-off the write path refuses at, so the form is refused up front (D-112 criterion 1).
+  const holdReleaseMinutes = await holdReleaseMinutesFor(event, performance)
+  const saleState = saleRefusal(performance, new Date(), 'CUSTOMER', holdReleaseMinutes)
 
   // A full house refuses the form up front rather than at submit, with the same waiting-list
   // offer the show page already makes for the same performance (D-101 criterion 2, D-113).
@@ -62,7 +63,7 @@ export default defineEventHandler(async (event) => {
     cap: await configValue(event, 'PUBLIC_ORDER_SEAT_CAP'),
     // The page quotes the figure it is actually held to, per-show override included, rather than
     // saying "shortly before curtain" (0012, D-106).
-    holdReleaseMinutes: resolveHoldReleaseMinutes(performance.holdReleaseMinutesBefore, await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE')),
+    holdReleaseMinutes,
     ticketTypes: visible,
     accessEntitlement: remaining,
     redeemablePass,

@@ -8,10 +8,10 @@ import { configValue } from './configuration'
 import { saysNoSuch } from '#shared/utils/no-such'
 import { effectiveCapacity, performanceNight } from './performances'
 import { performanceById } from './programme'
-import { bookableTicketTypes, writeReservation } from './reservations'
+import { bookableTicketTypes, holdReleaseMinutesFor, writeReservation } from './reservations'
 import { auditEntry } from '#shared/utils/audit'
-import { saleRefusal } from '#shared/utils/programme'
-import { bornExpiredReason, holdExpiresAt, resolveHoldReleaseMinutes, totalTickets } from '#shared/utils/reservations'
+import { onlineClosesAt, saleRefusal } from '#shared/utils/programme'
+import { holdExpiresAt, totalTickets } from '#shared/utils/reservations'
 import { showNightBounds } from '#shared/utils/show-night'
 import { offerExpiresAt, offerWouldBeBornExpired, partySizeMismatchReason } from '#shared/utils/waiting-list'
 import type { ReservationLineToWrite, WriteReservationResult } from './reservations'
@@ -125,16 +125,20 @@ export async function offerWaitingList(event: H3Event | undefined, performanceId
   let remaining = capacity === null ? Number.POSITIVE_INFINITY : capacity - Number(row?.held ?? 0)
   if (remaining <= 0) return { eligible: 0, offered: [] }
 
-  const windowMinutes = await configValue(event, 'WAITING_LIST_OFFER_WINDOW_MINUTES')
   const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<NextEntryRow>(nextWaitingEntriesQuery(performanceId, cap))
+  if (candidates.length === 0) return { eligible: 0, offered: [] }
+
+  const [windowMinutes, releaseMinutes] = await Promise.all([
+    configValue(event, 'WAITING_LIST_OFFER_WINDOW_MINUTES'),
+    holdReleaseMinutesFor(event, performance),
+  ])
+  const expiresAt = offerExpiresAt(now, windowMinutes, onlineClosesAt(performance, releaseMinutes))
+  if (offerWouldBeBornExpired(expiresAt, now)) return { eligible: candidates.length, offered: [] }
 
   const offered: OfferedWaitingListEntry[] = []
   for (const candidate of candidates) {
     if (candidate.partySize > remaining) break
-
-    const expiresAt = offerExpiresAt(now, windowMinutes, performance.startsAt)
-    if (offerWouldBeBornExpired(expiresAt, now)) continue
 
     const claimed = await db.all<{ id: string }>(offerEntryStatement(candidate.id, now, expiresAt))
     if (claimed.length === 0) continue
@@ -326,14 +330,11 @@ export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEn
   const performance = await performanceById(entry.performanceId)
   if (!performance) return { applied: false, refusal: 'This performance no longer exists' }
 
-  const refusal = saleRefusal(performance, now, 'CUSTOMER')
-  const releaseMinutes = resolveHoldReleaseMinutes(performance.holdReleaseMinutesBefore, await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE'))
-  const expiresAt = holdExpiresAt(performance.startsAt, releaseMinutes)
-  const born = bornExpiredReason(expiresAt, nowSeconds)
-
-  if (refusal || born) {
+  const releaseMinutes = await holdReleaseMinutesFor(event, performance)
+  const refusal = saleRefusal(performance, now, 'CUSTOMER', releaseMinutes)
+  if (refusal) {
     await db.run(sql`UPDATE waiting_list SET status = 'OFFERED', updated_at = unixepoch() WHERE id = ${entry.id} AND status = 'CLAIMED'`)
-    return { applied: false, refusal: refusal?.says ?? born ?? 'This performance can no longer take this booking' }
+    return { applied: false, refusal: refusal.says }
   }
 
   const isMember = await hasCurrentMembership(event, entry.userId, now)
@@ -356,7 +357,7 @@ export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEn
     windowBypassed: false,
     lines,
     capacity,
-    holdExpiresAt: expiresAt,
+    holdExpiresAt: holdExpiresAt(performance.startsAt, releaseMinutes),
   })
 
   if (result.tickets.length < result.requested) {

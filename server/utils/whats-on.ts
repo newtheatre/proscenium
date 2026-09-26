@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { configValue } from './configuration'
 import { warningsForListedShowsQuery } from './content-warnings'
 import { performanceSoldColumn } from './programme'
 import { publicContentWarnings, warningAssessment } from '#shared/utils/content-warnings'
@@ -13,10 +14,12 @@ import {
   remainingSeats,
   saysAvailability,
 } from '#shared/utils/programme'
+import { resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 import { resolvePrice } from '#shared/utils/ticket-types'
 import type { ShowContentWarning } from '#shared/utils/content-warnings'
 import type { ListedPerformance, ListedShow, PublicPrice, PublicShow } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
+import type { H3Event } from 'h3'
 
 // The public programme (D-101, D-102). Every payload here goes through the allow-listed
 // projections in `shared/utils/programme.ts`; no column reaches a visitor without being named.
@@ -82,6 +85,7 @@ interface PerformanceRow {
   showStatus: 'DRAFT' | 'PUBLISHED'
   bookingClosesHoursBefore: number | null
   showBookingClosesHoursBefore: number | null
+  holdReleaseMinutesBefore: number | null
   capacity: number | null
   sold: number
 }
@@ -103,6 +107,7 @@ export function listedPerformancesQuery(scope: SQL, at: number): SQL {
            s.status AS showStatus,
            p.booking_closes_hours_before AS bookingClosesHoursBefore,
            s.booking_closes_hours_before AS showBookingClosesHoursBefore,
+           p.hold_release_minutes_before AS holdReleaseMinutesBefore,
            coalesce(p.capacity_override, v.capacity) AS capacity,
            ${performanceSoldColumn('p')} AS sold
     FROM performances p
@@ -183,7 +188,7 @@ function assemble(
   performances: PerformanceRow[],
   prices: PriceRow[],
   warnings: ShowWarningRow[],
-  limited: number,
+  rules: ListingRules,
   at: Date,
 ): ListedShow[] {
   const pricesFor = new Map<string, PublicPrice[]>()
@@ -203,10 +208,11 @@ function assemble(
 
   const listed = new Map<string, ListedPerformance[]>()
   for (const row of performances) {
-    const projected = publicPerformance(row)
+    const releaseMinutes = resolveHoldReleaseMinutes(row.holdReleaseMinutesBefore, rules.holdReleaseMinutes)
+    const projected = publicPerformance(row, releaseMinutes)
     if (!projected) continue
     const house = { capacity: row.capacity, sold: Number(row.sold) }
-    const availability = performanceAvailability(row, house, limited, at)
+    const availability = performanceAvailability(row, house, rules.limitedPercent, releaseMinutes, at)
     const remaining = remainingSeats(house)
     const held = listed.get(row.showId) ?? []
     held.push({
@@ -265,10 +271,25 @@ export async function headlineSeason(at: Date): Promise<string | null> {
   return row?.name ?? null
 }
 
-// The limited threshold is passed in rather than read here: this file is imported by the test
-// projects, which resolve no Nuxt auto-import, and the routes are where configuration is read.
+// The two figures a listing is judged against. The release is the default a performance's own
+// override inherits (D-106).
+export interface ListingRules {
+  limitedPercent: number
+  holdReleaseMinutes: number
+}
+
+// Read where the request is, so a settings change applies to the next listing (0012). Imported by
+// name, because the test projects load this file and resolve no Nuxt auto-import.
+export async function listingRules(event: H3Event): Promise<ListingRules> {
+  const [limitedPercent, holdReleaseMinutes] = await Promise.all([
+    configValue(event, 'LISTING_LIMITED_THRESHOLD_PERCENT'),
+    configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE'),
+  ])
+  return { limitedPercent, holdReleaseMinutes }
+}
+
 export async function publicListing(
-  limitedPercent: number,
+  rules: ListingRules,
   page: number,
   pageSize: number,
   now: Date = new Date(),
@@ -285,7 +306,7 @@ export async function publicListing(
     db.all<{ total: number }>(countListedShowsQuery(at, venue)),
   ])
 
-  const items = assemble(shows, performances, prices, warnings, limitedPercent, now)
+  const items = assemble(shows, performances, prices, warnings, rules, now)
   return {
     items,
     total: Number(counted[0]?.total ?? 0),
@@ -296,7 +317,7 @@ export async function publicListing(
 // One published show by its public address. A draft show has no public page at all, which is what
 // `publicShow()` answering with nothing means (D-101 criterion 1).
 export async function publicShowBySlug(
-  limitedPercent: number,
+  rules: ListingRules,
   slug: string,
   now: Date = new Date(),
 ): Promise<ListedShow | null> {
@@ -321,5 +342,5 @@ export async function publicShowBySlug(
     db.all<ShowWarningRow>(warningsForListedShowsQuery(scope)),
   ])
 
-  return assemble(shows, performances, prices, warnings, limitedPercent, now)[0] ?? null
+  return assemble(shows, performances, prices, warnings, rules, now)[0] ?? null
 }

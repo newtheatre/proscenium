@@ -8,10 +8,10 @@ export default defineEventHandler(async (event) => {
   const nowSeconds = Math.floor(now.getTime() / 1000)
   const today = londonToday(now)
 
-  const [graceDays, closesHours, limitedPercent, year] = await Promise.all([
+  const [graceDays, closesHours, rules, year] = await Promise.all([
     configValue(event, 'MEMBERSHIP_GRACE_DAYS'),
     configValue(event, 'SESSION_SIGNUP_CLOSES_HOURS'),
-    configValue(event, 'LISTING_LIMITED_THRESHOLD_PERCENT'),
+    listingRules(event),
     academicYear(event),
   ])
 
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
     activePasses(account.id),
     openPassRequest(account.id),
     recentInbox(account.id, 3),
-    publicListing(limitedPercent, 1, 1, now),
+    publicListing(rules, 1, 1, now),
   ])
 
   const nextSignedUpSession = sessions

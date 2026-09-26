@@ -1620,7 +1620,7 @@ to that room. Nothing else about a room is inferred from a venue or the reverse.
 | `performanceNight(curtain: Date \| number): string` | Which show night a performance belongs to. Derived from `showNightOf(curtain)`, so a curtain before 04:00 belongs to the night that began the London day before. A stored curtain is integer seconds; both spellings are accepted. |
 | `performancesOnNight(night, venueId?)` | Every performance whose curtain falls inside the night's bounds, across the whole estate, narrowed by venue only when asked. Ordered by curtain, then venue. Two venues may run at once and one venue may run a matinee and an evening. |
 | `effectiveCapacity(performance)` | The performance's `capacity_override` if it has one, otherwise the venue's capacity. Null is uncapped; an explicit nought is a closed house, so the resolution is by absence and never by falsiness. |
-| `isOnSale(performance, at?, channel?)` | Whether an internal sales path may sell this performance. It is `saleRefusal()` with the reason dropped, so the two can never disagree. |
+| `isOnSale(performance, at?, channel?)` | The window alone, as the desk's bypass record asks it; an online path asks `saleRefusal()` with the hold release (D-112). It is `saleRefusal()` with the reason dropped, so the two can never disagree. |
 
 Ticket types are administered at `/box-office/ticket-types` (D-119), the programme itself at
 `/box-office/shows` (D-121), where D-120's overrides attach, and pass products at
@@ -1660,7 +1660,8 @@ withdrawing and the door's read all live.
 | `publicShow(show)` | The allow-listed columns a visitor may see, or null for a draft. Every public payload goes through it, so a draft show has no thin version to leak (D-121 criterion 1). |
 | `resolveBookingClosesHours(performance, show)` | The window in hours: the performance's own, then the show's default, then curtain-up. NULL means inherit and an explicit nought means this level says curtain-up (D-112 criterion 1). |
 | `bookingClosesAt(startsAt, hours)` | The closing instant, measured back from the curtain in seconds, so the clocks changing never moves it relative to the performance (0014). |
-| `saleRefusal(performance, at?, channel?)` | Why a sales path may not sell, or null. Cancelled, unpublished, off sale, externally ticketed and closed each name themselves; the closed one quotes the time in Europe/London and points at the door. `DESK` bypasses the customer window and nothing else (D-112 criteria 2 and 3). |
+| `saleRefusal(performance, at?, channel?, holdReleaseMinutes?)` | Why a sales path may not sell, or null. Cancelled, unpublished, off sale, externally ticketed and closed each name themselves; the closed one quotes the time in Europe/London and points at the door. `DESK` bypasses the customer window and nothing else (D-112 criteria 2 and 3). Every online path passes the resolved hold release, so a customer is refused from `onlineClosesAt()`; the desk passes none. |
+| `onlineClosesAt(performance, holdReleaseMinutes)` | The one online cut-off: the booking window or the hold release, whichever comes first (D-112 criterion 1, D-106). |
 
 Booking (D-104) is `POST /api/reservations`, `/book/[performanceId]` its one screen.
 `server/utils/reservations.ts` holds the write path: `bookableTicketTypes()` resolves prices the

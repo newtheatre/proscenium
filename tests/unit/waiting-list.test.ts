@@ -13,16 +13,18 @@ import {
 // D-113 as pure rules. The database rule (the active-only unique index, the race-safe claim) is
 // tests/integration/waiting-list.test.ts, against the real migrations.
 
-describe('an offer never outlives its performance (criterion 2)', () => {
+describe('an offer never outlives online booking (criterion 2, issue 1328)', () => {
   const NOW = 1_800_000_000
 
-  test('stands for the configured window when curtain is well ahead', () => {
+  test('stands for the configured window when the cut-off is well ahead', () => {
     expect(offerExpiresAt(NOW, 120, NOW + 100_000)).toBe(NOW + 120 * 60)
   })
 
-  test('is capped at curtain when the window would run past it', () => {
-    const startsAt = NOW + 60 * 60
-    expect(offerExpiresAt(NOW, 120, startsAt)).toBe(startsAt)
+  // The cut-off is the hold release or the booking window, whichever is first: a claim after it
+  // is refused, so an offer standing past it would promise what the write path will not give.
+  test('is capped at the online cut-off when the window would run past it', () => {
+    const closesAt = NOW + 45 * 60
+    expect(offerExpiresAt(NOW, 120, closesAt)).toBe(closesAt)
   })
 
   test('an offer with no time left to stand is born expired', () => {

@@ -10,8 +10,7 @@ export default defineEventHandler(async (event) => {
   // backwards for what the committee has not published yet (D-101 criterion 1).
   if (!slug.success) throw noSuch('show')
 
-  const limited = await configValue(event, 'LISTING_LIMITED_THRESHOLD_PERCENT')
-  const show = await publicShowBySlug(limited, slug.data)
+  const show = await publicShowBySlug(await listingRules(event), slug.data)
   if (!show) throw noSuch('show')
 
   const cacheSeconds = listingCacheSeconds(show.performances.map(one => one.bookingClosesAt))

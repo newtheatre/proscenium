@@ -84,8 +84,8 @@ export function effectiveCapacity(performance: { capacityOverride: number | null
   return performance.capacityOverride ?? performance.venueCapacity
 }
 
-// The one predicate every internal sales path asks. `saleRefusal` is the same answer with the
-// reason attached, which is what a refusal quotes to a customer (D-112, D-121, D-122).
+// The window alone, as the desk's bypass record asks it; an online path asks `saleRefusal` with the
+// hold release (D-112).
 export function isOnSale(performance: PerformanceSaleState, at: Date = new Date(), channel: SalesChannel = 'CUSTOMER'): boolean {
   return saleRefusal(performance, at, channel) === null
 }

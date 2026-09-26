@@ -69,7 +69,7 @@ function query<T>(sql: string, ...parameters: unknown[]): T | undefined {
 async function setUpBookableShow(
   holdReleaseMinutesBefore: number,
   startsAtOffsetMinutes: number,
-): Promise<{ performanceId: string, ticketTypeId: string }> {
+): Promise<{ performanceId: string, ticketTypeId: string, slug: string, startsAt: number }> {
   const title = named('The Seagull')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
   const showId = (await show.json() as { id: string }).id
@@ -87,7 +87,7 @@ async function setUpBookableShow(
 
   expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
 
-  return { performanceId, ticketTypeId }
+  return { performanceId, ticketTypeId, slug: slugged(title), startsAt }
 }
 
 async function bookedHold(
@@ -157,10 +157,10 @@ describe.skipIf(skip !== null)('an unpaid hold releases once past its own expiry
   }, CASE_TIMEOUT_MS)
 })
 
-describe.skipIf(skip !== null)('a booking born already past its release point is refused outright (D-106)', () => {
-  // Thirty minutes out, releasing an hour before curtain: the release point is already past
-  // the moment the reservation would be written, the committee decision this write path enforces.
-  test('the reservation write path refuses rather than creating a doomed hold', async () => {
+// Thirty minutes out, releasing an hour before curtain, with no booking window of its own: the
+// release is already past, so online booking has closed although the window alone says curtain.
+describe.skipIf(skip !== null)('online booking stops at the hold release when that comes first (D-112 criterion 1, issue 1328)', () => {
+  test('the reservation write path refuses naming the time it closed and the door, creating nothing', async () => {
     const { performanceId, ticketTypeId } = await setUpBookableShow(60, 30)
 
     const email = registrableAddress('guest')
@@ -171,11 +171,36 @@ describe.skipIf(skip !== null)('a booking born already past its release point is
     }, '')
 
     expect(answered.status).toBe(409)
+    const says = await answered.text()
+    expect(says).toContain('Online booking closed at')
+    expect(says).toContain('on the door')
 
     const row = query<{ total: number }>(
       'SELECT count(*) AS total FROM reservations WHERE performance_id = ?', performanceId,
     )
     expect(row?.total).toBe(0)
+  }, CASE_TIMEOUT_MS)
+
+  test('the booking screen refuses up front, quoting the release as the moment it closed', async () => {
+    const { performanceId, startsAt } = await setUpBookableShow(60, 30)
+
+    const answered = await send('GET', `/api/performances/${performanceId}/booking`, undefined, '')
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { refusal: { reason: string, closedAt?: number } | null, ticketTypes: unknown[] }
+    expect(body.refusal?.reason).toBe('WINDOW_CLOSED')
+    expect(body.refusal?.closedAt).toBe(startsAt - 60 * 60)
+    expect(body.ticketTypes).toEqual([])
+  }, CASE_TIMEOUT_MS)
+
+  test('the show page says booking closed and closes the performance at the release', async () => {
+    const { performanceId, slug, startsAt } = await setUpBookableShow(60, 30)
+
+    const answered = await send('GET', `/api/shows/${slug}`, undefined, '')
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { performances: { id: string, availability: string, bookingClosesAt: number }[] }
+    const listed = body.performances.find(one => one.id === performanceId)
+    expect(listed?.availability).toBe('BOOKING_CLOSED')
+    expect(listed?.bookingClosesAt).toBe(startsAt - 60 * 60)
   }, CASE_TIMEOUT_MS)
 })
 

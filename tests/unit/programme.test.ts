@@ -4,6 +4,7 @@ import {
   bookingClosesAt,
   bookingWindowSource,
   isPublicPerformance,
+  onlineClosesAt,
   performanceClosesAt,
   performanceForm,
   performanceScreenForm,
@@ -99,15 +100,15 @@ describe('a show is draft until it is published, and a draft is invisible (D-121
       durationMinutes: 120,
       intervalCount: 1,
     }
-    const projected = publicPerformance({ ...performance, ...{ notes: 'the fog machine leaks' } })
+    const projected = publicPerformance({ ...performance, ...{ notes: 'the fog machine leaks' } }, 15)
     expect(projected?.bookingClosesAt).toBe(seconds(CURTAIN) - 7200)
     expect(Object.keys(projected ?? {}).sort()).toEqual([
       'bookingClosesAt', 'cancelled', 'doorsAt', 'durationMinutes', 'externalBookingUrl',
       'id', 'intervalCount', 'intervalMinutes', 'startsAt', 'venueName',
     ])
 
-    expect(publicPerformance({ ...performance, status: 'DRAFT' })).toBeNull()
-    expect(publicPerformance({ ...performance, status: 'CANCELLED' })?.cancelled).toBe(true)
+    expect(publicPerformance({ ...performance, status: 'DRAFT' }, 15)).toBeNull()
+    expect(publicPerformance({ ...performance, status: 'CANCELLED' }, 15)?.cancelled).toBe(true)
   })
 
   test('a slug is lowercase words joined by hyphens, and the form refuses anything else', () => {
@@ -277,6 +278,56 @@ describe('a closed window refuses quoting the time it closed (D-112 criterion 2)
   test('a cancellation is stated ahead of the show being unpublished', () => {
     const both = performance({ status: 'CANCELLED', showStatus: 'DRAFT' })
     expect(saleRefusal(both, new Date(CURTAIN.getTime() - 86_400_000))?.reason).toBe('CANCELLED')
+  })
+})
+
+describe('online booking stops at one cut-off, the window or the hold release (D-112 criterion 1)', () => {
+  const performance = (over: Partial<PerformanceSaleState> = {}): PerformanceSaleState => ({
+    status: 'ON_SALE',
+    showStatus: 'PUBLISHED',
+    startsAt: seconds(CURTAIN),
+    bookingClosesHoursBefore: null,
+    showBookingClosesHoursBefore: null,
+    externalBookingUrl: null,
+    ...over,
+  })
+
+  const release = new Date(CURTAIN.getTime() - 15 * 60_000)
+
+  test('a hold release before the window is the cut-off', () => {
+    expect(onlineClosesAt(performance(), 15)).toBe(seconds(release))
+  })
+
+  test('a window before the hold release is the cut-off', () => {
+    expect(onlineClosesAt(performance({ showBookingClosesHoursBefore: 2 }), 15)).toBe(seconds(CURTAIN) - 7200)
+  })
+
+  // Issue 1328: the listing asked the window alone while the write path refused at the release, so
+  // What's on said tickets were available and Book then refused.
+  test('an online path is refused from the release, quoting it in London and naming the door', () => {
+    expect(saleRefusal(performance(), new Date(release.getTime() - 1000), 'CUSTOMER', 15)).toBeNull()
+    const refused = saleRefusal(performance(), release, 'CUSTOMER', 15)
+    expect(refused?.reason).toBe('WINDOW_CLOSED')
+    expect(refused?.closedAt).toBe(seconds(release))
+    expect(refused?.says).toContain('Online booking closed at')
+    expect(refused?.says).toContain('19:15')
+    expect(refused?.says).toContain('on the door')
+  })
+
+  test('the desk sells after the release exactly as it sells after the window', () => {
+    expect(saleRefusal(performance(), new Date(CURTAIN.getTime() - 60_000), 'DESK', 15)).toBeNull()
+  })
+
+  test('the public projection closes at the cut-off, so the listing cannot disagree with the form', () => {
+    const projected = publicPerformance({
+      ...performance(),
+      id: 'p1',
+      venueName: 'The Nottingham New Theatre',
+      doorsAt: null,
+      durationMinutes: null,
+      intervalCount: 0,
+    }, 15)
+    expect(projected?.bookingClosesAt).toBe(seconds(release))
   })
 })
 

@@ -45,14 +45,14 @@ export const claimWaitingListOfferForm = z.strictObject({
 
 export type ClaimWaitingListOfferInput = z.output<typeof claimWaitingListOfferForm>
 
-// An offer never outlives the performance it is for, whatever the configured window says: a link
-// promising a seat for a show already under way is nonsense (criterion 2 interpretation, 0014).
-export function offerExpiresAt(now: number, windowMinutes: number, startsAt: number): number {
-  return Math.min(now + windowMinutes * 60, startsAt)
+// An offer never outlives online booking, whatever the configured window says: a claim after the
+// cut-off is refused, so first refusal ends there and the door sells the seat (D-113 criterion 2).
+export function offerExpiresAt(now: number, windowMinutes: number, closesAt: number): number {
+  return Math.min(now + windowMinutes * 60, closesAt)
 }
 
-// Mirrors `bornExpiredReason` (D-106): an offer with no time left to stand is not made at all,
-// left `WAITING` for the next sweep to reconsider rather than offered and immediately lapsed.
+// An offer with no time left to stand is not made at all, left `WAITING` for the next sweep to
+// reconsider rather than offered and immediately lapsed.
 export function offerWouldBeBornExpired(expiresAt: number, now: number): boolean {
   return expiresAt <= now
 }

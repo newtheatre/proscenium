@@ -544,8 +544,8 @@ finished run drops off the listing with nothing to sweep.
 
 **Availability is one of four states, computed server-side.** `performanceAvailability()` asks
 `saleRefusal()` first, so anything the sales path would refuse (cancelled, off sale, unpublished,
-externally ticketed, past its window) reads BOOKING_CLOSED rather than offering a button that would
-409. Otherwise it is SOLD_OUT at nought seats left, LIMITED at or below
+externally ticketed, past its online cut-off) reads BOOKING_CLOSED rather than offering a button
+that would 409. Otherwise it is SOLD_OUT at nought seats left, LIMITED at or below
 `LISTING_LIMITED_THRESHOLD_PERCENT` of the house, and AVAILABLE above that. An uncapped venue is
 never limited and never sold out. The seats taken come from `PERFORMANCE_REFERENCES`, which counts
 real rows in `tickets` now that D-104 has classified it. The number of seats left is carried only
@@ -558,14 +558,25 @@ independently, null meaning inherit at each level. The listing's price query exc
 types, both access kinds and pass admissions in SQL as well as in the projection.
 
 **The listing caches until the next thing that changes it** (D-112 criterion 4, 0045). Both routes
-set `Cache-Control` from `listingCacheSeconds()`, which expires no later than the earliest booking
-window in the payload closing, capped at five minutes.
+set `Cache-Control` from `listingCacheSeconds()`, which expires no later than the earliest online
+cut-off in the payload, capped at five minutes.
 
 **The booking window resolves performance, then show, then curtain-up** (D-112 criterion 1), the
 same NULL-means-inherit rule the price overrides use, so an explicit nought at either level is
 that level saying curtain-up rather than an absent value. `resolveBookingClosesHours()`,
 `bookingClosesAt()` and `saleRefusal()` in `shared/utils/programme.ts` are the only readings of
 it. There is no configuration key beneath the show: two levels are what the story asks for.
+
+**Online booking stops at one cut-off** (D-112 criterion 1, issue 1328). `onlineClosesAt()` is the
+booking window or the hold release (`holdExpiresAt()` against the performance's own
+`hold_release_minutes_before`, else `HOLD_RELEASE_MINUTES_BEFORE`), whichever comes first, since a
+hold made after its own release would be released the moment it was made. Every online path passes
+the resolved release to `saleRefusal()` (`holdReleaseMinutesFor()` in
+`server/utils/reservations.ts`), so the listing, the booking screen, the reservation write path,
+the self-service edit and exchange, and the waiting list all refuse at the same instant, and a
+public performance's `bookingClosesAt` is that cut-off. The listing routes read both figures with
+`listingRules()`. The desk passes no release: its `window_bypassed` record asks about the window
+alone.
 
 ## Ticketing (module D)
 
@@ -903,9 +914,12 @@ race-safe statement first, and only learns the reservation id afterward from a s
 `WAITING` entries oldest first, budgeted against `capacity` minus what `heldSeatsQuery()` already
 reports held, and stops the moment the next entry's party does not fit rather than skipping ahead
 to a smaller one further down the queue. Each offer's window is
-`WAITING_LIST_OFFER_WINDOW_MINUTES`, capped at the performance's own `starts_at` so an offer never
-promises a seat for a show already under way. Every seat-freeing write offers inline once it
-commits: `releaseExpiredHolds()` (D-106), the self-service cancel (`POST /api/qr/cancel`, D-110),
+`WAITING_LIST_OFFER_WINDOW_MINUTES`, capped at the online cut-off (`onlineClosesAt()`, issue 1328)
+so an offer never promises what the claim would refuse, and an offer that would stand for no time
+at all is not made. A hold the release frees is therefore never offered: the door sells it. An
+offer reserves nothing until it is claimed, so the email and the entry page call it first refusal,
+never held. Every seat-freeing write offers inline once it commits: `releaseExpiredHolds()`
+(D-106), the self-service cancel (`POST /api/qr/cancel`, D-110),
 a desk refund (`POST /api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund`, D-116) and
 a raised capacity (`PUT /api/admin/performances/[id]`). The `waiting-list:sweep` task (every ten
 minutes) lapses offers past their window and re-offers the seat each lapse gives back, the one
@@ -921,7 +935,8 @@ again at that exact moment. A failed write (capacity gone in the interim) reopen
 
 **Tokens and routes.** `waitingListTokenFor()`/`verifyWaitingListToken()`
 (`server/utils/waiting-list-tokens.ts`) are D-108's QR scheme again, HMAC over the entry id alone
-(`NUXT_WAITING_LIST_TOKEN_SECRET`). `POST /api/performances/[id]/waiting-list` joins; `GET
+(`NUXT_WAITING_LIST_TOKEN_SECRET`). `POST /api/performances/[id]/waiting-list` joins, refused
+past the online cut-off since nothing could be offered from it; `GET
 /api/waiting-list/[token]` shows the entry's state and, while an offer stands, the ticket types it
 may be claimed against; `POST /api/waiting-list/[token]/claim` claims; `POST
 /api/waiting-list/[token]/remove` leaves the list, accepted at any time except once claimed, and

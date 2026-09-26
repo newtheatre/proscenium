@@ -2,14 +2,16 @@
 import { saysNoSuch } from '#shared/utils/no-such'
 import { saysWhenLong } from '#shared/utils/when'
 import { MAX_PARTY_SIZE, waitingListGuestJoinForm, waitingListPartyForm } from '#shared/utils/waiting-list'
+import type { SaleRefusalReason } from '#shared/utils/programme'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
-// Join the waiting list for a performance (D-113 criteria 1 and 6). No availability check here: a
-// join is refused server-side only by a duplicate, never by whether the house happens to be full.
+// Join the waiting list for a performance (D-113 criteria 1 and 6). A full house never refuses a
+// join; online booking having closed does, since nothing is offered after it (issue 1328).
 
 interface BookingInfo {
   show: { slug: string, title: string }
   performance: { startsAt: number, venueName: string }
+  refusal: { reason: SaleRefusalReason | 'SOLD_OUT', says: string } | null
 }
 
 const route = useRoute()
@@ -25,6 +27,8 @@ if (!data.value) {
 }
 
 const when = computed(() => saysWhenLong(data.value!.performance.startsAt))
+
+const closed = computed(() => (data.value?.refusal?.reason === 'WINDOW_CLOSED' ? data.value.refusal.says : null))
 
 const schema = computed(() => (account.value.signedIn ? waitingListPartyForm : waitingListGuestJoinForm))
 
@@ -113,6 +117,26 @@ useSeoMeta({
         variant="link"
       >
         Back to what's on
+      </UButton>
+    </div>
+
+    <div
+      v-else-if="closed"
+      class="mt-8 space-y-3"
+    >
+      <UAlert
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-ticket-x"
+        title="Online booking has closed"
+        :description="closed"
+        data-test="waiting-list-closed"
+      />
+      <UButton
+        :to="`/shows/${data!.show.slug}`"
+        variant="link"
+      >
+        Back to {{ data!.show.title }}
       </UButton>
     </div>
 

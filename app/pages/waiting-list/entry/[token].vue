@@ -103,7 +103,7 @@ async function leave(): Promise<void> {
 // An offer standing right now costs the next person their turn; a plain place on the list does
 // not, so the consequence says which it is (D-113 criteria 3 and 6).
 const leaveConsequence = computed(() => (data.value?.status === 'OFFERED'
-  ? 'The seat held for you goes to the next person on the list, and this link stops working.'
+  ? 'Your first refusal on the seat passes to the next person on the list, or to the door, and this link stops working.'
   : 'Your place on the list goes, and we stop emailing you about this performance.'))
 
 useSeoMeta({ title: 'Your waiting-list entry' })
@@ -160,7 +160,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         variant="subtle"
         icon="i-lucide-clock"
         title="A seat is free"
-        :description="`Held for you until ${saysWhenLong(data!.offerExpiresAt)}.`"
+        :description="`You have first refusal until ${saysWhenLong(data!.offerExpiresAt)}. Nothing is kept for you until you claim.`"
       />
 
       <p
@@ -261,7 +261,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         color="neutral"
         variant="subtle"
         :description="data!.status === 'LAPSED'
-          ? 'This offer lapsed and passed to the next person on the list. Contact the box office if you still want to attend.'
+          ? 'This offer lapsed and passed to the next person on the list, or to the door. Contact the box office if you still want to attend.'
           : data!.status === 'CLAIMED'
             ? 'These seats have already been claimed.'
             : 'You already left this waiting list.'"
