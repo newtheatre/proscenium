@@ -304,7 +304,9 @@ const movementFields = z.object({
   qty: z.number().int().refine(value => value !== 0, 'A movement of nothing is not a movement')
     .refine(value => Math.abs(value) <= MAX_MOVEMENT_QTY, 'That quantity is larger than the bar holds'),
   reason: z.enum(MOVEMENT_REASONS).nullish(),
-  unitCostPence: z.number().int().nonnegative().max(MAX_UNIT_COST_PENCE).nullish(),
+  // What the delivery was bought at, the way the screen asked for it; the route decides how it is
+  // kept from the item itself (deliveryCostBasis, 0100).
+  costPence: z.number().int().nonnegative().max(MAX_UNIT_COST_PENCE).nullish(),
   reversesId: z.string().trim().min(1, 'Say which movement it reverses').nullish(),
 })
 
@@ -325,9 +327,9 @@ function refuseUnpairedReason(value: { kind: StockMovementKind, reason?: Movemen
 
 export const movementForm = movementFields.superRefine(refuseUnpairedReason)
 
-// What the stock screen's own modal holds. A form validates its whole state, so a screen that is
-// not about one stocked item cannot be validated against the schema that names one.
-export const movementEntryForm = movementFields.omit({ itemId: true, reversesId: true }).refine(
+// What the stock screen's own modal holds: not the item, which it is about, nor the cost, which
+// it asks in pounds beside the form. A form validates its whole state, so these stay out.
+export const movementEntryForm = movementFields.omit({ itemId: true, reversesId: true, costPence: true }).refine(
   value => !KINDS_NEEDING_A_REASON.includes(value.kind) || Boolean(value.reason),
   { message: 'That needs a reason', path: ['reason'] },
 ).superRefine(refuseUnpairedReason)
@@ -423,7 +425,7 @@ const setupItemForm = z.discriminatedUnion('mode', [
 
 const setupDeliveryForm = z.object({
   qty: z.number().int().positive('A delivery is a quantity of something').max(MAX_MOVEMENT_QTY),
-  unitCostPence: z.number().int().nonnegative().max(MAX_UNIT_COST_PENCE).nullish(),
+  costPence: z.number().int().nonnegative().max(MAX_UNIT_COST_PENCE).nullish(),
 })
 
 const setupChoiceForm = z.object({
@@ -625,7 +627,15 @@ export interface StockItem {
   pouredBy: { id: string, name: string }[]
 }
 
-export interface StockMovement {
+// How a delivery's cost is kept (0100): what one unit cost, or what one container cost with what
+// it held, divided only when read.
+export interface DeliveryCost {
+  unitCostPence: number | null
+  containerCostPence: number | null
+  containerQty: number | null
+}
+
+export interface StockMovement extends DeliveryCost {
   id: string
   itemId: string
   itemName: string
@@ -633,7 +643,6 @@ export interface StockMovement {
   qty: number
   kind: StockMovementKind
   reason: MovementReason | null
-  unitCostPence: number | null
   refTable: string | null
   refId: string | null
   reversesId: string | null
@@ -756,6 +765,58 @@ export function saysQuantity(qty: number, unit: StockUnit): string {
 // Negative reads as minus-sign-before-currency, never a bare hyphen glued to the pound sign (#908).
 export function saysMoney(pence: number): string {
   return pence < 0 ? `−£${(-pence / 100).toFixed(2)}` : `£${(pence / 100).toFixed(2)}`
+}
+
+// The field takes pounds and a request carries pence, converted at this one boundary (0004).
+export const asPence = (pounds: number | null | undefined): number | null =>
+  (pounds === null || pounds === undefined ? null : Math.round(pounds * 100))
+export const asPounds = (pence: number | null | undefined): number | null =>
+  (pence === null || pence === undefined ? null : pence / 100)
+
+// How a delivery is priced, the way it is bought (0100): a whole item by the one, a measured item
+// by its container, or by the whole delivery where it has no one container size.
+export type DeliveryCostBasis = 'UNIT' | 'CONTAINER' | 'DELIVERY'
+
+export function deliveryCostBasis(item: { unit: StockUnit, containerMl: number | null }): DeliveryCostBasis {
+  if (item.unit === 'ITEM') return 'UNIT'
+  return item.containerMl ? 'CONTAINER' : 'DELIVERY'
+}
+
+// What every screen that takes a delivery's cost asks, one wording for each basis.
+export const DELIVERY_COST_QUESTION: Record<DeliveryCostBasis, { label: string, description: string }> = {
+  UNIT: {
+    label: 'Cost of one',
+    description: 'In pounds, what one of them cost. Gross profit is measured against it.',
+  },
+  CONTAINER: {
+    label: 'Cost of one container',
+    description: 'In pounds, what one whole bottle or keg cost. It is kept as typed and divided only when a report reads it.',
+  },
+  DELIVERY: {
+    label: 'Cost of the whole delivery',
+    description: 'In pounds, what everything in this delivery cost, since the item has no one container size.',
+  },
+}
+
+// What a route keeps a delivery's cost as, from the one figure the screen asked for.
+export function deliveryCost(item: { unit: StockUnit, containerMl: number | null }, qty: number, pence: number | null): DeliveryCost {
+  if (pence === null) return { unitCostPence: null, containerCostPence: null, containerQty: null }
+  switch (deliveryCostBasis(item)) {
+    case 'UNIT': return { unitCostPence: pence, containerCostPence: null, containerQty: null }
+    case 'CONTAINER': return { unitCostPence: null, containerCostPence: pence, containerQty: item.containerMl }
+    case 'DELIVERY': return { unitCostPence: null, containerCostPence: pence, containerQty: qty }
+  }
+}
+
+// The history reads a cost back in the terms it was bought in, never as a divided figure.
+export function saysDeliveryCost(movement: DeliveryCost & { unit: StockUnit }): string {
+  if (movement.containerCostPence !== null && movement.containerQty !== null) {
+    return `${saysMoney(movement.containerCostPence)} for ${saysQuantity(movement.containerQty, movement.unit)}`
+  }
+  if (movement.unitCostPence !== null) {
+    return `${saysMoney(movement.unitCostPence)} ${movement.unit === 'ML' ? 'a ml' : 'each'}`
+  }
+  return ''
 }
 
 export type StockStatus = 'OUT' | 'BELOW_PAR' | 'OK'

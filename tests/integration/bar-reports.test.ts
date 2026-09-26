@@ -181,6 +181,70 @@ describe('the cost basis is the weighted average of the deliveries that stand (F
   })
 })
 
+// Decision 0100 (issue 1320): whole pence a millilitre kept a £6.50 bottle as £7.50 and a £1.20
+// mixer as nothing, so the container's cost is held and divided only when a figure is read.
+describe('a container cost is divided when it is read, not when it is kept (0100)', () => {
+  function containerDelivery(database: TestDatabase, id: string, itemId: string, qty: number, costPence: number, containerQty: number): void {
+    insert(database, 'stock_movements', {
+      id,
+      item_id: itemId,
+      qty,
+      kind: 'DELIVERY',
+      container_cost_pence: costPence,
+      container_qty: containerQty,
+      created_at: BEFORE,
+    })
+  }
+
+  test('a glass of a £6.50 bottle costs its share of £6.50, not of £7.50', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      containerDelivery(database, 'd-1', itemId, 4500, 650, 750)
+      const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
+      depletion(database, 'm-1', itemId, 175, 'SALE', sale, INSIDE)
+
+      // 175 * 650 / 750 = 151.67, rounded once where it is read; a penny a ml would say 175.
+      expect(depleted(database)[0]?.costPence).toBe(152)
+    })
+  })
+
+  test('a £1.20 mixer costs something rather than nothing', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      containerDelivery(database, 'd-1', itemId, 2000, 120, 2000)
+      const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
+      depletion(database, 'm-1', itemId, 250, 'SALE', sale, INSIDE)
+
+      expect(depleted(database)[0]?.costPence).toBe(15)
+    })
+  })
+
+  test('a container delivery and an older unit-cost one average by quantity, and no row is rescaled', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 700, 2)
+      containerDelivery(database, 'd-2', itemId, 700, 700, 700)
+      const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
+      depletion(database, 'm-1', itemId, 100, 'SALE', sale, INSIDE)
+
+      // (700 * 2 + 700 * 1) / 1400 = 1.5p a ml over 100 ml.
+      expect(depleted(database)[0]?.costPence).toBe(150)
+      expect(rows(database, `SELECT unit_cost_pence FROM stock_movements WHERE id = 'd-1'`)).toEqual([{ unit_cost_pence: 2 }])
+    })
+  })
+
+  test('wastage is valued on the same divided basis', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      containerDelivery(database, 'd-1', itemId, 4500, 650, 750)
+      insert(database, 'stock_movements', { id: 'w-1', item_id: itemId, qty: -750, kind: 'WASTAGE', reason: 'BREAKAGE', created_at: INSIDE })
+
+      const [wasted] = read<{ costPence: number }>(database, wastageQuery(FROM_AT, TO_AT))
+      expect(wasted?.costPence).toBe(650)
+    })
+  })
+})
+
 describe('revenue and cost run on one clock (F-119 criterion 1, 0014)', () => {
   test('a sale recorded late keeps its revenue and its cost in the same period', async () => {
     await withDatabase((database) => {

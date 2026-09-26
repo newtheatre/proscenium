@@ -348,8 +348,14 @@ Open questions:
      movement referencing the original.
   5. Every movement stamps its actor (or system), timestamp and source document (delivery, sale
      line, stocktake), so any on-hand figure can be audited to its causes.
-  6. Deliveries record cost, giving GP reporting (F-119) its cost basis.
-- Source: Prompt Book F-2, P2; audit PR-12; Get-In part 5 (trigger-enforced append-only).
+  6. Deliveries record cost, giving GP reporting (F-119) its cost basis. Amended 26 September
+     2026 (issue 1320, decision 0100): a delivery of a measured item records what one container
+     cost, in whole pence, and what that container held (or what the whole delivery cost, where
+     the item has no one container size); a whole item records its cost a unit. The cost is
+     divided only when a report reads it, and no row is ever stored or rescaled as a divided
+     figure.
+- Source: Prompt Book F-2, P2; audit PR-12; Get-In part 5 (trigger-enforced append-only); issue
+  1320 (whole pence a millilitre kept a £6.50 bottle as £7.50).
 
 ## F-115: Stocktakes with blank-versus-zero and atomic apply
 

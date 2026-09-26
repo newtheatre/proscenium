@@ -288,9 +288,15 @@ describe('one payload per shape, validated before anything is written (F-127 cri
   })
 
   test('an opening delivery is optional, positive and costed in pence', () => {
-    expect(aSimple({ opening: { qty: 24, unitCostPence: 95 } }).success).toBe(true)
+    expect(aSimple({ opening: { qty: 24, costPence: 95 } }).success).toBe(true)
     expect(aSimple({ opening: null }).success).toBe(true)
     expect(aSimple({ opening: { qty: 0 } }).success).toBe(false)
     expect(aSimple({ opening: { qty: -24 } }).success).toBe(false)
+  })
+
+  // Decision 0100 (issue 1320): the opening delivery sends the one figure asked, whole pence.
+  test('an opening delivery by measure is costed in whole pence, as the screen asked', () => {
+    expect(aMeasured({ opening: { qty: 4500, costPence: 650 } }).success).toBe(true)
+    expect(aMeasured({ opening: { qty: 4500, costPence: 6.5 } }).success).toBe(false)
   })
 })

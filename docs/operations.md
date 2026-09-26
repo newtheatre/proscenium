@@ -539,9 +539,9 @@ batch). No second screen, and no import step precedes it.
 **Record what the opening stock cost first, where that is known** (0080). Gross profit prices
 depletion from the deliveries an item has had, so stock counted in with no delivery behind it has
 no cost and the first weeks read as pure profit. Enter the opening stock as a delivery with its
-unit cost, then let the count confirm it: an item whose count agrees with the delivery posts no
-adjustment at all. Where the cost is genuinely unknown, the count stands alone and that item's
-cost basis starts at its next delivery.
+cost, a bottle's or a keg's price for anything measured (0100), then let the count confirm it:
+an item whose count agrees with the delivery posts no adjustment at all. Where the cost is
+genuinely unknown, the count stands alone and that item's cost basis starts at its next delivery.
 
 **Count everything.** An item nobody counts stays at nought, and the first sale of it is refused
 outright by the trigger that keeps on-hand from going negative. The stocktake screen lists what is

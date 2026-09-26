@@ -4,7 +4,10 @@ import {
   HAND_ENTERED_KINDS,
   REASONS_BY_KIND,
   STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
+  DELIVERY_COST_QUESTION,
   STOCK_UNITS,
+  asPence,
+  deliveryCostBasis,
   movementEntryForm,
   says,
   saysQuantity,
@@ -66,7 +69,6 @@ interface MovementState {
   kind: HandEnteredKind
   qty: number
   reason?: MovementReason
-  unitCostPence?: number
   // An adjustment goes either way: stock is found as often as it is lost.
   adds: boolean
 }
@@ -86,29 +88,12 @@ watch(() => movement.kind, () => {
 })
 const directionOptions = [{ label: 'Add to stock', value: true }, { label: 'Take off stock', value: false }]
 
-// The field takes pounds and the request carries pence, converted here and nowhere else (0004).
 // Undefined stays undefined: a delivery whose cost nobody entered records none rather than nought.
-const pounds = computed({
-  get: () => (movement.unitCostPence === undefined ? undefined : movement.unitCostPence / 100),
-  set: (value: number | undefined) => {
-    movement.unitCostPence = value === undefined ? undefined : Math.round(value * 100)
-  },
-})
+const costPounds = ref<number | undefined>(undefined)
 
-// A ticket price is per bottle or keg, not per millilitre nobody has ever priced by hand
-// (F-114 criterion 6): asked in the unit the manager actually holds, the container.
-const byContainer = computed(() => moving.value?.unit === 'ML' && Boolean(moving.value?.containerMl))
-
-// Converted once, at the pounds-per-container to pence-per-ml boundary, the same rule as
-// `pounds` above: never redisplayed and redivided as the figure is edited.
-const containerPounds = ref<number | undefined>(undefined)
-
-// A whole penny a ml is the ledger's own limit (unit_cost_pence is an integer, 0004): the same
-// figure a manager dividing by hand would have had to settle for typing directly.
-watch(containerPounds, (value) => {
-  const size = moving.value?.containerMl
-  movement.unitCostPence = value === undefined || !size ? undefined : Math.round((value * 100) / size)
-})
+// Asked the way the item is bought, never per millilitre (F-114 criterion 6); the route keeps it
+// that way and a report divides it only when read (0100).
+const costQuestion = computed(() => (moving.value ? DELIVERY_COST_QUESTION[deliveryCostBasis(moving.value)] : null))
 
 async function reload(): Promise<void> {
   await refresh()
@@ -131,8 +116,8 @@ function edit(item: StockItem | null): void {
 
 function moveStock(item: StockItem): void {
   moving.value = item
-  Object.assign(movement, { kind: 'DELIVERY', qty: 1, reason: undefined, unitCostPence: undefined, adds: true })
-  containerPounds.value = undefined
+  Object.assign(movement, { kind: 'DELIVERY', qty: 1, reason: undefined, adds: true })
+  costPounds.value = undefined
 }
 
 async function save(): Promise<void> {
@@ -186,7 +171,7 @@ async function record(): Promise<void> {
         kind: movement.kind,
         qty: signedQty.value,
         reason: movement.reason ?? null,
-        unitCostPence: movement.kind === 'DELIVERY' ? movement.unitCostPence ?? null : null,
+        costPence: movement.kind === 'DELIVERY' ? asPence(costPounds.value) : null,
       },
     })
     toast.add({
@@ -683,29 +668,12 @@ const columns: TableColumn<StockItem>[] = [
           </UFormField>
 
           <UFormField
-            v-if="movement.kind === 'DELIVERY' && byContainer"
-            label="Cost a container"
-            name="unitCostPence"
-            :description="`In pounds, for the whole ${moving?.containerMl} ml container. Divided to a cost per ml, what gross profit is measured against.`"
+            v-if="movement.kind === 'DELIVERY' && costQuestion"
+            :label="costQuestion.label"
+            :description="costQuestion.description"
           >
             <UInputNumber
-              v-model="containerPounds"
-              :min="0"
-              :step="0.01"
-              :format-options="{ style: 'currency', currency: 'GBP' }"
-              class="w-full"
-              data-test="movement-cost"
-            />
-          </UFormField>
-
-          <UFormField
-            v-else-if="movement.kind === 'DELIVERY'"
-            label="Cost a unit"
-            name="unitCostPence"
-            description="In pounds, for what was actually paid. This is what gross profit is measured against."
-          >
-            <UInputNumber
-              v-model="pounds"
+              v-model="costPounds"
               :min="0"
               :step="0.01"
               :format-options="{ style: 'currency', currency: 'GBP' }"

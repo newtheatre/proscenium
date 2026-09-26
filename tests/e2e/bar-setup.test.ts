@@ -322,3 +322,44 @@ describe.skipIf(skip !== null)('the product\'s age flag follows what it pours (i
     }
   }, 120_000)
 })
+
+// Decision 0100 (issue 1320): the set-up sent a bottle's price as the price of each millilitre,
+// so a measured opening delivery asks and keeps the container's cost.
+describe.skipIf(skip !== null)('an opening delivery by measure is costed by the container (0100)', () => {
+  test('six bottles at £6.50 each are kept as £6.50 for 750 ml', async () => {
+    const categoryName = named('Wine')
+    await aCategory(categoryName)
+    const productName = named('House red')
+    const itemName = named('House red 750ml')
+
+    const view = await signedInBarManager()
+    try {
+      await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, '[data-test="shape-measured"]')
+      await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
+
+      await fill(view, '[data-test="setup-name"]', productName)
+      await pickOption(view, '[data-test="setup-category"]', categoryName)
+      await waitFor(view, `document.querySelector('[data-test="size-125ml"]')`)
+      await fill(view, '[data-test="setup-item-name"]', itemName)
+      for (const [kind, pounds] of [['bottle', '14'], ['250ml', '5'], ['175ml', '4'], ['125ml', '3']] as const) {
+        await fillNumber(view, `[data-test="size-price-${kind}"]`, pounds)
+      }
+      await click(view, '[data-test="setup-opening"]')
+      await waitFor(view, `document.querySelector('[data-test="setup-opening-cost"]')`)
+      expect(await textOf(view, '[data-test="setup-form"]')).toContain('Cost of one container')
+      await fillNumber(view, '[data-test="setup-opening-qty"]', '4500')
+      await fillNumber(view, '[data-test="setup-opening-cost"]', '6.5')
+
+      await click(view, '[data-test="setup-submit"]')
+      await waitFor(view, `location.pathname.startsWith('/bar/products/') && !location.pathname.endsWith('/new')`, 30_000)
+
+      const answered = await send('GET', `/api/admin/bar/movements?search=${encodeURIComponent(itemName)}`)
+      const { items } = await answered.json() as { items: { qty: number, unitCostPence: number | null, containerCostPence: number | null, containerQty: number | null }[] }
+      expect(items).toEqual([expect.objectContaining({ qty: 4500, unitCostPence: null, containerCostPence: 650, containerQty: 750 })])
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+})

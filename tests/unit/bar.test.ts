@@ -8,13 +8,17 @@ import {
   STOCK_MOVEMENT_KINDS,
   categoryForm,
   categoryPriceForm,
+  DELIVERY_COST_QUESTION,
   componentsForm,
+  deliveryCost,
+  deliveryCostBasis,
   effectivePriceRow,
   movementEntryForm,
   movementForm,
   priceRef,
   productForm,
   says,
+  saysDeliveryCost,
   saysMoney,
   saysQuantity,
   saysStockStatus,
@@ -93,8 +97,16 @@ describe('a movement is signed, explained and costed where it should be', () => 
   })
 
   test('a cost is whole pence and never a fraction of one', () => {
-    expect(aMovement({ unitCostPence: 4.8 }).success).toBe(false)
-    expect(aMovement({ unitCostPence: 480 }).success).toBe(true)
+    expect(aMovement({ costPence: 4.8 }).success).toBe(false)
+    expect(aMovement({ costPence: 480 }).success).toBe(true)
+  })
+
+  // Decision 0100 (issue 1320): the screen sends one figure, what was paid, and the route decides
+  // how it is kept, so no caller can send a price a millilitre any more.
+  test('a delivery sends one cost, never a unit or a container cost of its own', () => {
+    const parsed = movementForm.safeParse({ itemId: 'item-1', kind: 'DELIVERY', qty: 750, unitCostPence: 1, containerCostPence: 650 })
+    expect(parsed.success && Object.keys(parsed.data)).not.toContain('unitCostPence')
+    expect(parsed.success && Object.keys(parsed.data)).not.toContain('containerCostPence')
   })
 
   // A form validates its whole state, so a modal about one item cannot be held to the schema that
@@ -348,5 +360,44 @@ describe('there is one way to create a product', () => {
     const source = await Bun.file('app/pages/bar/products/index.vue').text()
     expect(source).toContain('data-test="set-up-product"')
     expect(source).not.toContain('data-test="add-product"')
+  })
+})
+
+// Decision 0100 (issue 1320): what a screen records a delivery's cost as, and how the history
+// reads it back, in the terms the stock was bought in.
+describe('a delivery is costed by the container it came in (0100)', () => {
+  test('each item is asked for its cost the way it is bought', () => {
+    expect(deliveryCostBasis({ unit: 'ML', containerMl: 750 })).toBe('CONTAINER')
+    expect(deliveryCostBasis({ unit: 'ML', containerMl: null })).toBe('DELIVERY')
+    expect(deliveryCostBasis({ unit: 'ITEM', containerMl: null })).toBe('UNIT')
+    expect(DELIVERY_COST_QUESTION.CONTAINER.label).toBe('Cost of one container')
+  })
+
+  test('a measured item with a container size is costed by that container', () => {
+    expect(deliveryCost({ unit: 'ML', containerMl: 750 }, 4500, 650))
+      .toEqual({ unitCostPence: null, containerCostPence: 650, containerQty: 750 })
+  })
+
+  test('a measured item with no one container size is costed by the whole delivery', () => {
+    expect(deliveryCost({ unit: 'ML', containerMl: null }, 50_000, 12_000))
+      .toEqual({ unitCostPence: null, containerCostPence: 12_000, containerQty: 50_000 })
+  })
+
+  test('a whole item is costed by the unit, which is exact already', () => {
+    expect(deliveryCost({ unit: 'ITEM', containerMl: null }, 24, 95))
+      .toEqual({ unitCostPence: 95, containerCostPence: null, containerQty: null })
+  })
+
+  test('no cost entered records none rather than nought', () => {
+    expect(deliveryCost({ unit: 'ML', containerMl: 750 }, 750, null))
+      .toEqual({ unitCostPence: null, containerCostPence: null, containerQty: null })
+  })
+
+  test('the history says what a delivery cost in the terms it was bought in', () => {
+    expect(saysDeliveryCost({ unit: 'ML', unitCostPence: null, containerCostPence: 650, containerQty: 750 })).toBe('£6.50 for 750 ml')
+    expect(saysDeliveryCost({ unit: 'ITEM', unitCostPence: null, containerCostPence: 2150, containerQty: 24 })).toBe('£21.50 for 24')
+    expect(saysDeliveryCost({ unit: 'ITEM', unitCostPence: 95, containerCostPence: null, containerQty: null })).toBe('£0.95 each')
+    expect(saysDeliveryCost({ unit: 'ML', unitCostPence: 1, containerCostPence: null, containerQty: null })).toBe('£0.01 a ml')
+    expect(saysDeliveryCost({ unit: 'ML', unitCostPence: null, containerCostPence: null, containerQty: null })).toBe('')
   })
 })

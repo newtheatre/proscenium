@@ -1,8 +1,8 @@
 import { sql } from 'drizzle-orm'
 import { auditEntry } from '#shared/utils/audit'
-import { says } from '#shared/utils/bar'
+import { deliveryCost, says } from '#shared/utils/bar'
 import type { SQL } from 'drizzle-orm'
-import type { ProductSetupInput, ProductStatus, ServingKind } from '#shared/utils/bar'
+import type { ProductSetupInput, ProductStatus, ServingKind, StockUnit } from '#shared/utils/bar'
 
 // F-127: one guided set-up becomes one batch. Every insert carries its own claim or its parent's
 // existence as a predicate, so a name lost to a racer leaves nothing behind rather than a husk.
@@ -16,6 +16,9 @@ export interface SetupContext {
   pricedKinds: readonly ServingKind[]
   // Names of the stocked items this set-up points at that are retired (F-113 criterion 5).
   retiredItems: readonly string[]
+  // The register item a thing sold as itself or by measure pours, when it is not new: its unit and
+  // container size decide how the opening delivery's cost is kept (0100).
+  pouredItem?: { unit: StockUnit, containerMl: number | null }
   newId: () => string
 }
 
@@ -213,10 +216,12 @@ export function planProductSetup(input: ProductSetupInput, context: SetupContext
   })
 
   if (input.shape !== 'RECIPE' && input.opening && itemId) {
+    const costed = newItem ? { unit: newItem.unit, containerMl: newItem.containerMl ?? null } : context.pouredItem
+    const cost = deliveryCost(costed ?? { unit: 'ITEM', containerMl: null }, input.opening.qty, input.opening.costPence ?? null)
     statements.push(sql`
-      INSERT INTO stock_movements (id, item_id, qty, kind, unit_cost_pence, actor_id)
-      SELECT ${context.newId()}, ${itemId}, ${input.opening.qty}, 'DELIVERY',
-             ${input.opening.unitCostPence ?? null}, ${context.actorId}
+      INSERT INTO stock_movements (id, item_id, qty, kind, unit_cost_pence, container_cost_pence, container_qty, actor_id)
+      SELECT ${context.newId()}, ${itemId}, ${input.opening.qty}, 'DELIVERY', ${cost.unitCostPence},
+             ${cost.containerCostPence}, ${cost.containerQty}, ${context.actorId}
       WHERE ${landed}
     `)
   }

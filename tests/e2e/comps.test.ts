@@ -502,7 +502,7 @@ async function aStockedProduct(pricePence: number, delivered: number, perServing
   const { variantId } = await aSellableProduct(pricePence)
   const itemAnswered = await send('POST', '/api/admin/bar/items', { name: named('Gin'), unit: 'ML', containerMl: 700 })
   const { id: itemId } = await itemAnswered.json() as { id: string }
-  await send('POST', '/api/admin/bar/movements', { itemId, qty: delivered, kind: 'DELIVERY', unitCostPence: 1 })
+  await send('POST', '/api/admin/bar/movements', { itemId, qty: delivered, kind: 'DELIVERY', costPence: 1 })
   await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: perServing }] })
   return { variantId, itemId }
 }
@@ -535,7 +535,7 @@ describe.skipIf(skip !== null)('a comp depletes exactly as a paid sale would, re
     expect(onHandOfItem(itemId)).toBe(25)
 
     // The approval is freed rather than burned: a restock and a retry still spend it (F-110).
-    await send('POST', '/api/admin/bar/movements', { itemId, qty: 100, kind: 'DELIVERY', unitCostPence: 1 })
+    await send('POST', '/api/admin/bar/movements', { itemId, qty: 100, kind: 'DELIVERY', costPence: 1 })
     expect((await give(id, venueId, 500)).status).toBe(200)
   })
 
