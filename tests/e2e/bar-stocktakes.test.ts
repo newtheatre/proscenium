@@ -61,8 +61,11 @@ const anItem = async (over: Record<string, unknown> = {}): Promise<ListedItem> =
   return items.find(item => item.id === id)!
 }
 
-const deliver = async (itemId: string, qty: number, unitCostPence?: number): Promise<void> => {
-  const answered = await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty, unitCostPence })
+// These items have no one container size, so a delivery is costed whole (0100): the figure sent is
+// what each unit cost times how many came.
+const deliver = async (itemId: string, qty: number, pencePerUnit?: number): Promise<void> => {
+  const costPence = pencePerUnit === undefined ? undefined : pencePerUnit * qty
+  const answered = await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty, costPence })
   expect(answered.status).toBe(200)
 }
 
@@ -181,7 +184,7 @@ describe.skipIf(skip !== null)('variance is shown in units and at cost before an
     const item = await anItem()
     await deliver(item.id, 10, 100)
     const second = await created(await send('POST', '/api/admin/bar/movements', {
-      itemId: item.id, kind: 'DELIVERY', qty: 10, unitCostPence: 900,
+      itemId: item.id, kind: 'DELIVERY', qty: 10, costPence: 9000,
     }))
     // Weighted: (10*100 + 10*900) / 20 = 500, not 900, which the most recent delivery alone would give.
     const opened = await open()

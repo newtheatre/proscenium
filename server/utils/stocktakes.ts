@@ -62,19 +62,6 @@ export async function countStocktakes(clause: ListClause): Promise<number> {
   return count(sql`SELECT count(*) AS total FROM stocktakes t${predicate(clause)}`)
 }
 
-interface StocktakeLineRow extends Omit<StocktakeLine, 'variance' | 'varianceCostPence'> {
-  variance: number | null
-  unitCostPence: number | null
-}
-
-function readLine(row: StocktakeLineRow): StocktakeLine {
-  const { unitCostPence, ...rest } = row
-  return {
-    ...rest,
-    varianceCostPence: row.variance === null || unitCostPence === null ? null : row.variance * unitCostPence,
-  }
-}
-
 // Priced the same way the applied variance report values a line (server/utils/bar-reports.ts's
 // unitCostPence, F-119's basis), so a stocktake in progress never disagrees with what it applies as.
 export function stocktakeLinesQuery(stocktakeId: string): SQL {
@@ -82,7 +69,7 @@ export function stocktakeLinesQuery(stocktakeId: string): SQL {
     SELECT l.id AS id, l.item_id AS itemId, i.name AS itemName, i.unit AS unit,
            l.expected_qty AS expectedQty, l.counted_qty AS countedQty,
            CASE WHEN l.counted_qty IS NULL THEN NULL ELSE l.counted_qty - l.expected_qty END AS variance,
-           ${unitCostPence} AS unitCostPence
+           round((l.counted_qty - l.expected_qty) * ${unitCostPence}) AS varianceCostPence
     FROM stocktake_lines l JOIN bar_items i ON i.id = l.item_id
     WHERE l.stocktake_id = ${stocktakeId}
     ORDER BY i.name COLLATE NOCASE
@@ -90,5 +77,5 @@ export function stocktakeLinesQuery(stocktakeId: string): SQL {
 }
 
 export async function stocktakeLines(stocktakeId: string): Promise<StocktakeLine[]> {
-  return (await db.all<StocktakeLineRow>(stocktakeLinesQuery(stocktakeId))).map(readLine)
+  return db.all<StocktakeLine>(stocktakeLinesQuery(stocktakeId))
 }

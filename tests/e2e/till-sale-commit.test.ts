@@ -82,7 +82,7 @@ const anItem = async (over: Record<string, unknown> = {}): Promise<string> =>
   created(await send('POST', '/api/admin/bar/items', { name: named('Tonic'), unit: 'ML', containerMl: 1000, ...over }))
 
 const deliver = (itemId: string, qty: number): Promise<Response> =>
-  send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty, unitCostPence: 100 })
+  send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty, costPence: 100 })
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, as = barManager.cookie): Promise<Response> =>
   sellOnTheTill(app, { venueId, lines, expectedTotalPence }, as)

@@ -104,6 +104,28 @@ describe('one line per item, blank distinct from an entered zero (F-115 criterio
     })
   })
 
+  // Decision 0100 (issue 1320): the count is valued as the gross profit report values it, on the
+  // container's cost divided when it is read, and rounded once to whole pence (0004).
+  test('a variance is valued on the divided container cost, in whole pence', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const itemId = bottle(database)
+      insert(database, 'stock_movements', {
+        id: 'd-1', item_id: itemId, qty: 4500, kind: 'DELIVERY', container_cost_pence: 650, container_qty: 750,
+      })
+      insert(database, 'stocktakes', { id: 'st-1', status: 'OPEN', opened_by: opener })
+      insert(database, 'stocktake_lines', { id: 'l-1', stocktake_id: 'st-1', item_id: itemId, expected_qty: 4500, counted_qty: 4325 })
+      insert(database, 'bar_items', { id: 'item-2', name: 'Gin 2', unit: 'ML' })
+      insert(database, 'stocktake_lines', { id: 'l-2', stocktake_id: 'st-1', item_id: 'item-2', expected_qty: 0, counted_qty: 10 })
+
+      const [statement, ...parameters] = boundStatement(database, stocktakeLinesQuery('st-1'))
+      const lines = rows<StocktakeLine>(database, statement, ...parameters)
+      // 175 ml short at 650p for 750 ml is 151.67p, which a penny a ml would have called 175p.
+      expect(lines.find(line => line.itemId === itemId)?.varianceCostPence).toBe(-152)
+      expect(lines.find(line => line.itemId === 'item-2')?.varianceCostPence).toBeNull()
+    })
+  })
+
   test('a negative count does not exist to record', async () => {
     await withDatabase((database) => {
       const opener = person(database)

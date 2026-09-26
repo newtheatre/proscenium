@@ -231,6 +231,55 @@ describe('the movement kinds cover what the bar does (criterion 3)', () => {
   })
 })
 
+// Decision 0100 (issue 1320): a measured delivery's cost is what its container cost, held with what
+// the container held. A CHECK would rebuild this append-only table (0010), so a trigger holds it.
+describe('a delivery is costed by the container it came in (0100)', () => {
+  test('a container cost and what the container held arrive together', async () => {
+    await withDatabase((database) => {
+      bottle(database)
+      move(database, { qty: 4500, kind: 'DELIVERY', container_cost_pence: 650, container_qty: 750 })
+      expect(() => move(database, { qty: 750, kind: 'DELIVERY', container_cost_pence: 650 })).toThrow()
+      expect(() => move(database, { qty: 750, kind: 'DELIVERY', container_qty: 750 })).toThrow()
+    })
+  })
+
+  test('a container cost belongs to a delivery and to nothing else', async () => {
+    await withDatabase((database) => {
+      bottle(database)
+      move(database, { qty: 750, kind: 'DELIVERY' })
+      expect(() => move(database, {
+        qty: -750,
+        kind: 'WASTAGE',
+        reason: 'BREAKAGE',
+        container_cost_pence: 650,
+        container_qty: 750,
+      })).toThrow()
+    })
+  })
+
+  test('a container holds something and costs no less than nothing', async () => {
+    await withDatabase((database) => {
+      bottle(database)
+      expect(() => move(database, { qty: 750, kind: 'DELIVERY', container_cost_pence: 650, container_qty: 0 })).toThrow()
+      expect(() => move(database, { qty: 750, kind: 'DELIVERY', container_cost_pence: -1, container_qty: 750 })).toThrow()
+      move(database, { qty: 750, kind: 'DELIVERY', container_cost_pence: 0, container_qty: 750 })
+    })
+  })
+
+  test('a delivery carries one cost or the other, never both', async () => {
+    await withDatabase((database) => {
+      bottle(database)
+      expect(() => move(database, {
+        qty: 750,
+        kind: 'DELIVERY',
+        unit_cost_pence: 1,
+        container_cost_pence: 650,
+        container_qty: 750,
+      })).toThrow()
+    })
+  })
+})
+
 describe('movements are append-only and corrections supersede (criterion 4)', () => {
   test('a movement cannot be edited', async () => {
     await withDatabase((database) => {
