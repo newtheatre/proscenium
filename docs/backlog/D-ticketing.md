@@ -382,7 +382,7 @@ Open questions:
      one atomic write.
   7. A reservation is pending (reserved and unpaid), collected (reserved in advance and now
      paid for) or door (a walk-up sale with no reservation); pending moves to collected or to
-     door and nowhere else. Trimmed 27 September 2026 (issue 1326): the screen shows the house
+     door and nowhere else. Trimmed 26 September 2026 (issue 1326): the screen shows the house
      for the performance on screen in the night's words (E-112 criterion 1), counted in seats:
      sold against capacity, in (admitted through the door), seats left (capacity less sold, or
      no cap), unpaid (the count and the amount still owed) and walk-ups (sold at the door,
