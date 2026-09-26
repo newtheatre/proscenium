@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { choiceWithStock, productBlocked, productOutOfStock, saleJustCompleted, sizeBlocked, sizeOutOfStock, variantStock } from '#shared/utils/sale'
+import { choiceWithStock, productBlocked, productOutOfStock, saleJustCompleted, sizeBlocked, sizeOutOfStock, uncountedProducts, variantStock } from '#shared/utils/sale'
 import type { SaleChoice, SaleProduct, SaleVariant } from '#shared/utils/sale'
 
 // F-128 criterion 8: what the grid and the size sheet read off each size's servings, and when that
@@ -117,5 +117,32 @@ describe('a completed sale is what refreshes the till\'s stock', () => {
 
   test('nothing having happened is not one', () => {
     expect(saleJustCompleted([null, null], [null, null])).toBe(false)
+  })
+})
+
+// Issue 1297: until the bar's first count is applied, a size with nothing on hand is pressable and
+// refused at the charge, so the till tells whoever can count how many drinks that is (0080).
+describe('the drinks the till would refuse until the first count', () => {
+  const empty = variantStock(0, false)
+  const some = variantStock(4, false)
+
+  test('a drink with any size that has nothing on hand counts once, however many such sizes', () => {
+    const catalogue = { stockCounted: false, products: [aProduct([aVariant('a', empty), aVariant('b', empty)]), aProduct([aVariant('c', some)])] }
+    expect(uncountedProducts(catalogue)).toBe(1)
+  })
+
+  test('a size whose every choice has nothing on hand counts; one choice still poured does not', () => {
+    const allGone = { ...aVariant('d', some), choice: { id: 'g', name: 'Mixer', options: [{ id: 'o1', itemName: 'Tonic', stock: empty }, { id: 'o2', itemName: 'Soda', stock: empty }] } }
+    const oneLeft = { ...aVariant('e', some), choice: { id: 'g', name: 'Mixer', options: [{ id: 'o1', itemName: 'Tonic', stock: empty }, { id: 'o2', itemName: 'Soda', stock: some }] } }
+    expect(uncountedProducts({ stockCounted: false, products: [aProduct([allGone])] })).toBe(1)
+    expect(uncountedProducts({ stockCounted: false, products: [aProduct([oneLeft])] })).toBe(0)
+  })
+
+  test('once a count is applied the till greys those out itself, so there is nothing to say', () => {
+    expect(uncountedProducts({ stockCounted: true, products: [aProduct([aVariant('a', variantStock(0, true))])] })).toBe(0)
+  })
+
+  test('a catalogue held from before the till said whether stock was counted says nothing', () => {
+    expect(uncountedProducts({ products: [aProduct([aVariant('a', empty)])] })).toBe(0)
   })
 })

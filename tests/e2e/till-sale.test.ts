@@ -404,6 +404,32 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect(await textOf(view, '[data-test="allergen-note"]')).toContain('Contains gluten')
     view.close()
   }, 120_000)
+
+  // Issue 1297: before the bar's first count, a drink pouring stock with nothing on hand is refused
+  // at the charge, so the till tells whoever can count it how many drinks that is (0080).
+  test('before the first count, the Bar Manager is told how many drinks the till would refuse', async () => {
+    const { venueId } = programme('sale-uncounted')
+    const { productId, variantId } = await aSellableProduct({ name: named('Uncounted gin') })
+    const itemId = await anItem({ name: named('Uncounted base') })
+    await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 25 }] })
+    await openTill(venueId)
+
+    const listed = await catalogue(venueId).then(response => response.json()) as ListedCatalogue & { stockCounted?: boolean }
+    expect(listed.stockCounted).toBe(false)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-uncounted"]')`)
+    expect(await textOf(view, '[data-test="till-uncounted"]')).toContain('nothing on hand')
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="till-uncounted"] a[href="/bar/stock/stocktakes"]')`)).toBe(true)
+    view.close()
+  }, 120_000)
 })
 
 // The choice modal's option buttons are keyed by the option row's own id, read back from the
