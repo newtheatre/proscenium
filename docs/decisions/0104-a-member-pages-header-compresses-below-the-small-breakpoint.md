@@ -34,8 +34,9 @@ nested heading sizes are unchanged.
 
 ## Consequences
 
-- On a phone the content starts in the first screen: the header drops from about 280px to about
-  150px on the longest descriptions, with the strip gone as well.
+- On a phone the content starts in the first screen. Measured on the access requirements page at
+  390px wide, the strip and header took 384px under the site header before the form began; they
+  now take 190px.
 - `tests/unit/design-language.test.ts` pins the three widths, `MEMBER_PAGE_HEADER` and that every
   member `UPageHeader` takes it, so a new page cannot spell its own.
 - Desktop is unchanged, and so is every page's copy.
