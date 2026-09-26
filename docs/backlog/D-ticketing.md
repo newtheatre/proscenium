@@ -453,9 +453,10 @@ Open questions:
 - Acceptance criteria:
   1. Refunds are in person by policy: money was taken on the reader, so it is handed back the
      same way; the system records the refund, it performs no card reversal.
-  2. Refunding requires manager approval: the money.refund permission, held by the Front of
-     House Manager's role and the IT Manager's, on any day and for any performance. The refunder
-     is the approver recorded on every refund row. Tonight's duty manager plays no part (0102).
+  2. Refunding requires manager approval: the money.refund permission held with the desk, which
+     the Front of House Manager's role and the IT Manager's carry, on any day and for any
+     performance. The refunder is the approver recorded on every refund row. Tonight's duty
+     manager plays no part (0102).
   3. Refunds are recorded per ticket, newest tickets of the requested type first, each writing a
      ledger entry (module I) at the moment the money is handed back.
   4. Concurrent refunds of the same ticket are detected atomically (row-claiming update); the

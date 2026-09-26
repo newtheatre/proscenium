@@ -15,6 +15,7 @@ async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>
   }
 }
 
+// Any split the map could produce; FOH_MANAGER stands in for a desk role without money.refund.
 function count(database: TestDatabase): number {
   const [query, ...parameters] = boundStatement(database, officersWithoutRefundApprovalQuery(['FOH_MANAGER'], ['ADMIN', 'MANAGER']))
   const [row] = rows<{ count: number }>(database, query, ...parameters)

@@ -61,8 +61,8 @@ export const PERMISSIONS = [
   // Taking a copy of season sales for reporting: general box office duty, distinct from the
   // programme's own configuration (D-129).
   'ticketing.export',
-  // Approving a refund: general box office is not enough (D-116 criterion 2). Tonight's
-  // confirmed duty manager reaches the same approval without holding it (0009).
+  // Approving a paid refund at the desk (D-116 criterion 2): a standing grant held with the desk,
+  // never derived from a shift (0102).
   'money.refund',
   // Deciding an access profile declaration: sighting evidence, agreeing the door's wording. A
   // named accessibility officer's, never general box office's (D-127 criterion 2).

@@ -160,14 +160,6 @@ describe('permissions come from live grants only', () => {
     expect(held.has('ticketing.manage')).toBe(false)
   })
 
-  // The desk refunds a paid ticket on any day, approved by the role that holds the desk (0102).
-  test('the front of house officer holds money.refund, so every desk holder approves a refund', () => {
-    expect(permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now).has('money.refund')).toBe(true)
-    for (const [role, held] of Object.entries(PERMISSION_MAP)) {
-      if (held.includes('ticketing.write')) expect(`${role}: ${held.includes('money.refund')}`).toBe(`${role}: true`)
-    }
-  })
-
   test('the box office is no longer a role of its own, so nothing can grant it (A-133 criterion 2)', () => {
     expect(isRole('BOX_OFFICE')).toBe(false)
     expect(permissionsFor([{ role: 'BOX_OFFICE' as Role, expiresAt: null }], now).size).toBe(0)

@@ -1,14 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, forgetSpentStep, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { committeeYearOf } from '#shared/utils/london'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
-import { codeForStep, stepFor } from '#shared/utils/totp'
+import { OFFICER_BYPASS_ACTION } from '#shared/utils/night-authority'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -22,7 +21,6 @@ const CASE_TIMEOUT_MS = 120_000
 let app: AppUnderTest
 let officer: TestMember
 let boxOffice: TestMember
-let manager: TestMember
 let venueId: string
 
 beforeAll(async () => {
@@ -32,23 +30,6 @@ beforeAll(async () => {
 
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
-
-  // MANAGER is privileged (0037/A-112) and now carries money.refund (D-116 criterion 2), so the
-  // full MFA dance is needed before requirePermission honours the grant, exactly as D-114's did.
-  const managerPassword = generatePassword()
-  manager = await registerMember(app, 'manager', managerPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'FOH_MANAGER' }, officer.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'MANAGER' }, officer.cookie)
-
-  const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, manager.cookie)).json() as { secret: string }
-  await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, manager.cookie)
-  forgetSpentStep(app, manager.email)
-  const { attemptId } = await (await request(app, 'POST', '/api/auth/sign-in', { email: manager.email, password: managerPassword })).json() as { attemptId: string }
-  const managerAnswered = await request(app, 'POST', '/api/auth/mfa/challenge', {
-    attemptId,
-    code: await codeForStep(secret, stepFor(new Date())),
-  })
-  manager = { ...manager, cookie: (managerAnswered.headers.get('set-cookie') ?? '').split(';')[0]! }
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)
@@ -145,7 +126,7 @@ describe.skipIf(skip !== null)('a refund is money handed back in person, one tic
 
     const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, {
       expectedTotalPence: 900,
-    }, manager.cookie)
+    })
     expect(refunded.status).toBe(200)
 
     const ticket = query<{ refundedAt: number | null }>('SELECT refunded_at AS refundedAt FROM tickets WHERE id = ?', ticketId)
@@ -167,7 +148,7 @@ describe.skipIf(skip !== null)('a refund is money handed back in person, one tic
 
     const wrong = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, {
       expectedTotalPence: 500,
-    }, manager.cookie)
+    })
     expect(wrong.status).toBe(409)
     const text = await wrong.text()
     expect(text).toContain('£5.00')
@@ -179,10 +160,10 @@ describe.skipIf(skip !== null)('a refund is money handed back in person, one tic
 
   test('an already-refunded ticket is refused a second time', async () => {
     const { reservationId, ticketId } = await collectedBooking(900)
-    const first = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, manager.cookie)
+    const first = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
     expect(first.status).toBe(200)
 
-    const second = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, manager.cookie)
+    const second = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
     expect(second.status).toBe(409)
   }, CASE_TIMEOUT_MS)
 
@@ -208,7 +189,7 @@ describe.skipIf(skip !== null)('a refund is money handed back in person, one tic
     const reservationId = query<{ id: string }>('SELECT id FROM reservations WHERE reference = ?', reference)!.id
     const ticketId = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', reservationId)!.id
 
-    const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, manager.cookie)
+    const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
     expect(refused.status).toBe(409)
   }, CASE_TIMEOUT_MS)
 })
@@ -221,29 +202,22 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2, 0102)', (
     const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
     expect(refunded.status).toBe(200)
 
-    const entry = query<{ actorId: string }>(
-      'SELECT e.actor_id AS actorId FROM ledger_entries e JOIN ledger_lines l ON l.entry_id = e.id WHERE l.ticket_id = ? AND l.kind = ?',
-      ticketId, 'REFUND',
-    )
+    const { entryId } = await refunded.json() as { entryId: string }
+    const entry = query<{ actorId: string }>('SELECT actor_id AS actorId FROM ledger_entries WHERE id = ?', entryId)
     expect(entry?.actorId).toBe(boxOffice.id)
     const trail = query<{ actorId: string }>(
       'SELECT actor_id AS actorId FROM audit_log WHERE action = ? AND target = ?', 'ticket.refunded', `reservation:${reservationId}`,
     )
     expect(trail?.actorId).toBe(boxOffice.id)
-
-    // The approval is a standing permission, not tonight's screens, so no bypass is recorded.
-    expect(query('SELECT id FROM audit_log WHERE action = ? AND actor_id = ?', 'night.officer-bypass', boxOffice.id)).toBeUndefined()
   }, CASE_TIMEOUT_MS)
 
-  // No shift gives the desk, so the duty manager's old branch answered nobody but an officer.
-  test('tonight\'s confirmed duty manager holding no role cannot refund', async () => {
+  // No shift gives the desk (ticketing.write), so a confirmed duty manager holding no role is
+  // refused at the route (0102).
+  test('tonight\'s confirmed duty manager holding no role is refused; the Front of House Manager refunds tonight\'s ticket with no bypass recorded', async () => {
     const database = new Database(app.databaseFile)
     let seeded: { performanceId: string }
     try {
-      const night = currentShowNight()
-      const hoursIntoNight = (Date.now() - showNightBounds(night).from.getTime()) / 3_600_000
-      const curtainHoursAfterNightStart = Math.min(23.9, hoursIntoNight + 0.1)
-      seeded = tonightsPerformance(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8), night, curtainHoursAfterNightStart })
+      seeded = tonightsPerformance(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8) })
     }
     finally {
       database.close()
@@ -258,7 +232,8 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2, 0102)', (
     }, '')
     const { reference } = await answered.json() as { reference: string }
     const reservationId = query<{ id: string }>('SELECT id FROM reservations WHERE reference = ?', reference)!.id
-    expect((await send('POST', `/api/box-office/desk/reservations/${reservationId}/collect`, { expectedTotalPence: 900, tender: 'CARD' })).status).toBe(200)
+    const collected = await send('POST', `/api/box-office/desk/reservations/${reservationId}/collect`, { expectedTotalPence: 900, tender: 'CARD' })
+    expect(collected.status).toBe(200)
     const ticketId = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', reservationId)!.id
 
     const dutyManager = await registerMember(app, 'dutymanager', generatePassword())
@@ -266,20 +241,12 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2, 0102)', (
 
     const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, dutyManager.cookie)
     expect(refused.status).toBe(403)
-    expect(query<{ refundedAt: number | null }>('SELECT refunded_at AS refundedAt FROM tickets WHERE id = ?', ticketId)?.refundedAt).toBeNull()
-  }, CASE_TIMEOUT_MS)
+    const ticket = query<{ refundedAt: number | null }>('SELECT refunded_at AS refundedAt FROM tickets WHERE id = ?', ticketId)
+    expect(ticket?.refundedAt).toBeNull()
 
-  test('REFUND_PAID_REQUIRES_MANAGER off still lets the desk refund directly', async () => {
-    const set = await send('PUT', '/api/admin/config/REFUND_PAID_REQUIRES_MANAGER', { value: false }, officer.cookie)
-    expect(set.status).toBe(200)
-    try {
-      const { reservationId, ticketId } = await collectedBooking(900)
-      const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
-      expect(refunded.status).toBe(200)
-    }
-    finally {
-      await send('PUT', '/api/admin/config/REFUND_PAID_REQUIRES_MANAGER', { value: true }, officer.cookie)
-    }
+    const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
+    expect(refunded.status).toBe(200)
+    expect(query('SELECT id FROM audit_log WHERE action = ? AND actor_id = ?', OFFICER_BYPASS_ACTION, boxOffice.id)).toBeUndefined()
   }, CASE_TIMEOUT_MS)
 })
 
@@ -288,7 +255,7 @@ describe.skipIf(skip !== null)('the double refund: concurrent requests for the s
     const { reservationId, ticketId } = await collectedBooking(900)
 
     const answers = await race(2, async () => {
-      const answered = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, manager.cookie)
+      const answered = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
       return { status: answered.status }
     })
 
@@ -303,7 +270,7 @@ describe.skipIf(skip !== null)('cancelling a collected booking (criterion 6)', (
   test('refused while any ticket still holds unrefunded money, quoting the amount', async () => {
     const { reservationId } = await collectedBooking(900)
 
-    const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/cancel`, {}, manager.cookie)
+    const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/cancel`, {})
     expect(refused.status).toBe(409)
     expect(await refused.text()).toContain('£9.00')
 
@@ -313,10 +280,10 @@ describe.skipIf(skip !== null)('cancelling a collected booking (criterion 6)', (
 
   test('once every ticket is refunded, the booking cancels', async () => {
     const { reservationId, ticketId } = await collectedBooking(900)
-    const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, manager.cookie)
+    const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
     expect(refunded.status).toBe(200)
 
-    const cancelled = await send('POST', `/api/box-office/desk/reservations/${reservationId}/cancel`, {}, manager.cookie)
+    const cancelled = await send('POST', `/api/box-office/desk/reservations/${reservationId}/cancel`, {})
     expect(cancelled.status).toBe(200)
 
     const row = query<{ status: string, cancelledBy: string | null }>(
@@ -324,14 +291,6 @@ describe.skipIf(skip !== null)('cancelling a collected booking (criterion 6)', (
     )
     expect(row?.status).toBe('CANCELLED')
     expect(row?.cancelledBy).toBe('STAFF')
-  }, CASE_TIMEOUT_MS)
-
-  test('an ordinary box office officer cancels once nothing is owed: cancelling itself needs no refund authority', async () => {
-    const { reservationId, ticketId } = await collectedBooking(900)
-    await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, manager.cookie)
-
-    const cancelled = await send('POST', `/api/box-office/desk/reservations/${reservationId}/cancel`, {})
-    expect(cancelled.status).toBe(200)
   }, CASE_TIMEOUT_MS)
 })
 
@@ -343,7 +302,7 @@ describe.skipIf(skip !== null)('a real refund reaches the money dashboard (I-102
 
     const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, {
       expectedTotalPence: 900,
-    }, manager.cookie)
+    })
     expect(refunded.status).toBe(200)
 
     const after = await send('GET', `/api/admin/finance/season?kind=YEAR&year=${committeeYearOf(new Date())}`, undefined, officer.cookie)

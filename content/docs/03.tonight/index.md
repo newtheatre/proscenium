@@ -52,12 +52,12 @@ which is how the committee sees a rota that is not being kept.
 | Contacts and incidents, Challenge 25, Emergency | Any of the three | Either |
 
 A door shift does not open the till, and the Front of house manager's role does not either; the
-roles are not interchangeable.
-
-Nothing on these screens refunds a ticket. The box office refunds a paid ticket in person, at the
-desk, on any day: take the person's booking reference and pass it to the Front of House Manager. The show night runs from 04:00 to 04:00, so a performance that
+roles are not interchangeable. The show night runs from 04:00 to 04:00, so a performance that
 finishes at 01:00 is still tonight, and a screen left open past 04:00 is refused rather than
 quietly moved on to the next night.
+
+Nothing on these screens refunds a ticket. The box office refunds a paid ticket in person, at the
+desk, on any day: take the person's booking reference and pass it to the Front of House Manager.
 
 ## The hub
 

@@ -13,9 +13,9 @@ import type { H3Event } from 'h3'
 
 // Criterion 2, gated by REFUND_PAID_REQUIRES_MANAGER: a `money.refund` holder approves their own
 // refund on any day and is the approver recorded. No shift reaches the desk, so none approves (0102).
-export async function requireRefundApproval(event: H3Event, resolved: Authority): Promise<string> {
-  if (!await configValue(event, 'REFUND_PAID_REQUIRES_MANAGER')) return resolved.account.id
-  if (resolved.permissions.has('money.refund')) return resolved.account.id
+export async function requireRefundApproval(event: H3Event, resolved: Authority): Promise<void> {
+  if (!await configValue(event, 'REFUND_PAID_REQUIRES_MANAGER')) return
+  if (resolved.permissions.has('money.refund')) return
   throw createError({
     statusCode: 403,
     statusMessage: 'Refunding a paid ticket needs the Front of House Manager: ask them to refund it at the desk',

@@ -774,9 +774,9 @@ and writes through the first.
 5), needs a live preview and a typed echo before it saves (criteria 1, 2). `blastRadiusPreview()`
 (`server/utils/blast-radius.ts`) is one function per key: `REFUND_PAID_REQUIRES_MANAGER` counts
 holders of a role with the desk (`ticketing.write`) and no `money.refund`, read from the permission
-map (`refundPreviewRoles()`), who would gain or lose self-approval (nobody since 0102, when the one
-desk role gained `money.refund`), `RETENTION_ARMED` counts accounts
-already due anonymisation, read with no side effect at all
+map (`refundPreviewRoles()`), who would gain or lose self-approval (nobody since 0102, when
+`FOH_MANAGER`, the one desk role without it, gained `money.refund`), `RETENTION_ARMED` counts
+accounts already due anonymisation, read with no side effect at all
 (`dueForAnonymisation()`, `server/utils/retention-candidates.ts`). `GET
 /api/admin/config/[key]/blast-radius` answers with the count and its category; `PUT` requires a
 `confirmation` field matching the key's own name or the previewed count
