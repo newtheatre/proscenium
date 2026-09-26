@@ -2,7 +2,8 @@
 
 - Status: Proposed
 - Date: 2026-09-21
-- Amended by: 0105
+- Amended: 26 September 2026 by 0105, which draws a group whose viewer sees one entry as that entry,
+  and fits every label to the sidebar at its default width
 
 ## Context
 

@@ -3,7 +3,7 @@ title: Bar
 description: The catalogue the till sells from, the stock register behind it, and the reports read from the ledger.
 module: Bar
 audience: committee
-updatedOn: 2026-09-22
+updatedOn: 2026-09-26
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -43,7 +43,7 @@ from a shift: a bar shift opens the till, not these screens.
   ::card{icon="i-lucide-truck" title="Order list" to="/docs/bar/order-list"}
   What is short against its par level, grouped for a supplier and exported as CSV.
   ::
-  ::card{icon="i-lucide-bar-chart-3" title="Reports" to="/docs/bar/reports"}
+  ::card{icon="i-lucide-bar-chart-3" title="Bar reports" to="/docs/bar/bar-reports"}
   Sales, gross profit, stocktake variance, comps and discounts over a period, with CSV export.
   ::
   ::card{icon="i-lucide-receipt" title="Tabs" to="/docs/bar/tabs"}

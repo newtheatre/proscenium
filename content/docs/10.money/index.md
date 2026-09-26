@@ -3,7 +3,7 @@ title: Money
 description: The money dashboard, the reports built on the ledger, daily reconciliation, period close and the SU export.
 module: Finance
 audience: committee
-updatedOn: 2026-09-23
+updatedOn: 2026-09-26
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -100,4 +100,4 @@ The range the figures cover is printed above them, from and to, as London dates.
 - [Roles and permissions](/docs/getting-started/roles-and-permissions)
 - [Desk](/docs/box-office/desk)
 - [Till](/docs/tonight/till)
-- [Bar reports](/docs/bar/reports)
+- [Bar reports](/docs/bar/bar-reports)

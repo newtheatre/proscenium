@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { SIDEBAR_DEFAULT_SIZE, SIDEBAR_LABEL_MAX, openOnArrival, sidebarParts } from '#shared/utils/console-sidebar'
+import { SIDEBAR_DEFAULT_SIZE, SIDEBAR_LABEL_MAX, openOnArrival, sidebarParts, visibleGroups } from '#shared/utils/console-sidebar'
+import { PERMISSION_MAP } from '#shared/utils/roles'
 import { CONSOLE_HOME, CONSOLE_NAV } from '#shared/utils/site-nav'
+import type { Viewer } from '#shared/utils/abilities'
+import type { Role } from '#shared/utils/roles'
 import type { NavGroup } from '#shared/utils/site-nav'
 
 // Decision 0105 and issue #1365: a heading that opens onto one screen is a click that shows
@@ -12,6 +15,20 @@ function seen(key: string, visible: number): NavGroup {
   return { ...group, items: group.items.slice(0, visible) }
 }
 
+// A viewer holding one role and nothing derived, the shape tests/unit/abilities.test.ts builds.
+const viewerHolding = (role: Role): Viewer => ({
+  id: 'x',
+  permissions: [...PERMISSION_MAP[role]],
+  onShiftTonight: false,
+  leadsDepartment: false,
+  isTrainer: false,
+  membershipState: { kind: 'none' },
+})
+
+// What the role's sidebar draws below Overview, in order.
+const drawn = (role: Role): string[] => sidebarParts(visibleGroups(viewerHolding(role)))
+  .map(part => part.kind === 'entry' ? `entry ${part.entry.to}` : `group ${part.group.key}`)
+
 describe('a group with one visible entry is drawn as that entry (0105)', () => {
   test('in its own place in the fixed order, between the groups either side', () => {
     const parts = sidebarParts([seen('rota', 3), seen('reports', 1), seen('money', 2)])
@@ -20,9 +37,14 @@ describe('a group with one visible entry is drawn as that entry (0105)', () => {
     expect(reports?.kind === 'entry' && reports.entry.to).toBe('/reports')
   })
 
-  test('a group narrowed to one entry by the viewer\'s abilities is a link too', () => {
-    const parts = sidebarParts([seen('box-office', 1)])
-    expect(parts).toEqual([{ kind: 'entry', entry: seen('box-office', 1).items[0]! }])
+  test('the Accessibility Officer\'s Box office, narrowed to one by abilities, is Access profiles', () => {
+    expect(drawn('ACCESSIBILITY_OFFICER')).toEqual(['entry /box-office/access-profiles'])
+  })
+
+  test('the Safety Officer and the Committee see links only, and the Treasurer one group beside a link', () => {
+    expect(drawn('SAFETY_OFFICER')).toEqual(['entry /rota/manage/safety', 'entry /reports'])
+    expect(drawn('COMMITTEE')).toEqual(['entry /money', 'entry /reports'])
+    expect(drawn('TREASURER')).toEqual(['entry /bar/reports', 'group money'])
   })
 
   test('a group holding two or more stays a group, with every entry in it', () => {
@@ -34,6 +56,7 @@ describe('a group with one visible entry is drawn as that entry (0105)', () => {
 describe('a sidebar holding one group opens it on arrival (0105)', () => {
   test('one group beside links is open before any route lands in it', () => {
     expect(openOnArrival([seen('money', 7), seen('reports', 1)])).toEqual(['money'])
+    expect(openOnArrival(visibleGroups(viewerHolding('TREASURER')))).toEqual(['money'])
   })
 
   test('two groups open only as the route or the officer opens them', () => {

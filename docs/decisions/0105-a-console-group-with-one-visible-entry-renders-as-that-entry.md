@@ -50,8 +50,8 @@ than `SIDEBAR_LABEL_MAX`. Both are constants in the same file, and the test read
 - The Treasurer, holding Money alone, lands with it open.
 - A wider sidebar takes 64 pixels from the page at 1280. Pages are laid out for the width left
   over, and the dashboard's own resize handle still lets an officer narrow it or collapse it to
-  icons. A width an officer has already dragged is kept by the dashboard, so the new default is
-  what a fresh browser sees.
+  icons. The dashboard keeps a width in a cookie from the first visit, so the sidebar is given its
+  own id: every browser starts once at the new default, and a width dragged after that is kept.
 - Every console documentation picture shows the sidebar and changes with it. They are retaken
   with the next full pass rather than one by one.
 

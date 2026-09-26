@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { can } from '#shared/utils/abilities'
-import { SIDEBAR_DEFAULT_SIZE, SIDEBAR_MAX_SIZE, openOnArrival, sidebarParts } from '#shared/utils/console-sidebar'
-import { CONSOLE_HOME, CONSOLE_NAV, groupFor, navCount } from '#shared/utils/site-nav'
+import { SIDEBAR_DEFAULT_SIZE, SIDEBAR_MAX_SIZE, openOnArrival, sidebarParts, visibleGroups } from '#shared/utils/console-sidebar'
+import { CONSOLE_HOME, groupFor, navCount } from '#shared/utils/site-nav'
 import type { NavEntry, NavSection } from '#shared/utils/site-nav'
 import type { NavigationMenuItem } from '@nuxt/ui'
 
@@ -12,10 +12,7 @@ const viewer = useViewer()
 
 const home = computed(() => can(viewer.value, CONSOLE_HOME.ability))
 
-// A group with nothing in it is not rendered: the empty ones are where the modules land.
-const groups = computed(() => CONSOLE_NAV
-  .map(group => ({ ...group, items: group.items.filter(entry => can(viewer.value, entry.ability)) }))
-  .filter(group => group.items.length > 0))
+const groups = computed(() => visibleGroups(viewer.value))
 
 // A waiting queue is counted on its entry and on its group, so a closed group still says so.
 const { counts, refresh } = useNavCounts()
@@ -83,7 +80,10 @@ function items(collapsed: boolean): NavigationMenuItem[][] {
 
 <template>
   <UDashboardGroup>
+    <!-- A named id keys the width's cookie, so a browser that held the old width starts once at
+         the new default (0105). -->
     <UDashboardSidebar
+      id="console"
       collapsible
       resizable
       :default-size="SIDEBAR_DEFAULT_SIZE"
