@@ -34,7 +34,6 @@ function grant(database: TestDatabase, userId: string, role: string, expiresAt: 
 
 // Read from the permission map, so a role gaining or losing the desk moves the count (0090).
 describe('the roles the preview reads', () => {
-  // Since 0102 the role holding the desk also approves, so the preview counts nobody.
   test('no role holds the desk without refund approval, and the front of house officer approves', () => {
     expect(refundPreviewRoles()).toEqual({ officers: [], approving: ['ADMIN', 'MANAGER', 'FOH_MANAGER'] })
   })

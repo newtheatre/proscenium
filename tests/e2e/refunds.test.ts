@@ -225,6 +225,7 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2, 0102)', (
 
     const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 }, officer.cookie)
     const ticketTypeId = (await type.json() as { id: string }).id
+
     const answered = await send('POST', '/api/reservations', {
       performanceId: seeded.performanceId,
       lines: [{ ticketTypeId, quantity: 1 }],
@@ -232,6 +233,7 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2, 0102)', (
     }, '')
     const { reference } = await answered.json() as { reference: string }
     const reservationId = query<{ id: string }>('SELECT id FROM reservations WHERE reference = ?', reference)!.id
+
     const collected = await send('POST', `/api/box-office/desk/reservations/${reservationId}/collect`, { expectedTotalPence: 900, tender: 'CARD' })
     expect(collected.status).toBe(200)
     const ticketId = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', reservationId)!.id
