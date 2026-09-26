@@ -21,8 +21,8 @@ address also works typed into any phone.
 duty manager shift on one of tonight's performances is the ordinary way in, and it stops working
 at 04:00 with nothing to revoke. Two roles open the screens anyway when the rota is wrong at
 19:20: the Front of House Manager opens the door and the duty manager's screens, and the Bar
-Manager opens the till. Every opening of that kind is recorded and flagged on the night report,
-which is how the committee sees a rota that is not being kept.
+Manager opens the till. Every act they take there is recorded and flagged on the night report,
+which is how the committee sees a rota that is not being kept; looking at a screen is not.
 ::
 
 ## If something goes wrong
