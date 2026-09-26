@@ -351,7 +351,7 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
     // filter now puts first: typing drops that row out of the filtered list before Enter runs.
     await click(view, '[data-test="uncounted-only-filter"]')
     const beforeTyping = await view.evaluate(
-      `[...document.querySelectorAll('[data-test^="counted-"]')].map(el => el.getAttribute('data-test'))`,
+      `[...document.querySelectorAll('[data-test^="counted-"]:not([data-test^="counted-part-"])')].map(el => el.getAttribute('data-test'))`,
     ) as string[]
     expect(beforeTyping.length).toBeGreaterThanOrEqual(3)
     const [, typedInto, expectedNext] = beforeTyping
