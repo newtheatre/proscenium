@@ -8,6 +8,7 @@ import type { MySummaryInputs } from '#server/utils/my-summary'
 const BASE: MySummaryInputs = {
   now: new Date('2026-09-15T12:00:00Z'),
   viewerId: 'u1',
+  onShiftTonight: false,
   shift: null,
   membershipTerm: { startsOn: '2025-09-01', expiresOn: '2026-07-31' },
   membershipGraceDays: 30,
@@ -50,11 +51,13 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
     expect(shape).not.toContain('"notes"')
   })
 
-  test('a confirmed shift inside tonight\'s show night is the one accent tile', () => {
+  // 0094: the accent is the one "on shift" fact the session and the hub read, never a second one.
+  test('a confirmed shift inside its window tonight is the one accent tile', () => {
     const tonight = new Date('2026-09-15T20:00:00Z')
     const summary = assembleMySummary({
       ...BASE,
       now: tonight,
+      onShiftTonight: true,
       shift: {
         shiftId: 's1',
         role: 'FRONT_OF_HOUSE',
@@ -66,6 +69,17 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
     })
     expect(summary.onShiftTonight).toBe(true)
     expect(summary.shift?.shiftId).toBe('s1')
+  })
+
+  test('a claim tonight is not the accent: it opens nothing until it is confirmed (issue 1305)', () => {
+    const tonight = new Date('2026-09-15T20:00:00Z')
+    const summary = assembleMySummary({
+      ...BASE,
+      now: tonight,
+      shift: { shiftId: 's4', role: 'DOOR', status: 'CLAIMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: Math.floor(tonight.getTime() / 1000) },
+    })
+    expect(summary.onShiftTonight).toBe(false)
+    expect(summary.shift?.status).toBe('CLAIMED')
   })
 
   test('a claimed shift on a future night is not tonight\'s accent', () => {
