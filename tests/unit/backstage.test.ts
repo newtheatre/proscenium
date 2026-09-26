@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import {
   BOARD_CODE_DIGITS,
+  BOARD_LABELS,
+  correctableMilestone,
+  nextCall,
   FREE_TEXT_LIMIT,
   MAX_FAILED_ATTEMPTS,
   MESSAGE_RETENTION_DAYS,
@@ -120,6 +123,81 @@ describe('committee configuration for milestone types and presets (criteria 1, 2
     expect(presetForm.safeParse({ label: '5 minutes', body: 'Five minutes please', sort: 0 }).success).toBe(true)
     expect(presetForm.safeParse({ label: '5 minutes', body: '', sort: 0 }).success).toBe(false)
   })
+
+  // Issue 1313: every call belongs to one end of the board.
+  test('each names the end that makes the call, and no third end', () => {
+    expect(milestoneTypeForm.parse({ label: 'House open', sort: 1, side: 'FOH' }).side).toBe('FOH')
+    expect(presetForm.parse({ label: 'Hold', body: 'Hold please', sort: 1, side: 'BACKSTAGE' }).side).toBe('BACKSTAGE')
+    expect(milestoneTypeForm.safeParse({ label: 'House open', sort: 1, side: 'BAR' }).success).toBe(false)
+  })
+})
+
+// Issue 1313: one tap for the call that comes next on this end, in the committee's own order.
+describe('the next call on each end (issue 1313, E-121 criterion 7)', () => {
+  const backstage = [
+    { id: 'clearance', sort: 0 },
+    { id: 'curtain', sort: 2 },
+    { id: 'interval', sort: 3 },
+    { id: 'restart', sort: 4 },
+    { id: 'end', sort: 5 },
+  ]
+  const milestone = (id: string, milestoneTypeId: string, composedAt: number, supersedesId: string | null = null) =>
+    ({ id, milestoneTypeId, supersedesId, composedAt })
+
+  test('a night nobody has called yet starts at the first call', () => {
+    expect(nextCall(backstage, [])?.id).toBe('clearance')
+  })
+
+  test('the call after this end\'s latest, in the committee\'s order', () => {
+    expect(nextCall(backstage, [milestone('m1', 'clearance', 100)])?.id).toBe('curtain')
+    expect(nextCall(backstage, [milestone('m1', 'clearance', 100), milestone('m2', 'interval', 200)])?.id).toBe('restart')
+  })
+
+  test('the other end\'s calls and presets are not this end\'s progress', () => {
+    const others = [milestone('m1', 'house-open', 150), { id: 'm2', milestoneTypeId: null, supersedesId: null, composedAt: 160 }]
+    expect(nextCall(backstage, [milestone('m0', 'clearance', 100), ...others])?.id).toBe('curtain')
+  })
+
+  test('a corrected call counts as what it was corrected to', () => {
+    expect(nextCall(backstage, [milestone('m1', 'interval', 100), milestone('m2', 'clearance', 110, 'm1')])?.id).toBe('curtain')
+  })
+
+  test('after the last call there is no next one', () => {
+    expect(nextCall(backstage, [milestone('m1', 'end', 100)])).toBeNull()
+  })
+})
+
+describe('a wrong call is changed until the next milestone (issue 1313, E-121 criterion 5)', () => {
+  const call = (id: string, side: BoardSide, milestoneTypeId: string | null, composedAt: number, supersedesId: string | null = null) =>
+    ({ id, side, milestoneTypeId, supersedesId, composedAt })
+
+  test('this end\'s latest milestone can be changed while it is the latest milestone on the board', () => {
+    const messages = [call('m1', 'BACKSTAGE', 'clearance', 100), call('m2', 'FOH', null, 120)]
+    expect(correctableMilestone('BACKSTAGE', messages)?.id).toBe('m1')
+  })
+
+  test('once any end calls the next milestone, the earlier one stands', () => {
+    const messages = [call('m1', 'BACKSTAGE', 'clearance', 100), call('m2', 'FOH', 'house-open', 120)]
+    expect(correctableMilestone('BACKSTAGE', messages)).toBeNull()
+    expect(correctableMilestone('FOH', messages)?.id).toBe('m2')
+  })
+
+  test('a correction is itself the latest, and is not changed twice over the same row', () => {
+    const messages = [call('m1', 'BACKSTAGE', 'interval', 100), call('m2', 'BACKSTAGE', 'clearance', 110, 'm1')]
+    expect(correctableMilestone('BACKSTAGE', messages)?.id).toBe('m2')
+  })
+
+  test('nothing to change on a night with no milestone', () => {
+    expect(correctableMilestone('BACKSTAGE', [call('m1', 'BACKSTAGE', null, 100)])).toBeNull()
+  })
+})
+
+// Issue 1313: a wings phone picks who it is from chips rather than typing in the dark.
+describe('the labels a wings phone picks from (issue 1313, E-120 criterion 1)', () => {
+  test('each is a valid label on its own', () => {
+    expect(BOARD_LABELS.length).toBeGreaterThan(2)
+    for (const label of BOARD_LABELS) expect(boardJoinForm.safeParse({ code: '123456', label }).success).toBe(true)
+  })
 })
 
 describe('retention (E-122 criterion 4)', () => {
@@ -144,10 +222,12 @@ describe('the FOH credential is derived and never issued (criterion 7)', () => {
   })
 })
 
-describe('front of house sends a preset or free text, never a milestone (criterion 7)', () => {
+// Issue 1313: front of house calls House open and Ready to restart, its own milestones.
+describe('front of house sends exactly one of its own milestone, a preset or free text (criterion 7)', () => {
   const composedAt = 1_795_000_000
 
-  test('a preset alone, or free text alone, is accepted', () => {
+  test('a milestone alone, a preset alone, or free text alone, is accepted', () => {
+    expect(fohMessageForm.safeParse({ milestoneTypeId: 'mt-house-open', composedAt }).success).toBe(true)
     expect(fohMessageForm.safeParse({ presetId: 'preset-1', composedAt }).success).toBe(true)
     expect(fohMessageForm.safeParse({ body: 'Two minutes on the bar queue', composedAt }).success).toBe(true)
   })
