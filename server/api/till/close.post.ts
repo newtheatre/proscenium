@@ -14,13 +14,13 @@ export default defineEventHandler(async (event) => {
 
   const account = await closerFor(event, session)
 
-  // Money may still be arriving on the reader for a hand-off nobody has answered for; the Z
-  // cannot be reconciled around it (F-124 criterion 6). A mismatch is a fact, not a wait.
+  // Money may still be arriving on the reader for a charge nobody has answered for; the Z cannot
+  // be reconciled around it (F-124 criterion 6, 0096). A mismatch is a fact, not a wait.
   const waiting = await openAttemptCount(session.night, session.venueId)
   if (waiting > 0) {
     throw createError({
       statusCode: 409,
-      statusMessage: `${waiting} SumUp ${waiting === 1 ? 'payment is' : 'payments are'} still waiting for an answer. Resolve ${waiting === 1 ? 'it' : 'them'} on the till first.`,
+      statusMessage: `${plural(waiting, 'card charge')} ${waiting === 1 ? 'is' : 'are'} still waiting for an answer. Answer ${waiting === 1 ? 'it' : 'them'} on the till first.`,
     })
   }
 
@@ -64,7 +64,7 @@ export default defineEventHandler(async (event) => {
       statusCode: 409,
       statusMessage: after && !isOpen(after)
         ? 'Somebody else closed this session first, so this reading was not recorded. Read the till before recording anything.'
-        : 'A SumUp payment landed while this close was in flight, so nothing was recorded. Answer it on the till and close again.',
+        : 'A card charge started while this close was in flight, so nothing was recorded. Answer it on the till and close again.',
     })
   }
   if (!after) throw createError({ statusCode: 409, statusMessage: 'That session is no longer there' })

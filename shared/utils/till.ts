@@ -51,6 +51,15 @@ export function saysChargeOnSumUp(totalPence: number | null): string {
   return totalPence === null ? 'Charge on SumUp' : `Charge ${saysMoney(totalPence)} on SumUp`
 }
 
+export type ChargePath = 'sumup' | 'typed' | 'tab'
+
+// One charge button under the thumb (0096, F-124 criterion 1): the hand-off where the phone has
+// it, with keying the figure by hand as the fallback link; a tab never goes to the reader.
+export function chargePaths(sumupAvailable: boolean, onTab: boolean): { primary: ChargePath, secondary: ChargePath | null } {
+  if (onTab) return { primary: 'tab', secondary: null }
+  return sumupAvailable ? { primary: 'sumup', secondary: 'typed' } : { primary: 'typed', secondary: null }
+}
+
 // The bar this device opened tonight, so a bare link to the till (the SumUp app's return in a
 // fresh tab, issue 1257) opens there rather than asking again. Kept for its show night only (0014).
 export const TILL_VENUE_DEVICE_KEY = 'nnt-till-venue'

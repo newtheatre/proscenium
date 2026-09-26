@@ -10,9 +10,8 @@ import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, wa
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// F-104 through the real route and screen: a sale is refused, quoting both figures, whenever it
-// disagrees with what the till would charge. What a match writes is F-105's own suite. Decision
-// 0096: a card charge is an attempt, and nothing is written until the reader has answered.
+// F-104 through the real route and screen: a sale disagreeing with the till's own total is refused,
+// quoting both figures. 0096: a card charge is an attempt, written once the reader has answered.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000

@@ -15,10 +15,10 @@ import { ATTEMPT_KEY_DOMAIN, OPEN_ATTEMPT_STATUSES, SUMUP_RETURN_PATH, SUMUP_STU
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { SaleInput, SaleReceipt } from '#shared/utils/sale'
-import type { SumupAttemptStatus, SumupAttemptView, SumupResolution, SumupReturnInput } from '#shared/utils/sumup'
+import type { ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView, SumupResolution, SumupReturnInput } from '#shared/utils/sumup'
 
-// One hand-off to the SumUp app (F-124, 0069): the row, its conditional transitions, and the
-// completion that posts the sale through the same commit the typed flow uses.
+// One card charge (F-124, 0069, 0096): handed to the SumUp app or keyed into the reader, its
+// conditional transitions, and the answer that posts the sale through the one `commitSale`.
 
 // The key is a booking-token signature over a domain-separated id, so a reservation's token can
 // never complete an attempt and nothing needs a second secret (D-108, D-124's own pattern).
@@ -50,6 +50,7 @@ export interface AttemptBasket {
 
 interface AttemptRow {
   id: string
+  kind: SumupAttemptKind
   tillSessionId: string
   venueId: string
   night: string
@@ -89,6 +90,7 @@ export function unresolvedAttemptsQuery(night: string, venueId: string): SQL {
 export function view(row: AttemptRow): SumupAttemptView {
   return {
     id: row.id,
+    kind: row.kind,
     status: row.status,
     createdAt: row.createdAt,
     createdByName: row.createdByName,
@@ -127,12 +129,13 @@ export async function refuseBookingsInOpenAttempts(night: string, reservationIds
     const basket = JSON.parse(row.basket) as AttemptBasket
     const held = basket.sale.tickets.map(ticket => ticket.reservationId)
     if (reservationIds.some(id => held.includes(id))) {
-      throw createError({ statusCode: 409, statusMessage: 'That booking is waiting on a SumUp payment already. Resolve it first.' })
+      throw createError({ statusCode: 409, statusMessage: 'That booking is in a charge still waiting for its answer. Answer that one first.' })
     }
   }
 }
 
 export interface StartAttemptInput {
+  kind: SumupAttemptKind
   basket: AttemptBasket
   expectedTotalPence: number
   actorId: string
@@ -144,10 +147,11 @@ export async function startAttempt(input: StartAttemptInput): Promise<string> {
     actorId: input.actorId,
     action: 'bar.sumup.started',
     target: `sumup-attempt:${id}`,
-    detail: { sessionId: input.basket.sessionId, expectedTotalPence: input.expectedTotalPence },
+    detail: { kind: input.kind, sessionId: input.basket.sessionId, expectedTotalPence: input.expectedTotalPence },
   })
   await auditedWrite(db.insert(schema.sumupAttempts).values({
     id,
+    kind: input.kind,
     tillSessionId: input.basket.sessionId,
     venueId: input.basket.venueId,
     night: input.basket.night,
@@ -303,9 +307,15 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
   return { status: 'SUCCEEDED', receipt, error: recorded ? null : DUPLICATE }
 }
 
-// Staff answering for an attempt the app never answered for (criterion 5): "it went through" is a
-// success replayed through the same path; "it did not" abandons it, with a note when a mismatch.
-export async function resolveAttempt(row: AttemptRow, outcome: 'succeeded' | 'abandoned', smpTxCode: string | null, note: string | null, by: CompletionActor): Promise<CompletionOutcome> {
+// Staff answering (criterion 5, 0096): "it went through" replays a success through the same path,
+// "Card declined" fails one still waiting, "it did not" abandons, with a note on a mismatch.
+export async function resolveAttempt(row: AttemptRow, outcome: ResolveOutcome, smpTxCode: string | null, note: string | null, by: CompletionActor): Promise<CompletionOutcome> {
+  if (outcome === 'declined') {
+    const moved = await move(row.id, 'STARTED', 'FAILED', { resolution: 'STAFF', resolvedBy: by.actorId }, by.actorId)
+    if (!moved) throw createError({ statusCode: 409, statusMessage: 'That charge has already been answered, so it cannot be declined now. Read the till again.' })
+    return { status: 'FAILED', receipt: null, error: null }
+  }
+
   if (outcome === 'succeeded') {
     if (row.status === 'COMPLETING' && stuckFor(row) >= SUMUP_STUCK_COMPLETING_MINUTES) {
       await move(row.id, 'COMPLETING', 'STARTED', {}, by.actorId)
@@ -340,7 +350,8 @@ export async function sweepAttempts(timeoutMinutes: number, now = new Date()): P
   let mismatched = 0
   for (const row of stale) {
     if (row.status === 'STARTED') {
-      if (await move(row.id, 'STARTED', 'ABANDONED', { resolution: 'SWEEP', error: 'No answer from the SumUp app in time' }, null)) abandoned++
+      const error = row.kind === 'TYPED' ? 'Nobody answered whether the reader took it in time' : 'No answer from the SumUp app in time'
+      if (await move(row.id, 'STARTED', 'ABANDONED', { resolution: 'SWEEP', error }, null)) abandoned++
     }
     else if (await move(row.id, 'COMPLETING', 'MISMATCH', { resolution: 'SWEEP', error: 'Recording the sale was interrupted; check the reader before retrying' }, null)) {
       mismatched++

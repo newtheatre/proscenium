@@ -1671,9 +1671,13 @@ answer and never resubmitted · `expected_total_pence` · `status` CHECK
 or `CALLBACK|KEY|STAFF|SWEEP`, who answered · `resolved_by` NULL → users restrict · `resolved_at` ·
 `resolution_note`, required when a mismatch is abandoned · `entry_id`, the ledger entry a success
 posted, no foreign key for the same reason `comp_requests.entry_id` has none, and a CHECK that it
-is set only on `SUCCEEDED` · `error`, why a mismatch could not be recorded (F-124, 0069).
+is set only on `SUCCEEDED` · `error`, why a mismatch could not be recorded (F-124, 0069) ·
+`kind` NULL, `SUMUP` or `TYPED`, with NULL read as `SUMUP` and no CHECK, since adding one would
+rebuild the table (0096, 0063).
 
-One row per hand-off of a basket to the SumUp app. Nothing posts to the ledger and no booking
+One row per card charge on the till: a hand-off of a basket to the SumUp app, or a figure keyed
+into the reader by hand and answered there with "Reader took it" or "Card declined" (0096). The
+table keeps its name from when it held hand-offs only. Nothing posts to the ledger and no booking
 moves until a row reaches `SUCCEEDED`; every transition is a conditional `UPDATE ... WHERE status
 = <from>`, so a callback and a staff answer racing each other advance the row once. `STARTED` and
 `COMPLETING` are open and refuse the till's close; `MISMATCH` is the reader holding money the ledger

@@ -124,7 +124,7 @@ required pre-show checklist item that is still not done.
   House open, clearance and the calls between front of house and the wings.
   ::
   ::card{icon="i-lucide-moon-star" title="Closing the night" to="/docs/tonight/closing-the-night"}
-  Unanswered SumUp hand-offs, closing the till, the post-show checklist and the night report.
+  Unanswered card charges, closing the till, the post-show checklist and the night report.
   ::
 ::
 

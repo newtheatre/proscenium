@@ -1,0 +1,1 @@
+ALTER TABLE `sumup_attempts` ADD `kind` text;

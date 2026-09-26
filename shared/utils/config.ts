@@ -105,7 +105,7 @@ export const CONFIG_KEYS = {
     schema: z.number().int().positive(),
     default: 120,
     workshop: 'money-and-box-office',
-    describes: 'Minutes a SumUp hand-off with no answer from the app waits before the sweep abandons it (F-124).',
+    describes: 'Minutes a card charge with no answer, from the SumUp app or from the person at the reader, waits before the sweep abandons it (F-124, 0096).',
   },
   RESERVATION_RESEND_ATTEMPTS: {
     schema: z.number().int().positive(),

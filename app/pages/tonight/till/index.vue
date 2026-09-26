@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
-import { saleJustCompleted } from '#shared/utils/sale'
-import { saysChargeOnReader, saysChargeOnSumUp } from '#shared/utils/till'
+import { needsTheReader, saleJustCompleted } from '#shared/utils/sale'
+import { chargePaths, saysChargeOnReader, saysChargeOnSumUp } from '#shared/utils/till'
 import { saysClock } from '#shared/utils/when'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { CompRequest } from '#shared/utils/comps'
@@ -279,8 +279,8 @@ function dismissComp(): void {
   resetComp()
 }
 
-// The submission step (F-104, F-105, 0004). A restricted line with no outcome yet opens the
-// Challenge 25 prompt (F-106); a tab holder chosen below charges credit, not the reader (F-108).
+// The submission step (F-104, F-105, 0004): an unchecked restricted line opens Challenge 25 first
+// (F-106); money on the reader is an attempt, written once it is answered (0096), a tab at once.
 async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.value): Promise<void> {
   if (!readyToCharge()) return
   if (!ageCheck && needsAgeCheck.value) {
@@ -291,8 +291,22 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
 
   charging.value = true
   chargeFailure.value = null
+  const body = saleBody(ageCheck, expectedAfter(ageCheck))
   try {
-    const answered = await $fetch<SaleReceipt>('/api/till/sale', { method: 'POST', body: saleBody(ageCheck, expectedAfter(ageCheck)) })
+    if (needsTheReader(body)) {
+      const started = await $fetch<{ id: string, totalPence: number }>('/api/till/payments', { method: 'POST', body: { ...body, kind: 'TYPED' } })
+      sumup.remember({
+        id: started.id,
+        kind: 'TYPED',
+        totalPence: started.totalPence,
+        startedAt: Date.now(),
+        basket: { bar: basket.value, tickets: ticketLines.value, walkUps: walkUpLines.value, discountId: selectedDiscountId.value },
+      })
+      waiting.value = null
+      ageCheckStep.value = 'closed'
+      return
+    }
+    const answered = await $fetch<SaleReceipt>('/api/till/sale', { method: 'POST', body })
     charged.value = {
       totalPence: answered.totalPence,
       refusedLines: answered.refusedLines,
@@ -307,7 +321,9 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
   catch (refused) {
     // K-103 protects reads, not writes: a transport failure needs different words from an
     // ordinary refusal, since whether the sale landed is unknown rather than settled (finding 16).
-    chargeFailure.value = writeFailureText(refused, 'Check the reader: ring it up again only if it took nothing.')
+    chargeFailure.value = writeFailureText(refused, needsTheReader(body)
+      ? 'Look under Unanswered card charges before charging again.'
+      : 'Check the tab before charging it again.')
     ageCheckStep.value = 'closed'
     // The refusal already names the true figure; catch the total up to it too, so what is shown
     // under the message is the one a retry would now send (F-104 criterion 3, no bypass).
@@ -388,6 +404,27 @@ function nextSale(): void {
 // why rather than disappearing (issue 1150 item 7).
 const readerLabel = computed(() => saysChargeOnReader(grandTotalPence.value, Boolean(selectedTabHolderId.value)))
 const sumupLabel = computed(() => saysChargeOnSumUp(grandTotalPence.value))
+
+// One charge button under the thumb, and keying the figure by hand as a link where the hand-off
+// leads (0096, F-124 criterion 1 as amended).
+const paths = computed(() => chargePaths(sumupAvailable.value, Boolean(selectedTabHolderId.value)))
+const chargeOffered = computed(() => Boolean(session.value) && !charged.value && !basketEmpty.value
+  && (grandTotalPence.value !== null || offline.value) && !sumup.pending.value && !compLocked.value)
+
+// A typed charge this screen holds, waiting for the person at the reader to answer it (0096).
+const typedPending = computed(() => sumup.pending.value?.kind === 'TYPED' ? sumup.pending.value : null)
+
+function answerTyped(outcome: 'succeeded' | 'declined'): void {
+  if (typedPending.value) void resolveAttempt(typedPending.value.id, outcome)
+}
+
+const chargedOn = computed(() => {
+  const receipt = charged.value
+  if (!receipt) return ''
+  if (receipt.tab) return `On ${receipt.tab.holderName}'s tab`
+  if (receipt.totalPence === 0) return 'Nothing to take on the reader'
+  return receipt.viaSumup ? 'Taken on SumUp' : 'Taken on the reader'
+})
 
 // A walk-up's door pass, printed from the counter laptop (F-123 criterion 4).
 function printPass(): void {
@@ -531,11 +568,21 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           @update:open="returnNotice = null"
         />
 
+        <TillReaderCharge
+          v-if="!charged && typedPending"
+          v-model:abandon-note="abandonNote"
+          :pending="typedPending"
+          :waiting="waiting"
+          :waiting-failure="waitingFailure"
+          :resolving="resolving"
+          @resolve="resolveAttempt"
+        />
+
         <TillSumUpWaiting
           v-if="!charged"
           v-model:smp-tx-code-typed="smpTxCodeTyped"
           v-model:abandon-note="abandonNote"
-          :pending="sumup.pending.value"
+          :pending="typedPending ? null : sumup.pending.value"
           :waiting="waiting"
           :waiting-failure="waitingFailure"
           :resolving="resolving"
@@ -663,14 +710,14 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           class="space-y-4"
           data-test="charge-confirmation"
         >
-          <!-- The one number read across a bar, so it carries the block and the words stay
-               short (F-104 criterion 6). -->
+          <!-- What was recorded, in the same large figure: the figure to key sat on the attempt,
+               before the card went in (F-104 criterion 6 as amended by 0096). -->
           <div
             class="rounded-xl bg-elevated px-4 py-5 text-center"
             data-test="charge-amount"
           >
             <p class="text-sm text-muted">
-              {{ charged?.tab ? `On ${charged.tab.holderName}'s tab` : charged?.viaSumup ? 'Taken on SumUp' : 'Key this into the reader' }}
+              {{ chargedOn }}
             </p>
             <p
               class="mt-1 font-mono text-5xl font-bold tabular-nums"
@@ -828,7 +875,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         <!-- Offline, the buttons stay where the thumb expects them, disabled, with the line
              above saying why: a control that vanishes reads as a fault (issue 1150 item 7). -->
         <NightAction
-          v-if="session && !charged && !basketEmpty && (grandTotalPence !== null || offline) && sumupAvailable && !sumup.pending.value && !compLocked"
+          v-if="chargeOffered && paths.primary === 'sumup'"
           :label="sumupLabel"
           icon="i-lucide-smartphone-nfc"
           :disabled="pricing || walkUpGuestIncomplete || offline"
@@ -837,15 +884,47 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           @press="() => chargeOnSumUp()"
         />
         <NightAction
-          v-if="session && !charged && !basketEmpty && (grandTotalPence !== null || offline) && !sumup.pending.value && !compLocked"
+          v-else-if="chargeOffered"
           :label="readerLabel"
           :icon="selectedTabHolderId ? 'i-lucide-book-user' : 'i-lucide-credit-card'"
-          :color="sumupAvailable ? 'neutral' : 'primary'"
           :disabled="pricing || walkUpGuestIncomplete || offline"
           :loading="charging"
           data-test="charge-reader"
           @press="() => charge()"
         />
+        <UButton
+          v-if="chargeOffered && paths.secondary === 'typed'"
+          variant="link"
+          color="neutral"
+          class="min-h-12 w-full justify-center"
+          :disabled="pricing || walkUpGuestIncomplete || offline || charging"
+          data-test="charge-reader"
+          @click="() => charge()"
+        >
+          Key it into the reader instead
+        </UButton>
+        <!-- The answer from the person at the reader: nothing is recorded until one is pressed (0096). -->
+        <template v-if="typedPending && !charged">
+          <NightAction
+            :label="waiting?.status === 'MISMATCH' ? 'Record it again' : 'Reader took it'"
+            icon="i-lucide-check"
+            :loading="resolving"
+            :disabled="waiting?.status === 'COMPLETING'"
+            data-test="reader-took-it"
+            @press="() => answerTyped('succeeded')"
+          />
+          <NightAction
+            v-if="waiting?.status !== 'MISMATCH'"
+            label="Card declined"
+            icon="i-lucide-x"
+            color="neutral"
+            variant="subtle"
+            :loading="resolving"
+            :disabled="waiting?.status === 'COMPLETING'"
+            data-test="card-declined"
+            @press="() => answerTyped('declined')"
+          />
+        </template>
         <NightAction
           v-if="!session"
           label="Open till"

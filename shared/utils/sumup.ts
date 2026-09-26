@@ -1,4 +1,5 @@
 import { saysMoney } from './bar'
+import { saleForm } from './sale'
 import { z } from 'zod'
 
 // The hand-off of a basket to the SumUp app and what comes back (F-124, 0069). Pure: the URL the
@@ -6,6 +7,17 @@ import { z } from 'zod'
 
 export const SUMUP_ATTEMPT_STATUSES = ['STARTED', 'COMPLETING', 'SUCCEEDED', 'FAILED', 'ABANDONED', 'MISMATCH'] as const
 export type SumupAttemptStatus = (typeof SUMUP_ATTEMPT_STATUSES)[number]
+
+// Handed to the SumUp app, or keyed into the reader by hand (0096). A row with no kind predates
+// the typed attempt and is a hand-off; the column carries no CHECK, since one would rebuild it.
+export const SUMUP_ATTEMPT_KINDS = ['SUMUP', 'TYPED'] as const
+export type SumupAttemptKind = (typeof SUMUP_ATTEMPT_KINDS)[number]
+
+// Starting either kind is the sale's own submission, and names which (0096). None named is a
+// hand-off, which is what every caller before the typed attempt meant.
+export const startAttemptForm = saleForm.safeExtend({
+  kind: z.enum(SUMUP_ATTEMPT_KINDS).default('SUMUP'),
+})
 
 export const SUMUP_RESOLUTIONS = ['CALLBACK', 'KEY', 'STAFF', 'SWEEP'] as const
 export type SumupResolution = (typeof SUMUP_RESOLUTIONS)[number]
@@ -100,10 +112,13 @@ export const completeAttemptForm = sumupReturnForm.extend({
 
 export type CompleteAttemptInput = z.output<typeof completeAttemptForm>
 
-// Staff answering "did it go through?" (criterion 5). A mismatch abandoned needs a note, since
-// the reader has money the ledger does not and somebody has to say what happened to it.
+// Staff answering "did it go through?" (criterion 5), or "Card declined" (0096). A mismatch
+// abandoned needs a note, since the reader has money the ledger does not.
+export const RESOLVE_OUTCOMES = ['succeeded', 'declined', 'abandoned'] as const
+export type ResolveOutcome = (typeof RESOLVE_OUTCOMES)[number]
+
 export const resolveAttemptForm = z.object({
-  outcome: z.enum(['succeeded', 'abandoned']),
+  outcome: z.enum(RESOLVE_OUTCOMES),
   smpTxCode: z.string().trim().max(100).nullish().transform(value => value ?? null),
   note: z.string().trim().max(500).nullish().transform(value => value ?? null),
 })
@@ -137,6 +152,7 @@ export function isHandheldUserAgent(userAgent: string): boolean {
 // The shape the till holds while an attempt is in flight and the list of tonight's open ones read.
 export interface SumupAttemptView {
   id: string
+  kind: SumupAttemptKind
   status: SumupAttemptStatus
   createdAt: number
   createdByName: string | null
@@ -149,12 +165,12 @@ export interface SumupAttemptView {
   resolution: SumupResolution | null
 }
 
-export function saysAttemptStatus(status: SumupAttemptStatus): string {
+export function saysAttemptStatus(status: SumupAttemptStatus, kind: SumupAttemptKind = 'SUMUP'): string {
   switch (status) {
-    case 'STARTED': return 'Waiting for the SumUp app'
+    case 'STARTED': return kind === 'TYPED' ? 'Keyed into the reader, waiting for an answer' : 'Waiting for the SumUp app'
     case 'COMPLETING': return 'Recording the sale'
     case 'SUCCEEDED': return 'Recorded'
-    case 'FAILED': return 'Not taken'
+    case 'FAILED': return kind === 'TYPED' ? 'Card declined' : 'Not taken'
     case 'ABANDONED': return 'Abandoned'
     case 'MISMATCH': return 'Taken on the reader, not recorded'
   }
