@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { closeBreakdown, closeVariancePence, readerExpectation, saysReaderShouldShow } from '#shared/utils/reconciliation'
+import { closeBreakdown, closeVariancePence, readerExpectation, saysExpectedOnTheReader } from '#shared/utils/reconciliation'
 import type { BarReconciliation, NightReconciliation } from '#shared/utils/reconciliation'
 
 // F-118 criteria 1 to 3 at the till close (issue 1308): one reader and one login serve the desk and
@@ -30,7 +30,7 @@ function theReviewNight(): NightReconciliation {
 describe('the close leads with what the reader should show for the whole night (criterion 1)', () => {
   test('the whole night, split between the bar and the box office', () => {
     expect(readerExpectation(theReviewNight())).toEqual({ totalPence: 4690, barPence: 1890, deskPence: 2800 })
-    expect(saysReaderShouldShow(readerExpectation(theReviewNight()))).toBe('The reader should show £46.90 (bar £18.90, box office £28.00)')
+    expect(saysExpectedOnTheReader(readerExpectation(theReviewNight()))).toBe('£46.90 (bar £18.90, box office £28.00)')
   })
 
   test('the bar half is the whole night\'s bar, not only this session\'s share of it', () => {
@@ -39,9 +39,9 @@ describe('the close leads with what the reader should show for the whole night (
   })
 
   test('a side that took nothing is not named at nought', () => {
-    expect(saysReaderShouldShow({ totalPence: 1890, barPence: 1890, deskPence: 0 })).toBe('The reader should show £18.90, all of it at the bar')
-    expect(saysReaderShouldShow({ totalPence: 2800, barPence: 0, deskPence: 2800 })).toBe('The reader should show £28.00, all of it at the box office')
-    expect(saysReaderShouldShow({ totalPence: 0, barPence: 0, deskPence: 0 })).toBe('The reader should show £0.00')
+    expect(saysExpectedOnTheReader({ totalPence: 1890, barPence: 1890, deskPence: 0 })).toBe('£18.90, all of it at the bar')
+    expect(saysExpectedOnTheReader({ totalPence: 2800, barPence: 0, deskPence: 2800 })).toBe('£28.00, all of it at the box office')
+    expect(saysExpectedOnTheReader({ totalPence: 0, barPence: 0, deskPence: 0 })).toBe('£0.00')
   })
 })
 

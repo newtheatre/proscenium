@@ -77,11 +77,12 @@ export function attemptByIdQuery(id: string): SQL {
   return sql`SELECT ${ATTEMPT_COLUMNS} FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by WHERE a.id = ${id}`
 }
 
-// Bounded by the night, never by a list of ids (0003): a night's hand-offs are a few dozen at most.
-export function unresolvedAttemptsQuery(night: string, venueId: string): SQL {
+// Bounded by the night, never by a list of ids (0003), and every bar's, since they share the one
+// reader (issue 1308): a night's hand-offs are a few dozen at most.
+export function unresolvedAttemptsQuery(night: string): SQL {
   return sql`
     SELECT ${ATTEMPT_COLUMNS} FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by
-    WHERE a.night = ${night} AND a.venue_id = ${venueId}
+    WHERE a.night = ${night}
       AND a.status IN (${sql.join(UNRESOLVED_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})
     ORDER BY a.created_at DESC
   `
@@ -109,8 +110,8 @@ export async function attemptById(id: string): Promise<AttemptRow | undefined> {
   return row
 }
 
-export async function unresolvedAttempts(night: string, venueId: string): Promise<SumupAttemptView[]> {
-  return (await db.all<AttemptRow>(unresolvedAttemptsQuery(night, venueId))).map(view)
+export async function unresolvedAttempts(night: string): Promise<SumupAttemptView[]> {
+  return (await db.all<AttemptRow>(unresolvedAttemptsQuery(night))).map(view)
 }
 
 export function basketOf(row: AttemptRow): AttemptBasket {
@@ -361,10 +362,10 @@ export async function sweepAttempts(timeoutMinutes: number, now = new Date()): P
   return { abandoned, mismatched }
 }
 
-export async function openAttemptCount(night: string, venueId: string): Promise<number> {
+export async function openAttemptCount(night: string): Promise<number> {
   const [row] = await db.all<{ n: number }>(sql`
     SELECT count(*) AS n FROM sumup_attempts
-    WHERE night = ${night} AND venue_id = ${venueId}
+    WHERE night = ${night}
       AND status IN (${sql.join(OPEN_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})
   `)
   return Number(row?.n ?? 0)

@@ -257,7 +257,7 @@ describe('a close is refused while a hand-off is open, on the write (F-124 crite
     })
   })
 
-  test('a hand-off at another venue on the same night is not this session\'s business', async () => {
+  test('a hand-off at another venue on the same night holds the close: its money is on the one reader (issue 1308)', async () => {
     await withDatabase((database) => {
       const { venueId, night } = sessionWithAttempt(database, null)
       const other = venue(database, '2')
@@ -267,7 +267,8 @@ describe('a close is refused while a hand-off is open, on the write (F-124 crite
         basket: '{}', expected_total_pence: 250, status: 'STARTED',
       })
 
-      expect(close(database, venueId, night, 'u-1')).toBe(1)
+      expect(close(database, venueId, night, 'u-1')).toBe(0)
+      expect(closedAt(database)).toBeNull()
     })
   })
 })

@@ -14,6 +14,6 @@ export default defineEventHandler(async (event) => {
 
   await closerFor(event, session)
 
-  // The same scope the close stamps, so the preview is a figure the closer can act on.
+  // Scoped to this session for the itemised lines; the whole-night figure the close compares ignores the scope.
   return nightReconciliation(session.night, { sessionId: session.id })
 })

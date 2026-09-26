@@ -59,10 +59,6 @@ export function saysExpectedOnTheReader(expected: ReaderExpectation): string {
   return expected.barPence !== 0 && expected.deskPence !== 0 ? `${total} (${where})` : `${total}, ${where}`
 }
 
-export function saysReaderShouldShow(expected: ReaderExpectation): string {
-  return `The reader should show ${saysExpectedOnTheReader(expected)}`
-}
-
 // Over is positive; the screen's preview and the close's own record share this one sum.
 export function closeVariancePence(night: NightReconciliation, actualZPence: number): number {
   return actualZPence - night.wholeNightExpectedPence
@@ -76,13 +72,13 @@ export interface CloseLine {
 // This bar's own figures under the lead line (criterion 2), a nought one left out, so a tab or a
 // refund nobody made is not read as a figure to find on the reader.
 export function closeBreakdown(bar: BarReconciliation): CloseLine[] {
-  const figure = (label: string, pence: number): CloseLine[] => (pence === 0 ? [] : [{ label, pence }])
+  const figure = (label: string, pence: number, shown = pence !== 0): CloseLine[] => (shown ? [{ label, pence }] : [])
   return [
     ...figure('Drinks on card', bar.cardSalesPence),
     ...figure('Tickets taken at the bar', bar.ticketsPence),
     ...figure('Tab settlements', bar.tabSettlementsPence),
     // Counted by the comp, since one can give away something that cost nothing.
-    ...(bar.compsCount > 0 ? [{ label: `Comps (${bar.compsCount}), forgone`, pence: bar.compsForegonePence }] : []),
+    ...figure(`Comps (${bar.compsCount}), forgone`, bar.compsForegonePence, bar.compsCount > 0),
     ...figure('Discounts given', bar.discountsPence),
     ...figure('Refunds', bar.refundsPence),
     ...figure('Tab charges (credit extended)', bar.tabChargesPence),

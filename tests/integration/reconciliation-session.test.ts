@@ -13,8 +13,8 @@ import { testVenue } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// Two bars running one night each reconcile to their own figure, never the estate's combined one
-// (F-118 criterion 3, F-202 criterion 3). The scope is the session an entry was rung up against.
+// The itemised close lines narrow to the session an entry was rung up against (F-118 criterion 2);
+// the figure the close compares and stamps is the whole night's (issue 1308).
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
@@ -191,8 +191,8 @@ describe('every figure on the close screen narrows the same way (F-118 criterion
   })
 })
 
-describe('the close stamps the session\'s own figure (F-118 criterion 3)', () => {
-  test('two sessions at two venues on one night each record their own expected total', async () => {
+describe('the close stamps the one reader\'s figure (F-118 criterion 3)', () => {
+  test('every close on the night stamps the one reader\'s whole-night figure (F-202 criterion 3, issue 1308)', async () => {
     await withDatabase((database) => {
       const bars = twoBars(database)
       const closer = person(database, 'closer')
@@ -201,11 +201,9 @@ describe('the close stamps the session\'s own figure (F-118 criterion 3)', () =>
       const studio = entry(database, { source: 'TILL', tender: 'CARD', happenedAt: FROM_AT + 120, sessionId: bars.studioSessionId })
       line(database, studio, { kind: 'BAR_ITEM', amountPence: 300 })
 
-      const expectedFor = (sessionId: string): number =>
-        read<{ cardSalesPence: number }>(database, cardSalesQuery(NIGHT, { sessionId }))[0]!.cardSalesPence
+      const expectedPence = read<{ cardSalesPence: number }>(database, cardSalesQuery(NIGHT))[0]!.cardSalesPence
 
       for (const [sessionId, venueId] of [[bars.mainSessionId, bars.mainVenueId], [bars.studioSessionId, bars.studioVenueId]] as const) {
-        const expectedPence = expectedFor(sessionId)
         const statement = closeSessionStatement({
           id: sessionId,
           venueId,
@@ -222,8 +220,8 @@ describe('the close stamps the session\'s own figure (F-118 criterion 3)', () =>
       const closed = rows<{ id: string, expected_total_pence: number }>(
         database, 'SELECT id, expected_total_pence FROM till_sessions ORDER BY id')
       expect(closed).toEqual([
-        { id: bars.mainSessionId, expected_total_pence: 500 },
-        { id: bars.studioSessionId, expected_total_pence: 300 },
+        { id: bars.mainSessionId, expected_total_pence: 800 },
+        { id: bars.studioSessionId, expected_total_pence: 800 },
       ])
     })
   })

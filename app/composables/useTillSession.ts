@@ -143,7 +143,6 @@ export function useTillSession() {
   const closeFailure = ref<string | null>(null)
 
   const actualZPence = computed(() => Math.round((actualZPounds.value ?? 0) * 100))
-  // Against the whole night, as the close itself compares it: one reader serves desk and bar (issue 1308).
   const variancePreviewPence = computed(() => (reconciliation.value ? closeVariancePence(reconciliation.value, actualZPence.value) : 0))
 
   // A note explains one variance, not a different one: it clears on either side changing, a

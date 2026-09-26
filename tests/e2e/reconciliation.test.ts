@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { saysMoney } from '#shared/utils/bar'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
@@ -106,7 +107,9 @@ interface ClosedSession { expectedTotalPence: number, actualZPence: number, vari
 // Every test here sells on the same show night, so what the one reader should show is read off
 // the preview rather than assumed from this test's own sales (issue 1308).
 async function wholeNight(id: string): Promise<Reconciliation> {
-  return await (await preview(id)).json() as Reconciliation
+  const seen = await preview(id)
+  expect(seen.status).toBe(200)
+  return await seen.json() as Reconciliation
 }
 
 async function aDeskCollection(performanceId: string, pricePence: number): Promise<void> {
@@ -169,8 +172,8 @@ describe.skipIf(skip !== null)('closing records the reader against the ledger (c
     const refused = await close(opened.session.id, expected - 200)
     expect(refused.status).toBe(400)
     const said = await message(refused)
-    expect(said).toContain(`£${((expected - 200) / 100).toFixed(2)}`)
-    expect(said).toContain(`should show £${(expected / 100).toFixed(2)}`)
+    expect(said).toContain(saysMoney(expected - 200))
+    expect(said).toContain(`should show ${saysMoney(expected)}`)
   })
 
   test('a disagreeing reading with a note is recorded, append-only, with the note', async () => {

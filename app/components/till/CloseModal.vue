@@ -27,9 +27,8 @@ const hasReading = computed(() => typeof actualZPounds.value === 'number' && Num
 // No reading yet means no variance to explain, whatever the untyped field would compute to.
 const needsVarianceNote = computed(() => hasReading.value && props.variancePreviewPence !== 0)
 
-// One reader and one login serve the desk and the bar on a show night, so the lead is the whole
-// night's figure (issue 1308); the lines under it are this bar's own, nought ones left out.
 const expected = computed(() => (props.reconciliation ? readerExpectation(props.reconciliation) : null))
+const where = computed(() => (expected.value ? saysWhereItWasTaken(expected.value) : ''))
 const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconciliation.bar) : []))
 </script>
 
@@ -55,7 +54,7 @@ const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconc
         :description="reconciliationFailure"
       />
       <div
-        v-else-if="reconciliation && expected"
+        v-else-if="expected"
         class="space-y-4"
         :class="{ 'opacity-50': refreshing }"
       >
@@ -70,15 +69,15 @@ const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconc
             >{{ saysMoney(expected.totalPence) }}</span>
           </p>
           <p
-            v-if="saysWhereItWasTaken(expected)"
+            v-if="where"
             class="mt-1 text-sm text-muted"
             data-test="expected-split"
           >
-            {{ saysWhereItWasTaken(expected) }}
+            {{ where }}
           </p>
         </div>
 
-        <dl
+        <div
           v-if="lines.length"
           data-test="reconciliation-breakdown"
           class="space-y-1 text-sm"
@@ -86,15 +85,17 @@ const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconc
           <p class="text-xs text-muted">
             This bar tonight
           </p>
-          <div
-            v-for="line in lines"
-            :key="line.label"
-            class="flex justify-between"
-          >
-            <dt>{{ line.label }}</dt>
-            <dd>{{ saysMoney(line.pence) }}</dd>
-          </div>
-        </dl>
+          <dl class="space-y-1">
+            <div
+              v-for="line in lines"
+              :key="line.label"
+              class="flex justify-between"
+            >
+              <dt>{{ line.label }}</dt>
+              <dd>{{ saysMoney(line.pence) }}</dd>
+            </div>
+          </dl>
+        </div>
 
         <UFormField label="What the reader's Z actually reads">
           <UInputNumber

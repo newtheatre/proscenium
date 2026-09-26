@@ -36,8 +36,8 @@ export interface SessionClose {
   varianceNote: string | null
 }
 
-// Both predicates ride the write (0001, 0003): a second close changes nothing, and a hand-off
-// started since the count was read refuses the close rather than being closed around (F-124).
+// Both predicates ride the write (0001, 0003): a second close changes nothing, and a hand-off at
+// any bar tonight, started since the count was read, refuses it: one reader (F-124, issue 1308).
 export function closeSessionStatement(close: SessionClose): SQL {
   return sql`
     UPDATE till_sessions SET closed_by = ${close.closedBy}, closed_at = unixepoch(),
@@ -46,7 +46,7 @@ export function closeSessionStatement(close: SessionClose): SQL {
     WHERE id = ${close.id} AND closed_at IS NULL
       AND NOT EXISTS (
         SELECT 1 FROM sumup_attempts
-        WHERE night = ${close.night} AND venue_id = ${close.venueId}
+        WHERE night = ${close.night}
           AND status IN (${sql.join(OPEN_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})
       )
     RETURNING id

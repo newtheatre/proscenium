@@ -1,4 +1,4 @@
-import { closeTillSessionForm, readerExpectation, saysExpectedOnTheReader } from '#shared/utils/reconciliation'
+import { closeTillSessionForm, closeVariancePence, readerExpectation, saysExpectedOnTheReader } from '#shared/utils/reconciliation'
 import { saysMoney } from '#shared/utils/bar'
 
 // Close a till session, stamping who and when, and record the expected-versus-actual reader
@@ -14,9 +14,9 @@ export default defineEventHandler(async (event) => {
 
   const account = await closerFor(event, session)
 
-  // Money may still be arriving on the reader for a charge nobody has answered for; the Z cannot
-  // be reconciled around it (F-124 criterion 6, 0096). A mismatch is a fact, not a wait.
-  const waiting = await openAttemptCount(session.night, session.venueId)
+  // Money may still be arriving on the reader for a charge nobody has answered for, at any bar
+  // tonight since they share it; the Z cannot be reconciled around it (F-124.6, 0096, issue 1308).
+  const waiting = await openAttemptCount(session.night)
   if (waiting > 0) {
     throw createError({
       statusCode: 409,
@@ -26,8 +26,9 @@ export default defineEventHandler(async (event) => {
 
   // Recomputed here, never trusted from an earlier preview read. One reader and one login serve
   // the desk and the bar, so the Z is the whole night's, a single whole-day number (F-118.1, F-202.3).
-  const expected = readerExpectation(await nightReconciliation(session.night, { sessionId: session.id }))
-  const variancePence = actualZPence - expected.totalPence
+  const night = await nightReconciliation(session.night)
+  const expected = readerExpectation(night)
+  const variancePence = closeVariancePence(night, actualZPence)
   if (variancePence !== 0 && !varianceNote) {
     throw createError({
       statusCode: 400,
