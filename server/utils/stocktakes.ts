@@ -82,11 +82,23 @@ export function stocktakeLinesQuery(stocktakeId: string): SQL {
     SELECT l.id AS id, l.item_id AS itemId, i.name AS itemName, i.unit AS unit,
            l.expected_qty AS expectedQty, l.counted_qty AS countedQty,
            CASE WHEN l.counted_qty IS NULL THEN NULL ELSE l.counted_qty - l.expected_qty END AS variance,
-           ${unitCostPence} AS unitCostPence
+           ${unitCostPence} AS unitCostPence, u.name AS countedByName
     FROM stocktake_lines l JOIN bar_items i ON i.id = l.item_id
+    LEFT JOIN users u ON u.id = l.counted_by
     WHERE l.stocktake_id = ${stocktakeId}
     ORDER BY i.name COLLATE NOCASE
   `
+}
+
+// One statement per count, each carrying its own "still open" predicate, so a stocktake applied
+// mid-submission takes none of it. A cleared count clears who entered it (0099).
+export function countStatements(stocktakeId: string, counts: readonly { itemId: string, counted: number | null }[], actorId: string): SQL[] {
+  return counts.map(count => sql`
+    UPDATE stocktake_lines
+    SET counted_qty = ${count.counted}, counted_by = ${count.counted === null ? null : actorId}
+    WHERE stocktake_id = ${stocktakeId} AND item_id = ${count.itemId}
+      AND EXISTS (SELECT 1 FROM stocktakes WHERE id = ${stocktakeId} AND status = 'OPEN')
+  `)
 }
 
 export async function stocktakeLines(stocktakeId: string): Promise<StocktakeLine[]> {

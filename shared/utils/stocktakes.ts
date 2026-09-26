@@ -31,6 +31,8 @@ export interface StocktakeLine {
   countedQty: number | null
   variance: number | null
   varianceCostPence: number | null
+  // Who entered the count, so the Bar Manager reviews every line before Apply (0099).
+  countedByName: string | null
 }
 
 export const stocktakeCountForm = z.object({

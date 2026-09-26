@@ -343,6 +343,9 @@ export const stocktakeLines = sqliteTable('stocktake_lines', {
   itemId: text('item_id').notNull().references(() => barItems.id, { onDelete: 'restrict' }),
   expectedQty: integer('expected_qty').notNull(),
   countedQty: integer('counted_qty'),
+  // Who entered the figure now standing, which may be tonight's bar shift (0099). Bare, since a
+  // reference added to a live table rebuilds it; NULL while the line is uncounted.
+  countedBy: text('counted_by'),
 }, table => [
   unique('stocktake_lines_item').on(table.stocktakeId, table.itemId),
   check('stocktake_lines_counted_not_negative', sql`${table.countedQty} IS NULL OR ${table.countedQty} >= 0`),
