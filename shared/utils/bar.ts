@@ -107,6 +107,11 @@ export const MOVEMENT_WRITERS: Record<StockMovementKind, string> = {
 export const HAND_ENTERED_KINDS: readonly StockMovementKind[] = STOCK_MOVEMENT_KINDS
   .filter(kind => MOVEMENT_WRITERS[kind] === 'the stock screen')
 
+// What a reversal may cancel: a row somebody typed in, or a stocktake's adjustment. A sale or a
+// comp keeps its money in the ledger, so its stock comes back only with that (issue 1350).
+export const REVERSIBLE_KINDS: readonly StockMovementKind[] = STOCK_MOVEMENT_KINDS
+  .filter(kind => kind === 'STOCKTAKE' || (HAND_ENTERED_KINDS.includes(kind) && kind !== 'REVERSAL'))
+
 // A vocabulary rather than free text: waste has to be reportable (F-204), and an append-only row
 // cannot be scrubbed later if somebody types a name into it (0010, 0011).
 export const MOVEMENT_REASONS = [
@@ -630,6 +635,31 @@ export interface StockItem {
   // The active products that deplete this item, derived from their components rather than stored
   // (F-128 criterion 7). Empty means nothing on the till pours it.
   pouredBy: { id: string, name: string }[]
+  // The measures the bar pours from it, one per quantity, which a write-off offers (issue 1350).
+  pourSizes: PourSize[]
+}
+
+export interface PourSize {
+  label: string
+  qty: number
+}
+
+// What a write-off offers: the measures poured from the item, smallest first, and the whole
+// container where no measure already is one.
+export function writeOffSizes(item: { unit: StockUnit, containerMl: number | null, pourSizes: readonly PourSize[] }): PourSize[] {
+  const sizes = [...item.pourSizes].sort((a, b) => a.qty - b.qty)
+  if (item.unit === 'ML' && item.containerMl && !sizes.some(size => size.qty === item.containerMl)) {
+    sizes.push({ label: 'The whole container', qty: item.containerMl })
+  }
+  return sizes
+}
+
+// The button that writes a movement says what it will write (issue 1350).
+export function saysMovementAction(movement: { kind: StockMovementKind, qty: number, unit: StockUnit, itemName: string, adds?: boolean }): string {
+  const amount = saysQuantity(Math.abs(movement.qty), movement.unit)
+  if (movement.kind === 'WASTAGE') return `Write off ${amount} of ${movement.itemName}`
+  if (movement.kind === 'DELIVERY') return `Record a delivery of ${amount} ${movement.unit === 'ML' ? 'of ' : ''}${movement.itemName}`
+  return movement.adds ? `Add ${amount} to ${movement.itemName}` : `Take ${amount} off ${movement.itemName}`
 }
 
 // How a delivery's cost is kept (0100): what one unit cost, or what one container cost with what

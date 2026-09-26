@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { sellsWithoutCheckId } from '#shared/utils/bar'
-import { click, fill, fillNumber, menuOptions, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { chooseAction, click, fill, fillNumber, menuOptions, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -130,6 +130,21 @@ async function listing<T>(path: string, query = '', as = officer.cookie): Promis
 const products = (query = '', as = officer.cookie) => listing<ListedProduct>('/api/admin/bar/products', query, as)
 const items = (query = '', as = officer.cookie) => listing<ListedItem>('/api/admin/bar/items', query, as)
 const movements = (query = '', as = officer.cookie) => listing<ListedMovement>('/api/admin/bar/movements', query, as)
+
+// A movement another screen writes, put straight in so a test can see how this one treats it.
+function aMovement(itemId: string, kind: 'SALE' | 'COMP' | 'STOCKTAKE', qty: number): string {
+  const database = new Database(app.databaseFile)
+  try {
+    const id = `mv-${crypto.randomUUID().slice(0, 12)}`
+    const document = kind === 'STOCKTAKE' ? ['stocktake_lines', `line-${id}`] : [null, null]
+    database.query('INSERT INTO stock_movements (id, item_id, qty, kind, ref_table, ref_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, itemId, qty, kind, document[0] ?? null, document[1] ?? null)
+    return id
+  }
+  finally {
+    database.close()
+  }
+}
 
 const onHand = async (id: string): Promise<number> =>
   (await items()).find(item => item.id === id)?.onHand ?? Number.NaN
@@ -776,6 +791,38 @@ describe.skipIf(skip !== null)('a correction supersedes, and stamps who made it 
     await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 750 }, barManager.cookie)
     expect((await movements(`&itemId=${id}`))[0]?.actorId).toBe(barManager.id)
   })
+
+  // Issue 1350 (F-114 criterion 4 as amended): a sale or a comp keeps its money in the ledger, so
+  // putting its stock back by hand would leave the two disagreeing. A stocktake's row may go.
+  test('a sale or a comp is never reversed by hand, and the refusal says how it is corrected', async () => {
+    const id = await addItem()
+    await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 750 })
+    for (const kind of ['SALE', 'COMP'] as const) {
+      const poured = aMovement(id, kind, -25)
+      const refused = await send('POST', '/api/admin/bar/movements', {
+        itemId: id,
+        kind: 'REVERSAL',
+        qty: 25,
+        reason: 'COUNT_CORRECTION',
+        reversesId: poured,
+      })
+      expect(refused.status).toBe(409)
+      expect((await refused.json() as { message?: string }).message).toContain('money')
+    }
+    expect(await onHand(id)).toBe(700)
+  })
+
+  test('a stocktake adjustment may still be reversed', async () => {
+    const id = await addItem()
+    const counted = aMovement(id, 'STOCKTAKE', 40)
+    expect((await send('POST', '/api/admin/bar/movements', {
+      itemId: id,
+      kind: 'REVERSAL',
+      qty: -40,
+      reason: 'COUNT_CORRECTION',
+      reversesId: counted,
+    })).status).toBe(200)
+  })
 })
 
 describe.skipIf(skip !== null)('who may administer the bar (F-111 criterion 5)', () => {
@@ -882,7 +929,7 @@ describe.skipIf(skip !== null)('the screens', () => {
 
   // A form validates its whole state, so a modal held to the wrong schema throws before the
   // handler runs and the button silently does nothing. Only driving it proves it works.
-  test('a wastage recorded through the modal reaches the register and moves on hand', async () => {
+  test('a delivery recorded through its own button reaches the register and moves on hand', async () => {
     const itemName = named('Modal bottle')
     const itemId = await addItem({ name: itemName })
     await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 3000, costPence: 480 })
@@ -894,16 +941,67 @@ describe.skipIf(skip !== null)('the screens', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="move-${itemId}"]`)
-    await click(view, `[data-test="move-${itemId}"]`)
+    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="deliver-${itemId}"]`)
+    await click(view, `[data-test="deliver-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
 
     await fillNumber(view, '[data-test="movement-qty"]', '250')
+    await waitFor(view, `document.querySelector('[data-test="movement-submit"]')?.textContent.includes('Record a delivery of 250 ml')`)
     await click(view, '[data-test="movement-submit"]')
     await waitFor(view, `!document.querySelector('[data-test="movement-form"]')`)
 
-    // A delivery is the modal's default, so what the screen wrote adds to what the API delivered.
     expect(await onHand(itemId)).toBe(3250)
+    view.close()
+  }, 120_000)
+
+  // Issue 1350: a write-off starts as one, offers the measures the bar pours from the item and
+  // the wastage reasons as chips, and says what it will write before it writes it.
+  test('a write-off is two chips and one press on a phone, and says what it takes off', async () => {
+    const categoryId = await addCategory()
+    const itemName = named('Wasted red')
+    const itemId = await addItem({ name: itemName })
+    await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 750 })
+    const productId = await addProduct(categoryId)
+    const variantId = await addVariant(productId, { servingKind: '175ml', label: '175ml' })
+    await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 175 }] })
+
+    const view = await openSignedOutView(app.baseURL, { width: 375, height: 812 })
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="write-off-${itemId}"]`)
+    await click(view, `[data-test="write-off-${itemId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
+    await click(view, '[data-test="write-off-size-175"]')
+    await click(view, '[data-test="write-off-reason-SPILLAGE"]')
+    await waitFor(view, `document.querySelector('[data-test="movement-submit"]')?.textContent.includes('Write off 175 ml of ${itemName}')`)
+    await click(view, '[data-test="movement-submit"]')
+    await waitFor(view, `!document.querySelector('[data-test="movement-form"]')`)
+
+    expect((await movements(`&itemId=${itemId}`))[0]).toMatchObject({ kind: 'WASTAGE', qty: -175, reason: 'SPILLAGE' })
+    expect(await onHand(itemId)).toBe(575)
+    view.close()
+  }, 120_000)
+
+  // Issue 1350: the history offers Reverse only where a reversal is allowed at all.
+  test('the movement history offers no Reverse on a sale', async () => {
+    const itemName = named('Sold bottle')
+    const itemId = await addItem({ name: itemName })
+    const delivered = await created(await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 750 }))
+    const sold = aMovement(itemId, 'SALE', -175)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock/movements?itemId=${itemId}`, `[data-test="reverse-${delivered}"]`)
+    expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="reverse-${sold}"]'))`)).toBe(false)
     view.close()
   }, 120_000)
 
@@ -920,8 +1018,8 @@ describe.skipIf(skip !== null)('the screens', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="move-${itemId}"]`)
-    await click(view, `[data-test="move-${itemId}"]`)
+    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="deliver-${itemId}"]`)
+    await click(view, `[data-test="deliver-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
     expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost of one container')
 
@@ -952,8 +1050,8 @@ describe.skipIf(skip !== null)('the screens', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="move-${itemId}"]`)
-    await click(view, `[data-test="move-${itemId}"]`)
+    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="deliver-${itemId}"]`)
+    await click(view, `[data-test="deliver-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
     const form = await textOf(view, '[data-test="movement-form"]')
     expect(form).toContain('Cost of one')
@@ -962,10 +1060,10 @@ describe.skipIf(skip !== null)('the screens', () => {
     view.close()
   }, 120_000)
 
-  // The picker offers only what the write path accepts for the chosen kind, and forgets a
-  // choice that stops making sense when the kind changes under it (F-204, 3.5).
-  test('the reason picker is filtered by kind, and resets when the kind changes', async () => {
-    const itemId = await addItem({ name: named('Reason bottle') })
+  // Each action offers only the reasons the write path accepts for its kind (F-204, 3.5).
+  test('a write-off offers wastage reasons and an adjustment its own', async () => {
+    const itemName = named('Reason bottle')
+    const itemId = await addItem({ name: itemName })
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -974,23 +1072,21 @@ describe.skipIf(skip !== null)('the screens', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/bar/stock?search=Reason`, `[data-test="move-${itemId}"]`)
-    await click(view, `[data-test="move-${itemId}"]`)
+    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="write-off-${itemId}"]`)
+    await click(view, `[data-test="write-off-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
+    const offered = await view.evaluate<string>(
+      `JSON.stringify([...document.querySelectorAll('[data-test^="write-off-reason-"]')].map(chip => chip.innerText.trim()))`,
+    )
+    expect(JSON.parse(offered)).toEqual(['Breakage', 'Spillage', 'Out of date', 'Line cleaning', 'Quality', 'Training', 'Other'])
+    await view.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+    await waitFor(view, `!document.querySelector('[data-test="movement-form"]')`)
 
-    await pickOption(view, '[data-test="movement-kind"]', 'Wastage')
+    await chooseAction(view, `[data-test="more-${itemId}"]`, 'Adjust the count')
     await waitFor(view, `document.querySelector('[data-test="movement-reason"]')`)
-    expect(await menuOptions(view, '[data-test="movement-reason"]')).toEqual([
-      'Breakage', 'Spillage', 'Out of date', 'Line cleaning', 'Quality', 'Training', 'Other',
-    ])
-    await pickOption(view, '[data-test="movement-reason"]', 'Breakage')
-
-    // Adjustment's own reasons replace wastage's, and the reason chosen a moment ago does not survive.
-    await pickOption(view, '[data-test="movement-kind"]', 'Adjustment')
     expect(await menuOptions(view, '[data-test="movement-reason"]')).toEqual([
       'Count correction', 'Opening balance', 'Other',
     ])
-    expect(await textOf(view, '[data-test="movement-reason"]')).not.toContain('Breakage')
 
     view.close()
   }, 120_000)

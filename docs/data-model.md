@@ -1504,7 +1504,7 @@ for each listing:
 | --- | --- |
 | `GET /api/admin/bar/categories` | The paged envelope, each row carrying its product count. Filtered by its declaration (`shared/utils/bar-categories-list.ts`, K-129): no field yet, only `search` over the name and `sort` by till order or name. |
 | `GET /api/admin/bar/products` | The paged envelope, every status included, each row carrying whether it has ever sold and `restrictedPours`, the names of the age-restricted stocked items its live sizes pour. Filtered by its declaration (`shared/utils/bar-products-list.ts`, K-129): `categoryId`, `retired` and `withoutCheckId` (a product left unrestricted that pours restricted stock, hidden and retired included, the Bar Manager's correction list, issue 1299), with `search` over the name and `sort` by category, category name, till order within the category, or product name. |
-| `GET /api/admin/bar/items` | The paged envelope, each row carrying what is on hand: the sum of its movements. Filtered by its declaration (`shared/utils/bar-items-list.ts`, K-129): `retired`, with `search` over the name and `sort` by status or name. |
+| `GET /api/admin/bar/items` | The paged envelope, each row carrying what is on hand: the sum of its movements, and `pourSizes`, the measures its live sizes pour (one per quantity, choices included, `pourSizesColumn`), which a write-off offers as chips (issue 1350). Filtered by its declaration (`shared/utils/bar-items-list.ts`, K-129): `retired`, with `search` over the name and `sort` by status or name. |
 | `GET /api/admin/bar/movements` | The paged envelope, newest first. Filtered by its declaration (`shared/utils/bar-movements-list.ts`, K-129): `itemId` and `kind`, with `search` over the stocked item's name and `sort` by when or `recordedOrder`, the row's own insertion order, which breaks a tie within the same second. |
 | `GET /api/admin/bar/stocktakes` | The paged envelope, newest opened first. Filtered by its declaration (`shared/utils/stocktakes-list.ts`, K-129): `status`, which is also the only column the `search` box runs over. |
 
@@ -1738,7 +1738,11 @@ as does every historical row (F-202) · `created_at`.
 On-hand is always `SUM(qty)`, computed where it is asked for; no column anywhere holds a balance,
 and a test over the live schema refuses one. Triggers refuse every UPDATE and DELETE, and refuse a
 reversal that does not name a movement of the same item and the opposite quantity. UNIQUE
-(`reverses_id`), so a movement is reversed once. Partial UNIQUE (`ref_id`) WHERE
+(`reverses_id`), so a movement is reversed once. Only a hand-entered movement (`DELIVERY`,
+`WASTAGE`, `ADJUST`) or a `STOCKTAKE` adjustment is reversed (`REVERSIBLE_KINDS`,
+`shared/utils/bar.ts`): the movements route refuses to reverse a `SALE` or a `COMP`, whose money
+stays in the ledger, so its stock comes back only with a void of that money (F-114 criterion 4,
+issue 1350). Partial UNIQUE (`ref_id`) WHERE
 ref_table='stocktake_lines' (a duplicate finish rolls the batch back).
 
 Two more triggers refuse a depletion that would take the sum below nothing, one per kind that

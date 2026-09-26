@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { pouredByColumn, readPouredBy, readRestrictedPours, restrictedPoursColumn, withoutCheckIdPredicate } from './bar-linkage'
+import { pourSizesColumn, pouredByColumn, readPourSizes, readPouredBy, readRestrictedPours, restrictedPoursColumn, withoutCheckIdPredicate } from './bar-linkage'
 import type { SQL } from 'drizzle-orm'
 import { SERVING_KINDS, effectivePriceRow } from '#shared/utils/bar'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
@@ -399,7 +399,8 @@ export async function productById(id: string): Promise<BarProduct | undefined> {
   return row ? readProduct(row) : undefined
 }
 
-interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements' | 'pouredBy'> {
+interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements' | 'pouredBy' | 'pourSizes'> {
+  pourSizes: string | null
   ageRestricted: number
   hasMovements: number
   pouredBy: string | null
@@ -411,6 +412,7 @@ const readItem = (row: ItemRow): StockItem => ({
   ageRestricted: row.ageRestricted === 1,
   hasMovements: row.hasMovements === 1,
   pouredBy: readPouredBy(row.pouredBy),
+  pourSizes: readPourSizes(row.pourSizes),
 })
 
 const ITEM_COLUMNS = sql`
@@ -438,7 +440,7 @@ export function itemsClause(query: ListQuery): ListClause {
 export function itemsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT ${ITEM_COLUMNS}, ${onHandColumn('i')} AS onHand, ${MOVED} AS hasMovements,
-           ${pouredByColumn('i')} AS pouredBy
+           ${pouredByColumn('i')} AS pouredBy, ${pourSizesColumn('i')} AS pourSizes
     FROM bar_items i${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
@@ -456,7 +458,7 @@ export async function countItems(clause: ListClause): Promise<number> {
 export async function itemById(id: string): Promise<StockItem | undefined> {
   const [row] = await db.all<ItemRow>(sql`
     SELECT ${ITEM_COLUMNS}, ${onHandColumn('i')} AS onHand, ${MOVED} AS hasMovements,
-           ${pouredByColumn('i')} AS pouredBy
+           ${pouredByColumn('i')} AS pouredBy, ${pourSizesColumn('i')} AS pourSizes
     FROM bar_items i WHERE i.id = ${id}
   `)
   return row ? readItem(row) : undefined

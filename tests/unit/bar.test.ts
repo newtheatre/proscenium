@@ -3,6 +3,7 @@ import {
   HAND_ENTERED_KINDS,
   KINDS_NEEDING_A_REASON,
   MOVEMENT_WRITERS,
+  REVERSIBLE_KINDS,
   STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   STOCK_MOVEMENT_KINDS,
   categoryForm,
@@ -19,6 +20,7 @@ import {
   says,
   saysDeliveryCost,
   saysMoney,
+  saysMovementAction,
   saysQuantity,
   saysStockStatus,
   priceForm,
@@ -26,6 +28,7 @@ import {
   stockStatus,
   variantEditForm,
   variantForm,
+  writeOffSizes,
 } from '#shared/utils/bar'
 
 // F-111 and F-114's write-path rules, which the database CHECKs mirror rather than replace: a
@@ -55,6 +58,32 @@ describe('the movement vocabulary is complete and each kind has an owner (F-114 
     for (const kind of ['SALE', 'COMP', 'STOCKTAKE', 'TRANSFER'] as const) {
       expect(`${kind}: ${HAND_ENTERED_KINDS.includes(kind)}`).toBe(`${kind}: false`)
     }
+  })
+
+  // Issue 1350 (F-114 criterion 4 as amended): reversing a sale or a comp put the stock back while
+  // the money stayed in the ledger, so only a hand-entered row or a stocktake's is reversed.
+  test('only a hand-entered row or a stocktake adjustment is reversed', () => {
+    expect([...REVERSIBLE_KINDS]).toEqual(['DELIVERY', 'STOCKTAKE', 'WASTAGE', 'ADJUST'])
+  })
+})
+
+// Issue 1350: the stock screen names the change on the button that makes it, so a wrong default
+// can no longer write a delivery nobody meant.
+describe('a movement is named before it is written', () => {
+  test('a write-off, a delivery and an adjustment each say what they will do', () => {
+    expect(saysMovementAction({ kind: 'WASTAGE', qty: 175, unit: 'ML', itemName: 'House red' })).toBe('Write off 175 ml of House red')
+    expect(saysMovementAction({ kind: 'DELIVERY', qty: 24, unit: 'ITEM', itemName: 'Cider can' })).toBe('Record a delivery of 24 Cider can')
+    expect(saysMovementAction({ kind: 'ADJUST', qty: 3, unit: 'ITEM', itemName: 'Crisps', adds: true })).toBe('Add 3 to Crisps')
+    expect(saysMovementAction({ kind: 'ADJUST', qty: 3, unit: 'ITEM', itemName: 'Crisps', adds: false })).toBe('Take 3 off Crisps')
+  })
+
+  test('a write-off offers the sizes that pour the item, and the whole container once', () => {
+    expect(writeOffSizes({ unit: 'ML', containerMl: 750, pourSizes: [{ label: '175ml', qty: 175 }, { label: '125ml', qty: 125 }] }))
+      .toEqual([{ label: '125ml', qty: 125 }, { label: '175ml', qty: 175 }, { label: 'The whole container', qty: 750 }])
+    expect(writeOffSizes({ unit: 'ML', containerMl: 750, pourSizes: [{ label: 'Bottle', qty: 750 }] }))
+      .toEqual([{ label: 'Bottle', qty: 750 }])
+    expect(writeOffSizes({ unit: 'ITEM', containerMl: null, pourSizes: [{ label: 'Can', qty: 1 }] }))
+      .toEqual([{ label: 'Can', qty: 1 }])
   })
 })
 

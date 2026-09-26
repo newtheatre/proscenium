@@ -355,7 +355,10 @@ Open questions:
      (F-105), wastage (negative, mandatory reason), transfer (paired movements between locations
      netting zero), stocktake adjustment (F-115) and void credit (F-109).
   4. Movements are append-only, trigger-enforced: no update or delete; a correction is a reversing
-     movement referencing the original.
+     movement referencing the original. Amended 26 September 2026 (issue 1350): only a movement
+     entered by hand (a delivery, wastage or adjustment) or a stocktake adjustment is reversed;
+     a sale or a comp keeps its money in the ledger, so its stock comes back only with a void of
+     that money, and the route refuses to reverse it.
   5. Every movement stamps its actor (or system), timestamp and source document (delivery, sale
      line, stocktake), so any on-hand figure can be audited to its causes.
   6. Deliveries record cost, giving GP reporting (F-119) its cost basis. Amended 26 September

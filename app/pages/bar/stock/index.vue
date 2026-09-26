@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import {
-  HAND_ENTERED_KINDS,
   REASONS_BY_KIND,
   STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   DELIVERY_COST_QUESTION,
@@ -10,10 +9,12 @@ import {
   deliveryCostBasis,
   movementEntryForm,
   says,
+  saysMovementAction,
   saysQuantity,
   saysStockStatus,
   stockItemForm,
   stockStatus,
+  writeOffSizes,
 } from '#shared/utils/bar'
 import { barItemsList } from '#shared/utils/bar-items-list'
 import type { MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
@@ -76,16 +77,11 @@ interface MovementState {
 const movement = reactive<MovementState>({ kind: 'DELIVERY', qty: 1, adds: true })
 
 const unitOptions = STOCK_UNITS.map(value => ({ label: says(value), value }))
-// A reversal is raised from the movement history, against the movement it cancels.
-const kindOptions = (HAND_ENTERED_KINDS.filter(kind => kind !== 'REVERSAL') as HandEnteredKind[])
-  .map(value => ({ label: says(value), value }))
 // Only the reasons the kind actually takes: the server refuses the rest, so the picker never
 // offers one it would (F-204, 3.5).
 const reasonOptions = computed(() => (REASONS_BY_KIND[movement.kind] ?? []).map(value => ({ label: says(value), value })))
-
-watch(() => movement.kind, () => {
-  movement.reason = undefined
-})
+// A write-off offers the measures the bar pours from the item, so a spilt glass is one tap.
+const sizeChips = computed(() => (moving.value ? writeOffSizes(moving.value) : []))
 const directionOptions = [{ label: 'Add to stock', value: true }, { label: 'Take off stock', value: false }]
 
 const costPounds = ref<number>()
@@ -113,11 +109,22 @@ function edit(item: StockItem | null): void {
   open.value = true
 }
 
-function moveStock(item: StockItem): void {
+// Each action opens on its own kind, so no default can write a movement nobody meant (issue 1350).
+function moveStock(item: StockItem, kind: HandEnteredKind): void {
   moving.value = item
-  Object.assign(movement, { kind: 'DELIVERY', qty: 1, reason: undefined, adds: true })
+  Object.assign(movement, { kind, qty: kind === 'WASTAGE' ? 0 : 1, reason: undefined, adds: true })
   costPounds.value = undefined
 }
+
+const MOVEMENT_TITLES: Record<HandEnteredKind, string> = {
+  DELIVERY: 'Record a delivery of',
+  WASTAGE: 'Write off',
+  ADJUST: 'Adjust the count of',
+}
+
+const submitLabel = computed(() => (moving.value && movement.qty > 0
+  ? saysMovementAction({ kind: movement.kind, qty: movement.qty, unit: moving.value.unit, itemName: moving.value.name, adds: movement.adds })
+  : 'Say how much first'))
 
 async function save(): Promise<void> {
   saving.value = true
@@ -345,16 +352,27 @@ const columns: TableColumn<StockItem>[] = [
     id: 'act',
     header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
+    // The two movements a bar records by hand sit on the row; an adjustment, a retirement and a
+    // deletion are rarer and go behind More actions (issue 1350, K-123 criterion 10).
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
-      row.original.status === 'ACTIVE'
-        ? h(UButton, {
-            'size': 'sm',
-            'color': 'neutral',
-            'variant': 'ghost',
-            'data-test': `move-${row.original.id}`,
-            'onClick': () => moveStock(row.original),
-          }, () => 'Record a movement')
-        : null,
+      ...(row.original.status === 'ACTIVE'
+        ? [
+            h(UButton, {
+              'size': 'sm',
+              'color': 'neutral',
+              'variant': 'ghost',
+              'data-test': `deliver-${row.original.id}`,
+              'onClick': () => moveStock(row.original, 'DELIVERY'),
+            }, () => 'Delivery'),
+            h(UButton, {
+              'size': 'sm',
+              'color': 'neutral',
+              'variant': 'ghost',
+              'data-test': `write-off-${row.original.id}`,
+              'onClick': () => moveStock(row.original, 'WASTAGE'),
+            }, () => 'Write off'),
+          ]
+        : []),
       h(UButton, {
         'size': 'sm',
         'color': 'neutral',
@@ -362,27 +380,29 @@ const columns: TableColumn<StockItem>[] = [
         'data-test': `edit-${row.original.id}`,
         'onClick': () => edit(row.original),
       }, () => 'Edit'),
-      h(UButton, {
-        'size': 'sm',
-        'color': 'neutral',
-        'variant': 'ghost',
-        'data-test': `status-${row.original.id}`,
-        'onClick': () => {
-          if (row.original.status === 'RETIRED') return void setStatus(row.original, 'ACTIVE')
-          retireFailure.value = null
-          retiring.value = row.original
+      rowOverflow(row.original.id, [
+        ...(row.original.status === 'ACTIVE'
+          ? [{ label: 'Adjust the count', onSelect: () => moveStock(row.original, 'ADJUST') }]
+          : []),
+        {
+          label: row.original.status === 'RETIRED' ? 'Bring back' : 'Retire',
+          onSelect: () => {
+            if (row.original.status === 'RETIRED') return void setStatus(row.original, 'ACTIVE')
+            retireFailure.value = null
+            retiring.value = row.original
+          },
         },
-      }, () => (row.original.status === 'RETIRED' ? 'Bring back' : 'Retire')),
-      rowOverflow(row.original.id, row.original.hasMovements
-        ? []
-        : [{
-            label: 'Delete',
-            color: 'error',
-            onSelect: () => {
-              failure.value = null
-              removing.value = row.original
-            },
-          }]),
+        ...(row.original.hasMovements
+          ? []
+          : [{
+              label: 'Delete',
+              color: 'error' as const,
+              onSelect: () => {
+                failure.value = null
+                removing.value = row.original
+              },
+            }]),
+      ]),
     ]),
   },
 ]
@@ -604,7 +624,7 @@ const columns: TableColumn<StockItem>[] = [
 
     <UModal
       :open="moving !== null"
-      :title="moving ? `Record a movement for ${moving.name}` : ''"
+      :title="moving ? `${MOVEMENT_TITLES[movement.kind]} ${moving.name}` : ''"
       description="A movement is written once and never edited. Correct one from the movement history instead."
       @update:open="moving = null; failure = null"
     >
@@ -626,19 +646,6 @@ const columns: TableColumn<StockItem>[] = [
           />
 
           <UFormField
-            label="What happened"
-            name="kind"
-            required
-          >
-            <USelect
-              v-model="movement.kind"
-              :items="kindOptions"
-              class="w-full"
-              data-test="movement-kind"
-            />
-          </UFormField>
-
-          <UFormField
             v-if="movement.kind === 'ADJUST'"
             label="Which way"
             name="adds"
@@ -652,6 +659,28 @@ const columns: TableColumn<StockItem>[] = [
             />
           </UFormField>
 
+          <div
+            v-if="movement.kind === 'WASTAGE' && sizeChips.length > 0"
+            class="space-y-2"
+          >
+            <p class="text-sm font-medium">
+              How much
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-for="size in sizeChips"
+                :key="size.qty"
+                :color="movement.qty === size.qty ? 'primary' : 'neutral'"
+                :variant="movement.qty === size.qty ? 'solid' : 'subtle'"
+                class="min-h-12"
+                :data-test="`write-off-size-${size.qty}`"
+                @click="movement.qty = size.qty"
+              >
+                {{ size.label }}, {{ saysQuantity(size.qty, moving!.unit) }}
+              </UButton>
+            </div>
+          </div>
+
           <UFormField
             label="Quantity"
             name="qty"
@@ -660,7 +689,7 @@ const columns: TableColumn<StockItem>[] = [
           >
             <UInputNumber
               v-model="movement.qty"
-              :min="1"
+              :min="0"
               class="w-full"
               data-test="movement-qty"
             />
@@ -680,6 +709,28 @@ const columns: TableColumn<StockItem>[] = [
               data-test="movement-cost"
             />
           </UFormField>
+
+          <div
+            v-else-if="movement.kind === 'WASTAGE'"
+            class="space-y-2"
+          >
+            <p class="text-sm font-medium">
+              Why
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-for="reason in reasonOptions"
+                :key="reason.value"
+                :color="movement.reason === reason.value ? 'primary' : 'neutral'"
+                :variant="movement.reason === reason.value ? 'solid' : 'subtle'"
+                class="min-h-12"
+                :data-test="`write-off-reason-${reason.value}`"
+                @click="movement.reason = reason.value"
+              >
+                {{ reason.label }}
+              </UButton>
+            </div>
+          </div>
 
           <UFormField
             v-else
@@ -704,8 +755,9 @@ const columns: TableColumn<StockItem>[] = [
           form="movement-form"
           :loading="saving"
           data-test="movement-submit"
+          :disabled="movement.qty <= 0"
         >
-          Record the movement
+          {{ submitLabel }}
         </UButton>
         <UButton
           color="neutral"

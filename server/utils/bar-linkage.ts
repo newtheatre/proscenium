@@ -2,6 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { auditEntry, changes } from '#shared/utils/audit'
 import type { SQL } from 'drizzle-orm'
+import type { PourSize } from '#shared/utils/bar'
 
 // F-128: both directions are read from the components that already exist. Nothing stores a link,
 // and every predicate here scopes by subquery rather than by an id list read first (0006).
@@ -34,6 +35,31 @@ export function pouredByColumn(alias: string): SQL {
   )`
 }
 
+// The measures poured from an item by a live size of a product still on the catalogue, directly
+// or as a choice, one per quantity (issue 1350). A column over the row, binding nothing (0006).
+export function pourSizesColumn(alias: string): SQL {
+  const item = sql.raw(`${alias}.id`)
+  return sql`(
+    SELECT json_group_array(json_object('label', label, 'qty', qty)) FROM (
+      SELECT min(label) AS label, qty FROM (
+        SELECT v.label AS label, c.qty AS qty
+        FROM variant_components c
+        JOIN product_variants v ON v.id = c.variant_id AND v.status = 'ACTIVE'
+        JOIN bar_products p ON p.id = v.product_id AND p.status <> 'RETIRED'
+        WHERE c.item_id = ${item}
+        UNION ALL
+        SELECT v.label AS label, g.qty AS qty
+        FROM choice_group_items g
+        JOIN variant_components c ON c.choice_group_id = g.choice_group_id
+        JOIN product_variants v ON v.id = c.variant_id AND v.status = 'ACTIVE'
+        JOIN bar_products p ON p.id = v.product_id AND p.status <> 'RETIRED'
+        WHERE g.item_id = ${item}
+      )
+      GROUP BY qty ORDER BY qty
+    )
+  )`
+}
+
 // SQLite hands back json_group_array as text, and an empty group as an empty array.
 function readJsonArray<T>(value: string | null): T[] {
   if (!value) return []
@@ -42,6 +68,7 @@ function readJsonArray<T>(value: string | null): T[] {
 }
 
 export const readPouredBy = (value: string | null): PouredBy[] => readJsonArray(value)
+export const readPourSizes = (value: string | null): PourSize[] => readJsonArray(value)
 
 // The other direction: the items a product's live sizes deplete, or offer as a choice. A subquery
 // over the product it is handed, so it binds nothing per product or item (0006).
