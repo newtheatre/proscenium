@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { stocktakeLinesQuery, stocktakeByIdQuery, openStocktakeQuery } from '#server/utils/stocktakes'
+import { countStatements, stocktakeLinesQuery, stocktakeByIdQuery, openStocktakeQuery } from '#server/utils/stocktakes'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
 
@@ -101,6 +101,40 @@ describe('one line per item, blank distinct from an entered zero (F-115 criterio
       const [statement, ...parameters] = boundStatement(database, stocktakeLinesQuery('st-1'))
       const [line] = rows<StocktakeLine>(database, statement, ...parameters)
       expect(line!.countedQty).toBeNull()
+    })
+  })
+
+  // Decision 0099 (issue 1322): a count can come from tonight's bar shift, so each line says who
+  // entered it, and the Bar Manager reviews every line before Apply.
+  test('a count records who entered it, and clearing it clears that too', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const counter = person(database, '2')
+      const itemId = bottle(database)
+      insert(database, 'stocktakes', { id: 'st-1', status: 'OPEN', opened_by: opener })
+      insert(database, 'stocktake_lines', { id: 'l-1', stocktake_id: 'st-1', item_id: itemId, expected_qty: 10 })
+
+      database.batch(countStatements('st-1', [{ itemId, counted: 9 }], counter).map(statement => boundStatement(database, statement)))
+      const [statement, ...parameters] = boundStatement(database, stocktakeLinesQuery('st-1'))
+      expect(rows<StocktakeLine & { countedByName: string | null }>(database, statement, ...parameters)[0])
+        .toMatchObject({ countedQty: 9, countedByName: 'Person 2' })
+
+      database.batch(countStatements('st-1', [{ itemId, counted: null }], counter).map(one => boundStatement(database, one)))
+      expect(rows(database, `SELECT counted_qty, counted_by FROM stocktake_lines WHERE id = 'l-1'`))
+        .toEqual([{ counted_qty: null, counted_by: null }])
+    })
+  })
+
+  test('a stocktake applied in the meantime takes none of a count', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const itemId = bottle(database)
+      insert(database, 'stocktakes', { id: 'st-1', status: 'APPLIED', opened_by: opener, opened_at: 0, applied_by: opener, applied_at: 1 })
+      insert(database, 'stocktake_lines', { id: 'l-1', stocktake_id: 'st-1', item_id: itemId, expected_qty: 10 })
+
+      database.batch(countStatements('st-1', [{ itemId, counted: 3 }], opener).map(statement => boundStatement(database, statement)))
+      expect(rows(database, `SELECT counted_qty, counted_by FROM stocktake_lines WHERE id = 'l-1'`))
+        .toEqual([{ counted_qty: null, counted_by: null }])
     })
   })
 

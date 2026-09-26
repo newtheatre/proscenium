@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { sqliteTarget } from '#tests/helpers/database'
+import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -19,6 +21,7 @@ let app: AppUnderTest
 let officer: TestMember
 let barManager: TestMember
 let member: TestMember
+let barShift: TestMember
 const barPassword = generatePassword()
 
 beforeAll(async () => {
@@ -26,6 +29,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   member = await registerMember(app, 'ordinary', generatePassword())
+  barShift = await registerMember(app, 'barshift', generatePassword())
 
   barManager = await registerMember(app, 'barmanager', barPassword)
   await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
@@ -256,6 +260,108 @@ describe.skipIf(skip !== null)('who may run a stocktake', () => {
     expect((await send('POST', '/api/admin/bar/stocktakes', undefined, member.cookie)).status).toBe(403)
     expect((await count(opened.stocktake.id, [], member.cookie)).status).toBe(403)
     expect((await apply(opened.stocktake.id, member.cookie)).status).toBe(403)
+    await apply(opened.stocktake.id)
+  })
+})
+
+// Decision 0099 (issue 1322): the whole register was one person's phone job, so tonight's confirmed
+// bar shift may enter counts while a stocktake is open. Open and Apply stay with bar.write.
+describe.skipIf(skip !== null)('tonight\'s confirmed bar shift may enter counts (0099)', () => {
+  let slot = 700
+
+  // A shift on tonight's performance, in the state and the window the test needs (0078).
+  function aBarShift(userId: string, status: 'CONFIRMED' | 'CLAIMED', window?: { startsAt: number, endsAt: number }): void {
+    const database = new Database(app.databaseFile)
+    try {
+      const { performanceId } = tonightsPerformance(sqliteTarget(database), { suffix: `count-${(slot += 1)}` })
+      database.query(`INSERT INTO shifts (id, performance_id, role, slot, user_id, status, starts_at, ends_at)
+        VALUES (?, ?, 'BAR', ?, ?, ?, ?, ?)`)
+        .run(`${performanceId}-BAR-${slot}`, performanceId, slot, userId, status, window?.startsAt ?? null, window?.endsAt ?? null)
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  function clearShifts(userId: string): void {
+    const database = new Database(app.databaseFile)
+    try {
+      database.query(`UPDATE shifts SET status = 'CANCELLED' WHERE user_id = ?`).run(userId)
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  test('a confirmed bar shift inside its window counts, and the line says who counted it', async () => {
+    const item = await anItem()
+    await deliver(item.id, 10)
+    const opened = await open()
+    aBarShift(barShift.id, 'CONFIRMED')
+    try {
+      expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 9 }], barShift.cookie)).status).toBe(200)
+      const answered = await send('GET', `/api/admin/bar/stocktakes/${opened.stocktake.id}`, undefined, barShift.cookie)
+      expect(answered.status).toBe(200)
+      const { lines } = await answered.json() as { lines: (StocktakeLine & { countedByName: string | null })[] }
+      const line = lines.find(one => one.itemId === item.id)
+      expect(line?.countedQty).toBe(9)
+      expect(line?.countedByName).toBe(barShift.name)
+    }
+    finally {
+      clearShifts(barShift.id)
+      await apply(opened.stocktake.id)
+    }
+  })
+
+  test('a shift claimed but not confirmed may not count', async () => {
+    const item = await anItem()
+    const opened = await open()
+    aBarShift(barShift.id, 'CLAIMED')
+    try {
+      expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 1 }], barShift.cookie)).status).toBe(403)
+      expect((await view(opened.stocktake.id)).lines.find(one => one.itemId === item.id)?.countedQty).toBeNull()
+    }
+    finally {
+      clearShifts(barShift.id)
+      await apply(opened.stocktake.id)
+    }
+  })
+
+  test('a shift whose window has ended may not count', async () => {
+    const item = await anItem()
+    const opened = await open()
+    const now = Math.floor(Date.now() / 1000)
+    // Ended three hours ago, well past the grace a late volunteer is allowed (0078).
+    aBarShift(barShift.id, 'CONFIRMED', { startsAt: now - 5 * 3600, endsAt: now - 3 * 3600 })
+    try {
+      expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 1 }], barShift.cookie)).status).toBe(403)
+      expect((await view(opened.stocktake.id)).lines.find(one => one.itemId === item.id)?.countedQty).toBeNull()
+    }
+    finally {
+      clearShifts(barShift.id)
+      await apply(opened.stocktake.id)
+    }
+  })
+
+  test('the bar shift may not open or apply a stocktake', async () => {
+    const opened = await open()
+    aBarShift(barShift.id, 'CONFIRMED')
+    try {
+      expect((await apply(opened.stocktake.id, barShift.cookie)).status).toBe(403)
+      await apply(opened.stocktake.id)
+      expect((await send('POST', '/api/admin/bar/stocktakes', undefined, barShift.cookie)).status).toBe(403)
+    }
+    finally {
+      clearShifts(barShift.id)
+    }
+  })
+
+  test('the Bar Manager\'s own count is named too, so every line can be reviewed before Apply', async () => {
+    const item = await anItem()
+    const opened = await open()
+    await count(opened.stocktake.id, [{ itemId: item.id, counted: 0 }])
+    const { lines } = await view(opened.stocktake.id) as { lines: (StocktakeLine & { countedByName: string | null })[] }
+    expect(lines.find(one => one.itemId === item.id)?.countedByName).toBe(barManager.name)
     await apply(opened.stocktake.id)
   })
 })
