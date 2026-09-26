@@ -87,7 +87,7 @@ function span(daysAhead: number, hour = 14, hours = 2): { startsAt: string, ends
   return { startsAt: start.toISOString(), endsAt: new Date(start.getTime() + hours * 3_600_000).toISOString() }
 }
 
-// A member's booking: its tier follows from the purpose, so this is always a rehearsal (C-115 c1).
+// A member's booking, so its tier follows from the purpose: always a rehearsal (C-115 criterion 1).
 async function bookAs(roomId: string, when: { startsAt: string, endsAt: string }, who: TestMember): Promise<string> {
   const answered = await send('POST', '/api/rooms/bookings', { roomId, title: 'Rehearsal', purpose: 'REHEARSAL', ...when }, who.cookie)
   expect(answered.status).toBe(200)

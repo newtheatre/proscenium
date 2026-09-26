@@ -149,7 +149,7 @@ describe('the server decides a booking\'s tier (C-115 criterion 1)', () => {
     expect(bookingTier('MEETING', undefined, true)).toBe('GENERAL')
   })
 
-  test('the form no longer needs a tier at all', () => {
+  test('a booking form needs no tier', () => {
     const parsed = bookingForm.safeParse({
       roomId: 'r-1',
       title: 'Rehearsal',

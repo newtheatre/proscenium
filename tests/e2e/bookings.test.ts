@@ -253,6 +253,8 @@ describe.skipIf(skip !== null)('one slot, one winner (C-107)', () => {
 // from what the room is for, and only an officer sets Production or Committee (C-115 criterion 1).
 describe.skipIf(skip !== null)('the server decides a booking\'s tier (C-115 criterion 1)', () => {
   const tierOf = (id: string): string | undefined => read<{ tier: string }>('SELECT tier FROM room_bookings WHERE id = ?', id)?.tier
+  const auditOf = (action: string, id: string): string | undefined =>
+    read<{ detail: string }>('SELECT detail FROM audit_log WHERE action = ? AND target = ?', action, `booking:${id}`)?.detail
 
   test('a member who sends Production on a rehearsal books a rehearsal', async () => {
     const room = await makeRoom()
@@ -261,7 +263,7 @@ describe.skipIf(skip !== null)('the server decides a booking\'s tier (C-115 crit
     expect(answered.status).toBe(200)
     const { id } = await answered.json() as { id: string }
     expect(tierOf(id)).toBe('REHEARSAL')
-    expect(read<{ detail: string }>('SELECT detail FROM audit_log WHERE target = ?', `booking:${id}`)?.detail).toContain('"tier":"REHEARSAL"')
+    expect(auditOf('room.booked', id)).toContain('"tier":"REHEARSAL"')
   })
 
   test('a member\'s meeting is general use, whatever it sends', async () => {
@@ -281,8 +283,7 @@ describe.skipIf(skip !== null)('the server decides a booking\'s tier (C-115 crit
     expect(answered.status).toBe(200)
     const { id } = await answered.json() as { id: string }
     expect(tierOf(id)).toBe('REHEARSAL')
-    expect(read<{ detail: string }>('SELECT detail FROM audit_log WHERE action = \'room.requested\' AND target = ?', `booking:${id}`)?.detail)
-      .toContain('"tier":"REHEARSAL"')
+    expect(auditOf('room.requested', id)).toContain('"tier":"REHEARSAL"')
   })
 
   test('an officer\'s Production stands', async () => {

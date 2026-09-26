@@ -37,6 +37,9 @@ export default defineEventHandler(async (event) => {
     },
   )
 
+  // The member asked, so the tier is theirs as any member booking's is (C-115 criterion 1).
+  const tier = bookingTier(request.purpose, undefined, false)
+
   // The predicate rides the INSERT, so two officers claiming one slot cannot both win (0003).
   const claim = await claimSlot({
     roomId: room.id,
@@ -45,8 +48,7 @@ export default defineEventHandler(async (event) => {
     attendees: request.attendees,
     startsAt: request.startsAt,
     endsAt: request.endsAt,
-    // The member asked, so the tier is theirs as any member booking's is (C-115 criterion 1).
-    tier: bookingTier(request.purpose, undefined, false),
+    tier,
     purpose: request.purpose,
     status: verdict.needsApproval ? 'PENDING_APPROVAL' : 'CONFIRMED',
     notes: request.notes,
@@ -86,7 +88,7 @@ export default defineEventHandler(async (event) => {
     actorId: account.id,
     action: 'external.request.relisted',
     target: `external:${id}`,
-    detail: { became: claim.id, room: room.id, needsApproval: verdict.needsApproval },
+    detail: { became: claim.id, room: room.id, tier, needsApproval: verdict.needsApproval },
   }))
 
   await notify(event, {
