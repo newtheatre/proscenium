@@ -45,8 +45,7 @@ function expiry(at: Date): string {
   return formatLondon(at, { dateStyle: 'full', timeStyle: 'short' })
 }
 
-// Any string in a context may have been typed by somebody outside the committee, a guest's name
-// among them, so `render` escapes them all before a template builds its HTML part (issue 1391).
+// Quotes too, so a value inside an attribute (an href) cannot close it.
 function escapeHtml(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;').replaceAll('\'', '&#39;')
@@ -56,7 +55,7 @@ function escapeHtml(value: string): string {
 function escaped(value: unknown): unknown {
   if (typeof value === 'string') return escapeHtml(value)
   if (Array.isArray(value)) return value.map(escaped)
-  if (value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+  if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
     return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, escaped(inner)]))
   }
   return value
