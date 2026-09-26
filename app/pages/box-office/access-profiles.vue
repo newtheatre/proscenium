@@ -85,7 +85,7 @@ async function verify(event: FormSubmitEvent<{ fohNote: string }>): Promise<void
   if (!reviewing.value) return
   deciding.value = true
   try {
-    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/verify`, { method: 'POST', body: event.data })
+    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/verify`, { method: 'POST', body: { ...event.data, version: detail.value?.version ?? null } })
     toast.add({ title: `${reviewing.value.name}'s access profile verified`, icon: 'i-lucide-check', color: 'success' })
     reviewing.value = null
     await load()
@@ -114,7 +114,7 @@ async function decline(event: FormSubmitEvent<DeclineAccessProfileInput>): Promi
   deciding.value = true
   declineFailure.value = null
   try {
-    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/decline`, { method: 'POST', body: event.data })
+    await $fetch(`/api/admin/access-profiles/${reviewing.value.userId}/decline`, { method: 'POST', body: { ...event.data, version: detail.value?.version ?? null } })
     toast.add({ title: `${reviewing.value.name}'s access profile declined`, icon: 'i-lucide-x', color: 'neutral' })
     declining.value = false
     reviewing.value = null

@@ -115,6 +115,13 @@ export const declineAccessProfileForm = z.strictObject({
 
 export type DeclineAccessProfileInput = z.output<typeof declineAccessProfileForm>
 
+// The declaration the officer decided on: its payload's IV, fresh on every save of it and untouched
+// by a consent switch. Null for a row never encrypted (issue 1383, 0003).
+const decidedOn = { version: z.string().nullable() }
+
+export const verifyAccessProfileRequest = verifyAccessProfileForm.extend(decidedOn)
+export const declineAccessProfileRequest = declineAccessProfileForm.extend(decidedOn)
+
 // The declaration and where it stands: every flag, both notes and the card number.
 export interface AccessProfileDeclaration {
   status: AccessProfileStatus
@@ -213,4 +220,5 @@ export interface OfficerAccessProfile extends AccessProfileDeclaration {
   name: string
   email: string
   verifiedBy: string | null
+  version: string | null
 }
