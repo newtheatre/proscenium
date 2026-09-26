@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, hasDefault, isSensitive } from '#shared/utils/config'
+import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, PRIVILEGED_FLOOR, hasDefault, isSensitive } from '#shared/utils/config'
 import { configChangeDetail } from '#shared/utils/config-audit'
 import { DAY_OF_YEAR_KEYS, configProblem } from '#shared/utils/config-rules'
 import { isRecordable } from '#shared/utils/audit'
@@ -36,6 +36,24 @@ describe('what a setting will accept (J-104 criterion 3)', () => {
   test('a pair that holds is accepted', () => {
     expect(configProblem('TRAINING_FINAL_WARNING_DAYS', 30, shipped)).toBeNull()
     expect(configProblem('ROOM_NO_SHOW_RECORD_AT', 3, shipped)).toBeNull()
+  })
+
+  // A-112 criterion 4, issue 1357: a role can be added to the list, and never one on 0009's floor
+  // taken off, so a plain save cannot drop the treasurer's second factor.
+  test('the second-factor roles refuse losing a role on the floor, and name it', () => {
+    const without = (...roles: string[]): string[] => PRIVILEGED_FLOOR.filter(role => !roles.includes(role))
+
+    expect(configProblem('PRIVILEGED_ROLES', without('TREASURER'), shipped)).toContain('Treasurer')
+    const two = configProblem('PRIVILEGED_ROLES', without('TREASURER', 'SAFETY_OFFICER'), shipped)
+    expect(two).toContain('Treasurer')
+    expect(two).toContain('Safety Officer')
+    expect(configProblem('PRIVILEGED_ROLES', [], shipped)).toContain('second factor')
+  })
+
+  test('the second-factor roles take the floor, or more', () => {
+    expect(configProblem('PRIVILEGED_ROLES', [...PRIVILEGED_FLOOR], shipped)).toBeNull()
+    expect(configProblem('PRIVILEGED_ROLES', [...PRIVILEGED_FLOOR, 'COMMITTEE'], shipped)).toBeNull()
+    expect(configProblem('PRIVILEGED_ROLES', [...PRIVILEGED_FLOOR, 'NOT_A_ROLE'], shipped)).toContain('not a valid value')
   })
 
   test('every shipped default is a value the rules accept', () => {

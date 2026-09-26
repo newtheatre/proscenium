@@ -48,6 +48,43 @@ describe('a setting nothing reads says so (J-104 criterion 6)', () => {
   })
 })
 
+// Issue 1357: rules, not keys. A card is headed in words with its key beneath, a reader is shown
+// values and nothing to press, and the limits on the machinery are folded away.
+describe('the settings screen reads as rules', () => {
+  test('a card is headed in words, with the key beneath it and the unit beside the number', async () => {
+    const source = await read(SETTINGS)
+    expect(source).toContain('configHeading(setting.key)')
+    expect(source).toContain(':data-test="`key-${setting.key}`"')
+    expect(source).toContain('configUnit(setting.key)')
+  })
+
+  test('the search finds a setting by its heading too', async () => {
+    const source = await read(SETTINGS)
+    expect(source).toMatch(/configHeading\(setting\.key\)\.toLowerCase\(\)\.includes\(term\)/)
+  })
+
+  test('a reader of the settings is shown each value in words and no input', async () => {
+    const source = await read(SETTINGS)
+    expect(source).toContain('can(useViewer().value, editSettings)')
+    expect(source).toContain('v-if="!setting.synced && edits"')
+    expect(source).toContain(':data-test="`value-${setting.key}`"')
+    expect(source).toContain('saysConfigValue(')
+    expect(await read('app/components/settings/BankHolidaySync.vue')).toContain('v-if="!readOnly"')
+  })
+
+  test('the technical limits are folded away until opened or searched for', async () => {
+    const source = await read(SETTINGS)
+    expect(source).toContain('isTechnical(')
+    expect(source).toContain('data-test="technical-limits"')
+  })
+
+  // The floor is the server's to enforce; the picker only stops somebody trying (0009).
+  test('the second-factor roles on the floor cannot be unticked in the picker', async () => {
+    expect(await read(SETTINGS)).toContain(':fixed="roleFloor(setting.key)"')
+    expect(await read('app/components/settings/RolesField.vue')).toMatch(/disabled: props\.fixed/)
+  })
+})
+
 describe('the backups screen says where a restore happens (J-107 criterion 6)', () => {
   test('it names who does one and where the steps are', async () => {
     const source = await read(BACKUPS)

@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import type { ConfigKey } from '#shared/utils/config'
-import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, PEOPLE_KEYS, ROLE_KEYS, hasDefault, isConfigKey, isEnforced, isSensitive, plannedFor } from '#shared/utils/config'
+import {
+  CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, PEOPLE_KEYS, PRIVILEGED_FLOOR, ROLE_KEYS, TECHNICAL_KEYS, WIDE_BLAST_RADIUS,
+  hasDefault, holdsRoles, isConfigKey, isEnforced, isSensitive, isTechnical, isWideBlastRadius, plannedFor,
+} from '#shared/utils/config'
 import { PERMISSION_MAP, ROLES, isRole } from '#shared/utils/roles'
 import type { Permission } from '#shared/utils/roles'
 
@@ -83,21 +86,72 @@ describe('configuration surface (0012, 0019)', () => {
     'emergency-card.write', 'age-checks.export', 'safety.read', 'safety.write',
   ]
 
-  test('every role touching money, personal data or safety records needs a second factor', () => {
+  // The floor is what the settings route refuses to go below (0009, issue 1357), so the rule is
+  // pinned on the floor itself and not only on what ships.
+  test('every role touching money, personal data or safety records is on the floor', () => {
     const shouldBePrivileged = ROLES.filter(role => PERMISSION_MAP[role].some(permission => MONEY_OR_SAFETY_PERMISSIONS.includes(permission)))
-    const privileged = new Set<string>(CONFIG_KEYS.PRIVILEGED_ROLES.default)
-    expect(shouldBePrivileged.filter(role => !privileged.has(role))).toEqual([])
+    const floor = new Set<string>(PRIVILEGED_FLOOR)
+    expect(shouldBePrivileged.filter(role => !floor.has(role))).toEqual([])
   })
 
-  // A retired role left in the default reads as a requirement nobody can be subject to (0090).
-  test('every privileged role in the default is a role that can still be granted', () => {
-    expect(CONFIG_KEYS.PRIVILEGED_ROLES.default.filter(role => !isRole(role))).toEqual([])
+  test('the list ships as its floor', () => {
+    expect(CONFIG_KEYS.PRIVILEGED_ROLES.default).toEqual([...PRIVILEGED_FLOOR])
+  })
+
+  // A retired role left in the floor reads as a requirement nobody can be subject to (0090).
+  test('every role on the floor is a role that can still be granted', () => {
+    expect(PRIVILEGED_FLOOR.filter(role => !isRole(role))).toEqual([])
   })
 
   // Named as well as derived: the safety officer holds safety records, so a stolen password alone
   // must not reach the open-items list (A-112, #1211).
   test('the safety officer needs a second factor', () => {
-    expect(CONFIG_KEYS.PRIVILEGED_ROLES.default).toContain('SAFETY_OFFICER')
+    expect(PRIVILEGED_FLOOR).toContain('SAFETY_OFFICER')
+  })
+
+  // Chosen from the roles, never typed as a code, so a misspelt role cannot be saved (issue 1357).
+  test('the list takes only roles that exist, from the role picker', () => {
+    expect(CONFIG_KEYS.PRIVILEGED_ROLES.schema.safeParse([...PRIVILEGED_FLOOR, 'NOT_A_ROLE']).success).toBe(false)
+    expect(CONFIG_KEYS.PRIVILEGED_ROLES.schema.safeParse([...PRIVILEGED_FLOOR, 'COMMITTEE']).success).toBe(true)
+    expect(holdsRoles('PRIVILEGED_ROLES')).toBe(true)
+  })
+})
+
+// J-105 criterion 5 is trimmed (issue 1357): which keys need a preview is code, reviewed like any
+// other change, and never a setting one plain save could empty.
+describe('the settings that need a preview and a typed confirmation', () => {
+  test('the flag list is not a setting', () => {
+    expect(isConfigKey('WIDE_BLAST_RADIUS_KEYS')).toBe(false)
+    expect(ENFORCED_KEYS as readonly string[]).not.toContain('WIDE_BLAST_RADIUS_KEYS')
+  })
+
+  test('refund policy, retention arming and the second-factor roles are flagged', () => {
+    expect([...WIDE_BLAST_RADIUS].sort()).toEqual(['PRIVILEGED_ROLES', 'REFUND_PAID_REQUIRES_MANAGER', 'RETENTION_ARMED'])
+    expect(isWideBlastRadius('PRIVILEGED_ROLES')).toBe(true)
+    expect(isWideBlastRadius('PASSWORD_MIN_LENGTH')).toBe(false)
+  })
+})
+
+// How much one run of a sweep does is a limit on the machinery, not a rule anybody works to, so the
+// screen folds these away (issue 1357). A cap a person meets, such as the tab cap, is a rule.
+describe('the technical limits', () => {
+  test('are the batch and sweep caps, and nothing a person meets', () => {
+    expect([...TECHNICAL_KEYS].sort()).toEqual([
+      'HOLD_RELEASE_BATCH_CAP',
+      'PASS_REQUEST_EXPIRE_BATCH_CAP',
+      'RETENTION_SWEEP_CAP',
+      'RETENTION_WARNING_CAP',
+      'ROOM_AVAILABILITY_ROW_BOUND',
+      'UNVERIFIED_EXPIRY_CAP',
+      'WAITING_LIST_OFFER_BATCH_CAP',
+      'WAITING_LIST_PURGE_BATCH_CAP',
+    ])
+    expect(isTechnical('PUBLIC_ORDER_SEAT_CAP')).toBe(false)
+    expect(isTechnical('BAR_TAB_CAP_PENCE')).toBe(false)
+  })
+
+  test('every batch cap is one', () => {
+    expect(CONFIG_KEY_NAMES.filter(key => key.endsWith('_BATCH_CAP') && !isTechnical(key))).toEqual([])
   })
 })
 
@@ -160,7 +214,7 @@ describe('who may run up a tab', () => {
   // Which keys hold people or roles is said, never guessed from a key's name.
   test('the screen is told which keys hold people and which hold roles', () => {
     expect([...PEOPLE_KEYS]).toEqual(['BAR_AUTHORISED_TAB_HOLDERS'])
-    expect([...ROLE_KEYS]).toEqual(['BAR_AUTHORISED_TAB_ROLES'])
+    expect([...ROLE_KEYS]).toEqual(['BAR_AUTHORISED_TAB_ROLES', 'PRIVILEGED_ROLES'])
     expect(PEOPLE_KEYS.filter(key => !isSensitive(key))).toEqual([])
   })
 
