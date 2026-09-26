@@ -10,6 +10,7 @@ import {
   confirmedOpeningShiftsTonightQuery,
   createOpeningStatement,
   declineOpeningShiftStatement,
+  openOpeningShiftsQuery,
   removeOpeningShiftStatement,
   stampOpeningShiftsStatement,
   unconfirmOpeningShiftStatement,
@@ -496,6 +497,23 @@ describe('a planned opening\'s staffing changes one-off after stamping (E-130 cr
 
       expectOneWinner(answers)
       expect(slotsOn(database, openingId)).toHaveLength(1)
+    })
+  })
+})
+
+// Issue 1335: "Shifts you can take" leaves out an opening the member already works, whichever of
+// its slots they hold, since a second slot on it would be refused.
+describe('the open-slot list for somebody who already works the opening', () => {
+  test('an opening with one of its slots held by the member is left out for them, and only them', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      const [first] = slotsOn(database, openingId)
+      person(database, 'me')
+      run(database, claimOpeningShiftStatement(first!.id, 'me', 'CONFIRMED'))
+
+      const now = OPENS_AT - 3600
+      expect(run(database, openOpeningShiftsQuery({}, now, 50, 'me'))).toEqual([])
+      expect(run(database, openOpeningShiftsQuery({}, now, 50, 'somebody-else'))).toHaveLength(1)
     })
   })
 })

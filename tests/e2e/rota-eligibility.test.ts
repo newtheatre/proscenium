@@ -248,8 +248,85 @@ describe.skipIf(skip !== null)('a member\'s own shifts', () => {
   })
 })
 
+// Issue 1335: the screen lists only what a member can take, and says once per locked role what
+// would open it (E-103 criterion 2 as trimmed).
+describe.skipIf(skip !== null)('shifts you can take, and roles you could take', () => {
+  interface RoleCard { role: string, openShifts: number, module: { id: string, name: string } | null, action: { kind: string } | null }
+
+  test('the claimable list holds only qualified roles and leaves out a performance already worked', async () => {
+    const module = await addModule()
+    await gate('DOOR', module)
+    const person = await registerMember(app, 'rota-claimable', generatePassword())
+    award(person.id, module)
+    try {
+      const free = programme('claimable-free')
+      const worked = programme('claimable-worked')
+      stampOpen(free.performanceId, 'DOOR', 1)
+      stampOpen(free.performanceId, 'BAR', 1)
+      stampOpen(worked.performanceId, 'DOOR', 2)
+      const database = new Database(app.databaseFile)
+      try {
+        database.query(`INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, 'DOOR', 1, ?, 'CONFIRMED')`)
+          .run(`${worked.performanceId}-held`, worked.performanceId, person.id)
+      }
+      finally {
+        database.close()
+      }
+
+      const listed = await shiftsFor(person.cookie, { claimable: 'true' })
+      const ids = listed.items.map(item => item.shiftId)
+      expect(ids).toContain(`${free.performanceId}-DOOR-1`)
+      expect(ids).not.toContain(`${free.performanceId}-BAR-1`)
+      expect(ids).not.toContain(`${worked.performanceId}-DOOR-2`)
+      expect(listed.items.every(item => item.eligible)).toBe(true)
+    }
+    finally {
+      await gate('DOOR', null)
+    }
+  })
+
+  test('each locked role is one card naming its module, how many shifts are open and the one action', async () => {
+    const module = await addModule()
+    await gate('BAR', module)
+    try {
+      const house = programme('roles-card')
+      stampOpen(house.performanceId, 'BAR', 1)
+      stampOpen(house.performanceId, 'BAR', 2)
+
+      const answered = await send('GET', '/api/rota/roles', undefined, member.cookie)
+      expect(answered.status).toBe(200)
+      const { roles } = await answered.json() as { roles: RoleCard[] }
+      const bar = roles.find(card => card.role === 'BAR')
+      expect(bar?.module).toEqual({ id: module, name: `Module ${module}` })
+      expect(bar?.openShifts).toBeGreaterThanOrEqual(2)
+      // No session teaches it, so the one thing to do is ask.
+      expect(bar?.action).toEqual({ kind: 'ASK' })
+    }
+    finally {
+      await gate('BAR', null)
+    }
+  })
+
+  test('a role card offers Sign up while a session teaching its module has places', async () => {
+    const module = await addModule()
+    await gate('BAR', module)
+    try {
+      const scheduled = await send('POST', '/api/admin/training/sessions', {
+        heldOn: daysFrom(9), startsAt: '19:00', endsAt: '21:00', capacity: 10, moduleIds: [module],
+      })
+      expect(scheduled.status).toBe(200)
+
+      const { roles } = await (await send('GET', '/api/rota/roles', undefined, member.cookie)).json() as { roles: RoleCard[] }
+      expect(roles.find(card => card.role === 'BAR')?.action).toMatchObject({ kind: 'SIGN_UP' })
+    }
+    finally {
+      await gate('BAR', null)
+    }
+  })
+})
+
 describe.skipIf(skip !== null)('the screen a member reads their rota from', () => {
-  test('a locked shift names what would unlock it, linking to the module', async () => {
+  test('a locked role names what would unlock it, once, on its card', async () => {
     const module = await addModule()
     await gate('DOOR', module)
 
@@ -267,10 +344,11 @@ describe.skipIf(skip !== null)('the screen a member reads their rota from', () =
       await click(view, 'form button[type="submit"]')
       await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
 
-      await visit(view, `${app.baseURL}/rota`, '[data-test="open-shifts-list"]')
-      const shown = await textOf(view, `[data-test="open-shift-${house.performanceId}-DOOR-1"]`)
-      expect(shown).toContain('Locked')
+      await visit(view, `${app.baseURL}/rota`, '[data-test="role-card-DOOR"]')
+      const shown = await textOf(view, '[data-test="role-card-DOOR"]')
       expect(shown).toContain(`Module ${module}`)
+      // The locked shift itself is not listed among the ones this member can take.
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="claim-${house.performanceId}-DOOR-1"]')`)).toBe(false)
     }
     finally {
       view.close()

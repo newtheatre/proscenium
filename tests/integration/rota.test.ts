@@ -29,7 +29,7 @@ import { shiftConstraintRefusal } from '#shared/utils/rota'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
-import type { OpenShiftRow } from '#server/utils/rota'
+import type { OpenShiftFilters, OpenShiftRow } from '#server/utils/rota'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -765,6 +765,52 @@ describe('the open-shift list (E-103)', () => {
       expect(firstPage.length).toBe(2)
       expect(secondPage.length).toBe(2)
       expect(firstPage.map(item => item.shiftId)).not.toEqual(secondPage.map(item => item.shiftId))
+    })
+  })
+
+  // Issue 1335: "Shifts you can take" lists only the roles the member qualifies for, and leaves out
+  // a performance they already work, since a second shift on it would be refused (E-104 c3).
+  test('only the roles asked for, and never a performance the member already works', async () => {
+    await withDatabase(async (database) => {
+      const worked = tonightsPerformance(database, { suffix: 'a' })
+      const free = tonightsPerformance(database, { suffix: 'b', curtainHoursAfterNightStart: 15.5 + 24 })
+      const me = person(database, 'me')
+      stampOpen(database, worked.performanceId, 'DOOR', 1, 'CONFIRMED', me)
+      stampOpen(database, worked.performanceId, 'DOOR', 2)
+      stampOpen(database, worked.performanceId, 'BAR', 1)
+      stampOpen(database, free.performanceId, 'DOOR', 1)
+      stampOpen(database, free.performanceId, 'BAR', 1)
+      stampOpen(database, free.performanceId, 'DUTY_MANAGER', 1)
+
+      const now = worked.startsAt - 3600
+      const filters: OpenShiftFilters = { roles: ['DOOR', 'BAR'], notWorkedBy: me }
+      const items = rows<OpenShiftRow>(database, ...boundStatement(database, openShiftsQuery(filters, now, 25, 0)))
+      expect(items.map(item => item.shiftId).sort()).toEqual([`${free.performanceId}-BAR-1`, `${free.performanceId}-DOOR-1`])
+
+      const [total] = rows<{ total: number }>(database, ...boundStatement(database, countOpenShiftsQuery(filters, now)))
+      expect(total?.total).toBe(2)
+    })
+  })
+
+  test('a claim the member was declined does not count as working the performance', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const me = person(database, 'me')
+      stampOpen(database, tonight.performanceId, 'BAR', 1, 'DECLINED', me)
+      stampOpen(database, tonight.performanceId, 'DOOR', 1)
+
+      const now = tonight.startsAt - 3600
+      const items = rows<OpenShiftRow>(database, ...boundStatement(database, openShiftsQuery({ roles: ['DOOR'], notWorkedBy: me }, now, 25, 0)))
+      expect(items.map(item => item.shiftId)).toEqual([`${tonight.performanceId}-DOOR-1`])
+    })
+  })
+
+  test('no role to list means nothing listed, not everything', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      stampOpen(database, tonight.performanceId, 'DOOR', 1)
+      const now = tonight.startsAt - 3600
+      expect(rows<OpenShiftRow>(database, ...boundStatement(database, openShiftsQuery({ roles: [] }, now, 25, 0)))).toEqual([])
     })
   })
 
