@@ -15,13 +15,20 @@ interface Pass {
 
 const outcome = ref<Outcome>('working')
 const pass = ref<Pass | null>(null)
+const { account } = useAccount()
 
+// A signed-in holder with no pass link open is sent to their own passes, each with its QR, rather
+// than told to go and find it (issue 1332).
 onMounted(async () => {
   try {
     pass.value = await $fetch<Pass>('/api/passes/current')
     outcome.value = 'found'
   }
   catch {
+    if (account.value.signedIn) {
+      await navigateTo('/account/passes', { replace: true })
+      return
+    }
     outcome.value = 'refused'
   }
 })
@@ -94,8 +101,11 @@ useSeoMeta({
           That link isn't valid
         </h1>
         <p class="text-muted">
-          Open your pass from the email you were sent when it was issued, or view it from your
-          account while signed in.
+          Open your pass from the email you were sent when it was issued, or sign in and it is under
+          <NuxtLink
+            to="/account/passes"
+            class="underline"
+          >Passes</NuxtLink>, with its QR code.
         </p>
       </div>
     </UPageCard>

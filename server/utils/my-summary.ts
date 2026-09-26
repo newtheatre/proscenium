@@ -100,6 +100,8 @@ export interface MySummaryInputs {
   nextSession: { id: string, moduleName: string, heldOn: string, startsAt: string, place: string | null } | null
   passes: ActivePass[]
   passRequest: OpenPassRequest | null
+  // The endpoint mints the link, since a token needs the Nitro runtime this file must not touch.
+  ticket: { id: string, reference: string, showTitle: string, venueName: string, startsAt: number, url: string } | null
   notifications: { id: string, title: string, link: string | null, createdAt: number }[]
   nextShow: { slug: string, title: string, performances: { startsAt: number, availability: Availability }[] } | null
 }
@@ -166,6 +168,15 @@ export function assembleMySummary(input: MySummaryInputs): MySummary {
       active: input.passes.map(pass => ({ id: pass.id, typeName: pass.typeName, covers: pass.covers, status: pass.status })),
       request: input.passRequest ? { state: input.passRequest.status } : null,
     },
+    ticket: input.ticket === null
+      ? null
+      : {
+          reference: input.ticket.reference,
+          showTitle: input.ticket.showTitle,
+          venueName: input.ticket.venueName,
+          startsAt: input.ticket.startsAt,
+          url: input.ticket.url,
+        },
     notifications: input.notifications.slice(0, 3).map(item => ({ id: item.id, title: item.title, link: item.link, createdAt: item.createdAt })),
     nextShow,
   }

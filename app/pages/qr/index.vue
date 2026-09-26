@@ -67,6 +67,20 @@ async function loadBooking(): Promise<void> {
 
 // The exchanged cookie names the booking; a missing or spent one is an invitation to resend,
 // never a dead end (D-108 criterion 2 sits next to criterion 4 for exactly this reason).
+interface OwnBooking {
+  reference: string
+  showTitle: string
+  venueName: string
+  when: string
+  state: string
+  url: string
+}
+
+// A signed-in visitor with no booking open is shown their own, rather than asked for a reference
+// and an address the account already knows (issue 1332).
+const { account } = useAccount()
+const ownBookings = ref<OwnBooking[] | null>(null)
+
 onMounted(async () => {
   made.value = null
   try {
@@ -74,6 +88,11 @@ onMounted(async () => {
   }
   catch {
     outcome.value = 'resend'
+    if (account.value.signedIn) {
+      ownBookings.value = await $fetch<{ bookings: OwnBooking[] }>('/api/account/bookings')
+        .then(answer => answer.bookings)
+        .catch(() => null)
+    }
   }
 })
 
@@ -476,10 +495,57 @@ useSeoMeta({ title: 'Your booking' })
         data-test="qr-resend"
         class="space-y-4"
       >
-        <div class="space-y-2">
+        <div
+          v-if="ownBookings"
+          class="space-y-3 border-b border-default pb-4"
+          data-test="qr-own-bookings"
+        >
           <h1 class="nnt-headline text-xl">
-            {{ resendHeadline }}
+            Your bookings
           </h1>
+          <ul
+            v-if="ownBookings.length > 0"
+            class="space-y-2"
+          >
+            <li
+              v-for="own in ownBookings"
+              :key="own.reference"
+            >
+              <!-- A plain link: the booking's address is a server route that sets its cookie, which
+                   an in-app navigation would never reach (issue 1329). -->
+              <a
+                :href="own.url"
+                class="flex min-h-11 flex-col justify-center rounded-lg border border-default px-3 py-2 hover:border-primary"
+              >
+                <span class="font-medium">{{ own.showTitle }}</span>
+                <span class="text-sm text-muted">{{ own.when }} · {{ own.venueName }} · {{ own.state }} · {{ own.reference }}</span>
+              </a>
+            </li>
+          </ul>
+          <p
+            v-else
+            class="text-sm text-muted"
+          >
+            You have no bookings still to come. <NuxtLink
+              to="/whats-on"
+              class="underline"
+            >See what is on</NuxtLink>.
+          </p>
+          <p class="text-sm text-muted">
+            Passes you hold, each with its QR code, are under <NuxtLink
+              to="/account/passes"
+              class="underline"
+            >Passes</NuxtLink>.
+          </p>
+        </div>
+
+        <div class="space-y-2">
+          <component
+            :is="ownBookings ? 'h2' : 'h1'"
+            class="nnt-headline text-xl"
+          >
+            {{ resendHeadline }}
+          </component>
           <p class="text-muted">
             Enter your booking reference and the email address you booked with, and a fresh copy of
             your confirmation, with the same QR, is on its way.

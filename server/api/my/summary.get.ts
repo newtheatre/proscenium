@@ -1,3 +1,4 @@
+import { ownBookingsFrom } from '#shared/utils/reservations'
 import type { MyShiftRow } from '#server/utils/rota'
 
 // The one request `/my` makes (K-127 criterion 1): eight endpoints' worth of reading composed
@@ -29,6 +30,7 @@ export default defineEventHandler(async (event) => {
     passRequest,
     notifications,
     listing,
+    bookings,
   ] = await Promise.all([
     db.all<MyShiftRow>(myShiftsQuery(account.id, nowSeconds)),
     longestTerm(account.id),
@@ -42,7 +44,9 @@ export default defineEventHandler(async (event) => {
     openPassRequest(account.id),
     recentInbox(account.id, 3),
     publicListing(rules, 1, 1, now),
+    ownBookings(account.id, ownBookingsFrom(now), 1),
   ])
+  const booking = bookings[0]
 
   const nextSignedUpSession = sessions
     .filter(session => session.myStatus !== null)
@@ -81,6 +85,7 @@ export default defineEventHandler(async (event) => {
       : null,
     passes,
     passRequest: passRequest ?? null,
+    ticket: booking ? { ...booking, url: `/qr/${await qrTokenFor(booking.id)}` } : null,
     notifications,
     nextShow: listedShow
       ? {

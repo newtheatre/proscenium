@@ -768,7 +768,11 @@ to report until D-126 exists (`docs/known-issues.md`). While the booking is unpa
 carries the show's guidance, and so does the confirmation email: `bookingGuidance()` in
 `server/utils/whats-on.ts` reads the show by a subquery on the booking's reference through the
 same projection the listing's `guidance` comes from (`visitorGuidance()`), and names the show page
-only while the show is published (D-102 criterion 4, issue 1330). `POST /api/reservations/resend`
+only while the show is published (D-102 criterion 4, issue 1330). `GET /api/account/bookings` is
+the signed-in way back to a booking without the email: the caller's own `PENDING` and `COLLECTED`
+bookings from the start of tonight's show night (`ownBookingsQuery()`, bound to 20), each with its
+`/qr/[token]` link; `/qr` lists them for a signed-in visitor with no booking open, and the My NNT
+summary carries the first (issue 1332). `POST /api/reservations/resend`
 re-sends the same confirmation, rate limited (`RESERVATION_RESEND_ATTEMPTS`,
 `RESERVATION_RESEND_WINDOW_MINUTES`, both by IP and by reference) and enumeration-safe: it answers
 identically whether or not the reference and address match, and only actually sends while the
@@ -1035,7 +1039,8 @@ resolves against the other's route even if the two id spaces collided. `GET /pas
 exchanges it for a cookie exactly as `/qr/[token]` does; `GET /api/passes/current` and `/passes`
 read the pass live from that cookie. The email (`pass-issued` template) carries the same QR
 inline. `GET /api/account/passes` is the signed-in view: held passes and the caller's own
-requests, regardless of channel.
+requests, regardless of channel; each active pass carries its QR, built from the same token, so
+it can be shown at the door without the email (issue 1332).
 
 ### pass_admissions  APPEND-ONLY
 `id` PK · `pass_id` restrict · `performance_id` restrict · `ticket_id` UNIQUE restrict ·
