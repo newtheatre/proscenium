@@ -104,6 +104,31 @@ describe('one line per item, blank distinct from an entered zero (F-115 criterio
     })
   })
 
+  // Issue 1321: a count walks the bar shelf by shelf, so the lines come grouped by stock group
+  // and carry the container size the count is typed in.
+  test('lines come grouped by stock group, then by name, with no group last', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      insert(database, 'bar_items', { id: 'i-rum', name: 'Rum', unit: 'ML', container_ml: 700, category: 'Spirits' })
+      insert(database, 'bar_items', { id: 'i-ice', name: 'Ice', unit: 'ITEM' })
+      insert(database, 'bar_items', { id: 'i-red', name: 'House red', unit: 'ML', container_ml: 750, category: 'wine' })
+      insert(database, 'bar_items', { id: 'i-gin', name: 'Gin', unit: 'ML', container_ml: 700, category: 'Spirits' })
+      insert(database, 'stocktakes', { id: 'st-1', status: 'OPEN', opened_by: opener })
+      for (const itemId of ['i-rum', 'i-ice', 'i-red', 'i-gin']) {
+        insert(database, 'stocktake_lines', { id: `l-${itemId}`, stocktake_id: 'st-1', item_id: itemId, expected_qty: 0 })
+      }
+
+      const [statement, ...parameters] = boundStatement(database, stocktakeLinesQuery('st-1'))
+      const lines = rows<StocktakeLine>(database, statement, ...parameters)
+      expect(lines.map(line => [line.category, line.itemName, line.containerMl])).toEqual([
+        ['Spirits', 'Gin', 700],
+        ['Spirits', 'Rum', 700],
+        ['wine', 'House red', 750],
+        [null, 'Ice', null],
+      ])
+    })
+  })
+
   test('a negative count does not exist to record', async () => {
     await withDatabase((database) => {
       const opener = person(database)

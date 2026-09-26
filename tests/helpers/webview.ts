@@ -334,8 +334,8 @@ export async function visit(view: Bun.WebView, url: string, marker?: string): Pr
 
 // One browser backs every view, so they share a cookie jar: a test that needs a signed-out visitor
 // has to end the session rather than assume a new view carries none.
-export async function openSignedOutView(baseURL: string): Promise<Bun.WebView> {
-  const view = await openView()
+export async function openSignedOutView(baseURL: string, size?: { width: number, height: number }): Promise<Bun.WebView> {
+  const view = await openView(size)
   await view.navigate(`${baseURL}/`)
   await waitFor(view, 'document.body')
   await view.evaluate(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)
