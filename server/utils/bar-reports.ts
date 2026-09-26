@@ -44,12 +44,13 @@ export function resolveReportPeriod(period: ReportPeriodInput): { fromAt: number
   return { fromAt, toAt }
 }
 
-// The delivered cost of one unit of stocked item `i`: the weighted average across every
-// unreversed delivery, or null if it has never had one; callers coalesce it their own way.
+// The delivered cost of one unit of item `i`, weighted across every unreversed delivery, or null if
+// none; a container's cost is divided here, when read, and never before it is kept (0100).
 export const unitCostPence = sql`(
-  SELECT sum(d.qty * d.unit_cost_pence) * 1.0 / sum(d.qty)
+  SELECT sum(d.qty * coalesce(d.container_cost_pence * 1.0 / d.container_qty, d.unit_cost_pence)) * 1.0 / sum(d.qty)
   FROM stock_movements d
-  WHERE d.item_id = i.id AND d.kind = 'DELIVERY' AND d.unit_cost_pence IS NOT NULL
+  WHERE d.item_id = i.id AND d.kind = 'DELIVERY'
+    AND (d.unit_cost_pence IS NOT NULL OR d.container_cost_pence IS NOT NULL)
     AND NOT EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = d.id)
 )`
 

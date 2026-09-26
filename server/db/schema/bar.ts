@@ -137,7 +137,8 @@ export const stockMovements = sqliteTable('stock_movements', {
   qty: integer('qty').notNull(),
   kind: text('kind').notNull(),
   reason: text('reason'),
-  // Delivered cost, which is what gross profit is measured against (F-114 criterion 6, F-119).
+  // Delivered cost of one unit, which gross profit is measured against (F-114 criterion 6, F-119).
+  // A measured delivery keeps its container's cost below instead (0100).
   unitCostPence: integer('unit_cost_pence'),
   // The document this movement came from, so any on-hand figure audits to its causes.
   refTable: text('ref_table'),
@@ -149,6 +150,10 @@ export const stockMovements = sqliteTable('stock_movements', {
   // Bare: a foreign key onto venues would rebuild this append-only table (0010). Nullable so
   // every historical row reads NULL rather than needing a guess (F-202).
   locationVenueId: text('location_venue_id'),
+  // What one container of a delivery cost in whole pence, and what it held in the item's unit,
+  // divided only when read (0100). Bare, as a CHECK would rebuild; a trigger holds the pair whole.
+  containerCostPence: integer('container_cost_pence'),
+  containerQty: integer('container_qty'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   index('stock_movements_item').on(table.itemId, table.createdAt),

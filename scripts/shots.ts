@@ -179,7 +179,7 @@ if (studio) {
 const barCategory = await (await send('POST', '/api/admin/bar/categories', { name: 'Wine', sort: 10 }, cookie)).json() as { id: string }
 await send('POST', '/api/admin/bar/products', { name: 'House red', categoryId: barCategory.id }, cookie)
 const barItem = await (await send('POST', '/api/admin/bar/items', { name: 'House red 750ml', unit: 'ML', containerMl: 750 }, cookie)).json() as { id: string }
-await send('POST', '/api/admin/bar/movements', { itemId: barItem.id, kind: 'DELIVERY', qty: 4500, unitCostPence: 480 }, cookie)
+await send('POST', '/api/admin/bar/movements', { itemId: barItem.id, kind: 'DELIVERY', qty: 4500, costPence: 650 }, cookie)
 await send('POST', '/api/admin/bar/stocktakes', undefined, cookie)
 
 // G-129: two departments, a module needing another and a scheduled session, so the training

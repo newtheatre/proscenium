@@ -650,6 +650,8 @@ const MOVEMENT_COLUMNS = sql`
   m.kind AS kind,
   m.reason AS reason,
   m.unit_cost_pence AS unitCostPence,
+  m.container_cost_pence AS containerCostPence,
+  m.container_qty AS containerQty,
   m.ref_table AS refTable,
   m.ref_id AS refId,
   m.reverses_id AS reversesId,
