@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ROLES, saysRole } from '#shared/utils/roles'
 
-// Roles are chosen from the roles that exist, by title, so a misspelt one cannot be saved.
+// Roles are chosen from the roles that exist, by title, so a misspelt one cannot be saved. A
+// fixed role is ticked and cannot be unticked; the server refuses its removal regardless.
 
 const model = defineModel<string[]>({ default: () => [] })
-const props = defineProps<{ name: string, label: string }>()
+const props = withDefaults(defineProps<{ name: string, label: string, fixed?: readonly string[] }>(), { fixed: () => [] })
 
-const items: { label: string, value: string }[] = ROLES.map(role => ({ label: saysRole(role), value: role }))
+const items = computed<{ label: string, value: string, disabled: boolean }[]>(() =>
+  ROLES.map(role => ({ label: saysRole(role), value: role, disabled: props.fixed.includes(role) })))
 </script>
 
 <template>

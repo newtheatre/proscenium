@@ -12,8 +12,9 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
 ## Open questions
 
 1. The wide-blast-radius list: which settings require preview and typed confirmation (refund
-   policy and retention arming are certain; hold expiry, tab cap and room rules are candidates)?
-   To be settled at the configuration workshop.
+   policy, retention arming and the second-factor roles are certain; hold expiry, tab cap and
+   room rules are candidates)? To be settled at the configuration workshop, and landed as a pull
+   request: the list is code (J-105 criterion 5, issue 1357).
 2. Signing a manual audit entry: is a fresh MFA-verified session sufficient, or does entry require
    an explicit re-authentication at the moment of signing?
 3. Audit archive vocabulary: do the four apps' action names map onto the unified taxonomy at
@@ -85,7 +86,10 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
      Amended 24 September 2026 (issue 1264): a key that holds people (named in the key set, never
      guessed from its name) shows them as names, added with the person picker and removed one at a
      time; a key that holds roles is chosen from the roles. Only a reader of the settings is told
-     the names.
+     the names. Amended 26 September 2026 (issue 1357): a setting is headed by what it decides,
+     with its key beneath, and a number carries the unit its key names. Somebody who reads the
+     settings and changes none is shown each value in words and nothing to press. The limits on
+     how much one run of a sweep does are folded under the rules until opened or searched for.
   3. Values are validated per key (type, range, cross-field rules); an invalid value is refused and never stored, and an impossible date such as a 29 February year boundary is a named refusal case.
      Amended 24 September 2026 (issue 1266): a yearly boundary written as a month and a day
      (`YEAR_START`, `YEAR_END`, `ACADEMIC_YEAR_BOUNDARY`) is chosen from a calendar with no year in
@@ -114,7 +118,11 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   2. Saving a flagged change requires a typed confirmation echoing the previewed count or the setting name; the confirmation text is validated, not a checkbox.
   3. Any setting reverts to its prior value in one action, and the revert is itself an audited change.
   4. Retention arming specifically is refused until a reviewed dry-run digest exists, carrying forward the old estate's dry-run-first discipline.
-  5. The wide-blast-radius flag on a setting is itself configuration, changeable only by an administrator and audited.
+  5. Trimmed 26 September 2026 (issue 1357): which settings are flagged wide-blast-radius is a
+     list in the code (`WIDE_BLAST_RADIUS`, `shared/utils/config.ts`), changed by a reviewed pull
+     request, and not a setting. As a setting, one plain save could empty it and take every
+     preview and typed confirmation with it. The list is refund policy, retention arming and the
+     roles that need a second factor.
 - Source: Prompt Book J-3, A-5 (retention arming); audit SD-12 (dry-run sweep awaiting an explicit arming)
 
 ## J-106: The health endpoint

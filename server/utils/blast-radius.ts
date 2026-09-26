@@ -1,8 +1,9 @@
-import { db } from '@nuxthub/db'
+import { db, schema } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING, 0055).
 import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
+import { privilegedWithoutFactor } from './directory'
 import { dueForAnonymisation } from './retention-candidates'
 import type { BlastRadiusPreview } from '#shared/utils/blast-radius'
 import type { ConfigKey } from '#shared/utils/config'
@@ -43,6 +44,17 @@ async function officersWithoutRefundApproval(): Promise<number> {
   return row?.count ?? 0
 }
 
+// A preview is read before the new list is known, so this counts every role holder a role added
+// to PRIVILEGED_ROLES would refuse until they set up an authenticator (A-112, issue 1357).
+export function roleHoldersWithoutFactorQuery(now: number): SQL {
+  return sql`SELECT count(*) AS count FROM ${schema.users} WHERE ${privilegedWithoutFactor([...ROLES], now)}`
+}
+
+async function roleHoldersWithoutFactor(): Promise<number> {
+  const [row] = await db.all<{ count: number }>(roleHoldersWithoutFactorQuery(Math.floor(Date.now() / 1000)))
+  return row?.count ?? 0
+}
+
 const PREVIEWS: Partial<Record<ConfigKey, (event: H3Event | undefined) => Promise<BlastRadiusPreview>>> = {
   REFUND_PAID_REQUIRES_MANAGER: async () => ({
     count: await officersWithoutRefundApproval(),
@@ -51,6 +63,10 @@ const PREVIEWS: Partial<Record<ConfigKey, (event: H3Event | undefined) => Promis
   RETENTION_ARMED: async event => ({
     count: await dueForAnonymisation(event),
     category: 'accounts already due anonymisation, the moment this is armed',
+  }),
+  PRIVILEGED_ROLES: async () => ({
+    count: await roleHoldersWithoutFactor(),
+    category: 'role holders who sign in with a password and have no authenticator: any whose role is added here is refused on its screens until they set one up',
   }),
 }
 

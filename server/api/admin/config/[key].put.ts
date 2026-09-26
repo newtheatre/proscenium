@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { blastRadiusPreview } from '#server/utils/blast-radius'
 import { writeConfigValue } from '#server/utils/config-write'
-import { isConfigKey } from '#shared/utils/config'
+import { isConfigKey, isWideBlastRadius } from '#shared/utils/config'
 
 const body = z.object({ value: z.unknown(), confirmation: z.string().trim().optional() })
 
@@ -17,9 +17,8 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, body)
 
   // A flagged key needs its preview echoed back before the write is attempted at all: the
-  // confirmation text is validated, never a checkbox (J-105 criteria 1, 2, 5).
-  const flagged = (await configValue(event, 'WIDE_BLAST_RADIUS_KEYS')).includes(key)
-  if (flagged) {
+  // confirmation text is validated, never a checkbox (J-105 criteria 1, 2).
+  if (isWideBlastRadius(key)) {
     const preview = await blastRadiusPreview(event, key)
     const expected = [key, preview ? String(preview.count) : null].filter((value): value is string => value !== null)
     if (!expected.includes(input.confirmation ?? '')) {

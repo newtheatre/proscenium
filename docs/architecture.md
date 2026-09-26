@@ -790,16 +790,26 @@ default where the workshop register proposed one, and the workshop it belongs to
 `configValue(event, key)` reads a `config` row if one exists, the default otherwise, and 503s a
 key with neither (J-104). `PUT /api/admin/config/[key]` and the read side, `GET
 /api/admin/config`, are the whole surface; `/admin/settings.vue` renders every key from the second
-and writes through the first.
+and writes through the first. The screen heads each card with `configHeading()` and reads a
+number's unit from its key with `configUnit()` (`shared/utils/config-wording.ts`, whose heading
+map is typed over every key, so a key added without one fails the build). A reader without
+`editSettings` gets `saysConfigValue()` in place of each input, and `TECHNICAL_KEYS`, the batch
+and sweep caps, are folded under the rules.
 
-**A key named in `WIDE_BLAST_RADIUS_KEYS`**, itself a `config` row and so itself audited (criterion
-5), needs a live preview and a typed echo before it saves (criteria 1, 2). `blastRadiusPreview()`
+**A key named in `WIDE_BLAST_RADIUS`** (`shared/utils/config.ts`), a list in the code rather than a
+setting since issue 1357 trimmed criterion 5, needs a live preview and a typed echo before it saves
+(criteria 1, 2). `blastRadiusPreview()`
 (`server/utils/blast-radius.ts`) is one function per key: `REFUND_PAID_REQUIRES_MANAGER` counts
 holders of a role with the desk (`ticketing.write`) and no `money.refund`, read from the permission
 map (`refundPreviewRoles()`), who would gain or lose self-approval (nobody since 0102, when
 `FOH_MANAGER`, the one desk role without it, gained `money.refund`), `RETENTION_ARMED` counts
 accounts already due anonymisation, read with no side effect at all
-(`dueForAnonymisation()`, `server/utils/retention-candidates.ts`). `GET
+(`dueForAnonymisation()`, `server/utils/retention-candidates.ts`), and `PRIVILEGED_ROLES` counts
+every role holder signing in with a password and no confirmed authenticator
+(`roleHoldersWithoutFactorQuery()`, the directory's `privilegedWithoutFactor()` over every role),
+since a preview is read before the new list is known. `PRIVILEGED_ROLES` is also add-only above
+`PRIVILEGED_FLOOR`, 0009's money, personal data and safety roles: `configProblem()` refuses a list
+leaving one off and names it, so no confirmation gets below the floor (A-112 criterion 4). `GET
 /api/admin/config/[key]/blast-radius` answers with the count and its category; `PUT` requires a
 `confirmation` field matching the key's own name or the previewed count
 (`confirmationMatches()`, `shared/utils/blast-radius.ts`, pure and shared with the client), 400ing

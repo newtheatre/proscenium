@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { saysDayLong, saysMonthDay } from '#shared/utils/when'
+import { saysDayLong } from '#shared/utils/when'
 import { isDayOfYearKey } from '#shared/utils/config-rules'
-import { holdsPeople, holdsRoles } from '#shared/utils/config'
+import { holdsPeople, holdsRoles, isTechnical, roleFloor } from '#shared/utils/config'
+import { configHeading, configUnit, saysConfigValue } from '#shared/utils/config-wording'
+import { can, editSettings } from '#shared/utils/abilities'
 import { coversThrough, lastCovered, londonDate } from '#shared/utils/working-days'
 import { confirmationOptions } from '#shared/utils/blast-radius'
 import type { BlastRadiusPreview } from '#shared/utils/blast-radius'
@@ -77,6 +79,22 @@ const tabs = computed(() => grouped.value.map(group => ({
 const tab = ref(Object.keys(WORKSHOPS)[0]!)
 const shown = computed(() => grouped.value.find(group => group.workshop === tab.value)?.settings ?? [])
 
+// The Manager and the Theatre Manager read the settings and change none, so they are shown each
+// value in words and nothing to press (issue 1357). The server refuses them either way.
+const edits = computed(() => can(useViewer().value, editSettings))
+
+// How much one scheduled run may do is folded under the rules, and a search opens it.
+const technicalOpen = ref(false)
+const folded = computed(() => !technicalOpen.value && !search.value.trim())
+const sections = computed(() => {
+  const rules = shown.value.filter(setting => !isTechnical(setting.key))
+  const technical = shown.value.filter(setting => isTechnical(setting.key))
+  return [
+    { id: 'rules', technical: false, count: rules.length, listed: rules },
+    { id: 'technical', technical: true, count: technical.length, listed: folded.value ? [] : technical },
+  ]
+})
+
 // A search that empties the tab you are on has found its match somewhere else.
 watch(search, () => {
   if (shown.value.length) return
@@ -117,12 +135,20 @@ function kind(setting: Setting): 'boolean' | 'money' | 'dayOfYear' | 'people' | 
 const numbers = reactive<Record<string, number>>({})
 const lists = reactive<Record<string, string[]>>({})
 
-// Fifty keys is too many to scroll for one. Matched on the name and on what it describes, because
+// Too many keys to scroll for one. Matched on the heading, the key and what it describes, because
 // somebody looking for the tab cap may not remember it is called BAR_TAB_CAP_PENCE.
 function matches(setting: Setting): boolean {
   const term = search.value.trim().toLowerCase()
   if (!term) return true
-  return setting.key.toLowerCase().includes(term) || setting.describes.toLowerCase().includes(term)
+  return configHeading(setting.key).toLowerCase().includes(term)
+    || setting.key.toLowerCase().includes(term)
+    || setting.describes.toLowerCase().includes(term)
+}
+
+// A reader is told the names of the people a key holds, so they are named here and not by id.
+function saysStanding(setting: Setting): string {
+  if (setting.people) return setting.people.length ? setting.people.map(person => person.name ?? 'An account that no longer exists').join(', ') : 'Nobody'
+  return saysConfigValue(setting.key, standing(setting))
 }
 
 async function load(): Promise<void> {
@@ -154,8 +180,8 @@ async function save(setting: Setting, value: unknown, confirmation?: string): Pr
   }
 }
 
-// A flagged save previews its blast radius before anything is asked to confirm (J-105 criteria
-// 1, 5): the modal opens on a loading preview rather than waiting to show the typed-echo field.
+// A flagged save previews its blast radius before anything is asked to confirm (J-105 criterion
+// 1): the modal opens on a loading preview rather than waiting to show the typed-echo field.
 const confirming = ref<Setting | null>(null)
 const pendingValue = ref<unknown>(null)
 const confirmationText = ref('')
@@ -270,7 +296,7 @@ onMounted(async () => {
       <UInput
         v-model="search"
         icon="i-lucide-search"
-        placeholder="A key, or what it decides"
+        placeholder="What it decides, or its key"
         class="w-full"
         data-test="config-search"
       />
@@ -304,258 +330,302 @@ onMounted(async () => {
             No setting in this group matches that.
           </p>
 
-          <div
-            v-for="setting in shown"
-            :key="setting.key"
-            :data-test="`setting-${setting.key}`"
-            class="rounded-lg border border-default p-4"
+          <template
+            v-for="section in sections"
+            :key="section.id"
           >
-            <div class="flex flex-wrap items-start justify-between gap-2">
-              <div class="space-y-1">
-                <p class="font-mono text-sm">
-                  {{ setting.key }}
-                </p>
-                <p class="text-sm text-muted">
-                  {{ setting.describes }}
-                </p>
-                <p
-                  v-if="coverage(setting)"
-                  class="text-sm"
-                  :class="coverage(setting)!.short ? 'text-error' : 'text-muted'"
-                  :data-test="`coverage-${setting.key}`"
-                >
-                  {{ coverage(setting)!.says }}
-                </p>
-              </div>
-              <div class="flex gap-1">
-                <UBadge
-                  v-if="setting.wideBlastRadius"
-                  color="warning"
-                  variant="subtle"
-                  size="sm"
-                  :data-test="`blast-radius-${setting.key}`"
-                >
-                  Wide blast radius
-                </UBadge>
-                <UButton
-                  v-if="setting.plannedFor"
-                  :to="storyLink(setting.plannedFor.issue)"
-                  target="_blank"
-                  color="neutral"
-                  variant="subtle"
-                  size="xs"
-                  trailing-icon="i-lucide-external-link"
-                  :data-test="`planned-${setting.key}`"
-                  title="Nothing reads this switch: the feature it turns on is not built. The link opens the story that builds it."
-                >
-                  Not built ({{ setting.plannedFor.story }})
-                </UButton>
-                <UBadge
-                  v-else-if="!setting.enforced"
-                  color="neutral"
-                  variant="subtle"
-                  size="sm"
-                  :data-test="`unenforced-${setting.key}`"
-                  title="The committee states this number here and it is quoted where it is published. Changing it changes no refusal."
-                >
-                  Nothing enforces this
-                </UBadge>
-                <UBadge
-                  v-if="!setting.hasDefault && !setting.set"
-                  color="error"
-                  variant="subtle"
-                  size="sm"
-                >
-                  Not set
-                </UBadge>
-              </div>
+            <div
+              v-if="section.technical && section.count"
+              class="space-y-1 pt-3"
+            >
+              <UButton
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :icon="folded ? 'i-lucide-chevron-right' : 'i-lucide-chevron-down'"
+                :aria-expanded="!folded"
+                :disabled="Boolean(search.trim())"
+                data-test="technical-limits"
+                @click="technicalOpen = !technicalOpen"
+              >
+                Technical limits ({{ section.count }})
+              </UButton>
+              <p class="text-xs text-muted">
+                How much one scheduled run may do at once. These stop a backlog arriving as one huge batch; nobody meets them as a rule.
+              </p>
             </div>
 
             <div
-              v-if="!setting.synced"
-              class="mt-3 flex flex-wrap items-center gap-3"
+              v-for="setting in section.listed"
+              :key="setting.key"
+              :data-test="`setting-${setting.key}`"
+              class="rounded-lg border border-default p-4"
             >
-              <USwitch
-                v-if="kind(setting) === 'boolean'"
-                :model-value="standing(setting) === true"
-                :aria-label="setting.describes"
-                :disabled="setting.plannedFor !== null"
-                :loading="saving === setting.key"
-                :data-test="`toggle-${setting.key}`"
-                @update:model-value="attemptSave(setting, $event)"
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="space-y-1">
+                  <h2 class="font-medium">
+                    {{ configHeading(setting.key) }}
+                  </h2>
+                  <p
+                    class="font-mono text-xs text-muted"
+                    :data-test="`key-${setting.key}`"
+                  >
+                    {{ setting.key }}
+                  </p>
+                  <p class="text-sm text-muted">
+                    {{ setting.describes }}
+                  </p>
+                  <p
+                    v-if="coverage(setting)"
+                    class="text-sm"
+                    :class="coverage(setting)!.short ? 'text-error' : 'text-muted'"
+                    :data-test="`coverage-${setting.key}`"
+                  >
+                    {{ coverage(setting)!.says }}
+                  </p>
+                </div>
+                <div class="flex gap-1">
+                  <UBadge
+                    v-if="setting.wideBlastRadius"
+                    color="warning"
+                    variant="subtle"
+                    size="sm"
+                    :data-test="`blast-radius-${setting.key}`"
+                  >
+                    Wide blast radius
+                  </UBadge>
+                  <UButton
+                    v-if="setting.plannedFor"
+                    :to="storyLink(setting.plannedFor.issue)"
+                    target="_blank"
+                    color="neutral"
+                    variant="subtle"
+                    size="xs"
+                    trailing-icon="i-lucide-external-link"
+                    :data-test="`planned-${setting.key}`"
+                    title="Nothing reads this switch: the feature it turns on is not built. The link opens the story that builds it."
+                  >
+                    Not built ({{ setting.plannedFor.story }})
+                  </UButton>
+                  <UBadge
+                    v-else-if="!setting.enforced"
+                    color="neutral"
+                    variant="subtle"
+                    size="sm"
+                    :data-test="`unenforced-${setting.key}`"
+                    title="The committee states this number here and it is quoted where it is published. Changing it changes no refusal."
+                  >
+                    Nothing enforces this
+                  </UBadge>
+                  <UBadge
+                    v-if="!setting.hasDefault && !setting.set"
+                    color="error"
+                    variant="subtle"
+                    size="sm"
+                  >
+                    Not set
+                  </UBadge>
+                </div>
+              </div>
+
+              <div
+                v-if="!setting.synced && edits"
+                class="mt-3 flex flex-wrap items-center gap-3"
+              >
+                <USwitch
+                  v-if="kind(setting) === 'boolean'"
+                  :model-value="standing(setting) === true"
+                  :aria-label="configHeading(setting.key)"
+                  :disabled="setting.plannedFor !== null"
+                  :loading="saving === setting.key"
+                  :data-test="`toggle-${setting.key}`"
+                  @update:model-value="attemptSave(setting, $event)"
+                />
+
+                <template v-else-if="kind(setting) === 'money'">
+                  <UInputNumber
+                    :model-value="pounds(numbers[setting.key])"
+                    :min="0"
+                    :step="0.01"
+                    :format-options="{ style: 'currency', currency: 'GBP' }"
+                    :aria-label="configHeading(setting.key)"
+                    class="w-48"
+                    :data-test="`input-${setting.key}`"
+                    @update:model-value="numbers[setting.key] = pence($event as number)"
+                  />
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    :loading="saving === setting.key"
+                    :aria-label="`Save ${configHeading(setting.key)}`"
+                    :data-test="`save-${setting.key}`"
+                    @click="attemptSave(setting, numbers[setting.key])"
+                  >
+                    Save
+                  </UButton>
+                </template>
+
+                <template v-else-if="kind(setting) === 'dayOfYear'">
+                  <SettingsDayOfYearField
+                    v-model="drafts[setting.key]"
+                    :name="setting.key"
+                    :label="configHeading(setting.key)"
+                  />
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    :loading="saving === setting.key"
+                    :aria-label="`Save ${configHeading(setting.key)}`"
+                    :data-test="`save-${setting.key}`"
+                    @click="attemptSave(setting, drafts[setting.key])"
+                  >
+                    Save
+                  </UButton>
+                </template>
+
+                <template v-else-if="kind(setting) === 'number'">
+                  <UInputNumber
+                    v-model="numbers[setting.key]"
+                    :min="0"
+                    :aria-label="configHeading(setting.key)"
+                    class="w-40"
+                    :data-test="`input-${setting.key}`"
+                  />
+                  <span
+                    v-if="configUnit(setting.key)"
+                    class="text-sm text-muted"
+                  >{{ configUnit(setting.key) }}</span>
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    :loading="saving === setting.key"
+                    :aria-label="`Save ${configHeading(setting.key)}`"
+                    :data-test="`save-${setting.key}`"
+                    @click="attemptSave(setting, numbers[setting.key])"
+                  >
+                    Save
+                  </UButton>
+                </template>
+
+                <template v-else-if="kind(setting) === 'people' || kind(setting) === 'roles'">
+                  <SettingsPeopleField
+                    v-if="kind(setting) === 'people'"
+                    v-model="lists[setting.key]"
+                    :name="setting.key"
+                    :label="configHeading(setting.key)"
+                    :people="setting.people ?? []"
+                  />
+                  <SettingsRolesField
+                    v-else
+                    v-model="lists[setting.key]"
+                    :name="setting.key"
+                    :label="configHeading(setting.key)"
+                    :fixed="roleFloor(setting.key)"
+                  />
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    :loading="saving === setting.key"
+                    :aria-label="`Save ${configHeading(setting.key)}`"
+                    :data-test="`save-${setting.key}`"
+                    @click="attemptSave(setting, lists[setting.key] ?? [])"
+                  >
+                    Save
+                  </UButton>
+                </template>
+
+                <template v-else-if="kind(setting) === 'list'">
+                  <UInputTags
+                    v-model="lists[setting.key]"
+                    :aria-label="configHeading(setting.key)"
+                    class="min-w-64 flex-1"
+                    :data-test="`input-${setting.key}`"
+                  />
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    :loading="saving === setting.key"
+                    :aria-label="`Save ${configHeading(setting.key)}`"
+                    :data-test="`save-${setting.key}`"
+                    @click="attemptSave(setting, lists[setting.key] ?? [])"
+                  >
+                    Save
+                  </UButton>
+                </template>
+
+                <template v-else>
+                  <UInput
+                    v-model="drafts[setting.key]"
+                    :aria-label="configHeading(setting.key)"
+                    :data-test="`input-${setting.key}`"
+                    class="min-w-64 flex-1 font-mono"
+                  />
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    :loading="saving === setting.key"
+                    :aria-label="`Save ${configHeading(setting.key)}`"
+                    :data-test="`save-${setting.key}`"
+                    @click="saveText(setting)"
+                  >
+                    Save
+                  </UButton>
+                </template>
+
+                <UButton
+                  v-if="setting.set"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-undo-2"
+                  :loading="reverting === setting.key"
+                  :aria-label="`Revert ${configHeading(setting.key)}`"
+                  :data-test="`revert-${setting.key}`"
+                  @click="revert(setting)"
+                >
+                  Revert
+                </UButton>
+
+                <span
+                  v-if="notices[setting.key]"
+                  class="text-sm text-muted"
+                >{{ notices[setting.key] }}</span>
+              </div>
+              <p
+                v-else-if="!setting.synced"
+                class="mt-3 text-sm font-medium"
+                :data-test="`value-${setting.key}`"
+              >
+                {{ saysStanding(setting) }}
+              </p>
+              <SettingsBankHolidaySync
+                v-else
+                class="mt-3"
+                :dates="(standing(setting) as string[] | null) ?? []"
+                :read-only="!edits"
+                @synced="load"
               />
 
-              <template v-else-if="kind(setting) === 'money'">
-                <UInputNumber
-                  :model-value="pounds(numbers[setting.key])"
-                  :min="0"
-                  :step="0.01"
-                  :format-options="{ style: 'currency', currency: 'GBP' }"
-                  :aria-label="setting.describes"
-                  class="w-48"
-                  :data-test="`input-${setting.key}`"
-                  @update:model-value="numbers[setting.key] = pence($event as number)"
-                />
-                <UButton
-                  color="neutral"
-                  variant="outline"
-                  :loading="saving === setting.key"
-                  :aria-label="`Save ${setting.describes}`"
-                  :data-test="`save-${setting.key}`"
-                  @click="attemptSave(setting, numbers[setting.key])"
-                >
-                  Save
-                </UButton>
-              </template>
-
-              <template v-else-if="kind(setting) === 'dayOfYear'">
-                <SettingsDayOfYearField
-                  v-model="drafts[setting.key]"
-                  :name="setting.key"
-                  :label="setting.describes"
-                />
-                <UButton
-                  color="neutral"
-                  variant="outline"
-                  :loading="saving === setting.key"
-                  :aria-label="`Save ${setting.describes}`"
-                  :data-test="`save-${setting.key}`"
-                  @click="attemptSave(setting, drafts[setting.key])"
-                >
-                  Save
-                </UButton>
-              </template>
-
-              <template v-else-if="kind(setting) === 'number'">
-                <UInputNumber
-                  v-model="numbers[setting.key]"
-                  :min="0"
-                  :aria-label="setting.describes"
-                  class="w-40"
-                  :data-test="`input-${setting.key}`"
-                />
-                <UButton
-                  color="neutral"
-                  variant="outline"
-                  :loading="saving === setting.key"
-                  :aria-label="`Save ${setting.describes}`"
-                  :data-test="`save-${setting.key}`"
-                  @click="attemptSave(setting, numbers[setting.key])"
-                >
-                  Save
-                </UButton>
-              </template>
-
-              <template v-else-if="kind(setting) === 'people' || kind(setting) === 'roles'">
-                <SettingsPeopleField
-                  v-if="kind(setting) === 'people'"
-                  v-model="lists[setting.key]"
-                  :name="setting.key"
-                  :label="setting.describes"
-                  :people="setting.people ?? []"
-                />
-                <SettingsRolesField
-                  v-else
-                  v-model="lists[setting.key]"
-                  :name="setting.key"
-                  :label="setting.describes"
-                />
-                <UButton
-                  color="neutral"
-                  variant="outline"
-                  :loading="saving === setting.key"
-                  :aria-label="`Save ${setting.describes}`"
-                  :data-test="`save-${setting.key}`"
-                  @click="attemptSave(setting, lists[setting.key] ?? [])"
-                >
-                  Save
-                </UButton>
-              </template>
-
-              <template v-else-if="kind(setting) === 'list'">
-                <UInputTags
-                  v-model="lists[setting.key]"
-                  :aria-label="setting.describes"
-                  class="min-w-64 flex-1"
-                  :data-test="`input-${setting.key}`"
-                />
-                <UButton
-                  color="neutral"
-                  variant="outline"
-                  :loading="saving === setting.key"
-                  :aria-label="`Save ${setting.describes}`"
-                  :data-test="`save-${setting.key}`"
-                  @click="attemptSave(setting, lists[setting.key] ?? [])"
-                >
-                  Save
-                </UButton>
-              </template>
-
-              <template v-else>
-                <UInput
-                  v-model="drafts[setting.key]"
-                  :aria-label="setting.describes"
-                  :data-test="`input-${setting.key}`"
-                  class="min-w-64 flex-1 font-mono"
-                />
-                <UButton
-                  color="neutral"
-                  variant="outline"
-                  :loading="saving === setting.key"
-                  :aria-label="`Save ${setting.describes}`"
-                  :data-test="`save-${setting.key}`"
-                  @click="saveText(setting)"
-                >
-                  Save
-                </UButton>
-              </template>
-
-              <UButton
-                v-if="setting.set"
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-undo-2"
-                :loading="reverting === setting.key"
-                :aria-label="`Revert ${setting.describes}`"
-                :data-test="`revert-${setting.key}`"
-                @click="revert(setting)"
+              <p
+                v-if="!setting.synced"
+                class="mt-2 text-xs text-muted"
               >
-                Revert
-              </UButton>
-
-              <span
-                v-if="notices[setting.key]"
-                class="text-sm text-muted"
-              >{{ notices[setting.key] }}</span>
+                <span v-if="setting.hasDefault && kind(setting) === 'people'">Ships naming nobody. </span>
+                <span v-else-if="setting.hasDefault">Ships as {{ saysConfigValue(setting.key, setting.default) }}. </span>
+                <span v-if="setting.updatedBy && setting.updatedAt">
+                  Changed by {{ setting.updatedBy.name }} on
+                  {{ saysDayLong(setting.updatedAt) }}.
+                </span>
+                <span v-else>Never changed.</span>
+              </p>
             </div>
-            <SettingsBankHolidaySync
-              v-else
-              class="mt-3"
-              :dates="(standing(setting) as string[] | null) ?? []"
-              @synced="load"
-            />
-
-            <p
-              v-if="!setting.synced"
-              class="mt-2 text-xs text-muted"
-            >
-              <span v-if="setting.hasDefault && kind(setting) === 'dayOfYear'">Ships as {{ saysMonthDay(String(setting.default)) }}. </span>
-              <span v-else-if="setting.hasDefault && (kind(setting) === 'people' || kind(setting) === 'roles')">Ships naming {{ (setting.default as unknown[]).length ? (setting.default as string[]).join(', ') : 'nobody' }}. </span>
-              <span v-else-if="setting.hasDefault">Ships as <span class="font-mono">{{ asText(setting.default) }}</span>. </span>
-              <span v-if="setting.updatedBy && setting.updatedAt">
-                Changed by {{ setting.updatedBy.name }} on
-                {{ saysDayLong(setting.updatedAt) }}.
-              </span>
-              <span v-else>Never changed.</span>
-            </p>
-          </div>
+          </template>
         </div>
       </template>
     </UTabs>
 
     <UModal
       :open="confirming !== null"
-      :title="confirming ? `Confirm: ${confirming.key}` : ''"
+      :title="confirming ? `Confirm: ${configHeading(confirming.key)}` : ''"
       description="This setting reaches a great deal. Read the count before you type either option below."
       @update:open="confirming = null"
     >
