@@ -211,6 +211,11 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     // Disabled, so it no longer counts and the guard holds again.
     const response = await send('DELETE', '/api/admin/roles', { userId: session.user.id, role: 'ADMIN' }, cookie)
     expect(response.status).toBe(409)
+
+    // The guarded batch that does revoke records it once: its assertion changes no row (0049).
+    const before = await revocations(spareSession.user.id)
+    expect((await send('DELETE', '/api/admin/roles', { userId: spareSession.user.id, role: 'ADMIN' }, cookie)).status).toBe(200)
+    expect(await revocations(spareSession.user.id)).toBe(before + 1)
   })
 
   test('an ordinary role can be revoked', async () => {
@@ -218,6 +223,27 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     const read = await fetch(`${app.baseURL}/api/admin/roles?userId=${subjectId}`, { headers: { cookie } })
     expect(await read.json()).toMatchObject({ roles: [] })
   })
+
+  // 0049: the trail records a revocation when one happened, and only then.
+  test('a revoke records itself once, and revoking a role nobody holds records nothing', async () => {
+    expect((await send('POST', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)).status).toBe(200)
+    const before = await revocations(subjectId)
+    expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)).status).toBe(200)
+    expect(await revocations(subjectId)).toBe(before + 1)
+    expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)).status).toBe(200)
+    expect(await revocations(subjectId)).toBe(before + 1)
+  })
 })
+
+async function revocations(userId: string): Promise<number> {
+  const { Database } = await import('bun:sqlite')
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return (database.query(`SELECT count(*) AS n FROM audit_log WHERE action = 'role.revoked' AND target = ?`).get(`user:${userId}`) as { n: number }).n
+  }
+  finally {
+    database.close()
+  }
+}
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
     }
     // Waiting for a first sign-in, so it keeps nothing until then (A-120 criterion 3).
-    if (input.role === PROTECTED_ROLE) await refuseProtectedGrant(null, expiresAt)
+    const guard = input.role === PROTECTED_ROLE ? grantKeepsAnItManagerWhere({ userId: null, expiresAt }, Math.floor(Date.now() / 1000)) : null
 
     const userId = newId()
     const statements = pendingGrantStatements({
@@ -70,7 +70,7 @@ export default defineEventHandler(async (event) => {
       },
     }).map(statement => db.run(statement))
     try {
-      await db.batch([statements[0]!, ...statements.slice(1)])
+      await batchKeepingAnItManager(guard, statements, () => refuseProtectedGrant(null, expiresAt))
     }
     catch (error) {
       const refusal = pendingGrantConstraintRefusal(error)
@@ -91,8 +91,10 @@ export default defineEventHandler(async (event) => {
   }
 
   // A lapse is a revocation nobody acts on, so every IT Manager grant leaves one that cannot
-  // lapse (A-120 criterion 1).
-  if (input.role === PROTECTED_ROLE) await refuseProtectedGrant(subject.id, expiresAt)
+  // lapse (A-120 criterion 1); the batch carries the guard (criterion 5).
+  const guard = input.role === PROTECTED_ROLE
+    ? grantKeepsAnItManagerWhere({ userId: subject.id, expiresAt }, Math.floor(Date.now() / 1000))
+    : null
 
   // The unique key is (user, role), so a lapsed grant is still a row: without this a renewal
   // would insert nothing, say nothing, and leave the role gone (A-131 criterion 5).
@@ -104,7 +106,7 @@ export default defineEventHandler(async (event) => {
     .where(and(eq(schema.roleGrants.userId, subject.id), eq(schema.roleGrants.role, input.role)))
     .limit(1)
 
-  await db.batch([
+  await batchKeepingAnItManager(guard, [
     db.insert(schema.roleGrants).values({
       id: newId(),
       userId: subject.id,
@@ -126,7 +128,7 @@ export default defineEventHandler(async (event) => {
         ? { role: input.role, noted: note !== null, ...changes({ expiresAt: [held.expiresAt, expiresAt] }) }
         : { role: input.role, expiresAt, permanent: expiresAt === null, noted: note !== null },
     })),
-  ])
+  ], () => refuseProtectedGrant(subject.id, expiresAt))
 
   return { ok: true, role: input.role, expiresAt, renewed: Boolean(held), pending: false, userId: subject.id }
 })

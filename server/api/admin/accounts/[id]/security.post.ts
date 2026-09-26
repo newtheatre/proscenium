@@ -31,8 +31,6 @@ export default defineEventHandler(async (event) => {
     return { ok: true, operation: input.operation, ...await eraseAccount(id, resolved.account.id) }
   }
 
-  if (input.operation === 'disable') await refuseStranding(PROTECTED_ROLE, id, 'disabling')
-
   // The epoch is what ends every session at once, and it never goes backwards, so re-enabling
   // cannot resurrect a cookie sealed before the disable (criterion 1).
   const revoke = { sessionEpoch: sql`${schema.users.sessionEpoch} + 1` }
@@ -65,7 +63,9 @@ export default defineEventHandler(async (event) => {
     ])
   }
   else {
-    await db.batch([touch, record])
+    // Disabling the last IT Manager strands the system as revoking would, guarded on the write.
+    const guard = input.operation === 'disable' ? keepsAnItManagerWhere(id, Math.floor(Date.now() / 1000)) : null
+    await batchKeepingAnItManager(guard, [touch, record], () => refuseStranding(PROTECTED_ROLE, id, 'disabling'))
   }
 
   return { ok: true, operation: input.operation }

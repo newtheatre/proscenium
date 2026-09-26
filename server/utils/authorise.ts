@@ -1,6 +1,9 @@
 import type { H3Event } from 'h3'
 import { and, eq, gt, isNull, or } from 'drizzle-orm'
-import { protectedGrantRefusal, strandingBy, strandingRefusal } from '#shared/utils/protected-role'
+import { constraintRefusal } from '#shared/utils/constraint-refusal'
+import { IT_MANAGERS_CHANGED, protectedGrantRefusal, strandingBy, strandingRefusal } from '#shared/utils/protected-role'
+import type { BatchItem } from 'drizzle-orm/batch'
+import type { SQL } from 'drizzle-orm'
 import type { ProtectedHolder, Stranding, StrandingAct } from '#shared/utils/protected-role'
 import type { Grant, Permission, Role } from '#shared/utils/roles'
 import type { AccountRow } from '#server/utils/accounts'
@@ -92,8 +95,7 @@ async function isUsableAccount(userId: string): Promise<boolean> {
   return row !== undefined
 }
 
-// The last administrator cannot be removed: it is a write check rather than a constraint,
-// because it depends on every other row (A-120).
+// The guard's own read, for the words of a refusal; the write carries it too (A-120 criterion 5).
 export async function wouldStrandTheSystem(role: Role, userId: string, now = new Date()): Promise<Stranding | null> {
   if (role !== PROTECTED_ROLE) return null
   return strandingBy(await protectedHolders(now), userId)
@@ -110,4 +112,18 @@ export async function refuseProtectedGrant(userId: string | null, expiresAt: num
   const [holders, usable] = await Promise.all([protectedHolders(), userId === null ? false : isUsableAccount(userId)])
   const refusal = protectedGrantRefusal(holders, { userId, expiresAt, usable })
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
+}
+
+// The guard rides the batch as its first statement, so two officers acting at once cannot both
+// pass it (A-120 criterion 5, 0035); `explain` rereads it for the words of the refusal.
+export async function batchKeepingAnItManager(guard: SQL | null, writes: BatchItem<'sqlite'>[], explain: () => Promise<void>): Promise<unknown[]> {
+  const statements = guard === null ? writes : [db.run(itManagerAssertion(guard)), ...writes]
+  try {
+    return await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]) as unknown[]
+  }
+  catch (error) {
+    if (guard === null || !constraintRefusal([{ violated: IT_MANAGER_ASSERTION, says: IT_MANAGERS_CHANGED }], error)) throw error
+    await explain()
+    throw createError({ statusCode: 409, statusMessage: IT_MANAGERS_CHANGED })
+  }
 }
