@@ -239,8 +239,8 @@ const columns: TableColumn<BarProduct>[] = [
       // Below sm the allergens and sold columns are hidden: their content sits here instead,
       // so a phone keeps the row actions in view without losing what those columns said (922).
       h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, [
-        says(row.original.allergenState),
-        row.original.allergenNote ? `, ${row.original.allergenNote}` : '',
+        says(row.original.allergens.state),
+        row.original.allergens.note ? `, ${row.original.allergens.note}` : '',
         row.original.everSold ? ', has been sold' : ', never sold',
       ].join('')),
     ]),
@@ -250,8 +250,9 @@ const columns: TableColumn<BarProduct>[] = [
     header: 'Allergens',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => h('div', {}, [
-      h('div', { class: 'text-sm' }, says(row.original.allergenState)),
-      row.original.allergenNote ? h('div', { class: 'text-xs text-muted' }, row.original.allergenNote) : null,
+      // What the till says, read from the stock it pours (issue 1348).
+      h('div', { 'class': 'text-sm', 'data-test': `allergens-${row.original.id}` }, says(row.original.allergens.state)),
+      row.original.allergens.note ? h('div', { class: 'text-xs text-muted' }, row.original.allergens.note) : null,
     ]),
   },
   {
@@ -465,10 +466,19 @@ const columns: TableColumn<BarProduct>[] = [
             />
           </UFormField>
 
+          <p
+            v-if="editing"
+            class="text-sm text-muted"
+            data-test="product-allergens-derived"
+          >
+            At the till: {{ says(editing.allergens.state) }}{{ editing.allergens.note ? `. ${editing.allergens.note}` : '' }}
+            It is read from the stock it pours, answered once on the Allergens screen.
+          </p>
+
           <UFormField
-            label="Allergens"
+            label="Added at the bar"
             name="allergenState"
-            description="Confirmed no allergens is an answer; no information recorded is the absence of one, and the till says which."
+            description="Only what this product adds to the stock it pours, such as a garnish. Leave it on no information recorded if it adds nothing."
           >
             <USelect
               v-model="state.allergenState"
@@ -483,7 +493,7 @@ const columns: TableColumn<BarProduct>[] = [
             label="Allergen note"
             name="allergenNote"
             :required="state.allergenState === 'RECORDED'"
-            description="What staff read out at the bar. It has to cover the ingredients, not only the bottle."
+            description="What the addition contains, read out at the bar after the stock's own answers."
           >
             <UTextarea
               v-model="state.allergenNote"

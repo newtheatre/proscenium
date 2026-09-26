@@ -196,7 +196,11 @@ Open questions:
 - Depends on: F-103, F-111
 - Acceptance criteria:
   1. Every product carries an allergen note maintained in product administration; the sale screen
-     shows an allergen affordance on every product tile and basket line.
+     shows an allergen affordance on every product tile and basket line. Amended 26 September
+     2026 (issue 1348): the answer (no information, confirmed none, or recorded with a note) is
+     given once per stocked item, on the stock register and one review screen that lists the
+     unanswered first; a product's answer is derived from every item its live sizes pour,
+     choices included, with its own note kept only for what the bar adds, such as a garnish.
   2. Opening the note never leaves the sale; the basket is intact on return.
   3. "Confirmed no allergens" is a distinct recorded state from "no information recorded", and the
      till displays which of the two it is.

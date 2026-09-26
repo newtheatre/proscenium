@@ -438,6 +438,53 @@ describe.skipIf(skip !== null)('a product pouring restricted stock asks for Chec
   })
 })
 
+// Issue 1348 (F-107 criteria 1, 3 and 4): the answer is given once, on the stocked item, and every
+// product reads its own from what it pours, with only what the bar adds kept on the product.
+describe.skipIf(skip !== null)('allergens are answered once, on the stocked item (issue 1348)', () => {
+  interface ListedAnswer { id: string, allergenState: string, allergenNotes: string | null }
+
+  test('an item takes an answer, recorded needs its note, and the change is audited', async () => {
+    const id = await addItem({ allergenState: 'NONE' })
+    expect((await items()).find(item => item.id === id) as unknown as ListedAnswer).toMatchObject({ allergenState: 'NONE' })
+
+    const name = named('Answered red')
+    const refused = await send('PUT', `/api/admin/bar/items/${id}`, { name, unit: 'ML', containerMl: 750, allergenState: 'RECORDED' })
+    expect(refused.status).toBe(400)
+    expect((await send('PUT', `/api/admin/bar/items/${id}`, {
+      name,
+      unit: 'ML',
+      containerMl: 750,
+      allergenState: 'RECORDED',
+      allergenNotes: 'Contains sulphites',
+    })).status).toBe(200)
+    const entry = trail<{ detail: { changes: { allergenState: { from: string, to: string } } } }>('bar.item.updated', `bar-item:${id}`)
+    expect(entry?.detail.changes.allergenState).toEqual({ from: 'NONE', to: 'RECORDED' })
+  })
+
+  test('the register lists the unanswered first, and filters to them', async () => {
+    const stem = named('Answer me')
+    const unanswered = await addItem({ name: `${stem} one` })
+    const answered = await addItem({ name: `${stem} two`, allergenState: 'NONE' })
+    const search = `&search=${encodeURIComponent(stem)}`
+    const listed = await listing<ListedAnswer>('/api/admin/bar/items', `${search}&allergenState=is:UNKNOWN`)
+    expect(listed.map(item => item.id)).toEqual([unanswered])
+    const sorted = await listing<ListedAnswer>('/api/admin/bar/items', `${search}&sort=allergens`)
+    expect(sorted.map(item => item.id)).toEqual([unanswered, answered])
+  })
+
+  test('a product reads its answer from what it pours, with what the bar adds after', async () => {
+    const categoryId = await addCategory()
+    const wine = named('Poured white')
+    const itemId = await addItem({ name: wine, allergenState: 'RECORDED', allergenNotes: 'Contains sulphites' })
+    const productId = await addProduct(categoryId, { allergenState: 'RECORDED', allergenNote: 'Lemon twist' })
+    const variantId = await addVariant(productId, { servingKind: '175ml', label: '175ml' })
+    await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 175 }] })
+
+    const product = (await products()).find(one => one.id === productId) as unknown as { allergens: { state: string, note: string } }
+    expect(product.allergens).toEqual({ state: 'RECORDED', note: `${wine}: Contains sulphites. Added at the bar: Lemon twist.` })
+  })
+})
+
 // The name predicate and the audit insert share one batch (auditedWrite, 0049), so a losing
 // racer's write touches nothing and the audit trail never logs a change that did not happen.
 describe.skipIf(skip !== null)('a race for a name is refused, and the loser logs nothing (0049)', () => {
@@ -1060,6 +1107,26 @@ describe.skipIf(skip !== null)('the screens', () => {
     expect(form).toContain('Cost of one')
     expect(form).not.toContain('Cost of one container')
 
+    view.close()
+  }, 120_000)
+
+  // Issue 1348: the one review table works through the unanswered first, and saves in place.
+  test('the allergens screen answers an item in place', async () => {
+    const itemName = named('Aaa unanswered')
+    const itemId = await addItem({ name: itemName })
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/bar/stock/allergens`, `[data-test="allergen-row-${itemId}"]`)
+    await click(view, `[data-test="allergen-${itemId}-NONE"]`)
+    await click(view, `[data-test="allergen-save-${itemId}"]`)
+    await waitFor(view, `!document.querySelector('[data-test="allergen-save-${itemId}"]')`)
+    expect(((await items()).find(item => item.id === itemId) as unknown as { allergenState: string }).allergenState).toBe('NONE')
     view.close()
   }, 120_000)
 

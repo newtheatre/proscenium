@@ -116,6 +116,9 @@ export const barItems = sqliteTable('bar_items', {
   // products across several till categories, so it has no one sale category to inherit (F-120).
   category: text('category'),
   ageRestricted: integer('age_restricted', { mode: 'boolean' }).notNull().default(true),
+  // The allergen answer every product pouring this reads (issue 1348). Bare and nullable: NULL is
+  // unanswered, or recorded where a note was written before the answer had a state of its own.
+  allergenState: text('allergen_state'),
   allergenNotes: text('allergen_notes'),
   status: text('status').notNull().default('ACTIVE'),
   createdAt: integer('created_at').notNull().default(now),

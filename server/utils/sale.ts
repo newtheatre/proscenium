@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
 import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, onHandOfItems, resolvedPriceColumns } from '#server/utils/bar'
-import { stockCounted, tillServings } from '#server/utils/bar-linkage'
+import { derivedAllergens, stockCounted, tillServings } from '#server/utils/bar-linkage'
 import { chunked } from '#shared/utils/approvals'
 import { NOT_ENOUGH_STOCK, checkIdFor, choiceWithStock, pouredNames, saysPouredLines, stockShortOf, variantStock } from '#shared/utils/sale'
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
@@ -185,6 +185,8 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
     ORDER BY c.sort, c.name COLLATE NOCASE, p.sort, p.name COLLATE NOCASE
   `)
 
+  // Each tile's allergen answer reads what the product pours, not a copy kept on it (issue 1348).
+  const allergens = await derivedAllergens(sql`SELECT id FROM bar_products WHERE status = 'ACTIVE'`, productRows)
   const variants = [...(await activeVariantsWithChoices(on)).variants.values()]
   // Read here and never on the sale path, which the trigger guards on the write (F-128 criterion 8).
   const [servings, counted] = await Promise.all([tillServings(), stockCounted()])
@@ -204,8 +206,8 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
         categoryId: row.categoryId,
         // The tile's mark: any size, or any option offered, that asks (issue 1299, F-106.6).
         ageRestricted: sizes.some(size => size.ageRestricted || size.choice?.options.some(option => option.ageRestricted) === true),
-        allergenState: row.allergenState,
-        allergenNote: row.allergenNote,
+        allergenState: allergens.get(row.id)?.state ?? row.allergenState,
+        allergenNote: allergens.get(row.id)?.note ?? row.allergenNote,
         variants: sizes,
       }
     })

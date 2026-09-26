@@ -109,6 +109,12 @@ const newItem = reactive({
   unit: 'ITEM' as StockUnit,
   containerMl: null as number | null,
   ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
+  allergenState: 'UNKNOWN' as AllergenState,
+  allergenNotes: '',
+})
+
+watch(() => newItem.allergenState, (state) => {
+  if (state === 'UNKNOWN') newItem.allergenNotes = ''
 })
 
 interface SizeRow {
@@ -327,6 +333,8 @@ function itemPayload(): Record<string, unknown> {
       unit: newItem.unit,
       containerMl: newItem.unit === 'ML' ? newItem.containerMl : null,
       ageRestricted: newItem.ageRestricted,
+      allergenState: newItem.allergenState,
+      allergenNotes: newItem.allergenNotes.trim() || null,
     },
   }
 }
@@ -626,8 +634,8 @@ function moveFocus(step: number): void {
           </UFormField>
 
           <UFormField
-            label="Allergens"
-            description="Confirmed no allergens is an answer; no information recorded is the absence of one."
+            label="Added at the bar"
+            description="Only what this product adds to the stock it pours, such as a garnish. Its answer at the till is read from that stock too."
           >
             <USelect
               v-model="product.allergenState"
@@ -729,6 +737,31 @@ function moveFocus(step: number): void {
               description="A new stocked item starts restricted, since most of the shelf is alcohol. Switch it off for a soft drink or a snack."
               data-test="setup-item-age-restricted"
             />
+
+            <UFormField
+              label="The stocked item's allergens"
+              description="Answered once, on the stocked item, and every product that pours it says the same at the till."
+            >
+              <USelect
+                v-model="newItem.allergenState"
+                :items="allergenOptions"
+                class="w-full"
+                data-test="setup-item-allergen-state"
+              />
+            </UFormField>
+
+            <UFormField
+              v-if="newItem.allergenState !== 'UNKNOWN'"
+              label="The stocked item's allergen note"
+              :required="newItem.allergenState === 'RECORDED'"
+            >
+              <UTextarea
+                v-model="newItem.allergenNotes"
+                :rows="2"
+                class="w-full"
+                data-test="setup-item-allergen-note"
+              />
+            </UFormField>
           </template>
 
           <UFormField

@@ -67,7 +67,7 @@ const CIDER: Simple = {
     allergenState: 'NONE',
     allergenNote: null,
   },
-  item: { mode: 'NEW', item: { name: 'Cider 440ml can', unit: 'ITEM', ageRestricted: true } },
+  item: { mode: 'NEW', item: { name: 'Cider 440ml can', unit: 'ITEM', ageRestricted: true, allergenState: 'UNKNOWN' } },
   serving: { servingKind: 'can', label: 'Can', qty: 1, pricePence: 300 },
   opening: null,
 }
@@ -83,7 +83,7 @@ const HOUSE_RED: ProductSetupInput = {
     allergenState: 'RECORDED',
     allergenNote: 'Contains sulphites.',
   },
-  item: { mode: 'NEW', item: { name: 'House red 750ml', unit: 'ML', containerMl: 750, ageRestricted: true } },
+  item: { mode: 'NEW', item: { name: 'House red 750ml', unit: 'ML', containerMl: 750, ageRestricted: true, allergenState: 'UNKNOWN' } },
   sizes: [
     { servingKind: 'bottle', label: 'Bottle', qty: 750, pricePence: 1400 },
     { servingKind: '250ml', label: '250ml', qty: 250, pricePence: 500 },

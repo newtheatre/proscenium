@@ -168,6 +168,8 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Discounts', icon: 'i-lucide-percent', to: '/bar/discounts', ability: viewBarCatalogue, section: 'Set-up' },
       // Set-up while no tab holder is named, which is how the keys ship (F-108, issue 1342).
       { label: 'Tabs', icon: 'i-lucide-receipt', to: '/bar/tabs', ability: manageBarTabs, section: 'Set-up' },
+      // Answered once per stocked item, and every product pouring it reads it (issue 1348).
+      { label: 'Allergens', icon: 'i-lucide-wheat', to: '/bar/stock/allergens', ability: viewBarStock, section: 'Set-up' },
     ],
   },
 

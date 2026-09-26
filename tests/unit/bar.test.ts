@@ -11,6 +11,7 @@ import {
   DELIVERY_COST_QUESTION,
   componentsForm,
   deliveryCost,
+  deriveAllergens,
   deliveryCostBasis,
   effectivePriceRow,
   movementEntryForm,
@@ -426,5 +427,56 @@ describe('a delivery is costed by the container it came in (0100)', () => {
     expect(saysDeliveryCost({ unit: 'ITEM', unitCostPence: 95, containerCostPence: null, containerQty: null })).toBe('£0.95 each')
     expect(saysDeliveryCost({ unit: 'ML', unitCostPence: 1, containerCostPence: null, containerQty: null })).toBe('£0.01 a ml')
     expect(saysDeliveryCost({ unit: 'ML', unitCostPence: null, containerCostPence: null, containerQty: null })).toBe('')
+  })
+})
+
+// Issue 1348 (F-107 criteria 1, 3 and 4): the answer is given once, on the stocked item, and a
+// product reads its own from everything it pours, choices included, plus what the bar adds.
+describe('a product takes its allergen answer from what it pours', () => {
+  const noAddition = { state: 'UNKNOWN', note: null } as const
+
+  test('everything poured confirmed clear, and nothing added, is confirmed none', () => {
+    expect(deriveAllergens([
+      { itemName: 'Gin', state: 'NONE', note: null },
+      { itemName: 'Tonic water', state: 'NONE', note: null },
+    ], noAddition)).toEqual({ state: 'NONE', note: null })
+  })
+
+  test('a recorded item is named with its note, and what the bar adds follows', () => {
+    expect(deriveAllergens([
+      { itemName: 'House red', state: 'RECORDED', note: 'Contains sulphites.' },
+      { itemName: 'Lemonade', state: 'NONE', note: null },
+    ], { state: 'RECORDED', note: 'Orange slice' })).toEqual({
+      state: 'RECORDED',
+      note: 'House red: Contains sulphites. Added at the bar: Orange slice.',
+    })
+  })
+
+  test('one item nobody has answered for leaves the product unanswered, and says which', () => {
+    expect(deriveAllergens([
+      { itemName: 'House red', state: 'RECORDED', note: 'Contains sulphites' },
+      { itemName: 'Tonic water', state: 'UNKNOWN', note: null },
+    ], { state: 'NONE', note: null })).toEqual({
+      state: 'UNKNOWN',
+      note: 'No information recorded for Tonic water. House red: Contains sulphites.',
+    })
+  })
+
+  test('a product that pours nothing keeps the answer it was given', () => {
+    expect(deriveAllergens([], { state: 'RECORDED', note: 'Contains nuts' })).toEqual({ state: 'RECORDED', note: 'Contains nuts' })
+    expect(deriveAllergens([], noAddition)).toEqual({ state: 'UNKNOWN', note: null })
+  })
+})
+
+describe('a stocked item carries the allergen answer (issue 1348)', () => {
+  test('a note with no state stated is a recorded answer; nothing at all is no answer', () => {
+    expect(stockItemForm.parse({ name: 'House red', unit: 'ML', allergenNotes: 'Sulphites' }).allergenState).toBe('RECORDED')
+    expect(stockItemForm.parse({ name: 'Gin', unit: 'ML' }).allergenState).toBe('UNKNOWN')
+    expect(stockItemForm.parse({ name: 'Gin', unit: 'ML', allergenState: 'NONE' }).allergenState).toBe('NONE')
+  })
+
+  test('recorded needs its note, and a note is not filed as unknown', () => {
+    expect(stockItemForm.safeParse({ name: 'House red', unit: 'ML', allergenState: 'RECORDED' }).success).toBe(false)
+    expect(stockItemForm.safeParse({ name: 'House red', unit: 'ML', allergenState: 'UNKNOWN', allergenNotes: 'Sulphites' }).success).toBe(false)
   })
 })

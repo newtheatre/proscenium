@@ -405,6 +405,23 @@ describe.skipIf(skip !== null)('the screen', () => {
     view.close()
   }, 120_000)
 
+  // Issue 1348 (F-107 criteria 1 and 4): the till reads a product's answer from the stock it pours,
+  // answered once on the stocked item, so a wine says what its bottle contains.
+  test('a tile\'s allergens are read from the stock it pours, named item by item', async () => {
+    const { venueId } = programme('sale-allergen-poured')
+    const { productId, variantId } = await aSellableProduct({ name: named('Poured note') })
+    const wine = named('Poured red')
+    const itemId = await anItem({ name: wine, allergenState: 'RECORDED', allergenNotes: 'Contains sulphites' })
+    await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 25 }] })
+    await openTill(venueId)
+
+    const listed = await catalogue(venueId).then(response => response.json()) as ListedCatalogue
+    expect(listed.products.find(product => product.id === productId)).toMatchObject({
+      allergenState: 'RECORDED',
+      allergenNote: `${wine}: Contains sulphites.`,
+    })
+  })
+
   // Issue 1297: before the bar's first count, a drink pouring stock with nothing on hand is refused
   // at the charge, so the till tells whoever can count it how many drinks that is (0080).
   test('before the first count, the Bar Manager is told how many drinks the till would refuse', async () => {

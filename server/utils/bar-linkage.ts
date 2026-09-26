@@ -1,7 +1,9 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { auditEntry, changes } from '#shared/utils/audit'
+import { deriveAllergens } from '#shared/utils/bar'
 import type { SQL } from 'drizzle-orm'
+import type { AllergenAnswer, AllergenState, PouredAllergen } from '#shared/utils/bar'
 
 // F-128: both directions are read from the components that already exist. Nothing stores a link,
 // and every predicate here scopes by subquery rather than by an id list read first (0006).
@@ -50,6 +52,48 @@ export function pourSizesColumn(alias: string): SQL {
       ORDER BY qty
     )
   )`
+}
+
+// An item's allergen answer. A note written before the answer had its own column reads as a
+// recorded answer, so no row needs rewriting (issue 1348).
+export function itemAllergenState(alias: string): SQL {
+  const item = sql.raw(alias)
+  return sql`coalesce(${item}.allergen_state,
+    CASE WHEN coalesce(trim(${item}.allergen_notes), '') <> '' THEN 'RECORDED' ELSE 'UNKNOWN' END)`
+}
+
+// Every item each product's live sizes pour, a choice's options included, with the item's own
+// answer (issue 1348, F-107 criterion 4). Scoped by subquery, so it binds nothing per product (0006).
+export function pouredAllergensQuery(products: SQL): SQL {
+  return sql`
+    SELECT v.product_id AS productId, r.name AS itemName, ${itemAllergenState('r')} AS state, r.allergen_notes AS note
+    FROM product_variants v JOIN variant_components c ON c.variant_id = v.id
+    JOIN bar_items r ON r.id = c.item_id
+    WHERE v.status = 'ACTIVE' AND v.product_id IN (${products})
+    UNION
+    SELECT v.product_id, r.name, ${itemAllergenState('r')}, r.allergen_notes
+    FROM product_variants v JOIN variant_components c ON c.variant_id = v.id
+    JOIN choice_group_items g ON g.choice_group_id = c.choice_group_id
+    JOIN bar_items r ON r.id = g.item_id
+    WHERE v.status = 'ACTIVE' AND v.product_id IN (${products})
+    ORDER BY 1, 2 COLLATE NOCASE
+  `
+}
+
+export interface PouredAllergenRow extends PouredAllergen {
+  productId: string
+}
+
+// Each product's derived answer, keyed by product, from one read of what they all pour.
+export async function derivedAllergens(
+  products: SQL,
+  additions: readonly { id: string, allergenState: AllergenState, allergenNote: string | null }[],
+): Promise<Map<string, AllergenAnswer>> {
+  const rows = await db.all<PouredAllergenRow>(pouredAllergensQuery(products))
+  return new Map(additions.map(product => [
+    product.id,
+    deriveAllergens(rows.filter(row => row.productId === product.id), { state: product.allergenState, note: product.allergenNote }),
+  ]))
 }
 
 // SQLite hands back json_group_array as text, and an empty group as an empty array.

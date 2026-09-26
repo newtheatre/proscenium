@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { pourSizesColumn, pouredByColumn, readPourSizes, readPouredBy, readRestrictedPours, restrictedPoursColumn, poursRestrictedSwitchedOffPredicate } from './bar-linkage'
+import { derivedAllergens, itemAllergenState, pourSizesColumn, pouredByColumn, readPourSizes, readPouredBy, readRestrictedPours, restrictedPoursColumn, poursRestrictedSwitchedOffPredicate } from './bar-linkage'
 import type { SQL } from 'drizzle-orm'
 import { SERVING_KINDS, effectivePriceRow } from '#shared/utils/bar'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
@@ -8,7 +8,7 @@ import { barItemsList } from '#shared/utils/bar-items-list'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
 import { barProductsList } from '#shared/utils/bar-products-list'
 import { aliasColumns, count, predicate, whereFrom, yesNo } from './list-filters'
-import type { BarCategory, BarProduct, CategoryPrice, ChoiceGroup, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
+import type { AllergenAnswer, BarCategory, BarProduct, CategoryPrice, ChoiceGroup, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { ListClause, Reference } from './list-filters'
 
@@ -325,19 +325,20 @@ export async function claimName(entity: NamedEntity, name: string, exceptId?: st
   return row
 }
 
-interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 'everSold' | 'restrictedPours'> {
+interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 'everSold' | 'restrictedPours' | 'allergens'> {
   staffedOnly: number
   ageRestricted: number
   everSold: number
   restrictedPours: string | null
 }
 
-const readProduct = (row: ProductRow): BarProduct => ({
+const readProduct = (row: ProductRow, allergens: Map<string, AllergenAnswer>): BarProduct => ({
   ...row,
   staffedOnly: row.staffedOnly === 1,
   ageRestricted: row.ageRestricted === 1,
   everSold: row.everSold === 1,
   restrictedPours: readRestrictedPours(row.restrictedPours),
+  allergens: allergens.get(row.id) ?? { state: row.allergenState, note: row.allergenNote },
 })
 
 export const PRODUCT_COLUMNS = sql`
@@ -386,8 +387,11 @@ export function productsQuery(clause: ListClause, limit: number, offset: number)
   `
 }
 
+// The derived answer reads every product's pours rather than an id list from this page (0006).
 export async function listProducts(clause: ListClause, limit: number, offset: number): Promise<BarProduct[]> {
-  return (await db.all<ProductRow>(productsQuery(clause, limit, offset))).map(readProduct)
+  const rows = await db.all<ProductRow>(productsQuery(clause, limit, offset))
+  const allergens = await derivedAllergens(sql`SELECT id FROM bar_products`, rows)
+  return rows.map(row => readProduct(row, allergens))
 }
 
 export async function countProducts(clause: ListClause): Promise<number> {
@@ -402,7 +406,8 @@ export async function productById(id: string): Promise<BarProduct | undefined> {
     SELECT ${productRowColumns()}
     FROM bar_products p JOIN bar_categories c ON c.id = p.category_id WHERE p.id = ${id}
   `)
-  return row ? readProduct(row) : undefined
+  if (!row) return undefined
+  return readProduct(row, await derivedAllergens(sql`SELECT ${id}`, [row]))
 }
 
 interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements' | 'pouredBy' | 'pourSizes'> {
@@ -429,15 +434,24 @@ const ITEM_COLUMNS = sql`
   i.par_qty AS parQty,
   i.category AS category,
   i.age_restricted AS ageRestricted,
+  ${itemAllergenState('i')} AS allergenState,
   i.allergen_notes AS allergenNotes,
   i.status AS status
 `
 
 const MOVED = sql`CASE WHEN EXISTS (SELECT 1 FROM stock_movements m WHERE m.item_id = i.id) THEN 1 ELSE 0 END`
 
+// The allergen answer is an expression rather than a column, so a filter and a sort by it read the
+// same reading every screen shows (issue 1348); unanswered sorts first.
+function itemColumns(name: string): Reference {
+  if (name === 'allergen_state') return itemAllergenState('i')
+  if (name === 'allergen_order') return sql`CASE ${itemAllergenState('i')} WHEN 'UNKNOWN' THEN 0 ELSE 1 END`
+  return aliasColumns('i')(name)
+}
+
 export function itemsClause(query: ListQuery): ListClause {
   return whereFrom(barItemsList, query, {
-    column: aliasColumns('i'),
+    column: itemColumns,
     search: [sql`i.name`],
     fields: { retired: yesNo(sql`i.status = 'RETIRED'`) },
   })

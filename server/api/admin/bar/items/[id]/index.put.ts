@@ -33,6 +33,7 @@ export default defineEventHandler(async (event) => {
           par_qty = ${input.parQty ?? null},
           category = ${input.category ?? null},
           age_restricted = ${input.ageRestricted ? 1 : 0},
+          allergen_state = ${input.allergenState},
           allergen_notes = ${input.allergenNotes ?? null}
       WHERE id = ${id}
         AND NOT EXISTS (SELECT 1 FROM bar_items WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
@@ -51,6 +52,7 @@ export default defineEventHandler(async (event) => {
           parQty: [held.parQty, input.parQty ?? null],
           category: [held.category, input.category ?? null],
           ageRestricted: [held.ageRestricted, input.ageRestricted],
+          allergenState: [held.allergenState, input.allergenState],
         }),
         allergenNotesChanged: (input.allergenNotes ?? null) !== held.allergenNotes,
       },

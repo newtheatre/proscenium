@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import {
+  ALLERGEN_STATES,
   REASONS_BY_KIND,
   STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   DELIVERY_COST_QUESTION,
@@ -17,7 +18,7 @@ import {
   writeOffSizes,
 } from '#shared/utils/bar'
 import { barItemsList } from '#shared/utils/bar-items-list'
-import type { MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
+import type { AllergenState, MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Stock', middleware: 'console', docs: '/docs/bar/stock' })
@@ -37,11 +38,19 @@ const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 // Search, filters, sort and page live in the URL (K-129).
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(barItemsList)
 
-const { data, status, error, refresh } = await useAsyncData(
-  'bar-items',
-  () => request<Listing>('/api/admin/bar/items', { query: query.value }),
-  { watch: [query], default: empty },
-)
+// How many live items still have no allergen answer, whatever the page shows (issue 1348).
+const [{ data, status, error, refresh }, { data: unanswered, refresh: recount }] = await Promise.all([
+  useAsyncData(
+    'bar-items',
+    () => request<Listing>('/api/admin/bar/items', { query: query.value }),
+    { watch: [query], default: empty },
+  ),
+  useAsyncData(
+    'bar-items-unanswered',
+    () => request<Listing>('/api/admin/bar/items', { query: { allergenState: 'is:UNKNOWN', retired: 'false', pageSize: 1 } }),
+    { default: empty },
+  ),
+])
 
 const editing = ref<StockItem | null>(null)
 const open = ref(false)
@@ -59,10 +68,17 @@ interface ItemState {
   parQty?: number
   category?: string
   ageRestricted: boolean
+  allergenState: AllergenState
   allergenNotes?: string
 }
 
-const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT })
+const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT, allergenState: 'UNKNOWN' })
+const allergenOptions = ALLERGEN_STATES.map(value => ({ label: says(value), value }))
+
+// The note field is hidden when nothing is recorded, so the value behind it goes too.
+watch(() => state.allergenState, (chosen) => {
+  if (chosen === 'UNKNOWN') state.allergenNotes = undefined
+})
 
 type HandEnteredKind = Exclude<StockMovementKind, 'SALE' | 'COMP' | 'STOCKTAKE' | 'TRANSFER' | 'REVERSAL'>
 
@@ -91,7 +107,7 @@ const costPounds = ref<number>()
 const costQuestion = computed(() => (moving.value ? DELIVERY_COST_QUESTION[deliveryCostBasis(moving.value)] : null))
 
 async function reload(): Promise<void> {
-  await refresh()
+  await Promise.all([refresh(), recount()])
   if (page.value > data.value.pages) page.value = data.value.pages
 }
 
@@ -104,6 +120,7 @@ function edit(item: StockItem | null): void {
     parQty: item?.parQty ?? undefined,
     category: item?.category ?? undefined,
     ageRestricted: item?.ageRestricted ?? STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
+    allergenState: item?.allergenState ?? 'UNKNOWN',
     allergenNotes: item?.allergenNotes ?? undefined,
   })
   open.value = true
@@ -139,6 +156,7 @@ async function save(): Promise<void> {
     parQty: state.parQty ?? null,
     category: state.category?.trim() || null,
     ageRestricted: state.ageRestricted,
+    allergenState: state.allergenState,
     allergenNotes: state.allergenNotes?.trim() || null,
   }
   try {
@@ -430,6 +448,17 @@ const columns: TableColumn<StockItem>[] = [
       :description="failure"
     />
 
+    <UAlert
+      v-if="unanswered.total > 0"
+      data-test="allergens-unanswered"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-wheat"
+      :title="`${plural(unanswered.total, 'stocked item')} ${unanswered.total === 1 ? 'has' : 'have'} no allergen answer`"
+      description="Every product that pours one says so at the till. Answer them before the first night the till is used for real."
+      :actions="[{ label: 'Answer them', color: 'warning', to: '/bar/stock/allergens' }]"
+    />
+
     <p class="text-sm text-muted">
       What is stocked, and how much of it is on hand.
     </p>
@@ -584,10 +613,24 @@ const columns: TableColumn<StockItem>[] = [
           </UFormField>
 
           <UFormField
-            label="Allergen notes"
+            label="Allergens"
+            name="allergenState"
+            description="Answered once here, and every product that pours it says the same at the till."
+          >
+            <USelect
+              v-model="state.allergenState"
+              :items="allergenOptions"
+              class="w-full"
+              data-test="item-allergen-state"
+            />
+          </UFormField>
+
+          <UFormField
+            v-if="state.allergenState !== 'UNKNOWN'"
+            label="Allergen note"
             name="allergenNotes"
-            hint="Optional"
-            description="The reference a product's own note is written from."
+            :required="state.allergenState === 'RECORDED'"
+            description="What staff read out at the bar."
           >
             <UTextarea
               v-model="state.allergenNotes"

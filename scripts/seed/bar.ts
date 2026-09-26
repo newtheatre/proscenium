@@ -147,8 +147,7 @@ const PRODUCTS: SeedProduct[] = [
     category: 'wine',
     status: 'ACTIVE',
     ageRestricted: true,
-    allergenState: 'RECORDED',
-    allergenNote: 'Contains sulphites.',
+    allergenState: 'NONE',
     variants: [
       { slug: '175', servingKind: '175ml', label: '175ml glass', pricePence: 350, recipe: { item: 'house-red', qty: 175 } },
       { slug: '250', servingKind: '250ml', label: '250ml glass', pricePence: 480, recipe: { item: 'house-red', qty: 250 } },
@@ -161,8 +160,7 @@ const PRODUCTS: SeedProduct[] = [
     category: 'wine',
     status: 'ACTIVE',
     ageRestricted: true,
-    allergenState: 'RECORDED',
-    allergenNote: 'Contains sulphites.',
+    allergenState: 'NONE',
     variants: [
       { slug: '175', servingKind: '175ml', label: '175ml glass', pricePence: 350, recipe: { item: 'house-white', qty: 175 } },
       { slug: 'bottle', servingKind: 'bottle', label: 'Bottle', pricePence: 1400, recipe: { item: 'house-white', qty: 750 } },
@@ -174,8 +172,7 @@ const PRODUCTS: SeedProduct[] = [
     category: 'wine',
     status: 'ACTIVE',
     ageRestricted: true,
-    allergenState: 'RECORDED',
-    allergenNote: 'Contains sulphites.',
+    allergenState: 'NONE',
     // Poured by a trained member rather than self-served, which is what staffed-only means.
     staffedOnly: true,
     variants: [
@@ -188,8 +185,7 @@ const PRODUCTS: SeedProduct[] = [
     category: 'beer',
     status: 'ACTIVE',
     ageRestricted: true,
-    allergenState: 'RECORDED',
-    allergenNote: 'Contains barley (gluten).',
+    allergenState: 'NONE',
     variants: [{ slug: 'can', servingKind: 'can', label: 'Can', pricePence: 250, recipe: { item: 'lager', qty: 1 } }],
   },
   {
@@ -198,8 +194,7 @@ const PRODUCTS: SeedProduct[] = [
     category: 'beer',
     status: 'ACTIVE',
     ageRestricted: true,
-    allergenState: 'RECORDED',
-    allergenNote: 'Contains barley (gluten).',
+    allergenState: 'NONE',
     variants: [{ slug: 'can', servingKind: 'can', label: 'Can', pricePence: 320, recipe: { item: 'ale', qty: 1 } }],
   },
   {
@@ -217,8 +212,7 @@ const PRODUCTS: SeedProduct[] = [
     category: 'beer',
     status: 'ACTIVE',
     ageRestricted: false,
-    allergenState: 'RECORDED',
-    allergenNote: 'Contains barley (gluten).',
+    allergenState: 'NONE',
     variants: [{ slug: 'can', servingKind: 'can', label: 'Can', pricePence: 220, recipe: { item: 'alcohol-free-lager', qty: 1 } }],
   },
   {
@@ -239,8 +233,7 @@ const PRODUCTS: SeedProduct[] = [
     category: 'snacks',
     status: 'ACTIVE',
     ageRestricted: false,
-    allergenState: 'RECORDED',
-    allergenNote: 'May contain milk.',
+    allergenState: 'NONE',
     variants: [{ slug: 'bag', servingKind: 'bag', label: 'Bag', pricePence: 100, recipe: { item: 'crisps', qty: 1 } }],
   },
   {
@@ -249,8 +242,7 @@ const PRODUCTS: SeedProduct[] = [
     category: 'snacks',
     status: 'ACTIVE',
     ageRestricted: false,
-    allergenState: 'RECORDED',
-    allergenNote: 'Contains milk, soya and may contain nuts.',
+    allergenState: 'NONE',
     variants: [{ slug: 'bar', servingKind: 'bar', label: 'Bar', pricePence: 110, recipe: { item: 'chocolate', qty: 1 } }],
   },
   {
@@ -260,8 +252,9 @@ const PRODUCTS: SeedProduct[] = [
     // Hidden rather than retired: it comes back every December (F-112).
     status: 'HIDDEN',
     ageRestricted: true,
+    // What the bar adds to the wine it pours: the one product-level answer left (issue 1348).
     allergenState: 'RECORDED',
-    allergenNote: 'Contains sulphites.',
+    allergenNote: 'Mulled with cinnamon and cloves.',
     variants: [{ slug: 'mug', servingKind: 'mug', label: 'Mug', pricePence: 300, recipe: { item: 'house-red', qty: 200 } }],
   },
   {
@@ -297,6 +290,9 @@ export function seedBar(target: SeedTarget, people: People, programme: Programme
       container_ml: item.containerMl,
       par_qty: item.parQty,
       age_restricted: item.ageRestricted ? 1 : 0,
+      // Answered once on the item, which every product pouring it reads (issue 1348); cider is
+      // left unanswered so the allergen review has something to show.
+      allergen_state: item.allergenNotes ? 'RECORDED' : item.slug === 'cider' || item.status === 'RETIRED' ? null : 'NONE',
       allergen_notes: item.allergenNotes,
       status: item.status ?? 'ACTIVE',
     }).id)
