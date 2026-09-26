@@ -113,9 +113,17 @@ describe.skipIf(skip !== null)('the members area and account settings split (K-1
     }
   })
 
+  // The old site's addresses answer 301 before any page runs, so the rule is the redirect map's
+  // (K-127 criterion 4, issue 1341).
   test('/account redirects a signed-in member to /my', async () => {
     const answer = await fetch(`${app.baseURL}/account`, { headers: { cookie: member.cookie }, redirect: 'manual' })
-    expect([200, 302, 303]).toContain(answer.status)
-    if (answer.status !== 200) expect(answer.headers.get('location')).toContain('/my')
+    expect(answer.status).toBe(301)
+    expect(new URL(answer.headers.get('location') ?? '', app.baseURL).pathname).toBe('/my')
+  })
+
+  test('/account/tab redirects to the bar tab, not the profile', async () => {
+    const answer = await fetch(`${app.baseURL}/account/tab`, { headers: { cookie: member.cookie }, redirect: 'manual' })
+    expect(answer.status).toBe(301)
+    expect(new URL(answer.headers.get('location') ?? '', app.baseURL).pathname).toBe('/account/bar-tab')
   })
 })
