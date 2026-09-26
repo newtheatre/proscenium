@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { HUB_KPI_LABELS, checklistHint, compApprovalLine, firstNameOf, groupedBoardCode, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, checklistHint, compApprovalLine, doorStripLine, firstNameOf, groupedBoardCode, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysIntervals, saysSeatsLeft, seesAccessTonight, staleBannerLine } from '#shared/utils/night-hub'
 
 // The show-night hub's wording and numbers (E-112, E-127, issue 905). The screens place these; what
 // they say is decided here, so one test holds it.
@@ -207,5 +207,28 @@ describe('the comp approval line (D-117, F-110, issue 1150 item 10)', () => {
 
   test('a round that prices at nothing still reads as money, never as a ticket', () => {
     expect(compApprovalLine('Sam Yates', 0)).toBe('£0.00 at the bar for Sam Yates.')
+  })
+})
+
+// Issue 1307: the door and the bar read the house too, and only the door and the duty manager
+// read the access wording (D-127 criterion 3).
+describe('who reads what on a show night (issue 1307, D-127 criterion 3)', () => {
+  test('the door and the duty manager see tonight\'s access wording, the bar does not', () => {
+    expect(seesAccessTonight('DOOR')).toBe(true)
+    expect(seesAccessTonight('DUTY_MANAGER')).toBe(true)
+    expect(seesAccessTonight('BAR')).toBe(false)
+  })
+})
+
+describe('the strip under the door\'s camera (issue 1307)', () => {
+  test('the intervals read the way the running time line reads them', () => {
+    expect(saysIntervals(0, null)).toBe('straight through')
+    expect(saysIntervals(1, 20)).toBe('1 interval of 20 minutes')
+    expect(saysIntervals(2, null)).toBe('2 intervals')
+  })
+
+  test('the strip names the latecomer rule and the intervals, in the glance\'s own words', () => {
+    expect(doorStripLine('AT_INTERVAL', 1, 20)).toBe('Latecomers admitted at the interval · 1 interval of 20 minutes')
+    expect(doorStripLine('NOT_ADMITTED', 0, null)).toBe('Latecomers not admitted · straight through')
   })
 })
