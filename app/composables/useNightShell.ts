@@ -45,8 +45,7 @@ export function resolveNightAuthority(): void {
   const request = useRequestFetch()
   const resolved = useNightAuthority()
 
-  // On mount and not during setup: an officer's resolution writes a bypass audit row, and a
-  // server render would write one for a page nobody ever acted on (0044).
+  // A role check is a read, so it records no officer bypass however often a screen makes it (0098).
   onMounted(async () => {
     const answers = await Promise.allSettled(NIGHT_ROLES.map(async (role) => {
       const answered = await request<{ via: 'SHIFT' | 'OFFICER', performances: NightPerformance[] }>('/api/tonight/authority', { query: { role } })

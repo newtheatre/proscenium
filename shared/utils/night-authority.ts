@@ -71,6 +71,25 @@ export function outsideWindowRefusal(window: string): { statusCode: 403, statusM
   }
 }
 
+// Looking is not standing in: a read records no bypass unless it shows what only tonight's team
+// may see and asks to be recorded; every write records (0098, amending 0044).
+export function bypassIsRecorded(method: string, recordsRead = false): boolean {
+  return recordsRead || !['GET', 'HEAD'].includes(method.toUpperCase())
+}
+
+const BYPASS_ROLE_WORDS: Record<NightRole, string> = { DUTY_MANAGER: 'duty manager', DOOR: 'door', BAR: 'bar' }
+
+export interface OfficerBypassLine { role: NightRole, officerName: string | null, confirmedShift: boolean }
+
+// One night report line per role an officer stood in for, and whether tonight's rota had that
+// role confirmed anyway, which is a question about the rota of its own (E-123, 0098).
+export function saysOfficerBypass(line: OfficerBypassLine): string {
+  const words = BYPASS_ROLE_WORDS[line.role]
+  const who = line.officerName ?? 'an officer'
+  const beside = line.confirmedShift ? `beside a confirmed ${words} shift` : `with no confirmed ${words} shift`
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}: ${who} stood in by officer role, ${beside}`
+}
+
 // The dedupe key, carried in the audit row's target. Two venues may run one night and one venue
 // may run a matinee and an evening, so the venue is in the key and the performance is not (0044).
 export function officerBypassTarget(night: string, venueId: string, role: NightRole): string {

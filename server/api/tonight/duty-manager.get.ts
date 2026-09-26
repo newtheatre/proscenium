@@ -1,7 +1,8 @@
 // Everything the duty manager's tonight screen shows in one call (E-112 criteria 1 and 2).
 // Guarded by the DUTY_MANAGER authority: door and till have their own screens and their own guard.
 export default defineEventHandler(async (event) => {
-  const resolved = await requireNightAuthority(event, 'DUTY_MANAGER')
+  // The one read an officer's bypass records: it shows tonight's agreed access wording (0098).
+  const resolved = await requireNightAuthority(event, 'DUTY_MANAGER', {}, { recordsRead: true })
 
   const performances = await Promise.all(resolved.performanceIds.map(async (performanceId) => {
     const performance = await tonightPerformance(performanceId)

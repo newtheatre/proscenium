@@ -191,7 +191,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   1. Show-night tools open only to a confirmed shift on tonight's performance at that venue: DUTY_MANAGER opens approvals (comps, waiting-list overrides), the board reset and the close-night action; DOOR opens the door screen; BAR opens the till. A DOOR shift does not open the till. Amended 15 September 2026 by decision 0078: a confirmed shift opens its tool only between its own start less the configured grace and its own end plus that grace (E-131), and the refusal names the window. Amended by decision 0077: BAR also resolves on a confirmed shift on tonight's bar opening at the venue, which carries no performance (E-130, F-125).
   2. Authority is evaluated server-side on every request against the E-110 boundary; at 04:00 it is gone with nothing to revoke, and a request a second later is refused.
   3. A released or reassigned shift loses its authority on the next request, not at next login.
-  4. Designated officer roles may open the screens without a shift; every bypass use is recorded and flagged on the night report's staffing section.
+  4. Designated officer roles may open the screens without a shift; every bypass use is recorded and flagged on the night report's staffing section. Amended 26 September 2026 by decision 0098 (issue 1324): a use is an act, so a read records nothing, except the glance's read of tonight's access wording; every other request records once per night, venue and role.
   5. Hiding navigation is never the enforcement: every show-night API route checks authority itself.
 - Source: Prompt Book E-2, P3; audit PR-9, PR-12 (shift scoping carries; staff bypass flagged).
 
@@ -357,7 +357,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As tonight's duty manager, I want the night report auto-compiled from the evening's data so that sign-off is review, not typing.
 - Depends on: E-112, E-115, E-118, E-121; Prompt Book D-5, F-1
 - Acceptance criteria:
-  1. The report compiles with no typing: attendance vs sold (admitted, no-shows, walk-ups), takings by tender split desk and bar, incidents and near misses with severities, Challenge 25 outcome counts, the milestone timeline, staffing (each shift's holder, officer bypasses flagged, unfilled slots), and a bar summary.
+  1. The report compiles with no typing: attendance vs sold (admitted, no-shows, walk-ups), takings by tender split desk and bar, incidents and near misses with severities, Challenge 25 outcome counts, the milestone timeline, staffing (each shift's holder, officer bypasses flagged, unfilled slots), and a bar summary. Amended 26 September 2026 by decision 0098 (issue 1324): the staffing section flags every role an officer stood in for, naming the officer and whether a confirmed shift of that role existed, not the duty manager's alone.
   2. Every figure derives from ledger and register queries at compile time, never a stored total; comps and discounts appear as foregone revenue, never as silent gaps.
   3. The access section carries counts only; a report can never contain an access need or the identity of an access-ticket holder.
   4. Before close, the report is viewable as a live draft that recomputes on each view.

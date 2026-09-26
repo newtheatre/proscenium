@@ -882,8 +882,10 @@ administrative only (0009, 0044). `FOH_MANAGER` also holds the programme and the
 (`ticketing.*`, 0090) and `money.refund`, so it refunds a paid ticket on any day through its own
 permission, never through the bypass (0102). Planning the rota is not one of them: `rota.read` and
 `rota.write` are ordinary administrative permissions, held by `FOH_MANAGER` and `ADMIN`, and they
-are what open `/rota/manage/**` (0046). Every officer resolution writes `night.officer-bypass`
-once per account, night, venue and role, held by a partial unique index rather than by reading
+are what open `/rota/manage/**` (0046). Every officer resolution that acts writes
+`night.officer-bypass`: a `GET` or `HEAD` records nothing, unless its route passes `recordsRead`
+as the glance does for tonight's access wording, and every other method records (0098, through
+`bypassIsRecorded`). It is written once per account, night, venue and role, held by a partial unique index rather than by reading
 before writing; the row's detail carries every performance that venue ran that night, and on a
 bar opening an empty list and the `openingId` the officer let themselves into (0077). Holding one
 of the three does not admit anybody to the console: `reachConsole` reads the standing permissions
@@ -1555,7 +1557,7 @@ real SQL:
 | Incidents | `incidents`, `incident_severity_config`, `incident_followup_closures` | The full chain, each flagged with its follow-up requirement and closure state whichever way it sits. Closes the known-issues gap E-116 criterion 4 left open. |
 | Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |
 | Milestones | `backstage_messages` | Venue and night, not performance: the board is E-120's own scope, so a matinee day's two reports read the same timeline and the reader judges which call belonged to which house from the clock. Closes the known-issues gap E-121 criterion 1 left open. |
-| Staffing | `shifts`, `audit_log` | One row per stamped slot, unfilled ones naming nobody. The officer-bypass flag re-reads the exact audit target `requireNightAuthority` writes (`night:{night}:{venueId}:{role}`), matched against this performance inside the bypass's own recorded `performanceIds`. |
+| Staffing | `shifts`, `audit_log` | One row per stamped slot, unfilled ones naming nobody. Beside it, `bypasses`: one line per `night.officer-bypass` row on the three targets `requireNightAuthority` writes for the venue's night (`night:{night}:{venueId}:{role}`), matched against this performance inside the bypass's own recorded `performanceIds`, naming the role, the officer and whether a confirmed shift of that role was on the performance (0098). |
 | Bar summary | `ledger_lines` | Revenue and items sold from this performance's `TILL`-sourced lines, alongside takings rather than instead of it. |
 | Access | `access_profiles`, `reservations`, `tickets` | A verified count only, never a need or an identity (criterion 3, D-127 criterion 3's own counts-only rule). |
 
@@ -1613,8 +1615,9 @@ lost race, and otherwise the refusal is the checklist gate, shown with a link to
 the refusal itself when authority lists no house to choose. The screen asks `GET
 /api/tonight/authority` for `DUTY_MANAGER` on the performance it shows, asking again on a switch,
 so an officer standing in is told before signing that the sign-off records as such (0044),
-whatever shift they hold elsewhere. The staffing bypass flag is the night's, shown once and never
-beside a slot, because the audit entry it reads names no shift.
+whatever shift they hold elsewhere. The staffing bypass lines are the night's, shown above the
+slots and never beside one, because the audit entries they read name no shift; a report frozen
+before 0098 carries only the duty manager's flag, and the screen still shows it.
 
 ## The programme (build-order contract d, 0043)
 

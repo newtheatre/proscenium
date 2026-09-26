@@ -136,9 +136,18 @@ async function recordOfficerBypass(actorId: string, night: string, covered: Nigh
   await db.insert(schema.auditLog).values(entry).onConflictDoNothing()
 }
 
+// A read that shows what only tonight's team may see, such as the agreed access wording, sets
+// `recordsRead` so an officer reading it is recorded as an act would be (0098).
+export interface NightAuthorityOptions { recordsRead?: boolean }
+
 // Hiding a link is never the enforcement (E-111 criterion 5), and the night is `showNightOf`'s
 // alone, so authority expires at 04:00 with nothing to revoke and no second boundary anywhere.
-export async function requireNightAuthority(event: H3Event, role: NightRole, scope: NightScope = {}): Promise<NightAuthority> {
+export async function requireNightAuthority(
+  event: H3Event,
+  role: NightRole,
+  scope: NightScope = {},
+  options: NightAuthorityOptions = {},
+): Promise<NightAuthority> {
   // Identity first, so a signed-out caller is told that and cannot read tonight's date off which
   // refusal it gets back.
   const resolved = await authority(event)
@@ -177,7 +186,8 @@ export async function requireNightAuthority(event: H3Event, role: NightRole, sco
   await requireSecondFactorIfPrivileged(event, resolved)
 
   const covered = await coverage(tonight, role, scope)
-  await recordOfficerBypass(resolved.account.id, tonight, covered, role)
+  // Recorded when the officer acts, never when a screen merely looks (0098).
+  if (bypassIsRecorded(event.method, options.recordsRead)) await recordOfficerBypass(resolved.account.id, tonight, covered, role)
 
   return {
     account: resolved.account,

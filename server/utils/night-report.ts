@@ -3,9 +3,10 @@ import { sql } from 'drizzle-orm'
 import { checklistFor } from './checklist'
 import { heldSeatsSubquery } from './capacity'
 import { cardSalesQuery } from './reconciliation'
-import { OFFICER_BYPASS_ACTION, officerBypassTarget } from '#shared/utils/night-authority'
+import { NIGHT_ROLES, OFFICER_BYPASS_ACTION, officerBypassTarget } from '#shared/utils/night-authority'
 import { showNightBounds } from '#shared/utils/show-night'
 import type { ChecklistEntry } from './checklist'
+import type { OfficerBypassLine } from '#shared/utils/night-authority'
 import type { SQL } from 'drizzle-orm'
 
 // The night report compiler (E-123). Every figure derives from the ledger and the registers at
@@ -192,20 +193,13 @@ export interface ReportStaffingRow {
   slot: number
   status: string
   name: string | null
-  officerBypass: boolean
 }
 
 // One row per stamped slot, filled or not: an unfilled slot names nobody rather than being
-// absent (criterion 1). The bypass flag reads the same audit target `requireNightAuthority` writes.
-export function reportStaffingQuery(performanceId: string, venueId: string, night: string): SQL {
+// absent (criterion 1).
+export function reportStaffingQuery(performanceId: string): SQL {
   return sql`
-    SELECT s.id AS shiftId, s.role AS role, s.slot AS slot, s.status AS status, u.name AS name,
-      EXISTS (
-        SELECT 1 FROM audit_log a, json_each(a.detail, '$.performanceIds') pids
-        WHERE a.action = ${OFFICER_BYPASS_ACTION}
-          AND a.target = ${officerBypassTarget(night, venueId, 'DUTY_MANAGER')}
-          AND pids.value = ${performanceId}
-      ) AS officerBypass
+    SELECT s.id AS shiftId, s.role AS role, s.slot AS slot, s.status AS status, u.name AS name
     FROM shifts s
     LEFT JOIN users u ON u.id = s.user_id
     WHERE s.performance_id = ${performanceId} AND s.status <> 'CANCELLED'
@@ -213,11 +207,39 @@ export function reportStaffingQuery(performanceId: string, venueId: string, nigh
   `
 }
 
-type StaffingRow = Omit<ReportStaffingRow, 'officerBypass'> & { officerBypass: number }
+export async function reportStaffing(performanceId: string): Promise<ReportStaffingRow[]> {
+  return db.all<ReportStaffingRow>(reportStaffingQuery(performanceId))
+}
 
-export async function reportStaffing(performanceId: string, venueId: string, night: string): Promise<ReportStaffingRow[]> {
-  const rows = await db.all<StaffingRow>(reportStaffingQuery(performanceId, venueId, night))
-  return rows.map(row => ({ ...row, officerBypass: Boolean(row.officerBypass) }))
+// `OfficerBypassLine` as the report carries it: the role an officer stood in for, who, and
+// whether a confirmed shift of that role was on the performance anyway.
+export type ReportOfficerBypass = OfficerBypassLine
+
+// Every role an officer acted in on this performance, read from the targets the guard writes for
+// the venue's night, three bound whatever the night holds (E-123 criterion 1, 0098, 0006).
+export function reportOfficerBypassesQuery(performanceId: string, venueId: string, night: string): SQL {
+  const targets = NIGHT_ROLES.map(role => sql`${officerBypassTarget(night, venueId, role)}`)
+  return sql`
+    SELECT json_extract(a.detail, '$.role') AS role, u.name AS officerName,
+      EXISTS (
+        SELECT 1 FROM shifts s
+        WHERE s.performance_id = ${performanceId} AND s.status = 'CONFIRMED'
+          AND s.role = json_extract(a.detail, '$.role')
+      ) AS confirmedShift
+    FROM audit_log a
+    LEFT JOIN users u ON u.id = a.actor_id
+    WHERE a.action = ${OFFICER_BYPASS_ACTION}
+      AND a.target IN (${sql.join(targets, sql`, `)})
+      AND EXISTS (SELECT 1 FROM json_each(a.detail, '$.performanceIds') pids WHERE pids.value = ${performanceId})
+    ORDER BY CASE json_extract(a.detail, '$.role') WHEN 'DUTY_MANAGER' THEN 0 WHEN 'DOOR' THEN 1 ELSE 2 END, u.name
+  `
+}
+
+export async function reportOfficerBypasses(performanceId: string, venueId: string, night: string): Promise<ReportOfficerBypass[]> {
+  const rows = await db.all<Omit<ReportOfficerBypass, 'confirmedShift'> & { confirmedShift: number }>(
+    reportOfficerBypassesQuery(performanceId, venueId, night),
+  )
+  return rows.map(row => ({ ...row, confirmedShift: Boolean(row.confirmedShift) }))
 }
 
 export interface ReportBarSummary { revenuePence: number, itemsSold: number }
@@ -272,6 +294,7 @@ export interface NightReport {
   ageChecks: ReportAgeChecks
   milestones: ReportMilestone[]
   staffing: ReportStaffingRow[]
+  bypasses: ReportOfficerBypass[]
   bar: ReportBarSummary
   access: ReportAccess
   checklist: ChecklistEntry[]
@@ -280,18 +303,19 @@ export interface NightReport {
 // The whole report, one call, every section its own query run together (criterion 4: a draft
 // before close and a frozen read after E-124 exists run this identically).
 export async function compileNightReport(performanceId: string, venueId: string, night: string): Promise<NightReport> {
-  const [attendance, takings, incidents, ageChecks, milestones, staffing, bar, access, checklist] = await Promise.all([
+  const [attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, bar, access, checklist] = await Promise.all([
     reportAttendance(performanceId),
     reportTakings(performanceId, night),
     reportIncidents(performanceId),
     reportAgeChecks(performanceId),
     reportMilestones(venueId, night),
-    reportStaffing(performanceId, venueId, night),
+    reportStaffing(performanceId),
+    reportOfficerBypasses(performanceId, venueId, night),
     reportBarSummary(night),
     reportAccess(performanceId),
     // Performance-scoped like every other section here (E-128); an exception's reason now
     // prints here, closing the gap E-114 criterion 5 left open.
     checklistFor(performanceId),
   ])
-  return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bar, access, checklist }
+  return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, bar, access, checklist }
 }

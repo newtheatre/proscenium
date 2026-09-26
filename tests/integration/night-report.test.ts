@@ -303,7 +303,7 @@ describe('staffing (criterion 1)', () => {
       shift(database, 's-confirmed', tonight.performanceId, 'CONFIRMED', who, 2)
 
       const found = read<{ shiftId: string, name: string | null }>(
-        database, reportStaffingQuery(tonight.performanceId, tonight.venueId, tonight.night))
+        database, reportStaffingQuery(tonight.performanceId))
       expect(found.find(row => row.shiftId === 's-open')?.name).toBeNull()
       expect(found.find(row => row.shiftId === 's-confirmed')?.name).toBe('Someone holder')
     })

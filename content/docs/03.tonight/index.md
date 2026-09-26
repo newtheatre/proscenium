@@ -130,8 +130,10 @@ required pre-show checklist item that is still not done.
 
 ## What happens next
 
-An officer opening a screen with no shift writes one audit entry per night, venue and role, and
-the night report's staffing section flags it. A shift holder writes nothing extra: the rota's own
+An officer acting on a screen with no shift (admitting at the door, selling at the till, ticking
+the checklist, logging an incident, closing the night, or reading tonight at a glance) writes one
+audit entry per night, venue and role, and the night report's staffing section names the officer
+and the role. Only looking at a screen records nothing. A shift holder writes nothing extra: the rota's own
 claim and confirmation are the record of how they came to hold it. Every admission, sale, check
 and incident logged from these screens keys to a performance, never to a day.
 

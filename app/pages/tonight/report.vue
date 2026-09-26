@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
 import { saysCategory, saysSeverity } from '#shared/utils/incidents'
+import { saysOfficerBypass } from '#shared/utils/night-authority'
 import { OFFICER_SIGN_OFF_NOTICE, saysSignedOff, tenderTotalPence } from '#shared/utils/night-signoff'
 import { saysShiftRole } from '#shared/utils/rota'
 import { saysClock } from '#shared/utils/when'
 import type { Category, Severity } from '#shared/utils/incidents'
+import type { OfficerBypassLine } from '#shared/utils/night-authority'
 import type { NightReportSigner } from '#shared/utils/night-signoff'
 import type { ShiftRole } from '#shared/utils/rota'
 
@@ -19,7 +21,8 @@ interface Report {
   incidents: { id: string, category: Category, severity: Severity, body: string, happenedAt: number, supersededBy: string | null, followUpRequired: boolean }[]
   ageChecks: { accepted: number, refused: number }
   milestones: { id: string, label: string, composedAt: number, supersededBy: string | null }[]
-  staffing: { shiftId: string, role: ShiftRole, slot: number, name: string | null, officerBypass: boolean }[]
+  staffing: { shiftId: string, role: ShiftRole, slot: number, name: string | null, officerBypass?: boolean }[]
+  bypasses?: OfficerBypassLine[]
   bar: { revenuePence: number, itemsSold: number }
   access: { verified: number }
   checklist: { id: string, label: string, exempted: boolean, exemptReason: string | null }[]
@@ -250,14 +253,34 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
       </NightBlock>
 
       <NightBlock title="Staffing">
-        <!-- The flag is the night's, not any slot's: the audit entry names no shift (0044). -->
+        <!-- Each role an officer acted in, for the night and never beside a slot: the audit entry
+             names no shift (0098). -->
+        <ul
+          v-if="report.bypasses && report.bypasses.length > 0"
+          class="mb-2 space-y-1"
+          data-test="staffing-officer-bypass"
+        >
+          <li
+            v-for="bypass in report.bypasses"
+            :key="`${bypass.role}-${bypass.officerName ?? ''}`"
+          >
+            <UBadge
+              color="warning"
+              variant="subtle"
+              size="sm"
+              class="text-left whitespace-normal"
+            >
+              {{ saysOfficerBypass(bypass) }}
+            </UBadge>
+          </li>
+        </ul>
+        <!-- A report frozen before 0098 carries only the duty manager's flag. -->
         <UBadge
-          v-if="report.staffing.some(row => row.officerBypass)"
+          v-else-if="!report.bypasses && report.staffing.some(row => row.officerBypass)"
           color="warning"
           variant="subtle"
           size="sm"
           class="mb-2"
-          data-test="staffing-officer-bypass"
         >
           An officer opened the duty manager's screens without the shift
         </UBadge>
