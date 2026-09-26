@@ -7,11 +7,12 @@ import {
   bookingWindowSource,
   performanceScreenForm,
   resolveBookingClosesHours,
+  runningTimeRefusal,
   saysBookingWindow,
   saysPerformanceStatus,
 } from '#shared/utils/programme'
 import { performancesList } from '#shared/utils/performances-list'
-import type { TableColumn } from '@nuxt/ui'
+import type { FormError, TableColumn } from '@nuxt/ui'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { AdminPerformance, AdminShow, ShowVenue } from '#shared/utils/programme'
 
@@ -238,6 +239,20 @@ const venueOptions = computed(() => props.venues
 const bookableVenues = computed(() => props.venues.filter(one => !one.archived))
 const addRefusal = computed(() => addPerformanceRefusal(bookableVenues.value.length))
 
+const venueOf = (venueId: string): ShowVenue | undefined => props.venues.find(one => one.id === venueId)
+const runningTimeOptional = computed(() => editingPerformance.value?.status === 'CANCELLED' || (venueOf(form.venueId)?.isExternal ?? false))
+
+// The route's own rule, asked before the request so the field says it rather than a banner (D-121).
+function checkRunningTime(): FormError[] {
+  const venue = venueOf(form.venueId)
+  const refusal = venue ? runningTimeRefusal(venue, form.durationMinutes, editingPerformance.value?.status) : null
+  return refusal ? [{ name: 'durationMinutes', message: refusal }] : []
+}
+
+// A row the rota cannot window: at a venue we run, still to happen, and no running time (0078).
+const untimed = (one: AdminPerformance): boolean => one.status !== 'CANCELLED' && one.durationMinutes === null
+  && one.startsAt >= Date.now() / 1000 && venueOf(one.venueId)?.isExternal === false
+
 function windowOf(one: AdminPerformance): string {
   const inherited = { bookingClosesHoursBefore: props.show.bookingClosesHoursBefore }
   const hours = resolveBookingClosesHours(one, inherited)
@@ -259,6 +274,9 @@ const columns: TableColumn<AdminPerformance>[] = [
         }, () => saysPerformanceStatus(row.original.status)),
         row.original.externalBookingUrl
           ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Externally ticketed')
+          : null,
+        untimed(row.original)
+          ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'No running time')
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, row.original.venueName),
@@ -462,6 +480,7 @@ const columns: TableColumn<AdminPerformance>[] = [
           id="performance-form"
           :schema="performanceScreenForm"
           :state="form"
+          :validate="checkRunningTime"
           class="space-y-4"
           data-test="performance-form"
           @submit="savePerformance"
@@ -526,14 +545,16 @@ const columns: TableColumn<AdminPerformance>[] = [
             <UFormField
               label="Running time"
               name="durationMinutes"
-              hint="Optional"
-              description="Minutes."
+              :required="!runningTimeOptional"
+              :hint="runningTimeOptional ? 'Optional' : undefined"
+              description="Minutes, without the intervals. Every shift ends from it."
             >
               <UInputNumber
                 v-model="form.durationMinutes"
                 :min="1"
                 :max="600"
                 class="w-full"
+                data-test="performance-duration"
               />
             </UFormField>
 

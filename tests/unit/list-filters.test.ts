@@ -322,7 +322,7 @@ describe('the migrated declarations (criteria 1 and 6)', () => {
   // at request time if one is missing, and this holds the same coverage statically.
   const ANSWERED_BY_BINDING: Record<string, readonly string[]> = {
     [accountsList.key]: ['role', 'holdsRole', 'membership', 'anonymised', 'authenticator', 'privilegedWithoutFactor', 'approachingRetention', 'neverSignedIn', 'shadow'],
-    [showsList.key]: ['unassessed', 'onSale'],
+    [showsList.key]: ['unassessed', 'onSale', 'untimed'],
     [performancesList.key]: ['external'],
     [roomsList.key]: [],
     [blackoutsList.key]: ['past'],

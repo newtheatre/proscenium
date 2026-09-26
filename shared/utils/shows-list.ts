@@ -2,7 +2,7 @@ import { SHOW_STATUSES, saysShowStatus } from './programme'
 import type { ListSpec } from './list-filters'
 
 // The shows list's declaration (K-129, D-121). The season and category pickers get their options
-// from the reference-data endpoints; "unassessed" and "on sale" are questions about other rows.
+// from the reference-data endpoints; "unassessed", "on sale" and "untimed" ask about other rows.
 export const showsList = {
   key: 'shows',
   search: { placeholder: 'A show title or address', maxLength: 120 },
@@ -20,6 +20,7 @@ export const showsList = {
     { key: 'categoryId', label: 'Category', kind: 'search-list', column: 'category_id', cap: 12, icon: 'i-lucide-tag' },
     { key: 'unassessed', label: 'Warnings unassessed', kind: 'yes-no', negated: 'Warnings assessed' },
     { key: 'onSale', label: 'On sale', kind: 'yes-no', negated: 'Nothing on sale' },
+    { key: 'untimed', label: 'Running time missing', kind: 'yes-no', negated: 'Running times set' },
   ],
   sort: {
     fields: [

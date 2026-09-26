@@ -15,7 +15,7 @@ import {
   showsQuery,
 } from '#server/utils/programme'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
+import { testVenue, ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { PerformanceReference } from '#server/utils/programme'
 import type { FilterField } from '#shared/utils/list-filters'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -57,6 +57,8 @@ const parsedShows = (raw: Record<string, string>) => {
 }
 // The list with nothing asked of it: the default sort and no predicate.
 const everyShow = () => showsClause(parsedShows({}))
+const listedShows = (database: TestDatabase, raw: Record<string, string>): string[] =>
+  read<{ id: string }>(database, showsQuery(showsClause(parsedShows(raw)), 25, 0)).map(row => row.id)
 
 // What D-104 will add, stood up here so the predicate can be proved against rows that do not
 // exist yet.
@@ -252,8 +254,6 @@ describe('"has sold tickets" is a count over rows, never a flag (D-121 criterion
 // "unassessed" and "on sale" are questions about other rows, all answered by one clause.
 describe('the shows list filters by its declaration (K-129)', () => {
   const schema = showsSchema
-  const listed = (database: TestDatabase, raw: Record<string, string>): string[] =>
-    read<{ id: string }>(database, showsQuery(showsClause(parsedShows(raw)), 25, 0)).map(row => row.id)
 
   function seedSeasons(database: TestDatabase): void {
     tonightsPerformance(database, { showStatus: 'PUBLISHED', status: 'ON_SALE' })
@@ -270,21 +270,21 @@ describe('the shows list filters by its declaration (K-129)', () => {
   test('a season is, is not, is any of and is empty', async () => {
     await withDatabase((database) => {
       seedSeasons(database)
-      expect(listed(database, { seasonId: 'is:season-autumn' })).toEqual(['show-a'])
-      expect(listed(database, { seasonId: 'any:season-autumn,season-spring' })).toEqual(['show-b', 'show-a'])
-      expect(listed(database, { seasonId: 'empty' })).toEqual(['show-c'])
-      expect(listed(database, { seasonId: 'not:season-autumn' })).toEqual(['show-b', 'show-c'])
+      expect(listedShows(database, { seasonId: 'is:season-autumn' })).toEqual(['show-a'])
+      expect(listedShows(database, { seasonId: 'any:season-autumn,season-spring' })).toEqual(['show-b', 'show-a'])
+      expect(listedShows(database, { seasonId: 'empty' })).toEqual(['show-c'])
+      expect(listedShows(database, { seasonId: 'not:season-autumn' })).toEqual(['show-b', 'show-c'])
     })
   })
 
   test('unassessed and on sale are answered from other rows, and combine with a season by AND', async () => {
     await withDatabase((database) => {
       seedSeasons(database)
-      expect(listed(database, { unassessed: 'true' })).toEqual(['show-a'])
-      expect(listed(database, { onSale: 'true' })).toEqual(['show-a'])
-      expect(listed(database, { onSale: 'false' })).toEqual(['show-b', 'show-c'])
-      expect(listed(database, { onSale: 'true', seasonId: 'is:season-spring' })).toEqual([])
-      expect(listed(database, { status: 'is:DRAFT', search: 'test' })).toEqual(['show-b'])
+      expect(listedShows(database, { unassessed: 'true' })).toEqual(['show-a'])
+      expect(listedShows(database, { onSale: 'true' })).toEqual(['show-a'])
+      expect(listedShows(database, { onSale: 'false' })).toEqual(['show-b', 'show-c'])
+      expect(listedShows(database, { onSale: 'true', seasonId: 'is:season-spring' })).toEqual([])
+      expect(listedShows(database, { status: 'is:DRAFT', search: 'test' })).toEqual(['show-b'])
     })
   })
 
@@ -304,7 +304,7 @@ describe('the shows list filters by its declaration (K-129)', () => {
         for (const operator of operatorsOf(field)) {
           const value = field.kind === 'yes-no' ? 'false' : (field.options?.[0]?.value ?? 'season-autumn')
           const raw = operator === 'empty' ? 'empty' : operator === 'between' ? `between:${value},${value}` : `${operator}:${value}`
-          expect(() => listed(database, { [field.key]: raw })).not.toThrow()
+          expect(() => listedShows(database, { [field.key]: raw })).not.toThrow()
         }
       }
     })
@@ -321,9 +321,44 @@ describe('the shows list filters by its declaration (K-129)', () => {
   test('the sort is a declared field and the default order is status then title', async () => {
     await withDatabase((database) => {
       seedSeasons(database)
-      expect(listed(database, {})).toEqual(['show-b', 'show-c', 'show-a'])
-      expect(listed(database, { sort: 'title', direction: 'desc' })).toEqual(['show-c', 'show-b', 'show-a'])
+      expect(listedShows(database, {})).toEqual(['show-b', 'show-c', 'show-a'])
+      expect(listedShows(database, { sort: 'title', direction: 'desc' })).toEqual(['show-c', 'show-b', 'show-a'])
       expect(schema.safeParse({ sort: 'slug' }).success).toBe(false)
+    })
+  })
+})
+
+// The imported diary holds performances with no running time; the list is where they are found.
+describe('a show with an upcoming performance missing its running time is counted and found (D-121 criterion 6)', () => {
+  function seedUntimed(database: TestDatabase): void {
+    const timed = tonightsPerformance(database, { night: '2099-01-01' })
+    tonightsPerformance(database, { suffix: 'b', night: '2099-01-01' })
+    testVenue(database, { suffix: 'away', isExternal: true })
+    const later = timed.startsAt + 86_400
+    const untimed = 'INSERT INTO performances (id, show_id, venue_id, starts_at, status) VALUES (?, ?, ?, ?, ?)'
+    database.batch([
+      [untimed, 'p-untimed', 'show-a', 'venue-a', later, 'DRAFT'],
+      [untimed, 'p-cancelled', 'show-b', 'venue-b', later, 'CANCELLED'],
+      [untimed, 'p-past', 'show-b', 'venue-b', 1_000_000, 'DRAFT'],
+      [untimed, 'p-away', 'show-b', 'venue-away', later, 'DRAFT'],
+    ])
+  }
+
+  test('only an upcoming, uncancelled performance at a venue we run with no running time counts', async () => {
+    await withDatabase((database) => {
+      seedUntimed(database)
+      const counted = read<{ id: string, untimedPerformanceCount: number }>(database, showsQuery(everyShow(), 25, 0))
+      expect(Object.fromEntries(counted.map(row => [row.id, row.untimedPerformanceCount]))).toEqual({ 'show-a': 1, 'show-b': 0 })
+    })
+  })
+
+  test('the list filters on it both ways, binding nothing per performance', async () => {
+    await withDatabase((database) => {
+      seedUntimed(database)
+      expect(listedShows(database, { untimed: 'true' })).toEqual(['show-a'])
+      expect(listedShows(database, { untimed: 'false' })).toEqual(['show-b'])
+      const [statement] = boundStatement(database, showsQuery(showsClause(parsedShows({ untimed: 'true' })), 25, 0))
+      expect(statement).not.toContain(' IN (?')
     })
   })
 })

@@ -9,7 +9,7 @@ import { showsList } from '#shared/utils/shows-list'
 import { posterUrl } from '#shared/utils/seo'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { AdminPerformance, AdminShow, ShowStatus, ShowsStandingCounts } from '#shared/utils/programme'
+import type { AdminPerformance, AdminShow, ShowStatus, ShowVenue, ShowsStandingCounts } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
 // Reading and counting the programme for its administration (D-121, D-112). "Has sold tickets" is
@@ -159,7 +159,7 @@ const readShow = ({ posterKey, ...row }: ShowRow): AdminShow => ({
 })
 
 // The declaration's predicates and order, bound through the `s` alias the raw SQL below uses
-// (K-129). "Unassessed" and "on sale" are questions about other rows, answered here.
+// (K-129). "Unassessed", "on sale" and "untimed" ask about other rows, answered here.
 export function showsClause(query: ListQuery): ListClause {
   return whereFrom(showsList, query, {
     column: aliasColumns('s'),
@@ -167,6 +167,7 @@ export function showsClause(query: ListQuery): ListClause {
     fields: {
       unassessed: yesNo(UNASSESSED),
       onSale: yesNo(ON_SALE),
+      untimed: yesNo(sql`exists (SELECT 1 ${UNTIMED_PERFORMANCES})`),
     },
   })
 }
@@ -211,9 +212,18 @@ const SHOW_HOUSE = sql`
     WHERE p.show_id = s.id AND p.status <> 'CANCELLED') AS venueNames
 `
 
+// A performance still to come, at a venue we run, whose shifts end at curtain for want of a
+// running time (D-121 criterion 6). The count and the list's filter read this one predicate.
+const UNTIMED_PERFORMANCES = sql`
+  FROM performances p JOIN venues v ON v.id = p.venue_id
+  WHERE p.show_id = s.id AND p.status <> 'CANCELLED' AND v.is_external = 0
+    AND p.duration_minutes IS NULL AND p.starts_at >= unixepoch()
+`
+
 // Counted rather than stored, so the console cannot show a figure the rows disagree with.
 const SHOW_COUNTS = sql`
   (SELECT count(*) FROM performances p WHERE p.show_id = s.id) AS performanceCount,
+  (SELECT count(*) ${UNTIMED_PERFORMANCES}) AS untimedPerformanceCount,
   (SELECT count(*) FROM performances p WHERE p.show_id = s.id AND p.status = 'ON_SALE') AS onSaleCount,
   (SELECT count(*) FROM show_content_warnings w WHERE w.show_id = s.id) AS warningCount,
   (SELECT count(*) FROM ticket_types t
@@ -407,22 +417,18 @@ export function cascadeOnSaleQuery(showId: string): SQL {
   `
 }
 
-export interface ProgrammeVenue {
-  id: string
-  name: string
-  capacity: number | null
-  archived: boolean
-}
-
-interface ProgrammeVenueRow extends Omit<ProgrammeVenue, 'archived'> {
+interface ProgrammeVenueRow extends Omit<ShowVenue, 'archived' | 'isExternal'> {
+  isExternal: number
   archived: number
 }
 
 // Every venue, retired ones included: a rota template pointing at one already has to resolve it.
 // A picker for new work filters on `archived` itself (D-131 criterion 5).
-export async function listVenues(): Promise<ProgrammeVenue[]> {
-  const rows = await db.all<ProgrammeVenueRow>(sql`SELECT id, name, capacity, archived FROM venues ORDER BY name COLLATE NOCASE`)
-  return rows.map(row => ({ ...row, archived: row.archived === 1 }))
+export async function listVenues(): Promise<ShowVenue[]> {
+  const rows = await db.all<ProgrammeVenueRow>(sql`
+    SELECT id, name, capacity, is_external AS isExternal, archived FROM venues ORDER BY name COLLATE NOCASE
+  `)
+  return rows.map(row => ({ ...row, isExternal: row.isExternal === 1, archived: row.archived === 1 }))
 }
 
 export interface ShowOption {

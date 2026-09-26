@@ -88,7 +88,7 @@ async function bookableShow(capacityOverride?: number): Promise<{ performanceId:
   const showId = (await show.json() as { id: string }).id
 
   const performance = await send('POST', `/api/admin/shows/${showId}/performances`, {
-    venueId, startsAt: nextWeek(), ...(capacityOverride !== undefined ? { capacityOverride } : {}),
+    venueId, startsAt: nextWeek(), durationMinutes: 120, ...(capacityOverride !== undefined ? { capacityOverride } : {}),
   })
   const performanceId = (await performance.json() as { id: string }).id
 

@@ -38,15 +38,17 @@ describe('what may be uploaded as a poster (D-132 criterion 6)', () => {
 const ready = (over: Partial<PublishReadiness> = {}): PublishReadiness => ({
   posterUrl: '/posters/show_01HQ/poster.png',
   performanceCount: 3,
+  untimedPerformanceCount: 0,
   activePriceCount: 2,
   ...over,
 })
 
 describe('the publish checklist reports readiness (D-132 criterion 7)', () => {
-  test('three checks, in the mockup\'s order, each stated in words', () => {
+  test('four checks, each stated in words, the running time beside the performances (D-121 criterion 6)', () => {
     expect(publishChecklist(ready()).map(check => [check.key, check.says, check.done])).toEqual([
       ['poster', 'Poster uploaded', true],
       ['performances', 'Performances scheduled', true],
+      ['running-time', 'Running time set for every performance', true],
       ['pricing', 'Pricing set', true],
     ])
   })
@@ -57,6 +59,7 @@ describe('the publish checklist reports readiness (D-132 criterion 7)', () => {
     expect(missing({ posterUrl: null })).toEqual(['poster'])
     expect(missing({ performanceCount: 0 })).toEqual(['performances'])
     expect(missing({ activePriceCount: 0 })).toEqual(['pricing'])
+    expect(missing({ untimedPerformanceCount: 2 })).toEqual(['running-time'])
   })
 
   test('cast list and rights are absent: neither has a schema behind it yet', () => {

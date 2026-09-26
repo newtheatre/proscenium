@@ -75,11 +75,11 @@ async function setUpBookableShow(
   const showId = (await show.json() as { id: string }).id
 
   const startsAt = Math.floor(Date.now() / 1000) + startsAtOffsetMinutes * 60
-  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt })
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120 })
   const performanceId = (await performance.json() as { id: string }).id
 
   expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
-    venueId, startsAt, intervalCount: 0, holdReleaseMinutesBefore,
+    venueId, startsAt, durationMinutes: 120, intervalCount: 0, holdReleaseMinutesBefore,
   })).status).toBe(200)
 
   const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })

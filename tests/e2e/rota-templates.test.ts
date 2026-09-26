@@ -239,6 +239,7 @@ describe.skipIf(skip !== null)('a performance is stamped from its venue\'s templ
     const added = await send('POST', `/api/admin/shows/${house.showId}/performances`, {
       venueId: house.venueId,
       startsAt: Math.floor(Date.now() / 1000) + 14 * 86_400,
+      durationMinutes: 120,
       intervalCount: 0,
     })
     expect(added.status).toBe(200)
@@ -300,6 +301,7 @@ describe.skipIf(skip !== null)('a performance is stamped from its venue\'s templ
     const moved = await send('PUT', `/api/admin/performances/${from.performanceId}`, {
       venueId: to.venueId,
       startsAt: Math.floor(Date.now() / 1000) + 21 * 86_400,
+      durationMinutes: 120,
       intervalCount: 0,
     })
     expect(moved.status).toBe(200)
@@ -320,6 +322,7 @@ describe.skipIf(skip !== null)('a performance is stamped from its venue\'s templ
     const moved = await send('PUT', `/api/admin/performances/${from.performanceId}`, {
       venueId: to.venueId,
       startsAt: Math.floor(Date.now() / 1000) + 22 * 86_400,
+      durationMinutes: 120,
       intervalCount: 0,
     })
     expect(moved.status).toBe(200)
@@ -343,6 +346,7 @@ describe.skipIf(skip !== null)('a performance is stamped from its venue\'s templ
     const moved = await send('PUT', `/api/admin/performances/${from.performanceId}`, {
       venueId: to.venueId,
       startsAt: Math.floor(Date.now() / 1000) + 23 * 86_400,
+      durationMinutes: 120,
       intervalCount: 0,
     })
     expect(moved.status).toBe(200)

@@ -205,6 +205,7 @@ describe.skipIf(skip !== null)('every performance states its availability, compu
     expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
       venueId,
       startsAt: Math.floor(Date.now() / 1000) + 3600,
+      durationMinutes: 120,
       bookingClosesHoursBefore: 24,
     })).status).toBe(200)
     await publish(created.id)
@@ -230,7 +231,7 @@ describe.skipIf(skip !== null)('the listing is cacheable and still tells the tru
     const startsAt = Math.floor(Date.now() / 1000) + 3600 + closesIn
     const performanceId = await addPerformance(created.id, { startsAt })
     expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
-      venueId, startsAt, bookingClosesHoursBefore: 1,
+      venueId, startsAt, durationMinutes: 120, bookingClosesHoursBefore: 1,
     })).status).toBe(200)
     await publish(created.id)
 
@@ -244,7 +245,7 @@ describe.skipIf(skip !== null)('the listing is cacheable and still tells the tru
     const created = await newShow()
     const performanceId = await addPerformance(created.id)
     expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
-      venueId, startsAt: nextWeek(), notes: 'The fog machine leaks',
+      venueId, startsAt: nextWeek(), durationMinutes: 120, notes: 'The fog machine leaks',
     })).status).toBe(200)
     await publish(created.id)
 

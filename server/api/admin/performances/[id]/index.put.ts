@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
-import { performanceForm } from '#shared/utils/programme'
+import { performanceForm, runningTimeRefusal } from '#shared/utils/programme'
 import { COMMITTED_SHIFT_STATUSES, saysShiftRole } from '#shared/utils/rota'
 import type { ShiftRole } from '#shared/utils/rota'
 
@@ -22,6 +22,8 @@ export default defineEventHandler(async (event) => {
   if (venue.archived && venue.id !== held.venueId) {
     throw createError({ statusCode: 409, statusMessage: `${venue.name} is retired and cannot be booked for a new performance` })
   }
+  const untimed = runningTimeRefusal(venue, input.durationMinutes, held.status)
+  if (untimed) throw createError({ statusCode: 400, statusMessage: untimed })
 
   // The capacity that will apply, so clearing the override or moving to a smaller venue is checked
   // as well as lowering the number. Refusing quotes both figures (D-105 criterion 4).

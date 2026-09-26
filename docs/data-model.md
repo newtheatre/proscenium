@@ -488,7 +488,8 @@ while listing warnings is a 409, because it is two answers to one question.
 
 ### performances
 `id` PK · `show_id` → shows cascade · `venue_id` → venues restrict · `starts_at` ·
-`doors_at` · `duration_minutes` · `interval_count` (default nought) · `interval_minutes` ·
+`doors_at` · `duration_minutes` (the running time, required by the write path at a venue we
+run, D-121 criterion 6) · `interval_count` (default nought) · `interval_minutes` ·
 `capacity_override` NULL = venue capacity · `booking_closes_hours_before` NULL = inherit the
 show's default, and an explicit 0 = this performance closes at curtain-up (D-112) ·
 `hold_release_minutes_before` NULL = config default ·
@@ -505,14 +506,14 @@ for the two that read and `ticketing.write` for the rest:
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale, how many tickets have sold and how many content warnings it carries. Filtered by its declaration (`shared/utils/shows-list.ts`, K-129): status, season, category, `unassessed` and `onSale`, with `search` over title and address and `sort` by status or title. `unassessed=true` narrows it to published shows nobody has assessed; `unassessed=false` now excludes them, a genuine third answer rather than the old "no filter" that any yes-or-no field not being sent already gives. |
+| `GET /api/admin/shows` | The paged envelope, drafts included, each row carrying its performance count, how many are on sale, how many tickets have sold and how many content warnings it carries. Filtered by its declaration (`shared/utils/shows-list.ts`, K-129): status, season, category, `unassessed`, `onSale` and `untimed` (an upcoming, uncancelled performance at a venue we run with no running time, D-121 criterion 6), with `search` over title and address and `sort` by status or title. `unassessed=true` narrows it to published shows nobody has assessed; `unassessed=false` now excludes them, a genuine third answer rather than the old "no filter" that any yes-or-no field not being sent already gives. |
 | `POST /api/admin/shows` | Adds one, always DRAFT. The address is refused if it is already held. |
 | `GET /api/admin/shows/[id]` | One show, every performance of it, the venues a performance may be put in, the category and season pickers (D-131), the warnings it carries and the vocabulary it may pick from. |
 | `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. |
 | `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. `cascadePerformances` takes DRAFT performances on sale in the same batch; CANCELLED ones are skipped by predicate. |
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
-| `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. |
-| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. |
+| `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6). |
+| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). |
 | `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |
 | `POST /api/admin/performances/[id]/cancel` | Cancels one, and answers with how many tickets are owed a refund. |
 | `DELETE /api/admin/performances/[id]` | Deletes a performance nothing has sold for. One that has is a 409 naming cancelling as the way. |

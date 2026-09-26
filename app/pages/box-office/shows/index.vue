@@ -187,6 +187,9 @@ const seasonLine = computed(() => saysShowSeasonLine(
 // Drafts with no artwork, named on the page that can do something about it: a draft going on sale
 // looking like every other show is what the poster card exists to prevent (D-132 criterion 6).
 const artless = computed(() => data.value.items.filter(one => one.status === 'DRAFT' && one.posterUrl === null))
+
+// Shows whose coming nights would cut every shift at curtain, named where they are put right (D-121).
+const untimedShows = computed(() => data.value.items.filter(one => one.untimedPerformanceCount > 0))
 </script>
 
 <template>
@@ -261,6 +264,16 @@ const artless = computed(() => data.value.items.filter(one => one.status === 'DR
       data-test="shows-artless"
       :title="`${plural(artless.length, 'draft')} with no poster`"
       :description="`${artless.map(one => one.title).join(', ')}. A draft can go on sale without artwork, but it will show its own gradient everywhere until one is uploaded.`"
+    />
+
+    <UAlert
+      v-if="untimedShows.length"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-timer-off"
+      data-test="shows-untimed"
+      :title="`${plural(untimedShows.length, 'show')} with a performance missing its running time`"
+      :description="`${untimedShows.map(one => one.title).join(', ')}. Every shift at a venue we run ends from the running time, so its volunteers are refused soon after curtain. Set it on each performance: saving moves the shifts. Filter by Running time missing to find them all.`"
     />
 
     <section
