@@ -68,6 +68,30 @@ describe('what a submit does (C-105 criteria 7 and 8, C-120 criterion 7, issue 1
     expect(source).toContain('tier: undefined,')
   })
 
+  // Issue 1338, A-129 criterion 2: a lapsed member is told before the form, with the fix.
+  test('both forms refuse a lapsed member up front, in the policy\'s words, with the way to fix it', async () => {
+    for (const [path, prefix] of [[BOOK, 'booking'], [EXTERNAL, 'external']] as const) {
+      const source = await read(path)
+      expect(source).toContain('memberOrGrace')
+      expect(source).toContain(`data-test="${prefix}-needs-membership"`)
+      expect(source).toContain(`data-test="${prefix}-membership-link"`)
+    }
+  })
+
+  // Issue 1338, docs/copy-style.md section 8: two fields never ask one question.
+  test('what the room is for is asked once, as chips, with an optional name beside it', async () => {
+    for (const path of [BOOK, EXTERNAL]) {
+      const source = await read(path)
+      expect(source).toContain('<PurposeChips')
+      expect(source).not.toContain('label="What it is for"')
+      expect(source).toContain('label="A name for it"')
+    }
+  })
+
+  test('the unlisted-room form names the earliest day it can be asked for', async () => {
+    expect(await read(EXTERNAL)).toContain('externalEarliestDay')
+  })
+
   test('no submit on the booking form goes round the schema', async () => {
     const source = await read(BOOK)
     expect(source).not.toContain('@click="bookSeries"')

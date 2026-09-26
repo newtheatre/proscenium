@@ -250,7 +250,8 @@ describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)'
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
   }
 
-  test('booking a room is refused with the policy\'s own words, and the failure links to /account/membership', async () => {
+  // Issue 1338: refused up front, before a member fills the form in (A-129 criterion 2).
+  test('booking a room is refused with the policy\'s own words before the form, linking to /account/membership', async () => {
     const lapsed = await registerMember(app, 'no-membership-book', password, { signIn: false })
     const room = await makeRoom()
     const day = threeWeeksMonday()
@@ -258,12 +259,10 @@ describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)'
     const view = await openSignedOutView(app.baseURL)
     try {
       await signIn(view, lapsed.email)
-      await visit(view, `${app.baseURL}/rooms/book?room=${room}&day=${day}&at=19:00&purpose=REHEARSAL`, '[data-test="booking-form"]')
-      await fill(view, '[data-test="booking-title"]', 'Read-through')
-      await click(view, '[data-test="booking-submit"]')
+      await visit(view, `${app.baseURL}/rooms/book?room=${room}&day=${day}&at=19:00&purpose=REHEARSAL`, '[data-test="booking-needs-membership"]')
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="booking-form"]\')')).toBe(false)
 
-      await waitFor(view, `document.querySelector('[data-test="booking-membership-link"]')`, 30_000)
-      expect(await textOf(view, '[data-test="booking-failures"]'))
+      expect(await textOf(view, '[data-test="booking-needs-membership"]'))
         .toContain('Booking a room needs a current membership. Renew it at the Students\' Union.')
       const href = await view.evaluate<string>(
         `document.querySelector('[data-test="booking-membership-link"]').getAttribute('href')`,
