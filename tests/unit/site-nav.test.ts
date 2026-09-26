@@ -100,6 +100,13 @@ describe('a group is a job, and the order never varies (0040)', () => {
     expect(CONSOLE_NAV.map(group => group.label)).not.toContain('Tonight')
   })
 
+  // Issue #1365: approving is a filter on the board, so it is not a screen of its own in the rota.
+  test('Approvals is folded into the rota board', () => {
+    const rota = CONSOLE_NAV.find(group => group.key === 'rota')!
+    expect(rota.items.map(item => item.to)).not.toContain('/rota/manage/approvals')
+    expect(entryFor('/rota/manage/shifts')?.label).toBe('Rota board')
+  })
+
   test('every item sits under its own group prefix', () => {
     const stray = CONSOLE_NAV.flatMap(group =>
       group.items.filter(item => item.to !== group.prefix && !item.to.startsWith(`${group.prefix}/`))
