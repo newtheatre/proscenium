@@ -10,6 +10,7 @@ import {
   confirmedOpeningShiftsTonightQuery,
   createOpeningStatement,
   declineOpeningShiftStatement,
+  myOpeningShiftsQuery,
   removeOpeningShiftStatement,
   stampOpeningShiftsStatement,
   unconfirmOpeningShiftStatement,
@@ -496,6 +497,23 @@ describe('a planned opening\'s staffing changes one-off after stamping (E-130 cr
 
       expectOneWinner(answers)
       expect(slotsOn(database, openingId)).toHaveLength(1)
+    })
+  })
+})
+
+// An opening is tonight's work until 04:00, as a performance shift is, so My rota keeps it after
+// the bar shuts rather than dropping it the moment the opening ends (0014, issue 1305).
+describe('a member\'s own opening slots stay on their rota through the night (E-130 criterion 4)', () => {
+  test('after the opening ends tonight it is still listed; once the night is over it is not', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      person(database, 'one')
+      const [slot] = slotsOn(database, openingId)
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))
+
+      const listed = (at: number): unknown[] => run(database, myOpeningShiftsQuery('one', at))
+      expect(listed(CLOSES_AT + 3600)).toHaveLength(1)
+      expect(listed(NIGHT_START + 24 * 3600 + 60)).toHaveLength(0)
     })
   })
 })

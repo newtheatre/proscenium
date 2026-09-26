@@ -519,3 +519,41 @@ async function message(response: Response): Promise<string> {
   const body = await response.json() as { statusMessage?: string, message?: string }
   return body.statusMessage ?? body.message ?? ''
 }
+
+interface TonightFacts { onShiftTonight: boolean, canWorkTonight: boolean }
+
+async function facts(cookie: string): Promise<TonightFacts> {
+  const session = await (await request(app, 'GET', '/api/auth/session', undefined, cookie)).json() as TonightFacts
+  return { onShiftTonight: session.onShiftTonight, canWorkTonight: session.canWorkTonight }
+}
+
+// The session carries the one fact every screen reads (0094): the on-shift bar reads the first,
+// the Tonight menu entry the second, and a claim or a standing role alone is not on shift.
+describe.skipIf(skip !== null)('the session says who can work tonight (0094, issue 1305)', () => {
+  test('a confirmed shift in its window is on shift and can work tonight', async () => {
+    const holder = await registerMember(app, 'facts-shift', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', holder.id)
+    expect(await facts(holder.cookie)).toEqual({ onShiftTonight: true, canWorkTonight: true })
+  })
+
+  test('a confirmed slot on tonight\'s bar opening is on shift too (0077)', async () => {
+    const holder = await registerMember(app, 'facts-opening', generatePassword())
+    openingSlot(barOpening(hireVenue()), holder.id)
+    expect(await facts(holder.cookie)).toEqual({ onShiftTonight: true, canWorkTonight: true })
+  })
+
+  test('a claim waiting for an officer is neither', async () => {
+    const claimant = await registerMember(app, 'facts-claim', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', claimant.id, 'CLAIMED')
+    expect(await facts(claimant.cookie)).toEqual({ onShiftTonight: false, canWorkTonight: false })
+  })
+
+  test('an officer with a night permission can work tonight without being on shift', async () => {
+    expect(await facts(bar.cookie)).toEqual({ onShiftTonight: false, canWorkTonight: true })
+    expect(await facts(foh.cookie)).toEqual({ onShiftTonight: false, canWorkTonight: true })
+  })
+
+  test('an ordinary member with nothing tonight is neither', async () => {
+    expect(await facts(member.cookie)).toEqual({ onShiftTonight: false, canWorkTonight: false })
+  })
+})

@@ -13,12 +13,12 @@ import {
   dismissShiftStatement,
   dropExternalTemplateStatements,
   myShiftsQuery,
-  onShiftTonightQuery,
   openShiftsQuery,
   releaseShiftStatement,
   replaceTemplateStatements,
   stampableSlotsQuery,
   stampPerformanceStatement,
+  tonightShiftWindowsQuery,
 } from '#server/utils/rota'
 import { venueInUseQuery } from '#server/utils/venues'
 import { auditEntry } from '#shared/utils/audit'
@@ -805,6 +805,29 @@ describe('a member\'s own shifts (E-103)', () => {
       expect(items.map(item => item.shiftId)).toEqual(['shift-mine', 'shift-later'])
     })
   })
+
+  // A shift is tonight's work until 04:00, not until its curtain, so My rota keeps it through the
+  // evening with its own window rather than dropping it at 19:30 (0014, 0078, issue 1305).
+  test('tonight\'s shift stays after its curtain, with its window, and last night\'s is gone', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database, { suffix: 'a', curtainHoursAfterNightStart: 15.5 })
+      const lastNight = tonightsPerformance(database, { suffix: 'b', night: daysAfter(currentShowNight(), -1) })
+      const who = person(database, 'holder')
+      database.batch([
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status, starts_at, ends_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?)',
+          'shift-tonight', tonight.performanceId, 'DOOR', who, 'CONFIRMED', tonight.startsAt - 5400, tonight.startsAt + 9000],
+        ['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+          'shift-last-night', lastNight.performanceId, 'DOOR', who, 'CONFIRMED'],
+      ])
+
+      const afterCurtain = tonight.startsAt + 3600
+      const items = rows<{ shiftId: string, windowStartsAt: number | null, windowEndsAt: number | null }>(
+        database, ...boundStatement(database, myShiftsQuery(who, afterCurtain)))
+      expect(items).toEqual([expect.objectContaining({
+        shiftId: 'shift-tonight', windowStartsAt: tonight.startsAt - 5400, windowEndsAt: tonight.startsAt + 9000,
+      })])
+    })
+  })
 })
 
 describe('claiming an open shift (E-104)', () => {
@@ -1330,22 +1353,79 @@ describe('a confirmed shift resolves authority only for a current account', () =
   })
 })
 
-// The viewer fact the account menu's Tonight entry is gated on (#1039, 0040). Confirmed only,
-// unlike My NNT's accent tile, which counts a claim still waiting on approval (0009, 0044).
-describe('onShiftTonight is a confirmed shift inside tonight, and nothing else', () => {
+// The windows behind the one "on shift" fact, read by the session, /my and the hub alike (0094):
+// confirmed only, on a performance or a bar opening, for an account that is still live (0009).
+describe('onShiftTonight reads tonight\'s confirmed shifts and their windows, and nothing else', () => {
   const bounds = showNightBounds(currentShowNight())
   const from = Math.floor(bounds.from.getTime() / 1000)
   const to = Math.floor(bounds.to.getTime() / 1000)
 
-  function shift(database: TestDatabase, performanceId: string, userId: string, status: string): void {
-    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
-      `${performanceId}-shift`, performanceId, 'DOOR', userId, status]])
+  function shift(database: TestDatabase, performanceId: string, userId: string, status: string, window: [number, number] | null = null): void {
+    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status, starts_at, ends_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?)',
+      `${performanceId}-shift`, performanceId, 'DOOR', userId, status, window?.[0] ?? null, window?.[1] ?? null]])
+  }
+
+  function windows(database: TestDatabase, userId: string): { startsAt: number | null, endsAt: number | null }[] {
+    return run(database, tonightShiftWindowsQuery(userId, from, to)) as { startsAt: number | null, endsAt: number | null }[]
   }
 
   function onShift(database: TestDatabase, userId: string): boolean {
-    const [row] = run(database, onShiftTonightQuery(userId, from, to)) as { n: number }[]
-    return (row?.n ?? 0) > 0
+    return windows(database, userId).length > 0
   }
+
+  test('a confirmed shift carries its own window, not the performance\'s curtain', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const holder = person(database, 'holder')
+      shift(database, tonight.performanceId, holder, 'CONFIRMED', [tonight.startsAt - 5400, tonight.startsAt + 9000])
+
+      expect(windows(database, holder)).toEqual([{ startsAt: tonight.startsAt - 5400, endsAt: tonight.startsAt + 9000 }])
+    })
+  })
+
+  test('a confirmed slot on tonight\'s bar opening counts, with the opening\'s hours (0077)', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database)
+      const holder = person(database, 'barkeep')
+      database.batch([
+        ['INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at) VALUES (?, ?, ?, ?, ?, ?)',
+          'opening-a', venue.id, currentShowNight(), 'Society social', from + 14 * 3600, from + 19 * 3600],
+        ['INSERT INTO bar_opening_shifts (id, opening_id, slot, user_id, status) VALUES (?, ?, 1, ?, ?)',
+          'opening-a-1', 'opening-a', holder, 'CONFIRMED'],
+        ['INSERT INTO bar_opening_shifts (id, opening_id, slot, user_id, status) VALUES (?, ?, 2, ?, ?)',
+          'opening-a-2', 'opening-a', person(database, 'claimant'), 'CLAIMED'],
+      ])
+
+      expect(windows(database, holder)).toEqual([{ startsAt: from + 14 * 3600, endsAt: from + 19 * 3600 }])
+      expect(onShift(database, 'claimant')).toBe(false)
+    })
+  })
+
+  test('a cancelled bar opening is nobody\'s shift', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database)
+      const holder = person(database, 'barkeep')
+      database.batch([
+        ['INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'opening-x', venue.id, currentShowNight(), 'Called off', from + 14 * 3600, from + 19 * 3600, 'CANCELLED'],
+        ['INSERT INTO bar_opening_shifts (id, opening_id, slot, user_id, status) VALUES (?, ?, 1, ?, ?)',
+          'opening-x-1', 'opening-x', holder, 'CONFIRMED'],
+      ])
+
+      expect(onShift(database, holder)).toBe(false)
+    })
+  })
+
+  test('a disabled account is not on shift, whatever the rota says (0009)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const holder = person(database, 'holder')
+      database.batch([['UPDATE users SET disabled = 1 WHERE id = ?', holder]])
+      shift(database, tonight.performanceId, holder, 'CONFIRMED')
+
+      expect(onShift(database, holder)).toBe(false)
+    })
+  })
 
   test('a confirmed shift tonight reads true', async () => {
     await withDatabase(async (database) => {

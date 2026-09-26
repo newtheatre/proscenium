@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { can, member, memberOrGrace, viewBarReports, viewReports, workTonight } from '#shared/utils/abilities'
+import { can, canWorkTonight, member, memberOrGrace, viewBarReports, viewReports } from '#shared/utils/abilities'
 import type { Viewer } from '#shared/utils/abilities'
 import type { MembershipState } from '#shared/utils/membership'
 
@@ -84,23 +84,23 @@ describe('viewReports rests on reports.read alone', () => {
   })
 })
 
-// #1039, 0040: Tonight in the account menu is gated on this one fact, which stayed hard-coded
-// false while E-102 and E-104 were outstanding. Only a confirmed shift tonight sets it.
-describe('workTonight rests on the shift fact alone', () => {
+// 0094, amending 0040: Tonight in the account menu is gated on one fact, a confirmed shift in its
+// window or a night permission. `tests/unit/work-tonight.test.ts` pins the permission half.
+describe('canWorkTonight rests on the shift fact or a night permission', () => {
   const onShift = (onShiftTonight: boolean): Viewer => ({
     id: 'someone', permissions: [], onShiftTonight, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' },
   })
 
   test('a viewer on shift tonight holds it, with no permission at all', () => {
-    expect(can(onShift(true), workTonight)).toBe(true)
+    expect(can(onShift(true), canWorkTonight)).toBe(true)
   })
 
-  test('a viewer who is not refuses, whatever else they hold', () => {
-    expect(can(onShift(false), workTonight)).toBe(false)
-    expect(can({ ...onShift(false), permissions: ['rota.write'], leadsDepartment: true }, workTonight)).toBe(false)
+  test('a viewer who is not, and holds no night permission, refuses', () => {
+    expect(can(onShift(false), canWorkTonight)).toBe(false)
+    expect(can({ ...onShift(false), permissions: ['rota.write'], leadsDepartment: true }, canWorkTonight)).toBe(false)
   })
 
   test('a guest with no account is refused, not thrown at', () => {
-    expect(can(null, workTonight)).toBe(false)
+    expect(can(null, canWorkTonight)).toBe(false)
   })
 })
