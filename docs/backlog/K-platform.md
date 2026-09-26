@@ -380,6 +380,8 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
   3. K-116 is satisfied by procedure rather than a transform: at cutover the bar counts physical
      stock into F-115's existing screen, and that count is the opening balance
      (`docs/operations.md`, "The bar's opening balance").
+     Amended 26 September 2026 (issue 1297): the first count is taken before the first shadow
+     night, about 7 October, and again at cutover; the latest applied is the balance (0080).
   4. The old estate's bar catalogue (`bar_products` 40, `bar_prices` 34, `bar_recipe_items` 18,
      `bar_categories` 5) does hold real rows and is untouched by this resolution. Whether it is
      worth importing, and whose story that is, arguably F-111's, is a live question for the

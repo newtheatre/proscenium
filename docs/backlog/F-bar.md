@@ -761,7 +761,7 @@ Open questions:
      the current on-hand supports, read as criterion 4 reads them in one query over every active
      product that binds no parameter per product (0006). A size with none left reads "Out of
      stock" in the size sheet, and a product whose every size is out reads it on its tile. Once
-     any stocktake has been applied the button is disabled too; before then, the cutover count
+     any stocktake has been applied the button is disabled too; before then, the first count
      has not set a trusted balance (0080), so the label shows and the button stays live. The
      label is advice, because the catalogue is held on the device and can trail the shelf: the
      trigger on the sale's write stays what holds (F-105 criterion 5), and the till reads the

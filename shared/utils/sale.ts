@@ -187,9 +187,10 @@ export const sizeBlocked = (variant: Stocked): boolean => variant.stock?.blocks 
 export const productOutOfStock = (product: Pick<SaleProduct, 'variants'>): boolean => product.variants.every(sizeOutOfStock)
 export const productBlocked = (product: Pick<SaleProduct, 'variants'>): boolean => product.variants.every(sizeBlocked)
 
-// A size the till would refuse at the charge: nothing on hand, or none of its choices poured.
+// A size the till would refuse at the charge, for itself or for any choice it offers: what the
+// till leaves pressable before the first count, a size or an option alike (F-128 criterion 8).
 const sizeHasNothing = (size: SaleVariant): boolean =>
-  sizeOutOfStock(size) || (size.choice !== null && size.choice.options.length > 0 && size.choice.options.every(sizeOutOfStock))
+  sizeOutOfStock(size) || (size.choice?.options.some(sizeOutOfStock) ?? false)
 
 // Before the bar's first count, drinks the till lets you press and then refuses; once a count is
 // applied it greys them out itself, so none are worth saying (issue 1297, 0080).

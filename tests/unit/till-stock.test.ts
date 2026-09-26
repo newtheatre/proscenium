@@ -131,11 +131,11 @@ describe('the drinks the till would refuse until the first count', () => {
     expect(uncountedProducts(catalogue)).toBe(1)
   })
 
-  test('a size whose every choice has nothing on hand counts; one choice still poured does not', () => {
+  test('a size with any choice that has nothing on hand counts, as the charge refuses that choice', () => {
     const allGone = { ...aVariant('d', some), choice: { id: 'g', name: 'Mixer', options: [{ id: 'o1', itemName: 'Tonic', stock: empty }, { id: 'o2', itemName: 'Soda', stock: empty }] } }
     const oneLeft = { ...aVariant('e', some), choice: { id: 'g', name: 'Mixer', options: [{ id: 'o1', itemName: 'Tonic', stock: empty }, { id: 'o2', itemName: 'Soda', stock: some }] } }
     expect(uncountedProducts({ stockCounted: false, products: [aProduct([allGone])] })).toBe(1)
-    expect(uncountedProducts({ stockCounted: false, products: [aProduct([oneLeft])] })).toBe(0)
+    expect(uncountedProducts({ stockCounted: false, products: [aProduct([oneLeft])] })).toBe(1)
   })
 
   test('once a count is applied the till greys those out itself, so there is nothing to say', () => {

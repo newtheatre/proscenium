@@ -541,8 +541,8 @@ cutover (26 to 31 October), and the latest applied one is the balance (0080). Un
 applied, the till tells anyone who can reach the stocktake screen how many drinks on it pour stock
 with nothing on hand, with a link to the stocktakes.
 
-The bar manager counts physical stock into the stocktake screen bar already has
-(`/bar/stock/stocktakes`, F-115) and applies it. That count **is** the opening balance: F-115's
+The count goes into the stocktake screen bar already has (`/bar/stock/stocktakes`, F-115) and is
+applied there. That count **is** the opening balance: F-115's
 apply route already does everything K-116 asked for beyond the transform (a blank count reads
 differently from an entered zero, and a finished stocktake posts its adjustments in one atomic
 batch). No second screen, and no import step precedes it.
