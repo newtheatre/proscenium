@@ -182,7 +182,6 @@ useSeoMeta({ title: 'Your waiting-list entry' })
               :min="0"
               :max="data!.partySize"
               :aria-label="`${type.name} tickets`"
-              class="w-36"
               :data-test="`quantity-${type.id}`"
             />
           </li>
