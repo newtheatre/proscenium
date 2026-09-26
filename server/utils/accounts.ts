@@ -21,6 +21,7 @@ export interface AccountRow {
   disabled: boolean
   sessionEpoch: number
   anonymisedAt: number | null
+  studentId: string | null
 }
 
 export function newId(): string {

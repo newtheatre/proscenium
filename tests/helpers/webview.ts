@@ -468,6 +468,12 @@ export async function readTime(view: Bun.WebView, selector: string): Promise<str
   return view.evaluate<string>(`[...document.querySelectorAll(${segments})].map(segment => segment.innerText).join('')`)
 }
 
+// A date field is segments too; an untyped one reads as its placeholders, with no digit in it.
+export async function readDate(view: Bun.WebView, selector: string): Promise<string> {
+  const segments = JSON.stringify(`${selector} [data-reka-date-field-segment]`)
+  return view.evaluate<string>(`[...document.querySelectorAll(${segments})].map(segment => segment.innerText).join('')`)
+}
+
 // A Nuxt UI select is a listbox in a portal, so a value cannot be set on it the way an input takes
 // one: the trigger is opened and the option itself is clicked, the way a person does it.
 async function openMenu(view: Bun.WebView, selector: string): Promise<void> {

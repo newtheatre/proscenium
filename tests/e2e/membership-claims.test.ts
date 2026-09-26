@@ -5,7 +5,7 @@ import { daysAfter, endOfTerm, londonDay } from '#shared/utils/membership'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillDate, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillDate, openSignedOutView, readDate, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -89,14 +89,6 @@ interface Own { membership: { startsOn: string, expiresOn: string } | null, stat
 // The open claim says what happens now and what comes later, the order 0031 and the runbook keep.
 const RECORDING_SAYS = 'An officer records it, usually within a day. The committee checks memberships against the SU\'s list later.'
 
-const flat = (text: string): string => text.replace(/\s+/g, ' ')
-
-// Whether the purchase day holds a typed date, rather than the field's own placeholders.
-function dateTyped(view: Bun.WebView): Promise<boolean> {
-  return view.evaluate<boolean>(`/\\d/.test([...document.querySelectorAll('[data-test="claim-starts"] [data-reka-date-field-segment]')]
-    .map(segment => segment.innerText).join(''))`)
-}
-
 const claim = (as: TestMember, over: Record<string, unknown> = {}): Promise<Response> =>
   send('POST', '/api/account/membership/claim', { studentId: nextNumber(), startsOn: today, term: 1, ...over }, as.cookie)
 
@@ -139,8 +131,11 @@ describe.skipIf(skip !== null)('claiming (A-130 criterion 1)', () => {
     expect(read<{ n: number }>(`SELECT count(*) n FROM membership_claims WHERE user_id = ?`, member.id)!.n).toBe(1)
   })
 
-  test('a purchase in the future, a term of two, and a blank number are all refused', async () => {
+  test('a missing purchase day, one in the future, a term of two, and a blank number are all refused', async () => {
     const member = await registerMember(app, 'hopeful', password)
+    const undated = await claim(member, { startsOn: undefined })
+    expect(undated.status).toBe(400)
+    expect((await undated.json() as { data: { fields: Record<string, string> } }).data.fields.startsOn).toBe('Give the date on your SU receipt')
     const ahead = londonDay(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
     expect((await claim(member, { startsOn: ahead })).status).toBe(400)
     expect((await claim(member, { term: 2 })).status).toBe(400)
@@ -322,16 +317,18 @@ describe.skipIf(skip !== null)('the screens (A-130 criterion 4)', () => {
       await visit(view, `${app.baseURL}/account/membership`, '[data-test="membership-state"]')
       expect(await textOf(view, '[data-test="membership-state"]')).toContain('No membership')
       expect(await textOf(view, '[data-test="claim-form"]')).toContain('The date on your SU receipt')
-      expect(await dateTyped(view)).toBe(false)
+      expect(await readDate(view, '[data-test="claim-starts"]')).not.toMatch(/\d/)
 
       await fill(view, 'input[data-test="claim-student-id"]', nextNumber())
       await fillDate(view, '[data-test="claim-starts"]', daysAfter(today, -40))
       await click(view, '[data-test="claim-submit"]')
       await waitFor(view, `document.querySelector('[data-test="claim-open"]')`, 30_000)
-      const open = flat(await textOf(view, '[data-test="claim-open"]'))
+      const open = await textOf(view, '[data-test="claim-open"]')
       expect(open).toContain('Waiting')
       expect(open).toContain(RECORDING_SAYS)
       expect(open).not.toContain('checks it against')
+      expect(read<{ startsOn: string }>('SELECT starts_on AS startsOn FROM membership_claims WHERE user_id = ?', member.id)!.startsOn)
+        .toBe(daysAfter(today, -40))
     }
     finally {
       view.close()
@@ -355,7 +352,7 @@ describe.skipIf(skip !== null)('the screens (A-130 criterion 4)', () => {
 
       await visit(view, `${app.baseURL}/account/membership`, '[data-test="claim-form"]')
       await waitFor(view, `document.querySelector('input[data-test="claim-student-id"]')?.value === ${JSON.stringify(number)}`)
-      expect(await dateTyped(view)).toBe(false)
+      expect(await readDate(view, '[data-test="claim-starts"]')).not.toMatch(/\d/)
     }
     finally {
       view.close()

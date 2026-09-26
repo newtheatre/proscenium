@@ -73,9 +73,7 @@ describe('what a claim carries (A-130 criterion 1)', () => {
 
 describe('where the claim form starts (issue 1343)', () => {
   test('no purchase day, a one-year term, and the number the account already holds', () => {
-    const start = claimFormStart('20123456', '20999999')
-    expect(start).toEqual({ studentId: '20123456', term: 1 })
-    expect('startsOn' in start).toBe(false)
+    expect(claimFormStart('20123456', '20999999')).toStrictEqual({ studentId: '20123456', term: 1 })
   })
 
   test('with no number recorded, the one last claimed, so a declined claim is put right rather than retyped', () => {
