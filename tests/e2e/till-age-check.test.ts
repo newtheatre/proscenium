@@ -316,8 +316,6 @@ describe.skipIf(skip !== null)('every restricted product is named when more than
   })
 })
 
-// One tap in, not one charge in (F-106 criterion 6, issue 1150 item 5). These wait for the
-// nightly browser run; they are not a CI gate.
 // Issue 1299, F-106 criterion 1, F-111 criterion 6: a line's Check ID follows what it pours. The
 // product's own switch adds it to one pouring nothing restricted, and never takes it away.
 describe.skipIf(skip !== null)('Check ID follows what a line pours, whatever the product is switched to (issue 1299)', () => {
@@ -418,6 +416,8 @@ describe.skipIf(skip !== null)('Check ID follows what a line pours, whatever the
   })
 })
 
+// One tap in, not one charge in (F-106 criterion 6, issue 1150 item 5). These wait for the
+// nightly browser run; they are not a CI gate.
 describe.skipIf(skip !== null)('the screen asks before the drink is poured', () => {
   async function atTheTill(venueId: string, waitFor_: string) {
     const view = await openSignedOutView(app.baseURL)

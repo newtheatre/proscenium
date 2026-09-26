@@ -114,7 +114,7 @@ const {
   offline,
   recomputeTotal,
   grandTotalPence,
-  isVariantRestricted,
+  isLineRestricted,
   needsAgeCheck,
   passedAgeCheck,
   askingAgeCheckFor,
@@ -241,7 +241,7 @@ const {
   give: giveCompRequest,
 } = useTillComp({
   venueId,
-  isVariantRestricted,
+  isLineRestricted,
   requestComp: body => $fetch<{ id: string, priced: PricedBasket }>('/api/till/comp-requests', { method: 'POST', body }),
   pollRequest: id => $fetch<{ request: CompRequest }>(`/api/till/comp-requests/${id}`),
   giveComp: (id, body) => $fetch<SaleReceipt>(`/api/till/comp-requests/${id}/sale`, { method: 'POST', body }),

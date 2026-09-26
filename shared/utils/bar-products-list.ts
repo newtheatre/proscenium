@@ -17,12 +17,13 @@ export const barProductsList = {
       icon: 'i-lucide-layout-grid',
     },
     { key: 'retired', label: 'Retired', kind: 'yes-no' },
-    // The Bar Manager's correction list: unrestricted and pouring restricted stock (issue 1299).
+    // The Bar Manager's tidy-up list: switched off though it pours restricted stock (issue 1299).
+    // The till asks for Check ID on those anyway; this is the list reading true.
     {
       key: 'withoutCheckId',
-      label: 'Pours restricted stock without Check ID',
+      label: 'Pours restricted stock, Age restricted off',
       kind: 'yes-no',
-      negated: 'Asks for Check ID where its stock needs it',
+      negated: 'Age restricted wherever its stock is',
       icon: 'i-lucide-id-card',
     },
   ],

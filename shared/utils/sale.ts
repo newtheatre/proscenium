@@ -86,6 +86,24 @@ export function needsTheReader(sale: Pick<SaleInput, 'tabHolderId' | 'expectedTo
   return sale.tabHolderId === null && sale.expectedTotalPence > 0
 }
 
+// Check ID follows what a size pours (issue 1299, F-106 criterion 1, F-111 criterion 6): any
+// restricted item in it asks, and the product's own switch adds it to one pouring none.
+export function checkIdFor(restrictedAnyway: boolean, pours: readonly string[], restrictedItems: ReadonlySet<string>): boolean {
+  return restrictedAnyway || pours.some(itemId => restrictedItems.has(itemId))
+}
+
+// One line's answer off the catalogue the till holds: its size, or the option chosen. The tile's
+// mark is any size's, so it is never the line's own answer.
+export function lineNeedsCheckId(products: readonly SaleProduct[], line: { variantId: string, choiceItemId: string | null }): boolean {
+  for (const product of products) {
+    const variant = product.variants.find(size => size.id === line.variantId)
+    if (!variant) continue
+    const option = variant.choice?.options.find(choice => choice.id === line.choiceItemId)
+    return (variant.ageRestricted ?? product.ageRestricted) || option?.ageRestricted === true
+  }
+  return false
+}
+
 // What the Tickets tab shows about a booking it found (F-122 criterion 2): no email, no price
 // per ticket, only what is owed and whether the till may take it.
 export interface TillBooking {
@@ -114,6 +132,9 @@ export interface WalkUpOption {
 export interface SaleChoiceOption {
   id: string
   itemName: string
+  // Its stocked item is age restricted, so choosing it asks for Check ID (issue 1299); absent on
+  // a catalogue the device held from earlier.
+  ageRestricted?: boolean
   // The till catalogue's alone (F-128 criterion 9); the sale path reads no stock and leaves it off.
   stock?: VariantStock | null
 }
@@ -142,6 +163,9 @@ export interface SaleVariant {
   choice: SaleChoice | null
   // Null for a size that depletes nothing, which has nothing to run out of.
   stock: VariantStock | null
+  // Its recipe pours restricted stock, or its product is restricted anyway (issue 1299). Absent
+  // on a catalogue the device held from earlier, where its product's mark stands in.
+  ageRestricted?: boolean
 }
 
 export function variantStock(servingsLeft: number | null, stockCounted: boolean): VariantStock | null {

@@ -6,7 +6,7 @@ import { createError } from 'h3'
 import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, onHandOfItems, resolvedPriceColumns } from '#server/utils/bar'
 import { stockCounted, tillServings } from '#server/utils/bar-linkage'
 import { chunked } from '#shared/utils/approvals'
-import { NOT_ENOUGH_STOCK, choiceWithStock, stockShortOf, variantStock } from '#shared/utils/sale'
+import { NOT_ENOUGH_STOCK, checkIdFor, choiceWithStock, stockShortOf, variantStock } from '#shared/utils/sale'
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { discountedPence } from '#shared/utils/discounts'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
@@ -81,6 +81,8 @@ interface OptionRow {
   itemId: string
   itemName: string
   qty: number
+  // Set here from the register, not read off the row (issue 1299).
+  ageRestricted?: boolean
 }
 
 // One resolved ingredient a sale line depletes: an item and how much of it, in the item's own
@@ -91,7 +93,7 @@ export interface Depletion {
 }
 
 // The public `SaleVariant` shape plus what only the write path reads: F-121's `price_ref`,
-// F-113's recipe, F-106's `ageRestricted` gate (the owning product's flag, not this size's own).
+// F-113's recipe, and F-106's gate, derived from what the size pours (issue 1299).
 interface ResolvedVariant extends Omit<SaleVariant, 'stock'> {
   productId: string
   priceRowId: string
@@ -128,6 +130,9 @@ export async function activeVariantsWithChoices(on: string): Promise<Resolvable>
   `))
   const groupNames = await db.all<{ id: string, name: string }>(sql`SELECT id, name FROM choice_groups`)
   const nameOf = new Map(groupNames.map(group => [group.id, group.name]))
+  // Read whole, binding nothing per item: Check ID follows what a line pours (issue 1299, 0006).
+  const restrictedItems = new Set((await db.all<{ id: string }>(sql`SELECT id FROM bar_items WHERE age_restricted = 1`)).map(item => item.id))
+  for (const option of options) option.ageRestricted = restrictedItems.has(option.itemId)
 
   const choiceOf = new Map<string, SaleChoice>()
   const recipeOf = new Map<string, Depletion[]>()
@@ -144,7 +149,7 @@ export async function activeVariantsWithChoices(on: string): Promise<Resolvable>
       name: nameOf.get(component.choiceGroupId) ?? '',
       options: options
         .filter(option => option.choiceGroupId === component.choiceGroupId)
-        .map(option => ({ id: option.id, itemName: option.itemName })),
+        .map(option => ({ id: option.id, itemName: option.itemName, ageRestricted: option.ageRestricted === true })),
     })
   }
   const optionById = new Map(options.map(option => [option.id, option]))
@@ -159,7 +164,7 @@ export async function activeVariantsWithChoices(on: string): Promise<Resolvable>
       pricePence: row.pricePence,
       priceSource: row.priceSource,
       priceRowId: row.priceRowId,
-      ageRestricted: row.ageRestricted === 1,
+      ageRestricted: checkIdFor(row.ageRestricted === 1, (recipeOf.get(row.id) ?? []).map(ingredient => ingredient.itemId), restrictedItems),
       choice,
       recipe: recipeOf.get(row.id) ?? [],
     }]
@@ -187,23 +192,27 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
   // Read here and never on the sale path, which the trigger guards on the write (F-128 criterion 8).
   const [servings, counted] = await Promise.all([tillServings(), stockCounted()])
   const products: SaleProduct[] = productRows
-    .map(row => ({
-      id: row.id,
-      name: row.name,
-      categoryId: row.categoryId,
-      ageRestricted: row.ageRestricted === 1,
-      allergenState: row.allergenState,
-      allergenNote: row.allergenNote,
-      variants: variants.filter(variant => variant.productId === row.id)
-        // Only what the screen needs: the write-path fields (price row, recipe, the product's own
-        // age-restricted flag, already carried on the product itself) stay internal.
-        .map(({ productId: _productId, priceRowId: _priceRowId, ageRestricted: _ageRestricted, recipe: _recipe, ...variant }) =>
+    .map((row) => {
+      const sizes = variants.filter(variant => variant.productId === row.id)
+        // Only what the screen needs: the write-path fields (price row, recipe) stay internal.
+        .map(({ productId: _productId, priceRowId: _priceRowId, recipe: _recipe, ...variant }) =>
           ({
             ...variant,
             choice: choiceWithStock(variant.choice, servings.options.get(variant.id), counted),
             stock: variantStock(servings.sizes.get(variant.id) ?? null, counted),
-          })),
-    }))
+          }))
+      return {
+        id: row.id,
+        name: row.name,
+        categoryId: row.categoryId,
+        // The tile's mark: any size, or any option offered, that asks (issue 1299, F-106.6).
+        ageRestricted: row.ageRestricted === 1
+          || sizes.some(size => size.ageRestricted || (size.choice?.options.some(option => option.ageRestricted) ?? false)),
+        allergenState: row.allergenState,
+        allergenNote: row.allergenNote,
+        variants: sizes,
+      }
+    })
     .filter(product => product.variants.length > 0)
 
   return { on, categories, products }
@@ -211,6 +220,8 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
 
 interface ResolvedLine {
   variant: ResolvedVariant
+  // The size's own answer, or the option chosen when that pours restricted stock (issue 1299).
+  ageRestricted: boolean
   qty: number
   choiceItemId: string | null
   choiceItemName: string | null
@@ -229,6 +240,7 @@ function resolveLines(lines: BasketLineInput[], { variants, optionById }: Resolv
 
     let choiceItemId: string | null = null
     let choiceItemName: string | null = null
+    let ageRestricted = variant.ageRestricted
     const depletion = [...variant.recipe]
     if (variant.choice) {
       const chosen = variant.choice.options.find(option => option.id === line.choiceItemId)
@@ -238,13 +250,14 @@ function resolveLines(lines: BasketLineInput[], { variants, optionById }: Resolv
       }
       choiceItemId = chosen.id
       choiceItemName = chosen.itemName
+      ageRestricted ||= option.ageRestricted === true
       depletion.push({ itemId: option.itemId, qty: option.qty })
     }
     else if (line.choiceItemId) {
       throw createError({ statusCode: 422, statusMessage: `${variant.label} takes no choice` })
     }
 
-    return { variant, qty: line.qty, choiceItemId, choiceItemName, depletion, amountPence: variant.pricePence * line.qty }
+    return { variant, ageRestricted, qty: line.qty, choiceItemId, choiceItemName, depletion, amountPence: variant.pricePence * line.qty }
   })
 }
 
@@ -439,7 +452,7 @@ function saleableAfterAgeCheck(
   priced: PricedLine[],
   ageCheck: InlineAgeCheckInput | null,
 ): { restricted: number[], sold: number[] } {
-  const restricted = resolved.map((line, index) => (line.variant.ageRestricted ? index : -1)).filter(index => index !== -1)
+  const restricted = resolved.map((line, index) => (line.ageRestricted ? index : -1)).filter(index => index !== -1)
   const refused = restricted.length > 0 && ageCheck?.outcome === 'REFUSED'
   const sold = refused ? resolved.map((_, index) => index).filter(index => !restricted.includes(index)) : resolved.map((_, index) => index)
   return { restricted, sold }

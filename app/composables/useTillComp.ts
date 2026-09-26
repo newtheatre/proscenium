@@ -16,7 +16,7 @@ interface SentLine extends TillCompLine { restricted: boolean }
 export interface TillCompDeps {
   venueId: Ref<string | null>
   // Read once, at the moment of asking, and frozen from there (F-110 criterion 4).
-  isVariantRestricted: (variantId: string) => boolean
+  isLineRestricted: (line: TillCompLine) => boolean
   requestComp: (body: { venueId: string, lines: TillCompLine[], reason: string }) => Promise<{ id: string, priced: PricedBasket }>
   pollRequest: (id: string) => Promise<{ request: CompRequest }>
   giveComp: (id: string, body: { venueId: string, expectedForegonePence: number, ageCheck: InlineAgeCheckInput | null }) => Promise<SaleReceipt>
@@ -28,7 +28,7 @@ const POLL_MS = 4000
 const POLL_CUTOFF_MS = 2 * 60 * 60 * 1000
 
 export function useTillComp(deps: TillCompDeps) {
-  const { venueId, isVariantRestricted, requestComp, pollRequest, giveComp } = deps
+  const { venueId, isLineRestricted, requestComp, pollRequest, giveComp } = deps
 
   const open = ref(false)
   const reason = ref('')
@@ -111,7 +111,7 @@ export function useTillComp(deps: TillCompDeps) {
     try {
       const answered = await requestComp({ venueId: venueId.value, lines, reason: reason.value.trim() })
       requestId.value = answered.id
-      sentLines.value = lines.map(line => ({ ...line, restricted: isVariantRestricted(line.variantId) }))
+      sentLines.value = lines.map(line => ({ ...line, restricted: isLineRestricted(line) }))
       sentPriced.value = answered.priced
       pendingPoll.start(poll, POLL_MS, POLL_CUTOFF_MS)
       void poll()

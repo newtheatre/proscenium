@@ -1526,9 +1526,12 @@ left unset; creating or editing a discount above whatever it currently holds sti
 ### bar_products  (sellable things)
 `id` PK · `category_id` → bar_categories restrict · `name` unique, case-insensitively · `status`
 CHECK `ACTIVE|HIDDEN|RETIRED`, default `HIDDEN` · `staffed_only` bool (not on self-serve tabs) ·
-`age_restricted` bool, what Challenge 25 prompts on (F-106), which may not be saved off while any
-live size pours a restricted stocked item, directly or as a choice: the guided set-up refuses
-before it writes, and an edit carries `checkIdHeld` on its own `UPDATE` (issue 1299) ·
+`age_restricted` bool, "restricted anyway": the till's Challenge 25 prompt (F-106) follows what a
+line pours, its size's recipe or the option chosen, read against `bar_items.age_restricted` at the
+sale, and this adds the prompt to a product pouring nothing restricted (issue 1299). It may not be
+saved off while any live size pours a restricted stocked item, directly or as a choice, so the
+product list reads true: the guided set-up refuses before it writes, and an edit carries
+`checkIdHeld` on its own `UPDATE` ·
 `allergen_state` CHECK
 `UNKNOWN|NONE|RECORDED` · `allergen_note`, required by `RECORDED` and refused by `UNKNOWN` (F-107) ·
 `sort` · `created_at`.
