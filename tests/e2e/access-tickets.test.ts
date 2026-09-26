@@ -86,8 +86,11 @@ async function verifiedPatron(companions: number, fohNote = 'Aisle seat, assista
     consent: true,
   }, patron.cookie)).status).toBe(200)
 
+  // A decision sends back the version of the declaration it read (issue 1383).
+  const read = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${patron.id}`, undefined, accessOfficer.cookie))
+  const { version } = (await read.json() as { profile: { version: string | null } }).profile
   const verified = await withoutSecondFactor(() =>
-    send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote }, accessOfficer.cookie))
+    send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote, version }, accessOfficer.cookie))
   expect(verified.status).toBe(200)
   return patron
 }
