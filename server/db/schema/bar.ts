@@ -284,8 +284,8 @@ export const tillSessions = sqliteTable('till_sessions', {
   check('till_sessions_closes_after_it_opens', sql`${table.closedAt} IS NULL OR ${table.closedAt} >= ${table.openedAt}`),
 ])
 
-// One hand-off of a basket to the SumUp app (F-124, 0069). The basket is held here as priced;
-// nothing posts until the app reports success, and every transition is a conditional write.
+// One card charge on the till, handed to the SumUp app or keyed into the reader (F-124, 0069, 0096).
+// The basket is held here as priced; nothing posts until it is answered, and every move is conditional.
 export const sumupAttempts = sqliteTable('sumup_attempts', {
   id: id(),
   tillSessionId: text('till_session_id').notNull().references(() => tillSessions.id, { onDelete: 'restrict' }),
@@ -308,6 +308,8 @@ export const sumupAttempts = sqliteTable('sumup_attempts', {
   // The entry the success posted. No foreign key, the same shape as comp_requests.entry_id.
   entryId: text('entry_id'),
   error: text('error'),
+  // SUMUP or TYPED, NULL reading as SUMUP (0096). No CHECK: adding one would rebuild the table (0063).
+  kind: text('kind'),
 }, table => [
   index('sumup_attempts_night_status').on(table.night, table.status),
   index('sumup_attempts_session').on(table.tillSessionId),

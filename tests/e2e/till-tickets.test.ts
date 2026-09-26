@@ -4,6 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
+import { answerCharge, sellOnTheTill, startTypedCharge } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -115,7 +116,7 @@ async function pendingBooking(performanceId: string, ticketTypeId: string, quant
 }
 
 const sale = (venueId: string, body: Record<string, unknown>, as = barManager.cookie): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines: [], ...body }, as)
+  sellOnTheTill(app, { venueId, lines: [], ...body }, as)
 
 interface EntryRow { id: string, source: string, tender: string, total_pence: number }
 interface LineRow { kind: string, amount_pence: number, reservation_id: string | null }
@@ -299,7 +300,7 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     // The booking inside the attempt cannot be charged again by hand (criterion 7).
     const byHand = await sale(venueId, { tickets: [{ reservationId: booking.id }], expectedTotalPence: 900 })
     expect(byHand.status).toBe(409)
-    expect(await message(byHand)).toContain('SumUp')
+    expect(await message(byHand)).toContain('waiting for its answer')
 
     // The keyed return posts the sale with no session at all (criterion 3), and once only.
     const key = new URL(answer.launchUrl.replace('sumupmerchant://', 'https://')).searchParams.get('callback')!.split('/pay/return/')[1]!
@@ -362,9 +363,11 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', failing.id)!.status).toBe('PENDING')
 
     const started = await (await send('POST', '/api/till/payments', { venueId, lines: [], tickets: [{ reservationId: contested.id }], expectedTotalPence: 900 }, barManager.cookie)).json() as AttemptAnswer
+    // A hand-off is answered Payment did not, never Card declined (0096).
+    expect((await answerCharge(app, started.id, 'declined', barManager.cookie)).status).toBe(409)
     const closeRefused = await send('POST', '/api/till/close', { id: sessionId, actualZPence: 0 }, barManager.cookie)
     expect(closeRefused.status).toBe(409)
-    expect(await message(closeRefused)).toContain('SumUp')
+    expect(await message(closeRefused)).toContain('waiting for an answer')
 
     // The desk collects it while the phone is in the SumUp app.
     expect((await send('POST', `/api/box-office/desk/reservations/${contested.id}/collect`, { expectedTotalPence: 900, tender: 'CARD' })).status).toBe(200)
@@ -378,5 +381,34 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
 
     const closed = await send('POST', '/api/till/close', { id: sessionId, actualZPence: 0 }, barManager.cookie)
     expect(closed.status).toBe(200)
+  })
+})
+
+// Decision 0096: a declined card at the bar never leaves a PAID booking behind it.
+describe.skipIf(skip !== null)('a booking in a typed charge is collected only once the reader has answered (0096)', () => {
+  test('Card declined leaves the booking unpaid and chargeable again; Reader took it collects it', async () => {
+    const { venueId, performanceId } = programme('typed-booking')
+    const ticketTypeId = await aTicketType()
+    const booking = await pendingBooking(performanceId, ticketTypeId)
+    await openTill(venueId)
+    const basket = { venueId, lines: [], tickets: [{ reservationId: booking.id }], expectedTotalPence: 900 }
+    const bookingStatus = (): string => query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', booking.id)!.status
+    const entries = (): number => query<{ n: number }>('SELECT count(*) AS n FROM ledger_entries')!.n
+
+    const before = entries()
+    const first = await (await startTypedCharge(app, basket, barManager.cookie)).json() as { id: string }
+    expect(bookingStatus()).toBe('PENDING')
+
+    // Held by the open attempt, so a second charge of it waits for the first (F-124 criterion 7).
+    expect((await startTypedCharge(app, basket, barManager.cookie)).status).toBe(409)
+
+    expect((await answerCharge(app, first.id, 'declined', barManager.cookie)).status).toBe(200)
+    expect(bookingStatus()).toBe('PENDING')
+    expect(entries()).toBe(before)
+
+    const retried = await sale(venueId, { tickets: [{ reservationId: booking.id }], expectedTotalPence: 900 })
+    expect(retried.status).toBe(200)
+    expect(bookingStatus()).toBe('COLLECTED')
+    expect(entries()).toBe(before + 1)
   })
 })

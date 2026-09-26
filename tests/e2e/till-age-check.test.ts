@@ -4,6 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -106,7 +107,7 @@ async function aMixedBasketSetup(): Promise<MixedBasket> {
 }
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, ageCheck: unknown, as = barManager.cookie): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines, expectedTotalPence, ageCheck }, as)
+  sellOnTheTill(app, { venueId, lines, expectedTotalPence, ageCheck }, as)
 
 interface Counts { entries: number, lines: number, movements: number, ageChecks: number, ageCheckAudits: number, saleAudits: number }
 
@@ -351,6 +352,8 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
 
     // The basket already passed, so charging does not ask a second time.
     await click(view, `[aria-label="Charge £2.50"]`)
+    await waitFor(view, `document.querySelector('[data-test="reader-took-it"]')`)
+    await click(view, '[data-test="reader-took-it"]')
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
     view.close()
   }, 120_000)
@@ -371,6 +374,8 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     expect(await view.evaluate<boolean>(`document.querySelector('[data-test="age-check-not-required"]') === null`)).toBe(true)
 
     await click(view, `[aria-label="Charge £5.00"]`)
+    await waitFor(view, `document.querySelector('[data-test="reader-took-it"]')`)
+    await click(view, '[data-test="reader-took-it"]')
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
     expect(counts().ageChecks).toBe(before.ageChecks + 1)
     expect(latestAgeCheck()).toMatchObject({ outcome: 'NOT_REQUIRED', id_type: null, reason: null })
@@ -414,7 +419,44 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£3.00')`)
 
     await click(view, `[aria-label="Charge £3.00"]`)
+    await waitFor(view, `document.querySelector('[data-test="reader-took-it"]')`)
+    await click(view, '[data-test="reader-took-it"]')
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
+    view.close()
+  }, 120_000)
+
+  // 0096 writes a card sale only once the reader answers, so a refusal given at the charge cannot
+  // ride the sale: it is on the register at once, and a declined card leaves it there.
+  test('a refusal given at the charge stays on the register when the card is then declined', async () => {
+    const { venueId, restrictedProductId, ordinaryProductId, restrictedProductName } = await aMixedBasketSetup()
+    const view = await atTheTill(venueId, `[data-test="product-${ordinaryProductId}"]`)
+
+    await click(view, `[data-test="product-${ordinaryProductId}"]`)
+    await click(view, `[data-test="product-${restrictedProductId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="age-check-refuse"]')`)
+    // Closed rather than answered, so the charge is what asks.
+    await view.evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find(button => (button.getAttribute('aria-label') || '').toLowerCase().includes('close')).click()`)
+    await waitFor(view, `!document.querySelector('[data-test="age-check-refuse"]')`)
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£5.50')`)
+
+    const before = counts()
+    await click(view, `[aria-label="Charge £5.50"]`)
+    await waitFor(view, `document.querySelector('[data-test="age-check-refuse"]')`)
+    await click(view, '[data-test="age-check-refuse"]')
+    await click(view, '[data-test="age-check-reason-NO_ID_SHOWN"]')
+    await fill(view, '[data-test="age-check-description"]', 'Declined to show ID')
+    await click(view, '[data-test="age-check-confirm-refuse"]')
+
+    await waitFor(view, `document.querySelector('[data-test="reader-charge"]')`)
+    expect(await textOf(view, '[data-test="charge-amount-figure"]')).toContain('£3.00')
+    expect(counts().ageChecks).toBe(before.ageChecks + 1)
+
+    await click(view, '[data-test="card-declined"]')
+    await waitFor(view, `document.querySelector('[data-test="charge-failure"]')`)
+    expect(counts()).toMatchObject({ entries: before.entries, ageChecks: before.ageChecks + 1 })
+    const row = latestAgeCheck()
+    expect(row).toMatchObject({ outcome: 'REFUSED', reason: 'NO_ID_SHOWN' })
+    expect(row?.product).toContain(restrictedProductName)
     view.close()
   }, 120_000)
 
@@ -438,7 +480,7 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     view.close()
   }, 120_000)
 
-  // F-104 criterion 6, issue 1150 item 6: the one number the confirmation is read for.
+  // F-104 criterion 6 as amended by 0096: the one number the typed attempt is read for.
   test('the amount to key into the reader is the display figure, in the mono face', async () => {
     const { venueId, ordinaryProductId } = await aMixedBasketSetup()
     const view = await atTheTill(venueId, `[data-test="product-${ordinaryProductId}"]`)

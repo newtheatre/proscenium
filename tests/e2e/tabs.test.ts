@@ -425,9 +425,10 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `!document.querySelector('[aria-label^="Put"]')`)
     expect(await textOf(view, '[data-test="basket-split"]')).toContain('£9.00')
 
+    // Decision 0096: the reader's charge waits for its answer, where a tab would have posted at once.
     await click(view, `[data-test="charge-reader"]`)
-    await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
-    expect(await textOf(view, '[data-test="charge-confirmation"]')).toContain('Key this into the reader')
+    await waitFor(view, `document.querySelector('[data-test="reader-charge"]')`)
+    expect(await textOf(view, '[data-test="reader-charge"]')).toContain('Key this into the reader')
     expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="tab-balance-note"]')`)).toBe(false)
     view.close()
   }, 120_000)

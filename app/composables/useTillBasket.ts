@@ -6,8 +6,8 @@ import type { ComputedRef, Ref } from 'vue'
 import type { InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
 import type { PricedBasket, PricedLine, SaleChoice, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
 
-// A refusal drops the restricted lines from what is payable; shared by a reader charge
-// (expectedAfter below) and a comp's own give (useTillComp.ts), so the two never diverge.
+// A refusal drops the restricted lines from what is payable, for a comp's own give (useTillComp.ts),
+// which is the one path an inline refusal still rides.
 export function pencePayable(priced: PricedBasket, restricted: boolean[], ageCheck: InlineAgeCheckInput | null): number {
   if (ageCheck?.outcome !== 'REFUSED') return priced.totalPence
   return priced.lines
@@ -277,13 +277,6 @@ export function useTillBasket(deps: TillBasketDeps) {
     }
   }
 
-  // A refusal drops the restricted lines: what the screen expects to be charged has to shrink to
-  // match, or the server's own cross-check would refuse a total nobody asked for (F-104, F-106).
-  function expectedAfter(ageCheck: InlineAgeCheckInput | null): number {
-    const bar = basket.value.length === 0 ? 0 : pencePayable(priced.value!, basket.value.map(isRestricted), ageCheck)
-    return bar + ticketsPence.value + walkUpsPence.value
-  }
-
   function resetBasket(): void {
     basket.value = []
     priced.value = null
@@ -322,7 +315,6 @@ export function useTillBasket(deps: TillBasketDeps) {
     refuseAgeCheck,
     lineAmount,
     saleBody,
-    expectedAfter,
     resetBasket,
     resetInvalidSelections,
     resetSelections,

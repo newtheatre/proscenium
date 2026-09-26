@@ -2,6 +2,7 @@ import { getCurrentInstance, onMounted, ref, shallowRef } from 'vue'
 import { showNightOf } from '#shared/utils/show-night'
 import { isHandheldUserAgent } from '#shared/utils/sumup'
 import { deviceNightCacheStore } from './useNightCache'
+import type { SumupAttemptKind } from '#shared/utils/sumup'
 
 // The till's side of a SumUp hand-off (F-124): what it remembers while the app has the screen,
 // so the basket comes back if the app says no and the answer is found if the tab was reloaded.
@@ -23,6 +24,8 @@ function fromTonight(at: unknown, now = Date.now()): boolean {
 
 export interface PendingAttempt<Basket> {
   id: string
+  // Absent reads as a hand-off (0096).
+  kind?: SumupAttemptKind
   totalPence: number
   startedAt: number
   basket: Basket

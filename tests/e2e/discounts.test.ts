@@ -4,6 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -93,7 +94,7 @@ async function aSellableProduct(): Promise<{ variantId: string }> {
 }
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, discountId: string | null, as = barManager.cookie): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines, expectedTotalPence, discountId }, as)
+  sellOnTheTill(app, { venueId, lines, expectedTotalPence, discountId }, as)
 
 interface LedgerLineRow { amount_pence: number, discount_id: string | null, discount_percent: number | null, discount_pence: number | null }
 
@@ -313,6 +314,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£4.00')`)
 
     await click(view, `[aria-label="Charge £4.00"]`)
+    await waitFor(view, `document.querySelector('[data-test="reader-took-it"]')`)
+    await click(view, '[data-test="reader-took-it"]')
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
     expect(await textOf(view, '[data-test="charge-confirmation"]')).toContain('£4.00')
     expect(await textOf(view, '[data-test="discount-applied-note"]')).toContain(name)

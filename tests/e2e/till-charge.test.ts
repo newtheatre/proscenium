@@ -1,15 +1,17 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, query, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
+import { race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
+import { answerCharge, sellOnTheTill, startTypedCharge } from '#tests/helpers/till'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// F-104 through the real route and screen: a sale is refused, quoting both figures, whenever it
-// disagrees with what the till would charge. What a match writes is F-105's own suite.
+// F-104 through the real route and screen: a sale disagreeing with the till's own total is refused,
+// quoting both figures. 0096: a card charge is an attempt, written once the reader has answered.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -93,7 +95,15 @@ async function aSellableProduct(over: Record<string, unknown> = {}): Promise<{ p
 }
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, as = barManager.cookie): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines, expectedTotalPence }, as)
+  sellOnTheTill(app, { venueId, lines, expectedTotalPence }, as)
+
+const attemptRow = (id: string) =>
+  query<{ kind: string | null, status: string, entry_id: string | null }>(app, 'SELECT kind, status, entry_id FROM sumup_attempts WHERE id = ?', id)
+
+async function tillSessionId(venueId: string): Promise<string> {
+  const opened = await openTill(venueId)
+  return (await opened.json() as { session: { id: string } }).session.id
+}
 
 function ledgerCounts(): { entries: number, lines: number } {
   const database = new Database(app.databaseFile, { readonly: true })
@@ -187,11 +197,189 @@ describe.skipIf(skip !== null)('who may submit a sale', () => {
 
     expect((await charge(venueId, [{ variantId, qty: 1 }], 250, member.cookie)).status).toBe(403)
     expect((await request(app, 'POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 })).status).toBe(401)
+    expect((await request(app, 'POST', '/api/till/payments', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250, kind: 'TYPED' })).status).toBe(401)
     expect((await charge(venueId, [{ variantId, qty: 1 }], 250)).status).toBe(200)
   })
 })
 
+describe.skipIf(skip !== null)('a typed charge records nothing until the reader has answered (0096)', () => {
+  test('the attempt holds the basket and writes nothing; Reader took it records the sale, once', async () => {
+    const { venueId } = programme('typed-took')
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId)
+
+    const before = ledgerCounts()
+    const started = await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 2 }], expectedTotalPence: 500 }, barManager.cookie)
+    expect(started.status).toBe(200)
+    const attempt = await started.json() as { id: string, totalPence: number, launchUrl?: string }
+    expect(attempt.totalPence).toBe(500)
+    // Nothing to open: the figure is keyed by hand.
+    expect(attempt.launchUrl).toBeUndefined()
+    expect(ledgerCounts()).toEqual(before)
+    expect(attemptRow(attempt.id)).toMatchObject({ kind: 'TYPED', status: 'STARTED', entry_id: null })
+
+    const took = await answerCharge(app, attempt.id, 'succeeded', barManager.cookie)
+    expect(took.status).toBe(200)
+    const answer = await took.json() as { status: string, receipt: { entryId: string, totalPence: number } }
+    expect(answer.status).toBe('SUCCEEDED')
+    expect(answer.receipt.totalPence).toBe(500)
+    expect(ledgerCounts().entries).toBe(before.entries + 1)
+    expect(attemptRow(attempt.id)).toMatchObject({ status: 'SUCCEEDED', entry_id: answer.receipt.entryId })
+
+    const again = await answerCharge(app, attempt.id, 'succeeded', barManager.cookie)
+    expect((await again.json() as { status: string }).status).toBe('SUCCEEDED')
+    expect(ledgerCounts().entries).toBe(before.entries + 1)
+  })
+
+  test('Card declined writes nothing, and a declined charge cannot then be recorded', async () => {
+    const { venueId } = programme('typed-declined')
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId)
+
+    const before = ledgerCounts()
+    const attempt = await (await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, barManager.cookie)).json() as { id: string }
+    const declined = await answerCharge(app, attempt.id, 'declined', barManager.cookie)
+    expect(declined.status).toBe(200)
+    expect((await declined.json() as { status: string }).status).toBe('FAILED')
+    expect(ledgerCounts()).toEqual(before)
+
+    const tookAfter = await answerCharge(app, attempt.id, 'succeeded', barManager.cookie)
+    expect((await tookAfter.json() as { status: string }).status).toBe('FAILED')
+    expect(ledgerCounts()).toEqual(before)
+    expect((await answerCharge(app, attempt.id, 'declined', barManager.cookie)).status).toBe(409)
+  })
+
+  // F-104 criterion 3 at the answer: the re-check runs against the database as it then stands.
+  test('a price moved between the attempt and the answer is a mismatch, and nothing is written', async () => {
+    const { venueId } = programme('typed-mismatch')
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId)
+
+    const before = ledgerCounts()
+    const attempt = await (await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, barManager.cookie)).json() as { id: string }
+    await priceVariant(variantId, 300)
+
+    const took = await (await answerCharge(app, attempt.id, 'succeeded', barManager.cookie)).json() as { status: string, error: string | null }
+    expect(took.status).toBe('MISMATCH')
+    expect(took.error).toContain('£2.50')
+    expect(took.error).toContain('£3.00')
+    expect(ledgerCounts()).toEqual(before)
+  })
+
+  test('the one-step sale route refuses a card basket with money in it, and writes nothing', async () => {
+    const { venueId } = programme('typed-one-step')
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId)
+
+    const before = ledgerCounts()
+    const refused = await send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, barManager.cookie)
+    expect(refused.status).toBe(409)
+    expect(await message(refused)).toContain('reader')
+    expect(ledgerCounts()).toEqual(before)
+  })
+
+  test('an unanswered typed charge holds the close until somebody answers it', async () => {
+    const { venueId } = programme('typed-close')
+    const { variantId } = await aSellableProduct()
+    const sessionId = await tillSessionId(venueId)
+
+    const attempt = await (await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, barManager.cookie)).json() as { id: string }
+    const held = await send('POST', '/api/till/close', { id: sessionId, actualZPence: 0 }, barManager.cookie)
+    expect(held.status).toBe(409)
+    expect(await message(held)).toContain('waiting for an answer')
+
+    await answerCharge(app, attempt.id, 'declined', barManager.cookie)
+    expect((await send('POST', '/api/till/close', { id: sessionId, actualZPence: 0 }, barManager.cookie)).status).toBe(200)
+  })
+
+  test('the SumUp app\'s answer never records a typed charge', async () => {
+    const { venueId } = programme('typed-no-callback')
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId)
+
+    const before = ledgerCounts()
+    const attempt = await (await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, barManager.cookie)).json() as { id: string }
+    const callback = await send('POST', `/api/till/payments/${attempt.id}/complete`, { smpStatus: 'success', smpTxCode: 'TX1' }, barManager.cookie)
+    expect(callback.status).toBe(409)
+    expect(ledgerCounts()).toEqual(before)
+    expect(attemptRow(attempt.id)?.status).toBe('STARTED')
+  })
+
+  // Two devices answering at once: the transitions are conditional writes (0001, 0003).
+  test('two Reader took it answers racing record the sale exactly once', async () => {
+    const { venueId } = programme('typed-race-took')
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId)
+
+    const before = ledgerCounts()
+    const attempt = await (await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, barManager.cookie)).json() as { id: string }
+    const answers = await race(4, () => answerCharge(app, attempt.id, 'succeeded', barManager.cookie))
+    expect(answers.map(answer => answer.status)).toEqual([200, 200, 200, 200])
+    const bodies = await Promise.all(answers.map(async answer => answer.json() as Promise<{ receipt: unknown }>))
+
+    expect(bodies.filter(body => body.receipt)).toHaveLength(1)
+    expect(ledgerCounts().entries).toBe(before.entries + 1)
+    expect(attemptRow(attempt.id)?.status).toBe('SUCCEEDED')
+  })
+
+  test('Reader took it racing Card declined lands one of them, and the ledger agrees with it', async () => {
+    const { venueId } = programme('typed-race-both')
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId)
+
+    const before = ledgerCounts()
+    const attempt = await (await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, barManager.cookie)).json() as { id: string }
+    const answers = await race(2, index => answerCharge(app, attempt.id, index === 0 ? 'succeeded' : 'declined', barManager.cookie))
+    const statuses = answers.map(answer => answer.status).sort()
+
+    const settled = attemptRow(attempt.id)?.status
+    expect(['SUCCEEDED', 'FAILED']).toContain(settled!)
+    // The loser of a recorded sale is refused its decline; a won decline leaves the late answer reading FAILED.
+    expect(statuses).toEqual(settled === 'SUCCEEDED' ? [200, 409] : [200, 200])
+    expect(ledgerCounts().entries).toBe(before.entries + (settled === 'SUCCEEDED' ? 1 : 0))
+  })
+})
+
 describe.skipIf(skip !== null)('the screen', () => {
+  // 0096: Charge shows the figure to key and records nothing; the answer at the reader decides.
+  test('Charge asks for the reader\'s answer; Card declined brings the basket back; Reader took it records it', async () => {
+    const { variantId } = await aSellableProduct({ name: named('Screen typed') })
+    const { venueId } = programme('charge-screen-typed')
+    await openTill(venueId)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
+    await click(view, `[data-test="variant-${variantId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£2.50')`)
+
+    const before = ledgerCounts()
+    await click(view, `[aria-label="Charge £2.50"]`)
+    await waitFor(view, `document.querySelector('[data-test="reader-charge"]')`)
+    expect(await textOf(view, '[data-test="reader-charge"]')).toContain('Key this into the reader')
+    expect(await textOf(view, '[data-test="charge-amount-figure"]')).toContain('£2.50')
+    expect(ledgerCounts()).toEqual(before)
+
+    await click(view, '[data-test="card-declined"]')
+    await waitFor(view, `document.querySelector('[data-test="charge-failure"]')`)
+    expect(await textOf(view, '[data-test="charge-failure"]')).toContain('declined')
+    expect(ledgerCounts()).toEqual(before)
+
+    await waitFor(view, `document.querySelector('[aria-label="Charge £2.50"]')`)
+    await click(view, `[aria-label="Charge £2.50"]`)
+    await waitFor(view, `document.querySelector('[data-test="reader-took-it"]')`)
+    await click(view, '[data-test="reader-took-it"]')
+    await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
+    expect(await textOf(view, '[data-test="charge-confirmation"]')).toContain('Taken on the reader')
+    expect(ledgerCounts().entries).toBe(before.entries + 1)
+    view.close()
+  }, 120_000)
+
   test('charging shows what to key into the reader, and starting the next sale clears the basket', async () => {
     const { variantId } = await aSellableProduct({ name: named('Screen charge') })
     const { venueId } = programme('charge-screen')
@@ -209,6 +397,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£2.50')`)
 
     await click(view, `[aria-label="Charge £2.50"]`)
+    await waitFor(view, `document.querySelector('[data-test="reader-took-it"]')`)
+    await click(view, '[data-test="reader-took-it"]')
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
     expect(await textOf(view, '[data-test="charge-confirmation"]')).toContain('£2.50')
 

@@ -11,7 +11,8 @@ export const ATTEMPT_COLUMNS = sql`
   a.expected_total_pence AS expectedTotalPence, a.status AS status, a.smp_status AS smpStatus,
   a.smp_tx_code AS smpTxCode, a.smp_message AS smpMessage, a.smp_failure_cause AS smpFailureCause,
   a.resolution AS resolution, a.resolved_by AS resolvedBy, a.resolved_at AS resolvedAt,
-  a.resolution_note AS resolutionNote, a.callback_at AS callbackAt, a.entry_id AS entryId, a.error AS error
+  a.resolution_note AS resolutionNote, a.callback_at AS callbackAt, a.entry_id AS entryId, a.error AS error,
+  coalesce(a.kind, 'SUMUP') AS kind
 `
 
 // How long a row has gone without a word, measured from the answer that began the recording

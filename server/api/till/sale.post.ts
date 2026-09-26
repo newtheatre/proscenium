@@ -1,11 +1,21 @@
 import { londonDayOf } from '#shared/utils/ledger'
-import { saleForm } from '#shared/utils/sale'
+import { needsTheReader, saleForm } from '#shared/utils/sale'
 
 // The submission boundary (F-104) and the atomic commit (F-105): drinks, a Challenge 25 outcome,
 // a discount, a tab, a booking's ticket money (F-122) and a walk-up (F-123) batch together.
 export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, saleForm)
   const resolved = await requireNightAuthority(event, 'BAR', { venueId: input.venueId, performanceId: input.performanceId })
+
+  // Money on the reader is recorded only once the reader has answered for it (0096): that is an
+  // attempt, and this one step is left to what involves no reader at all.
+  if (needsTheReader(input)) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'A card sale is recorded once the reader has taken it. Charge it from the till, then answer there.',
+    })
+  }
+
   const session = requireOpenSession(await openSessionFor(resolved.venueId, resolved.night))
 
   // A booking inside a SumUp hand-off still waiting for its answer cannot be charged again by

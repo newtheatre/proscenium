@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
 import { saysAttemptStatus } from '#shared/utils/sumup'
-import type { SumupAttemptView } from '#shared/utils/sumup'
+import type { ResolveOutcome, SumupAttemptView } from '#shared/utils/sumup'
 
 // F-124 criteria 5 and 6: the hand-off this screen started, waiting for an answer, and any other
-// hand-off tonight still open, so a laptop can answer for a phone that left one.
+// card charge tonight still open, typed ones too (0096), so a laptop can answer for a phone.
 
 defineProps<{
   pending: { id: string, totalPence: number } | null
@@ -17,8 +17,12 @@ defineProps<{
 
 const emit = defineEmits<{
   checkAgain: []
-  resolve: [id: string, outcome: 'succeeded' | 'abandoned', note: string | null]
+  resolve: [id: string, outcome: ResolveOutcome, note: string | null]
 }>()
+
+// A typed charge still waiting is answered as the reader answered it; anything else is asked
+// whether the payment went through (0096).
+const typedAndWaiting = (attempt: SumupAttemptView): boolean => attempt.kind === 'TYPED' && attempt.status === 'STARTED'
 
 const smpTxCodeTyped = defineModel<string>('smpTxCodeTyped', { required: true })
 const abandonNote = defineModel<string>('abandonNote', { required: true })
@@ -101,10 +105,10 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
     </p>
   </NightBlock>
 
-  <!-- Tonight's other hand-offs still waiting, so the laptop can answer for a phone (criterion 6). -->
+  <!-- Tonight's other charges still waiting, so the laptop can answer for a phone (criterion 6). -->
   <NightBlock
     v-if="openAttempts.length"
-    title="Unanswered SumUp payments"
+    title="Unanswered card charges"
     data-test="sumup-open-attempts"
   >
     <div
@@ -116,7 +120,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
       <p class="text-sm">
         <span class="font-semibold">{{ saysMoney(attempt.expectedTotalPence) }}</span>
         · {{ timeOf(attempt.createdAt) }}<span v-if="attempt.createdByName"> · {{ attempt.createdByName }}</span>
-        · {{ saysAttemptStatus(attempt.status) }}
+        · {{ saysAttemptStatus(attempt.status, attempt.kind) }}
       </p>
       <p
         v-if="attempt.error"
@@ -132,9 +136,22 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
           :data-test="`sumup-open-succeeded-${attempt.id}`"
           @click="emit('resolve', attempt.id, 'succeeded', null)"
         >
-          Payment went through
+          {{ attempt.kind === 'TYPED' ? 'Reader took it' : 'Payment went through' }}
         </UButton>
         <UButton
+          v-if="typedAndWaiting(attempt)"
+          size="sm"
+          color="neutral"
+          variant="subtle"
+          class="min-h-12"
+          :loading="resolving"
+          :data-test="`sumup-open-declined-${attempt.id}`"
+          @click="emit('resolve', attempt.id, 'declined', null)"
+        >
+          Card declined
+        </UButton>
+        <UButton
+          v-else
           size="sm"
           color="neutral"
           variant="subtle"

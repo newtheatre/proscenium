@@ -21,7 +21,7 @@ export function request(app: AppUnderTest, method: string, path: string, body?: 
   })
 }
 
-function query<T>(app: AppUnderTest, sql: string, ...parameters: unknown[]): T | undefined {
+export function query<T>(app: AppUnderTest, sql: string, ...parameters: unknown[]): T | undefined {
   const database = new Database(app.databaseFile, { readonly: true })
   try {
     return (database.query(sql).get(...parameters as never[]) as T | null) ?? undefined

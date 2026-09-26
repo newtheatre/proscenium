@@ -944,14 +944,18 @@ never blocks the request and never logs a value, only which keys are missing.
 
 On a phone, the till opens the SumUp app with the basket's total already keyed; on the counter
 laptop, and wherever the two secrets above are unset, the figure is keyed into the reader by hand
-as before (decision 0069). Nothing is charged online and no card data is touched: the app takes
-the payment on the SU's reader and returns to `/pay/return/<key>` with the outcome.
+(decision 0069). Nothing is charged online and no card data is touched: the app takes the payment
+on the SU's reader and returns to `/pay/return/<key>` with the outcome. Keying by hand is an
+attempt too (decision 0096): nothing is recorded until the person at the reader presses "Reader
+took it", and "Card declined" records nothing and brings the basket back. Everything below about
+an unanswered hand-off holds for an unanswered typed charge, which has no return and no key.
 
 **Switching it on.** Sign in to the SU's SumUp merchant dashboard at `me.sumup.com`, open
 Developers, and under Payment Switch generate an affiliate key against an application id of your
 choosing (`uk.org.newtheatre.unified` is the one to use; it must match `NUXT_SUMUP_APP_ID`
 exactly). Set both as worker secrets with `bunx wrangler secret put`, mirror them in the password
-manager, and redeploy. The till shows "Charge on SumUp" on a handheld from the next request. The
+manager, and redeploy. The till shows "Charge on SumUp" on a handheld from the next request, as
+its one charge button, with "Key in by hand" as a link under it. The
 SumUp app on each volunteer's phone must be signed in to the SU's account and paired with the
 reader, exactly as it is for a hand-keyed payment.
 

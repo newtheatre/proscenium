@@ -4,6 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellOnTheTill } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -84,7 +85,7 @@ const deliver = (itemId: string, qty: number): Promise<Response> =>
   send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty, unitCostPence: 100 })
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, as = barManager.cookie): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines, expectedTotalPence }, as)
+  sellOnTheTill(app, { venueId, lines, expectedTotalPence }, as)
 
 interface Counts { entries: number, lines: number, movements: number, audits: number }
 

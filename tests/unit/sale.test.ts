@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, saleForm } from '#shared/utils/sale'
+import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, needsTheReader, saleForm } from '#shared/utils/sale'
 
 const aLine = { variantId: 'var-1', qty: 1 }
 
@@ -49,6 +49,19 @@ describe('a sale submission carries what the screen believes the total is (F-104
     expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 2.5 }).success).toBe(false)
     expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: -1 }).success).toBe(false)
     expect(saleForm.safeParse({ lines: [{ variantId: 'var-1', qty: 1 }], expectedTotalPence: 0 }).success).toBe(true)
+  })
+})
+
+// Decision 0096: the reader answers before anything is written, so only what involves no reader
+// may still be written in one step.
+describe('what waits for the reader and what does not (0096)', () => {
+  test('a card basket with money in it waits for the reader', () => {
+    expect(needsTheReader({ tabHolderId: null, expectedTotalPence: 250 })).toBe(true)
+  })
+
+  test('a tab charge and a basket with nothing to take are written at once', () => {
+    expect(needsTheReader({ tabHolderId: 'user-1', expectedTotalPence: 250 })).toBe(false)
+    expect(needsTheReader({ tabHolderId: null, expectedTotalPence: 0 })).toBe(false)
   })
 })
 

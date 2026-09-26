@@ -21,6 +21,11 @@ export default defineEventHandler(async (event) => {
     resolution = 'CALLBACK'
   }
 
+  // A figure keyed by hand is answered by the person at the reader, on the till (0096).
+  if (row.kind === 'TYPED') {
+    throw createError({ statusCode: 409, statusMessage: 'That charge was keyed into the reader by hand, so it is answered on the till' })
+  }
+
   const outcome = await completeAttempt(row, input, {
     actorId,
     resolution,

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellOnTheTill } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -87,7 +88,7 @@ function openTill(venueId: string, performanceId: string): Promise<Response> {
 }
 
 const sell = (venueId: string, variantId: string, pricePence: number): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence })
+  sellOnTheTill(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence }, bar.cookie)
 
 interface Reconciliation {
   bar: { cardSalesPence: number, tabSettlementsPence: number, expectedPence: number }
