@@ -457,3 +457,47 @@ describe('the shared labels (item 8)', () => {
     expect(saysRole('BOX_OFFICE')).toBe('Box Office Manager')
   })
 })
+
+// A guest's name or a member's display name is text in the HTML part, never markup, in an email
+// the theatre sends from its own domain (issue 1391, 0011).
+const MARKUP = `<b>&"'`
+const ESCAPED = '&lt;b&gt;&amp;&quot;&#39;'
+
+// Every string at any depth carries the markup; a Date, a number or a flag is left as it is.
+function hostile(value: unknown): unknown {
+  if (typeof value === 'string') return `${value}${MARKUP}`
+  if (Array.isArray(value)) return value.map(hostile)
+  if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+    return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, hostile(inner)]))
+  }
+  return value
+}
+
+describe('every typed value is escaped in the HTML part, and only there (issue 1391)', () => {
+  const context = hostile(EVERYTHING) as TemplateContext
+
+  for (const name of TEMPLATE_NAMES) {
+    test(`${name}: the HTML part escapes every value; the subject and the text part keep it as typed`, () => {
+      const rendered = render(name, context)
+      expect(rendered.html).not.toContain(MARKUP)
+      expect(rendered.html).not.toContain('<b>')
+      expect(rendered.html).toContain(ESCAPED)
+      expect(rendered.html).not.toContain('&amp;lt;')
+      expect(rendered.text).toContain(MARKUP)
+      expect(rendered.subject).not.toContain('&lt;')
+    })
+  }
+
+  test('an announcement body is still paragraphs, escaped once', () => {
+    const rendered = render('admin-announcement', { ...EVERYTHING, body: 'One <b>\n\nTwo & three' })
+    expect(rendered.html).toContain('<p>One &lt;b&gt;</p>')
+    expect(rendered.html).toContain('<p>Two &amp; three</p>')
+    expect(rendered.text).toContain('One <b>\n\nTwo & three')
+  })
+
+  test('a link keeps its address, escaped for the attribute it sits in', () => {
+    const rendered = render('membership-expiring', { ...EVERYTHING, purchaseUrl: 'https://su.example.invalid/buy?a=1&b=2' })
+    expect(rendered.html).toContain('href="https://su.example.invalid/buy?a=1&amp;b=2"')
+    expect(rendered.text).toContain('https://su.example.invalid/buy?a=1&b=2')
+  })
+})
