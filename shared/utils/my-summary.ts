@@ -6,6 +6,8 @@ import type { Availability } from './programme'
 // not show, so an identifier never rides along because a query happened to carry it.
 export interface MySummary {
   onShiftTonight: boolean
+  // Whether the shift the tile shows is tonight's: on shift at a bar opening is not next week's show.
+  shiftIsTonight: boolean
   shift: { shiftId: string, role: string, showTitle: string, venueName: string, startsAt: number, status: string } | null
   membership: { state: 'current' | 'grace' | 'lapsed' | 'none', until: string | null, claim: 'open' | 'declined' | null }
   room: { bookingId: string, roomName: string, startsAt: number, endsAt: number, purpose: string | null, cancellable: boolean } | null

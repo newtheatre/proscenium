@@ -9,6 +9,7 @@ const { account } = useAccount()
 
 const EMPTY: MySummary = {
   onShiftTonight: false,
+  shiftIsTonight: false,
   shift: null,
   membership: { state: 'none', until: null, claim: null },
   room: null,

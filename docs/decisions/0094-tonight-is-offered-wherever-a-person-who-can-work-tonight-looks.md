@@ -51,8 +51,9 @@ place of Release, since the server refuses a release from then (E-107 criterion 
 - The account menu stops offering Tonight to somebody whose shift is hours away or over, and
   starts offering it to a bar-opening shift and to the three officers. The hub itself is unchanged:
   it still asks the guard which tiles to show (0098).
-- `onShiftTonight` costs two small reads per session request, the shift windows and the opening
-  windows, each bound to a fixed handful of parameters (0006).
+- `onShiftTonight` costs one small read per session request, tonight's confirmed shift and opening
+  windows in one statement bound to six parameters (0006); the grace is read from the
+  configuration the request has already loaded.
 - A shift stamped before shifts carried a window has none, and is on shift all night, as the guard
   already treats it (0078, E-131 criterion 4).
 - The copy-style glossary gains "On shift": confirmed and inside the window. "Claimed" means

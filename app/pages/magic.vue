@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { localPath } from '#shared/utils/local-path'
 import { landingAfterSignIn } from '#shared/utils/night-authority'
 
 const route = useRoute()
@@ -35,10 +36,7 @@ onMounted(async () => {
 })
 
 // Only a path on this site: an absolute URL here would make the link an open redirect.
-const nextPath = computed(() => {
-  const next = route.query.next
-  return typeof next === 'string' && /^\/(?!\/)/.test(next) ? next : '/'
-})
+const nextPath = computed(() => localPath(route.query.next) ?? '/')
 
 const askAgain = computed(() =>
   nextPath.value === '/' ? '/sign-in?method=link' : `/sign-in?method=link&next=${encodeURIComponent(nextPath.value)}`)

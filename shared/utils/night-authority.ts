@@ -1,4 +1,5 @@
 import { auditEntry } from './audit'
+import { localPath } from './local-path'
 import { saysRole } from './roles'
 import { insideWindow } from './rota-times'
 import type { AuditRow } from './audit'
@@ -71,8 +72,7 @@ export function worksTonight(viewer: { onShiftTonight: boolean, permissions: rea
 // An explicit `next` on this site always wins, the home page included; with none, somebody on
 // shift lands on Tonight. Anything but a local path is no `next`, or sign-in is an open redirect.
 export function landingAfterSignIn(next: unknown, onShiftTonight: boolean): string {
-  if (typeof next === 'string' && /^\/(?!\/)/.test(next)) return next
-  return onShiftTonight ? '/tonight' : '/'
+  return localPath(next) ?? (onShiftTonight ? '/tonight' : '/')
 }
 
 // Names both ways in, because a volunteer refused at 19:20 needs to know which one to go and get.

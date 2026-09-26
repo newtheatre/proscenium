@@ -1,4 +1,4 @@
-import { showNightBounds, showNightOf } from './show-night'
+import { showNightStartOf } from './show-night'
 import { saysClock } from './when'
 import type { NightRole } from './night-authority'
 
@@ -79,5 +79,5 @@ export function tonightToolFor(role: NightRole): { label: string, to: string } {
 // The server refuses a release once the shift's show night has begun (E-107 criterion 1), so a
 // screen stops offering one at the same instant: 04:00 on the day, never the curtain (0014).
 export function releaseStillOpen(startsAt: number, at: number): boolean {
-  return at < showNightBounds(showNightOf(new Date(startsAt * 1000))).from.getTime() / 1000
+  return at < showNightStartOf(startsAt)
 }

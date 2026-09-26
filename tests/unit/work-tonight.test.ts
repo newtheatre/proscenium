@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { dutyManagerToTell } from '#server/utils/tonight'
 import { can, canWorkTonight } from '#shared/utils/abilities'
+import { localPath } from '#shared/utils/local-path'
 import { landingAfterSignIn, onShiftAt, worksTonight } from '#shared/utils/night-authority'
 import { SHELL_NAV } from '#shared/utils/site-nav'
 import { releaseStillOpen, tonightToolFor } from '#shared/utils/tonight'
@@ -78,6 +79,25 @@ describe('sign-in lands on tonight in the window, and an explicit next always wi
     expect(landingAfterSignIn('https://evil.example/', false)).toBe('/')
     expect(landingAfterSignIn(['/rooms'], false)).toBe('/')
   })
+
+  // A browser reads a backslash as a slash and drops a tab, so both reach another origin (WHATWG URL).
+  test('a backslash or a tab that makes a path another origin is no next either', () => {
+    expect(landingAfterSignIn('/\\evil.example', false)).toBe('/')
+    expect(landingAfterSignIn('/\t/evil.example', true)).toBe('/tonight')
+  })
+})
+
+describe('one rule for a local path, wherever a next is read (0094)', () => {
+  test('a path on this site comes back as it was, query and fragment included', () => {
+    expect(localPath('/rooms/mine?tab=2#next')).toBe('/rooms/mine?tab=2#next')
+    expect(localPath('/')).toBe('/')
+  })
+
+  test('anything that would leave the site is nothing', () => {
+    for (const next of ['//evil.example/', '/\\evil.example', '/\t/evil.example', 'https://evil.example/', 'rooms', '', undefined, ['/rooms']]) {
+      expect(localPath(next)).toBeNull()
+    }
+  })
 })
 
 describe('Tonight is the account menu\'s first entry, for whoever can work tonight (0094)', () => {
@@ -137,6 +157,9 @@ describe('where a volunteer on shift looks (issue 1305)', () => {
     const tile = await read('app/components/my/tiles/NextShift.vue')
     expect(tile).toContain('saysShiftRole(')
     expect(tile).toContain('Claimed, waiting to be confirmed')
+    // The accent is on shift and this shift being tonight's, so a bar opening never lights next week's show.
+    expect(tile).toContain('props.summary.onShiftTonight && props.summary.shiftIsTonight')
+    expect(tile).toContain('saysShiftStatus(')
     expect(tile).not.toContain('summary.shift?.role }}')
   })
 
@@ -160,8 +183,24 @@ describe('where a volunteer on shift looks (issue 1305)', () => {
   })
 
   test('every sign-in way lands through the one rule', async () => {
-    for (const page of ['app/pages/sign-in.vue', 'app/pages/magic.vue']) {
+    for (const page of ['app/pages/sign-in.vue', 'app/pages/magic.vue', 'server/routes/auth/google.get.ts']) {
       expect(await read(page)).toContain('landingAfterSignIn(')
     }
+  })
+
+  test('every place a next is read uses the one local-path rule, never a regex of its own', async () => {
+    for (const file of ['app/pages/sign-in.vue', 'app/pages/magic.vue', 'app/middleware/signed-out.ts', 'server/routes/auth/google.get.ts', 'server/middleware/google-return.ts']) {
+      const source = await read(file)
+      expect(source).toContain('localPath(')
+      expect(source).not.toContain('(?!\\/)')
+    }
+  })
+
+  test('an explicit next of the home page still travels with the Google link', async () => {
+    expect(await read('app/pages/sign-in.vue')).toContain('explicitNext.value === null ? \'/auth/google\'')
+  })
+
+  test('a slot on a finished opening is not offered for release', async () => {
+    expect(await read('app/pages/rota/index.vue')).toContain('slot.endsAt >= nowSeconds')
   })
 })

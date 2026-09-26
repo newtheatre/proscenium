@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import * as z from 'zod'
+import { localPath } from '#shared/utils/local-path'
 import { landingAfterSignIn } from '#shared/utils/night-authority'
 import type { AuthFormField, ButtonProps, FormSubmitEvent } from '@nuxt/ui'
 
@@ -58,16 +59,14 @@ const addressField: AuthFormField[] = [
 ]
 
 // Only a path on this site: an absolute URL here would make the sign-in screen an open redirect.
-const nextPath = computed(() => {
-  const next = route.query.next
-  return typeof next === 'string' && /^\/(?!\/)/.test(next) ? next : '/'
-})
+const explicitNext = computed(() => localPath(route.query.next))
 
-// Google keeps the return path across its round trip, so the way back is one click either way.
+// Google keeps the return path across its round trip, so the way back is one click either way, and
+// an explicit next of the home page travels too, since an explicit next always wins (0094).
 const providers = computed<ButtonProps[]>(() => [{
   label: 'Sign in with Google',
   icon: 'i-simple-icons-google',
-  to: nextPath.value === '/' ? '/auth/google' : `/auth/google?next=${encodeURIComponent(nextPath.value)}`,
+  to: explicitNext.value === null ? '/auth/google' : `/auth/google?next=${encodeURIComponent(explicitNext.value)}`,
   external: true,
 }])
 

@@ -1,19 +1,26 @@
 <script setup lang="ts">
 import { isNightRole } from '#shared/utils/night-authority'
-import { saysShiftRole } from '#shared/utils/rota'
+import { saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import { saysWhen } from '#shared/utils/when'
+import type { ShiftStatus } from '#shared/utils/rota'
 import type { MySummary } from '#shared/utils/my-summary'
 
 const props = defineProps<{ summary: MySummary }>()
 
-const badgeColor = computed(() => (props.summary.shift?.status === 'CONFIRMED' ? 'success' : 'neutral'))
+const status = computed(() => props.summary.shift?.status)
+const badgeColor = computed(() => (status.value === 'CONFIRMED' ? 'success' : status.value === 'DECLINED' ? 'error' : 'neutral'))
 // A claim opens nothing until an officer confirms it, so it says so rather than reading as a shift (0094).
-const badgeLabel = computed(() => (props.summary.shift?.status === 'CONFIRMED' ? 'Confirmed' : 'Claimed, waiting to be confirmed'))
+const badgeLabel = computed(() => {
+  if (status.value === 'CLAIMED') return 'Claimed, waiting to be confirmed'
+  return status.value ? saysShiftStatus(status.value as ShiftStatus) : ''
+})
 // The rota's value is never shown: `DUTY_MANAGER` is a column, not something a member reads.
 const roleWords = computed(() => {
   const role = props.summary.shift?.role
   return role && isNightRole(role) ? saysShiftRole(role) : ''
 })
+// On shift, and this shift being tonight's: a bar opening tonight never lights next week's show.
+const onThisShift = computed(() => props.summary.onShiftTonight && props.summary.shiftIsTonight)
 </script>
 
 <template>
@@ -23,12 +30,12 @@ const roleWords = computed(() => {
     :label="summary.onShiftTonight ? 'Go to tonight' : 'See my rota'"
     :highlight="summary.onShiftTonight"
     :empty="!summary.shift"
-    empty-title="No shift claimed"
-    empty-label="See open shifts"
+    :empty-title="summary.onShiftTonight ? 'On shift at the bar tonight' : 'No shift claimed'"
+    :empty-label="summary.onShiftTonight ? 'Go to tonight' : 'See open shifts'"
     class="lg:col-span-2 sm:col-span-2"
   >
     <p
-      v-if="summary.onShiftTonight"
+      v-if="onThisShift"
       class="mb-2 text-sm font-medium text-primary"
     >
       On shift tonight

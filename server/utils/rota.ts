@@ -8,7 +8,7 @@ import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { onShiftAt } from '#shared/utils/night-authority'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
-import { currentShowNight, showNightBounds, showNightOf } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds, showNightOf, showNightStartOf } from '#shared/utils/show-night'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ListClause } from './list-filters'
 import type { AuditRow } from '#shared/utils/audit'
@@ -484,12 +484,6 @@ export interface MyShiftRow {
   windowEndsAt: number | null
 }
 
-// The start of the show night `now` falls in: a shift is that night's work until 04:00, not until
-// its curtain, so a member's own list keeps it all evening (0014, 0094).
-export function tonightStartOf(now: number): number {
-  return Math.floor(showNightBounds(showNightOf(new Date(now * 1000))).from.getTime() / 1000)
-}
-
 // A member's own shifts from tonight on, not cancelled. Bounded by LIMIT rather than paged: nobody
 // holds enough shifts at once to need a second page (E-103).
 export function myShiftsQuery(userId: string, now: number): SQL {
@@ -501,7 +495,7 @@ export function myShiftsQuery(userId: string, now: number): SQL {
     JOIN performances p ON p.id = s.performance_id
     JOIN venues v ON v.id = p.venue_id
     JOIN shows sh ON sh.id = p.show_id
-    WHERE s.user_id = ${userId} AND s.status <> 'CANCELLED' AND p.starts_at >= ${tonightStartOf(now)}
+    WHERE s.user_id = ${userId} AND s.status <> 'CANCELLED' AND p.starts_at >= ${showNightStartOf(now)}
     ORDER BY p.starts_at, s.role, s.slot
     LIMIT 100
   `

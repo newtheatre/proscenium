@@ -82,6 +82,31 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
     expect(summary.shift?.status).toBe('CLAIMED')
   })
 
+  // On shift at a bar opening tonight, with the next performance shift next week: the tile says
+  // which shift it shows, so it never calls next week's show tonight's (issue 1305).
+  test('on shift tonight with the shown shift on a later night: the shift is not tonight\'s', () => {
+    const tonight = new Date('2026-09-15T20:00:00Z')
+    const nextWeek = Math.floor(new Date('2026-09-22T19:30:00Z').getTime() / 1000)
+    const summary = assembleMySummary({
+      ...BASE,
+      now: tonight,
+      onShiftTonight: true,
+      shift: { shiftId: 's5', role: 'DOOR', status: 'CONFIRMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: nextWeek },
+    })
+    expect(summary.onShiftTonight).toBe(true)
+    expect(summary.shiftIsTonight).toBe(false)
+  })
+
+  test('a shift tonight says so, whatever the session fact', () => {
+    const tonight = new Date('2026-09-15T20:00:00Z')
+    const summary = assembleMySummary({
+      ...BASE,
+      now: tonight,
+      shift: { shiftId: 's6', role: 'DOOR', status: 'CLAIMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: Math.floor(tonight.getTime() / 1000) },
+    })
+    expect(summary.shiftIsTonight).toBe(true)
+  })
+
   test('a claimed shift on a future night is not tonight\'s accent', () => {
     const nextWeek = Math.floor(new Date('2026-09-22T20:00:00Z').getTime() / 1000)
     const summary = assembleMySummary({

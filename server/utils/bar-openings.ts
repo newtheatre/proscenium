@@ -3,9 +3,10 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { approveSlotStatement, claimSlotStatement, declineSlotStatement, ourVenue, tonightStartOf } from './rota'
+import { approveSlotStatement, claimSlotStatement, declineSlotStatement, ourVenue } from './rota'
 import { predicate, whereFrom } from './list-filters'
 import { barOpeningConstraintRefusal } from '#shared/utils/rota-openings'
+import { showNightStartOf } from '#shared/utils/show-night'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
 import type { ApprovalGate, ClaimScope } from './rota'
 import type { ListClause } from './list-filters'
@@ -314,7 +315,7 @@ export function myOpeningShiftsQuery(userId: string, now: number): SQL {
     JOIN bar_openings o ON o.id = s.opening_id
     JOIN venues v ON v.id = o.venue_id
     WHERE s.user_id = ${userId} AND s.status <> 'CANCELLED' AND o.status <> 'CANCELLED'
-      AND o.starts_at >= ${tonightStartOf(now)}
+      AND o.starts_at >= ${showNightStartOf(now)}
     ORDER BY o.starts_at, s.slot
     LIMIT 100
   `

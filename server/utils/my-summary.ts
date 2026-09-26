@@ -2,6 +2,7 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, desc, eq, gte } from 'drizzle-orm'
 import { refusalToCancel } from '#shared/utils/bookings'
 import { londonDay, membershipState } from '#shared/utils/membership'
+import { showNightOf } from '#shared/utils/show-night'
 import type { MembershipState } from '#shared/utils/membership'
 import type { MySummary } from '#shared/utils/my-summary'
 import type { Availability } from '#shared/utils/programme'
@@ -133,6 +134,7 @@ export function assembleMySummary(input: MySummaryInputs): MySummary {
 
   return {
     onShiftTonight: input.onShiftTonight,
+    shiftIsTonight: input.shift !== null && showNightOf(new Date(input.shift.startsAt * 1000)) === showNightOf(input.now),
     shift: input.shift === null
       ? null
       : {

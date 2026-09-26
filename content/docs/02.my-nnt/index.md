@@ -24,8 +24,10 @@ your account settings. The help icon at the top right of each screen opens its p
 ![My NNT on a phone, with the next shift tile (1), the membership tile (2) and the training tile (3)](/images/docs/members/my.png)
 
 1. **Next shift** shows the shift the member holds next, its role in words, and whether it is
-   **Confirmed** or **Claimed, waiting to be confirmed**, or a link to the open shifts. While the
-   member is on shift it says **On shift tonight** and links to Tonight.
+   **Confirmed**, **Declined** or **Claimed, waiting to be confirmed**, or a link to the open
+   shifts. While the member is on shift the tile links to Tonight, and says **On shift tonight**
+   when the shift it shows is tonight's; on shift at a bar opening with no performance shift, it
+   reads **On shift at the bar tonight**.
 2. **Membership** says whether the membership is current, in grace or lapsed.
 3. **Training** counts what the member holds and names what they could do next.
 

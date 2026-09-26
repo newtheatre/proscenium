@@ -1,4 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm'
+import { localPath } from '#shared/utils/local-path'
 import { landingAfterSignIn } from '#shared/utils/night-authority'
 import type { CandidateAccount } from '#shared/utils/google-sign-in'
 
@@ -7,11 +8,6 @@ function candidate(row: { id: string, googleSub: string | null, disabled: boolea
 }
 
 const RETURN_COOKIE = 'nnt-after-google'
-
-// Only a path on this site, so the return trip cannot be pointed at somebody else's.
-function onwards(value: string | undefined): string {
-  return value && /^\/(?!\/)/.test(value) ? value : '/'
-}
 
 // Sign in with a Workspace Google account.
 export default defineOAuthGoogleEventHandler({
@@ -75,7 +71,8 @@ export default defineOAuthGoogleEventHandler({
     if (!account) return sendRedirect(event, '/sign-in?refused=account')
 
     const asked = getCookie(event, RETURN_COOKIE)
-    const after = onwards(asked)
+    // Only a path on this site, so the return trip cannot be pointed at somebody else's.
+    const after = localPath(asked) ?? '/'
     deleteCookie(event, RETURN_COOKIE)
 
     // A reassertion, not a sign-in: it must land back on the same account already in session, or

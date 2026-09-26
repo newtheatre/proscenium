@@ -116,6 +116,9 @@ const claiming = ref<string | null>(null)
 const releasing = ref<string | null>(null)
 const dismissing = ref<string | null>(null)
 
+// A duty manager's own shift has nobody listed, so its card says to tell the Front of House Manager.
+const tellFor = (shift: MyShift): DutyManagerToTell | null => mine.value.dutyManagers[shift.performanceId] ?? null
+
 function releasable(shift: MyShift): boolean {
   return (shift.status === 'CLAIMED' || shift.status === 'CONFIRMED') && releaseStillOpen(shift.startsAt, nowSeconds)
 }
@@ -318,30 +321,28 @@ useSeoMeta({ title: 'Rota' })
               >
                 {{ tonightToolFor(shift.role).label }}
               </UButton>
-              <template v-if="!releasable(shift)">
-                <UButton
-                  v-if="mine.dutyManagers[shift.performanceId]?.phone"
-                  :to="telHref(mine.dutyManagers[shift.performanceId]!.phone!)"
-                  external
-                  size="lg"
-                  color="neutral"
-                  variant="subtle"
-                  icon="i-lucide-phone"
-                  class="min-h-12"
-                  data-test="tell-duty-manager"
-                >
-                  Tell {{ mine.dutyManagers[shift.performanceId]!.firstName }}
-                </UButton>
-                <p
-                  v-else
-                  class="text-sm text-muted"
-                  data-test="tell-duty-manager"
-                >
-                  {{ mine.dutyManagers[shift.performanceId]
-                    ? `Cannot make it? Tell ${mine.dutyManagers[shift.performanceId]!.firstName}, tonight's duty manager.`
-                    : 'Cannot make it? Tell the Front of House Manager.' }}
-                </p>
-              </template>
+              <UButton
+                v-if="tellFor(shift)?.phone"
+                :to="telHref(tellFor(shift)!.phone!)"
+                external
+                size="lg"
+                color="neutral"
+                variant="subtle"
+                icon="i-lucide-phone"
+                class="min-h-12"
+                data-test="tell-duty-manager"
+              >
+                Tell {{ tellFor(shift)!.firstName }}
+              </UButton>
+              <p
+                v-else
+                class="text-sm text-muted"
+                data-test="tell-duty-manager"
+              >
+                {{ tellFor(shift)
+                  ? `Cannot make it? Tell ${tellFor(shift)!.firstName}, tonight's duty manager.`
+                  : 'Cannot make it? Tell the Front of House Manager.' }}
+              </p>
             </div>
           </div>
           <UButton
@@ -402,7 +403,7 @@ useSeoMeta({ title: 'Rota' })
             </UButton>
           </div>
           <UButton
-            v-if="slot.status === 'CLAIMED' || slot.status === 'CONFIRMED'"
+            v-if="(slot.status === 'CLAIMED' || slot.status === 'CONFIRMED') && slot.endsAt >= nowSeconds"
             size="sm"
             color="neutral"
             variant="subtle"
