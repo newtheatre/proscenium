@@ -245,6 +245,7 @@ const {
   requestComp: body => $fetch<{ id: string, priced: PricedBasket }>('/api/till/comp-requests', { method: 'POST', body }),
   pollRequest: id => $fetch<{ request: CompRequest }>(`/api/till/comp-requests/${id}`),
   giveComp: (id, body) => $fetch<SaleReceipt>(`/api/till/comp-requests/${id}/sale`, { method: 'POST', body }),
+  refreshCatalogue: () => catalogue.refresh(),
 })
 
 // The frozen total once a request exists, the same figure the server holds; the live basket
@@ -262,7 +263,11 @@ function giveComp(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.value): 
     return
   }
   ageCheckStep.value = 'closed'
-  void giveCompRequest(ageCheck)
+  void giveCompRequest(ageCheck).then((asks) => {
+    if (!asks) return
+    chargeVia.value = 'comp'
+    ageCheckStep.value = 'choose'
+  })
 }
 
 // Reader, tab and SumUp all land in `charged`, a comp in its own receipt; the grid's stock labels
@@ -371,6 +376,8 @@ async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = passedAgeChe
 async function askedForAnAgeCheck(refused: unknown, via: 'reader' | 'sumup'): Promise<boolean> {
   if (!refusalData<{ ageCheckFor?: string[] }>(refused)?.ageCheckFor?.length) return false
   await catalogue.refresh()
+  // A read that failed leaves the line unmarked, and asking then would only refuse again.
+  if (!needsAgeCheck.value) return false
   chargeVia.value = via
   ageCheckStep.value = 'choose'
   return true

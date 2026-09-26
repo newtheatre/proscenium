@@ -770,30 +770,11 @@ export async function commitSale(
     entryId = posted.id
   }
 
-  let ageCheckResult: SaleReceipt['ageCheck'] = null
-  if (ageCheck && restricted.length > 0) {
-    const id = newId()
-    const restrictedNames = [...new Set(restricted.map(index => priced[index]!.productName))]
-    const write = recordAgeCheck(context.actorId, {
-      performanceId: performanceId,
-      outcome: ageCheck.outcome,
-      idType: ageCheck.idType,
-      reason: ageCheck.reason,
-      description: ageCheck.description,
-      product: restrictedNames.join(', '),
-      notes: ageCheck.notes,
-    }, id)
-    // Deliberately not conditional on the entry, unlike the sale's own writes above: the check is
-    // a conversation that happened, and it reaches the register whether a sale followed (F-106).
-    statements.push(db.run(write.statement))
-    statements.push(db.insert(schema.auditLog).values(auditEntry({
-      actorId: context.actorId,
-      action: 'age-check.logged',
-      target: `age-check:${id}`,
-      detail: { outcome: ageCheck.outcome },
-    })))
-    ageCheckResult = { id, outcome: ageCheck.outcome }
-  }
+  const check = ageCheck && restricted.length > 0 ? ageCheckStatements(ageCheck, restricted, priced, performanceId, context.actorId) : null
+  // Deliberately not conditional on the entry, unlike the sale's own writes above: the check is
+  // a conversation that happened, and it reaches the register whether a sale followed (F-106).
+  if (check) statements.push(...check.statements)
+  const ageCheckResult: SaleReceipt['ageCheck'] = check?.result ?? null
 
   try {
     await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
@@ -873,14 +854,14 @@ export async function commitSale(
   }
 }
 
-// A comp's Challenge 25 row and its audit, whether a sale follows it or not (F-106 criteria 3, 6).
+// A Challenge 25 row and its audit, whether a sale follows it or not (F-106 criteria 3, 6).
 function ageCheckStatements(
   ageCheck: InlineAgeCheckInput,
   restricted: number[],
   priced: PricedLine[],
   performanceId: string | null,
   actorId: string,
-): { statements: BatchItem<'sqlite'>[], result: NonNullable<SaleReceipt['ageCheck']> } {
+): { statements: [BatchItem<'sqlite'>, BatchItem<'sqlite'>], result: NonNullable<SaleReceipt['ageCheck']> } {
   const id = newId()
   const write = recordAgeCheck(actorId, {
     performanceId,
@@ -893,18 +874,6 @@ function ageCheckStatements(
   }, id)
   const audit = db.insert(schema.auditLog).values(auditEntry({ actorId, action: 'age-check.logged', target: `age-check:${id}`, detail: { outcome: ageCheck.outcome } }))
   return { statements: [db.run(write.statement), audit], result: { id, outcome: ageCheck.outcome } }
-}
-
-// The register row alone, its constraint's refusal said in words, as the sale's own batch says it.
-async function runAgeCheckBatch(statements: BatchItem<'sqlite'>[]): Promise<void> {
-  try {
-    await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
-  }
-  catch (error) {
-    const refusal = error instanceof Error ? ageCheckConstraintRefusal(error) : null
-    if (refusal) throw createError(refusal)
-    throw error
-  }
 }
 
 // Spends an already-approved comp request (F-110): the basket it names, never one resubmitted by
@@ -951,6 +920,7 @@ export async function commitCompSale(
     throw createError({
       statusCode: 409,
       statusMessage: `${names.join(' and ')} ${names.length === 1 ? 'needs' : 'need'} a Challenge 25 outcome before this can be given`,
+      data: { ageCheckFor: names },
     })
   }
 
@@ -970,7 +940,7 @@ export async function commitCompSale(
   // Nothing left to give, but a refusal still reaches the register, as the card path's does (F-106.3).
   if (soldResolved.length === 0) {
     const check = ageCheck && restricted.length > 0 ? ageCheckStatements(ageCheck, restricted, priced, performanceId, context.actorId) : null
-    if (check) await runAgeCheckBatch(check.statements)
+    if (check) await withAgeCheckConstraints(() => runLedgerBatch(check.statements))
     return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: check?.result ?? null, refusedLines: refusedPriced, tab: null, discount: null, comp: null, tickets: [], walkUps: [] }
   }
 
