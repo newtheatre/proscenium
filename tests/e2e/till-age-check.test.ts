@@ -318,6 +318,106 @@ describe.skipIf(skip !== null)('every restricted product is named when more than
 
 // One tap in, not one charge in (F-106 criterion 6, issue 1150 item 5). These wait for the
 // nightly browser run; they are not a CI gate.
+// Issue 1299, F-106 criterion 1, F-111 criterion 6: a line's Check ID follows what it pours. The
+// product's own switch adds it to one pouring nothing restricted, and never takes it away.
+describe.skipIf(skip !== null)('Check ID follows what a line pours, whatever the product is switched to (issue 1299)', () => {
+  async function anItem(ageRestricted: boolean): Promise<{ id: string, name: string }> {
+    const name = named(ageRestricted ? 'Rum' : 'Lemonade')
+    return { id: await created(await send('POST', '/api/admin/bar/items', { name, unit: 'ML', containerMl: 1000, ageRestricted })), name }
+  }
+
+  const deliver = async (item: { id: string }): Promise<void> => {
+    expect((await send('POST', '/api/admin/bar/movements', { itemId: item.id, kind: 'DELIVERY', qty: 5000, unitCostPence: 1 })).status).toBe(200)
+  }
+
+  // Switched off, so only what it pours can ask for Check ID.
+  async function anUnrestrictedProduct(): Promise<{ productId: string, variantId: string }> {
+    const productId = await aProductIn(await aCategory(), { name: named('Punch'), ageRestricted: false })
+    const variantId = await addVariant(productId)
+    expect((await priceVariant(variantId, 400)).status).toBe(200)
+    return { productId, variantId }
+  }
+
+  async function onTheTill(productId: string): Promise<string> {
+    expect((await activate(productId)).status).toBe(200)
+    const { venueId } = programme(`check-id-${crypto.randomUUID().slice(0, 6)}`)
+    await openTill(venueId)
+    return venueId
+  }
+
+  test('a recipe pouring a restricted item asks, though the product was never switched on', async () => {
+    const rum = await anItem(true)
+    await deliver(rum)
+    const { productId, variantId } = await anUnrestrictedProduct()
+    // The recipe editor has no Check ID guard of its own: the till derives it at the sale.
+    expect((await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId: rum.id, qty: 25 }] })).status).toBe(200)
+    const venueId = await onTheTill(productId)
+
+    const before = counts()
+    const refused = await charge(venueId, [{ variantId, qty: 1 }], 400, null)
+    expect(refused.status).toBe(409)
+    expect(await message(refused)).toContain('Challenge 25')
+    expect(counts()).toEqual(before)
+
+    const sold = await charge(venueId, [{ variantId, qty: 1 }], 400, { outcome: 'ACCEPTED', idType: 'PASSPORT', description: 'Checked at the bar' })
+    expect(sold.status).toBe(200)
+    expect(counts().ageChecks).toBe(before.ageChecks + 1)
+  })
+
+  test('a choice asks only when the option chosen is restricted', async () => {
+    const rum = await anItem(true)
+    const ice = await anItem(false)
+    await deliver(rum)
+    await deliver(ice)
+    const { productId, variantId } = await anUnrestrictedProduct()
+    const groupId = await created(await send('POST', '/api/admin/bar/choice-groups', { name: named('Extras'), options: [{ itemId: rum.id, qty: 25 }, { itemId: ice.id, qty: 10 }] }))
+    expect((await send('PUT', `/api/admin/bar/variants/${variantId}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true })).status).toBe(200)
+    const venueId = await onTheTill(productId)
+
+    const group = (await (await send('GET', '/api/admin/bar/choice-groups')).json() as { groups: { id: string, options: { id: string, itemId: string }[] }[] })
+      .groups.find(entry => entry.id === groupId)!
+    const optionFor = (item: { id: string }): string => group.options.find(option => option.itemId === item.id)!.id
+
+    expect((await charge(venueId, [{ variantId, qty: 1, choiceItemId: optionFor(ice) }], 400, null)).status).toBe(200)
+    const refused = await charge(venueId, [{ variantId, qty: 1, choiceItemId: optionFor(rum) }], 400, null)
+    expect(refused.status).toBe(409)
+    expect(await message(refused)).toContain('Challenge 25')
+  })
+
+  test('an item switched to restricted after set-up asks from the next sale on', async () => {
+    const punch = await anItem(false)
+    await deliver(punch)
+    const { productId, variantId } = await anUnrestrictedProduct()
+    expect((await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId: punch.id, qty: 25 }] })).status).toBe(200)
+    const venueId = await onTheTill(productId)
+    expect((await charge(venueId, [{ variantId, qty: 1 }], 400, null)).status).toBe(200)
+
+    expect((await send('PUT', `/api/admin/bar/items/${punch.id}`, { name: punch.name, unit: 'ML', containerMl: 1000, ageRestricted: true })).status).toBe(200)
+
+    const refused = await charge(venueId, [{ variantId, qty: 1 }], 400, null)
+    expect(refused.status).toBe(409)
+    expect(await message(refused)).toContain('Challenge 25')
+  })
+
+  test('the till marks the tile, the size and the option from what they pour', async () => {
+    const rum = await anItem(true)
+    const ice = await anItem(false)
+    const { productId, variantId } = await anUnrestrictedProduct()
+    const groupId = await created(await send('POST', '/api/admin/bar/choice-groups', { name: named('Extras'), options: [{ itemId: rum.id, qty: 25 }, { itemId: ice.id, qty: 10 }] }))
+    expect((await send('PUT', `/api/admin/bar/variants/${variantId}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true })).status).toBe(200)
+    const venueId = await onTheTill(productId)
+
+    const catalogue = await (await send('GET', `/api/till/products?venueId=${venueId}`, undefined, barManager.cookie)).json() as {
+      products: { id: string, ageRestricted: boolean, variants: { id: string, ageRestricted: boolean, choice: { options: { itemName: string, ageRestricted: boolean }[] } | null }[] }[]
+    }
+    const product = catalogue.products.find(entry => entry.id === productId)!
+    expect(product.ageRestricted).toBe(true)
+    const size = product.variants.find(entry => entry.id === variantId)!
+    expect(size.ageRestricted).toBe(false)
+    expect(size.choice?.options.filter(option => option.ageRestricted)).toHaveLength(1)
+  })
+})
+
 describe.skipIf(skip !== null)('the screen asks before the drink is poured', () => {
   async function atTheTill(venueId: string, waitFor_: string) {
     const view = await openSignedOutView(app.baseURL)

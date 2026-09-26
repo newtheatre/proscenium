@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, needsTheReader, saleForm } from '#shared/utils/sale'
+import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, saleForm } from '#shared/utils/sale'
+import type { SaleProduct } from '#shared/utils/sale'
 
 const aLine = { variantId: 'var-1', qty: 1 }
 
@@ -150,5 +151,53 @@ describe('tickets and walk-ups in the basket (F-122, F-123)', () => {
     expect(parsed.walkUpGuest).toBeNull()
     expect(saleForm.safeParse({ lines: [], walkUps: [walkUp], expectedTotalPence: 1800, walkUpGuest: { name: 'Sam', email: 'sam@example.invalid' } }).success).toBe(true)
     expect(saleForm.safeParse({ lines: [], walkUps: [walkUp], expectedTotalPence: 1800, walkUpGuest: { name: 'Sam', email: 'not an address' } }).success).toBe(false)
+  })
+})
+
+// Issue 1299, F-106 criterion 1, F-111 criterion 6: Check ID follows what a line pours, and the
+// product's own switch only adds it to one that pours nothing restricted ("restricted anyway").
+describe('Check ID follows what a line pours (issue 1299)', () => {
+  const restrictedItems = new Set(['item-gin', 'item-rum'])
+
+  test('a size pouring a restricted item asks, whatever its product is switched to', () => {
+    expect(checkIdFor(false, ['item-gin', 'item-tonic'], restrictedItems)).toBe(true)
+  })
+
+  test('a size pouring nothing restricted asks only when its product is restricted anyway', () => {
+    expect(checkIdFor(false, ['item-tonic'], restrictedItems)).toBe(false)
+    expect(checkIdFor(true, ['item-tonic'], restrictedItems)).toBe(true)
+    expect(checkIdFor(true, [], restrictedItems)).toBe(true)
+    expect(checkIdFor(false, [], restrictedItems)).toBe(false)
+  })
+
+  const cola: SaleProduct = {
+    id: 'p-cola',
+    name: 'Cola',
+    categoryId: 'cat-1',
+    ageRestricted: true,
+    allergenState: 'NONE',
+    allergenNote: null,
+    variants: [
+      { id: 'v-gin', servingKind: 'single', label: 'With gin', pricePence: 450, priceSource: 'variant', choice: null, stock: null, ageRestricted: true },
+      {
+        id: 'v-mixed', servingKind: 'single', label: 'Glass', pricePence: 250, priceSource: 'variant', stock: null, ageRestricted: false,
+        choice: { id: 'g-1', name: 'Mixer', options: [{ id: 'o-rum', itemName: 'Rum', ageRestricted: true }, { id: 'o-ice', itemName: 'Ice', ageRestricted: false }] },
+      },
+    ],
+  }
+
+  test('a line asks when its size or the option chosen pours restricted stock, and not otherwise', () => {
+    expect(lineNeedsCheckId([cola], { variantId: 'v-gin', choiceItemId: null })).toBe(true)
+    expect(lineNeedsCheckId([cola], { variantId: 'v-mixed', choiceItemId: 'o-rum' })).toBe(true)
+    expect(lineNeedsCheckId([cola], { variantId: 'v-mixed', choiceItemId: 'o-ice' })).toBe(false)
+  })
+
+  test('the tile\'s own mark is not the line\'s answer: a product marked for one size leaves the others alone', () => {
+    expect(cola.ageRestricted).toBe(true)
+    expect(lineNeedsCheckId([cola], { variantId: 'v-mixed', choiceItemId: 'o-ice' })).toBe(false)
+  })
+
+  test('a size the catalogue does not hold asks nothing, and the server decides', () => {
+    expect(lineNeedsCheckId([cola], { variantId: 'v-gone', choiceItemId: null })).toBe(false)
   })
 })
