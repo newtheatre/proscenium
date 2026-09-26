@@ -213,23 +213,33 @@ describe.skipIf(skip !== null)('a refund is money handed back in person, one tic
   }, CASE_TIMEOUT_MS)
 })
 
-describe.skipIf(skip !== null)('who may approve a refund (criterion 2)', () => {
-  test('an ordinary box office officer, holding neither money.refund nor a duty-manager shift, is refused', async () => {
+describe.skipIf(skip !== null)('who may approve a refund (criterion 2, 0102)', () => {
+  // A booking a week out: the night bypass never reached it, and the role's own permission does.
+  test('the Front of House Manager refunds a paid ticket for another night, recorded as the approver', async () => {
     const { reservationId, ticketId } = await collectedBooking(900)
 
-    const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
-    expect(refused.status).toBe(403)
+    const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
+    expect(refunded.status).toBe(200)
 
-    const ticket = query<{ refundedAt: number | null }>('SELECT refunded_at AS refundedAt FROM tickets WHERE id = ?', ticketId)
-    expect(ticket?.refundedAt).toBeNull()
+    const entry = query<{ actorId: string }>(
+      'SELECT e.actor_id AS actorId FROM ledger_entries e JOIN ledger_lines l ON l.entry_id = e.id WHERE l.ticket_id = ? AND l.kind = ?',
+      ticketId, 'REFUND',
+    )
+    expect(entry?.actorId).toBe(boxOffice.id)
+    const trail = query<{ actorId: string }>(
+      'SELECT actor_id AS actorId FROM audit_log WHERE action = ? AND target = ?', 'ticket.refunded', `reservation:${reservationId}`,
+    )
+    expect(trail?.actorId).toBe(boxOffice.id)
+
+    // The approval is a standing permission, not tonight's screens, so no bypass is recorded.
+    expect(query('SELECT id FROM audit_log WHERE action = ? AND actor_id = ?', 'night.officer-bypass', boxOffice.id)).toBeUndefined()
   }, CASE_TIMEOUT_MS)
 
-  test('tonight\'s confirmed duty manager approves without holding money.refund or any MFA', async () => {
+  // No shift gives the desk, so the duty manager's old branch answered nobody but an officer.
+  test('tonight\'s confirmed duty manager holding no role cannot refund', async () => {
     const database = new Database(app.databaseFile)
-    let seeded: { performanceId: string, night: string }
+    let seeded: { performanceId: string }
     try {
-      // Booking closes at curtain (no override set here), so curtain must sit ahead of whatever
-      // time this suite happens to run, not the fixture's usual fixed 19:30.
       const night = currentShowNight()
       const hoursIntoNight = (Date.now() - showNightBounds(night).from.getTime()) / 3_600_000
       const curtainHoursAfterNightStart = Math.min(23.9, hoursIntoNight + 0.1)
@@ -241,7 +251,6 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2)', () => {
 
     const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 }, officer.cookie)
     const ticketTypeId = (await type.json() as { id: string }).id
-
     const answered = await send('POST', '/api/reservations', {
       performanceId: seeded.performanceId,
       lines: [{ ticketTypeId, quantity: 1 }],
@@ -249,42 +258,18 @@ describe.skipIf(skip !== null)('who may approve a refund (criterion 2)', () => {
     }, '')
     const { reference } = await answered.json() as { reference: string }
     const reservationId = query<{ id: string }>('SELECT id FROM reservations WHERE reference = ?', reference)!.id
-
-    const collected = await send('POST', `/api/box-office/desk/reservations/${reservationId}/collect`, { expectedTotalPence: 900, tender: 'CARD' })
-    expect(collected.status).toBe(200)
+    expect((await send('POST', `/api/box-office/desk/reservations/${reservationId}/collect`, { expectedTotalPence: 900, tender: 'CARD' })).status).toBe(200)
     const ticketId = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', reservationId)!.id
 
-    // The desk screen itself needs ticketing.write to reach at all; the confirmed shift is
-    // what then carries the refund's own approval, not a second standing grant (D-116 criterion 2).
     const dutyManager = await registerMember(app, 'dutymanager', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'FOH_MANAGER' }, officer.cookie)
     confirmDutyManagerTonight(dutyManager.id, seeded.performanceId)
-
-    const refunded = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, dutyManager.cookie)
-    expect(refunded.status).toBe(200)
-  }, CASE_TIMEOUT_MS)
-
-  test('a duty-manager shift on a different performance does not reach this one', async () => {
-    const { reservationId, ticketId } = await collectedBooking(900)
-
-    const database = new Database(app.databaseFile)
-    let elsewhere: { performanceId: string }
-    try {
-      elsewhere = tonightsPerformance(sqliteTarget(database), { suffix: crypto.randomUUID().slice(0, 8) })
-    }
-    finally {
-      database.close()
-    }
-
-    const dutyManager = await registerMember(app, 'dutymanager', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'FOH_MANAGER' }, officer.cookie)
-    confirmDutyManagerTonight(dutyManager.id, elsewhere.performanceId)
 
     const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 }, dutyManager.cookie)
     expect(refused.status).toBe(403)
+    expect(query<{ refundedAt: number | null }>('SELECT refunded_at AS refundedAt FROM tickets WHERE id = ?', ticketId)?.refundedAt).toBeNull()
   }, CASE_TIMEOUT_MS)
 
-  test('REFUND_PAID_REQUIRES_MANAGER off lets an ordinary officer refund directly', async () => {
+  test('REFUND_PAID_REQUIRES_MANAGER off still lets the desk refund directly', async () => {
     const set = await send('PUT', '/api/admin/config/REFUND_PAID_REQUIRES_MANAGER', { value: false }, officer.cookie)
     expect(set.status).toBe(200)
     try {

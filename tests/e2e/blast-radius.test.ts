@@ -42,7 +42,8 @@ describe.skipIf(skip !== null)('the blast-radius preview (criterion 1)', () => {
     const answered = await send('GET', '/api/admin/config/REFUND_PAID_REQUIRES_MANAGER/blast-radius')
     expect(answered.status).toBe(200)
     const body = await answered.json() as { count: number, category: string }
-    expect(body.count).toBeGreaterThanOrEqual(1)
+    // The Front of House Manager approves refunds itself since 0102, so its grant is not counted.
+    expect(body.count).toBe(0)
     expect(body.category).toContain('box office officers')
   })
 

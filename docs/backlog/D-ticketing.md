@@ -445,16 +445,17 @@ Open questions:
 
 ## D-116: Refunds, in person, per ticket, race-safe
 
-- Role: Shift authority
+- Role: Box Office officer
 - Phase: MVP
-- Story: As the duty manager, I want refunds recorded per ticket with my approval so that revenue
-  and capacity stay true after money is handed back at the desk.
+- Story: As the Front of House Manager, I want refunds recorded per ticket with my approval so
+  that revenue and capacity stay true after money is handed back at the desk.
 - Depends on: D-114
 - Acceptance criteria:
   1. Refunds are in person by policy: money was taken on the reader, so it is handed back the
      same way; the system records the refund, it performs no card reversal.
-  2. Refunding requires manager approval (a money.refund permission held by manager and admin
-     roles, or tonight's confirmed duty manager); the approver is recorded on every refund row.
+  2. Refunding requires manager approval: the money.refund permission, held by the Front of
+     House Manager's role and the IT Manager's, on any day and for any performance. The refunder
+     is the approver recorded on every refund row. Tonight's duty manager plays no part (0102).
   3. Refunds are recorded per ticket, newest tickets of the requested type first, each writing a
      ledger entry (module I) at the moment the money is handed back.
   4. Concurrent refunds of the same ticket are detected atomically (row-claiming update); the

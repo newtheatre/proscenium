@@ -2,6 +2,8 @@
 
 - Status: Accepted (IT Manager, 23 September 2026)
 - Date: 2026-09-23
+- Amended: 26 September 2026 by 0102, under which `FOH_MANAGER` also holds `money.refund` and
+  approves a paid refund on any day, no longer through the night bypass
 
 ## Context
 

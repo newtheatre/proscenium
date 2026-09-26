@@ -138,11 +138,11 @@ describe('permissions come from live grants only', () => {
   })
 
   // The front of house officer administers the rota, checklist, emergency card, licensing export,
-  // cross-season report, the board's configuration (E-126) and the programme's (0090).
+  // cross-season report, the board's configuration (E-126), the programme's (0090) and refunds (0102).
   test('the front of house officer holds that standing administration and nothing else', () => {
     const held = [...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)]
       .filter(permission => !OPERATIONAL_PERMISSIONS.includes(permission)).sort()
-    expect(held).toEqual(['age-checks.export', 'board.read', 'board.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'reports.read', 'rota.read', 'rota.write', 'ticketing.export', 'ticketing.read', 'ticketing.write'])
+    expect(held).toEqual(['age-checks.export', 'board.read', 'board.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'money.refund', 'reports.read', 'rota.read', 'rota.write', 'ticketing.export', 'ticketing.read', 'ticketing.write'])
   })
 
   // Nothing outside the three named ones may be operational, whatever a role picks up later.
@@ -158,7 +158,14 @@ describe('permissions come from live grants only', () => {
       expect(`${permission}: ${held.has(permission)}`).toBe(`${permission}: true`)
     }
     expect(held.has('ticketing.manage')).toBe(false)
-    expect(held.has('money.refund')).toBe(false)
+  })
+
+  // The desk refunds a paid ticket on any day, approved by the role that holds the desk (0102).
+  test('the front of house officer holds money.refund, so every desk holder approves a refund', () => {
+    expect(permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now).has('money.refund')).toBe(true)
+    for (const [role, held] of Object.entries(PERMISSION_MAP)) {
+      if (held.includes('ticketing.write')) expect(`${role}: ${held.includes('money.refund')}`).toBe(`${role}: true`)
+    }
   })
 
   test('the box office is no longer a role of its own, so nothing can grant it (A-133 criterion 2)', () => {
