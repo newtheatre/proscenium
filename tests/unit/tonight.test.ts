@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { readTeamRow } from '#server/utils/tonight'
 import { activePerformanceId, contactRoster, saysPerformanceChoice, saysTeamHolder, telHref } from '#shared/utils/tonight'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
+import type { ContactSlot } from '#shared/utils/tonight'
 
 // The duty manager's tonight screen (E-112). What the database returns is proved against the
 // real migrations in `tests/integration/tonight.test.ts`; this is the pure read of one row.
@@ -129,7 +130,7 @@ describe('who is on tonight, for the contacts block (E-112 criterion 2)', () => 
 
   test('a claim is its own row, never folded into a gap or into the same person confirmed', () => {
     const claim = { role: 'DOOR' as const, filled: false, claimed: true, name: 'Little John', phone: null }
-    const listed = contactRoster([slot('DOOR', null, null), claim, slot('DOOR', 'Little John', null)])
+    const listed = contactRoster<ContactSlot>([slot('DOOR', null, null), claim, slot('DOOR', 'Little John', null)])
     expect(listed.map(one => [one.filled, one.claimed ?? false])).toEqual([[false, false], [false, true], [true, false]])
   })
 
