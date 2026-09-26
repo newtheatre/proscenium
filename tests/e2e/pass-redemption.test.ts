@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -201,5 +201,39 @@ describe.skipIf(skip !== null)('capacity still applies in full (criterion 3)', (
 
     const total = query<{ total: number }>('SELECT count(*) AS total FROM pass_admissions WHERE pass_id = ?', passId)
     expect(total?.total).toBe(0)
+  }, CASE_TIMEOUT_MS)
+})
+
+// Issue 1329: using a pass lands on the booking it made, which owes nothing, so it reads booked
+// rather than "Unpaid, £0.00"; and signing out takes the booking this device remembered with it.
+describe.skipIf(skip !== null)('using a pass lands on its booking, and signing out forgets it (issue 1329)', () => {
+  test('Use my pass opens the booking as booked, and after sign-out it no longer opens', async () => {
+    const { performanceId, passTypeId, priceId } = await coveredPerformance()
+    const password = generatePassword()
+    const holder = await registerMember(app, 'holder', password, { signIn: false })
+    expect((await send('POST', '/api/box-office/desk/passes', {
+      passTypeId, passTypePriceId: priceId, userId: holder.id, expectedTotalPence: 4500,
+    }, boxOffice.cookie)).status).toBe(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', holder.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+
+      await visit(view, `${app.baseURL}/book/${performanceId}`, '[data-test="redeem-pass"]')
+      await click(view, '[data-test="redeem-pass"]')
+      await waitFor(view, `document.querySelector('[data-test="booking-made"]')`)
+      expect(await view.evaluate<string>('location.pathname')).toBe('/qr')
+      expect(await textOf(view, '[data-test="booking-status"]')).toBe('Booked')
+
+      expect(await view.evaluate<number>(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)).toBe(200)
+      expect(await view.evaluate<number>(`fetch('/api/qr/current').then(response => response.status)`)).toBe(401)
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })

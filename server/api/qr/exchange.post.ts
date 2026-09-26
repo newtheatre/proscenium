@@ -3,6 +3,7 @@ import { saleRefusal } from '#shared/utils/programme'
 import {
   differentShowReason,
   holdExpiresAt,
+  otherBookingReason,
   reservationExchangeForm,
   sameNightReason,
 } from '#shared/utils/reservations'
@@ -14,6 +15,8 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, reservationExchangeForm)
 
   const reservation = await selfServiceReservation(reservationId)
+  const other = reservation && otherBookingReason(input.reference, reservation.reference)
+  if (other) throw createError({ statusCode: 409, statusMessage: other })
   if (!reservation || reservation.status !== 'PENDING') {
     throw createError({ statusCode: 409, statusMessage: 'This booking can no longer be exchanged here' })
   }
@@ -68,12 +71,7 @@ export default defineEventHandler(async (event) => {
 
   // The old token still verifies, but names a row that now reads Exchanged: this page's own
   // cookie has to move to the new booking, or the booker would be looking at the old one.
-  setCookie(event, QR_COOKIE_NAME, qrToken, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: QR_COOKIE_MAX_AGE_SECONDS,
-  })
+  rememberQrToken(event, qrToken)
 
   // The batch committed, so the exchange is real: send after, never before (0003). The new QR
   // is the e-ticket re-issue criterion 4 asks for; the old one now reads Exchanged when presented.

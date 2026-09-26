@@ -7,7 +7,7 @@ import type { H3Event } from 'h3'
 // The cookie a browser exchange leaves behind, so the token itself stops sitting in the
 // address bar and any referrer header after the first open (D-108 criterion 4).
 export const QR_COOKIE_NAME = 'nnt-qr-token'
-export const QR_COOKIE_MAX_AGE_SECONDS = 60 * 60
+const QR_COOKIE_MAX_AGE_SECONDS = 60 * 60
 
 let key: Promise<CryptoKey> | undefined
 
@@ -42,6 +42,22 @@ async function sign(reservationId: string): Promise<string> {
 
 export async function qrTokenFor(reservationId: string): Promise<string> {
   return encodeQrToken(reservationId, await sign(reservationId))
+}
+
+// The browser now holds this booking as if its link had been opened, so whatever just made or
+// moved it can go straight to the booking page (D-108 criterion 4, issue 1329).
+export function rememberQrToken(event: H3Event, token: string): void {
+  setCookie(event, QR_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: QR_COOKIE_MAX_AGE_SECONDS,
+  })
+}
+
+// The path has to match rememberQrToken's, or the browser keeps the cookie.
+export function forgetQrToken(event: H3Event): void {
+  deleteCookie(event, QR_COOKIE_NAME, { path: '/' })
 }
 
 // Constant-time-ish: length is checked first (both are fixed-length base64url, so a mismatch

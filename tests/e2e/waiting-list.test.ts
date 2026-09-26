@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
-import { click, fill, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -136,6 +136,36 @@ describe.skipIf(skip !== null)('a join is committed only alongside a link the jo
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, body, '')).status).toBe(200)
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, body, '')).status).toBe(409)
     expect(entriesFor(performanceId)).toHaveLength(1)
+  }, CASE_TIMEOUT_MS)
+})
+
+// Issue 1329: a claim lands on the booking page itself, as a fresh booking does, rather than a
+// panel whose link opened a server route inside the app and found nothing there.
+describe.skipIf(skip !== null)('a claimed offer opens the booking it made (criterion 2)', () => {
+  test('claiming lands on the booking page, headed booking made', async () => {
+    const { performanceId } = await bookableShow()
+    const email = `claimer-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
+      performanceId, partySize: 1, guest: { name: 'Ada Claimer', email },
+    }, '')).status).toBe(200)
+    expect(await (await send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`)).json()).toEqual({ offered: 1 })
+
+    const letter = (await letters(app)).find(text => text.includes(email) && text.includes('/waiting-list/entry/')) ?? ''
+    const entryUrl = letter.match(/https?:\/\/\S*\/waiting-list\/entry\/\S+/)?.[0]
+    expect(entryUrl).toBeDefined()
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, entryUrl!, '[data-test="waiting-list-offered"]')
+      await fillNumber(view, '[data-test^="quantity-"]', '1')
+      await click(view, '[data-test="waiting-list-claim-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="booking-made"]')`)
+      expect(await view.evaluate<string>('location.pathname')).toBe('/qr')
+      expect(await textOf(view, '[data-test="booking-found"]')).toContain('Reference')
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })
 

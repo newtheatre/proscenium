@@ -133,7 +133,10 @@ Open questions:
      carries a word and not only a colour; each night in the picker says its own availability in
      the same terms the show page uses; a signed-out visitor looking at a run that also prices a
      member ticket is offered the way in to see it; and the confirmation names the address the
-     booking has been emailed to (D-108 criterion 2).
+     booking has been emailed to (D-108 criterion 2). Amended 26 September 2026 (issue 1329): the
+     confirmation is the booking page itself, opened from its top and headed "Booking made", which
+     a claimed waiting-list offer and a redeemed pass land on too; each quantity stepper button is
+     at least 44px square; and a cancelled booking's page shows no QR code.
 - Source: Prompt Book D-2; audit PR-2; booking.png
 
 ## D-105: Capacity enforced by the database

@@ -1538,23 +1538,32 @@ The Nottingham New Theatre`,
     }
   },
 
+  // Issue 1329: it names both ways out, so it opens the booking page where each is done. There is
+  // deliberately no cancel link: cancelling is a confirmed step there, not a click in an email.
   'reservation-hold-expiring': (context: TemplateContext): Rendered => {
     const show = String(context.show)
     const when = String(context.when)
     const releasesAt = String(context.releasesAt)
     const reference = String(context.reference)
+    const url = String(context.url)
+    const imageUrl = String(context.imageUrl)
+    const qrWidth = String(context.qrWidth)
     return {
       subject: `Your hold on ${show} releases soon`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Your unpaid booking ${reference} for ${show}, ${when}, is held until ${releasesAt}.</p>
-<p>Pay at the box office before then to keep your seats, or cancel to free them for somebody
-else. After ${releasesAt} the seats go back on sale and may be sold to somebody else.</p>`),
+<p>Pay at the box office before then to keep your seats, or cancel from your booking to free them
+for somebody else. After ${releasesAt} the seats go back on sale and may be sold to somebody else.</p>
+<p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
+<p><a href="${url}">Open your booking</a></p>`),
       text: `Hello ${context.name},
 
 Your unpaid booking ${reference} for ${show}, ${when}, is held until ${releasesAt}.
 
-Pay at the box office before then to keep your seats, or cancel to free them for somebody else.
-After ${releasesAt} the seats go back on sale and may be sold to somebody else.
+Pay at the box office before then to keep your seats, or cancel from your booking to free them
+for somebody else. After ${releasesAt} the seats go back on sale and may be sold to somebody else.
+
+Open your booking: ${url}
 
 The Nottingham New Theatre`,
     }

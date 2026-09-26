@@ -2,10 +2,22 @@ import { notify } from './notify'
 import { qrPng } from './qr'
 import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
+import type { BookingLink } from './holds'
 import type { H3Event } from 'h3'
 
 // Kept apart from server/utils/reservations.ts, which `tests/` imports directly under Bun:
 // `useRuntimeConfig()` needs a real Nitro runtime, so nothing reachable from a unit test may call it.
+
+// The booking page and its QR as a hosted PNG, never an SVG, which Gmail will not render (D-108
+// criterion 2). The width is the bitmap's own, so the email never scales and blurs the code.
+function bookingLink(event: H3Event | undefined, qrToken: string): BookingLink {
+  const url = `${useRuntimeConfig(event).public.baseURL}/qr/${qrToken}`
+  return { url, imageUrl: `${url}/image.png`, qrWidth: qrPng(url).width }
+}
+
+export async function bookingLinkFor(event: H3Event | undefined, reservationId: string): Promise<BookingLink> {
+  return bookingLink(event, await qrTokenFor(reservationId))
+}
 
 export interface ConfirmationContext {
   userId: string
@@ -19,9 +31,6 @@ export interface ConfirmationContext {
 // Shared by the reservation write and the resend route, so a resend renders from the same
 // template with the same QR rather than a second, driftable copy (D-108 criteria 1, 2).
 export async function sendReservationConfirmation(event: H3Event | undefined, context: ConfirmationContext): Promise<void> {
-  const url = `${useRuntimeConfig(event).public.baseURL}/qr/${context.qrToken}`
-  // The width is the bitmap's own, so the email never scales the code and blurs the modules.
-  const { width } = qrPng(url)
   await notify(event, {
     userId: context.userId,
     type: 'reservation.confirmed',
@@ -31,9 +40,7 @@ export async function sendReservationConfirmation(event: H3Event | undefined, co
       show: context.showTitle,
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       totalDue: saysPrice(context.totalPence),
-      url,
-      imageUrl: `${url}/image.png`,
-      qrWidth: width,
+      ...bookingLink(event, context.qrToken),
     },
   })
 }
@@ -50,8 +57,6 @@ export interface WalkUpPaidContext {
 // A walk-up sold at the bar to somebody who gave an address (F-123 criterion 2): the door reads
 // the same QR whether it arrived this way or was photographed off the till.
 export async function sendWalkUpPaid(event: H3Event | undefined, context: WalkUpPaidContext): Promise<void> {
-  const url = `${useRuntimeConfig(event).public.baseURL}/qr/${context.qrToken}`
-  const { width } = qrPng(url)
   await notify(event, {
     userId: context.userId,
     type: 'reservation.walk-up-paid',
@@ -61,9 +66,7 @@ export async function sendWalkUpPaid(event: H3Event | undefined, context: WalkUp
       show: context.showTitle,
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       paid: saysPrice(context.paidPence),
-      url,
-      imageUrl: `${url}/image.png`,
-      qrWidth: width,
+      ...bookingLink(event, context.qrToken),
     },
   })
 }

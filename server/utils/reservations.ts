@@ -275,6 +275,7 @@ export interface ReservationCurrentState {
   showTitle: string
   startsAt: number
   totalPence: number
+  holdExpiresAt: number | null
   exchangedToShowTitle: string | null
   exchangedToStartsAt: number | null
 }
@@ -286,6 +287,7 @@ export function reservationCurrentStateQuery(id: string): SQL {
     SELECT r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
            s.title AS showTitle, p.starts_at AS startsAt,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
+           r.hold_expires_at AS holdExpiresAt,
            xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
@@ -340,6 +342,7 @@ export async function reservationForDoor(reference: string): Promise<DoorReserva
 
 export interface SelfServiceReservation {
   id: string
+  reference: string
   status: string
   userId: string | null
   performanceId: string
@@ -352,7 +355,7 @@ export interface SelfServiceReservation {
 // reservation's own state plus enough of its performance to re-run capacity and sale checks.
 export function selfServiceReservationQuery(id: string): SQL {
   return sql`
-    SELECT r.id AS id, r.status AS status, r.user_id AS userId, r.performance_id AS performanceId,
+    SELECT r.id AS id, r.reference AS reference, r.status AS status, r.user_id AS userId, r.performance_id AS performanceId,
            p.show_id AS showId, s.slug AS showSlug, p.starts_at AS startsAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id

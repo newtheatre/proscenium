@@ -62,7 +62,7 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Member | Membership, for the person | The person. "A member books", never "a membership books". |
 | Ticket | Reservation, booking, hold | A `reservations` row with `sold: true` (D-104): paid, or to be paid at the box office. |
 | Reservation | (no reader-facing use) | The table and the API's word (`POST /api/reservations`). A reader never sees it. |
-| Booking | Reservation, facing the reader | The reader's word for a reservation, sold or not: `book/[performanceId].vue` says "View your booking". |
+| Booking | Reservation, facing the reader | The reader's word for a reservation, sold or not: the hold reminder says "Open your booking". |
 | Hold | Reservation, booking | The state before release or payment, in the booking policy's words: "An unpaid booking is released N minutes before curtain, and the seats go back on sale" (`book/[performanceId].vue`), `hold_expires_at`. |
 | Room | Venue, space, in body copy | A bookable part of the estate, with opening hours, a policy, a blackout calendar. |
 | Venue | Room | Where a performance happens: its own row, an address, an emergency card; may point at a room (0043). |

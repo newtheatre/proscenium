@@ -19,6 +19,9 @@ export default defineEventHandler(async (event) => {
 
   const outcome = await eraseAccount(account.id, account.id)
   await clearUserSession(event)
+  // A booking or a pass remembered on this device goes with the account (issue 1329).
+  forgetQrToken(event)
+  forgetPassQrToken(event)
 
   return { ok: true, ...outcome }
 })
