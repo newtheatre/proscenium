@@ -8,12 +8,14 @@ import {
   performanceClosesAt,
   performanceForm,
   performanceScreenForm,
+  preselectedVenueId,
   publicPerformance,
   publicShow,
   resolveBookingClosesHours,
   saleRefusal,
   saysBookingWindow,
   saysClosingTime,
+  saysVenueOption,
   showForm,
   toSlug,
   venueFilters,
@@ -376,5 +378,34 @@ describe('the venue filter is keyed on a slug and labelled with the name (J-111)
     expect(venueForFilter('djanogly-theatre', names)).toBe('Djanogly Theatre')
     expect(venueForFilter('all', names)).toBeNull()
     expect(venueForFilter('a-venue-nobody-holds', names)).toBeNull()
+  })
+})
+
+// A new performance lands where the run is playing, and never silently at a venue with no rota of
+// ours: the first venue by name was an external one, so nothing was stamped (issue 1319, E-102).
+describe('the venue a new performance starts at (issue 1319)', () => {
+  const venue = (id: string, over: { isExternal?: boolean, archived?: boolean } = {}) => ({
+    id, name: id, capacity: 100, isExternal: over.isExternal ?? false, archived: over.archived ?? false,
+  })
+  const venues = [venue('arts-centre', { isExternal: true }), venue('studio'), venue('theatre')]
+
+  test('the show\'s last venue, where it can still be booked', () => {
+    expect(preselectedVenueId(venues, 'theatre')).toBe('theatre')
+    expect(preselectedVenueId(venues, 'arts-centre')).toBe('arts-centre')
+  })
+
+  test('otherwise the first venue we run, never an external one first', () => {
+    expect(preselectedVenueId(venues, null)).toBe('studio')
+    expect(preselectedVenueId([venue('arts-centre', { isExternal: true }), venue('studio'), venue('theatre', { archived: true })], 'theatre')).toBe('studio')
+  })
+
+  test('an external venue only when nothing else can be booked, and nothing when nothing can', () => {
+    expect(preselectedVenueId([venue('arts-centre', { isExternal: true })], null)).toBe('arts-centre')
+    expect(preselectedVenueId([venue('studio', { archived: true })], null)).toBe('')
+  })
+
+  test('an external venue says in the picker that it has no rota', () => {
+    expect(saysVenueOption({ name: 'Arts Centre', isExternal: true })).toBe('Arts Centre (external: no rota)')
+    expect(saysVenueOption({ name: 'The Studio', isExternal: false })).toBe('The Studio')
   })
 })

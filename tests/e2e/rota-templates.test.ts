@@ -5,6 +5,8 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { adminSession, forgetSpentStep, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride } from '#tests/helpers/config'
 import { tonightsPerformance } from '#tests/helpers/programme'
+import { daysAfter } from '#shared/utils/membership'
+import { currentShowNight } from '#shared/utils/show-night'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -71,6 +73,20 @@ function programme(suffix: string): { venueId: string, showId: string, performan
   try {
     const made = tonightsPerformance(sqliteTarget(database), { suffix })
     return { venueId: made.venueId, showId: made.showId, performanceId: made.performanceId }
+  }
+  finally {
+    database.close()
+  }
+}
+
+// A second night at a venue already in use, holding one hand-added shift and no more.
+function partlyStaffedAt(venueId: string, suffix: string): string {
+  const database = new Database(app.databaseFile)
+  try {
+    const made = tonightsPerformance(sqliteTarget(database), { suffix, venueId, night: daysAfter(currentShowNight(), 2) })
+    database.query('INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)')
+      .run(crypto.randomUUID().replaceAll('-', ''), made.performanceId, 'DUTY_MANAGER', 1, 'OPEN')
+    return made.performanceId
   }
   finally {
     database.close()
@@ -251,16 +267,48 @@ describe.skipIf(skip !== null)('a performance is stamped from its venue\'s templ
     expect(stamped.every(shift => shift.status === 'OPEN' && shift.user_id === null)).toBe(true)
   })
 
-  test('the backfill reaches a performance that was there before the template, and repeats safely', async () => {
-    const first = await (await send('POST', `/api/admin/rota/templates/${house.venueId}/stamp`, {}, foh.cookie)).json() as { stamped: number }
-    expect(first.stamped).toBeGreaterThan(0)
+  // The house was in the diary before its template, and saving the template stamped it (issue 1319).
+  test('saving a template stamped the performance already there, so the backfill finds nothing to add', async () => {
     expect(shiftsOn(house.performanceId)).toHaveLength(4)
-
     const again = await (await send('POST', `/api/admin/rota/templates/${house.venueId}/stamp`, {}, foh.cookie)).json() as { stamped: number }
     expect(again.stamped).toBe(0)
     expect(shiftsOn(house.performanceId)).toHaveLength(4)
+  })
+
+  test('the backfill fills a performance holding some of its slots, and repeats safely', async () => {
+    const partial = partlyStaffedAt(house.venueId, 'partial')
+
+    const first = await (await send('POST', `/api/admin/rota/templates/${house.venueId}/stamp`, {}, foh.cookie)).json() as { stamped: number }
+    expect(first.stamped).toBe(3)
+    expect(shiftsOn(partial)).toHaveLength(4)
+
+    const again = await (await send('POST', `/api/admin/rota/templates/${house.venueId}/stamp`, {}, foh.cookie)).json() as { stamped: number }
+    expect(again.stamped).toBe(0)
+    expect(shiftsOn(partial)).toHaveLength(4)
 
     expect(trail('shift.stamped', `venue:${house.venueId}`)?.detail).toMatchObject({ venueId: house.venueId })
+  })
+
+  // The imported diary sat unstamped until somebody found "Stamp the diary" (issue 1319).
+  test('saving a venue\'s first template stamps its never-stamped performances in the same save', async () => {
+    const fresh = programme('first-save')
+    expect(shiftsOn(fresh.performanceId)).toHaveLength(0)
+
+    const saved = await send('PUT', `/api/admin/rota/templates/${fresh.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
+    expect(saved.status).toBe(200)
+    expect((await saved.json() as { stamped: number }).stamped).toBe(4)
+    expect(shiftsOn(fresh.performanceId).map(shift => `${shift.role}:${shift.slot}:${shift.status}`).sort())
+      .toEqual(['BAR:1:OPEN', 'DOOR:1:OPEN', 'DOOR:2:OPEN', 'DUTY_MANAGER:1:OPEN'])
+  })
+
+  test('saving a template again stamps nothing onto a rota it already stamped (E-101 criterion 3)', async () => {
+    const fresh = programme('second-save')
+    await send('PUT', `/api/admin/rota/templates/${fresh.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
+    const widened = await send('PUT', `/api/admin/rota/templates/${fresh.venueId}`, {
+      slots: [{ role: 'DUTY_MANAGER', count: 1 }, { role: 'DOOR', count: 3 }, { role: 'BAR', count: 1 }],
+    }, foh.cookie)
+    expect((await widened.json() as { stamped: number }).stamped).toBe(0)
+    expect(shiftsOn(fresh.performanceId)).toHaveLength(4)
   })
 
   test('cancelling a performance cancels its rota (criterion 4)', async () => {
@@ -376,8 +424,53 @@ describe.skipIf(skip !== null)('a performance is stamped from its venue\'s templ
   })
 })
 
+// "0/0 confirmed, Fully staffed" was a night nobody was rostered for (issue 1319).
+describe.skipIf(skip !== null)('the board says when nobody is rostered (issue 1319)', () => {
+  interface Card { kind: string, performanceId?: string, venueId?: string, isExternal?: boolean, hasTemplate?: boolean, shifts: unknown[] }
+
+  test('a card carries its venue, whether we run it and whether a template can fill it', async () => {
+    const ours = programme('board-ours')
+    const theirs = programme('board-theirs')
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('UPDATE venues SET is_external = 1 WHERE id = ?').run(theirs.venueId)
+    }
+    finally {
+      database.close()
+    }
+
+    const board = await (await send('GET', '/api/admin/rota/shifts/board', undefined, foh.cookie)).json() as { items: Card[] }
+    const card = (id: string): Card | undefined => board.items.find(item => item.performanceId === id)
+    expect(card(ours.performanceId)).toMatchObject({ venueId: ours.venueId, isExternal: false, hasTemplate: false, shifts: [] })
+    expect(card(theirs.performanceId)).toMatchObject({ venueId: theirs.venueId, isExternal: true, hasTemplate: false, shifts: [] })
+  })
+
+  test('the card says nobody is rostered at our venue and not rostered at an external one', async () => {
+    const ours = programme('words-ours')
+    const theirs = programme('words-theirs')
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('UPDATE venues SET is_external = 1 WHERE id = ?').run(theirs.venueId)
+    }
+    finally {
+      database.close()
+    }
+
+    const view = await visitAsFoh('/rota/manage/shifts')
+    try {
+      await waitFor(view, `!!document.querySelector('[data-test="performance-${ours.performanceId}"]')`)
+      expect(await textOf(view, `[data-test="performance-${ours.performanceId}"]`)).toContain('No shifts: nobody is rostered')
+      expect(await textOf(view, `[data-test="performance-${theirs.performanceId}"]`)).toContain('Not rostered')
+      expect(await textOf(view, `[data-test="performance-${theirs.performanceId}"]`)).not.toContain('Fully staffed')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+})
+
 describe.skipIf(skip !== null)('the screen the officer works from', () => {
-  test('the front of house officer reaches it, sets a template up and stamps the diary', async () => {
+  test('the front of house officer reaches it, and saving a template stamps the diary (issue 1319)', async () => {
     const fresh = programme('screen')
     const view = await visitAsFoh('/rota/manage/templates')
     try {
@@ -387,12 +480,12 @@ describe.skipIf(skip !== null)('the screen the officer works from', () => {
       await click(view, `[data-test="edit-template-${fresh.venueId}"]`)
       await waitFor(view, '!!document.querySelector(\'[data-test="template-submit"]\')')
       await click(view, '[data-test="template-submit"]')
+      await waitFor(view, 'document.body.innerText.includes(\'stamped onto the performances that had none\')')
+      expect(shiftsOn(fresh.performanceId).length).toBeGreaterThan(0)
 
       await waitFor(view, `!!document.querySelector('[data-test="stamp-${fresh.venueId}"]')`)
       await click(view, `[data-test="stamp-${fresh.venueId}"]`)
-      await waitFor(view, 'document.body.innerText.includes(\'now carry every slot\')')
-
-      expect(shiftsOn(fresh.performanceId).length).toBeGreaterThan(0)
+      await waitFor(view, 'document.body.innerText.includes(\'already has its slots\')')
     }
     finally {
       view.close()
