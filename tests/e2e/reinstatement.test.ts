@@ -159,7 +159,7 @@ describe.skipIf(skip !== null)('reinstating an expired or customer-cancelled hol
     const { performanceId, ticketTypeId } = await bookableShow()
     const booked = await bookedReservation(performanceId, ticketTypeId)
     const cookie = await qrCookie(booked.qrToken)
-    expect((await send('POST', '/api/qr/cancel', {}, cookie)).status).toBe(200)
+    expect((await send('POST', '/api/qr/cancel', { reference: booked.reference }, cookie)).status).toBe(200)
     expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', booked.id)?.status).toBe('CANCELLED')
 
     const reinstated = await send('POST', `/api/box-office/desk/reservations/${booked.id}/reinstate`, { reason: 'Changed their mind again' })

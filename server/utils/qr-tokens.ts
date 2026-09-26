@@ -1,4 +1,7 @@
+import { selfServiceReservation } from './reservations'
 import { decodeQrToken, encodeQrToken } from '#shared/utils/qr-tokens'
+import { otherBookingReason } from '#shared/utils/reservations'
+import type { SelfServiceReservation } from './reservations'
 import type { H3Event } from 'h3'
 
 // Stateless by design: a resend recomputes the identical signature from the reservation id
@@ -88,4 +91,13 @@ export async function requireQrReservationId(event: H3Event): Promise<string> {
   if (!reservationId) throw createError({ statusCode: 401, statusMessage: 'That link has expired. Open it again from your email' })
 
   return reservationId
+}
+
+// The cookie's booking, only when it is the one the page is showing: booking in another tab moves
+// the cookie, so a page naming another booking, or none, is refused (issue 1329).
+export async function shownSelfServiceReservation(reservationId: string, showing: string | undefined): Promise<SelfServiceReservation | undefined> {
+  const reservation = await selfServiceReservation(reservationId)
+  const other = reservation && otherBookingReason(showing, reservation.reference)
+  if (other) throw createError({ statusCode: 409, statusMessage: other })
+  return reservation
 }

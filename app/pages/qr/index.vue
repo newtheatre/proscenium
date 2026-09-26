@@ -100,7 +100,7 @@ async function startEdit(): Promise<void> {
   editFailure.value = null
   editLoading.value = true
   try {
-    const options = await $fetch<{ ticketTypes: BookableType[], lines: NamedLine[], cap: number }>('/api/qr/edit-options')
+    const options = await $fetch<{ ticketTypes: BookableType[], lines: NamedLine[], cap: number }>('/api/qr/edit-options', { query: { reference: booking.value?.reference } })
     bookableTypes.value = options.ticketTypes
     editCap.value = options.cap
     const seeded: Record<string, number> = {}
@@ -172,7 +172,7 @@ async function startExchange(): Promise<void> {
   exchangeFailure.value = null
   exchangeLoading.value = true
   try {
-    const options = await $fetch<{ performances: ExchangeOption[] }>('/api/qr/exchange-options')
+    const options = await $fetch<{ performances: ExchangeOption[] }>('/api/qr/exchange-options', { query: { reference: booking.value?.reference } })
     exchangeOptions.value = options.performances
     exchangeChoice.value = undefined
     exchanging.value = true

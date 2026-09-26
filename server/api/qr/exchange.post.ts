@@ -3,7 +3,6 @@ import { saleRefusal } from '#shared/utils/programme'
 import {
   differentShowReason,
   holdExpiresAt,
-  otherBookingReason,
   reservationExchangeForm,
   sameNightReason,
 } from '#shared/utils/reservations'
@@ -14,9 +13,7 @@ export default defineEventHandler(async (event) => {
   const reservationId = await requireQrReservationId(event)
   const input = await readValidatedBodyOrThrow(event, reservationExchangeForm)
 
-  const reservation = await selfServiceReservation(reservationId)
-  const other = reservation && otherBookingReason(input.reference, reservation.reference)
-  if (other) throw createError({ statusCode: 409, statusMessage: other })
+  const reservation = await shownSelfServiceReservation(reservationId, input.reference)
   if (!reservation || reservation.status !== 'PENDING') {
     throw createError({ statusCode: 409, statusMessage: 'This booking can no longer be exchanged here' })
   }

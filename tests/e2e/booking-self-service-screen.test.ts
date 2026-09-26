@@ -158,8 +158,8 @@ describe.skipIf(skip !== null)('the booking screen says which night and which wa
 
     const database = new Database(app.databaseFile, { readonly: true })
     try {
-      const statuses = database.query('SELECT reference, status FROM reservations WHERE reference IN (?, ?)')
-        .all(first.reference, second.reference) as { reference: string, status: string }[]
+      const statuses = database.query('SELECT status FROM reservations WHERE reference IN (?, ?)')
+        .all(first.reference, second.reference) as { status: string }[]
       expect(statuses.map(row => row.status)).toEqual(['PENDING', 'PENDING'])
     }
     finally {

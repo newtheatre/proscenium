@@ -164,8 +164,8 @@ describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', (
   })
 
   // Issue 1329: one cookie names one booking, so a page showing another is refused, not obeyed.
-  test('a write naming a different booking from the one the cookie holds is refused', () => {
-    expect(otherBookingReason(undefined, 'ABCDEF')).toBeNull()
+  test('a write naming no booking, or a different one from the one the cookie holds, is refused', () => {
+    expect(otherBookingReason(undefined, 'ABCDEF')).toBe('This page is out of date. Reload it, then try again.')
     expect(otherBookingReason('abcdef', 'ABCDEF')).toBeNull()
     expect(otherBookingReason('GHJKLM', 'ABCDEF')).toBe('This page is showing a different booking. Reload to see the one you are changing.')
   })
@@ -354,7 +354,7 @@ describe('D-110: the edit form matches the booking form\'s own line shape (crite
   })
 })
 
-describe('D-111: exchange asks for a target performance and nothing else', () => {
+describe('D-111: exchange asks for a target performance and the booking the page shows', () => {
   test('a performance id parses', () => {
     expect(reservationExchangeForm.safeParse({ performanceId: 'perf-1' }).success).toBe(true)
   })

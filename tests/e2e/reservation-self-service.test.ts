@@ -126,7 +126,7 @@ describe.skipIf(skip !== null)('D-110: adding and removing tickets while unpaid 
     const { reference, qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
     const cookie = await qrCookie(qrToken)
 
-    const edited = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 3 }] }, cookie)
+    const edited = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 3 }], reference }, cookie)
     expect(edited.status).toBe(200)
     expect((await edited.json() as { totalPence: number }).totalPence).toBe(2_700)
 
@@ -139,10 +139,10 @@ describe.skipIf(skip !== null)('D-110: adding and removing tickets while unpaid 
 
   test('a removal frees the seats immediately, for the next booking to take', async () => {
     const { performanceId, standardId } = await bookableShow(2)
-    const { qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 2 }])
+    const { reference, qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 2 }])
     const cookie = await qrCookie(qrToken)
 
-    const edited = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 1 }] }, cookie)
+    const edited = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 1 }], reference }, cookie)
     expect(edited.status).toBe(200)
 
     // The seat given back is available to a second, unrelated booking against the same house.
@@ -156,11 +156,12 @@ describe.skipIf(skip !== null)('D-110: adding and removing tickets while unpaid 
 
   test('adding one type and removing another in the same request applies both', async () => {
     const { performanceId, standardId, concessionId } = await bookableShow()
-    const { qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 2 }])
+    const { reference, qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 2 }])
     const cookie = await qrCookie(qrToken)
 
     const edited = await send('PUT', '/api/qr/tickets', {
       lines: [{ ticketTypeId: standardId, quantity: 1 }, { ticketTypeId: concessionId, quantity: 1 }],
+      reference,
     }, cookie)
     expect(edited.status).toBe(200)
     expect((await edited.json() as { totalPence: number }).totalPence).toBe(1_400)
@@ -168,11 +169,12 @@ describe.skipIf(skip !== null)('D-110: adding and removing tickets while unpaid 
 
   test('a type named twice is refused before anything is written', async () => {
     const { performanceId, standardId } = await bookableShow()
-    const { qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
+    const { reference, qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
     const cookie = await qrCookie(qrToken)
 
     const edited = await send('PUT', '/api/qr/tickets', {
       lines: [{ ticketTypeId: standardId, quantity: 1 }, { ticketTypeId: standardId, quantity: 1 }],
+      reference,
     }, cookie)
     expect(edited.status).toBe(400)
   }, CASE_TIMEOUT_MS)
@@ -181,7 +183,7 @@ describe.skipIf(skip !== null)('D-110: adding and removing tickets while unpaid 
 describe.skipIf(skip !== null)('D-110: net capacity is re-checked and the whole edit fails atomically (criterion 2)', () => {
   test('an increase past the house\'s capacity is refused, taking a same-request decrease down with it', async () => {
     const { performanceId, standardId, concessionId } = await bookableShow(3)
-    const { qrToken } = await bookedReservation(performanceId, [
+    const { reference, qrToken } = await bookedReservation(performanceId, [
       { ticketTypeId: standardId, quantity: 1 }, { ticketTypeId: concessionId, quantity: 1 },
     ])
     const cookie = await qrCookie(qrToken)
@@ -196,8 +198,9 @@ describe.skipIf(skip !== null)('D-110: net capacity is re-checked and the whole 
 
     // Wants standard 1 -> 3 (short by one) and concession 1 -> 0 in the same request: the
     // concession drop must not apply just because the standard increase was refused.
-    const edited = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 3 }] }, cookie)
+    const edited = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 3 }], reference }, cookie)
     expect(edited.status).toBe(409)
+    expect(await edited.text()).toContain('no longer has room for that change')
 
     const lines = query<{ total: number }>(
       `SELECT count(*) AS total FROM tickets t
@@ -212,10 +215,10 @@ describe.skipIf(skip !== null)('D-110: net capacity is re-checked and the whole 
 
   test('dropping to zero tickets is refused: cancel is the route for that', async () => {
     const { performanceId, standardId } = await bookableShow()
-    const { qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
+    const { reference, qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
     const cookie = await qrCookie(qrToken)
 
-    const edited = await send('PUT', '/api/qr/tickets', { lines: [] }, cookie)
+    const edited = await send('PUT', '/api/qr/tickets', { lines: [], reference }, cookie)
     expect(edited.status).toBe(400)
   }, CASE_TIMEOUT_MS)
 })
@@ -226,7 +229,7 @@ describe.skipIf(skip !== null)('D-110: self-cancel while unpaid (criterion 3)', 
     const { reference, qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
     const cookie = await qrCookie(qrToken)
 
-    const cancelled = await send('POST', '/api/qr/cancel', {}, cookie)
+    const cancelled = await send('POST', '/api/qr/cancel', { reference }, cookie)
     expect(cancelled.status).toBe(200)
 
     const row = query<{ status: string, cancelledBy: string | null }>(
@@ -252,8 +255,9 @@ describe.skipIf(skip !== null)('D-110: self-cancel while unpaid (criterion 3)', 
 
     write('UPDATE performances SET starts_at = ? WHERE id = ?', Math.floor(Date.now() / 1000) - 3_600, performanceId)
 
-    const cancelled = await send('POST', '/api/qr/cancel', {}, cookie)
+    const cancelled = await send('POST', '/api/qr/cancel', { reference }, cookie)
     expect(cancelled.status).toBe(409)
+    expect(await cancelled.text()).toContain('already started')
 
     const row = query<{ status: string }>('SELECT status FROM reservations WHERE reference = ?', reference)
     expect(row?.status).toBe('PENDING')
@@ -268,21 +272,23 @@ describe.skipIf(skip !== null)('D-110: nothing self-service is left once money h
 
     write('UPDATE reservations SET status = ? WHERE reference = ?', 'COLLECTED', reference)
 
-    const edited = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 2 }] }, cookie)
+    const edited = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 2 }], reference }, cookie)
     expect(edited.status).toBe(409)
+    expect(await edited.text()).toContain('can no longer be changed here')
 
-    const cancelled = await send('POST', '/api/qr/cancel', {}, cookie)
+    const cancelled = await send('POST', '/api/qr/cancel', { reference }, cookie)
     expect(cancelled.status).toBe(409)
+    expect(await cancelled.text()).toContain('can no longer be cancelled here')
   }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('D-110: the QR is unchanged by an edit (criterion 5)', () => {
   test('the same token still opens the booking, now reading its new total', async () => {
     const { performanceId, standardId } = await bookableShow()
-    const { qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
+    const { reference, qrToken } = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
     const cookie = await qrCookie(qrToken)
 
-    await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 2 }] }, cookie)
+    await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 2 }], reference }, cookie)
 
     const reopened = await fetch(`${app.baseURL}/qr/${qrToken}`, { redirect: 'manual' })
     expect(reopened.status).toBe(302)
@@ -291,6 +297,36 @@ describe.skipIf(skip !== null)('D-110: the QR is unchanged by an edit (criterion
     const current = await fetch(`${app.baseURL}/api/qr/current`, { headers: { cookie } })
     const body = await current.json() as { totalDue: string | null }
     expect(body.totalDue).toBe('£18.00')
+  }, CASE_TIMEOUT_MS)
+})
+
+// Issue 1329: one cookie names one booking, and opening or making another moves it, so a write
+// acts only when it names the booking the cookie holds, and one naming another or none is refused.
+describe.skipIf(skip !== null)('a write acts only on the booking the page is showing', () => {
+  test('naming another booking, or none, changes nothing on the booking the cookie holds', async () => {
+    const { performanceId, standardId } = await bookableShow()
+    const first = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
+    const second = await bookedReservation(performanceId, [{ ticketTypeId: standardId, quantity: 1 }])
+    const cookie = await qrCookie(second.qrToken)
+
+    const edited = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId: standardId, quantity: 2 }], reference: first.reference }, cookie)
+    expect(edited.status).toBe(409)
+    expect(await edited.text()).toContain('showing a different booking')
+
+    const cancelled = await send('POST', '/api/qr/cancel', {}, cookie)
+    expect(cancelled.status).toBe(409)
+    expect(await cancelled.text()).toContain('out of date')
+
+    // Refused as another booking, ahead of the same-night 400 it would otherwise have met.
+    const exchanged = await send('POST', '/api/qr/exchange', { performanceId, reference: first.reference }, cookie)
+    expect(exchanged.status).toBe(409)
+    expect(await exchanged.text()).toContain('showing a different booking')
+
+    const row = query<{ status: string, tickets: number }>(
+      `SELECT r.status AS status, (SELECT count(*) FROM tickets t WHERE t.reservation_id = r.id) AS tickets
+       FROM reservations r WHERE r.reference = ?`, second.reference,
+    )
+    expect(row).toEqual({ status: 'PENDING', tickets: 1 })
   }, CASE_TIMEOUT_MS)
 })
 

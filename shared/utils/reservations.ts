@@ -103,14 +103,18 @@ export const reservationResendForm = z.object({
   email: z.string().email('Enter a real email address').max(320),
 })
 
-// The booking the page is showing (issue 1329). One cookie names one booking, so a page left open
-// while another booking moved the cookie is refused, never acted on for the other booking.
+// The booking the page is showing (issue 1329): one cookie names one booking, so a write naming
+// another, or none, is refused. Optional so the refusal is a sentence, not a field error.
 const showingReference = z.string().trim().length(RESERVATION_REFERENCE_LENGTH).optional()
 
 export function otherBookingReason(showing: string | undefined, held: string): string | null {
-  if (showing === undefined || showing.toUpperCase() === held.toUpperCase()) return null
+  if (showing === undefined) return 'This page is out of date. Reload it, then try again.'
+  if (showing.toUpperCase() === held.toUpperCase()) return null
   return 'This page is showing a different booking. Reload to see the one you are changing.'
 }
+
+// The two reads the booking page makes before a change name the booking in the query string.
+export const showingBookingQuery = z.object({ reference: showingReference })
 
 // D-110: self-service edit while unpaid. Desired totals per type, the same shape a fresh
 // booking uses, so "each type appears at most once" is one rule either way (criterion 1).
@@ -130,10 +134,10 @@ export const reservationExchangeForm = z.strictObject({
   reference: showingReference,
 })
 
-// A cancel carries nothing but the booking it means; an empty body is the same as naming none.
-export const reservationCancelForm = z.strictObject({ reference: showingReference }).optional()
-
 export type ReservationExchangeInput = z.output<typeof reservationExchangeForm>
+
+// A cancel carries nothing but the booking it means; an empty body is the same as naming none.
+export const reservationCancelForm = z.strictObject({ reference: showingReference }).default({})
 
 export interface TicketTypeCount {
   ticketTypeId: string

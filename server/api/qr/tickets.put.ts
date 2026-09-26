@@ -1,5 +1,5 @@
 import { saleRefusal } from '#shared/utils/programme'
-import { belowMinimumTicketsReason, otherBookingReason, overCapReason, reservationEditForm, ticketEditDelta } from '#shared/utils/reservations'
+import { belowMinimumTicketsReason, overCapReason, reservationEditForm, ticketEditDelta } from '#shared/utils/reservations'
 
 // Self-service edit while unpaid (D-110 criterion 1). The QR cookie is the only credential asked
 // for: a guest booker has no session, and a signed-in booker's own cookie works identically.
@@ -7,9 +7,7 @@ export default defineEventHandler(async (event) => {
   const reservationId = await requireQrReservationId(event)
   const input = await readValidatedBodyOrThrow(event, reservationEditForm)
 
-  const reservation = await selfServiceReservation(reservationId)
-  const other = reservation && otherBookingReason(input.reference, reservation.reference)
-  if (other) throw createError({ statusCode: 409, statusMessage: other })
+  const reservation = await shownSelfServiceReservation(reservationId, input.reference)
   if (!reservation || reservation.status !== 'PENDING') {
     throw createError({ statusCode: 409, statusMessage: 'This booking can no longer be changed here' })
   }

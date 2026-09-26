@@ -5,11 +5,6 @@ export default defineEventHandler(async (event) => {
   const passId = await verifyPassQrToken(token)
   if (!passId) return sendRedirect(event, '/passes?refused=invalid')
 
-  setCookie(event, PASS_QR_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: PASS_QR_COOKIE_MAX_AGE_SECONDS,
-  })
+  rememberPassQrToken(event, token)
   return sendRedirect(event, '/passes')
 })
