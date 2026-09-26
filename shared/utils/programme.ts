@@ -603,13 +603,6 @@ export interface ListedShow {
   performances: ListedPerformance[]
 }
 
-// The two figures a listing is judged against, both configuration read by the route (0012). The
-// release is the default a performance's own override inherits (D-106).
-export interface ListingRules {
-  limitedPercent: number
-  holdReleaseMinutes: number
-}
-
 export function remainingSeats(house: PerformanceHouse): number | null {
   if (house.capacity === null) return null
   return Math.max(0, house.capacity - house.sold)

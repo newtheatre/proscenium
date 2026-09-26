@@ -17,7 +17,7 @@ import {
 import { resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 import { resolvePrice } from '#shared/utils/ticket-types'
 import type { ShowContentWarning } from '#shared/utils/content-warnings'
-import type { ListedPerformance, ListedShow, ListingRules, PublicPrice, PublicShow } from '#shared/utils/programme'
+import type { ListedPerformance, ListedShow, PublicPrice, PublicShow } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
@@ -269,6 +269,13 @@ export function headlineSeasonDay(at: Date): string {
 export async function headlineSeason(at: Date): Promise<string | null> {
   const [row] = await db.all<{ name: string }>(headlineSeasonQuery(headlineSeasonDay(at)))
   return row?.name ?? null
+}
+
+// The two figures a listing is judged against. The release is the default a performance's own
+// override inherits (D-106).
+export interface ListingRules {
+  limitedPercent: number
+  holdReleaseMinutes: number
 }
 
 // Read where the request is, so a settings change applies to the next listing (0012). Imported by

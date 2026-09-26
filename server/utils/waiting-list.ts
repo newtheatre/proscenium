@@ -125,17 +125,20 @@ export async function offerWaitingList(event: H3Event | undefined, performanceId
   let remaining = capacity === null ? Number.POSITIVE_INFINITY : capacity - Number(row?.held ?? 0)
   if (remaining <= 0) return { eligible: 0, offered: [] }
 
-  const windowMinutes = await configValue(event, 'WAITING_LIST_OFFER_WINDOW_MINUTES')
-  const closesAt = onlineClosesAt(performance, await holdReleaseMinutesFor(event, performance))
   const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<NextEntryRow>(nextWaitingEntriesQuery(performanceId, cap))
+  if (candidates.length === 0) return { eligible: 0, offered: [] }
+
+  const [windowMinutes, releaseMinutes] = await Promise.all([
+    configValue(event, 'WAITING_LIST_OFFER_WINDOW_MINUTES'),
+    holdReleaseMinutesFor(event, performance),
+  ])
+  const expiresAt = offerExpiresAt(now, windowMinutes, onlineClosesAt(performance, releaseMinutes))
+  if (offerWouldBeBornExpired(expiresAt, now)) return { eligible: candidates.length, offered: [] }
 
   const offered: OfferedWaitingListEntry[] = []
   for (const candidate of candidates) {
     if (candidate.partySize > remaining) break
-
-    const expiresAt = offerExpiresAt(now, windowMinutes, closesAt)
-    if (offerWouldBeBornExpired(expiresAt, now)) continue
 
     const claimed = await db.all<{ id: string }>(offerEntryStatement(candidate.id, now, expiresAt))
     if (claimed.length === 0) continue
@@ -329,8 +332,6 @@ export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEn
 
   const releaseMinutes = await holdReleaseMinutesFor(event, performance)
   const refusal = saleRefusal(performance, now, 'CUSTOMER', releaseMinutes)
-  const expiresAt = holdExpiresAt(performance.startsAt, releaseMinutes)
-
   if (refusal) {
     await db.run(sql`UPDATE waiting_list SET status = 'OFFERED', updated_at = unixepoch() WHERE id = ${entry.id} AND status = 'CLAIMED'`)
     return { applied: false, refusal: refusal.says }
@@ -356,7 +357,7 @@ export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEn
     windowBypassed: false,
     lines,
     capacity,
-    holdExpiresAt: expiresAt,
+    holdExpiresAt: holdExpiresAt(performance.startsAt, releaseMinutes),
   })
 
   if (result.tickets.length < result.requested) {

@@ -2,6 +2,7 @@
 import { saysNoSuch } from '#shared/utils/no-such'
 import { saysWhenLong } from '#shared/utils/when'
 import { MAX_PARTY_SIZE, waitingListGuestJoinForm, waitingListPartyForm } from '#shared/utils/waiting-list'
+import type { SaleRefusalReason } from '#shared/utils/programme'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
 // Join the waiting list for a performance (D-113 criteria 1 and 6). A full house never refuses a
@@ -10,7 +11,7 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 interface BookingInfo {
   show: { slug: string, title: string }
   performance: { startsAt: number, venueName: string }
-  refusal: { reason: string, says: string } | null
+  refusal: { reason: SaleRefusalReason | 'SOLD_OUT', says: string } | null
 }
 
 const route = useRoute()

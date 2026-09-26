@@ -120,6 +120,13 @@ const seats = computed(() => ordered.value.reduce((total, line) => total + line.
 
 const when = computed(() => (data.value ? saysWhenLong(data.value.performance.startsAt) : ''))
 
+const refusalTitle = computed(() => {
+  const refusal = data.value?.refusal
+  if (refusal?.waitingListUrl) return saysAvailability('SOLD_OUT', null)
+  if (refusal?.reason === 'WINDOW_CLOSED') return 'Online booking has closed'
+  return 'Booking is not open'
+})
+
 const nightWhen = (at: number): string => saysWhen(at)
 
 const guestName = ref('')
@@ -320,7 +327,7 @@ useSeoMeta({
         color="neutral"
         variant="subtle"
         :icon="data!.refusal.waitingListUrl ? 'i-lucide-clock' : 'i-lucide-ticket-x'"
-        :title="data!.refusal.waitingListUrl ? saysAvailability('SOLD_OUT', null) : data!.refusal.reason === 'WINDOW_CLOSED' ? 'Online booking has closed' : 'Booking is not open'"
+        :title="refusalTitle"
         :description="data!.refusal.says"
         data-test="booking-refused"
       />
