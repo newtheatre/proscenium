@@ -412,3 +412,54 @@ describe.skipIf(skip !== null)('a booking in a typed charge is collected only on
     expect(entries()).toBe(before + 1)
   })
 })
+
+// F-102 criterion 5, issue 1308: an ended night has no shift left to answer for it, so a charge
+// from one waits for the Bar Manager's standing role, exactly as its till session does.
+describe.skipIf(skip !== null)('a charge from an earlier night is answered by the Bar Manager, not tonight\'s shift', () => {
+  const EARLIER = '2020-01-01'
+
+  function anEarlierCharge(venueId: string, suffix: string): string {
+    const database = new Database(app.databaseFile)
+    try {
+      const sessionId = `earlier-${suffix}`
+      database.query('INSERT INTO till_sessions (id, venue_id, night, opened_by, opened_at) VALUES (?, ?, ?, ?, 1000)')
+        .run(sessionId, venueId, EARLIER, barManager.id)
+      const id = `earlier-charge-${suffix}`
+      database.query(`INSERT INTO sumup_attempts (id, till_session_id, venue_id, night, created_by, basket, expected_total_pence, status, kind)
+        VALUES (?, ?, ?, ?, ?, '{}', 250, 'STARTED', 'TYPED')`)
+        .run(id, sessionId, venueId, EARLIER, barManager.id)
+      return id
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  test('tonight\'s bar shift at the same bar is refused, and nothing moves', async () => {
+    const { venueId, performanceId } = programme('earlier-night-shift')
+    const volunteer = await registerMember(app, 'earlier-night-shift', generatePassword())
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`${performanceId}-BAR`, performanceId, 'BAR', 1, volunteer.id, 'CONFIRMED')
+    }
+    finally {
+      database.close()
+    }
+    const id = anEarlierCharge(venueId, 'shift')
+
+    const refused = await answerCharge(app, id, 'declined', volunteer.cookie)
+    expect(refused.status).toBe(403)
+    expect(await message(refused)).toContain('earlier night')
+    expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', id)!.status).toBe('STARTED')
+  })
+
+  test('the Bar Manager answers it', async () => {
+    const { venueId } = programme('earlier-night-manager')
+    const id = anEarlierCharge(venueId, 'manager')
+
+    const answered = await answerCharge(app, id, 'declined', barManager.cookie)
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { status: string }).status).toBe('FAILED')
+  })
+})
