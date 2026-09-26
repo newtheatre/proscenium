@@ -1,4 +1,5 @@
 import { auditEntry } from './audit'
+import { saysRole } from './roles'
 import type { AuditRow } from './audit'
 import type { Permission, Role } from './roles'
 
@@ -59,6 +60,21 @@ export function nightAuthorityRefusal(role: NightRole): { statusCode: 403, statu
   return {
     statusCode: 403,
     statusMessage: `This needs ${NIGHT_ROLE_WORDS[role]} ${tonight}, or ${NIGHT_ROLE_OFFICER[role].words}`,
+  }
+}
+
+// Whoever confirms a queued claim (E-105): a unit test fails when this role stops holding
+// `rota.write`, so the refusal below cannot send a volunteer to somebody who cannot help.
+export const CLAIM_CONFIRMER: Role = 'FOH_MANAGER'
+
+const CLAIMED_ROLE_WORDS: Record<NightRole, string> = { DUTY_MANAGER: 'duty manager', DOOR: 'door', BAR: 'bar' }
+
+// A claim waiting for an officer is not a shift yet, and not nothing: the refusal says which, and
+// who turns it into one (E-112 criterion 2, E-104).
+export function claimedShiftRefusal(role: NightRole): { statusCode: 403, statusMessage: string } {
+  return {
+    statusCode: 403,
+    statusMessage: `Your ${CLAIMED_ROLE_WORDS[role]} shift tonight is claimed, not confirmed yet: the ${saysRole(CLAIM_CONFIRMER)} confirms it on the rota`,
   }
 }
 

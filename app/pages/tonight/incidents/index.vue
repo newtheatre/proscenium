@@ -4,7 +4,7 @@ import type { NightRole } from '#shared/utils/night-authority'
 import { CATEGORIES, SEVERITIES, saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysClock } from '#shared/utils/when'
 import { saysShiftRole } from '#shared/utils/rota'
-import { contactRoster, saysPerformanceChoice, telHref } from '#shared/utils/tonight'
+import { contactRoster, saysPerformanceChoice, saysTeamHolder, telHref } from '#shared/utils/tonight'
 import type { Category, Severity } from '#shared/utils/incidents'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/contacts-and-incidents' })
@@ -59,7 +59,7 @@ async function resolveAuthority(): Promise<void> {
   }
 }
 
-interface TeamSlot { role: NightRole, filled: boolean, name: string | null, phone: string | null }
+interface TeamSlot { shiftId: string, role: NightRole, filled: boolean, claimed: boolean, name: string | null, phone: string | null }
 
 const team = ref<TeamSlot[]>([])
 
@@ -245,7 +245,7 @@ async function submitCorrect(): Promise<void> {
             </p>
             <div
               v-for="slot in team"
-              :key="`${slot.role}-${slot.name ?? 'unfilled'}`"
+              :key="slot.shiftId"
               class="flex items-center gap-3 rounded-xl bg-elevated"
               :class="slot.filled ? 'p-4' : 'px-4 py-2'"
               :data-test="`team-${slot.role}`"
@@ -257,12 +257,12 @@ async function submitCorrect(): Promise<void> {
                 <span class="block truncate text-lg font-semibold">{{ slot.name }}</span>
                 <span class="block text-sm text-muted">{{ saysShiftRole(slot.role) }}</span>
               </span>
-              <!-- An unfilled slot stays in the list, one quiet line rather than a card, so it
-                   reads as a gap in the rota and never as somebody to ring. -->
+              <!-- An unfilled slot or an unconfirmed claim stays in the list, one quiet line rather
+                   than a card, so it reads as a gap in the rota and never as somebody to ring. -->
               <span
                 v-else
                 class="min-w-0 grow text-sm text-muted"
-              >{{ saysShiftRole(slot.role) }} · unfilled</span>
+              >{{ saysShiftRole(slot.role) }} · {{ slot.claimed ? saysTeamHolder(slot) : 'unfilled' }}</span>
               <!-- Only where the member's own consent is set: nothing here reveals a number the
                    roster did not already carry (A-114). -->
               <UButton

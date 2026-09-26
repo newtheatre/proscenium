@@ -31,6 +31,10 @@ which is how the committee sees a rota that is not being kept.
   manager's role"** (or the same for a bar shift and the Bar Manager, or for a duty manager
   shift): nothing tonight gives you this screen. Find the person named, or ask the officer to assign you the shift on
   the rota. The IT Manager is never offered as the answer to a rota that is wrong.
+- **"Your door shift tonight is claimed, not confirmed yet: the Front of House Manager confirms
+  it on the rota"** (or the same for a bar or duty manager shift): you claimed the shift, and it
+  is waiting for an officer. A claim opens nothing until it is confirmed; ask the Front of House
+  Manager to confirm it on the rota board or on Approvals.
 - **"Nothing is running tonight, so there is nothing to take charge of"**: no performance at
   any venue tonight, or the only one is cancelled. Check the programme.
 - **"Show-night tools open for tonight only, and that night has ended"**: the screen was open

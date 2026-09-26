@@ -1,7 +1,8 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { heldSeatsSubquery } from './capacity'
-import { COMMITTED_SHIFT_STATUSES } from '#shared/utils/rota'
+import { showNightBounds } from '#shared/utils/show-night'
+import type { ConfirmedShiftScope } from './rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { SQL } from 'drizzle-orm'
 
@@ -37,6 +38,7 @@ export interface TonightTeamMember {
   role: ShiftRole
   status: ShiftStatus
   filled: boolean
+  claimed: boolean
   name: string | null
   phone: string | null
 }
@@ -63,16 +65,18 @@ export function tonightTeamQuery(performanceId: string): SQL {
   `
 }
 
-// An unfilled slot never shows a blank name: OPEN, DECLINED and an unconfirmed claim all read as
-// unfilled (E-112 criterion 2). The phone shows only where consent is currently set, read fresh.
+// Filled means confirmed (E-112 criterion 2): a claim names its claimant as claimed, never as on
+// shift, and never with a number to ring. The phone shows only where consent is set, read fresh.
 export function readTeamRow(row: TeamRow): TonightTeamMember {
-  const filled = (COMMITTED_SHIFT_STATUSES as readonly string[]).includes(row.status)
+  const filled = row.status === 'CONFIRMED'
+  const claimed = row.status === 'CLAIMED'
   return {
     shiftId: row.shiftId,
     role: row.role,
     status: row.status,
     filled,
-    name: filled ? row.name : null,
+    claimed,
+    name: filled || claimed ? row.name : null,
     phone: filled && row.visible ? row.phone : null,
   }
 }
@@ -80,6 +84,39 @@ export function readTeamRow(row: TeamRow): TonightTeamMember {
 export async function tonightTeam(performanceId: string): Promise<TonightTeamMember[]> {
   const rows = await db.all<TeamRow>(tonightTeamQuery(performanceId))
   return rows.map(readTeamRow)
+}
+
+// A claim of this role waiting for an officer, inside the request's own scope on tonight's
+// programme; a bar claim may sit on a performance or on tonight's bar opening (E-104, 0077).
+export function claimedShiftTonightQuery(userId: string, role: ShiftRole, from: number, to: number, scope: ConfirmedShiftScope): SQL {
+  const atVenue = scope.venueId ? sql` AND p.venue_id = ${scope.venueId}` : sql``
+  const atPerformance = scope.performanceId ? sql` AND p.id = ${scope.performanceId}` : sql``
+  // Narrowed as the guard's own opening lookup is: by venue alone, since an opening names no performance.
+  const openingAtVenue = scope.venueId ? sql` AND o.venue_id = ${scope.venueId}` : sql``
+  const opening = role === 'BAR'
+    ? sql` OR EXISTS (
+        SELECT 1 FROM bar_opening_shifts os
+        JOIN bar_openings o ON o.id = os.opening_id
+        WHERE os.user_id = ${userId} AND os.status = 'CLAIMED'
+          AND o.status <> 'CANCELLED' AND o.starts_at >= ${from} AND o.starts_at < ${to}${openingAtVenue}
+      )`
+    : sql``
+  return sql`
+    SELECT (EXISTS (
+      SELECT 1 FROM shifts s
+      JOIN performances p ON p.id = s.performance_id
+      WHERE s.user_id = ${userId} AND s.role = ${role} AND s.status = 'CLAIMED'
+        AND p.status <> 'CANCELLED' AND p.starts_at >= ${from} AND p.starts_at < ${to}${atVenue}${atPerformance}
+    )${opening}) AS claimed
+  `
+}
+
+export async function claimedShiftTonight(userId: string, role: ShiftRole, night: string, scope: ConfirmedShiftScope): Promise<boolean> {
+  const { from, to } = showNightBounds(night)
+  const [row] = await db.all<{ claimed: number }>(
+    claimedShiftTonightQuery(userId, role, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000), scope),
+  )
+  return Boolean(row?.claimed)
 }
 
 export interface OnCall { name: string, phone: string }

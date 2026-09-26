@@ -195,11 +195,12 @@ export interface ReportStaffingRow {
   officerBypass: boolean
 }
 
-// One row per stamped slot, filled or not: an unfilled slot names nobody rather than being
-// absent (criterion 1). The bypass flag reads the same audit target `requireNightAuthority` writes.
+// One row per stamped slot: a gap or a decline names nobody and a claim names its claimant for the
+// screen to mark (criterion 1). The bypass flag reads the target `requireNightAuthority` writes.
 export function reportStaffingQuery(performanceId: string, venueId: string, night: string): SQL {
   return sql`
-    SELECT s.id AS shiftId, s.role AS role, s.slot AS slot, s.status AS status, u.name AS name,
+    SELECT s.id AS shiftId, s.role AS role, s.slot AS slot, s.status AS status,
+      CASE WHEN s.status IN ('CONFIRMED', 'CLAIMED') THEN u.name END AS name,
       EXISTS (
         SELECT 1 FROM audit_log a, json_each(a.detail, '$.performanceIds') pids
         WHERE a.action = ${OFFICER_BYPASS_ACTION}
