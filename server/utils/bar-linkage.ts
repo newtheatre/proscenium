@@ -34,12 +34,14 @@ export function pouredByColumn(alias: string): SQL {
   )`
 }
 
-// SQLite hands back the array as text, and an item nothing pours as an empty one.
-export function readPouredBy(value: string | null): PouredBy[] {
+// SQLite hands back json_group_array as text, and an empty group as an empty array.
+function readJsonArray<T>(value: string | null): T[] {
   if (!value) return []
-  const parsed = JSON.parse(value) as PouredBy[]
+  const parsed = JSON.parse(value) as T[]
   return Array.isArray(parsed) ? parsed : []
 }
+
+export const readPouredBy = (value: string | null): PouredBy[] => readJsonArray(value)
 
 // The other direction: the items a product's live sizes deplete, or offer as a choice. A subquery
 // over the product it is handed, so it binds nothing per product or item (0006).
@@ -68,36 +70,18 @@ export function restrictedPoursColumn(alias: string): SQL {
   )`
 }
 
-export function readRestrictedPours(value: string | null): string[] {
-  if (!value) return []
-  const parsed = JSON.parse(value) as string[]
-  return Array.isArray(parsed) ? parsed : []
-}
+export const readRestrictedPours = (value: string | null): string[] => readJsonArray(value)
 
-// The Bar Manager's correction list: a product still on the catalogue, left unrestricted, that
-// pours restricted stock. Hidden counts, since it goes back on the till with one press.
+// The Bar Manager's correction list: any product left unrestricted that pours restricted stock.
+// Hidden and retired count, since either goes back on the till with one press.
 export function withoutCheckIdPredicate(alias: string): SQL {
-  const product = sql.raw(alias)
-  return sql`(${product}.age_restricted = 0 AND ${product}.status <> 'RETIRED'
-    AND EXISTS (${restrictedPoured(sql.raw(`${alias}.id`))}))`
+  return sql`(${sql.raw(alias)}.age_restricted = 0 AND EXISTS (${restrictedPoured(sql.raw(`${alias}.id`))}))`
 }
 
 // Rides an edit's own UPDATE, so a component landing between the read and the write cannot leave
 // a product pouring restricted stock saved without Check ID (0049).
 export function checkIdHeld(productId: string, ageRestricted: boolean): SQL {
-  return sql`(${ageRestricted ? 1 : 0} = 1 OR NOT EXISTS (${restrictedPoured(sql`${productId}`)}))`
-}
-
-export function restrictedPoursOfQuery(productId: string): SQL {
-  return sql`
-    SELECT r.name AS name FROM bar_items r
-    WHERE r.age_restricted = 1 AND r.id IN (${itemsPouredBy(sql`${productId}`)})
-    ORDER BY r.name COLLATE NOCASE
-  `
-}
-
-export async function restrictedPoursOf(productId: string): Promise<string[]> {
-  return (await db.all<{ name: string }>(restrictedPoursOfQuery(productId))).map(row => row.name)
+  return ageRestricted ? sql`1 = 1` : sql`NOT EXISTS (${restrictedPoured(sql`${productId}`)})`
 }
 
 // Servings one recipe row supports: its item's on-hand over the quantity a serving takes.

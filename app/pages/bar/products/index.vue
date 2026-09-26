@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ALLERGEN_STATES, PRODUCT_AGE_RESTRICTED_DEFAULT, productForm, says, saysRestricted } from '#shared/utils/bar'
+import { ALLERGEN_STATES, PRODUCT_AGE_RESTRICTED_DEFAULT, productForm, says, saysRestricted, sellsWithoutCheckId } from '#shared/utils/bar'
 import { barProductsList } from '#shared/utils/bar-products-list'
-import type { FilterOption } from '#shared/utils/list-filters'
+import { encodeCondition } from '#shared/utils/list-filters'
+import type { FilterCondition, FilterOption } from '#shared/utils/list-filters'
 import type { AllergenState, BarCategory, BarProduct, ProductStatus } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -36,26 +37,34 @@ const filterOptions = computed<Record<string, FilterOption[]>>(() => ({ category
 // Search, filters, sort and page live in the URL (K-129).
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(barProductsList, { options: filterOptions })
 
-const { data, status, error, refresh } = await useAsyncData(
-  'bar-products',
-  () => request<Listing<BarProduct>>('/api/admin/bar/products', { query: query.value }),
-  { watch: [query], default: noProducts },
-)
-
 // The correction list's size whatever the page shows: a product pouring restricted stock that
 // sells without Check ID is the Bar Manager's to fix (F-106, issue 1299).
-const { data: unchecked, refresh: recount } = await useAsyncData(
-  'bar-products-without-check-id',
-  () => request<Listing<BarProduct>>('/api/admin/bar/products', { query: { withoutCheckId: 'is:true', pageSize: 1 } }),
-  { default: noProducts },
-)
-const showingUnchecked = computed(() => conditions.value.some(condition => condition.key === 'withoutCheckId'))
+const WITHOUT_CHECK_ID: FilterCondition = { key: 'withoutCheckId', operator: 'is', values: ['true'] }
+
+const [{ data, status, error, refresh }, { data: unchecked, refresh: recount }] = await Promise.all([
+  useAsyncData(
+    'bar-products',
+    () => request<Listing<BarProduct>>('/api/admin/bar/products', { query: query.value }),
+    { watch: [query], default: noProducts },
+  ),
+  useAsyncData(
+    'bar-products-without-check-id',
+    () => request<Listing<BarProduct>>('/api/admin/bar/products', {
+      query: { withoutCheckId: encodeCondition(WITHOUT_CHECK_ID), pageSize: 1 },
+    }),
+    { default: noProducts },
+  ),
+])
+
+const showingUnchecked = computed(() => conditions.value
+  .some(condition => condition.key === WITHOUT_CHECK_ID.key && condition.values[0] === 'true'))
 
 function showUnchecked(): void {
-  set('withoutCheckId', { key: 'withoutCheckId', operator: 'is', values: ['true'] })
+  set('withoutCheckId', WITHOUT_CHECK_ID)
 }
 
 const editing = ref<BarProduct | null>(null)
+const editingPours = computed(() => editing.value?.restrictedPours ?? [])
 const open = ref(false)
 const removing = ref<BarProduct | null>(null)
 
@@ -215,7 +224,7 @@ const columns: TableColumn<BarProduct>[] = [
         row.original.ageRestricted
           ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Age restricted')
           : null,
-        !row.original.ageRestricted && row.original.restrictedPours.length > 0
+        sellsWithoutCheckId(row.original)
           ? h(UBadge, { 'color': 'error', 'variant': 'subtle', 'size': 'sm', 'data-test': `no-check-id-${row.original.id}` }, () => 'No Check ID')
           : null,
         row.original.staffedOnly
@@ -223,7 +232,7 @@ const columns: TableColumn<BarProduct>[] = [
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, row.original.categoryName),
-      !row.original.ageRestricted && row.original.restrictedPours.length > 0
+      sellsWithoutCheckId(row.original)
         ? h('div', { class: 'text-xs text-error' }, `Pours ${saysRestricted(row.original.restrictedPours)}`)
         : null,
       // Below sm the allergens and sold columns are hidden: their content sits here instead,
@@ -485,17 +494,17 @@ const columns: TableColumn<BarProduct>[] = [
 
           <USwitch
             v-model="state.ageRestricted"
-            :disabled="(editing?.restrictedPours.length ?? 0) > 0"
+            :disabled="editingPours.length > 0"
             label="Age restricted"
             description="A basket holding one of these asks for a Challenge 25 outcome before it can be paid for."
             data-test="product-age-restricted"
           />
           <p
-            v-if="editing && editing.restrictedPours.length > 0"
+            v-if="editingPours.length > 0"
             class="text-sm text-muted"
             data-test="product-age-follows"
           >
-            It pours {{ saysRestricted(editing.restrictedPours) }}, so it asks for Check ID too. Switch the
+            It pours {{ saysRestricted(editingPours) }}, so it asks for Check ID too. Switch the
             stocked item off on the stock register if it is not alcohol.
           </p>
 

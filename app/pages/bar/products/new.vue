@@ -7,6 +7,7 @@ import {
   STOCK_UNITS,
   measurePreset,
   presetForCategory,
+  restrictedStockOf,
   says,
   saysRestricted,
 } from '#shared/utils/bar'
@@ -119,18 +120,19 @@ const choice = reactive({ offered: false, name: '', includedInPrice: false, qty:
 const choiceOptions = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 1 }])
 const opening = reactive({ offered: false, qty: 1, unitCostPounds: null as number | null })
 
-// The product's switch follows what it pours: a new item by its own switch, anything from the
-// register by the flag it already carries (F-111 criterion 6, issue 1299).
-const restrictedPoured = computed<string[]>(() => {
-  if (shape.value !== 'RECIPE' && itemMode.value === 'NEW') {
-    return newItem.ageRestricted ? [newItem.name.trim() || 'the new stocked item'] : []
-  }
-  const ids = shape.value === 'RECIPE'
-    ? [...components.value.map(line => line.itemId), ...(choice.offered ? choiceOptions.value.map(option => option.itemId) : [])]
-    : [existingItemId.value]
-  const restricted = ids.map(id => knownItems.value.find(item => item.id === id)).filter(item => item?.ageRestricted)
-  return [...new Set(restricted.map(item => item!.name))]
-})
+// The product's switch follows what it pours, by the same rule the route refuses on (F-111
+// criterion 6, issue 1299).
+const restrictedPoured = computed<string[]>(() => restrictedStockOf(
+  shape.value === 'RECIPE'
+    ? { shape: 'RECIPE', components: components.value, choice: choice.offered ? { group: { options: choiceOptions.value } } : null }
+    : {
+        shape: shape.value === 'SIMPLE' ? 'SIMPLE' : 'MEASURED',
+        item: itemMode.value === 'NEW'
+          ? { mode: 'NEW', item: { name: newItem.name.trim() || 'the new stocked item', ageRestricted: newItem.ageRestricted } }
+          : { mode: 'EXISTING', itemId: existingItemId.value },
+      },
+  knownItems.value,
+))
 
 // Restricted stock holds the switch on; otherwise it is the product's own "restricted anyway".
 const ageRestricted = computed({

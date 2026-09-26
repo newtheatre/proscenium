@@ -37,6 +37,46 @@ export function checkIdRefusal(product: { name: string, ageRestricted: boolean }
     + 'or switch it off on any stocked item that is not alcohol'
 }
 
+// The row the correction list holds, read the way withoutCheckIdPredicate reads it on the server.
+export const sellsWithoutCheckId = (product: Pick<BarProduct, 'ageRestricted' | 'restrictedPours'>): boolean =>
+  !product.ageRestricted && product.restrictedPours.length > 0
+
+export interface RegisterFlag {
+  id: string
+  name: string
+  ageRestricted: boolean
+}
+
+// What a set-up says it pours. The route's parsed input satisfies it, and so does the form's state.
+export type SetupPours
+  = | {
+    shape: 'RECIPE'
+    components: readonly { itemId: string }[]
+    choice?: { group: { options: readonly { itemId: string }[] } } | null
+  }
+  | {
+    shape: 'SIMPLE' | 'MEASURED'
+    item: { mode: 'NEW', item: { name: string, ageRestricted: boolean } } | { mode: 'EXISTING', itemId: string }
+  }
+
+// The register items a set-up names: a recipe's ingredients then its choice's options, or the one
+// item a thing sold as itself or by measure comes out of.
+export function setupItemIds(input: SetupPours): string[] {
+  if (input.shape === 'RECIPE') {
+    return [...input.components.map(component => component.itemId), ...(input.choice?.group.options.map(option => option.itemId) ?? [])]
+  }
+  return input.item.mode === 'EXISTING' ? [input.item.itemId] : []
+}
+
+// The restricted stock a set-up pours: a new item by its own flag, which starts restricted, and an
+// item from the register by the flag it already carries, never the product's (issue 1299).
+export function restrictedStockOf(input: SetupPours, register: readonly RegisterFlag[]): string[] {
+  if (input.shape !== 'RECIPE' && input.item.mode === 'NEW') {
+    return input.item.item.ageRestricted ? [input.item.item.name] : []
+  }
+  return [...new Set(setupItemIds(input).flatMap(id => register.find(item => item.id === id && item.ageRestricted)?.name ?? []))]
+}
+
 // Complete at birth: widening a CHECK is a table rebuild, and a rebuild of an append-only table
 // is refused outright (0010). The kinds no screen writes yet are listed with the path that will.
 export const STOCK_MOVEMENT_KINDS = [

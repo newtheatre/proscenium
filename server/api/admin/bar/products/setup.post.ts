@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { londonDayOf } from '#shared/utils/ledger'
-import { checkIdRefusal, productSetupForm } from '#shared/utils/bar'
+import { checkIdRefusal, productSetupForm, restrictedStockOf, setupItemIds } from '#shared/utils/bar'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { ServingKind, StockUnit } from '#shared/utils/bar'
 
@@ -14,10 +14,7 @@ export default defineEventHandler(async (event) => {
   const category = await categoryById(input.product.categoryId)
   if (!category) throw noSuch('category')
 
-  const named = input.shape === 'RECIPE'
-    ? [...input.components.map(component => component.itemId),
-        ...(input.choice?.group.options.map(option => option.itemId) ?? [])]
-    : input.item.mode === 'EXISTING' ? [input.item.itemId] : []
+  const named = setupItemIds(input)
 
   const held = named.length === 0
     ? []

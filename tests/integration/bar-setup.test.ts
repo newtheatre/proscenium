@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { planProductSetup, restrictedStockOf } from '#server/utils/bar-setup'
-import { checkIdRefusal, productSetupForm } from '#shared/utils/bar'
+import { planProductSetup } from '#server/utils/bar-setup'
+import { checkIdRefusal, productSetupForm, restrictedStockOf } from '#shared/utils/bar'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 import type { SetupContext, SetupPlan } from '#server/utils/bar-setup'

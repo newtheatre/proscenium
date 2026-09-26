@@ -453,12 +453,12 @@ describe('the products that pour restricted stock without Check ID (issue 1299)'
     })
   })
 
-  // Hidden counts: a hidden product goes back on the till with one press, and would sell without
+  // Hidden and retired count: either goes back on the till with one press, and would sell without
   // Check ID the moment it did.
-  test('the correction list holds every unretired product pouring restricted stock unrestricted', async () => {
+  test('the correction list holds every product pouring restricted stock unrestricted', async () => {
     await withDatabase((database) => {
       catalogue(database)
-      expect(withoutCheckId(database)).toEqual(['prod-review-merlot', 'prod-spiked'])
+      expect(withoutCheckId(database)).toEqual(['prod-old-merlot', 'prod-review-merlot', 'prod-spiked'])
     })
   })
 
@@ -466,7 +466,7 @@ describe('the products that pour restricted stock without Check ID (issue 1299)'
     await withDatabase((database) => {
       catalogue(database)
       database.batch([
-        [`UPDATE bar_products SET age_restricted = 1 WHERE id = 'prod-review-merlot'`],
+        [`UPDATE bar_products SET age_restricted = 1 WHERE id IN ('prod-review-merlot', 'prod-old-merlot')`],
         [`UPDATE bar_items SET age_restricted = 0 WHERE id = 'item-vodka'`],
       ])
       expect(withoutCheckId(database)).toEqual([])

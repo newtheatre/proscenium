@@ -366,10 +366,14 @@ export function productsClause(query: ListQuery): ListClause {
   })
 }
 
+// Every column readProduct reads: a function, since productEverSoldColumn reads the references
+// afresh on each call.
+const productRowColumns = (): SQL =>
+  sql`${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold, ${restrictedPoursColumn('p')} AS restrictedPours`
+
 export function productsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
-    SELECT ${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold,
-           ${restrictedPoursColumn('p')} AS restrictedPours
+    SELECT ${productRowColumns()}
     FROM bar_products p JOIN bar_categories c ON c.id = p.category_id${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
@@ -389,8 +393,7 @@ export async function countProducts(clause: ListClause): Promise<number> {
 
 export async function productById(id: string): Promise<BarProduct | undefined> {
   const [row] = await db.all<ProductRow>(sql`
-    SELECT ${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold,
-           ${restrictedPoursColumn('p')} AS restrictedPours
+    SELECT ${productRowColumns()}
     FROM bar_products p JOIN bar_categories c ON c.id = p.category_id WHERE p.id = ${id}
   `)
   return row ? readProduct(row) : undefined

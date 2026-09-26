@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellsWithoutCheckId } from '#shared/utils/bar'
 import { click, fill, fillNumber, menuOptions, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -385,7 +386,7 @@ describe.skipIf(skip !== null)('a product pouring restricted stock asks for Chec
     const wine = await aWinePouredUnrestricted()
     const listed = await listing<ListedProduct & { restrictedPours: string[] }>('/api/admin/bar/products', '&withoutCheckId=true')
     expect(listed.find(product => product.id === wine.productId)?.restrictedPours).toEqual([wine.itemName])
-    expect(listed.every(product => !product.ageRestricted && product.restrictedPours.length > 0)).toBe(true)
+    expect(listed.every(sellsWithoutCheckId)).toBe(true)
   })
 
   test('an edit leaving it unrestricted is refused naming the stocked item; switching it on clears it', async () => {

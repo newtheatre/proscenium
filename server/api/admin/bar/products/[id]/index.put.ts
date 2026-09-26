@@ -55,11 +55,11 @@ export default defineEventHandler(async (event) => {
   )
 
   if (!applied) {
-    const taken = await claimName('product', input.name, id)
-    if (taken) throw createError({ statusCode: 409, statusMessage: `A product is already called ${taken.name}` })
-    if (!await productById(id)) throw noSuch('product')
     // What it pours is read after the refusal, so the message names whatever stood in the way.
-    const unchecked = checkIdRefusal({ name: input.name, ageRestricted: input.ageRestricted }, await restrictedPoursOf(id))
+    const [taken, now] = await Promise.all([claimName('product', input.name, id), productById(id)])
+    if (taken) throw createError({ statusCode: 409, statusMessage: `A product is already called ${taken.name}` })
+    if (!now) throw noSuch('product')
+    const unchecked = checkIdRefusal(input, now.restrictedPours)
     throw createError({ statusCode: 409, statusMessage: unchecked ?? `${held.name} changed while you were editing it: reload and try again` })
   }
 

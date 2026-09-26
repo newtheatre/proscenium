@@ -45,25 +45,6 @@ function servingsOf(input: ProductSetupInput): SetupServing[] {
   return [{ ...input.serving, qty: 0 }]
 }
 
-export interface HeldItem {
-  id: string
-  name: string
-  ageRestricted: boolean
-}
-
-// The restricted stock a set-up pours: a new item by its own flag, which starts restricted, and an
-// item from the register by the flag it already carries, never the product's (issue 1299).
-export function restrictedStockOf(input: ProductSetupInput, held: readonly HeldItem[]): string[] {
-  if (input.shape !== 'RECIPE' && input.item.mode === 'NEW') {
-    return input.item.item.ageRestricted ? [input.item.item.name] : []
-  }
-  const ids = input.shape === 'RECIPE'
-    ? [...input.components.map(component => component.itemId), ...(input.choice?.group.options.map(option => option.itemId) ?? [])]
-    : input.item.mode === 'EXISTING' ? [input.item.itemId] : []
-  const names = ids.map(id => held.find(item => item.id === id)).filter(item => item?.ageRestricted).map(item => item!.name)
-  return [...new Set(names)]
-}
-
 function whyHidden(unpriced: SetupServing[], retired: readonly string[]): string | null {
   const parts: string[] = []
   if (unpriced.length > 0) {
