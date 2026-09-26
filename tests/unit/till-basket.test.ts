@@ -225,43 +225,6 @@ describe('saleBody sends exactly what the sale route and the SumUp hand-off both
   })
 })
 
-describe('expectedAfter shrinks to match a refusal, so the server\'s cross-check never refuses a figure nobody asked for (F-104, F-106)', () => {
-  test('an accepted check keeps the full priced total', () => {
-    const { basket, scope } = setup([aProduct({ ageRestricted: true })])
-    basket.tapVariant('Lager', aVariant())
-    basket.priced.value = aPriced({ totalPence: 500, lines: [{ variantId: 'variant-1', productName: 'Lager', variantLabel: 'Pint', choiceItemName: null, qty: 1, unitPricePence: 500, priceSource: 'variant', amountPence: 500, discountPence: 0 }] })
-    const accepted: InlineAgeCheckInput = { outcome: 'ACCEPTED', idType: 'PASSPORT', reason: null, description: 'Checked at the till', notes: null }
-    expect(basket.expectedAfter(accepted)).toBe(500)
-    scope.stop()
-  })
-
-  test('a refusal drops the restricted line and keeps the rest', () => {
-    const restricted = aProduct({ id: 'p-2', name: 'Wine', ageRestricted: true, variants: [aVariant({ id: 'variant-2', label: 'Small', pricePence: 300 })] })
-    const { basket, scope } = setup([aProduct(), restricted])
-    basket.tapVariant('Lager', aVariant())
-    basket.tapVariant('Wine', aVariant({ id: 'variant-2', label: 'Small', pricePence: 300 }))
-    basket.priced.value = aPriced({
-      totalPence: 800,
-      lines: [
-        { variantId: 'variant-1', productName: 'Lager', variantLabel: 'Pint', choiceItemName: null, qty: 1, unitPricePence: 500, priceSource: 'variant', amountPence: 500, discountPence: 0 },
-        { variantId: 'variant-2', productName: 'Wine', variantLabel: 'Small', choiceItemName: null, qty: 1, unitPricePence: 300, priceSource: 'variant', amountPence: 300, discountPence: 0 },
-      ],
-    })
-    const refused: InlineAgeCheckInput = { outcome: 'REFUSED', idType: null, reason: 'APPEARED_UNDERAGE', description: 'Looked under 18', notes: null }
-    expect(basket.expectedAfter(refused)).toBe(500)
-    scope.stop()
-  })
-
-  test('ticket and walk-up money rides along even when the bar basket is empty', () => {
-    const { basket, scope } = setup([], {
-      ticketsPence: computed(() => 1200),
-      walkUpsPence: computed(() => 300),
-    })
-    expect(basket.expectedAfter(null)).toBe(1500)
-    scope.stop()
-  })
-})
-
 // The charge button reads grandTotalPence, which reads priced: a failure that left the last
 // good price in place would show a wrong figure as a right one.
 describe('a pricing failure clears the total rather than leaving the last good figure (F-103 criterion 3)', () => {
@@ -356,7 +319,6 @@ describe('visibly over 25 settles the sale like a pass, with nothing to write (F
     basket.priced.value = aPriced({ totalPence: 500, lines: [{ variantId: 'variant-1', productName: 'Gin', variantLabel: 'Pint', choiceItemName: null, qty: 1, unitPricePence: 500, priceSource: 'variant', amountPence: 500, discountPence: 0 }] })
     basket.acceptAgeCheck(visiblyOver)
     expect(basket.saleBody(basket.passedAgeCheck.value, 500).ageCheck).toEqual(visiblyOver)
-    expect(basket.expectedAfter(visiblyOver)).toBe(500)
     scope.stop()
   })
 })

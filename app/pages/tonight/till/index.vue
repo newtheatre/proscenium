@@ -6,7 +6,6 @@ import { saysClock } from '#shared/utils/when'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { CompRequest } from '#shared/utils/comps'
 import type { PricedBasket, SaleProduct, SaleReceipt } from '#shared/utils/sale'
-import type { SumupAttemptKind } from '#shared/utils/sumup'
 import type { ChargedReceipt } from '~/composables/useSumUpCharge'
 import type { AgeCheckStep } from '~/components/till/Challenge25Modal.vue'
 
@@ -125,7 +124,6 @@ const {
   refuseAgeCheck,
   lineAmount,
   saleBody,
-  expectedAfter,
   resetBasket,
   resetSelections,
 } = useTillBasket({
@@ -156,6 +154,8 @@ onMounted(() => {
 })
 
 const charging = ref(false)
+// Where a charge whose start went unanswered shows up, so nobody starts a second one blind.
+const UNANSWERED_FIRST = 'Look under Unanswered card charges before charging again.'
 const chargeFailure = ref<string | null>(null)
 const charged = ref<ChargedReceipt | null>(null)
 
@@ -181,6 +181,7 @@ const {
   checkAttempt,
   resolveAttempt,
   refreshOpenAttempts,
+  rememberAttempt,
 } = useSumUpCharge({
   request: (path, options) => $fetch(path, options),
   returnedAttemptId: typeof route.query.attempt === 'string' ? route.query.attempt : null,
@@ -293,7 +294,7 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
 
   charging.value = true
   chargeFailure.value = null
-  const body = saleBody(ageCheck, expectedAfter(ageCheck))
+  const body = saleBody(ageCheck, grandTotalPence.value!)
   const typed = needsTheReader(body)
   try {
     if (typed) {
@@ -305,7 +306,6 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
     const answered = await $fetch<SaleReceipt>('/api/till/sale', { method: 'POST', body })
     charged.value = {
       totalPence: answered.totalPence,
-      refusedLines: answered.refusedLines,
       discount: answered.discount,
       tab: answered.tab,
       tickets: answered.tickets,
@@ -317,9 +317,7 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
   catch (refused) {
     // K-103 protects reads, not writes: a transport failure needs different words from an
     // ordinary refusal, since whether the sale landed is unknown rather than settled (finding 16).
-    chargeFailure.value = writeFailureText(refused, typed
-      ? 'Look under Unanswered card charges before charging again.'
-      : 'Check the tab before charging it again.')
+    chargeFailure.value = writeFailureText(refused, typed ? UNANSWERED_FIRST : 'Check the tab before charging it again.')
     ageCheckStep.value = 'closed'
     // A start that may have landed is listed, so nobody has to guess before charging again.
     if (typed) void refreshOpenAttempts()
@@ -332,19 +330,7 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
   }
 }
 
-// What this screen keeps of a started charge, enough to bring the basket back if it is turned down.
-function rememberAttempt(started: { id: string, totalPence: number }, kind: SumupAttemptKind): void {
-  sumup.remember({
-    id: started.id,
-    kind,
-    totalPence: started.totalPence,
-    startedAt: Date.now(),
-    basket: { bar: basket.value, tickets: ticketLines.value, walkUps: walkUpLines.value, discountId: selectedDiscountId.value },
-  })
-}
-
-// The hand-off (F-124 criterion 1): the basket is held on an attempt and the SumUp app opens;
-// what this screen remembers is enough to bring the basket back if the app says no.
+// The hand-off (F-124 criterion 1): the basket is held on an attempt and the SumUp app opens.
 async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.value): Promise<void> {
   if (!readyToCharge()) return
   if (!ageCheck && needsAgeCheck.value) {
@@ -356,7 +342,7 @@ async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = passedAgeChe
   charging.value = true
   chargeFailure.value = null
   try {
-    const expectedTotalPence = expectedAfter(ageCheck)
+    const expectedTotalPence = grandTotalPence.value!
     const started = await $fetch<{ id: string, launchUrl: string, totalPence: number }>('/api/till/payments', {
       method: 'POST',
       body: saleBody(ageCheck, expectedTotalPence),
@@ -368,7 +354,7 @@ async function chargeOnSumUp(ageCheck: InlineAgeCheckInput | null = passedAgeChe
   }
   catch (refused) {
     // This only starts a hand-off, not a sale, so the ambiguity is whether that start landed.
-    chargeFailure.value = writeFailureText(refused, 'Look under Unanswered card charges before charging again.')
+    chargeFailure.value = writeFailureText(refused, UNANSWERED_FIRST)
     ageCheckStep.value = 'closed'
     void refreshOpenAttempts()
     await recomputeTotal()
@@ -400,10 +386,16 @@ function submitAgeCheck(outcome: InlineAgeCheckInput): void {
 // reaches the register now, as the tap's does (F-106 criterion 6), and the rest is charged after.
 async function refuseAtTheCharge(outcome: InlineAgeCheckInput, via: 'reader' | 'sumup'): Promise<void> {
   ageCheckStep.value = 'closed'
-  await refuseAgeCheck(outcome)
-  if (basketEmpty.value) return
-  await recomputeTotal()
-  void (via === 'sumup' ? chargeOnSumUp(null) : charge(null))
+  // Held through the write and the reprice, so a tap on the old total cannot start a second charge.
+  charging.value = true
+  try {
+    await refuseAgeCheck(outcome)
+    if (!basketEmpty.value) await recomputeTotal()
+  }
+  finally {
+    charging.value = false
+  }
+  if (!basketEmpty.value) await (via === 'sumup' ? chargeOnSumUp(null) : charge(null))
 }
 
 function nextSale(): void {
@@ -782,13 +774,6 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
           >
             Print the pass
           </UButton>
-          <UAlert
-            v-if="charged && charged.refusedLines.length"
-            data-test="age-check-refused-note"
-            color="warning"
-            variant="subtle"
-            :description="`ID refused. Not sold: ${charged.refusedLines.map(line => line.productName).join(', ')}`"
-          />
           <UAlert
             v-if="charged && charged.discount"
             data-test="discount-applied-note"

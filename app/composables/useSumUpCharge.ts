@@ -3,7 +3,7 @@ import { usePendingPoll } from './usePendingPoll'
 import { useSumUp } from './useSumUp'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
-import type { PricedLine, SaleReceipt, TillBooking } from '#shared/utils/sale'
+import type { SaleReceipt, TillBooking } from '#shared/utils/sale'
 import type { ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
 import type { TillSession } from '#shared/utils/till'
 import type { BasketLine, WalkUpLine } from './useTillBasket'
@@ -14,7 +14,6 @@ import type { PendingAttempt } from './useSumUp'
 
 export interface ChargedReceipt {
   totalPence: number
-  refusedLines: PricedLine[]
   discount: SaleReceipt['discount']
   tab: SaleReceipt['tab']
   tickets: SaleReceipt['tickets']
@@ -50,7 +49,7 @@ export interface SumUpChargeDeps {
 
 const RESTORED_ELSEWHERE = 'SumUp did not take that payment, and its basket was restored in another tab on this phone. Carry on in that tab.'
 
-const TOOK_IT_ALREADY = 'if the reader did take the money, charge it again and press Reader took it without taking the card a second time.'
+const TOOK_IT_ALREADY = 'if the reader did take the money, charge it again by hand (Key in by hand on a phone with SumUp) and press Reader took it, without taking the card a second time.'
 
 // What the till says over a basket that came back, by who turned it down (0096).
 function returnedWords(attempt: { kind?: SumupAttemptKind, status: 'FAILED' | 'ABANDONED' }): string {
@@ -102,6 +101,17 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     resetSelections()
   }
 
+  // What this screen keeps of a started charge, enough to bring the basket back if it is turned down.
+  function rememberAttempt(started: { id: string, totalPence: number }, kind: SumupAttemptKind): void {
+    sumup.remember({
+      id: started.id,
+      kind,
+      totalPence: started.totalPence,
+      startedAt: Date.now(),
+      basket: { bar: basket.value, tickets: ticketLines.value, walkUps: walkUpLines.value, discountId: selectedDiscountId.value },
+    })
+  }
+
   // Once answered: a success clears the basket (with the receipt when this screen answered, so the
   // door passes show), a failure brings it back, a mismatch stays with its reason (criteria 4, 5).
   function settleAttempt(status: SumupAttemptStatus, pending: NonNullable<typeof sumup.pending.value>, receipt: SaleReceipt | null = null): void {
@@ -109,7 +119,6 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       stopWatching()
       charged.value = {
         totalPence: receipt?.totalPence ?? pending.totalPence,
-        refusedLines: receipt?.refusedLines ?? [],
         discount: receipt?.discount ?? null,
         tab: null,
         tickets: receipt?.tickets ?? [],
@@ -165,8 +174,8 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       // itself is one (issue 1144).
       void nextTick(() => {
         chargeFailure.value = returnedWords(restoring)
-        // Try SumUp again is for a hand-off; a declined typed charge is charged again as it was.
-        retryOffered.value = restoring.kind !== 'TYPED'
+        // Only after SumUp said no: an abandoned hand-off may have taken the money already.
+        retryOffered.value = restoring.kind !== 'TYPED' && restoring.status === 'FAILED'
       })
     }
     else if (claim.outcome === 'elsewhere') {
@@ -274,6 +283,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     startWatching,
     resolveAttempt,
     refreshOpenAttempts,
+    rememberAttempt,
     resume,
     returnToTab,
   }

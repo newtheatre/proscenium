@@ -36,7 +36,7 @@ function setup(status: Outcome, visible = ref(true), options: SetupOptions = {})
   const charged = ref<ChargedReceipt | null>(null)
   const asked: string[] = []
   const deps = {
-    // The app answering as the SumUp app told it: the attempt is over and the money never moved.
+    // The server answering every read and resolve at the status this tab was set up with.
     request: async <T>(path: string) => {
       asked.push(path)
       if (path.endsWith('/resolve')) return { status, error: null, receipt: options.receipt ?? null } as T

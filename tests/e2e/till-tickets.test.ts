@@ -363,6 +363,8 @@ describe.skipIf(skip !== null)('the hand-off to the SumUp app (F-124)', () => {
     expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', failing.id)!.status).toBe('PENDING')
 
     const started = await (await send('POST', '/api/till/payments', { venueId, lines: [], tickets: [{ reservationId: contested.id }], expectedTotalPence: 900 }, barManager.cookie)).json() as AttemptAnswer
+    // A hand-off is answered Payment did not, never Card declined (0096).
+    expect((await answerCharge(app, started.id, 'declined', barManager.cookie)).status).toBe(409)
     const closeRefused = await send('POST', '/api/till/close', { id: sessionId, actualZPence: 0 }, barManager.cookie)
     expect(closeRefused.status).toBe(409)
     expect(await message(closeRefused)).toContain('waiting for an answer')
