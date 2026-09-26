@@ -44,8 +44,17 @@ export interface AccessTonight {
   wording: string
 }
 
-// The bookings that hold an access or companion ticket, which is the same test the desk's own
-// screen applies before it decrypts anything (D-127 criterion 3).
+// A booking holding a live access or companion ticket: the one test the glance and the door's
+// verdict both apply before any wording is decrypted (D-127 criterion 3).
+export function holdsLiveAccessTicket(reservation: SQL): SQL {
+  return sql`EXISTS (
+    SELECT 1 FROM tickets t
+    JOIN ticket_types tt ON tt.id = t.ticket_type_id
+    WHERE t.reservation_id = ${reservation} AND t.refunded_at IS NULL AND tt.access_kind IS NOT NULL
+  )`
+}
+
+// Tonight's bookings holding an access or companion ticket, in name order.
 export function accessBookingsQuery(performanceId: string): SQL {
   return sql`
     SELECT r.user_id AS userId, u.name AS name, ${heldSeatsForReservation(sql`r.id`)} AS party
@@ -53,11 +62,7 @@ export function accessBookingsQuery(performanceId: string): SQL {
     JOIN users u ON u.id = r.user_id
     WHERE r.performance_id = ${performanceId}
       AND r.status IN (${holding})
-      AND EXISTS (
-        SELECT 1 FROM tickets t
-        JOIN ticket_types tt ON tt.id = t.ticket_type_id
-        WHERE t.reservation_id = r.id AND t.refunded_at IS NULL AND tt.access_kind IS NOT NULL
-      )
+      AND ${holdsLiveAccessTicket(sql`r.id`)}
     ORDER BY u.name COLLATE NOCASE
   `
 }

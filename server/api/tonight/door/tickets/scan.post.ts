@@ -25,12 +25,14 @@ export default defineEventHandler(async (event) => {
     reservation.admittedAt,
   )
 
+  // Tonight's own booking only: the agreed wording is for the person in front of the door (D-128 4).
+  const [party, accessWording] = await Promise.all([
+    doorParty(reservation.id),
+    reservation.performanceId === input.performanceId ? doorAccessWording(reservation.id) : null,
+  ])
   // The door's own card reads `data`; the message is unchanged, so the desk still gets the
   // amount due while the screen shows the wording (E-129 criterion 7).
-  const party = await doorParty(reservation.id)
   const unpaid = reservation.status === 'PENDING' && reservation.performanceId === input.performanceId
-  // Tonight's own booking only: the agreed wording is for the person in front of the door (D-128 4).
-  const accessWording = reservation.performanceId === input.performanceId ? await doorAccessWording(reservation.id) : null
 
   if (!outcome.admit) {
     throw createError({

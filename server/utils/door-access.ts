@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { doorWordingFor } from './access-profiles'
+import { holdsLiveAccessTicket } from './tonight-glance'
 import type { SQL } from 'drizzle-orm'
 
 // The agreed access wording on the door's verdict (D-128 criterion 4, issue 1307). Only a booking
@@ -9,12 +10,7 @@ export function doorAccessHolderQuery(reservationId: string): SQL {
   return sql`
     SELECT r.user_id AS userId
     FROM reservations r
-    WHERE r.id = ${reservationId} AND r.user_id IS NOT NULL
-      AND EXISTS (
-        SELECT 1 FROM tickets t
-        JOIN ticket_types tt ON tt.id = t.ticket_type_id
-        WHERE t.reservation_id = r.id AND t.refunded_at IS NULL AND tt.access_kind IS NOT NULL
-      )
+    WHERE r.id = ${reservationId} AND r.user_id IS NOT NULL AND ${holdsLiveAccessTicket(sql`r.id`)}
   `
 }
 

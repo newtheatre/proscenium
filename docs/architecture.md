@@ -1180,12 +1180,14 @@ roles, through `requireAnyNightAuthority()` and `tonightView()` in `server/utils
 which the duty manager's route now builds on too, adding the team. The hub reads its numbers from
 it, so a door or bar shift sees the house; the glance falls back to it read-only when the duty
 manager's route refuses, drawing none of the comp requests, the rota, the backstage code or the
-close. The access wording rides it only where `seesAccessTonight()` says the resolved role may read
-it, the door and the duty manager, never the bar (D-127 criterion 3); the door is tried first, so a
-volunteer holding a door shift resolves as the door. The door's strip under the camera reads it
-too. A ticket scan's verdict carries the agreed wording for a booking holding a live access or
-companion ticket (`doorAccessWording()`, `server/utils/door-access.ts`), and nothing for any other
-(D-128 criterion 4).
+close. The door's strip under the camera reads it too, for the numbers. The access wording rides
+it only when the caller asks (`?access=1`, which only the glance sends) and `seesAccessTonight()`
+says the resolved role may read it, the door and the duty manager, never the bar (D-127 criterion
+3), so the hub's and the strip's 20-second polls never decrypt a profile. The door is tried first,
+so a volunteer holding a door shift resolves as the door. A ticket scan's verdict carries the
+agreed wording for a booking holding a live access or companion ticket (`doorAccessWording()`,
+`server/utils/door-access.ts`, sharing `holdsLiveAccessTicket()` with the glance), and nothing for
+any other (D-128 criterion 4).
 
 `readTeamRow()` is the roster's pure half: `OPEN`, `DECLINED` and an unconfirmed `CLAIMED` all
 read as unfilled, because "who is actually coming" is the question the screen answers, never a

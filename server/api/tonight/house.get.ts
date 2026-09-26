@@ -1,13 +1,16 @@
+import { z } from 'zod'
 import { seesAccessTonight } from '#shared/utils/night-hub'
 
-// Tonight's house and show information for any of the three roles, access wording for the door and
-// the duty manager only (issue 1307, D-127 criterion 3); the door is tried first so it reads it.
-export default defineEventHandler(async (event) => {
-  const resolved = await requireAnyNightAuthority(event, ['DOOR', 'DUTY_MANAGER', 'BAR'])
+// Tonight's house and show information for any of the three roles, the door tried first. Access
+// wording is decrypted only when a screen showing it asks, for the door or duty manager (D-127 3).
+const query = z.object({ access: yesOrNo.optional() })
 
-  const performances = await Promise.all(resolved.performanceIds.map(performanceId =>
-    tonightView(performanceId, seesAccessTonight(resolved.role)),
-  ))
+export default defineEventHandler(async (event) => {
+  const { access: asked } = await getValidatedQueryOrThrow(event, query)
+  const resolved = await requireAnyNightAuthority(event, ['DOOR', 'DUTY_MANAGER', 'BAR'])
+  const withAccess = Boolean(asked) && seesAccessTonight(resolved.role)
+
+  const performances = await Promise.all(resolved.performanceIds.map(performanceId => tonightView(performanceId, withAccess)))
 
   return {
     night: resolved.night,

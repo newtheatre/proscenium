@@ -105,7 +105,7 @@ async function load(): Promise<void> {
 
 async function loadReadOnly(): Promise<void> {
   try {
-    data.value = await request<DutyManagerTonight>('/api/tonight/house')
+    data.value = await request<DutyManagerTonight>('/api/tonight/house', { query: { access: 1 } })
     dutyManager.value = false
     syncedAt.value = new Date()
     failure.value = null
@@ -198,10 +198,6 @@ setNightSubject(() => ({
   title: selected.value?.showTitle ?? 'Tonight',
   meta: selected.value ? nightHeaderLine(selected.value.startsAt, selected.value.venueName) : null,
 }))
-
-// `/api/tonight/duty-manager` answers only a duty manager, so its answer is the fact that this
-// viewer can close tonight; a door or bar shift gets the screen's own action instead (0009).
-const canClose = computed(() => dutyManager.value)
 
 const guidance = computed(() => {
   const performance = selected.value
@@ -702,8 +698,9 @@ onUnmounted(() => {
     </UModal>
 
     <template #actions>
+      <!-- The duty manager's route answering is the fact this viewer can close tonight (0009). -->
       <NightAction
-        v-if="canClose"
+        v-if="dutyManager"
         label="Close the night"
         icon="i-lucide-moon-star"
         color="neutral"

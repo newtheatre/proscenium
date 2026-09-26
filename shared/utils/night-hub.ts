@@ -111,13 +111,14 @@ export function passPressureAdvice(covering: number, headroom: number | null): s
   return 'More passes than seats left: admit in order of arrival and send walk-ups to the bar.'
 }
 
-/** "2h 10 · 1 interval", the answer the door is asked most often after the price. */
+// "1 interval of 20 minutes", or "straight through" for none.
 export function saysIntervals(intervalCount: number, intervalMinutes: number | null): string {
   if (intervalCount === 0) return 'straight through'
   const counted = plural(intervalCount, 'interval')
   return intervalMinutes ? `${counted} of ${intervalMinutes} minutes` : counted
 }
 
+/** "2h 10 · 1 interval", the answer the door is asked most often after the price. */
 export function runningTimeLine(durationMinutes: number | null, intervalCount: number, intervalMinutes: number | null): string {
   const intervals = saysIntervals(intervalCount, intervalMinutes)
   if (durationMinutes === null) return `Running time not yet stated · ${intervals}`
