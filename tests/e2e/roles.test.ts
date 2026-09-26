@@ -218,6 +218,23 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     const read = await fetch(`${app.baseURL}/api/admin/roles?userId=${subjectId}`, { headers: { cookie } })
     expect(await read.json()).toMatchObject({ roles: [] })
   })
+
+  // 0049: the trail records a revocation only when one happened.
+  test('revoking a role nobody holds answers ok and records nothing', async () => {
+    const { Database } = await import('bun:sqlite')
+    const revocations = (): number => {
+      const database = new Database(app.databaseFile, { readonly: true })
+      try {
+        return (database.query(`SELECT count(*) AS n FROM audit_log WHERE action = 'role.revoked' AND target = ?`).get(`user:${subjectId}`) as { n: number }).n
+      }
+      finally {
+        database.close()
+      }
+    }
+    const before = revocations()
+    expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)).status).toBe(200)
+    expect(revocations()).toBe(before)
+  })
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
