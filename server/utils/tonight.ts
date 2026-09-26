@@ -88,7 +88,7 @@ export async function tonightTeam(performanceId: string): Promise<TonightTeamMem
 
 // A claim of this role waiting for an officer, inside the request's own scope on tonight's
 // programme; a bar claim may sit on a performance or on tonight's bar opening (E-104, 0077).
-export function claimedShiftTonightQuery(userId: string, role: ShiftRole, from: number, to: number, scope: ConfirmedShiftScope = {}): SQL {
+export function claimedShiftTonightQuery(userId: string, role: ShiftRole, from: number, to: number, scope: ConfirmedShiftScope): SQL {
   const atVenue = scope.venueId ? sql` AND p.venue_id = ${scope.venueId}` : sql``
   const atPerformance = scope.performanceId ? sql` AND p.id = ${scope.performanceId}` : sql``
   // Narrowed as the guard's own opening lookup is: by venue alone, since an opening names no performance.
@@ -111,7 +111,7 @@ export function claimedShiftTonightQuery(userId: string, role: ShiftRole, from: 
   `
 }
 
-export async function claimedShiftTonight(userId: string, role: ShiftRole, night: string, scope: ConfirmedShiftScope = {}): Promise<boolean> {
+export async function claimedShiftTonight(userId: string, role: ShiftRole, night: string, scope: ConfirmedShiftScope): Promise<boolean> {
   const { from, to } = showNightBounds(night)
   const [row] = await db.all<{ claimed: number }>(
     claimedShiftTonightQuery(userId, role, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000), scope),
