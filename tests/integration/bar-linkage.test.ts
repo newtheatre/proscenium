@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { STOCK_COUNTED_QUERY, pouredByColumn, readPouredBy, readTillServings, retireItemStatements, servingsAvailableQuery, tillServingsQuery } from '#server/utils/bar-linkage'
+import { STOCK_COUNTED_QUERY, checkIdHeld, pouredByColumn, readPouredBy, readRestrictedPours, readTillServings, restrictedPoursColumn, retireItemStatements, servingsAvailableQuery, tillServingsQuery, withoutCheckIdPredicate } from '#server/utils/bar-linkage'
 import type { TillServings, TillServingsRow } from '#server/utils/bar-linkage'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -365,6 +365,132 @@ describe('the stock is counted once a stocktake has been applied (F-128 criterio
       bar(database)
       insert(database, 'stocktakes', { id: 'st-1', status: 'APPLIED', opened_by: 'user-1', opened_at: 1000, applied_by: 'user-1', applied_at: 2000 })
       expect(counted(database)).toBe(true)
+    })
+  })
+})
+
+// Issue 1299, F-106 and F-111 criterion 6: a wine set up through either form went on the till
+// without Check ID, so the catalogue answers which products pour restricted stock without it.
+describe('the products that pour restricted stock without Check ID (issue 1299)', () => {
+  function catalogue(database: TestDatabase): void {
+    insert(database, 'users', { id: 'user-1', email: 'manager@newtheatre.org.uk', name: 'Bar manager' })
+    insert(database, 'bar_categories', { id: 'cat-1', name: 'Wine' })
+    insert(database, 'bar_items', { id: 'item-merlot', name: 'Merlot 750ml', unit: 'ML', container_ml: 750, age_restricted: 1 })
+    insert(database, 'bar_items', { id: 'item-vodka', name: 'Vodka 700ml', unit: 'ML', container_ml: 700, age_restricted: 1 })
+    insert(database, 'bar_items', { id: 'item-cola', name: 'Cola can', unit: 'ITEM', age_restricted: 0 })
+
+    const product = (id: string, name: string, over: Record<string, unknown> = {}): void =>
+      insert(database, 'bar_products', { id, category_id: 'cat-1', name, status: 'ACTIVE', age_restricted: 0, ...over })
+    const size = (id: string, productId: string, over: Record<string, unknown> = {}): void =>
+      insert(database, 'product_variants', { id, product_id: productId, serving_kind: 'item', label: 'Each', ...over })
+
+    product('prod-review-merlot', 'Review Merlot')
+    size('var-review-merlot', 'prod-review-merlot', { serving_kind: '175ml', label: '175ml' })
+    insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-review-merlot', item_id: 'item-merlot', qty: 175 })
+
+    product('prod-house-red', 'House red', { age_restricted: 1 })
+    size('var-house-red', 'prod-house-red')
+    insert(database, 'variant_components', { id: 'c-2', variant_id: 'var-house-red', item_id: 'item-merlot', qty: 750 })
+
+    product('prod-cola', 'Cola')
+    size('var-cola', 'prod-cola')
+    insert(database, 'variant_components', { id: 'c-3', variant_id: 'var-cola', item_id: 'item-cola', qty: 1 })
+
+    // A cola offering a shot of vodka as its choice pours vodka whenever the shot is chosen.
+    insert(database, 'choice_groups', { id: 'group-shot', name: 'Add a shot' })
+    insert(database, 'choice_group_items', { id: 'gi-1', choice_group_id: 'group-shot', item_id: 'item-vodka', qty: 25 })
+    product('prod-spiked', 'Spiked cola', { status: 'HIDDEN' })
+    size('var-spiked', 'prod-spiked')
+    insert(database, 'variant_components', { id: 'c-4', variant_id: 'var-spiked', item_id: 'item-cola', qty: 1 })
+    insert(database, 'variant_components', { id: 'c-5', variant_id: 'var-spiked', choice_group_id: 'group-shot', qty: 1 })
+
+    product('prod-old-merlot', 'Old Merlot', { status: 'RETIRED' })
+    size('var-old-merlot', 'prod-old-merlot')
+    insert(database, 'variant_components', { id: 'c-6', variant_id: 'var-old-merlot', item_id: 'item-merlot', qty: 750 })
+
+    product('prod-carafe', 'Carafe')
+    size('var-carafe', 'prod-carafe', { status: 'RETIRED' })
+    insert(database, 'variant_components', { id: 'c-7', variant_id: 'var-carafe', item_id: 'item-merlot', qty: 500 })
+  }
+
+  function restrictedPours(database: TestDatabase, productId: string): string[] {
+    const [statement, ...parameters] = boundStatement(database, restrictedPoursColumn('p'))
+    const [row] = rows<{ pours: string }>(database,
+      `SELECT ${statement} AS pours FROM bar_products p WHERE p.id = ?`, ...parameters, productId)
+    return readRestrictedPours(row?.pours ?? null)
+  }
+
+  function withoutCheckId(database: TestDatabase): string[] {
+    const [statement, ...parameters] = boundStatement(database, withoutCheckIdPredicate('p'))
+    return rows<{ id: string }>(database,
+      `SELECT p.id AS id FROM bar_products p WHERE ${statement} ORDER BY p.name`, ...parameters).map(row => row.id)
+  }
+
+  function held(database: TestDatabase, productId: string, ageRestricted: boolean): boolean {
+    const [statement, ...parameters] = boundStatement(database, checkIdHeld(productId, ageRestricted))
+    return Number(rows<{ held: number }>(database, `SELECT ${statement} AS held`, ...parameters)[0]?.held) === 1
+  }
+
+  test('a product names the restricted stocked items its live sizes pour', async () => {
+    await withDatabase((database) => {
+      catalogue(database)
+      expect(restrictedPours(database, 'prod-review-merlot')).toEqual(['Merlot 750ml'])
+      expect(restrictedPours(database, 'prod-cola')).toEqual([])
+    })
+  })
+
+  test('an item offered as a choice is poured by the product offering it', async () => {
+    await withDatabase((database) => {
+      catalogue(database)
+      expect(restrictedPours(database, 'prod-spiked')).toEqual(['Vodka 700ml'])
+    })
+  })
+
+  test('a retired size pours nothing', async () => {
+    await withDatabase((database) => {
+      catalogue(database)
+      expect(restrictedPours(database, 'prod-carafe')).toEqual([])
+    })
+  })
+
+  // Hidden and retired count: either goes back on the till with one press, and would sell without
+  // Check ID the moment it did.
+  test('the correction list holds every product pouring restricted stock unrestricted', async () => {
+    await withDatabase((database) => {
+      catalogue(database)
+      expect(withoutCheckId(database)).toEqual(['prod-old-merlot', 'prod-review-merlot', 'prod-spiked'])
+    })
+  })
+
+  test('switching the product on, or the stocked item off, takes it off the list', async () => {
+    await withDatabase((database) => {
+      catalogue(database)
+      database.batch([
+        [`UPDATE bar_products SET age_restricted = 1 WHERE id IN ('prod-review-merlot', 'prod-old-merlot')`],
+        [`UPDATE bar_items SET age_restricted = 0 WHERE id = 'item-vodka'`],
+      ])
+      expect(withoutCheckId(database)).toEqual([])
+    })
+  })
+
+  test('saving a product unrestricted holds only where it pours nothing restricted', async () => {
+    await withDatabase((database) => {
+      catalogue(database)
+      expect(held(database, 'prod-review-merlot', false)).toBe(false)
+      expect(held(database, 'prod-review-merlot', true)).toBe(true)
+      expect(held(database, 'prod-cola', false)).toBe(true)
+      expect(held(database, 'prod-spiked', false)).toBe(false)
+    })
+  })
+
+  // 0006: both read over the rows they are given and bind nothing per product or item.
+  test('neither the cell nor the list binds a parameter', async () => {
+    await withDatabase((database) => {
+      catalogue(database)
+      const [, ...cell] = boundStatement(database, restrictedPoursColumn('p'))
+      const [, ...list] = boundStatement(database, withoutCheckIdPredicate('p'))
+      expect(cell).toEqual([])
+      expect(list).toEqual([])
     })
   })
 })

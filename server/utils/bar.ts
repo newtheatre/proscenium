@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { pouredByColumn, readPouredBy } from './bar-linkage'
+import { pouredByColumn, readPouredBy, readRestrictedPours, restrictedPoursColumn, withoutCheckIdPredicate } from './bar-linkage'
 import type { SQL } from 'drizzle-orm'
 import { SERVING_KINDS, effectivePriceRow } from '#shared/utils/bar'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
@@ -319,10 +319,11 @@ export async function claimName(entity: NamedEntity, name: string, exceptId?: st
   return row
 }
 
-interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 'everSold'> {
+interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 'everSold' | 'restrictedPours'> {
   staffedOnly: number
   ageRestricted: number
   everSold: number
+  restrictedPours: string | null
 }
 
 const readProduct = (row: ProductRow): BarProduct => ({
@@ -330,6 +331,7 @@ const readProduct = (row: ProductRow): BarProduct => ({
   staffedOnly: row.staffedOnly === 1,
   ageRestricted: row.ageRestricted === 1,
   everSold: row.everSold === 1,
+  restrictedPours: readRestrictedPours(row.restrictedPours),
 })
 
 export const PRODUCT_COLUMNS = sql`
@@ -357,13 +359,21 @@ export function productsClause(query: ListQuery): ListClause {
   return whereFrom(barProductsList, query, {
     column: productColumns,
     search: [sql`p.name`],
-    fields: { retired: yesNo(sql`p.status = 'RETIRED'`) },
+    fields: {
+      retired: yesNo(sql`p.status = 'RETIRED'`),
+      withoutCheckId: yesNo(withoutCheckIdPredicate('p')),
+    },
   })
 }
 
+// Every column readProduct reads: a function, since productEverSoldColumn reads the references
+// afresh on each call.
+const productRowColumns = (): SQL =>
+  sql`${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold, ${restrictedPoursColumn('p')} AS restrictedPours`
+
 export function productsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
-    SELECT ${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold
+    SELECT ${productRowColumns()}
     FROM bar_products p JOIN bar_categories c ON c.id = p.category_id${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
@@ -383,7 +393,7 @@ export async function countProducts(clause: ListClause): Promise<number> {
 
 export async function productById(id: string): Promise<BarProduct | undefined> {
   const [row] = await db.all<ProductRow>(sql`
-    SELECT ${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold
+    SELECT ${productRowColumns()}
     FROM bar_products p JOIN bar_categories c ON c.id = p.category_id WHERE p.id = ${id}
   `)
   return row ? readProduct(row) : undefined

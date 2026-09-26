@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { planProductSetup } from '#server/utils/bar-setup'
+import { checkIdRefusal, productSetupForm, restrictedStockOf } from '#shared/utils/bar'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 import type { SetupContext, SetupPlan } from '#server/utils/bar-setup'
@@ -321,6 +322,64 @@ describe('a product goes on the till only when every size resolves (F-127 criter
       expect(plan.status).toBe('HIDDEN')
       expect(plan.reason).toContain('Campari')
     })
+  })
+})
+
+// Issue 1299 (F-106, F-111 criterion 6): the guided form wrote the product's own starting value
+// onto the new stocked item, so a wine went on the till with no Check ID.
+describe('a product set up over restricted stock asks for Check ID (issue 1299)', () => {
+  const REGISTER = [
+    { id: 'item-gin', name: 'Gin', ageRestricted: true },
+    { id: 'item-campari', name: 'Campari', ageRestricted: true },
+    { id: 'item-vermouth', name: 'Vermouth', ageRestricted: true },
+    { id: 'item-orange', name: 'Orange', ageRestricted: false },
+    { id: 'item-lemon', name: 'Lemon', ageRestricted: false },
+    { id: 'item-cola', name: 'Cola can', ageRestricted: false },
+  ]
+  const unrestricted = { ageRestricted: false }
+
+  test('a new stocked item nobody said anything about starts restricted, and the product follows it', () => {
+    const wine = productSetupForm.parse({
+      ...HOUSE_RED,
+      product: { ...HOUSE_RED.product, name: 'Review Merlot', ...unrestricted },
+      item: { mode: 'NEW', item: { name: 'Review Merlot 750ml', unit: 'ML', containerMl: 750 } },
+    })
+    const poured = restrictedStockOf(wine, [])
+    expect(poured).toEqual(['Review Merlot 750ml'])
+    expect(checkIdRefusal(wine.product, poured)).toContain('Review Merlot 750ml, which is age restricted')
+  })
+
+  test('a new stocked item switched off is not restricted stock', () => {
+    const cola = productSetupForm.parse({
+      ...CIDER,
+      product: { ...CIDER.product, name: 'Cola', ...unrestricted },
+      item: { mode: 'NEW', item: { name: 'Cola can', unit: 'ITEM', ...unrestricted } },
+    })
+    expect(restrictedStockOf(cola, [])).toEqual([])
+  })
+
+  test('an item from the register is read for its own flag, not the product\'s', () => {
+    const gin = { ...CIDER, product: { ...CIDER.product, ...unrestricted }, item: { mode: 'EXISTING', itemId: 'item-gin' } } as ProductSetupInput
+    const cola = { ...CIDER, product: { ...CIDER.product, ...unrestricted }, item: { mode: 'EXISTING', itemId: 'item-cola' } } as ProductSetupInput
+    expect(restrictedStockOf(gin, REGISTER)).toEqual(['Gin'])
+    expect(restrictedStockOf(cola, REGISTER)).toEqual([])
+  })
+
+  test('a recipe is restricted by any ingredient or any option of its choice', () => {
+    expect(restrictedStockOf(NEGRONI, REGISTER)).toEqual(['Gin', 'Campari', 'Vermouth'])
+    const shandy = {
+      ...NEGRONI,
+      components: [{ itemId: 'item-cola', qty: 1 }],
+      choice: { group: { name: 'Add a shot', options: [{ itemId: 'item-lemon', qty: 1 }, { itemId: 'item-gin', qty: 25 }] }, qty: 1, includedInPrice: false },
+    } as ProductSetupInput
+    expect(restrictedStockOf(shandy, REGISTER)).toEqual(['Gin'])
+  })
+
+  test('only a product left unrestricted over restricted stock is refused', () => {
+    expect(checkIdRefusal({ name: 'Negroni', ageRestricted: true }, ['Gin'])).toBe(null)
+    expect(checkIdRefusal({ name: 'Cola', ageRestricted: false }, [])).toBe(null)
+    expect(checkIdRefusal({ name: 'Negroni', ageRestricted: false }, ['Gin', 'Campari']))
+      .toBe('Negroni pours Gin and Campari, which are age restricted, so it asks for Check ID too: switch Age restricted on, or switch it off on any stocked item that is not alcohol')
   })
 })
 

@@ -34,11 +34,54 @@ export function pouredByColumn(alias: string): SQL {
   )`
 }
 
-// SQLite hands back the array as text, and an item nothing pours as an empty one.
-export function readPouredBy(value: string | null): PouredBy[] {
+// SQLite hands back json_group_array as text, and an empty group as an empty array.
+function readJsonArray<T>(value: string | null): T[] {
   if (!value) return []
-  const parsed = JSON.parse(value) as PouredBy[]
+  const parsed = JSON.parse(value) as T[]
   return Array.isArray(parsed) ? parsed : []
+}
+
+export const readPouredBy = (value: string | null): PouredBy[] => readJsonArray(value)
+
+// The other direction: the items a product's live sizes deplete, or offer as a choice. A subquery
+// over the product it is handed, so it binds nothing per product or item (0006).
+function itemsPouredBy(product: SQL): SQL {
+  return sql`
+    SELECT c.item_id FROM product_variants v JOIN variant_components c ON c.variant_id = v.id
+    WHERE v.product_id = ${product} AND v.status = 'ACTIVE' AND c.item_id IS NOT NULL
+    UNION
+    SELECT g.item_id FROM product_variants v JOIN variant_components c ON c.variant_id = v.id
+    JOIN choice_group_items g ON g.choice_group_id = c.choice_group_id
+    WHERE v.product_id = ${product} AND v.status = 'ACTIVE'
+  `
+}
+
+const restrictedPoured = (product: SQL): SQL =>
+  sql`SELECT 1 FROM bar_items r WHERE r.age_restricted = 1 AND r.id IN (${itemsPouredBy(product)})`
+
+// Issue 1299: which restricted stocked items a product pours, by name, for the list and the editor.
+export function restrictedPoursColumn(alias: string): SQL {
+  return sql`(
+    SELECT json_group_array(name) FROM (
+      SELECT r.name AS name FROM bar_items r
+      WHERE r.age_restricted = 1 AND r.id IN (${itemsPouredBy(sql.raw(`${alias}.id`))})
+      ORDER BY r.name COLLATE NOCASE
+    )
+  )`
+}
+
+export const readRestrictedPours = (value: string | null): string[] => readJsonArray(value)
+
+// The Bar Manager's correction list: any product left unrestricted that pours restricted stock.
+// Hidden and retired count, since either goes back on the till with one press.
+export function withoutCheckIdPredicate(alias: string): SQL {
+  return sql`(${sql.raw(alias)}.age_restricted = 0 AND EXISTS (${restrictedPoured(sql.raw(`${alias}.id`))}))`
+}
+
+// Rides an edit's own UPDATE, so a component landing between the read and the write cannot leave
+// a product pouring restricted stock saved without Check ID (0049).
+export function checkIdHeld(productId: string, ageRestricted: boolean): SQL {
+  return ageRestricted ? sql`1 = 1` : sql`NOT EXISTS (${restrictedPoured(sql`${productId}`)})`
 }
 
 // Servings one recipe row supports: its item's on-hand over the quantity a serving takes.

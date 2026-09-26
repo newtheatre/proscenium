@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { londonDayOf } from '#shared/utils/ledger'
-import { productSetupForm } from '#shared/utils/bar'
+import { checkIdRefusal, productSetupForm, restrictedStockOf, setupItemIds } from '#shared/utils/bar'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { ServingKind, StockUnit } from '#shared/utils/bar'
 
@@ -14,17 +14,14 @@ export default defineEventHandler(async (event) => {
   const category = await categoryById(input.product.categoryId)
   if (!category) throw noSuch('category')
 
-  const named = input.shape === 'RECIPE'
-    ? [...input.components.map(component => component.itemId),
-        ...(input.choice?.group.options.map(option => option.itemId) ?? [])]
-    : input.item.mode === 'EXISTING' ? [input.item.itemId] : []
+  const named = setupItemIds(input)
 
   const held = named.length === 0
     ? []
-    : await db.all<{ id: string, name: string, status: string, unit: StockUnit, containerMl: number | null }>(sql`
-      SELECT id, name, status, unit, container_ml AS containerMl FROM bar_items
+    : (await db.all<{ id: string, name: string, status: string, unit: StockUnit, containerMl: number | null, ageRestricted: number }>(sql`
+      SELECT id, name, status, unit, container_ml AS containerMl, age_restricted AS ageRestricted FROM bar_items
       WHERE id IN (${sql.join([...new Set(named)].map(id => sql`${id}`), sql`, `)})
-    `)
+    `)).map(item => ({ ...item, ageRestricted: item.ageRestricted === 1 }))
 
   if (held.length !== new Set(named).size) {
     throw noSuch('stocked item')
@@ -54,6 +51,11 @@ export default defineEventHandler(async (event) => {
       })
     }
   }
+
+  // The product's switch follows what it pours, so a wine cannot go on the till with no Check ID
+  // (F-106 criterion 5, F-111 criterion 6, issue 1299).
+  const unchecked = checkIdRefusal(input.product, restrictedStockOf(input, held))
+  if (unchecked) throw createError({ statusCode: 409, statusMessage: unchecked })
 
   const taken = await claimName('product', input.product.name)
   if (taken) {

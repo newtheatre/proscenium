@@ -1482,7 +1482,7 @@ for each listing:
 | Route | What it does |
 | --- | --- |
 | `GET /api/admin/bar/categories` | The paged envelope, each row carrying its product count. Filtered by its declaration (`shared/utils/bar-categories-list.ts`, K-129): no field yet, only `search` over the name and `sort` by till order or name. |
-| `GET /api/admin/bar/products` | The paged envelope, every status included, each row carrying whether it has ever sold. Filtered by its declaration (`shared/utils/bar-products-list.ts`, K-129): `categoryId` and `retired`, with `search` over the name and `sort` by category, category name, till order within the category, or product name. |
+| `GET /api/admin/bar/products` | The paged envelope, every status included, each row carrying whether it has ever sold and `restrictedPours`, the names of the age-restricted stocked items its live sizes pour. Filtered by its declaration (`shared/utils/bar-products-list.ts`, K-129): `categoryId`, `retired` and `withoutCheckId` (a product left unrestricted that pours restricted stock, hidden and retired included, the Bar Manager's correction list, issue 1299), with `search` over the name and `sort` by category, category name, till order within the category, or product name. |
 | `GET /api/admin/bar/items` | The paged envelope, each row carrying what is on hand: the sum of its movements. Filtered by its declaration (`shared/utils/bar-items-list.ts`, K-129): `retired`, with `search` over the name and `sort` by status or name. |
 | `GET /api/admin/bar/movements` | The paged envelope, newest first. Filtered by its declaration (`shared/utils/bar-movements-list.ts`, K-129): `itemId` and `kind`, with `search` over the stocked item's name and `sort` by when or `recordedOrder`, the row's own insertion order, which breaks a tie within the same second. |
 | `GET /api/admin/bar/stocktakes` | The paged envelope, newest opened first. Filtered by its declaration (`shared/utils/stocktakes-list.ts`, K-129): `status`, which is also the only column the `search` box runs over. |
@@ -1523,7 +1523,10 @@ left unset; creating or editing a discount above whatever it currently holds sti
 ### bar_products  (sellable things)
 `id` PK · `category_id` → bar_categories restrict · `name` unique, case-insensitively · `status`
 CHECK `ACTIVE|HIDDEN|RETIRED`, default `HIDDEN` · `staffed_only` bool (not on self-serve tabs) ·
-`age_restricted` bool, what Challenge 25 prompts on (F-106) · `allergen_state` CHECK
+`age_restricted` bool, what Challenge 25 prompts on (F-106), which may not be saved off while any
+live size pours a restricted stocked item, directly or as a choice: the guided set-up refuses
+before it writes, and an edit carries `checkIdHeld` on its own `UPDATE` (issue 1299) ·
+`allergen_state` CHECK
 `UNKNOWN|NONE|RECORDED` · `allergen_note`, required by `RECORDED` and refused by `UNKNOWN` (F-107) ·
 `sort` · `created_at`.
 

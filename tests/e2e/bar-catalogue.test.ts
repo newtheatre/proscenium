@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellsWithoutCheckId } from '#shared/utils/bar'
 import { click, fill, fillNumber, menuOptions, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -362,6 +363,61 @@ describe.skipIf(skip !== null)('every change is audited with a from and a to (F-
       `bar-product:${id}`,
     )
     expect(entry?.detail.changes.status).toEqual({ from: 'HIDDEN', to: 'ACTIVE' })
+  })
+})
+
+// Issue 1299 (F-106, F-111 criterion 6): a product pouring restricted stock sold with no Check ID,
+// so the list names every one for the Bar Manager and an edit cannot leave one that way.
+describe.skipIf(skip !== null)('a product pouring restricted stock asks for Check ID (issue 1299)', () => {
+  async function aWinePouredUnrestricted(): Promise<{ productId: string, itemId: string, itemName: string, name: string, categoryId: string }> {
+    const categoryId = await addCategory()
+    const name = named('Review Merlot')
+    const productId = await addProduct(categoryId, { name, ageRestricted: false })
+    const itemName = named('Merlot 750ml')
+    const itemId = await addItem({ name: itemName })
+    const variantId = await addVariant(productId, { servingKind: '175ml', label: '175ml' })
+    expect((await send('PUT', `/api/admin/bar/variants/${variantId}/components`, {
+      components: [{ itemId, qty: 175 }],
+    })).status).toBe(200)
+    return { productId, itemId, itemName, name, categoryId }
+  }
+
+  test('the list names each product that pours restricted stock without Check ID, and what it pours', async () => {
+    const wine = await aWinePouredUnrestricted()
+    const listed = await listing<ListedProduct & { restrictedPours: string[] }>('/api/admin/bar/products', '&withoutCheckId=true')
+    expect(listed.find(product => product.id === wine.productId)?.restrictedPours).toEqual([wine.itemName])
+    expect(listed.every(sellsWithoutCheckId)).toBe(true)
+  })
+
+  test('an edit leaving it unrestricted is refused naming the stocked item; switching it on clears it', async () => {
+    const wine = await aWinePouredUnrestricted()
+    const refused = await send('PUT', `/api/admin/bar/products/${wine.productId}`, {
+      name: wine.name,
+      categoryId: wine.categoryId,
+      ageRestricted: false,
+    })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain(`${wine.itemName}, which is age restricted`)
+
+    expect((await send('PUT', `/api/admin/bar/products/${wine.productId}`, {
+      name: wine.name,
+      categoryId: wine.categoryId,
+      ageRestricted: true,
+    })).status).toBe(200)
+    const listed = await listing<ListedProduct>('/api/admin/bar/products', '&withoutCheckId=true')
+    expect(listed.some(product => product.id === wine.productId)).toBe(false)
+  })
+
+  test('a stocked item that is not alcohol switched off takes the product off the list', async () => {
+    const wine = await aWinePouredUnrestricted()
+    expect((await send('PUT', `/api/admin/bar/items/${wine.itemId}`, {
+      name: wine.itemName,
+      unit: 'ML',
+      containerMl: 750,
+      ageRestricted: false,
+    })).status).toBe(200)
+    const listed = await listing<ListedProduct>('/api/admin/bar/products', '&withoutCheckId=true')
+    expect(listed.some(product => product.id === wine.productId)).toBe(false)
   })
 })
 
