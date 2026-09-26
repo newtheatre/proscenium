@@ -28,9 +28,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Criterion 2: a standing money.refund holder approves themselves; anyone else needs tonight's
-  // confirmed duty manager for this performance, scoped so a shift elsewhere does not reach it.
-  const approverId = await requireRefundApproval(event, resolved, { performanceId: reservation.performanceId })
+  // Criterion 2: the refunder's own money.refund is the approval, on any day (0102).
+  const approverId = await requireRefundApproval(event, resolved)
 
   const result = await refundTicket({
     reservationId: id,

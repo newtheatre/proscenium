@@ -141,9 +141,9 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Owns the catalogue and appoints its stewards; `training.override` stays ADMIN because
   // never-expiring is the rarer break-glass (G-107, G-110, questions 7 and 8).
   TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.by-address', 'training.leads', 'training.read', 'training.revoke', 'training.write'],
-  // One committee post: the programme and the rota, and the door and duty manager screens without
-  // a shift tonight, refund approval included. The till is the bar manager's (0044, 0090).
-  FOH_MANAGER: ['ticketing.read', 'ticketing.write', 'ticketing.export', 'night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read'],
+  // One committee post: the programme, the rota and paid refunds on any day, and the door and duty
+  // manager screens without a shift tonight. The till is the bar manager's (0044, 0090, 0102).
+  FOH_MANAGER: ['ticketing.read', 'ticketing.write', 'ticketing.export', 'money.refund', 'night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read'],
   FRONT_OF_HOUSE: [],
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).
