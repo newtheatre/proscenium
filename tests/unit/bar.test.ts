@@ -3,7 +3,6 @@ import {
   HAND_ENTERED_KINDS,
   KINDS_NEEDING_A_REASON,
   MOVEMENT_WRITERS,
-  PRODUCT_AGE_RESTRICTED_DEFAULT,
   STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   STOCK_MOVEMENT_KINDS,
   categoryForm,
@@ -295,31 +294,40 @@ describe('what a screen shows', () => {
 })
 
 // F-111 criterion 6, issue 1151 item 10: three screens each spelled their own starting value for
-// the same switch, and the two that create a product disagreed on it.
-describe('one stated default for a new product and one for a new stocked item', () => {
-  const CREATORS = ['app/pages/bar/products/index.vue', 'app/pages/bar/products/new.vue', 'app/pages/bar/stock/index.vue']
-
-  test('a new product is unrestricted until somebody says otherwise', () => {
-    expect(PRODUCT_AGE_RESTRICTED_DEFAULT).toBe(false)
-  })
+// the same switch. Issue 1299: a product's Check ID now follows what it pours, so it has no default.
+describe('one stated default for a new stocked item, and none for a product', () => {
+  const ITEM_CREATORS = ['app/pages/bar/products/new.vue', 'app/pages/bar/stock/index.vue']
+  const PRODUCT_CREATORS = ['app/pages/bar/products/index.vue', 'app/pages/bar/products/new.vue']
 
   test('a new stocked item is restricted, since the shelf it comes off mostly is', () => {
     expect(STOCK_ITEM_AGE_RESTRICTED_DEFAULT).toBe(true)
   })
 
-  test('each form falls back to its own default rather than to a value typed into the schema', () => {
-    const product = productForm.parse({ name: 'Pint of bitter', categoryId: 'cat-1' })
-    expect(product.ageRestricted).toBe(PRODUCT_AGE_RESTRICTED_DEFAULT)
+  test('a product has no restriction default: Check ID follows what it pours (issue 1299)', async () => {
+    const bar = await import('#shared/utils/bar')
+    expect('PRODUCT_AGE_RESTRICTED_DEFAULT' in bar).toBe(false)
+    // Its own switch is "restricted anyway", and a new product starts without it.
+    expect(productForm.parse({ name: 'Pint of bitter', categoryId: 'cat-1' }).ageRestricted).toBe(false)
+  })
+
+  test('a stocked item falls back to its own default rather than to a value typed into the schema', () => {
     const item = stockItemForm.parse({ name: 'Bitter cask', unit: 'ML' })
     expect(item.ageRestricted).toBe(STOCK_ITEM_AGE_RESTRICTED_DEFAULT)
   })
 
-  test('no screen that creates either spells a starting value of its own', async () => {
+  test('no screen that creates a stocked item spells a starting value of its own', async () => {
     const offenders: string[] = []
-    for (const file of CREATORS) {
+    for (const file of ITEM_CREATORS) {
       const source = await Bun.file(file).text()
-      if (/ageRestricted:\s*(true|false)/.test(source)) offenders.push(file)
-      if (!source.includes('AGE_RESTRICTED_DEFAULT')) offenders.push(`${file} (reads no shared default)`)
+      if (!source.includes('STOCK_ITEM_AGE_RESTRICTED_DEFAULT')) offenders.push(`${file} (reads no shared default)`)
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('no product screen reads a product default, since there is none', async () => {
+    const offenders: string[] = []
+    for (const file of PRODUCT_CREATORS) {
+      if ((await Bun.file(file).text()).includes('PRODUCT_AGE_RESTRICTED_DEFAULT')) offenders.push(file)
     }
     expect(offenders).toEqual([])
   })
