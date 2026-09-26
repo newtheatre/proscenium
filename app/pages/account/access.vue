@@ -168,6 +168,7 @@ useSeoMeta({ title: 'Access requirements' })
           </UBadge>
           <template v-if="profile.status === 'VERIFIED'">
             <p
+              v-if="profile.fohNote"
               class="text-sm"
               data-test="access-wording"
             >
