@@ -145,21 +145,40 @@ function person(database: TestDatabase, id: string): string {
   return id
 }
 
-describe('the six named milestone types are seeded, committee-configurable from there (E-121 criterion 1)', () => {
-  test('all six exist, none retired', async () => {
+describe('the named milestone types are seeded, committee-configurable from there (E-121 criterion 1)', () => {
+  // Issue 1313 adds front of house's Ready to restart beside the six the story named.
+  test('all seven exist, none retired, each on its own end', async () => {
     await withDatabase((database) => {
       const found = run(database, milestoneTypesQuery(false))
-      expect(found).toHaveLength(6)
-      expect(found.map(row => row.label)).toEqual(
-        ['Clearance', 'House open', 'Curtain up', 'Interval', 'Restart', 'End'])
+      expect(found.map(row => [row.label, row.side])).toEqual([
+        ['Clearance', 'BACKSTAGE'],
+        ['House open', 'FOH'],
+        ['Curtain up', 'BACKSTAGE'],
+        ['Interval', 'BACKSTAGE'],
+        ['Ready to restart', 'FOH'],
+        ['Restart', 'BACKSTAGE'],
+        ['End', 'BACKSTAGE'],
+      ])
     })
   })
 
-  test('the committee can add a seventh without a migration', async () => {
+  test('the committee can add another without a migration', async () => {
     await withDatabase((database) => {
       const officer = person(database, 'officer')
-      run(database, insertMilestoneTypeStatement('Fire check', 6, officer, 'mt-7'))
-      expect(run(database, milestoneTypesQuery(false))).toHaveLength(7)
+      run(database, insertMilestoneTypeStatement('Fire check', 6, officer, 'mt-8', 'BACKSTAGE'))
+      expect(run(database, milestoneTypesQuery(false))).toHaveLength(8)
+    })
+  })
+
+  // Issue 1313: a call nobody has placed on an end yet reads as the wings' milestone and the
+  // foyer's preset, which is where every such call sat before calls had an end.
+  test('a call with no end recorded reads as the wings\' milestone, or the foyer\'s preset', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      run(database, insertMilestoneTypeStatement('Fire check', 6, officer, 'mt-unplaced', null))
+      run(database, insertPresetStatement('5 minutes', 'Five minutes please', 0, officer, 'p-unplaced', null))
+      expect(run(database, milestoneTypesQuery(false)).find(row => row.id === 'mt-unplaced')?.side).toBe('BACKSTAGE')
+      expect(run(database, presetsQuery(false)).find(row => row.id === 'p-unplaced')?.side).toBe('FOH')
     })
   })
 
@@ -274,6 +293,25 @@ describe('correcting a milestone (criterion 5)', () => {
 
       const second = run(database, supersedeMessageStatement(nightId, 'msg-1', deviceId, milestoneTypeId, 'Interval', 1700000200, 'msg-3'))
       expect(second).toHaveLength(0)
+    })
+  })
+
+  // Issue 1313: a correction stays on its own end, from the end that made the call.
+  test('the wings cannot change front of house\'s call, nor change their own into one of the foyer\'s', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database)
+      run(database, ensureNightStatement(venue.id, NIGHT, 'bn-1'))
+      run(database, joinDeviceStatement('bn-1', 'Stage left', 'a'.repeat(64), 0, 'bd-1'))
+      run(database, ensureFohDeviceStatement('bn-1', 'b'.repeat(64), 0, 'bd-foh'))
+      const types = run(database, milestoneTypesQuery(false))
+      const byLabel = (label: string): string => types.find(row => row.label === label)!.id as string
+      run(database, postMessageStatement('bn-1', 'bd-foh', byLabel('House open'), 'House open', 1700000000, 'msg-foh'))
+      run(database, postMessageStatement('bn-1', 'bd-1', byLabel('Interval'), 'Interval', 1700000100, 'msg-wings'))
+
+      expect(run(database, supersedeMessageStatement('bn-1', 'msg-foh', 'bd-1', byLabel('Clearance'), 'Clearance', 1700000200, 'msg-2'))).toHaveLength(0)
+      expect(run(database, supersedeMessageStatement('bn-1', 'msg-wings', 'bd-1', byLabel('Ready to restart'), 'Ready to restart', 1700000200, 'msg-3'))).toHaveLength(0)
+      expect(run(database, supersedeMessageStatement('bn-1', 'msg-wings', 'bd-1', byLabel('Restart'), 'Restart', 1700000200, 'msg-4'))).toHaveLength(1)
+      expect(run(database, supersedeMessageStatement('bn-1', 'msg-foh', 'bd-foh', byLabel('Ready to restart'), 'Ready to restart', 1700000300, 'msg-5'))).toHaveLength(1)
     })
   })
 
