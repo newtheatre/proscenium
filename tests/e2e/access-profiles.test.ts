@@ -290,6 +290,10 @@ describe.skipIf(skip !== null)('a decision holds only for the declaration the of
     return member
   }
 
+  const decisionsRecorded = (member: TestMember): number => count(
+    `SELECT count(*) AS n FROM audit_log WHERE target = ? AND action IN ('access-profile.verified', 'access-profile.declined')`, `user:${member.id}`,
+  )
+
   const verifyAs = (userId: string, version: string | null): Promise<Response> => withoutSecondFactor(() =>
     send('POST', `/api/admin/access-profiles/${userId}/verify`, { fohNote: 'Aisle seat', version }, accessOfficer.cookie))
 
@@ -311,6 +315,7 @@ describe.skipIf(skip !== null)('a decision holds only for the declaration the of
     expect((await stale.json() as { statusMessage?: string }).statusMessage).toBe(CHANGED)
     expect(await own(member)).toMatchObject({ status: 'PENDING', companions: 2, requesterNote: 'Uses a wheelchair and a stick' })
     expect(count(`SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type = 'access-profile.verified'`, member.id)).toBe(0)
+    expect(decisionsRecorded(member)).toBe(0)
   })
 
   test('the same holds for a decline', async () => {
@@ -322,6 +327,8 @@ describe.skipIf(skip !== null)('a decision holds only for the declaration the of
       send('POST', `/api/admin/access-profiles/${member.id}/decline`, { reason: 'Could not check the card', version: seen }, accessOfficer.cookie))
     expect(stale.status).toBe(409)
     expect(await own(member)).toMatchObject({ status: 'PENDING', companions: 0, declineReason: null })
+    expect(count(`SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type = 'access-profile.declined'`, member.id)).toBe(0)
+    expect(decisionsRecorded(member)).toBe(0)
   })
 
   test('a consent switch is not a change to the declaration, so the officer\'s read still stands', async () => {

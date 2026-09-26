@@ -243,9 +243,10 @@ async function clearCardNumber(row: AccessProfileRow, userId: string): Promise<A
   return { ...payload, accessCardNumber: null }
 }
 
-// A fresh or lapsed declaration only (D-127 criterion 5). Matched again at the write below, so a
-// row decided out from under this request between the read and the write loses cleanly (0003).
-const decidablePredicate = (now: number) => sql`(status = 'PENDING' OR (status = 'VERIFIED' AND expires_at IS NOT NULL AND expires_at <= ${now}))`
+// A fresh or lapsed declaration, as the officer read it, matched again at the write (D-127 criterion
+// 5, 0003); a member's save since the read changes the IV and refuses the decision (issue 1383).
+export const decisionPredicate = (now: number, version: string | null) =>
+  sql`(status = 'PENDING' OR (status = 'VERIFIED' AND expires_at IS NOT NULL AND expires_at <= ${now})) AND encryption_iv IS ${version}`
 
 // Also the declaration the officer read: a member's save since then leaves this decision about
 // words that are no longer theirs, so it is refused rather than written over them (issue 1383).
@@ -280,7 +281,7 @@ export async function verifyAccessProfile(event: H3Event, userId: string, office
       UPDATE access_profiles
       SET status = 'VERIFIED', encrypted_payload = ${encrypted.ciphertext}, encryption_iv = ${encrypted.iv},
           verified_by = ${officerId}, verified_at = ${now}, expires_at = ${expiresAt}, updated_at = ${now}
-      WHERE user_id = ${userId} AND ${decidablePredicate(now)} AND encryption_iv IS ${version}
+      WHERE user_id = ${userId} AND ${decisionPredicate(now, version)}
       RETURNING user_id AS userId
     `),
     entry,
@@ -303,7 +304,7 @@ export async function declineAccessProfile(event: H3Event, userId: string, offic
     db.all<{ userId: string }>(sql`
       UPDATE access_profiles
       SET status = 'DECLINED', encrypted_payload = ${encrypted.ciphertext}, encryption_iv = ${encrypted.iv}, updated_at = ${now}
-      WHERE user_id = ${userId} AND ${decidablePredicate(now)} AND encryption_iv IS ${version}
+      WHERE user_id = ${userId} AND ${decisionPredicate(now, version)}
       RETURNING user_id AS userId
     `),
     entry,
