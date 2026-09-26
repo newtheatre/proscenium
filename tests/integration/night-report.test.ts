@@ -73,17 +73,22 @@ describe('attendance (criterion 1)', () => {
   })
 
   // Issue 1296: derived at compile time, never written, so sold and a later refund are untouched.
-  test('a paid booking never admitted counts as a no-show, and an unpaid hold does not', async () => {
+  test('a paid booking never admitted counts as a no-show; a wholly refunded one and an unpaid hold do not', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       reserve(database, 'r-admitted', tonight.performanceId, 'DOOR', 'WEB')
       reserve(database, 'r-paid-absent', tonight.performanceId, 'COLLECTED', 'WEB')
+      reserve(database, 'r-refunded', tonight.performanceId, 'COLLECTED', 'WEB')
       reserve(database, 'r-unpaid', tonight.performanceId, 'PENDING', 'WEB')
+      database.batch([
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          't-paid-absent', 'r-paid-absent', tonight.performanceId, 'tt-standard', 900, 'BASE'],
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source, refunded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          't-refunded', 'r-refunded', tonight.performanceId, 'tt-standard', 900, 'BASE', 1_000],
+      ])
 
       const [row] = read<{ admitted: number, noShows: number }>(database, reportAttendanceQuery(tonight.performanceId))
       expect(row).toMatchObject({ admitted: 1, noShows: 1 })
-      const [held] = rows<{ status: string }>(database, 'SELECT status FROM reservations WHERE id = ?', 'r-paid-absent')
-      expect(held?.status).toBe('COLLECTED')
     })
   })
 

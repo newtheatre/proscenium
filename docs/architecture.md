@@ -1372,12 +1372,14 @@ A system-verified item's done state is never stored: `noShowHoldsReleased()` and
 `incidentsReviewed()` (`server/utils/checklist.ts`) run live against this performance's own
 `reservations` and `incidents`/`audit_log` on every read, so a matinee's checklist never waits
 on the evening's data (E-128). The holds check counts `PENDING` only: a paid booking nobody used
-stays `COLLECTED`, which is the night report's no-show, not a hold to release (issue 1296). Reviewing an incident (`POST
-/api/tonight/incidents/[id]/review`) writes an `incident.reviewed` audit entry rather than a
-column on `incidents`, which cannot be touched post-insert; acknowledgement, not E-116's later
-severity-routed resolution, which is a separate workflow this does not build. `/tonight/incidents`
-offers it per entry to a caller who resolved duty manager authority, reading the same
-acknowledgement back as a `reviewed` flag on each row of `GET /api/tonight/incidents`.
+stays `COLLECTED`, which is the night report's no-show, not a hold to release (issue 1296).
+
+Reviewing an incident (`POST /api/tonight/incidents/[id]/review`) writes an `incident.reviewed`
+audit entry rather than a column on `incidents`, which cannot be touched post-insert;
+acknowledgement, not E-116's later severity-routed resolution, which is a separate workflow this
+does not build. `/tonight/incidents` offers it per entry to a caller who resolved duty manager
+authority, reading the same acknowledgement back as a `reviewed` flag on each row of
+`GET /api/tonight/incidents`.
 
 `POST /api/tonight/checklist/close` recomputes every required item across both phases; anything
 neither ticked nor exempted refuses with a 409 naming it by label (criterion 4), and a second
@@ -1537,7 +1539,7 @@ real SQL:
 
 | Section | Reads | Note |
 | --- | --- | --- |
-| Attendance | `reservations` | Sold rides `heldSeatsSubquery` (D-105); admitted is `status = 'DOOR'`, a walk-up the same status with `source = 'DOOR'`, a no-show a booking paid and never admitted (`COLLECTED` at compile time, derived and never written, so sold and a later refund are untouched; issue 1296) or one the old estate imported as `NO_SHOW`. |
+| Attendance | `reservations` | Sold rides `heldSeatsSubquery` (D-105); admitted is `status = 'DOOR'`, a walk-up the same status with `source = 'DOOR'`, a no-show a booking paid, never admitted and still holding an unrefunded ticket (`COLLECTED` at compile time, derived and never written, so sold and a later refund are untouched; issue 1296) or one the old estate imported as `NO_SHOW`. |
 | Takings | `ledger_entries`, `ledger_lines` | Grouped by tender, summed from `ll.amount_pence` on the lines matched to this performance, never `le.total_pence`, which can span more than one performance or product in a single entry. A reversal's negative line nets against what it reverses in the same sum; nothing is filtered by `void_of_entry_id`, which marks a tab-charge reversal, not something to exclude (0031). |
 | Incidents | `incidents`, `incident_severity_config`, `incident_followup_closures` | The full chain, each flagged with its follow-up requirement and closure state whichever way it sits. Closes the known-issues gap E-116 criterion 4 left open. |
 | Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |

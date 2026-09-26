@@ -231,7 +231,13 @@ async function closeNight(): Promise<void> {
                   >(optional)</span>
                 </p>
                 <p
-                  v-if="entry.systemCheck && !entry.exempted"
+                  v-if="entry.exempted"
+                  class="text-xs text-muted"
+                >
+                  Exception: {{ entry.exemptReason }}
+                </p>
+                <p
+                  v-else-if="entry.systemCheck"
                   class="text-xs text-muted"
                 >
                   Ticks itself: {{ entry.done ? 'clear' : 'not yet clear' }}
@@ -241,12 +247,6 @@ async function closeNight(): Promise<void> {
                   class="text-xs text-muted"
                 >
                   Ticked by {{ entry.tickedByName }}
-                </p>
-                <p
-                  v-else-if="entry.exempted"
-                  class="text-xs text-muted"
-                >
-                  Exception: {{ entry.exemptReason }}
                 </p>
               </div>
               <!-- An item that ticks itself but cannot clear tonight takes an exception like any
