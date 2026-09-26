@@ -102,6 +102,15 @@ export const reservationResendForm = z.object({
   email: z.string().email('Enter a real email address').max(320),
 })
 
+// The booking the page is showing (issue 1329). One cookie names one booking, so a page left open
+// while another booking moved the cookie is refused, never acted on for the other booking.
+const showingReference = z.string().trim().length(RESERVATION_REFERENCE_LENGTH).optional()
+
+export function otherBookingReason(showing: string | undefined, held: string): string | null {
+  if (showing === undefined || showing.toUpperCase() === held.toUpperCase()) return null
+  return 'This page is showing a different booking. Reload to see the one you are changing.'
+}
+
 // D-110: self-service edit while unpaid. Desired totals per type, the same shape a fresh
 // booking uses, so "each type appears at most once" is one rule either way (criterion 1).
 export const reservationEditForm = z.strictObject({
@@ -110,13 +119,18 @@ export const reservationEditForm = z.strictObject({
       lines => new Set(lines.map(line => line.ticketTypeId)).size === lines.length,
       'A ticket type appears once; add to its quantity instead of a second line',
     ),
+  reference: showingReference,
 })
 
 export type ReservationEditInput = z.output<typeof reservationEditForm>
 
 export const reservationExchangeForm = z.strictObject({
   performanceId: z.string().trim().min(1, 'Say which performance you mean'),
+  reference: showingReference,
 })
+
+// A cancel carries nothing but the booking it means; an empty body is the same as naming none.
+export const reservationCancelForm = z.strictObject({ reference: showingReference }).optional()
 
 export type ReservationExchangeInput = z.output<typeof reservationExchangeForm>
 
@@ -192,6 +206,12 @@ export interface QrExchangedTo {
 export interface QrStatusDisplay {
   headline: string
   detail: string | null
+}
+
+// A self-served pass (D-125) is PENDING with no hold and nothing owed; any other PENDING booking,
+// a free one included, is a hold the box office still collects before it releases (D-106).
+export function nothingToCollect(holdExpiresAt: number | null, totalPence: number): boolean {
+  return holdExpiresAt === null && totalPence === 0
 }
 
 // What the QR page (and eventually the door, D-126) says for each state a reservation can be

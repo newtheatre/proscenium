@@ -8,8 +8,8 @@ import type { H3Event } from 'h3'
 // Kept apart from server/utils/reservations.ts, which `tests/` imports directly under Bun:
 // `useRuntimeConfig()` needs a real Nitro runtime, so nothing reachable from a unit test may call it.
 
-// What every booking email links to: the booking page and its QR as a hosted PNG, never an SVG,
-// which Gmail will not render (D-108 criterion 2). The width is the bitmap's own.
+// The booking page and its QR as a hosted PNG, never an SVG, which Gmail will not render (D-108
+// criterion 2). The width is the bitmap's own, so the email never scales and blurs the code.
 function bookingLink(event: H3Event | undefined, qrToken: string): BookingLink {
   const url = `${useRuntimeConfig(event).public.baseURL}/qr/${qrToken}`
   return { url, imageUrl: `${url}/image.png`, qrWidth: qrPng(url).width }

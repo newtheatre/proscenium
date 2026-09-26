@@ -7,6 +7,8 @@ import {
   doorTicketOutcome,
   generateReservationReference,
   looksLikeReference,
+  nothingToCollect,
+  otherBookingReason,
   overCapReason,
   pastCurtainReason,
   qrStatusDisplay,
@@ -147,9 +149,24 @@ describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', (
     expect(qrStatusDisplay('PENDING', null, '£9.00')).toEqual({ headline: 'Unpaid', detail: '£9.00 due at the box office on the night.' })
   })
 
-  // Issue 1329 review: a pass redemption is a booking with nothing to pay, not "Unpaid, £0.00".
+  // Issue 1329: a pass redemption is a booking with nothing to pay, not "Unpaid, £0.00".
   test('a booking with nothing due reads as booked, never unpaid', () => {
     expect(qrStatusDisplay('PENDING', null, null)).toEqual({ headline: 'Booked', detail: 'Nothing is due.' })
+  })
+
+  // Only a self-served pass has no hold and owes nothing; a free booking is still a hold that lapses.
+  test('nothing is left to collect only on a booking with no hold and nothing owed', () => {
+    expect(nothingToCollect(null, 0)).toBe(true)
+    expect(nothingToCollect(1_900_000_000, 0)).toBe(false)
+    expect(nothingToCollect(null, 700)).toBe(false)
+    expect(nothingToCollect(1_900_000_000, 700)).toBe(false)
+  })
+
+  // Issue 1329: one cookie names one booking, so a page showing another is refused, not obeyed.
+  test('a write naming a different booking from the one the cookie holds is refused', () => {
+    expect(otherBookingReason(undefined, 'ABCDEF')).toBeNull()
+    expect(otherBookingReason('abcdef', 'ABCDEF')).toBeNull()
+    expect(otherBookingReason('GHJKLM', 'ABCDEF')).toBe('This page is showing a different booking. Reload to see the one you are changing.')
   })
 
   test('paid and admitted read differently from each other', () => {

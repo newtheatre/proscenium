@@ -123,7 +123,7 @@ async function saveEdit(): Promise<void> {
     const lines = Object.entries(quantities.value)
       .filter(([, quantity]) => quantity > 0)
       .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }))
-    await $fetch('/api/qr/tickets', { method: 'PUT', body: { lines } })
+    await $fetch('/api/qr/tickets', { method: 'PUT', body: { lines, reference: booking.value?.reference } })
     editing.value = false
     justMade.value = null
     await loadBooking()
@@ -144,7 +144,7 @@ async function cancelBooking(): Promise<void> {
   cancelling.value = true
   cancelFailure.value = null
   try {
-    await $fetch('/api/qr/cancel', { method: 'POST' })
+    await $fetch('/api/qr/cancel', { method: 'POST', body: { reference: booking.value?.reference } })
     cancelConfirming.value = false
     justMade.value = null
     await loadBooking()
@@ -187,7 +187,7 @@ async function submitExchange(): Promise<void> {
   exchangeSubmitting.value = true
   exchangeFailure.value = null
   try {
-    await $fetch('/api/qr/exchange', { method: 'POST', body: { performanceId: exchangeChoice.value } })
+    await $fetch('/api/qr/exchange', { method: 'POST', body: { performanceId: exchangeChoice.value, reference: booking.value?.reference } })
     exchanging.value = false
     justMade.value = null
     await loadBooking()
