@@ -73,9 +73,9 @@ export const members: Shot[] = [
     width: PHONE_WIDTH,
     annotations: [
       { selector: '[data-test="booking-room"]', label: 'Room' },
-      { selector: '[data-test="booking-title"]', label: 'What it is for' },
+      { selector: '[data-test="booking-purpose"]', label: 'What the room is for' },
+      { selector: '[data-test="booking-title"]', label: 'A name for it' },
       { selector: '[data-test="booking-day"]', label: 'Day' },
-      { selector: '[data-test="booking-from"]', label: 'From' },
     ],
   },
   {
@@ -98,8 +98,8 @@ export const members: Shot[] = [
     marker: '[data-test="external-warning"]',
     width: PHONE_WIDTH,
     annotations: [
-      { selector: '[data-test="external-title"]', label: 'What it is for' },
       { selector: '[data-test="external-purpose"]', label: 'What the room is for' },
+      { selector: '[data-test="external-title"]', label: 'A name for it' },
       { selector: '[data-test="external-day"]', label: 'Day' },
       { selector: '[data-test="external-from"]', label: 'From' },
     ],

@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { can, memberOrGrace } from '#shared/utils/abilities'
 import { describePurpose } from '#shared/utils/bookings'
+import { EXTERNAL_NO_MEMBERSHIP } from '#shared/utils/external-requests'
 import { fromLondonWallClock } from '#shared/utils/london'
+import { saysDayLong } from '#shared/utils/when'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { z } from 'zod'
 
@@ -15,7 +18,7 @@ const request = useRequestFetch()
 // The screen's own shape: a day and two wall clocks, which become the instants the write path
 // validates on the way out (C-120 criterion 7, 0014).
 const form = z.object({
-  title: z.string().trim().min(1, 'Say what the room is for').max(200),
+  title: z.string().trim().max(200),
   purpose: z.string().min(1, 'Say what the room is for'),
   attendees: z.number().int().positive().optional(),
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a day'),
@@ -46,12 +49,12 @@ const failures = ref<Failure[]>([])
 
 const { data: rules } = await useAsyncData(
   'external-policy',
-  () => request<{ purposes: string[] }>('/api/rooms/policy'),
-  { default: () => ({ purposes: [] as string[] }) },
+  () => request<{ purposes: string[], externalEarliestDay: string | null }>('/api/rooms/policy'),
+  { default: () => ({ purposes: [] as string[], externalEarliestDay: null }) },
 )
 
-const purposeOptions = computed(() =>
-  rules.value.purposes.map(purpose => ({ label: describePurpose(purpose), value: purpose })))
+// Said before the day is chosen rather than after it is refused (issue 1338, C-121).
+const earliestDay = computed(() => rules.value.externalEarliestDay)
 
 // A purpose off the query string is a suggestion, and it only lands if the vocabulary still holds
 // it: an unknown one would be sent and refused, or worse, warned about against nothing.
@@ -76,6 +79,9 @@ function instantOf(day: string, clock: string): string {
 // right rather than to invent its own wording (A-129).
 const needsMembership = computed(() => failures.value.some(failure => failure.reason === 'NO_MEMBERSHIP'))
 
+// Refused before the form rather than after it is filled in (A-129 criterion 2, issue 1338).
+const lapsed = computed(() => !can(useViewer().value, memberOrGrace))
+
 async function ask(event: FormSubmitEvent<ExternalForm>): Promise<void> {
   saving.value = true
   failures.value = []
@@ -83,7 +89,7 @@ async function ask(event: FormSubmitEvent<ExternalForm>): Promise<void> {
     const answer = await $fetch<{ warning: string | null }>('/api/rooms/external-requests', {
       method: 'POST',
       body: {
-        title: event.data.title,
+        title: event.data.title || describePurpose(event.data.purpose),
         purpose: event.data.purpose,
         attendees: event.data.attendees ?? null,
         startsAt: instantOf(event.data.day, event.data.from),
@@ -132,7 +138,31 @@ useSeoMeta({ title: 'Book a room not listed here' })
       data-test="external-warning"
     />
 
-    <UPageCard class="mt-8">
+    <UAlert
+      v-if="lapsed"
+      class="mt-8"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-id-card"
+      data-test="external-needs-membership"
+    >
+      <template #description>
+        <p>{{ EXTERNAL_NO_MEMBERSHIP }}</p>
+        <UButton
+          class="mt-3"
+          to="/account/membership"
+          variant="subtle"
+          data-test="external-membership-link"
+        >
+          Tell us about your membership
+        </UButton>
+      </template>
+    </UAlert>
+
+    <UPageCard
+      v-else
+      class="mt-8"
+    >
       <UForm
         :schema="form"
         :state="state"
@@ -141,10 +171,23 @@ useSeoMeta({ title: 'Book a room not listed here' })
         @submit="ask"
       >
         <UFormField
-          label="What it is for"
-          name="title"
+          label="What the room is for"
+          name="purpose"
           required
-          description="Shown to the Theatre Manager and written on the form."
+          description="What you need the room to be like. It is what decides whether a room they offer will suit."
+        >
+          <PurposeChips
+            v-model="state.purpose"
+            :purposes="rules.purposes"
+            test-prefix="external"
+          />
+        </UFormField>
+
+        <UFormField
+          label="A name for it"
+          name="title"
+          hint="Optional"
+          description="Shown to the Theatre Manager and written on the form. Left empty, it is called by what the room is for."
         >
           <UInput
             v-model="state.title"
@@ -154,28 +197,14 @@ useSeoMeta({ title: 'Book a room not listed here' })
         </UFormField>
 
         <UFormField
-          label="What the room is for"
-          name="purpose"
-          required
-          description="What you need the room to be like. It is what decides whether a room they offer will suit."
-        >
-          <USelect
-            v-model="state.purpose"
-            :items="purposeOptions"
-            value-key="value"
-            placeholder="Choose what it is for"
-            class="w-full"
-            data-test="external-purpose"
-          />
-        </UFormField>
-
-        <UFormField
           label="Day"
           name="day"
           required
+          :description="earliestDay ? `The earliest day you can ask for is ${saysDayLong(earliestDay)}.` : undefined"
         >
           <DateField
             v-model="state.day"
+            :min="earliestDay ?? undefined"
             data-test="external-day"
           />
         </UFormField>

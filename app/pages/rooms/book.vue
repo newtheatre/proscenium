@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { can, manageRoomsEstate } from '#shared/utils/abilities'
+import { can, manageRoomsEstate, memberOrGrace } from '#shared/utils/abilities'
+import { BOOKING_NO_MEMBERSHIP } from '#shared/utils/booking-policy'
 import { TIERS, describePurpose } from '#shared/utils/bookings'
 import { FREQUENCIES, saysRecurrence } from '#shared/utils/series'
 import { overCapacity } from '#shared/utils/rooms'
@@ -34,7 +35,7 @@ const namesTier = computed(() => can(useViewer().value, manageRoomsEstate))
 // rather than a second copy of the policy (C-106 criterion 3).
 const fields = z.object({
   roomId: z.string().min(1, 'Choose a room'),
-  title: z.string().trim().min(1, 'Say what the booking is for').max(200),
+  title: z.string().trim().max(200),
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a day'),
   from: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a start time'),
   to: z.string().regex(/^\d{2}:\d{2}$/, 'Choose an end time'),
@@ -85,8 +86,6 @@ const { data: rules } = await useAsyncData(
   { default: () => ({ seriesCap: 12, purposes: [] as string[] }) },
 )
 
-const purposeOptions = computed(() =>
-  rules.value.purposes.map(purpose => ({ label: describePurpose(purpose), value: purpose })))
 const seriesCap = computed(() => rules.value.seriesCap)
 
 // One schema for all three submits (C-105 criterion 8): what a series or a request needs on top is
@@ -145,7 +144,7 @@ const recurrence = computed(() => ({
 function seriesBody(skip: string[]): Record<string, unknown> {
   return {
     roomId: state.roomId,
-    title: state.title,
+    title: named(),
     attendees: state.attendees ?? null,
     tier: state.tier,
     purpose: state.purpose,
@@ -225,6 +224,11 @@ const { data: rooms } = await useAsyncData(
 const room = computed(() => rooms.value.find(one => one.id === state.roomId))
 
 // What was just made, said on the screen it lands on (C-105 criterion 7).
+// The name is optional, so a booking left unnamed is called by what the room is for (issue 1338).
+function named(): string {
+  return state.title.trim() || describePurpose(state.purpose)
+}
+
 function made(): string {
   return `${room.value?.name ?? 'The room'}, ${saysDayLong(state.day)} from ${state.from} to ${state.to}`
 }
@@ -251,14 +255,18 @@ function instantOf(day: string, clock: string): string {
 const capacity = computed(() => room.value?.capacity ?? undefined)
 const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.attendees ?? null))
 
+// Refused before the form rather than after it is filled in, in the policy's own words with the
+// fix beside them (A-129 criterion 2, issue 1338). The server still refuses, whatever this says.
+const lapsed = computed(() => !can(useViewer().value, memberOrGrace))
+
 // The server refuses NO_MEMBERSHIP outright (0031), so the form's job is to say where to put it
 // right rather than to invent its own wording (A-129).
-const needsMembership = computed(() => failures.value.some(failure => failure.reason === 'NO_MEMBERSHIP'))
+const needsMembership = computed(() => lapsed.value || failures.value.some(failure => failure.reason === 'NO_MEMBERSHIP'))
 
 // The SU's own page, read from the membership policy page only when a refusal wants it; unset,
 // the refusal links our membership page alone (A-202).
 const purchaseUrl = ref<string | null>(null)
-watch(needsMembership, async (needed) => {
+async function loadPurchaseUrl(needed: boolean): Promise<void> {
   if (!needed || purchaseUrl.value) return
   try {
     const { values } = await $fetch<{ values: PolicyValues }>('/api/policies/values', { query: { path: '/policies/membership' } })
@@ -267,10 +275,12 @@ watch(needsMembership, async (needed) => {
   catch {
     purchaseUrl.value = null
   }
-})
+}
+watch(needsMembership, loadPurchaseUrl)
+onMounted(() => loadPurchaseUrl(needsMembership.value))
 
 const seriesReady = computed(() =>
-  Boolean(state.roomId && state.title.trim() && state.day && state.purpose)
+  Boolean(state.roomId && state.day && state.purpose)
   && (state.frequency === 'DAILY' || state.weekdays.length > 0))
 
 // Said before submitting, not after: a room somebody else books, or one that always asks, is
@@ -298,7 +308,7 @@ async function book(event: FormSubmitEvent<BookingForm>): Promise<void> {
       method: 'POST',
       body: {
         roomId: event.data.roomId,
-        title: event.data.title,
+        title: named(),
         startsAt: instantOf(event.data.day, event.data.from),
         endsAt: instantOf(event.data.day, event.data.to),
         attendees: event.data.attendees ?? null,
@@ -335,7 +345,7 @@ async function ask(): Promise<void> {
       method: 'POST',
       body: {
         roomId: state.roomId,
-        title: state.title,
+        title: named(),
         startsAt: instantOf(state.day, state.from),
         endsAt: instantOf(state.day, state.to),
         attendees: state.attendees ?? null,
@@ -372,7 +382,44 @@ useSeoMeta({ title: 'Book a room' })
       :ui="MEMBER_PAGE_HEADER"
     />
 
-    <UPageCard class="mt-8">
+    <UAlert
+      v-if="lapsed"
+      class="mt-8"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-id-card"
+      data-test="booking-needs-membership"
+    >
+      <template #description>
+        <p>{{ BOOKING_NO_MEMBERSHIP }}</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <UButton
+            to="/account/membership"
+            variant="subtle"
+            data-test="booking-membership-link"
+          >
+            Tell us about your membership
+          </UButton>
+          <UButton
+            v-if="purchaseUrl"
+            variant="outline"
+            color="neutral"
+            :to="purchaseUrl"
+            target="_blank"
+            external
+            trailing-icon="i-lucide-external-link"
+            data-test="booking-membership-buy"
+          >
+            Buy a membership from the Students' Union
+          </UButton>
+        </div>
+      </template>
+    </UAlert>
+
+    <UPageCard
+      v-else
+      class="mt-8"
+    >
       <UForm
         :schema="form"
         :state="state"
@@ -404,10 +451,23 @@ useSeoMeta({ title: 'Book a room' })
         />
 
         <UFormField
-          label="What it is for"
-          name="title"
+          label="What the room is for"
+          name="purpose"
           required
-          description="Shown to officers, and to nobody else looking at the calendar."
+          description="What you need the room to be like. It is what a room we do not manage is judged suitable for."
+        >
+          <PurposeChips
+            v-model="state.purpose"
+            :purposes="rules.purposes"
+            test-prefix="booking"
+          />
+        </UFormField>
+
+        <UFormField
+          label="A name for it"
+          name="title"
+          hint="Optional"
+          description="Shown to officers, and to nobody else looking at the calendar. Left empty, it is called by what the room is for."
         >
           <UInput
             v-model="state.title"
@@ -466,22 +526,6 @@ useSeoMeta({ title: 'Book a room' })
             :max="capacity"
             class="w-full"
             data-test="booking-attendees"
-          />
-        </UFormField>
-
-        <UFormField
-          label="What the room is for"
-          name="purpose"
-          required
-          description="What you need the room to be like. It is what a room we do not manage is judged suitable for."
-        >
-          <USelect
-            v-model="state.purpose"
-            :items="purposeOptions"
-            value-key="value"
-            placeholder="Choose what it is for"
-            class="w-full"
-            data-test="booking-purpose"
           />
         </UFormField>
 

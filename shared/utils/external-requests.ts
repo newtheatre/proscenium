@@ -1,5 +1,6 @@
 import { londonParts } from './london'
-import { coversThrough, lastCovered, workingDaysBetween } from './working-days'
+import { saysDayLong } from './when'
+import { addWorkingDays, coversThrough, lastCovered, londonDate, workingDaysBetween } from './working-days'
 import { z } from 'zod'
 
 // Asking for a room we do not manage (C-120). The lifecycle has three decision points where
@@ -80,13 +81,21 @@ export interface ExternalContext {
   holidays: readonly string[]
 }
 
+export const EXTERNAL_NO_MEMBERSHIP = 'Asking for a room needs a current membership.'
+
+// The London date of the first day with enough notice: the notice's last working day, since a
+// booking on it or any day after has counted that many (issue 1338, C-121, 0038).
+export function earliestAskDay(now: Date, noticeWorkingDays: number, holidays: readonly string[]): string {
+  return londonDate(addWorkingDays(now, noticeWorkingDays, holidays))
+}
+
 // Judged separately from a room of ours: opening hours, capacity and an active flag are things
 // nobody tells us about a room we do not manage, so asking would be inventing an answer.
 export function judgeExternal(span: { startsAt: Date, endsAt: Date }, context: ExternalContext): ExternalFailure[] {
   const failures: ExternalFailure[] = []
 
   if (!context.hasMembership) {
-    failures.push({ reason: 'NO_MEMBERSHIP', says: 'Asking for a room needs a current membership.' })
+    failures.push({ reason: 'NO_MEMBERSHIP', says: EXTERNAL_NO_MEMBERSHIP })
   }
   if (span.endsAt.getTime() <= context.now.getTime()) {
     failures.push({ reason: 'IN_THE_PAST', says: 'That slot has already happened.' })
@@ -106,7 +115,8 @@ export function judgeExternal(span: { startsAt: Date, endsAt: Date }, context: E
   else if (workingDaysBetween(context.now, span.startsAt, context.holidays) < context.noticeWorkingDays) {
     failures.push({
       reason: 'SHORT_NOTICE',
-      says: `This needs ${context.noticeWorkingDays} working days, because a person fills in a form and waits for an answer. Weekends and bank holidays do not count.`,
+      says: `This needs ${context.noticeWorkingDays} working days, because a person fills in a form and waits for an answer. Weekends and bank holidays do not count. `
+        + `The earliest day you can ask for is ${saysDayLong(earliestAskDay(context.now, context.noticeWorkingDays, context.holidays), { now: context.now })}.`,
     })
   }
 
