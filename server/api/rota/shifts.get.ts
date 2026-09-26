@@ -33,15 +33,21 @@ export default defineEventHandler(async (event) => {
   ])
 
   const eligibilities = await shiftEligibilities(event, account.id, londonToday())
+  const closed = Object.values(eligibilities).some(one => !one.eligible && one.unlockedBy === null)
 
-  // Every slot on a bar opening is a bar slot, so they ride the bar role's filter and the bar
-  // role's gate; they are their own list because an opening names no show to page alongside one.
-  const openings = role !== undefined && role !== 'BAR'
-    ? []
-    : await db.all<OpenOpeningShiftRow>(openOpeningShiftsQuery(filters, now, OPENING_SLOT_CAP))
+  const [officers, openings] = await Promise.all([
+    // Whom a member asks about a role nobody can claim yet (issue 1318).
+    closed ? fohManagerNames() : Promise.resolve([] as string[]),
+    // Every slot on a bar opening is a bar slot, so they ride the bar role's filter and the bar
+    // role's gate; they are their own list because an opening names no show to page alongside one.
+    role !== undefined && role !== 'BAR'
+      ? Promise.resolve([] as OpenOpeningShiftRow[])
+      : db.all<OpenOpeningShiftRow>(openOpeningShiftsQuery(filters, now, OPENING_SLOT_CAP)),
+  ])
 
   return {
     ...envelope(items.map(item => ({ ...item, ...eligibilities[item.role] })), totalRow?.total ?? 0, page, pageSize),
     openings: openings.map(opening => ({ ...opening, ...eligibilities.BAR })),
+    officers,
   }
 })

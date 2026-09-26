@@ -566,6 +566,12 @@ say whether the holiday list reaches as far ahead as room requests are judged (C
 after eight days without a success, or `never`; 0092). A failed sync leaves the list as it was;
 see `### bank-holidays:sync` below.
 
+They also carry `shiftEligibility`, which never changes the status code either: `roles` gives each
+shift role's gating module as `SET`, `UNSET`, `DRAFT`, `RETIRED` or `MISSING`, and `ok` is true only
+when all three are `SET` (issue 1318). Anything else means nobody can claim that role: publish the
+module in the training console, or name another on **Shift templates**. It reads `null` if the
+modules could not be read.
+
 **No GitHub runner can reach it** (J-106 criterion 3, issue 1014): Bot Fight Mode on
 `newtheatre.org.uk` challenges every runner with a 403, so no workflow checks it: `migrate.yml`'s
 health job and the scheduled `health-watch.yml` were both removed. After a migration run, open

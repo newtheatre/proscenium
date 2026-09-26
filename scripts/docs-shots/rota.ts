@@ -2,7 +2,7 @@ import { CONSOLE_WIDTH } from './types'
 import type { Shot } from './types'
 
 const foh = 'dev-foh@e2e.newtheatre.org.uk'
-// The shift eligibility card needs config.read, and Safety has no seeded SAFETY_OFFICER persona.
+// The readiness card's module fields need config.write, and Safety has no seeded SAFETY_OFFICER persona.
 const admin = 'dev-admin@e2e.newtheatre.org.uk'
 
 // The runner waits after this, so a click is enough to have the dialog open for the capture.
@@ -16,7 +16,7 @@ export const rota: Shot[] = [
     marker: '[data-test="templates-table"]',
     width: CONSOLE_WIDTH,
     annotations: [
-      { selector: '[data-test="shift-eligibility"]', label: 'Shift eligibility' },
+      { selector: '[data-test="rota-readiness"]', label: 'Ready for a show night' },
       { selector: '[data-test="toolbar-search"]', label: 'Search' },
       { selector: '[data-test="templates-table"]', label: 'The table' },
       { selector: '[data-test^="edit-template-"]', label: 'Set it up or Edit' },

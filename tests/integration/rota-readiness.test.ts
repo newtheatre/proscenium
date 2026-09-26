@@ -160,6 +160,19 @@ describe('whom a member asks about a role not open yet (issue 1318)', () => {
       expect(run(database, fohManagersQuery(now)).map(row => row.name)).toEqual(['Someone live'])
     })
   })
+
+  // Erasure keeps the row and its grants but anonymises the person (0011), so the name would read
+  // as a placeholder nobody can ask.
+  test('an erased holder is not named', async () => {
+    await withDatabase((database) => {
+      const now = Math.floor(Date.now() / 1000)
+      person(database, 'erased')
+      grant(database, 'erased', 'FOH_MANAGER', null)
+      database.batch([['UPDATE users SET anonymised_at = ?, name = ? WHERE id = ?', now, 'Deleted user', 'erased']])
+
+      expect(run(database, fohManagersQuery(now))).toEqual([])
+    })
+  })
 })
 
 const checklistClause = () => checklistVenuesClause(filterQuerySchema(checklistVenuesList).parse({}))

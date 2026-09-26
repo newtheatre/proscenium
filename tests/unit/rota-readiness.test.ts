@@ -121,7 +121,7 @@ describe('a venue we run is ready once staffed, checked and carded (E-101, E-113
 
   test('names the system check that is missing', () => {
     expect(missingSystemChecks(['INCIDENTS_REVIEWED'])).toEqual(['NO_SHOW_HOLDS_RELEASED'])
-    expect(saysChecklistReadiness(['INCIDENTS_REVIEWED'])).toContain('No-show holds released')
+    expect(saysChecklistReadiness(['INCIDENTS_REVIEWED'])).toContain('Unpaid holds released')
     expect(saysChecklistReadiness(ready.systemChecks)).toBe('Both system checks are on the post-show checklist.')
   })
 })

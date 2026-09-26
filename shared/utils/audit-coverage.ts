@@ -510,6 +510,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/backstage/presets/[id]/index.put.ts', actions: ['backstage-preset.updated'] },
   { route: 'server/api/admin/backstage/presets/[id]/status.post.ts', actions: ['backstage-preset.retired', 'backstage-preset.reinstated'] },
   { route: 'server/api/admin/rota/templates/index.get.ts', exempt: 'reads every venue\'s template, including the venues that have none' },
+  { route: 'server/api/admin/rota/readiness.get.ts', exempt: 'reads what each venue we run and each shift role still needs before a show night' },
   {
     route: 'server/api/admin/rota/templates/[venueId]/index.put.ts',
     actions: ['shift-template.created', 'shift-template.updated'],

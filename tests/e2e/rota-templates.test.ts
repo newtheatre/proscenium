@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { adminSession, forgetSpentStep, markVerified, registerMember, request } from '#tests/helpers/accounts'
+import { clearConfigOverride } from '#tests/helpers/config'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -402,8 +403,8 @@ describe.skipIf(skip !== null)('the screen the officer works from', () => {
 // DECISION #933, K-129 for the picker: the mapping from shift role to gating module is
 // configuration, and this is where a training officer looks for it, labelled per role.
 describe.skipIf(skip !== null)('shift eligibility is set from the templates screen', () => {
-  afterAll(async () => {
-    await request(app, 'PUT', '/api/admin/config/SHIFT_ELIGIBILITY_BAR_MODULE', { value: null }, admin.cookie)
+  afterAll(() => {
+    clearConfigOverride(app, 'SHIFT_ELIGIBILITY_BAR_MODULE')
   })
 
   test('an administrator names the module that unlocks a bar shift, and it holds after a reload', async () => {
@@ -465,8 +466,8 @@ describe.skipIf(skip !== null)('the show-night readiness card', () => {
       expect(standing.DOOR).toBe('MISSING')
     }
     finally {
-      await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_BAR_MODULE', { value: null })
-      await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_DOOR_MODULE', { value: null })
+      clearConfigOverride(app, 'SHIFT_ELIGIBILITY_BAR_MODULE')
+      clearConfigOverride(app, 'SHIFT_ELIGIBILITY_DOOR_MODULE')
     }
   })
 })

@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
-import { sql } from 'drizzle-orm'
-import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { and, sql } from 'drizzle-orm'
+import { aliasColumns, predicate, whereFrom, yesNo } from './list-filters'
+import { listedVenue } from './venues'
 import { checklistEntryDone } from '#shared/utils/checklist'
 import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import type { ListClause } from './list-filters'
@@ -10,8 +11,6 @@ import type { SQL } from 'drizzle-orm'
 
 // The pre and post-show checklist (E-114), keyed to a performance rather than a venue and a
 // night (E-128). Configuration in `checklist_items`, stamped once (E-101's own pattern).
-
-const predicateOf = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
 export interface ChecklistItemRow {
   id: string
@@ -55,13 +54,14 @@ export interface VenueChecklist {
 // Search and "configured" through the declaration (K-129); paging scopes the outer join by a
 // subquery over the venues it covers, never by an id list read back from a result set (0006).
 export function checklistVenuesClause(query: ListQuery): ListClause {
-  return whereFrom(checklistVenuesList, query, {
+  const clause = whereFrom(checklistVenuesList, query, {
     column: aliasColumns('vp'),
     search: [sql`vp.name`],
     fields: {
       configured: yesNo(sql`exists (select 1 from checklist_items ci where ci.venue_id = vp.id and ci.active = 1)`),
     },
   })
+  return { ...clause, where: and(listedVenue(sql`exists (select 1 from checklist_items held where held.venue_id = vp.id)`), clause.where) }
 }
 
 interface VenueChecklistRow {
@@ -85,7 +85,7 @@ export function venueChecklistsQuery(clause: ListClause, limit: number, offset: 
     FROM venues v
     LEFT JOIN checklist_items i ON i.venue_id = v.id
     WHERE v.id IN (
-      SELECT vp.id FROM venues vp${predicateOf(clause)}
+      SELECT vp.id FROM venues vp${predicate(clause)}
       ORDER BY ${sql.join(clause.orderBy, sql`, `)}
       LIMIT ${limit} OFFSET ${offset}
     )
@@ -113,7 +113,7 @@ export async function listVenueChecklists(clause: ListClause, limit: number, off
 }
 
 export async function countVenueChecklists(clause: ListClause): Promise<number> {
-  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues vp${predicateOf(clause)}`)
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues vp${predicate(clause)}`)
   return row?.total ?? 0
 }
 

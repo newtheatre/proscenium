@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysWhenLong } from '#shared/utils/when'
 import { saysShiftRole, saysShiftStatus, SHIFT_ROLES } from '#shared/utils/rota'
+import { saysNotOpenYet } from '#shared/utils/rota-readiness'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { Page } from '#shared/utils/pagination'
 
@@ -65,13 +66,15 @@ const mineFailure = useListFailure(mineError, 'The shifts you hold could not be 
 const role = ref<ShiftRole | undefined>(undefined)
 const page = ref(1)
 
-type OpenShifts = Page<OpenShift> & { openings: OpenOpeningShift[] }
+type OpenShifts = Page<OpenShift> & { openings: OpenOpeningShift[], officers: string[] }
 
 const { data, status, error, refresh } = await useFetch<OpenShifts>('/api/rota/shifts', {
   query: computed(() => ({ role: role.value, page: page.value })),
   watch: [role, page],
-  default: (): OpenShifts => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1, openings: [] }),
+  default: (): OpenShifts => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1, openings: [], officers: [] }),
 })
+
+const notOpenYet = computed(() => saysNotOpenYet(data.value.officers))
 
 const openFailure = useListFailure(error, 'The open shifts could not be read.')
 
@@ -445,7 +448,7 @@ useSeoMeta({ title: 'My rota' })
               class="mt-1 text-sm text-muted"
               :data-test="`unlock-${shift.shiftId}`"
             >
-              Not open for claiming yet: the committee has not named what unlocks this role.
+              {{ notOpenYet }}
             </p>
           </div>
           <UButton
@@ -511,7 +514,7 @@ useSeoMeta({ title: 'My rota' })
                 class="mt-1 text-sm text-muted"
                 :data-test="`unlock-opening-${slot.slotId}`"
               >
-                Not open for claiming yet: the committee has not named what unlocks the bar.
+                {{ notOpenYet }}
               </p>
             </div>
             <UButton

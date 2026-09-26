@@ -27,8 +27,8 @@ const CONFIG: [string, unknown][] = [
   ['BAR_TAB_CAP_PENCE', 4000],
   ['LISTING_LIMITED_THRESHOLD_PERCENT', 15],
   ['MEMBERSHIP_GRACE_DAYS', 21],
-  // Set rather than left unset, so the rota actually gates on a record and the ineligible cases
-  // in the seeded shifts are visible instead of theoretical (E-103).
+  // Modules the seeded people hold, so the rota gates on a record and the ineligible cases in the
+  // seeded shifts are visible rather than every role reading as a draft (E-103).
   ['SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE', 'ADMN-101'],
   ['SHIFT_ELIGIBILITY_DOOR_MODULE', 'SFTY-001'],
   ['SHIFT_ELIGIBILITY_BAR_MODULE', 'ADMN-102'],

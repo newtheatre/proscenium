@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { can, editSettings, manageRota, viewSettings } from '#shared/utils/abilities'
-import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
+import { can, manageRota } from '#shared/utils/abilities'
 import { MAX_SHIFT_OFFSET_MINUTES, MAX_SLOT_COUNT, SHIFT_ROLES, orderedSlots, saysShiftRole, templateRefusal } from '#shared/utils/rota'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import type { ShiftRole, TemplateSlot } from '#shared/utils/rota'
@@ -34,68 +33,6 @@ const toast = useToast()
 const writes = computed(() => can(useViewer().value, manageRota))
 const failure = ref<string | null>(null)
 const saving = ref(false)
-
-// The mapping is configuration, not rota data, so it is its own ability: a rota manager with no
-// config.read never sees the card, and 0040's convention (hide, not merely disable) still holds.
-const seesEligibility = computed(() => can(useViewer().value, viewSettings))
-const editsEligibility = computed(() => can(useViewer().value, editSettings))
-
-const ELIGIBILITY_KEYS: Record<ShiftRole, string> = {
-  DUTY_MANAGER: 'SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE',
-  DOOR: 'SHIFT_ELIGIBILITY_DOOR_MODULE',
-  BAR: 'SHIFT_ELIGIBILITY_BAR_MODULE',
-}
-
-interface ConfigSetting { key: string, value: unknown }
-interface ModuleCandidate { id: string, name: string }
-
-const { data: eligibilitySettings, refresh: refreshEligibility } = await useAsyncData(
-  'rota-shift-eligibility',
-  () => (seesEligibility.value
-    ? request<{ settings: ConfigSetting[] }>('/api/admin/config')
-    : Promise.resolve({ settings: [] as ConfigSetting[] })),
-  { default: () => ({ settings: [] as ConfigSetting[] }) },
-)
-
-// Every module is a candidate here, not the current page of some other table's search (K-129).
-const { data: eligibilityModules } = await useAsyncData(
-  'rota-shift-eligibility-modules',
-  () => (seesEligibility.value
-    ? request<{ items: ModuleCandidate[] }>('/api/admin/training/modules', { query: { pageSize: MAX_PAGE_SIZE } })
-    : Promise.resolve({ items: [] as ModuleCandidate[] })),
-  { default: () => ({ items: [] as ModuleCandidate[] }) },
-)
-
-const moduleOptions = computed(() => eligibilityModules.value.items.map(one => ({ label: `${one.id} ${one.name}`, value: one.id })))
-const moduleName = (moduleId: string | null): string | null =>
-  moduleId === null ? null : (eligibilityModules.value.items.find(one => one.id === moduleId)?.name ?? moduleId)
-
-const eligibility = reactive<Record<ShiftRole, string | null>>({ DUTY_MANAGER: null, DOOR: null, BAR: null })
-watch(eligibilitySettings, (settings) => {
-  for (const role of SHIFT_ROLES) {
-    eligibility[role] = (settings.settings.find(one => one.key === ELIGIBILITY_KEYS[role])?.value as string | null | undefined) ?? null
-  }
-}, { immediate: true })
-
-const savingEligibility = ref<ShiftRole | null>(null)
-
-async function saveEligibility(role: ShiftRole, next: string | null): Promise<void> {
-  const before = eligibility[role]
-  eligibility[role] = next
-  savingEligibility.value = role
-  try {
-    await $fetch(`/api/admin/config/${ELIGIBILITY_KEYS[role]}`, { method: 'PUT', body: { value: next } })
-    toast.add({ title: 'Shift eligibility saved', icon: 'i-lucide-check', color: 'success' })
-    await refreshEligibility()
-  }
-  catch (error) {
-    eligibility[role] = before
-    toast.add({ title: refusalText(error), color: 'error' })
-  }
-  finally {
-    savingEligibility.value = null
-  }
-}
 
 // Search, filters, sort and page live in the URL (K-129).
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(rotaTemplatesList)
@@ -159,7 +96,7 @@ async function save(): Promise<void> {
       color: 'success',
     })
     open.value = false
-    await refresh()
+    await Promise.all([refresh(), refreshNuxtData('rota-readiness')])
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -186,7 +123,7 @@ async function remove(): Promise<void> {
       icon: 'i-lucide-check',
     })
     removing.value = null
-    await refresh()
+    await Promise.all([refresh(), refreshNuxtData('rota-readiness')])
   }
   catch (error) {
     removeFailure.value = refusalText(error)
@@ -302,34 +239,7 @@ watch(modalOpen, (nowOpen) => {
 
     <RotaFlow step="templates" />
 
-    <UPageCard
-      v-if="seesEligibility"
-      title="Shift eligibility"
-      description="A role with a module set here is locked to members who currently hold it; a locked shift on /rota names the module and links to the catalogue. A role left unset is closed to everybody: nobody can claim it until a module is named."
-      data-test="shift-eligibility"
-    >
-      <div class="grid gap-4 sm:grid-cols-3">
-        <UFormField
-          v-for="role in SHIFT_ROLES"
-          :key="role"
-          :label="saysShiftRole(role)"
-          :description="eligibility[role] ? `Currently ${moduleName(eligibility[role])}.` : 'Closed: nobody can claim this role yet.'"
-        >
-          <USelectMenu
-            :model-value="eligibility[role] ?? undefined"
-            :items="moduleOptions"
-            value-key="value"
-            clearable
-            :loading="savingEligibility === role"
-            :disabled="!editsEligibility || moduleOptions.length === 0"
-            placeholder="No module set"
-            class="w-full"
-            :data-test="`eligibility-${role}`"
-            @update:model-value="value => saveEligibility(role, (value as string | undefined) ?? null)"
-          />
-        </UFormField>
-      </div>
-    </UPageCard>
+    <RotaReadiness />
 
     <AdminToolbar
       v-model:search="search"

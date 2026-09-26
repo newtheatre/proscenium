@@ -1,52 +1,27 @@
 import { describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { join } from 'node:path'
+import { migrationTags } from '#migration/schema'
+import { applyMigration, applyMigrations } from '#tests/helpers/database'
 
-// Issue 1318: a data migration gives every venue we run the two system-verified checklist items
-// (E-114 criterion 3) and the board its four routine calls (E-121 criterion 2), against a scratch
-// database at the shape it meets. Found by name, so a renumbering on rebase does not break it.
+// Issue 1318's data migration against a scratch database at the shape it meets: system checks per
+// venue we run (E-114 criterion 3), four board calls (E-121 criterion 2). Found by name, not number.
 
-const MIGRATIONS_DIR = 'server/db/migrations/sqlite'
 const NAME = '_the_show_night_basics_are_seeded'
 
-async function journalTags(): Promise<string[]> {
-  const journal = await Bun.file(join(MIGRATIONS_DIR, 'meta', '_journal.json')).json() as { entries: { tag: string }[] }
-  return journal.entries.map(entry => entry.tag)
-}
-
-function execMigration(raw: Database, sql: string): void {
-  for (const statement of sql.split('--> statement-breakpoint')) {
-    const trimmed = statement.trim()
-    if (trimmed) raw.exec(trimmed)
-  }
-}
-
 async function tagOf(): Promise<string> {
-  const tag = (await journalTags()).find(one => one.endsWith(NAME))
+  const tag = (await migrationTags()).find(one => one.endsWith(NAME))
   if (!tag) throw new Error(`no migration ending ${NAME} is in the journal`)
   return tag
 }
 
-async function databaseBefore(): Promise<Database> {
+async function withMigrated(seed: (raw: Database) => void, check: (raw: Database) => void, runs = 1): Promise<void> {
   const raw = new Database(':memory:')
   raw.exec('PRAGMA foreign_keys = ON;')
-  const tags = await journalTags()
-  const cutoff = tags.indexOf(await tagOf())
-  for (const tag of tags.slice(0, cutoff)) {
-    execMigration(raw, await Bun.file(join(MIGRATIONS_DIR, `${tag}.sql`)).text())
-  }
-  return raw
-}
-
-async function migrate(raw: Database): Promise<void> {
-  execMigration(raw, await Bun.file(join(MIGRATIONS_DIR, `${await tagOf()}.sql`)).text())
-}
-
-async function withMigrated(seed: (raw: Database) => void, check: (raw: Database) => void, runs = 1): Promise<void> {
-  const raw = await databaseBefore()
   try {
+    const tag = await tagOf()
+    await applyMigrations(raw, tag)
     seed(raw)
-    for (let run = 0; run < runs; run++) await migrate(raw)
+    for (let run = 0; run < runs; run++) await applyMigration(raw, tag)
     check(raw)
   }
   finally {
@@ -88,7 +63,7 @@ describe('every venue we run gains the two system-verified items (E-114 criterio
   test('a venue we run gets both, post-show and required, made by no person', async () => {
     await withMigrated(raw => venue(raw, 'house'), (raw) => {
       expect(systemItems(raw, 'house')).toEqual([
-        { phase: 'POST', label: 'No-show holds released', sort: 0, required: 1, systemCheck: 'NO_SHOW_HOLDS_RELEASED', active: 1, updatedBy: null },
+        { phase: 'POST', label: 'Unpaid holds released', sort: 0, required: 1, systemCheck: 'NO_SHOW_HOLDS_RELEASED', active: 1, updatedBy: null },
         { phase: 'POST', label: 'Tonight\'s incidents reviewed', sort: 1, required: 1, systemCheck: 'INCIDENTS_REVIEWED', active: 1, updatedBy: null },
       ])
     })
@@ -131,8 +106,8 @@ describe('every venue we run gains the two system-verified items (E-114 criterio
     await withMigrated(raw => venue(raw, 'house'), (raw) => {
       const rows = audited(raw, 'checklist-item.created')
       expect(rows.map(row => [row.target, JSON.parse(row.detail), row.actorId])).toEqual([
-        ['venue:house', { phase: 'POST', label: 'No-show holds released' }, null],
         ['venue:house', { phase: 'POST', label: 'Tonight\'s incidents reviewed' }, null],
+        ['venue:house', { phase: 'POST', label: 'Unpaid holds released' }, null],
       ])
     })
   })
@@ -148,7 +123,8 @@ describe('the board gains its four routine calls (E-121 criterion 2)', () => {
         ['Ambulance', 3, 1],
       ])
       expect(presets(raw).find(row => row.label === 'Ambulance')?.body).toContain('Duty manager to the foyer')
-      expect(audited(raw, 'backstage-preset.created')).toHaveLength(4)
+      // Seeded unaudited, as 0079's milestones were: every fresh database would otherwise carry them.
+      expect(audited(raw, 'backstage-preset.created')).toEqual([])
     })
   })
 
@@ -162,7 +138,6 @@ describe('the board gains its four routine calls (E-121 criterion 2)', () => {
         ['Clear', 7],
         ['Ambulance', 8],
       ])
-      expect(audited(raw, 'backstage-preset.created')).toHaveLength(3)
     })
   })
 })
@@ -173,7 +148,6 @@ describe('running it again adds nothing', () => {
       expect(systemItems(raw, 'house')).toHaveLength(2)
       expect(presets(raw)).toHaveLength(4)
       expect(audited(raw, 'checklist-item.created')).toHaveLength(2)
-      expect(audited(raw, 'backstage-preset.created')).toHaveLength(4)
     }, 2)
   })
 })

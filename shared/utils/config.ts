@@ -694,23 +694,23 @@ export const CONFIG_KEYS = {
     describes: 'Standing recipients of the end-of-night report. The list is confirmed in the workshop.',
   },
 
-  // Which training module gates each shift role. Null is the honest starting state and refuses
-  // eligibility rather than granting it to everyone; setting it back to null restores that (E-103 criterion 4).
+  // Which training module gates each shift role, as the committee named them (issue 1318). Null
+  // still refuses eligibility rather than granting it to everyone (E-103 criterion 4).
   SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE: {
     schema: z.string().regex(MODULE_ID).nullable(),
-    default: null,
+    default: 'ADMN-201',
     workshop: 'spaces-and-training',
     describes: 'Training module a member must hold to claim a duty manager shift.',
   },
   SHIFT_ELIGIBILITY_DOOR_MODULE: {
     schema: z.string().regex(MODULE_ID).nullable(),
-    default: null,
+    default: 'ADMN-103',
     workshop: 'spaces-and-training',
     describes: 'Training module a member must hold to claim a door shift.',
   },
   SHIFT_ELIGIBILITY_BAR_MODULE: {
     schema: z.string().regex(MODULE_ID).nullable(),
-    default: null,
+    default: 'ADMN-102',
     workshop: 'spaces-and-training',
     describes: 'Training module a member must hold to claim a bar shift.',
   },
