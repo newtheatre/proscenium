@@ -89,6 +89,9 @@ automated tests; two consecutive green migration rehearsals.**
 
 ### Phase 3: shadow and cutover (12 to 31 October)
 
+- The bar's first full count is applied before the first shadow night, about 7 October, and
+  again at cutover: the new till refuses a sale of anything with nothing on hand, so an uncounted
+  bar cannot shadow at all (issue 1297, 0080; docs/operations.md, the bar's opening balance).
 - Shows are assigned to a system for their whole run during the transition: door and money
   follow the show's system, so no single night ever splits across two records.
 - The first shows of the season run on the old system with the new door screen and till

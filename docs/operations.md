@@ -531,8 +531,18 @@ import: `stocktakes`, `stocktake_lines`, `stock_deliveries` and `stock_delivery_
 zero rows, and the four rows in `stock_movements` sum to zero quantity. There is nothing to
 carry across.
 
-At cutover, the bar manager counts physical stock into the stocktake screen bar already has
-(`/bar/stock/stocktakes`, F-115) and applies it. That count **is** the opening balance: F-115's
+**Before the first shadow night, not at cutover** (issue 1297). From 12 October the new till takes
+real sales on the shadow nights, and a sale of an item with nothing on hand is refused by the
+stock trigger, so a bar that has never been counted refuses almost everything. The full count is
+taken by the Front of House Manager, on a regular basis from then on. The first is planned for
+about **Wednesday 7 October 2026**, before box office goes live on 12 October, and it needs
+someone holding `bar.write` today to open and apply the stocktake. A second full count follows at
+cutover (26 to 31 October), and the latest applied one is the balance (0080). Until the first is
+applied, the till tells anyone who can reach the stocktake screen how many drinks on it pour stock
+with nothing on hand, with a link to the stocktakes.
+
+The count goes into the stocktake screen bar already has (`/bar/stock/stocktakes`, F-115) and is
+applied there. That count **is** the opening balance: F-115's
 apply route already does everything K-116 asked for beyond the transform (a blank count reads
 differently from an entered zero, and a finished stocktake posts its adjustments in one atomic
 batch). No second screen, and no import step precedes it.

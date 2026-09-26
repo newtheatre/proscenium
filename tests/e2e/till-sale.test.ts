@@ -53,11 +53,11 @@ async function message(response: Response): Promise<string> {
   return body.statusMessage ?? body.message ?? ''
 }
 
-function programme(suffix: string): { venueId: string } {
+function programme(suffix: string): { venueId: string, performanceId: string } {
   const database = new Database(app.databaseFile)
   try {
     const made = tonightsPerformance(sqliteTarget(database), { suffix })
-    return { venueId: made.venueId }
+    return { venueId: made.venueId, performanceId: made.performanceId }
   }
   finally {
     database.close()
@@ -402,6 +402,63 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="allergen-note"]')`)
     expect(await textOf(view, '[data-test="allergen-state"]')).toContain('Allergens recorded')
     expect(await textOf(view, '[data-test="allergen-note"]')).toContain('Contains gluten')
+    view.close()
+  }, 120_000)
+
+  // Issue 1297: before the bar's first count, a drink pouring stock with nothing on hand is refused
+  // at the charge, so the till tells whoever can count it how many drinks that is (0080).
+  test('before the first count, the Bar Manager is told how many drinks the till would refuse', async () => {
+    const { venueId } = programme('sale-uncounted')
+    const { productId, variantId } = await aSellableProduct({ name: named('Uncounted gin') })
+    const itemId = await anItem({ name: named('Uncounted base') })
+    await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 25 }] })
+    await openTill(venueId)
+
+    const listed = await catalogue(venueId).then(response => response.json()) as ListedCatalogue & { stockCounted?: boolean }
+    expect(listed.stockCounted).toBe(false)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-uncounted"]')`)
+    expect(await textOf(view, '[data-test="till-uncounted"]')).toContain('nothing on hand')
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="till-uncounted"] a[href="/bar/stock/stocktakes"]')`)).toBe(true)
+    view.close()
+  }, 120_000)
+
+  // A shift cannot reach the stocktake screen, so it has nothing to do about the warning.
+  test('before the first count, a bar shift without the stock screen is not shown it', async () => {
+    const { venueId, performanceId } = programme('sale-uncounted-shift')
+    const { productId, variantId } = await aSellableProduct({ name: named('Uncounted rum') })
+    const itemId = await anItem({ name: named('Uncounted rum base') })
+    await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 25 }] })
+    await openTill(venueId)
+
+    const shiftPassword = generatePassword()
+    const shift = await registerMember(app, 'sale-uncounted-shift', shiftPassword)
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`${performanceId}-BAR`, performanceId, 'BAR', 1, shift.id, 'CONFIRMED')
+    }
+    finally {
+      database.close()
+    }
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', shift.email)
+    await fill(view, 'form input[type="password"]', shiftPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="till-uncounted"]')`)).toBe(false)
     view.close()
   }, 120_000)
 })
