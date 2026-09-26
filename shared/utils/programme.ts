@@ -172,6 +172,8 @@ export interface AdminShow {
   capacity: number
   nextPerformanceAt: number | null
   nextPerformanceVenue: string | null
+  // Where the latest performance was added, which the next one is offered first (issue 1319).
+  lastVenueId: string | null
   // The run, and the venues it plays, so the list states both without a second query (D-132
   // criterion 3). Cancelled performances are left out of all three.
   firstPerformanceAt: number | null
@@ -671,6 +673,18 @@ export function listingCacheSeconds(boundaries: number[], at: Date = new Date())
 export function addPerformanceRefusal(bookableVenues: number): string | null {
   if (bookableVenues > 0) return null
   return 'A performance needs a venue, and none is open. Add or reopen one under Box office, Venues.'
+}
+
+// Where the run is playing, else the first venue we run: the first by name was once an external
+// one, and a performance there stamps no rota at all (issue 1319, E-102).
+export function preselectedVenueId(venues: ShowVenue[], lastVenueId: string | null): string {
+  const bookable = venues.filter(one => !one.archived)
+  if (lastVenueId && bookable.some(one => one.id === lastVenueId)) return lastVenueId
+  return (bookable.find(one => !one.isExternal) ?? bookable[0])?.id ?? ''
+}
+
+export function saysVenueOption(venue: { name: string, isExternal: boolean }): string {
+  return venue.isExternal ? `${venue.name} (external: no rota)` : venue.name
 }
 
 // The details form as it is typed: every optional field is a string here, because an input holds

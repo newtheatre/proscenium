@@ -53,6 +53,25 @@ export function boardEntries<P extends { startsAt: number }, O extends { startsA
   return entries.sort((a, b) => a.startsAt - b.startsAt || rank(a) - rank(b))
 }
 
+export interface Staffing {
+  says: string
+  tone: 'success' | 'warning' | 'neutral'
+  empty: boolean
+}
+
+// Nought of nought is nobody rostered, never "Fully staffed"; an external night is rostered ad hoc,
+// so none there is a fact rather than a gap (issue 1319, E-101 criterion 5).
+export function saysStaffing(entry: { shifts: { status: string }[], isExternal?: boolean }): Staffing {
+  if (entry.shifts.length === 0) {
+    return entry.isExternal
+      ? { says: 'Not rostered', tone: 'neutral', empty: true }
+      : { says: 'No shifts: nobody is rostered', tone: 'warning', empty: true }
+  }
+  return entry.shifts.every(shift => shift.status === 'CONFIRMED')
+    ? { says: 'Fully staffed', tone: 'success', empty: false }
+    : { says: 'Needs people', tone: 'warning', empty: false }
+}
+
 // A bare day is read as "is" by the openings list's night filter, so the link lands on that night.
 export function openingsOnNightHref(night: string): string {
   return `/rota/manage/openings?night=${night}`
