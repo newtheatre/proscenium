@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import { conditionsOf, filterQuerySchema } from '#shared/utils/list-filters'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { membershipsList } from '#shared/utils/memberships-list'
-import { membershipsClause, notRenewed, registerExportWhere } from '#server/utils/membership'
+import { membershipsClause, notRenewed, registerExportWhere, renewalDueWhere } from '#server/utils/membership'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
@@ -178,6 +178,39 @@ describe('an erased member is off the register and its export, counted as hidden
 
       const [text, ...parameters] = boundStatement(database, sql`SELECT memberships.id AS id FROM memberships
         JOIN users ON users.id = memberships.user_id WHERE ${registerExportWhere('everyone', undefined, GRACE)}`)
+      expect(rows<{ id: string }>(database, text, ...parameters).map(row => row.id)).toEqual(['m-held'])
+    })
+  })
+
+  // The screen's search: LIKE's own case folding, and a wildcard typed is a character searched for.
+  test('the export searches exactly as the register does', async () => {
+    await withDatabase((database) => {
+      person(database, 'u-emile', 'Émile Zola')
+      person(database, 'u-under', 'Ann a_b Holder')
+      person(database, 'u-other', 'Anna Abb')
+      for (const userId of ['u-emile', 'u-under', 'u-other']) membership(database, `m-${userId}`, userId, daysAfter(TODAY, -30), daysAfter(TODAY, 30), true)
+
+      const exported = (search: string): string[] => {
+        const [text, ...parameters] = boundStatement(database, sql`SELECT memberships.id AS id FROM memberships
+          JOIN users ON users.id = memberships.user_id WHERE ${registerExportWhere('everyone', search, GRACE)} ORDER BY memberships.id`)
+        return rows<{ id: string }>(database, text, ...parameters).map(row => row.id)
+      }
+      for (const search of ['Émile', 'a_b']) {
+        expect(`${search}: ${exported(search)}`).toBe(`${search}: ${ids(database, { filter: 'everyone', search }).sort()}`)
+      }
+      expect(exported('a_b')).toEqual(['m-u-under'])
+    })
+  })
+
+  test('a renewal reminder is never due on an erased holder\'s membership', async () => {
+    await withDatabase((database) => {
+      person(database, 'u-held', 'Hal Held')
+      erased(database, 'u-gone')
+      membership(database, 'm-held', 'u-held', daysAfter(TODAY, -300), daysAfter(TODAY, 10), true)
+      membership(database, 'm-gone', 'u-gone', daysAfter(TODAY, -300), daysAfter(TODAY, 10), true)
+
+      const [text, ...parameters] = boundStatement(database, sql`SELECT memberships.id AS id FROM memberships
+        JOIN users ON users.id = memberships.user_id WHERE ${renewalDueWhere(TODAY, daysAfter(TODAY, 30))}`)
       expect(rows<{ id: string }>(database, text, ...parameters).map(row => row.id)).toEqual(['m-held'])
     })
   })

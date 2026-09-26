@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // An explicit column list: a register is not a reason to hand over everything on an account.
-  const items = await db.select({
+  const listing = db.select({
     id: schema.memberships.id,
     userId: schema.memberships.userId,
     name: schema.users.name,
@@ -42,11 +42,9 @@ export default defineEventHandler(async (event) => {
     .limit(input.pageSize)
     .offset(offsetFor(input.page, input.pageSize))
 
+  const [items, total, erasedHidden] = await Promise.all([listing, count(where), count(hiddenErased)])
+
   // The window travels with the listing so the screen can say why somebody still counts, rather
   // than keeping a second copy of the setting; the erased count says hidden never means lost (0071).
-  return {
-    ...envelope(items, await count(where!), input.page, input.pageSize),
-    graceDays: grace,
-    erasedHidden: await count(hiddenErased),
-  }
+  return { ...envelope(items, total, input.page, input.pageSize), graceDays: grace, erasedHidden }
 })

@@ -244,6 +244,27 @@ describe.skipIf(skip !== null)('erasing somebody else (A-125 criterion 6)', () =
     expect(exported).not.toContain(tombstoneEmail(person.id))
   })
 
+  // Issue #1364: the record is read-only at the routes too, not only on the page, and who held
+  // which office stays as governance history (0011).
+  test('an erased account\'s grant cannot be revoked, nor its membership confirmed', async () => {
+    const person = await member('erased-record')
+    expect((await send('POST', '/api/admin/roles', { userId: person.id, role: 'COMMITTEE' }, cookie)).status).toBe(200)
+    expect((await send('POST', '/api/admin/memberships', { userId: person.id, startsOn: londonDay(new Date()), years: 1 }, cookie)).status).toBe(200)
+    const membershipId = read<{ id: string }>('SELECT id FROM memberships WHERE user_id = ?', person.id)!.id
+
+    expect((await send('POST', `/api/admin/accounts/${person.id}/security`, { operation: 'erase' }, cookie)).status).toBe(200)
+
+    const revoke = await send('DELETE', `/api/admin/roles?userId=${person.id}&role=COMMITTEE`, undefined, cookie)
+    expect(revoke.status).toBe(409)
+    expect((await revoke.json() as { statusMessage: string }).statusMessage).toBe('That account has been erased')
+    expect(read('SELECT id FROM role_grants WHERE user_id = ? AND role = ?', person.id, 'COMMITTEE')).toBeDefined()
+
+    const confirm = await send('POST', `/api/admin/memberships/${membershipId}/confirm`, {}, cookie)
+    expect(confirm.status).toBe(409)
+    expect((await confirm.json() as { statusMessage: string }).statusMessage).toBe('That account has been erased')
+    expect(read<{ confirmed_at: number | null }>('SELECT confirmed_at FROM memberships WHERE id = ?', membershipId)!.confirmed_at).toBeNull()
+  })
+
   // The bundle is the definition of completeness, so it is the thing worth checking twice.
   test('an export taken before erasure has nothing left to find after it', async () => {
     const person = await member('exported')

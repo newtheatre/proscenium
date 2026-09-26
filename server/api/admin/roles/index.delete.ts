@@ -14,6 +14,12 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'roles.revoke')
   const input = await getValidatedQueryOrThrow(event, query)
 
+  // Erasure keeps who held which office as governance history, so a tombstone's grant is not
+  // revoked away (0011, issue #1364).
+  const subject = await findById(input.userId)
+  if (!subject) throw noSuch('account')
+  if (subject.anonymisedAt !== null) throw createError({ statusCode: 409, statusMessage: 'That account has been erased' })
+
   const guard = input.role === PROTECTED_ROLE ? keepsAnItManagerWhere(input.userId, Math.floor(Date.now() / 1000)) : null
 
   // A role the account does not hold revokes nothing, so it records nothing either (0049).

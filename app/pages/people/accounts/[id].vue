@@ -216,7 +216,7 @@ async function operate(operation: 'sign-out' | 'enable'): Promise<void> {
 }
 
 // An erased account is a record kept for the theatre's statistics: nothing on it can be changed,
-// so none of the controls that would are drawn (issue #1364, 0011).
+// so none of the controls that would are drawn (issue 1364, 0011).
 const erased = computed(() => view.value?.account.anonymisedAt ?? null)
 
 const signsInWith = computed(() => {
@@ -353,7 +353,7 @@ onMounted(load)
         </p>
 
         <div
-          v-if="sees.prelinks && !view.methods.google && !view.account.anonymisedAt"
+          v-if="sees.prelinks && !view.methods.google && !erased"
           data-test="google-link"
           class="mt-3 space-y-3 border-t border-default pt-3"
         >
@@ -569,57 +569,55 @@ onMounted(load)
           </UButton>
         </div>
 
-        <template v-if="!view.account.anonymisedAt">
-          <UButton
-            v-if="!eraseReveal"
-            class="mt-4"
-            color="error"
-            variant="soft"
-            data-test="erase-reveal"
-            @click="eraseReveal = true"
-          >
-            Erase this account
-          </UButton>
+        <UButton
+          v-if="!eraseReveal"
+          class="mt-4"
+          color="error"
+          variant="soft"
+          data-test="erase-reveal"
+          @click="eraseReveal = true"
+        >
+          Erase this account
+        </UButton>
 
-          <div
-            v-else
-            class="mt-4 space-y-3 border-t border-default pt-3"
-            data-test="erase-confirm"
-          >
-            <p class="text-sm">
-              Anonymises the account in one transaction. Bookings, records and shifts stay; nothing
-              personal about {{ view.account.email }} survives it. This cannot be undone.
-            </p>
-            <UFormField :label="`Type ${view.account.email} to confirm`">
-              <UInput
-                v-model="eraseConfirmEmail"
-                data-test="erase-confirm-email"
-              />
-            </UFormField>
-            <div class="flex gap-2">
-              <UButton
-                color="error"
-                variant="subtle"
-                :loading="working === 'erase'"
-                :disabled="eraseConfirmEmail.trim().toLowerCase() !== view.account.email.toLowerCase()"
-                data-test="erase-submit"
-                @click="eraseAccount"
-              >
-                Erase the account
-              </UButton>
-              <UButton
-                variant="ghost"
-                @click="eraseReveal = false; eraseConfirmEmail = ''"
-              >
-                Cancel
-              </UButton>
-            </div>
+        <div
+          v-else
+          class="mt-4 space-y-3 border-t border-default pt-3"
+          data-test="erase-confirm"
+        >
+          <p class="text-sm">
+            Anonymises the account in one transaction. Bookings, records and shifts stay; nothing
+            personal about {{ view.account.email }} survives it. This cannot be undone.
+          </p>
+          <UFormField :label="`Type ${view.account.email} to confirm`">
+            <UInput
+              v-model="eraseConfirmEmail"
+              data-test="erase-confirm-email"
+            />
+          </UFormField>
+          <div class="flex gap-2">
+            <UButton
+              color="error"
+              variant="subtle"
+              :loading="working === 'erase'"
+              :disabled="eraseConfirmEmail.trim().toLowerCase() !== view.account.email.toLowerCase()"
+              data-test="erase-submit"
+              @click="eraseAccount"
+            >
+              Erase the account
+            </UButton>
+            <UButton
+              variant="ghost"
+              @click="eraseReveal = false; eraseConfirmEmail = ''"
+            >
+              Cancel
+            </UButton>
           </div>
-        </template>
+        </div>
       </UPageCard>
 
       <UPageCard
-        v-if="!view.account.anonymisedAt"
+        v-if="!erased"
         data-test="merge"
         title="Merge into another account"
         description="A dry run first: nothing changes until the losing account's email is typed back as confirmation."
