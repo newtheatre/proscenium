@@ -204,6 +204,9 @@ const SHOW_HOUSE = sql`
   (SELECT v.name FROM performances p JOIN venues v ON v.id = p.venue_id
     WHERE p.show_id = s.id AND p.status <> 'CANCELLED' AND p.starts_at >= unixepoch()
     ORDER BY p.starts_at LIMIT 1) AS nextPerformanceVenue,
+  (SELECT p.venue_id FROM performances p
+    WHERE p.show_id = s.id AND p.status <> 'CANCELLED'
+    ORDER BY p.created_at DESC, p.starts_at DESC LIMIT 1) AS lastVenueId,
   (SELECT min(p.starts_at) FROM performances p
     WHERE p.show_id = s.id AND p.status <> 'CANCELLED') AS firstPerformanceAt,
   (SELECT max(p.starts_at) FROM performances p

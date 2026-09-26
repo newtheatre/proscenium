@@ -3,7 +3,7 @@ import { externalVenueTemplateRefusal, orderedSlots, shiftTemplateForm, template
 import type { TemplateSlot } from '#shared/utils/rota'
 
 // Set a venue's shift template. Editing one changes nothing already stamped: the backfill is what
-// carries a change onto a performance (E-101 criterion 3).
+// carries a change onto a performance (E-101 criterion 3). A night never stamped is stamped here.
 export default defineEventHandler(async (event) => {
   const venueId = getRouterParam(event, 'venueId') ?? ''
   const resolved = await requirePermission(event, 'rota.write')
@@ -26,16 +26,23 @@ export default defineEventHandler(async (event) => {
 
   const [cleared, ...written] = replaceTemplateStatements(venueId, input.slots, resolved.account.id)
 
-  await withShiftConstraints(() => db.batch([
+  const { night, from } = stampWindow()
+  const defaults = await shiftOffsetDefaults(event)
+
+  // In the same batch, after the template rows, so a first template never leaves the imported
+  // diary unstamped until somebody finds "Stamp the diary" (issue 1319).
+  const results = await withShiftConstraints(() => db.batch([
     db.run(cleared),
     ...written.map(statement => db.run(statement)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: held.length === 0 ? 'shift-template.created' : 'shift-template.updated',
       target: `venue:${venueId}`,
-      detail: changes({ slots: [said(held), said(input.slots)] }),
+      detail: { ...changes({ slots: [said(held), said(input.slots)] }), stampedFrom: night },
     })),
+    db.all<{ id: string }>(stampUnstampedStatement(venueId, from, defaults)),
   ]))
+  const stamped = results.at(-1) as { id: string }[]
 
-  return { ok: true, slots: orderedSlots(input.slots) }
+  return { ok: true, slots: orderedSlots(input.slots), stamped: stamped.length }
 })

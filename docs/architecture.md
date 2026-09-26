@@ -987,6 +987,8 @@ shift per slot on a performance. `shift_templates` and `shifts` are in `docs/dat
 | `templateRefusal(slots)` | Why a template may not be saved, or null. A venue template names each role once and holds exactly one duty manager, which correlates rows and so cannot be a CHECK (E-101 criterion 1). |
 | `stampPerformanceStatement(performanceId)` | The stamp for one performance, batched with the INSERT that creates it, so a performance can never exist staffed by nothing (E-102 criterion 1). |
 | `backfillVenueStatement(venueId, from)` | The same stamp over every performance at a venue from a given instant. `ON CONFLICT DO NOTHING` against the slot uniqueness makes a second run a no-op (E-102 criterion 2). |
+| `stampUnstampedStatement(venueId, from)` | The same stamp over only the performances at a venue from a given instant that hold no live (uncancelled) shift, batched with a template save, so a venue's first template reaches the diary already there and a rota already stamped is untouched (E-101 criterion 3, issue 1319). |
+| `unstaffedPerformancesQuery(from, to)` | The seven-day digest's rows: an open or declined shift, an unconfirmed duty manager, or no shifts at a venue we run. An external night with no shifts is left out, since it is staffed by hand (E-108, issue 1319). |
 | `cancelShiftsStatement(performanceId)` | Cancels a performance's shifts, batched with the cancellation itself (E-102 criterion 4). |
 | `cancelOrphanedShiftsStatement(performanceId, newVenueId)` | On a venue move, cancels only the held shifts whose role the new venue's template does not staff at all; a role it staffs with fewer slots than before still carries over (E-101, E-102, committee direction 4 September 2026). |
 | `activeShifts(performanceId)` | Every shift not already cancelled, open or held: what a cancellation or a move has to notify or count, in one query (E-102 criterion 4). |
@@ -1054,7 +1056,10 @@ come, filtered by role, status and night through `shared/utils/unfilled-shifts-l
 `dateAs: 'night'` extension the approvals list uses (K-129, 0014). No screen reads that paged
 list any more. `/rota/manage/shifts` is the Rota board (E-107 criterion 6, issue 933): it reads
 `GET /api/admin/rota/shifts/board`, which returns the next `BOARD_WINDOW` performances whole,
-every shift on them, filled ones included, and is what an officer reassigns from. Its `items`
+every shift on them, filled ones included, and is what an officer reassigns from. Each performance
+carries its `venueId`, `isExternal` and `hasTemplate`, so a card with no shifts says "No shifts:
+nobody is rostered" with a way to stamp or set up the template, or "Not rostered" at an external
+venue, through `saysStaffing()` (issue 1319). Its `items`
 also carry the window's `PLANNED` bar openings with their uncancelled slots (E-130 criterion 8,
 issue 1216), each entry tagged `kind: 'performance'` or `kind: 'opening'` and merged by start
 through `boardEntries` in `shared/utils/rota-board.ts`. Openings are read by a scope of their own,
@@ -1129,8 +1134,9 @@ and **Emergency cards** only once a performance there from tonight onwards carri
 while it already holds an item or a card (`listedVenue()` in `server/utils/venues.ts`, folded into
 each listing's clause).
 
-`server/utils/rota-escalation.ts` is `shifts:escalate`'s query: every performance inside seven
-days of a run with an open shift or a `DUTY_MANAGER` shift that is not `CONFIRMED`, the second
+`server/utils/rota-escalation.ts` runs `shifts:escalate` over `unstaffedPerformancesQuery()`: every
+performance inside seven days of a run with an open shift, no shifts at all at a venue we run, or a
+`DUTY_MANAGER` shift that is not `CONFIRMED`, the second
 counted whether or not it is also `CLAIMED`, because only a confirmed one satisfies the legal
 requirement (E-108 criteria 1 and 2). `rotaOfficers()` reads the same permission `rota.write`
 templates are administered under, rather than a named role, so an administrator is chased
