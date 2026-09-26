@@ -15,6 +15,7 @@ async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>
   }
 }
 
+// Any split the map could produce; FOH_MANAGER stands in for a desk role without money.refund.
 function count(database: TestDatabase): number {
   const [query, ...parameters] = boundStatement(database, officersWithoutRefundApprovalQuery(['FOH_MANAGER'], ['ADMIN', 'MANAGER']))
   const [row] = rows<{ count: number }>(database, query, ...parameters)
@@ -33,8 +34,8 @@ function grant(database: TestDatabase, userId: string, role: string, expiresAt: 
 
 // Read from the permission map, so a role gaining or losing the desk moves the count (0090).
 describe('the roles the preview reads', () => {
-  test('the desk without refund approval is the front of house officer, and only that', () => {
-    expect(refundPreviewRoles()).toEqual({ officers: ['FOH_MANAGER'], approving: ['ADMIN', 'MANAGER'] })
+  test('no role holds the desk without refund approval, and the front of house officer approves', () => {
+    expect(refundPreviewRoles()).toEqual({ officers: [], approving: ['ADMIN', 'MANAGER', 'FOH_MANAGER'] })
   })
 })
 

@@ -5,6 +5,8 @@ import { saysPrice } from '#shared/utils/ticket-types'
 // the figure this route refuses to let drift from what the ticket actually cost (criterion 1).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
+  // Criterion 2: the refunder's own money.refund is the approval, on any day (0102).
+  await requireRefundApproval(event, resolved)
   const id = getRouterParam(event, 'id') ?? ''
   const ticketId = getRouterParam(event, 'ticketId') ?? ''
   const input = await readValidatedBodyOrThrow(event, refundTicketForm)
@@ -28,15 +30,11 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Criterion 2: a standing money.refund holder approves themselves; anyone else needs tonight's
-  // confirmed duty manager for this performance, scoped so a shift elsewhere does not reach it.
-  const approverId = await requireRefundApproval(event, resolved, { performanceId: reservation.performanceId })
-
   const result = await refundTicket({
     reservationId: id,
     ticketId,
     pricePaid: ticket.pricePaid,
-    actorId: approverId,
+    actorId: resolved.account.id,
     performanceId: reservation.performanceId,
   })
   if (!result.applied) {

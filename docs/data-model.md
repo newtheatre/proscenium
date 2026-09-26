@@ -811,11 +811,13 @@ like a paid one (criterion 4, `heldSeatsSubquery`), and I-103's own `foregoneQue
 
 **Refunds and cancelling a paid booking (D-116).** `POST
 /api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund` hands money back one ticket at
-a time, under the same expected-total cross-check collection uses. Approval (criterion 2) needs
-`money.refund` (manager and admin) or tonight's confirmed duty manager for that performance,
-gated by the `REFUND_PAID_REQUIRES_MANAGER` configuration key (default true, registered ahead of
-this story); the general desk permission (`ticketing.write`) is still needed to reach the screen
-at all, so a duty-manager shift with no Front of House Manager role cannot use it (0090). The race (criterion 4) is
+a time, under the same expected-total cross-check collection uses. Approval (criterion 2) is the
+refunder's own `money.refund`, held with the desk by `FOH_MANAGER` and `ADMIN` (`MANAGER` holds
+it without the desk, so cannot reach the route), on any day and for any performance, gated by the
+`REFUND_PAID_REQUIRES_MANAGER` configuration key (default true, registered ahead of this story);
+the refunder is the actor on the ledger entry and the audit row. The general desk permission
+(`ticketing.write`) is needed to reach the route at all, and no shift gives it, so a duty manager
+plays no part and no officer bypass is recorded (0102). The race (criterion 4) is
 the ticket's own conditional claim (`UPDATE tickets SET refunded_at = ? WHERE ... AND refunded_at
 IS NULL`): `postEntry()` (`server/utils/ledger.ts`) gained an optional `guard` parameter for
 exactly this, making the ledger entry conditional on the claim's own `changes()` and the line

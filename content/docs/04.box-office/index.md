@@ -3,7 +3,7 @@ title: Box office
 description: The desk, passes, the programme and its reference data, and access profile verification.
 module: Ticketing
 audience: committee
-updatedOn: 2026-09-23
+updatedOn: 2026-09-26
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -27,8 +27,8 @@ The Box Office Manager and the Front of House Manager are one committee post, an
 what a pass covers once passes are live is the Manager's. Verifying an access profile is the
 Accessibility Officer's alone: general box office cannot open that screen or see what it holds.
 Approving a comp derives from tonight's confirmed duty manager shift, or from the Manager role.
-Approving a refund does too, and on a show night the Front of House Manager can also approve one
-for tonight's performance without a shift, recorded as the officer bypass it is.
+Refunding a paid ticket is the Front of House Manager's own, on any day and for any performance;
+no shift approves one.
 
 ## On a show night
 

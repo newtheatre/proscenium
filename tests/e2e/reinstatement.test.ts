@@ -20,7 +20,6 @@ let app: AppUnderTest
 let officer: TestMember
 let boxOffice: TestMember
 let boxOfficePassword: string
-let manager: TestMember
 let venueId: string
 
 beforeAll(async () => {
@@ -31,10 +30,6 @@ beforeAll(async () => {
   boxOfficePassword = generatePassword()
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
-
-  manager = await registerMember(app, 'manager', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'FOH_MANAGER' }, officer.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'MANAGER' }, officer.cookie)
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)
@@ -227,7 +222,7 @@ describe.skipIf(skip !== null)('a refunded booking is never reinstated through t
     const ticketId = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', booked.id)!.id
     expect((await send('POST', `/api/box-office/desk/reservations/${booked.id}/tickets/${ticketId}/refund`, {
       expectedTotalPence: 900,
-    }, manager.cookie)).status).toBe(200)
+    })).status).toBe(200)
     expect((await send('POST', `/api/box-office/desk/reservations/${booked.id}/cancel`)).status).toBe(200)
     expect(query<{ status: string, cancelledBy: string }>(
       'SELECT status, cancelled_by AS cancelledBy FROM reservations WHERE id = ?', booked.id,
@@ -339,7 +334,7 @@ describe.skipIf(skip !== null)('reinstating from the desk screen itself (#1037)'
     const ticketId = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', booked.id)!.id
     expect((await send('POST', `/api/box-office/desk/reservations/${booked.id}/tickets/${ticketId}/refund`, {
       expectedTotalPence: 900,
-    }, manager.cookie)).status).toBe(200)
+    })).status).toBe(200)
     expect((await send('POST', `/api/box-office/desk/reservations/${booked.id}/cancel`)).status).toBe(200)
 
     const view = await signInAsBoxOffice()
