@@ -1,6 +1,8 @@
+import { saysLatecomerPolicy } from './programme'
 import { plural } from './text'
 import { saysPrice } from './ticket-types'
 import { saysClock, saysDay } from './when'
+import type { NightRole } from './night-authority'
 
 // What the show-night header and the hub's tiles read (E-112). Pure: the numbers and the wording
 // are decided here so one test holds them, and the screens only place them.
@@ -110,13 +112,34 @@ export function passPressureAdvice(covering: number, headroom: number | null): s
 }
 
 /** "2h 10 · 1 interval", the answer the door is asked most often after the price. */
-export function runningTimeLine(durationMinutes: number | null, intervalCount: number, intervalMinutes: number | null): string {
+export function saysIntervals(intervalCount: number, intervalMinutes: number | null): string {
+  if (intervalCount === 0) return 'straight through'
   const counted = plural(intervalCount, 'interval')
-  const intervals = intervalCount === 0
-    ? 'straight through'
-    : intervalMinutes ? `${counted} of ${intervalMinutes} minutes` : counted
+  return intervalMinutes ? `${counted} of ${intervalMinutes} minutes` : counted
+}
+
+export function runningTimeLine(durationMinutes: number | null, intervalCount: number, intervalMinutes: number | null): string {
+  const intervals = saysIntervals(intervalCount, intervalMinutes)
   if (durationMinutes === null) return `Running time not yet stated · ${intervals}`
   return `${Math.floor(durationMinutes / 60)}h ${String(durationMinutes % 60).padStart(2, '0')} · ${intervals}`
+}
+
+// The door's numbers in one line, in the house's own words (issue 1150 item 16, issue 1307).
+export function doorStripNumbers(house: HubHouse): string {
+  const left = house.remaining === null ? 'no cap' : `${house.remaining} ${HUB_KPI_LABELS.seatsLeft}`
+  return `${house.admitted} ${HUB_KPI_LABELS.admitted} · ${house.sold} ${HUB_KPI_LABELS.sold} · ${left}`
+}
+
+// The line under the door's numbers: what to tell somebody arriving late, and when the break is
+// (issue 1307). The glance says each at more length.
+export function doorStripLine(latecomerPolicy: string | null, intervalCount: number, intervalMinutes: number | null): string {
+  return `${saysLatecomerPolicy(latecomerPolicy)} · ${saysIntervals(intervalCount, intervalMinutes)}`
+}
+
+// The door reads the agreed access wording and the duty manager runs the night; the bar serves
+// drinks and needs neither (D-127 criterion 3, issue 1307).
+export function seesAccessTonight(role: NightRole): boolean {
+  return role === 'DOOR' || role === 'DUTY_MANAGER'
 }
 
 /** Two groups of three, so the backstage code can be read out over a headset. */

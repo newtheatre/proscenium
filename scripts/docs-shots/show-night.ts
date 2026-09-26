@@ -31,6 +31,7 @@ export const showNight: Shot[] = [
       { selector: '[data-test="door-performance"]', label: 'Performance' },
       // The camera where the device has one, the line saying why not where it does not.
       { selector: '[data-test="qr-scanner"], [data-test="door-camera-note"]', label: 'The camera' },
+      { selector: '[data-test="door-strip"]', label: 'The house' },
       { selector: '[data-test="door-reference"]', label: 'QR, reference or name' },
       { selector: '[data-test="night-back"]', label: 'Back to tonight' },
     ],
