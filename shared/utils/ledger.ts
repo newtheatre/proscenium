@@ -121,7 +121,7 @@ export const entryForm = z.object({
 export type EntryInput = z.output<typeof entryForm>
 
 // Never stored: a total is what its lines say, read at the moment it is asked for (criterion 4).
-export function totalOf(lines: { amountPence: number, [key: string]: unknown }[]): number {
+export function totalOf<Line extends { amountPence: number }>(lines: readonly Line[]): number {
   return lines.reduce((sum, line) => sum + line.amountPence, 0)
 }
 

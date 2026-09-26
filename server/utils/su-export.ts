@@ -49,7 +49,7 @@ export async function setNominalMapping(input: NominalMappingInput, actorId: str
 // the mapping table, and a line with no mapping still exports with a null code (criterion 3).
 export function suExportQuery(fromDay: string, toDay: string): SQL {
   return sql`
-    SELECT le.london_day AS londonDay, ll.kind AS kind, le.source AS source,
+    SELECT le.london_day AS londonDay, ll.kind AS kind, le.source AS source, le.tender AS tender,
            m.nominal_code AS nominalCode, ll.amount_pence AS amountPence
     FROM ledger_lines ll
     JOIN ledger_entries le ON le.id = ll.entry_id

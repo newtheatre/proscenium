@@ -373,13 +373,22 @@ CI rather than exporting as `UNMAPPED` with no way to map it (issue #1283). A ne
 therefore adds its pair to the list and a migration seeding it, in the same pull request as its
 row below.
 
-Nothing in the export is a computed total. Each row carries a ledger line's own signed
-`amount_pence`, exactly as `ledger_lines` stores it; a refund line is already negative at the
+Every row but the last carries a ledger line's own signed `amount_pence`, exactly as
+`ledger_lines` stores it, with its entry's tender beside it; a refund line is already negative at the
 source (`server/utils/refunds.ts`), so summing a category's rows reaches the same net figure
 I-106 reports for the same lines without this route deriving it a second way. A line whose pair
 has no mapping still exports, on its own row with an explicit `UNMAPPED` code (criterion 3),
 never dropped. The row count is capped (`SU_EXPORT_ROW_CAP`) and the nominal code column runs
 through `toCsv`'s formula-injection guard (D-129) like every other user-typed export cell.
+
+**The file carries every tender, and closes on the card total (issue #1363).** A drink on a tab is
+a `BAR_ITEM` line tendered `TAB` when it is poured and a `TAB_SETTLEMENT` line tendered `CARD` when
+the tab is paid (F-109), so the amount column summed whole counts it twice. The tender column says
+which lines are reader money, a `BAR_ITEM` on `TAB` reads "Bar item on a tab", and the last line
+sums the `CARD` lines of the file: the same lines `revenueBySourceQuery` sums for the money
+dashboard (I-105), so the file and the dashboard agree on one figure for the same days, and an
+integration test holds them together. It is the file's only computed figure, and it is computed
+from the rows above it rather than by a second query.
 
 **An open period exports anyway, permitted but marked, never refused.** A treasurer may need a
 figure before closing (a return is due, a close is still being prepared), and refusing until

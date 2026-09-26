@@ -157,7 +157,7 @@ describe.skipIf(skip !== null)('/money/exports: editing a mapping before the CSV
     expect(exported.status).toBe(200)
     const csv = await exported.text()
     const [header, ...rows] = csv.trim().split('\r\n')
-    expect(header).toBe('"date","category","nominalCode","amountPence","amountPounds"')
+    expect(header).toBe('"date","category","tender","nominalCode","amountPence","amountPounds"')
     expect(rows.some(row => row.includes('"4150"'))).toBe(true)
   })
 

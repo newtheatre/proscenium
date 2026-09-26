@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { exportRangeForm, formatPoundsForExport, LEDGER_POSTING_PAIRS, nominalMappingForm, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportCsvRows, suExportForm, suExportLines } from '#shared/utils/su-export'
+import { exportRangeForm, formatPoundsForExport, LEDGER_POSTING_PAIRS, nominalMappingForm, SU_EXPORT_CARD_TOTAL, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportCsvRows, suExportForm, suExportLines } from '#shared/utils/su-export'
 import { periodQuery } from '#shared/utils/season-dashboard'
 import { ENTRY_SOURCES, isLineKind } from '#shared/utils/ledger'
 import type { SuExportRow } from '#shared/utils/su-export'
@@ -178,17 +178,39 @@ describe('choosing the period by name: a year, a season or a custom range (crite
 
 describe('the file itself (criteria 2, 3, 4)', () => {
   const lines: SuExportRow[] = [
-    { londonDay: '2026-09-15', kind: 'WALK_UP', source: 'DESK', nominalCode: '4100', amountPence: 900 },
-    { londonDay: '2026-09-16', kind: 'BAR_ITEM', source: 'TILL', nominalCode: null, amountPence: -500 },
+    { londonDay: '2026-09-15', kind: 'WALK_UP', source: 'DESK', tender: 'CARD', nominalCode: '4100', amountPence: 900 },
+    { londonDay: '2026-09-16', kind: 'BAR_ITEM', source: 'TILL', tender: 'CARD', nominalCode: null, amountPence: -500 },
   ]
 
-  test('each line is date, category, code or UNMAPPED, pence and pounds, in that order', () => {
+  test('each line is date, category, tender, code or UNMAPPED, pence and pounds, in that order', () => {
     const shaped = suExportCsvRows(lines)
-    expect(shaped).toEqual([
-      { date: '2026-09-15', category: 'Walk-up sale', nominalCode: '4100', amountPence: 900, amountPounds: '9.00' },
-      { date: '2026-09-16', category: 'Bar item', nominalCode: 'UNMAPPED', amountPence: -500, amountPounds: '-5.00' },
+    expect(shaped.slice(0, 2)).toEqual([
+      { date: '2026-09-15', category: 'Walk-up sale', tender: 'Card', nominalCode: '4100', amountPence: 900, amountPounds: '9.00' },
+      { date: '2026-09-16', category: 'Bar item', tender: 'Card', nominalCode: 'UNMAPPED', amountPence: -500, amountPounds: '-5.00' },
     ])
-    expect(Object.keys(shaped[0]!)).toEqual(['date', 'category', 'nominalCode', 'amountPence', 'amountPounds'])
+    expect(Object.keys(shaped[0]!)).toEqual(['date', 'category', 'tender', 'nominalCode', 'amountPence', 'amountPounds'])
+  })
+
+  // Issue #1363: a drink on a tab is a line when charged and another when settled, so the charge
+  // says it was credit and the closing line totals only the card money, the dashboard's revenue.
+  test('a drink charged to a tab says so, and is not card money', () => {
+    const shaped = suExportCsvRows([
+      { londonDay: '2026-09-20', kind: 'BAR_ITEM', source: 'TILL', tender: 'TAB', nominalCode: null, amountPence: 600 },
+      { londonDay: '2026-09-23', kind: 'TAB_SETTLEMENT', source: 'TILL', tender: 'CARD', nominalCode: null, amountPence: 600 },
+      { londonDay: '2026-09-23', kind: 'BAR_ITEM', source: 'TILL', tender: 'COMP', nominalCode: null, amountPence: 0 },
+    ])
+    expect(shaped[0]).toMatchObject({ category: 'Bar item on a tab', tender: 'Tab', amountPence: 600 })
+    expect(shaped[1]).toMatchObject({ category: 'Tab settlement', tender: 'Card', amountPence: 600 })
+    expect(shaped[2]).toMatchObject({ category: 'Bar item', tender: 'Comp', amountPence: 0 })
+    expect(shaped.at(-1)).toEqual({ date: '', category: SU_EXPORT_CARD_TOTAL, tender: '', nominalCode: '', amountPence: 600, amountPounds: '6.00' })
+  })
+
+  test('the closing line is always there, the card lines summed with their signs', () => {
+    expect(suExportCsvRows(lines).at(-1)).toMatchObject({ category: SU_EXPORT_CARD_TOTAL, amountPence: 400, amountPounds: '4.00' })
+    expect(suExportCsvRows([])).toEqual([
+      { date: '', category: SU_EXPORT_CARD_TOTAL, tender: '', nominalCode: '', amountPence: 0, amountPounds: '0.00' },
+    ])
+    expect(SU_EXPORT_CARD_TOTAL).toBe('Card total, the same as the money dashboard\'s revenue')
   })
 
   test('the cap refusal names the cap, the same sentence the download refuses with', () => {
