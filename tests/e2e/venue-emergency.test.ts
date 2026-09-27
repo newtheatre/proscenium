@@ -242,7 +242,9 @@ describe.skipIf(skip !== null)('who to ring first (issue 1519)', () => {
     expect(card).toMatchObject(security)
   })
 
-  test('the served screen reads to security, offers 999 too, and links neither number yet', async () => {
+  // Served as links, so a phone that never runs the script can still ring; the sheet is the
+  // hydrated screen's (0106).
+  test('the served screen reads to security and offers 999 too, each as a link that works unscripted', async () => {
     await send('PUT', `/api/admin/venues/${house.venueId}/emergency`, { address, ...security })
 
     const page = await send('GET', '/tonight/emergency', undefined, foh.cookie)
@@ -250,8 +252,8 @@ describe.skipIf(skip !== null)('who to ring first (issue 1519)', () => {
     expect(html).toContain('Read to University Security')
     expect(html).toContain('Call University Security')
     expect(html).toContain('Call 999')
-    expect(html).not.toContain('href="tel:01159518888"')
-    expect(html).not.toContain('href="tel:999"')
+    expect(html).toContain('href="tel:01159518888"')
+    expect(html).toContain('href="tel:999"')
   })
 
   test('a card that names nobody reads to 999, as it always has', async () => {
@@ -280,6 +282,7 @@ describe.skipIf(skip !== null)('who to ring first (issue 1519)', () => {
       await visit(view, `${app.baseURL}/tonight/emergency`, '[data-test="emergency-call-01159518888"]')
       await click(view, '[data-test="emergency-call-01159518888"]')
       await waitFor(view, `document.querySelector('[data-test="emergency-call-now"]')`)
+      expect(new URL(await view.evaluate<string>('location.href')).pathname).toBe('/tonight/emergency')
       expect(await view.evaluate<string>(`document.querySelector('[data-test="emergency-call-now"]').getAttribute('href')`)).toBe('tel:01159518888')
       expect(await textOf(view, '[role="dialog"]')).toContain('0115 951 8888')
 

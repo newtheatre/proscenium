@@ -277,7 +277,7 @@ const columns: TableColumn<VenueCard>[] = [
           <UFormField
             label="Their number"
             hint="Optional"
-            description="As you would dial it, spaces allowed. The card keeps Call 999 beneath it."
+            description="A desk or service line as you would dial it, spaces allowed, never somebody's own mobile. The card keeps Call 999 beside it."
           >
             <UInput
               v-model="state.firstCallPhone"

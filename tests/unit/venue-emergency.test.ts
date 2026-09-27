@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { EMERGENCY_SERVICES, cardAddressDraft, emergencyCallHref, emergencyCalls, emergencyCardComplete, emergencyCardForm, firstCallOf } from '#shared/utils/venue-emergency'
+import { EMERGENCY_SERVICES, cardAddressDraft, emergencyCalls, emergencyCardComplete, emergencyCardForm, firstCallOf } from '#shared/utils/venue-emergency'
 
 // E-113's pure validation. What the database holds is proved against the real migrations in
 // `tests/integration/venue-emergency.test.ts`.
@@ -115,7 +115,16 @@ describe('a card may name who to ring first (issue 1519)', () => {
     expect(withPhone('0115-951-8888')).toBe(false)
     expect(withPhone('ring the lodge')).toBe(false)
     expect(withPhone('12')).toBe(false)
-    expect(withPhone('1'.repeat(21))).toBe(false)
+    expect(withPhone('1 2')).toBe(false)
+    expect(withPhone('+ 1 2')).toBe(false)
+    expect(withPhone('1'.repeat(16))).toBe(false)
+  })
+
+  test('999 and 112 are never who to ring first, since the screen always offers them', () => {
+    const withPhone = (firstCallPhone: string) => emergencyCardForm.safeParse({ address: filled.address, firstCallName: 'Emergency services', firstCallPhone }).success
+    expect(withPhone('999')).toBe(false)
+    expect(withPhone('9 9 9')).toBe(false)
+    expect(withPhone('112')).toBe(false)
   })
 
   test('an overlong name is refused', () => {
@@ -126,6 +135,8 @@ describe('a card may name who to ring first (issue 1519)', () => {
 describe('who the screen rings, and in what order (issue 1519)', () => {
   const security = { firstCallName: 'University Security', firstCallPhone: '0115 951 8888' }
   const none = { firstCallName: null, firstCallPhone: null }
+  const at = (venueName: string, card: typeof security | typeof none) => ({ ...card, venueName })
+  const labels = (calls: { label: string }[]) => calls.map(call => call.label)
 
   test('a card with nobody named rings 999', () => {
     expect(firstCallOf(none)).toEqual(EMERGENCY_SERVICES)
@@ -136,34 +147,38 @@ describe('who the screen rings, and in what order (issue 1519)', () => {
     expect(firstCallOf(security)).toEqual({ name: 'University Security', phone: '0115 951 8888' })
   })
 
-  test('every named first call leads, once each by number, and 999 is always last', () => {
-    expect(emergencyCalls([security, none, { firstCallName: 'Security', firstCallPhone: '01159518888' }])).toEqual([
-      { name: 'University Security', phone: '0115 951 8888' },
-      EMERGENCY_SERVICES,
-    ])
-    expect(emergencyCalls([none, security])).toEqual([{ name: 'University Security', phone: '0115 951 8888' }, EMERGENCY_SERVICES])
-    expect(emergencyCalls([none])).toEqual([EMERGENCY_SERVICES])
-    expect(emergencyCalls([])).toEqual([EMERGENCY_SERVICES])
+  test('one campus venue offers security, then 999', () => {
+    expect(labels(emergencyCalls([at('Studio', security)]))).toEqual(['Call University Security', 'Call 999'])
+    expect(labels(emergencyCalls([at('The house', none)]))).toEqual(['Call 999'])
+    expect(labels(emergencyCalls([]))).toEqual(['Call 999'])
   })
 
-  test('a card that names 999 itself does not offer it twice', () => {
-    expect(emergencyCalls([{ firstCallName: 'Emergency services', firstCallPhone: '999' }])).toEqual([{ name: 'Emergency services', phone: '999' }])
+  // The cards lead with the reader's own venue, so the solid first action is their building's.
+  test('the calls follow the cards, so the reader\'s own venue decides what comes first', () => {
+    expect(labels(emergencyCalls([at('The house', none), at('Studio', security)]))).toEqual(['Call 999', 'Call University Security (Studio)'])
+    expect(labels(emergencyCalls([at('Studio', security), at('The house', none)]))).toEqual(['Call University Security (Studio)', 'Call 999'])
   })
 
-  test('the link the phone dials carries no spaces', () => {
-    expect(emergencyCallHref({ name: 'University Security', phone: '0115 951 8888' })).toBe('tel:01159518888')
-    expect(emergencyCallHref({ name: 'Security', phone: '+44 115 951 8888' })).toBe('tel:+441159518888')
-    expect(emergencyCallHref(EMERGENCY_SERVICES)).toBe('tel:999')
+  test('one number is offered once, naming every venue it covers only when some do not', () => {
+    const renamed = { firstCallName: 'Security', firstCallPhone: '01159518888' }
+    expect(labels(emergencyCalls([at('Studio', security), at('Trent', renamed)]))).toEqual(['Call University Security', 'Call 999'])
+    expect(labels(emergencyCalls([at('Studio', security), at('Trent', renamed), at('The house', none)]))).toEqual(['Call University Security (Studio, Trent)', 'Call 999'])
+  })
+
+  test('each call carries the link the phone dials, with no spaces', () => {
+    const [first, last] = emergencyCalls([at('Studio', { firstCallName: 'Security', firstCallPhone: '+44 115 951 8888' })])
+    expect(first).toMatchObject({ href: 'tel:+441159518888', digits: '441159518888' })
+    expect(last).toMatchObject({ href: 'tel:999', digits: '999' })
   })
 })
 
 // A tap in a pocket or a dark foyer must not ring anybody: every emergency call on the screen
-// opens a sheet first, and only the sheet's own button dials (issue 1519).
+// opens a sheet first, and only the sheet's own button dials once the script runs (issue 1519).
 describe('no emergency call dials on the first tap (issue 1519)', () => {
-  test('the screen pins no telephone link of its own', async () => {
+  test('every pinned call stops its own link and opens the sheet instead', async () => {
     const screen = await Bun.file('app/pages/tonight/emergency.vue').text()
     expect(screen).not.toContain('to="tel:999"')
-    expect(screen).toContain('emergencyCallHref(')
+    expect(screen).toContain('event.preventDefault()')
     expect(screen).toContain('<NightSheet')
   })
 })

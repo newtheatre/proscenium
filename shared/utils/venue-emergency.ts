@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { SHIFT_ROLES, saysShiftRole } from './rota'
+import { telHref } from './tonight'
 import type { ShiftRole } from './rota'
 
 // The venue emergency card's vocabulary (E-113). Nothing here reads a request or the database;
@@ -10,8 +11,11 @@ const NOTES_LIMIT = 2000
 
 const field = () => z.string().trim().max(FIELD_LIMIT).nullish().transform(value => value?.trim() || null)
 
-// Written as dialled, so the telephone link is the number with its spaces taken out.
-const DIALLABLE = /^\+?[\d ]{3,20}$/
+// Written as dialled, and counted in digits: a space is not a digit a phone can connect on.
+const DIALLABLE = /^\+?[\d ]+$/
+const dialled = (phone: string): string => phone.replace(/\D/g, '')
+// The emergency numbers themselves, which the screen always offers and nothing rings before.
+const EMERGENCY_NUMBERS = new Set(['999', '112'])
 
 // The one line a volunteer reads aloud to a 999 handler, so a card without it is not a card
 // (issue 902). Everything else on the form stays optional.
@@ -28,7 +32,8 @@ export const emergencyCardForm = z.object({
   notes: z.string().trim().max(NOTES_LIMIT).nullish().transform(value => value?.trim() || null),
   firstCallName: z.string().trim().max(80).nullish().transform(value => value?.trim() || null),
   firstCallPhone: z.string().trim().nullish().transform(value => value?.trim() || null)
-    .refine(value => value === null || DIALLABLE.test(value), 'the number to ring first is digits and spaces, with a plus in front if it needs one'),
+    .refine(value => value === null || (DIALLABLE.test(value) && dialled(value).length >= 3 && dialled(value).length <= 15), 'the number to ring first is digits and spaces, with a plus in front if it needs one')
+    .refine(value => value === null || !EMERGENCY_NUMBERS.has(dialled(value)), 'the number to ring first is who you call before 999, so it cannot be 999 itself'),
 }).refine(card => (card.firstCallName === null) === (card.firstCallPhone === null), {
   message: 'who to ring first needs both a name and a number, or neither',
   path: ['firstCallPhone'],
@@ -92,14 +97,19 @@ export function firstCallOf(card: FirstCall): EmergencyCall {
   return card.firstCallName && card.firstCallPhone ? { name: card.firstCallName, phone: card.firstCallPhone } : EMERGENCY_SERVICES
 }
 
-const digits = (phone: string): string => phone.replace(/\s+/g, '')
+export interface PinnedCall extends EmergencyCall { label: string, href: string, digits: string }
 
-// Each first call once by number in card order, then 999, which every venue keeps (0106).
-export function emergencyCalls(cards: readonly FirstCall[]): EmergencyCall[] {
-  const calls = [...cards.filter(card => card.firstCallName && card.firstCallPhone).map(firstCallOf), EMERGENCY_SERVICES]
-  return calls.filter((call, index) => calls.findIndex(one => digits(one.phone) === digits(call.phone)) === index)
-}
-
-export function emergencyCallHref(call: EmergencyCall): string {
-  return `tel:${digits(call.phone)}`
+// In card order, which leads with the reader's own venue, each number once and 999 always; a
+// first call that is not every venue's names the venues it is for (0106).
+export function emergencyCalls(cards: readonly (FirstCall & { venueName: string })[]): PinnedCall[] {
+  const calls = new Map<string, EmergencyCall & { venues: string[] }>()
+  for (const card of [...cards, { firstCallName: null, firstCallPhone: null, venueName: '' }]) {
+    const call = firstCallOf(card)
+    const held = calls.get(dialled(call.phone)) ?? { ...call, venues: [] }
+    calls.set(dialled(call.phone), { ...held, venues: card.venueName ? [...held.venues, card.venueName] : held.venues })
+  }
+  return [...calls.entries()].map(([digits, call]) => {
+    const some = digits !== EMERGENCY_SERVICES.phone && cards.length > 1 && call.venues.length < cards.length
+    return { name: call.name, phone: call.phone, label: some ? `Call ${call.name} (${call.venues.join(', ')})` : `Call ${call.name}`, href: telHref(call.phone), digits }
+  })
 }
