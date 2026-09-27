@@ -89,7 +89,7 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Email | E-mail | Already the practice: no hyphenated form appears under `app/`, `shared/` or `server/`. |
 | Postcode | Post code, post-code | One word, no hyphen, wherever an address is collected. |
 | Paid | Collected, for a booking | A booking whose money has been taken, whoever took it: the door's PAID card and the till's confirmation both say it (K-128, issue 1150 item 16). |
-| In | Admitted, collected, for a person | Through the door. `HUB_KPI_LABELS` carries the three house words, sold, in and seats left, and every show-night screen reads them from there. The desk uses the same three, in seats (issue 1326). |
+| In | Admitted, collected, for a person | Through the door. `HUB_KPI_LABELS` carries the three house words, sold, in and seats left, and every show-night screen reads them from there. Every one of those screens, the desk included, counts them in seats, and the night report counts sold and in the same way (issue 1326). |
 | Unpaid | Pending, held, for a booking | A booking not yet paid for. The desk's pill and its tile say it; the tile gives the tickets and the amount they owe. |
 | Walk-up | Door, for a sale | A booking made on the night with no booking ahead, known by its source: sold at the desk or the till, or a pass holder admitted on the spot. Admission also marks a booking made ahead as through the door, so "door" is never a count of walk-ups. |
 | Exception | Closed over, exempted | A checklist item answered with a reason instead of a tick. The control is a quiet "Can't do this?" line under the item, never a second button beside Tick (issue 1315); the record reads "Exception: …", and the night report prints the reason. |

@@ -737,9 +737,9 @@ desk-side creation route does) · timestamps.
 Indexes: (`performance_id`, `status`), (`user_id`, `created_at`), `hold_expires_at`.
 
 **Admission is a status, a walk-up is a source.** Admitting a booking at the door moves it from
-PENDING or COLLECTED to DOOR (`admitAtDoorStatement()`), and a walk-up sold at the desk or the
-door is written straight to DOOR with source DOOR. So `status = 'DOOR'` means through the door,
-whoever booked, and a walk-up is `source = 'DOOR'`. The desk counts both in seats (D-114 criterion
+PENDING or COLLECTED to DOOR (`admitAtDoorStatement()`). A walk-up sold at the desk or the till
+lands COLLECTED with source DOOR, and the door scans it in like any other. So `status = 'DOOR'`
+means through the door, whoever booked, and a walk-up is `source = 'DOOR'`. The desk counts both in seats (D-114 criterion
 7, issue 1326): "in" is `admittedSeatsSubquery()` and "walk-ups" is `walkUpSeatsSubquery()` in
 `server/utils/capacity.ts`, beside "sold" (`heldSeatsSubquery()`) and "unpaid" (PENDING seats).
 

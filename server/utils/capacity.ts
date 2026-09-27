@@ -106,15 +106,15 @@ export function admittedWalkUpSeatsSubquery(performanceId: SQL): SQL {
   )`
 }
 
-// Seats paid for, never admitted and not refunded: a no-show, derived and never written, so it
-// falls as the door admits people (issue 1296).
+// Seats owing nothing, never admitted and not refunded: a no-show, derived and never written, so it
+// falls as the door admits people (issue 1296). A pass seat owes nothing though it stays PENDING.
 export function noShowSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
     SELECT count(*) FROM ${sql.raw(TICKETS)} t
     JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
     WHERE t.performance_id = ${performanceId}
       AND t.refunded_at IS NULL
-      AND r.status IN ('NO_SHOW', 'COLLECTED')
+      AND (r.status IN ('NO_SHOW', 'COLLECTED') OR (r.status = 'PENDING' AND ${ticketOnPass(sql`t.id`)}))
   )`
 }
 
