@@ -118,9 +118,10 @@ const curtainDown = computed(() => selected.value ? curtainIsDown(selected.value
 const tiles = computed(() => hubTiles(authority.value.known ? authority.value.roles : null, curtainDown.value))
 const noRole = computed(() => authority.value.known && authority.value.roles.length === 0)
 
-const HUB_TILES: Record<HubTileId, { label: string, hint: string, icon: string, to: string, scoped: boolean }> = {
+const HUB_TILES: Record<HubTileId | 'stocktake', { label: string, hint: string, icon: string, to: string, scoped: boolean }> = {
   'door': { label: 'Door', hint: 'QR · ref · name', icon: 'i-lucide-scan-line', to: '/tonight/door', scoped: false },
   'till': { label: 'Till', hint: 'Bar sales', icon: 'i-lucide-store', to: '/tonight/till', scoped: false },
+  'stocktake': { label: 'Stocktake', hint: 'Count the bar', icon: 'i-lucide-clipboard-list', to: '/tonight/stocktake', scoped: false },
   'glance': { label: 'Tonight at a glance', hint: 'Numbers · show info', icon: 'i-lucide-gauge', to: '/tonight/glance', scoped: true },
   'checklist': { label: 'Checklist', hint: '', icon: 'i-lucide-list-checks', to: '/tonight/checklist', scoped: true },
   'report': { label: 'Night report', hint: 'The draft so far', icon: 'i-lucide-file-signature', to: '/tonight/report', scoped: true },
@@ -131,15 +132,40 @@ const HUB_TILES: Record<HubTileId, { label: string, hint: string, icon: string, 
 }
 
 // A tile says what is left rather than repeating its own name (issue 1150 item 3).
-function tileHint(id: HubTileId): string {
+function tileHint(id: HubTileId | 'stocktake'): string {
   if (id === 'checklist') return checklistHint(checklist.value, houseOpen.value)
   if (id === 'report' && curtainDown.value) return 'Sign off and close'
   return HUB_TILES[id].hint
 }
 
+// A count open for tonight's bar shift to take (decision 0099), asked only of somebody on the bar
+// and again with every poll, so the tile comes and goes as a stocktake is opened and applied.
+const onTheBar = computed(() => authority.value.known && authority.value.roles.includes('BAR'))
+const stocktakeOpen = ref(false)
+async function checkStocktake(): Promise<void> {
+  try {
+    stocktakeOpen.value = (await request<{ stocktake: unknown }>('/api/admin/bar/stocktakes/open')).stocktake !== null
+  }
+  catch {
+    stocktakeOpen.value = false
+  }
+}
+watch(onTheBar, (holds) => {
+  if (holds) void checkStocktake()
+}, { immediate: true })
+
+// The Stocktake tile follows the till's while a count is open (0099).
+const shownTiles = computed(() => tiles.value.flatMap(tile =>
+  tile.id === 'till' && stocktakeOpen.value ? [tile, { id: 'stocktake' as const, gold: false }] : [tile]))
+
+function poll(): void {
+  load()
+  if (onTheBar.value) void checkStocktake()
+}
+
 onMounted(() => {
   load()
-  timer = setInterval(load, POLL_MS)
+  timer = setInterval(poll, POLL_MS)
 })
 onUnmounted(() => {
   if (timer) clearInterval(timer)
@@ -245,7 +271,7 @@ onUnmounted(() => {
       <!-- The viewer's own job first and in gold, then the rest in the order a night taps them,
            Emergency last and red so a thumb in the dark never lands on it by accident (E-112 1). -->
       <NightTile
-        v-for="tile in tiles"
+        v-for="tile in shownTiles"
         :key="tile.id"
         :label="HUB_TILES[tile.id].label"
         :hint="tileHint(tile.id)"

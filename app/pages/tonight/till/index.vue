@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { can, viewBarStock } from '#shared/utils/abilities'
+import { can, takeStocktakes } from '#shared/utils/abilities'
 import { saysMoney } from '#shared/utils/bar'
 import { needsTheReader, saleJustCompleted, uncountedProducts } from '#shared/utils/sale'
 import { chargePaths, saysChargeOnReader, saysChargeOnSumUp } from '#shared/utils/till'
@@ -503,9 +503,9 @@ const chargedOn = computed(() => {
   return receipt.viaSumup ? 'Taken on SumUp' : 'Taken on the reader'
 })
 
-// Before the bar's first count, whoever can count is told how many drinks the charge would
-// refuse (issue 1297, 0080); a shift has nothing to do about it, so it is not shown one.
-const uncounted = computed(() => (catalogue.data.value && can(useViewer().value, viewBarStock) ? uncountedProducts(catalogue.data.value) : 0))
+// Before the bar's first count, whoever can take a stocktake is told how many drinks the charge would
+// refuse (issue 1297, 0080); a shift cannot open one, so it is not shown one.
+const uncounted = computed(() => (catalogue.data.value && can(useViewer().value, takeStocktakes) ? uncountedProducts(catalogue.data.value) : 0))
 
 // A walk-up's door pass, printed from the counter laptop (F-123 criterion 4).
 function printPass(): void {

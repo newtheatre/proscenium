@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { NO_STOCK_GROUP, joinCount, saysCount, splitCount, stocktakeGroups, stocktakeCountsForm } from '#shared/utils/stocktakes'
+import { NO_STOCK_GROUP, countedBlind, joinCount, saysCount, splitCount, stocktakeGroups, stocktakeCountsForm } from '#shared/utils/stocktakes'
 import type { StocktakeLine } from '#shared/utils/stocktakes'
 
 // Issue 1321 (F-115): three and a half bottles were typed as 2625, so a measured item with a
@@ -35,6 +35,19 @@ describe('a count is full containers plus the open one', () => {
   })
 })
 
+// Issue 1321's count is blind, so tonight's bar shift is sent nothing the expected figure can be
+// worked back from (0099): not the figure, the variance, nor its cost.
+describe('a line sent to somebody counting blind', () => {
+  const counted: StocktakeLine = {
+    id: 'l-gin', itemId: 'gin', itemName: 'Gin', unit: 'ML', containerMl: 700, category: 'Spirits',
+    expectedQty: 1400, countedQty: 1050, variance: -350, varianceCostPence: -700, countedByName: 'Sam',
+  }
+
+  test('keeps the count and who took it, and drops the expected figure and all it gives away', () => {
+    expect(countedBlind(counted)).toEqual({ ...counted, expectedQty: null, variance: null, varianceCostPence: null })
+  })
+})
+
 describe('the lines are grouped the way the bar is stocked', () => {
   const line = (itemId: string, category: string | null): StocktakeLine => ({
     id: `l-${itemId}`,
@@ -47,6 +60,7 @@ describe('the lines are grouped the way the bar is stocked', () => {
     countedQty: null,
     variance: null,
     varianceCostPence: null,
+    countedByName: null,
   })
 
   test('each stock group is one section, in the order the lines arrive', () => {

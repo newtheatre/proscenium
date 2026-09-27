@@ -89,7 +89,7 @@ describe('configuration surface (0012, 0019)', () => {
   // entry-level permissions is in one of them, whatever the default list currently says.
   const MONEY_OR_SAFETY_PERMISSIONS: Permission[] = [
     'money.refund', 'finance.read', 'finance.write', 'finance.export', 'finance.reopen',
-    'ticketing.export', 'bar.write', 'night.till', 'access.verify',
+    'ticketing.export', 'bar.write', 'bar.stocktake', 'night.till', 'access.verify',
     'emergency-card.write', 'age-checks.export', 'safety.read', 'safety.write',
   ]
 

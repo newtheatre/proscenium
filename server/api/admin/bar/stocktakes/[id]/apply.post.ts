@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm'
 // in one transaction, and freeze the stocktake. A blank line writes nothing (F-115 criteria 4, 6).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
-  const resolved = await requirePermission(event, 'bar.write')
+  const resolved = await requirePermission(event, 'bar.stocktake')
 
   const held = await stocktakeById(id)
   if (!held) throw noSuch('stocktake')

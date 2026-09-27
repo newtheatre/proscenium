@@ -134,15 +134,22 @@ describe('permissions come from live grants only', () => {
   test('the bar manager holds the bar administration and nothing else standing', () => {
     const held = [...permissionsFor([{ role: 'BAR_MANAGER', expiresAt: null }], now)]
       .filter(permission => !OPERATIONAL_PERMISSIONS.includes(permission)).sort()
-    expect(held).toEqual(['bar.read', 'bar.write'])
+    expect(held).toEqual(['bar.read', 'bar.stocktake', 'bar.write'])
   })
 
   // The front of house officer administers the rota, checklist, emergency card, licensing export,
-  // cross-season report, the board's configuration (E-126), the programme's (0090) and refunds (0102).
+  // cross-season report, board configuration (E-126), programme (0090), refunds (0102) and stocktake (0099).
   test('the front of house officer holds that standing administration and nothing else', () => {
     const held = [...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)]
       .filter(permission => !OPERATIONAL_PERMISSIONS.includes(permission)).sort()
-    expect(held).toEqual(['age-checks.export', 'board.read', 'board.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'money.refund', 'reports.read', 'rota.read', 'rota.write', 'ticketing.export', 'ticketing.read', 'ticketing.write'])
+    expect(held).toEqual(['age-checks.export', 'bar.stocktake', 'board.read', 'board.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'money.refund', 'reports.read', 'rota.read', 'rota.write', 'ticketing.export', 'ticketing.read', 'ticketing.write'])
+  })
+
+  // The Front of House Manager takes the full count (0099): the stocktake, and neither the catalogue,
+  // its prices and discounts, nor the rest of the stock register.
+  test('the front of house officer takes the stocktake and holds nothing else of the bar', () => {
+    const held = [...permissionsFor([{ role: 'FOH_MANAGER', expiresAt: null }], now)]
+    expect(held.filter(permission => permission.startsWith('bar.'))).toEqual(['bar.stocktake'])
   })
 
   // Nothing outside the three named ones may be operational, whatever a role picks up later.

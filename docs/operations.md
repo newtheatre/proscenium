@@ -535,8 +535,9 @@ carry across.
 real sales on the shadow nights, and a sale of an item with nothing on hand is refused by the
 stock trigger, so a bar that has never been counted refuses almost everything. The full count is
 taken by the Front of House Manager, on a regular basis from then on. The first is planned for
-about **Wednesday 7 October 2026**, before box office goes live on 12 October, and it needs
-someone holding `bar.write` today to open and apply the stocktake. A second full count follows at
+about **Wednesday 7 October 2026**, before box office goes live on 12 October. The Front of House
+Manager's role opens, counts and applies the stocktake itself (`bar.stocktake`, 0099), without
+the catalogue, its prices or discounts. A second full count follows at
 cutover (26 to 31 October), and the latest applied one is the balance (0080). Until the first is
 applied, the till tells anyone who can reach the stocktake screen how many drinks on it pour stock
 with nothing on hand, with a link to the stocktakes.

@@ -48,6 +48,12 @@ describe('a group with one visible entry is drawn as that entry (0105)', () => {
     expect(drawn('TREASURER')).toEqual(['entry /bar/reports', 'group money'])
   })
 
+  // The Front of House Manager takes the full count and nothing else of the bar (0099).
+  test('the Front of House Manager\'s Bar is Stocktakes alone', () => {
+    expect(drawn('FOH_MANAGER')).toContain('entry /bar/stock/stocktakes')
+    expect(drawn('FOH_MANAGER').filter(part => part.includes('/bar') || part === 'group bar')).toEqual(['entry /bar/stock/stocktakes'])
+  })
+
   test('a group holding two or more stays a group, with every entry in it', () => {
     const [money] = sidebarParts([seen('money', 7)])
     expect(money?.kind === 'group' && money.group.items.length).toBe(7)
