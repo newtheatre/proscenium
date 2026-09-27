@@ -47,6 +47,7 @@ not be a refusal at a desk (0031).
 | Route | Ability | Membership requirement | Sent to |
 | --- | --- | --- | --- |
 | `/rota` | `signedIn` | None yet. 0031 reserves the rota as something confirmation, not membership, may one day gate; nothing does today. | n/a |
+| `/tonight/emergency` | `signedIn`: every venue running tonight's card, to anybody signed in, shift or none (E-113 as amended by issue 1310). The duty managers' numbers show only to tonight's team at that venue, and a cached copy's only to the account that fetched it (A-114). | None: the card is the building's safety information. | `/sign-in` when signed out. |
 | `/training` | `signedIn` | None. | n/a |
 | `/training/sessions` | `signedIn` | None: signing up for a session does not check membership. | n/a |
 | `/training/sessions/[id]/register` | `signedIn` to reach; the register itself is gated by `runTrainingSessions` (`training.write` or a current trainer standing), not membership. | None. | n/a |
