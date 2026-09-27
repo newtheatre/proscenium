@@ -189,14 +189,20 @@ the token and the endpoint refuses the key, so neither a preview nor a deploy ca
 
 `/sign-in` and `/register` are the two entry points, and each carries its own steps rather than
 sending the visitor to a URL that means nothing on reload: the MFA challenge, the forgotten-password
-and sign-in-link requests, and the check-your-email panel are all states of the page the person is
-already on. Only three routes exist because an email points at them, and each is reached with a
-token in the query string:
+request and the check-your-email panel are all states of the page the person is already on.
+`/sign-in` asks for the address first and offers what it can use, settled by `wayInFor()` in
+`shared/utils/sign-in.ts` when the field is left or the form sent: Google alone for a theatre
+address, otherwise the emailed link first with the password form beside it (0103). The password
+form holds the only submit button on the screen once it is drawn.
+
+Only three routes exist because an email points at them, and each is reached with a token in the
+query string. Every link to them carries the `next` its request was sent with, added by
+`withNext()` and followed only as a path on this site:
 
 | Route | Consumes |
 | --- | --- |
-| `/verify?token=` | `POST /api/auth/verify`, offering a fresh send on a 410. A token issued by an address change is bound to that address and confirms no other (A-115) |
-| `/reset?token=` | `POST /api/auth/password/reset` |
+| `/verify?token=` | `POST /api/auth/verify`, offering a sign-in link on a 410. A token issued by an address change is bound to that address and confirms no other (A-115). In the browser that registered, which holds the address sealed in the `nnt-registered` cookie (`server/utils/registered-here.ts`), it signs in as well (0103) |
+| `/reset?token=` | `POST /api/auth/password/reset`, which signs in once the password is set, or answers with an MFA attempt |
 | `/magic?token=` | `POST /api/auth/magic-link/consume`, which may answer with an MFA attempt |
 
 Who is signed in is read once during rendering by `app/plugins/account.server.ts` into the
