@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { daysAfter } from '#shared/utils/membership'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -20,7 +20,9 @@ let app: AppUnderTest
 let admin: TestMember
 let foh: TestMember
 let member: TestMember
+let other: TestMember
 let venueId: string
+const fohPassword = generatePassword()
 
 // A week out rather than tonight: the open-slot list and a member's own rota both filter on the
 // clock, so an opening that has already run would drop out of a suite running late in the evening.
@@ -35,8 +37,9 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
 
-  foh = await registerMember(app, 'openings-foh', generatePassword())
+  foh = await registerMember(app, 'openings-foh', fohPassword)
   member = await registerMember(app, 'openings-member', generatePassword())
+  other = await registerMember(app, 'openings-other', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
 
   const database = new Database(app.databaseFile)
@@ -288,4 +291,87 @@ describe.skipIf(skip !== null)('cancelling one cancels its slots (E-130 criterio
     }
     expect(mine.openings.some(one => one.label === 'A get-in')).toBe(false)
   })
+})
+
+// E-130 criterion 3 with auto-confirm off: a claim on an opening queues, and the officer works it
+// where the opening is staffed, as the board works a shift's (E-105 criteria 2 and 3).
+describe.skipIf(skip !== null)('a queued claim is confirmed or declined (E-130 criterion 3)', () => {
+  async function setAutoConfirm(value: boolean): Promise<void> {
+    expect((await request(app, 'PUT', '/api/admin/config/SHIFT_CLAIM_AUTO_CONFIRM', { value }, admin.cookie)).status).toBe(200)
+  }
+
+  // Two queued claims on a fresh opening, one by each member.
+  async function queued(label: string): Promise<{ opening: Opening, first: Slot, second: Slot }> {
+    expect((await plan(label, foh.cookie)).status).toBe(200)
+    const { items, slots } = await listing(foh.cookie)
+    const opening = items.find(one => one.label === label)!
+    const [first, second] = slots.filter(one => one.openingId === opening.openingId) as [Slot, Slot]
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${first.slotId}/claim`, {}, member.cookie)).status).toBe(200)
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${second.slotId}/claim`, {}, other.cookie)).status).toBe(200)
+    const after = (await listing(foh.cookie)).slots.filter(one => one.openingId === opening.openingId)
+    expect(after.map(one => one.status)).toEqual(['CLAIMED', 'CLAIMED'])
+    return { opening, first, second }
+  }
+
+  const statusOf = async (slotId: string): Promise<string | undefined> =>
+    (await listing(foh.cookie)).slots.find(one => one.slotId === slotId)?.status
+
+  test('through the routes, one claim is confirmed once and another declined with its reason', async () => {
+    await setAutoConfirm(false)
+    try {
+      const { first, second } = await queued('A queued hire')
+
+      expect((await request(app, 'POST', `/api/rota/openings/shifts/${first.slotId}/approve`, {}, member.cookie)).status).toBe(403)
+      expect((await request(app, 'POST', `/api/rota/openings/shifts/${first.slotId}/approve`, {}, foh.cookie)).status).toBe(200)
+      expect((await request(app, 'POST', `/api/rota/openings/shifts/${first.slotId}/approve`, {}, foh.cookie)).status).toBe(409)
+      expect(await statusOf(first.slotId)).toBe('CONFIRMED')
+
+      const declined = await request(app, 'POST', `/api/rota/openings/shifts/${second.slotId}/decline`, { reason: 'Two on the bar is plenty that night' }, foh.cookie)
+      expect(declined.status).toBe(200)
+      expect(await statusOf(second.slotId)).toBe('DECLINED')
+      const database = new Database(app.databaseFile, { readonly: true })
+      try {
+        const row = database.query('SELECT decline_reason AS reason FROM bar_opening_shifts WHERE id = ?').get(second.slotId) as { reason: string }
+        expect(row.reason).toBe('Two on the bar is plenty that night')
+      }
+      finally {
+        database.close()
+      }
+    }
+    finally {
+      await setAutoConfirm(true)
+    }
+  })
+
+  test('on the screen, Confirm confirms one and Decline asks the reason for the other', async () => {
+    await setAutoConfirm(false)
+    let view: Bun.WebView | null = null
+    try {
+      const { opening, first, second } = await queued('A screened hire')
+
+      view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', foh.email)
+      await fill(view, 'form input[type="password"]', fohPassword)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      await visit(view, `${app.baseURL}/rota/manage/openings`, `[data-test="confirm-${first.slotId}"]`)
+      await click(view, `[data-test="confirm-${first.slotId}"]`)
+      await waitFor(view, `!document.querySelector('[data-test="confirm-${first.slotId}"]')`)
+      expect(await statusOf(first.slotId)).toBe('CONFIRMED')
+
+      await click(view, `[data-test="decline-${second.slotId}"]`)
+      await waitFor(view, `document.querySelector('[data-test="decline-reason"]')`)
+      await fill(view, '[data-test="decline-reason"]', 'The hire asked for one on the bar')
+      await click(view, '[data-test="confirm-decline-claim-verb"]')
+      await waitFor(view, `!document.querySelector('[data-test="decline-${second.slotId}"]')`)
+      expect(await statusOf(second.slotId)).toBe('DECLINED')
+      expect(await textOf(view, `[data-test="staffing-${opening.openingId}"]`)).toContain('Declined')
+    }
+    finally {
+      view?.close()
+      await setAutoConfirm(true)
+    }
+  }, 120_000)
 })

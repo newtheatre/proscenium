@@ -106,6 +106,24 @@ describe('the board shows bar openings beside performances (E-130 criterion 8)',
   })
 })
 
+// E-130 criterion 3: with auto-confirm off a claim on an opening queues, and it is worked where the
+// opening is staffed, with the reason a decline carries, as the board works a shift's.
+describe('a queued claim on a bar opening is confirmed or declined on the openings screen', () => {
+  test('a claimed slot offers Confirm and Decline, through the opening\'s own routes', async () => {
+    const source = await read(OPENINGS)
+    expect(source).toContain('`/api/rota/openings/shifts/${slot.slotId}/approve`')
+    expect(source).toContain('`/api/rota/openings/shifts/${slot.slotId}/decline`')
+    expect(source).toContain('`confirm-${slot.slotId}`')
+    expect(source).toContain('`decline-${slot.slotId}`')
+  })
+
+  test('a decline asks for the reason the claimant is shown', async () => {
+    const source = await read(OPENINGS)
+    expect(source).toContain(':schema="shiftDeclineForm"')
+    expect(source).toContain('data-test="decline-reason"')
+  })
+})
+
 describe('a module is chosen by name (G-120 criterion 7)', () => {
   test('the sign-off picker names the module', async () => {
     const source = await read(RECORDS)
