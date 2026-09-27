@@ -47,7 +47,7 @@ export const spaces: Shot[] = [
       { selector: '[data-test^="approve-"]:not([data-test="approve-selected"])', label: 'Approve' },
       { selector: '[data-test^="move-"]', label: 'Approve into another room' },
       { selector: '[data-test^="reject-"]:not([data-test="reject-selected"])', label: 'Reject' },
-      { selector: '[data-test^="unlist-"]', label: 'Not one of ours' },
+      { selector: '[data-test^="more-"]', label: 'More actions' },
     ],
   },
   {
