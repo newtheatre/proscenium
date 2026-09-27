@@ -97,7 +97,10 @@ const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconc
           </dl>
         </div>
 
-        <UFormField label="What the reader's Z actually reads">
+        <UFormField
+          label="What the reader's Z actually reads"
+          help="The Treasurer gets this figure, and any note, as the night's reader total, unless they have already recorded tonight's reading themselves."
+        >
           <UInputNumber
             v-model="actualZPounds"
             :min="0"
@@ -106,14 +109,6 @@ const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconc
             data-test="actual-z-input"
           />
         </UFormField>
-        <!-- The close is the night's reading, so the Treasurer resolves a difference rather than
-             retyping it (0097). -->
-        <p
-          class="text-xs text-muted"
-          data-test="reading-goes-to-treasurer"
-        >
-          The Treasurer gets this figure, and any note, as the night's reader total.
-        </p>
 
         <UAlert
           v-if="needsVarianceNote"

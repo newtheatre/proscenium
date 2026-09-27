@@ -41,12 +41,13 @@ function session(database: TestDatabase, id: string, opener: string): string {
 
 // The route's own batch: the close, its audit row only if the close landed, then the reading.
 function close(database: TestDatabase, sessionId: string, auditId: string, closedBy: string, readerPence: number, expectedPence: number, note: string | null = null): void {
+  const closing = {
+    id: sessionId, night: NIGHT, closedBy, expectedPence, actualZPence: readerPence, variancePence: readerPence - expectedPence, varianceNote: note,
+  }
   database.batch([
-    boundStatement(database, closeSessionStatement({
-      id: sessionId, night: NIGHT, closedBy, expectedPence, actualZPence: readerPence, variancePence: readerPence - expectedPence, varianceNote: note,
-    })),
+    boundStatement(database, closeSessionStatement(closing)),
     [`INSERT INTO audit_log (id, actor_id, action, target, detail) SELECT ?, ?, 'bar.till.closed', ?, '{}' WHERE changes() = 1`, auditId, closedBy, `till:${sessionId}`],
-    boundStatement(database, closeReadingStatement({ id: `z-${auditId}`, auditId, sessionId, night: NIGHT, closedBy, readerPence, expectedPence, note })),
+    boundStatement(database, closeReadingStatement(closing, { id: `z-${auditId}`, auditId })),
   ])
 }
 

@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
 
   // Both predicates ride the write, so a second close attempt and a hand-off started since the
   // count above change nothing and write no second audit row for one closure (0001, 0003).
-  const closed = await auditedWrite(db.all(closeSessionStatement({
+  const close = {
     id,
     night: session.night,
     closedBy: account.id,
@@ -62,16 +62,12 @@ export default defineEventHandler(async (event) => {
     actualZPence,
     variancePence,
     varianceNote: varianceNote ?? null,
-  })), entry, db.run(closeReadingStatement({
-    id: newId(),
-    auditId: entry.id,
-    sessionId: id,
-    night: session.night,
-    closedBy: account.id,
-    readerPence: actualZPence,
-    expectedPence: expected.totalPence,
-    note: varianceNote ?? null,
-  })))
+  }
+  const closed = await auditedWrite(
+    db.all(closeSessionStatement(close)),
+    entry,
+    db.run(closeReadingStatement(close, { id: newId(), auditId: entry.id })),
+  )
 
   const after = await sessionById(id)
   // This caller's own answer, not what the row happens to say: a loser here had their Z figure
