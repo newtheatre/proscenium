@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { daysAfter, endOfTerm, isCurrent, isInGrace, londonDay } from '#shared/utils/membership'
+import { awardFellowship, manualEntryForm, recordMembership } from '#shared/utils/admin-forms'
+import { MANUAL_ACTION_NAMES } from '#shared/utils/audit-actions'
+import { daysAfter, endOfTerm, isCurrent, isInGrace, londonDay, londonDayField } from '#shared/utils/membership'
+import type { ZodType } from 'zod'
 
 // A membership is a term bought at the SU, so every question about it is a question about dates
 // (0031). These are the sums the register and the sweep both rely on.
@@ -50,5 +53,30 @@ describe('the London day is the civil date, not the machine one (0014)', () => {
     expect(londonDay(new Date('2026-06-14T22:30:00Z'))).toBe('2026-06-14')
     // 23:30 UTC in summer is 00:30 the next day in London.
     expect(londonDay(new Date('2026-06-14T23:30:00Z'))).toBe('2026-06-15')
+  })
+})
+
+// A form sent with its date left empty named nothing in particular, on the fellowship, membership
+// and audit screens alike, since they share the one day field (K-128 criterion 2).
+describe('a missing date asks for one, on every form that shares the day field', () => {
+  const messageAt = (schema: ZodType, input: unknown, path: string): string | undefined => {
+    const result = schema.safeParse(input)
+    return result.success ? undefined : result.error.issues.find(issue => issue.path.join('.') === path)?.message
+  }
+
+  test('no date, or an empty one, asks for a date', () => {
+    expect(messageAt(londonDayField, undefined, '')).toBe('Choose a date')
+    expect(messageAt(londonDayField, '', '')).toBe('Choose a date')
+  })
+
+  test('a date in the wrong shape, or one the calendar lacks, keeps its own message', () => {
+    expect(messageAt(londonDayField, '14/09/2026', '')).toBe('Give the date as YYYY-MM-DD')
+    expect(messageAt(londonDayField, '2026-02-31', '')).toBe('That is not a day on the calendar')
+  })
+
+  test('the fellowship, membership and audit forms each say so at their date', () => {
+    expect(messageAt(awardFellowship, { userId: 'u1', awardedBy: 'The AGM', citation: 'For everything' }, 'awardedOn')).toBe('Choose a date')
+    expect(messageAt(recordMembership, { userId: 'u1', years: 1 }, 'startsOn')).toBe('Choose a date')
+    expect(messageAt(manualEntryForm, { action: MANUAL_ACTION_NAMES[0], target: 'u1', onBehalfOf: 'u2' }, 'occurredOn')).toBe('Choose a date')
   })
 })
