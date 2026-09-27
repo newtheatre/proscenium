@@ -11,6 +11,8 @@ import {
   DELIVERY_COST_QUESTION,
   componentsForm,
   deliveryCost,
+  deriveAllergens,
+  saysAtTheTill,
   deliveryCostBasis,
   effectivePriceRow,
   movementEntryForm,
@@ -30,6 +32,7 @@ import {
   variantForm,
   writeOffSizes,
 } from '#shared/utils/bar'
+import type { AllergenState } from '#shared/utils/bar'
 
 // F-111 and F-114's write-path rules, which the database CHECKs mirror rather than replace: a
 // refusal has to say what is wrong before a constraint error would.
@@ -426,5 +429,93 @@ describe('a delivery is costed by the container it came in (0100)', () => {
     expect(saysDeliveryCost({ unit: 'ITEM', unitCostPence: 95, containerCostPence: null, containerQty: null })).toBe('£0.95 each')
     expect(saysDeliveryCost({ unit: 'ML', unitCostPence: 1, containerCostPence: null, containerQty: null })).toBe('£0.01 a ml')
     expect(saysDeliveryCost({ unit: 'ML', unitCostPence: null, containerCostPence: null, containerQty: null })).toBe('')
+  })
+})
+
+// Issue 1348 (F-107 criteria 1, 3 and 4): the answer is given once, on the stocked item, and a
+// product reads its own from everything it pours, choices included, plus what the bar adds.
+describe('a product takes its allergen answer from what it pours', () => {
+  const noAddition = { state: 'UNKNOWN', note: null } as const
+
+  test('everything poured confirmed clear, and nothing added, is confirmed none', () => {
+    expect(deriveAllergens([
+      { itemName: 'Gin', state: 'NONE', note: null },
+      { itemName: 'Tonic water', state: 'NONE', note: null },
+    ], noAddition)).toEqual({ state: 'NONE', note: null })
+  })
+
+  test('a recorded item is named with its note, and what the bar adds follows', () => {
+    expect(deriveAllergens([
+      { itemName: 'House red', state: 'RECORDED', note: 'Contains sulphites.' },
+      { itemName: 'Lemonade', state: 'NONE', note: null },
+    ], { state: 'RECORDED', note: 'Orange slice' })).toEqual({
+      state: 'RECORDED',
+      note: 'House red: Contains sulphites. Added at the bar: Orange slice.',
+    })
+  })
+
+  test('one item nobody has answered for leaves the product unanswered, and says which', () => {
+    expect(deriveAllergens([
+      { itemName: 'House red', state: 'RECORDED', note: 'Contains sulphites' },
+      { itemName: 'Tonic water', state: 'UNKNOWN', note: null },
+    ], { state: 'NONE', note: null })).toEqual({
+      state: 'UNKNOWN',
+      note: 'No information recorded for Tonic water. House red: Contains sulphites.',
+    })
+  })
+
+  test('a product that pours nothing keeps the answer it was given', () => {
+    expect(deriveAllergens([], { state: 'RECORDED', note: 'Contains nuts' })).toEqual({ state: 'RECORDED', note: 'Contains nuts' })
+    expect(deriveAllergens([], noAddition)).toEqual({ state: 'UNKNOWN', note: null })
+  })
+
+  // A food-safety answer fails closed: a recorded answer with nothing written, or a state no form
+  // writes, is no answer at all, never a clean one (a direct load can write either).
+  test('a recorded item with no note, or a state outside the three, is unanswered', () => {
+    expect(deriveAllergens([
+      { itemName: 'Guest ale', state: 'RECORDED', note: null },
+      { itemName: 'Cider', state: 'RECORDED', note: '  ' },
+      { itemName: 'Perry', state: 'bogus' as AllergenState, note: null },
+      { itemName: 'Lemonade', state: 'NONE', note: null },
+    ], noAddition)).toEqual({ state: 'UNKNOWN', note: 'No information recorded for Guest ale, Cider, Perry.' })
+  })
+
+  // The bar's addition fails closed too; its own "No information recorded" still means nothing added.
+  test('an addition recorded with nothing written is unanswered, poured or not', () => {
+    expect(deriveAllergens([{ itemName: 'Gin', state: 'NONE', note: null }], { state: 'RECORDED', note: ' ' }))
+      .toEqual({ state: 'UNKNOWN', note: 'No information recorded for what the bar adds.' })
+    expect(deriveAllergens([], { state: 'RECORDED', note: '' })).toEqual({ state: 'UNKNOWN', note: null })
+  })
+
+  // A note is never hidden: a caution written on an item answered clear reaches the till with it.
+  test('a note on an item or an addition answered clear is read out, and leaves it clear', () => {
+    expect(deriveAllergens([
+      { itemName: 'Gin', state: 'NONE', note: 'May contain traces of milk' },
+      { itemName: 'Tonic water', state: 'NONE', note: null },
+    ], { state: 'NONE', note: 'Served with a lime wedge' })).toEqual({
+      state: 'NONE',
+      note: 'Gin: May contain traces of milk. Added at the bar: Served with a lime wedge.',
+    })
+  })
+})
+
+describe('what the product editor says the till will say', () => {
+  test('the answer ends its sentence, and a note follows as one of its own', () => {
+    expect(saysAtTheTill({ state: 'NONE', note: null })).toBe('Confirmed no allergens.')
+    expect(saysAtTheTill({ state: 'RECORDED', note: 'Contains nuts' })).toBe('Allergens recorded. Contains nuts.')
+    expect(saysAtTheTill({ state: 'RECORDED', note: 'Gin: Contains sulphites.' })).toBe('Allergens recorded. Gin: Contains sulphites.')
+  })
+})
+
+describe('a stocked item carries the allergen answer (issue 1348)', () => {
+  test('a note with no state stated is a recorded answer; nothing at all is no answer', () => {
+    expect(stockItemForm.parse({ name: 'House red', unit: 'ML', allergenNotes: 'Sulphites' }).allergenState).toBe('RECORDED')
+    expect(stockItemForm.parse({ name: 'Gin', unit: 'ML' }).allergenState).toBe('UNKNOWN')
+    expect(stockItemForm.parse({ name: 'Gin', unit: 'ML', allergenState: 'NONE' }).allergenState).toBe('NONE')
+  })
+
+  test('recorded needs its note, and a note is not filed as unknown', () => {
+    expect(stockItemForm.safeParse({ name: 'House red', unit: 'ML', allergenState: 'RECORDED' }).success).toBe(false)
+    expect(stockItemForm.safeParse({ name: 'House red', unit: 'ML', allergenState: 'UNKNOWN', allergenNotes: 'Sulphites' }).success).toBe(false)
   })
 })

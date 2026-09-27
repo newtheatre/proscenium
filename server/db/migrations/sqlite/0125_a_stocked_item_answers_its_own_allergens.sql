@@ -1,0 +1,1 @@
+ALTER TABLE `bar_items` ADD `allergen_state` text;

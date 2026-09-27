@@ -1572,8 +1572,8 @@ for each listing (the stocktakes list also to `bar.stocktake`, 0099):
 | Route | What it does |
 | --- | --- |
 | `GET /api/admin/bar/categories` | The paged envelope, each row carrying its product count. Filtered by its declaration (`shared/utils/bar-categories-list.ts`, K-129): no field yet, only `search` over the name and `sort` by till order or name. |
-| `GET /api/admin/bar/products` | The paged envelope, every status included, each row carrying whether it has ever sold and `restrictedPours`, the names of the age-restricted stocked items its live sizes pour. Filtered by its declaration (`shared/utils/bar-products-list.ts`, K-129): `categoryId`, `retired` and `poursRestrictedSwitchedOff` (a product left unrestricted that pours restricted stock, hidden and retired included, the Bar Manager's tidy-up list, issue 1299), with `search` over the name and `sort` by category, category name, till order within the category, or product name. |
-| `GET /api/admin/bar/items` | The paged envelope, each row carrying what is on hand: the sum of its movements, and `pourSizes`, the quantities the live sizes of products on the till pour from it (once each, choices included, the same products as Poured by, `pourSizesColumn`), which a write-off offers as chips (issue 1350). Filtered by its declaration (`shared/utils/bar-items-list.ts`, K-129): `retired`, with `search` over the name and `sort` by status or name. |
+| `GET /api/admin/bar/products` | The paged envelope, every status included, each row carrying whether it has ever sold, `allergens` (the answer the till gives, derived from what its live sizes pour with the product's own note as the bar's addition, `deriveAllergens`, issue 1348) and `restrictedPours`, the names of the age-restricted stocked items its live sizes pour. Filtered by its declaration (`shared/utils/bar-products-list.ts`, K-129): `categoryId`, `retired` and `poursRestrictedSwitchedOff` (a product left unrestricted that pours restricted stock, hidden and retired included, the Bar Manager's tidy-up list, issue 1299), with `search` over the name and `sort` by category, category name, till order within the category, or product name. |
+| `GET /api/admin/bar/items` | The paged envelope, each row carrying what is on hand: the sum of its movements, and `pourSizes`, the quantities the live sizes of products on the till pour from it (once each, choices included, the same products as Poured by, `pourSizesColumn`), which a write-off offers as chips (issue 1350), and `allergenState`, the item's answer as `itemAllergenState` reads it. Filtered by its declaration (`shared/utils/bar-items-list.ts`, K-129): `retired` and `allergenState` (issue 1348), with `search` over the name and `sort` by status, name, or allergens with the unanswered first. |
 | `GET /api/admin/bar/movements` | The paged envelope, newest first. Filtered by its declaration (`shared/utils/bar-movements-list.ts`, K-129): `itemId` and `kind`, with `search` over the stocked item's name and `sort` by when or `recordedOrder`, the row's own insertion order, which breaks a tie within the same second. |
 | `GET /api/admin/bar/stocktakes` | The paged envelope, newest opened first. Filtered by its declaration (`shared/utils/stocktakes-list.ts`, K-129): `status`, which is also the only column the `search` box runs over. |
 
@@ -1585,7 +1585,11 @@ item's own unit (F-120) · `category` free text, for grouping the order list; no
 categories and has no one sale category to inherit (F-203 is expected to normalise this free text
 into its own lookup table, for a supplier and a pack size to attach to; until then a typo splits a
 group silently) · `age_restricted` bool default true ·
-`allergen_notes`, the reference a product's own note is written from · `status` CHECK
+`allergen_state` NULL, the item's allergen answer (`UNKNOWN`, `NONE` or `RECORDED`), bare and
+nullable so the column rebuilds nothing, read by `itemAllergenState` (issue 1348) as the till
+reads it: a NULL is `RECORDED` where `allergen_notes` holds text, and `RECORDED` with nothing
+written, or any state no form writes, is `UNKNOWN`, so every screen fails closed ·
+`allergen_notes`, the answer's note · `status` CHECK
 `ACTIVE|RETIRED` · `created_at`. Retired, never deleted once anything has moved: every movement
 restricts on the foreign key.
 
@@ -1620,7 +1624,11 @@ saved off while any live size pours a restricted stocked item, directly or as a 
 product list reads true: the guided set-up refuses before it writes, and an edit carries
 `checkIdHeld` on its own `UPDATE` ·
 `allergen_state` CHECK
-`UNKNOWN|NONE|RECORDED` · `allergen_note`, required by `RECORDED` and refused by `UNKNOWN` (F-107) ·
+`UNKNOWN|NONE|RECORDED` · `allergen_note`, required by `RECORDED` and refused by `UNKNOWN` (F-107);
+since issue 1348 both are only what the bar adds to what the product pours, and the answer the
+till gives is derived (`deriveAllergens`): an item or an addition recorded with no note, or an
+item in a state no form writes, counts as unanswered, and a note on either answered clear is
+still read out ·
 `sort` · `created_at`.
 
 Nothing on the row says whether a product has ever sold, or whether it may go active. Both are

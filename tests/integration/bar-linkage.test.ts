@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { STOCK_COUNTED_QUERY, checkIdHeld, pourSizesColumn, pouredByColumn, readPouredBy, readRestrictedPours, readTillServings, restrictedPoursColumn, retireItemStatements, servingsAvailableQuery, tillServingsQuery, poursRestrictedSwitchedOffPredicate } from '#server/utils/bar-linkage'
+import { STOCK_COUNTED_QUERY, checkIdHeld, pourSizesColumn, pouredAllergensQuery, pouredByColumn, readPouredBy, readRestrictedPours, readTillServings, restrictedPoursColumn, retireItemStatements, servingsAvailableQuery, tillServingsQuery, poursRestrictedSwitchedOffPredicate } from '#server/utils/bar-linkage'
 import type { TillServings, TillServingsRow } from '#server/utils/bar-linkage'
-import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows, sql } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 import type { TestDatabase } from '#tests/helpers/database'
 
@@ -517,6 +517,59 @@ describe('the products that pour restricted stock with Age restricted off (issue
       const [, ...list] = boundStatement(database, poursRestrictedSwitchedOffPredicate('p'))
       expect(cell).toEqual([])
       expect(list).toEqual([])
+    })
+  })
+})
+
+// Issue 1348 (F-107): the answer lives on the stocked item, and each product reads it from
+// everything its live sizes pour, a choice's options included, in one read.
+describe('a product reads its allergens from the stock it pours (issue 1348)', () => {
+  function poured(database: TestDatabase): { productId: string, itemName: string, state: string, note: string | null }[] {
+    const [statement, ...parameters] = boundStatement(database, pouredAllergensQuery(sql`SELECT id FROM bar_products`))
+    return rows(database, statement, ...parameters)
+  }
+
+  test('each product lists every item it pours, directly or as a choice, with the item\'s answer', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      database.batch([
+        [`UPDATE bar_items SET allergen_state = 'NONE' WHERE id = 'item-gin'`],
+        [`UPDATE bar_items SET allergen_notes = 'Contains quinine' WHERE id = 'item-tonic'`],
+      ])
+      expect(poured(database).filter(row => row.productId === 'prod-gin')).toEqual([
+        { productId: 'prod-gin', itemName: 'Gin', state: 'NONE', note: null },
+        // A note written before the answer had a state of its own reads as a recorded answer.
+        { productId: 'prod-gin', itemName: 'Tonic', state: 'RECORDED', note: 'Contains quinine' },
+      ])
+      expect(poured(database).filter(row => row.productId === 'prod-crisps')).toEqual([
+        { productId: 'prod-crisps', itemName: 'Crisps', state: 'UNKNOWN', note: null },
+      ])
+    })
+  })
+
+  // Every screen reads the answer as the till does: recorded with nothing written, or a state no
+  // form writes, is no answer (a direct load can store either, since the column has no CHECK).
+  test('an item recorded with no note, or in a state no form writes, reads as unanswered', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      database.batch([
+        [`UPDATE bar_items SET allergen_state = 'RECORDED', allergen_notes = NULL WHERE id = 'item-gin'`],
+        [`UPDATE bar_items SET allergen_state = 'bogus', allergen_notes = 'Contains quinine' WHERE id = 'item-tonic'`],
+      ])
+      expect(poured(database).filter(row => row.productId === 'prod-gin').map(row => [row.itemName, row.state])).toEqual([
+        ['Gin', 'UNKNOWN'],
+        ['Tonic', 'UNKNOWN'],
+      ])
+    })
+  })
+
+  test('a retired size pours nothing, and the read binds no parameter', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      database.batch([[`UPDATE product_variants SET status = 'RETIRED' WHERE product_id = 'prod-negroni'`]])
+      expect(poured(database).some(row => row.productId === 'prod-negroni')).toBe(false)
+      const [, ...parameters] = boundStatement(database, pouredAllergensQuery(sql`SELECT id FROM bar_products`))
+      expect(parameters).toEqual([])
     })
   })
 })

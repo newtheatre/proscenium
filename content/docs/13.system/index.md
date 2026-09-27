@@ -86,7 +86,7 @@ The IT Manager holds every permission, so sees every line.
 | A shift role with no training module named, or one still a draft, retired or missing, so nobody can claim that shift | whoever reads the rota | the readiness card on [Shift templates](/docs/rota/shift-templates) |
 | Nothing is on hand at the bar | whoever reads the bar | [Stock](/docs/bar/stock) |
 | No stocktake has been applied yet | whoever reads the bar or takes a stocktake | [Stocktakes](/docs/bar/stocktakes) |
-| Products with no allergen information recorded, counting any not retired | whoever reads the bar | [Products](/docs/bar/products) |
+| Stocked items with no allergen answer, counting any not retired | whoever reads the bar | [Allergens](/docs/bar/stock#allergens) |
 
 ### An overdue restore drill
 

@@ -22,6 +22,51 @@ export type AllergenState = (typeof ALLERGEN_STATES)[number]
 // mostly is alcohol. A product has none: its Check ID follows what it pours (issue 1299).
 export const STOCK_ITEM_AGE_RESTRICTED_DEFAULT = true
 
+export interface AllergenAnswer {
+  state: AllergenState
+  note: string | null
+}
+
+export interface PouredAllergen {
+  itemName: string
+  state: AllergenState
+  note: string | null
+}
+
+const sentence = (text: string): string => text.trim().replace(/\.+$/, '')
+
+const written = (note: string | null): note is string => Boolean(note?.trim())
+
+// An answer only when it is a clean one: confirmed none, or recorded with something written. A
+// recorded answer with no note, or a state no form writes, fails closed as no answer (F-107).
+const answered = (answer: AllergenAnswer): boolean =>
+  answer.state === 'NONE' || (answer.state === 'RECORDED' && written(answer.note))
+
+// A product's answer from what it pours and what the bar adds (issue 1348, F-107 criteria 3 and 4):
+// unanswered while any part is, recorded while any is, and no note is hidden. UNKNOWN adds nothing.
+export function deriveAllergens(poured: readonly PouredAllergen[], addition: AllergenAnswer): AllergenAnswer {
+  const additionUnanswered = addition.state !== 'UNKNOWN' && !answered(addition)
+  if (poured.length === 0) return additionUnanswered ? { state: 'UNKNOWN', note: null } : addition
+  const unknown = [...new Set([
+    ...poured.filter(item => !answered(item)).map(item => item.itemName),
+    ...(additionUnanswered ? ['what the bar adds'] : []),
+  ])]
+  const noted = poured.filter(item => answered(item) && written(item.note))
+  const added = addition.state !== 'UNKNOWN' && written(addition.note) ? addition.note : null
+  const parts = [
+    ...(unknown.length > 0 ? [`No information recorded for ${unknown.join(', ')}`] : []),
+    ...noted.map(item => `${item.itemName}: ${sentence(item.note!)}`),
+    ...(added ? [`Added at the bar: ${sentence(added)}`] : []),
+  ]
+  const recorded = poured.some(item => item.state === 'RECORDED' && answered(item)) || (addition.state === 'RECORDED' && added !== null)
+  const state: AllergenState = unknown.length > 0 ? 'UNKNOWN' : recorded ? 'RECORDED' : 'NONE'
+  return { state, note: parts.length > 0 ? `${parts.join('. ')}.` : null }
+}
+
+// What the product editor says the till will say: the answer, then its note, each a sentence.
+export const saysAtTheTill = (answer: AllergenAnswer): string =>
+  `${says(answer.state)}.${written(answer.note) ? ` ${sentence(answer.note)}.` : ''}`
+
 // "Gin and Campari, which are age restricted": what every Check ID notice says a product pours.
 export function saysRestricted(names: readonly string[]): string {
   const named = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0] ?? ''
@@ -284,6 +329,8 @@ export const productForm = z.object({
 
 export const productStatusForm = z.object({ status: z.enum(PRODUCT_STATUSES) })
 
+// The allergen answer lives here, once per stocked item, and every product pouring it reads it
+// (issue 1348). A note sent with no state stated is a recorded answer, as one always was.
 export const stockItemForm = z.object({
   name: label('stocked item'),
   unit: z.enum(STOCK_UNITS),
@@ -291,10 +338,20 @@ export const stockItemForm = z.object({
   parQty: z.number().int().nonnegative().max(MAX_MOVEMENT_QTY).nullish(),
   category: z.string().trim().max(MAX_BAR_NAME).nullish(),
   ageRestricted: z.boolean().default(STOCK_ITEM_AGE_RESTRICTED_DEFAULT),
+  allergenState: z.enum(ALLERGEN_STATES).nullish(),
   allergenNotes: z.string().trim().max(MAX_ALLERGEN_NOTE).nullish(),
 }).refine(
   value => value.unit === 'ML' || !value.containerMl,
   { message: 'A container size belongs to something measured in millilitres', path: ['containerMl'] },
+).transform(value => ({
+  ...value,
+  allergenState: value.allergenState ?? (value.allergenNotes ? 'RECORDED' : 'UNKNOWN') as AllergenState,
+})).refine(
+  value => value.allergenState !== 'RECORDED' || Boolean(value.allergenNotes),
+  { message: 'Recorded allergens need the note that records them', path: ['allergenNotes'] },
+).refine(
+  value => value.allergenState !== 'UNKNOWN' || !value.allergenNotes,
+  { message: 'A note is information, so it cannot be filed as unknown', path: ['allergenState'] },
 )
 
 // Retiring an item the till still pours is refused naming the products; `hideDependents` is the
@@ -525,8 +582,11 @@ export interface BarProduct {
   status: ProductStatus
   staffedOnly: boolean
   ageRestricted: boolean
+  // The product's own answer, which is now only what the bar adds to what it pours (a garnish).
   allergenState: AllergenState
   allergenNote: string | null
+  // What the till says: read from every item its live sizes pour, plus the addition (issue 1348).
+  allergens: AllergenAnswer
   everSold: boolean
   // The age-restricted stocked items its live sizes pour, choices included, derived rather than
   // stored; switched off with any here is a product on the tidy-up list (issue 1299).
@@ -627,6 +687,7 @@ export interface StockItem {
   parQty: number | null
   category: string | null
   ageRestricted: boolean
+  allergenState: AllergenState
   allergenNotes: string | null
   status: StockItemStatus
   onHand: number

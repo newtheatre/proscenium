@@ -34,14 +34,14 @@ export type SetUpLine
   = | { kind: 'ELIGIBILITY', eligibility: RoleEligibility }
     | { kind: 'NOTHING_ON_HAND' }
     | { kind: 'NO_STOCKTAKE' }
-    | { kind: 'ALLERGENS_UNKNOWN', products: number }
+    | { kind: 'ALLERGENS_UNKNOWN', items: number }
 
 export function setUpLines(facts: SetUpFacts): SetUpLine[] {
   return [
     ...(facts.eligibility ?? []).filter(line => line.standing !== 'SET').map(eligibility => ({ kind: 'ELIGIBILITY' as const, eligibility })),
     ...(facts.anythingOnHand === false ? [{ kind: 'NOTHING_ON_HAND' as const }] : []),
     ...(facts.anyStocktake === false ? [{ kind: 'NO_STOCKTAKE' as const }] : []),
-    ...(facts.allergensUnknown ? [{ kind: 'ALLERGENS_UNKNOWN' as const, products: facts.allergensUnknown }] : []),
+    ...(facts.allergensUnknown ? [{ kind: 'ALLERGENS_UNKNOWN' as const, items: facts.allergensUnknown }] : []),
   ]
 }
 
@@ -50,7 +50,7 @@ export function saysSetUp(line: SetUpLine): string {
     case 'ELIGIBILITY': return saysEligibility(line.eligibility)
     case 'NOTHING_ON_HAND': return 'Nothing is on hand at the bar: record a delivery or an opening count.'
     case 'NO_STOCKTAKE': return 'No stocktake has been applied yet, so on-hand is what deliveries and sales say, not a count.'
-    case 'ALLERGENS_UNKNOWN': return `${plural(line.products, 'product')} ${line.products === 1 ? 'has' : 'have'} no allergen information recorded.`
+    case 'ALLERGENS_UNKNOWN': return `${plural(line.items, 'stocked item')} ${line.items === 1 ? 'has' : 'have'} no allergen answer.`
     default: return line satisfies never
   }
 }
@@ -61,7 +61,7 @@ export function setUpHref(line: SetUpLine): string {
     case 'ELIGIBILITY': return '/rota/manage/templates'
     case 'NOTHING_ON_HAND': return '/bar/stock'
     case 'NO_STOCKTAKE': return '/bar/stock/stocktakes'
-    case 'ALLERGENS_UNKNOWN': return '/bar/products'
+    case 'ALLERGENS_UNKNOWN': return '/bar/stock/allergens'
     default: return line satisfies never
   }
 }
