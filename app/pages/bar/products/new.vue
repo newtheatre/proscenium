@@ -8,11 +8,15 @@ import {
   asPence,
   asPounds,
   deliveryCostBasis,
+  defaultItemName,
   measurePreset,
+  openingQuantity,
   presetForCategory,
   restrictedStockOf,
   says,
   saysRestricted,
+  saysSetupFinish,
+  suggestedShape,
 } from '#shared/utils/bar'
 import type {
   AllergenState,
@@ -124,10 +128,18 @@ const choice = reactive({ offered: false, name: '', includedInPrice: false, qty:
 const choiceOptions = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 1 }])
 const opening = reactive({ offered: false, qty: 1, costPounds: null as number | null })
 
-// The opening delivery's cost is asked the way the stock it comes out of is bought (0100).
-const openingCost = computed(() => {
+// What the opening delivery comes out of: its cost is asked the way it is bought (0100), and its
+// quantity the way it stands on the shelf, in whole containers (issue 1349).
+const openingItem = computed(() => {
   const held = itemMode.value === 'NEW' ? newItem : knownItems.value.find(item => item.id === existingItemId.value)
-  return DELIVERY_COST_QUESTION[deliveryCostBasis(held ?? { unit: 'ITEM', containerMl: null })]
+  return { unit: held?.unit ?? 'ITEM', containerMl: held?.unit === 'ML' ? held.containerMl ?? null : null }
+})
+const openingCost = computed(() => DELIVERY_COST_QUESTION[deliveryCostBasis(openingItem.value)])
+const openingAsked = computed(() => {
+  const { unit, containerMl } = openingItem.value
+  if (unit === 'ITEM') return { label: 'How many', description: 'Whole items, as they stand on the shelf.' }
+  if (containerMl) return { label: 'Full containers', description: `How many full ${containerMl} ml bottles or kegs are on the shelf.` }
+  return { label: 'Millilitres', description: 'How much is on the shelf, since the item has no one container size.' }
 })
 
 // The product's switch follows what it pours, by the same rule the route refuses on (F-111
@@ -197,7 +209,7 @@ function fillFrom(id: MeasurePresetId | null): void {
       pricePounds: asPounds(defaults.value.get(size.servingKind)),
       chosen: shape.value !== 'SIMPLE' || index === 0,
     }))
-    if (chosen && itemMode.value === 'NEW' && newItem.name === '') {
+    if (chosen && itemMode.value === 'NEW' && (newItem.name === '' || newItem.name === suggestedItemName.value)) {
       newItem.unit = shape.value === 'SIMPLE' ? 'ITEM' : chosen.unit
       newItem.containerMl = shape.value === 'SIMPLE' ? null : chosen.containerMl
     }
@@ -211,6 +223,21 @@ function suggestedFor(id: string): MeasurePresetId | null {
   const category = categories.value.items.find(item => item.id === id)
   return category ? presetForCategory(category.name) : null
 }
+
+// The category comes first, and the shape its drinks are usually sold in is marked (issue 1349).
+const chosenCategory = computed(() => categories.value.items.find(item => item.id === product.categoryId) ?? null)
+const suggested = computed(() => (chosenCategory.value ? suggestedShape(chosenCategory.value.name) : null))
+
+// A new stocked item is named after the product until somebody names it otherwise (issue 1349).
+const suggestedItemName = computed(() => defaultItemName({
+  productName: product.name,
+  shape: shape.value,
+  containerMl: newItem.unit === 'ML' ? newItem.containerMl : null,
+  servingKind: shape.value === 'SIMPLE' ? sizes.value.find(size => size.chosen)?.servingKind ?? null : null,
+}))
+watch(suggestedItemName, (next, previous) => {
+  if (itemMode.value === 'NEW' && (newItem.name === '' || newItem.name === previous)) newItem.name = next
+})
 
 // The reads race each other when somebody arrows through the list, so a stale answer is dropped
 // rather than filling one category's sizes under another's name.
@@ -321,7 +348,7 @@ function productPayload(): Record<string, unknown> {
 
 function body(): Record<string, unknown> {
   const openingPayload = opening.offered
-    ? { qty: opening.qty, costPence: asPence(opening.costPounds) }
+    ? { qty: openingQuantity(opening.qty, openingItem.value), costPence: asPence(opening.costPounds) }
     : null
 
   if (shape.value === 'SIMPLE') {
@@ -379,15 +406,15 @@ async function submit(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    const answered = await $fetch<{ id: string, status: string, reason: string | null }>(
+    const answered = await $fetch<{ id: string, status: string, reason: string | null, inStock: boolean }>(
       '/api/admin/bar/products/setup',
       { method: 'POST', body: body() },
     )
     toast.add({
       title: `${product.name.trim()} is set up`,
-      description: answered.reason ?? 'It is on the till.',
+      description: saysSetupFinish(answered),
       icon: 'i-lucide-check',
-      color: answered.status === 'ACTIVE' ? 'success' : 'warning',
+      color: answered.status === 'ACTIVE' && answered.inStock ? 'success' : 'warning',
     })
     await navigateTo(`/bar/products/${answered.id}`)
   }
@@ -451,13 +478,40 @@ function moveFocus(step: number): void {
       class="space-y-4"
       data-test="shape-cards"
     >
-      <p class="text-sm text-muted">
+      <div class="space-y-2">
+        <p class="text-sm font-medium">
+          Which product category is it in?
+        </p>
+        <div
+          class="flex flex-wrap gap-2"
+          data-test="setup-categories"
+        >
+          <UButton
+            v-for="category in categories.items"
+            :key="category.id"
+            :color="product.categoryId === category.id ? 'primary' : 'neutral'"
+            :variant="product.categoryId === category.id ? 'solid' : 'subtle'"
+            :aria-pressed="product.categoryId === category.id"
+            class="min-h-12"
+            :data-test="`category-${category.id}`"
+            @click="product.categoryId = category.id"
+          >
+            {{ category.name }}
+          </UButton>
+        </div>
+      </div>
+
+      <p
+        v-if="product.categoryId"
+        class="text-sm text-muted"
+      >
         What shape is it? Everything else follows from the answer, and nothing here is fixed
         afterwards: a product's shape is read from its serving sizes, so it can always be changed
         on the product's own screen.
       </p>
 
       <div
+        v-if="product.categoryId"
         ref="shapeCards"
         class="grid gap-4 sm:grid-cols-3"
         role="radiogroup"
@@ -467,7 +521,9 @@ function moveFocus(step: number): void {
           v-for="(card, index) in SHAPES"
           :key="card.shape"
           class="cursor-pointer"
+          :class="suggested === card.shape ? 'ring-2 ring-primary' : ''"
           :data-test="card.test"
+          :data-suggested="suggested === card.shape"
           role="radio"
           :aria-checked="shape === card.shape"
           :aria-label="card.title"
@@ -489,6 +545,14 @@ function moveFocus(step: number): void {
             <h2 class="font-medium">
               {{ card.title }}
             </h2>
+            <UBadge
+              v-if="suggested === card.shape && chosenCategory"
+              color="primary"
+              variant="subtle"
+              size="sm"
+            >
+              Usual for {{ chosenCategory.name }}
+            </UBadge>
             <p
               :id="`${card.test}-description`"
               class="text-sm text-muted"
@@ -687,8 +751,8 @@ function moveFocus(step: number): void {
             class="grid gap-4 sm:grid-cols-2"
           >
             <UFormField
-              label="Quantity"
-              description="In the item's own unit."
+              :label="openingAsked.label"
+              :description="openingAsked.description"
             >
               <UInputNumber
                 v-model="opening.qty"

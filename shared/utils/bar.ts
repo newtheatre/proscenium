@@ -754,6 +754,44 @@ export function presetForCategory(name: string): MeasurePresetId | null {
   return found?.id ?? null
 }
 
+// The shape a category's drinks are usually sold in, which the set-up marks once the category is
+// chosen (issue 1349): packaged things are sold as themselves, the rest by measure.
+export function suggestedShape(categoryName: string): Exclude<ProductShape, 'UNSET' | 'RECIPE'> | null {
+  const preset = presetForCategory(categoryName)
+  if (!preset) return null
+  return preset === 'PACKAGED' ? 'SIMPLE' : 'MEASURED'
+}
+
+// A new stocked item is named after the product and what it comes in (issue 1349): the container
+// for a measure, the serving kind for a thing sold as itself, nothing for "each".
+export function defaultItemName(input: {
+  productName: string
+  shape: ProductShape
+  containerMl: number | null
+  servingKind: ServingKind | null
+}): string {
+  const name = input.productName.trim()
+  if (!name) return ''
+  if (input.shape === 'MEASURED' && input.containerMl) return `${name} ${input.containerMl}ml`
+  if (input.shape === 'SIMPLE' && input.servingKind && input.servingKind !== 'item') {
+    return `${name} ${says(input.servingKind).toLowerCase()}`
+  }
+  return name
+}
+
+// Opening stock is counted the way it stands on the shelf: whole containers of anything with a
+// container size, kept in the item's own unit (issue 1349, 0080).
+export function openingQuantity(counted: number, item: { unit: StockUnit, containerMl: number | null }): number {
+  return item.unit === 'ML' && item.containerMl ? counted * item.containerMl : counted
+}
+
+// The set-up's last word, which says whether the product is on the till and whether it has
+// anything to pour, rather than calling an empty product sellable (issue 1349).
+export function saysSetupFinish(result: { status: string, reason: string | null, inStock: boolean }): string {
+  if (result.status !== 'ACTIVE') return result.reason ?? 'It is hidden until it can be sold.'
+  return result.inStock ? 'It is on the till.' : 'Set up, but out of stock until a delivery or count.'
+}
+
 // Shape is a reading of the variants, so nothing stores it and an edit cannot contradict it (0017,
 // amended 15 September 2026). A choice group is a choice, not a second ingredient.
 export function productShape(variants: readonly {

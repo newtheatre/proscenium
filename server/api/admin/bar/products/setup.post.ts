@@ -119,5 +119,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { ok: true, id: plan.productId, status: plan.status, reason: plan.reason }
+  // Whether anything it pours is on the shelf, so the screen never calls an empty product sellable
+  // (issue 1349). Read after the batch, from the same servings the till reads (F-128 criterion 4).
+  const servings = await servingsAvailableOf(plan.productId)
+  const inStock = servings.some(size => (size.servings ?? 0) > 0)
+
+  return { ok: true, id: plan.productId, status: plan.status, reason: plan.reason, inStock }
 })
