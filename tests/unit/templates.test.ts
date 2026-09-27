@@ -150,9 +150,10 @@ describe('the house words (item 7)', () => {
     expect([...new Set(offenders)]).toEqual([])
   })
 
-  test('no template calls a room we do not manage "a room not listed here"', () => {
+  // Issue 1346: one name for these rooms, on every screen and in every message.
+  test('no template calls a Students\' Union room "not listed here" or "a room we do not manage"', () => {
     const offenders = everything()
-      .filter(one => /not listed here/i.test(`${one.subject} ${one.html} ${one.text}`))
+      .filter(one => /not listed here|rooms? we do not manage/i.test(`${one.subject} ${one.html} ${one.text}`))
       .map(one => one.name)
     expect([...new Set(offenders)]).toEqual([])
   })
@@ -523,9 +524,9 @@ describe('the shared labels (item 8)', () => {
     expect(saysStatus('BUMPED')).toBe('given to another booking')
   })
 
-  test('a converted request moved to a room we do not manage', () => {
+  test('a converted request moved to a Students\' Union room', () => {
     expect(saysBookingState({ status: 'CANCELLED', convertedToRequestId: 'r-1' }))
-      .toBe('Moved to a room we do not manage')
+      .toBe('Moved to a Students\' Union room')
   })
 
   test('every role name is a Title Case proper title', () => {

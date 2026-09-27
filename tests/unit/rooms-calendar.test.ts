@@ -33,6 +33,24 @@ describe('one name for a room the Students\' Union lends', () => {
   })
 })
 
+// The same name where an officer or a setting reads it, and in the audit trail (issue 1346).
+describe('the name reaches the trail, the settings and the personal-data notes', () => {
+  test('no reader-facing string calls them rooms we do not manage', async () => {
+    const { AUDIT_ACTIONS } = await import('#shared/utils/audit-actions')
+    const { configHeading } = await import('#shared/utils/config-wording')
+    const { CONFIG_KEYS } = await import('#shared/utils/config')
+    const readerFacing = [
+      AUDIT_ACTIONS['room.request.unlisted'].label,
+      configHeading('EXTERNAL_REQUEST_NOTICE_WORKING_DAYS'),
+      CONFIG_KEYS.EXTERNAL_REQUEST_NOTICE_WORKING_DAYS.describes,
+    ]
+    expect(readerFacing.filter(one => /rooms? we do not manage/i.test(one))).toEqual([])
+    expect(AUDIT_ACTIONS['room.request.unlisted'].label).toBe('Request moved to a Students\' Union room')
+    expect(await read('shared/utils/personal-data.ts')).not.toMatch(/rooms? we do not manage/i)
+    expect(await read('app/pages/rooms/book.vue')).not.toMatch(/rooms? we do not manage/i)
+  })
+})
+
 describe('the screens', () => {
   const read = (path: string): Promise<string> => Bun.file(path).text()
 
