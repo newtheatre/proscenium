@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
 import { auditIfChanged } from '#server/utils/audit'
-import { newPassTypeChildren, replacePricesStatements } from '#server/utils/pass-types'
+import { heldPricePointsRemovedQuery, newPassTypeChildren, priceUpsertStatements, updatePassTypeStatement } from '#server/utils/pass-types'
 import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -34,18 +34,19 @@ function seed(database: TestDatabase): void {
   ])
 }
 
-// The route's rename, its entry, then the price replace: one batch, in this order.
-function rename(database: TestDatabase, slug: string): unknown[] {
+// The route's edit, its entry, then the price points: one batch, in this order.
+function edit(database: TestDatabase, slug: string, prices: { label: string, price: number }[]): unknown[] {
   const entry = auditEntry({ actorId: null, action: 'pass-type.updated', target: 'pass-type:pt-b' })
-  const written = run(database, sql`
-    UPDATE pass_types SET slug = ${slug}
-    WHERE id = 'pt-b' AND NOT EXISTS (SELECT 1 FROM pass_types WHERE slug = ${slug} AND id <> 'pt-b')
-    RETURNING id
-  `)
+  const written = run(database, updatePassTypeStatement('pt-b', {
+    slug, name: 'Flexi', description: null, status: 'ON_SALE', validFrom: 1_000, validUntil: 2_000,
+    salesOpenAt: null, salesCloseAt: null, maxIssued: null, prices,
+  }))
   run(database, auditIfChanged(entry))
-  for (const statement of replacePricesStatements('pt-b', [{ label: 'Changed', price: 100 }], entry)) run(database, statement)
+  for (const statement of priceUpsertStatements('pt-b', prices, entry)) run(database, statement)
   return written
 }
+
+const rename = (database: TestDatabase, slug: string): unknown[] => edit(database, slug, [{ label: 'Changed', price: 100 }])
 
 const labels = (database: TestDatabase, passTypeId: string): string[] =>
   rows<{ label: string }>(database, 'SELECT label FROM pass_type_prices WHERE pass_type_id = ? ORDER BY label', passTypeId).map(row => row.label)
@@ -100,6 +101,59 @@ describe('a pass type\'s price points move only with the write they belong to (0
 
       expect(labels(database, 'pt-c')).toEqual(['Standard'])
       expect(rows(database, 'SELECT show_id AS showId FROM pass_type_shows WHERE pass_type_id = ?', 'pt-c')).toEqual([{ showId: 'show-1' }])
+    })
+  })
+})
+
+// An issued pass holds its price point (RESTRICT, D-124), so price points are kept by label and
+// changed in place: an edit only refuses when it would remove one a pass holds.
+describe('a pass type with passes issued is still edited, price points kept by label', () => {
+  function issued(database: TestDatabase): void {
+    seed(database)
+    database.batch([
+      ['INSERT INTO users (id, email, name) VALUES (?, ?, ?)', 'u-1', 'holder@example.invalid', 'A Holder (test)'],
+      ['INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid) VALUES (?, ?, ?, ?, ?, ?)',
+        'pass-1', 'PASS01', 'pt-b', 'price-b', 'u-1', 3000],
+    ])
+  }
+
+  const points = (database: TestDatabase): { id: string, label: string, price: number }[] =>
+    rows(database, 'SELECT id, label, price FROM pass_type_prices WHERE pass_type_id = ? ORDER BY label', 'pt-b')
+
+  test('a rename with the same price points applies, and the issued pass keeps its price point', async () => {
+    await withDatabase((database) => {
+      issued(database)
+      expect(edit(database, 'flexi-renamed', [{ label: 'Standard', price: 3000 }])).toHaveLength(1)
+      expect(points(database)).toEqual([{ id: 'price-b', label: 'Standard', price: 3000 }])
+    })
+  })
+
+  test('a held price point changes its price in place, and the pass keeps what it paid', async () => {
+    await withDatabase((database) => {
+      issued(database)
+      expect(edit(database, 'flexi', [{ label: 'Standard', price: 3500 }, { label: 'Concession', price: 2000 }])).toHaveLength(1)
+      expect(points(database).map(point => [point.id === 'price-b', point.label, point.price]))
+        .toEqual([[false, 'Concession', 2000], [true, 'Standard', 3500]])
+      expect(rows(database, 'SELECT price_paid AS paid FROM passes WHERE id = ?', 'pass-1')).toEqual([{ paid: 3000 }])
+    })
+  })
+
+  test('removing a price point a pass holds is refused, writing nothing, and the refusal can name it', async () => {
+    await withDatabase((database) => {
+      issued(database)
+      expect(edit(database, 'flexi', [{ label: 'Deluxe', price: 5000 }])).toHaveLength(0)
+      expect(points(database)).toEqual([{ id: 'price-b', label: 'Standard', price: 3000 }])
+      expect(rows(database, 'SELECT id FROM audit_log WHERE action = ?', 'pass-type.updated')).toEqual([])
+      expect(run(database, heldPricePointsRemovedQuery('pt-b', ['Deluxe']))).toEqual([{ label: 'Standard' }])
+    })
+  })
+
+  test('removing a price point nobody holds applies', async () => {
+    await withDatabase((database) => {
+      issued(database)
+      database.batch([['INSERT INTO pass_type_prices (id, pass_type_id, label, price) VALUES (?, ?, ?, ?)', 'price-c', 'pt-b', 'Concession', 2000]])
+      expect(edit(database, 'flexi', [{ label: 'Standard', price: 3000 }])).toHaveLength(1)
+      expect(points(database)).toEqual([{ id: 'price-b', label: 'Standard', price: 3000 }])
     })
   })
 })
