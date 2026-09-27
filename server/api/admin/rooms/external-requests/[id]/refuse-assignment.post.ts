@@ -19,16 +19,36 @@ export default defineEventHandler(async (event) => {
 
   const now = Math.floor(Date.now() / 1000)
 
-  // Guarded, or a refusal lands against a request a colleague just confirmed (0006). A room
-  // refused after confirming is still a room we no longer have, so it goes back to waiting.
-  const still = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], {
-    status: 'AWAITING_EXTERNAL',
-    assigned_space_id: null,
-    updated_at: now,
+  const refused = auditEntry({
+    actorId: account.id,
+    action: 'external.request.assignment.refused',
+    target: `external:${id}`,
+    detail: { space: space.id, noted: input.note?.verdict ?? null },
   })
-  if (!still) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
+  // Written in the same action, so the blacklist builds itself out of the work, and audited like
+  // the peer route that makes the same change (C-119).
+  const noted = input.note
+    ? {
+        note: {
+          id: newId(),
+          spaceId: space.id,
+          purpose: request.purpose,
+          verdict: input.note.verdict,
+          reason: input.note.reason,
+          writtenBy: account.id,
+          now,
+        },
+        entry: auditEntry({
+          actorId: account.id,
+          action: 'external.space.note.set',
+          target: `space:${space.id}`,
+          detail: { space: space.id, purpose: request.purpose, verdict: input.note.verdict },
+        }),
+      }
+    : null
 
-  await db.insert(schema.externalAssignments).values({
+  // Guarded, or a refusal lands against a request a colleague just confirmed (0006).
+  const statements = refuseAssignmentStatements({
     id: newId(),
     requestId: id,
     spaceId: space.id,
@@ -36,45 +56,9 @@ export default defineEventHandler(async (event) => {
     reason: input.reason,
     recordedBy: account.id,
     recordedAt: now,
-  })
-
-  // Written in the same action, so the blacklist builds itself out of the work rather than
-  // being a chore somebody remembers to do afterwards (C-119).
-  if (input.note) {
-    await db.insert(schema.externalSpaceNotes)
-      .values({
-        id: newId(),
-        spaceId: space.id,
-        purpose: request.purpose,
-        verdict: input.note.verdict,
-        reason: input.note.reason,
-        writtenBy: account.id,
-      })
-      .onConflictDoUpdate({
-        target: [schema.externalSpaceNotes.spaceId, schema.externalSpaceNotes.purpose],
-        set: { verdict: input.note.verdict, reason: input.note.reason, writtenBy: account.id, updatedAt: now },
-      })
-  }
-
-  const entries = [auditEntry({
-    actorId: account.id,
-    action: 'external.request.assignment.refused',
-    target: `external:${id}`,
-    detail: { space: space.id, noted: input.note?.verdict ?? null },
-  })]
-
-  // Audited like the peer route that makes the same change: a privileged mutation may not lose
-  // its trail entry by being reached from a different screen (CLAUDE.md).
-  if (input.note) {
-    entries.push(auditEntry({
-      actorId: account.id,
-      action: 'external.space.note.set',
-      target: `space:${space.id}`,
-      detail: { space: space.id, purpose: request.purpose, verdict: input.note.verdict },
-    }))
-  }
-
-  await db.insert(schema.auditLog).values(entries)
+  }, refused, noted)
+  const [still] = await db.batch(statements.map(statement => db.all(statement)) as unknown as Parameters<typeof db.batch>[0])
+  if (!(still as unknown[]).length) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
 
   await notify(event, {
     type: 'external.request.reassigning',

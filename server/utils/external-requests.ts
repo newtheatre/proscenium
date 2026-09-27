@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import type { SQL } from 'drizzle-orm'
+import { moveRequestSql } from './external-writes'
 import { chunked } from '#shared/utils/approvals'
 import { OPEN_STATUSES } from '#shared/utils/external-requests'
 import type { ExternalStatus } from '#shared/utils/external-requests'
@@ -150,26 +151,5 @@ export function moveRequestStatement(
   from: readonly ExternalStatus[],
   set: Record<string, unknown>,
 ) {
-  const assignments = sql.join(
-    Object.entries(set).map(([column, value]) => sql`${sql.identifier(column)} = ${value}`),
-    sql`, `,
-  )
-  const states = from.map(status => sql`${status}`)
-
-  return db.all<{ id: string }>(sql`
-    UPDATE external_requests SET ${assignments}
-    WHERE id = ${id} AND status IN (${sql.join(states, sql`, `)})
-    RETURNING id
-  `)
-}
-
-// Guarded on the status it read, and on nothing else: a route decides what may follow what, and
-// the statement makes sure two officers cannot both act on the same step (0006).
-export async function moveRequest(
-  id: string,
-  from: readonly ExternalStatus[],
-  set: Record<string, unknown>,
-): Promise<boolean> {
-  const moved = await moveRequestStatement(id, from, set)
-  return moved.length > 0
+  return db.all<{ id: string }>(moveRequestSql(id, from, set))
 }

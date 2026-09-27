@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const now = Math.floor(Date.now() / 1000)
-  const moved = await moveRequest(id, ['REQUESTED'], {
+  const moved = await auditedWrite(moveRequestStatement(id, ['REQUESTED'], {
     status: 'AWAITING_EXTERNAL',
     submitted_at: now,
     submitted_by: account.id,
@@ -24,11 +24,7 @@ export default defineEventHandler(async (event) => {
     escalated_at: null,
     su_reference: input.suReference,
     updated_at: now,
-  })
-
-  if (!moved) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  }), auditEntry({
     actorId: account.id,
     action: 'external.request.submitted',
     target: `external:${id}`,
@@ -36,6 +32,8 @@ export default defineEventHandler(async (event) => {
     // text an officer typed cannot be corrected or erased later (0010, 0011).
     detail: { referenced: input.suReference !== null },
   }))
+
+  if (!moved) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
 
   await notify(event, {
     type: 'external.request.submitted',

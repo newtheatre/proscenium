@@ -7,18 +7,14 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const purpose = getRouterParam(event, 'purpose') ?? ''
 
-  const removed = await db.delete(schema.externalSpaceNotes)
-    .where(and(eq(schema.externalSpaceNotes.spaceId, id), eq(schema.externalSpaceNotes.purpose, purpose)))
-    .returning({ id: schema.externalSpaceNotes.id })
+  const removed = await auditedWrite(
+    db.delete(schema.externalSpaceNotes)
+      .where(and(eq(schema.externalSpaceNotes.spaceId, id), eq(schema.externalSpaceNotes.purpose, purpose)))
+      .returning({ id: schema.externalSpaceNotes.id }),
+    auditEntry({ actorId: account.id, action: 'external.space.note.removed', target: `space:${id}`, detail: { space: id, purpose } }),
+  )
 
-  if (removed.length === 0) throw noSuch('note')
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: account.id,
-    action: 'external.space.note.removed',
-    target: `space:${id}`,
-    detail: { space: id, purpose },
-  }))
+  if (!removed) throw noSuch('note')
 
   return { ok: true, spaceId: id, purpose }
 })

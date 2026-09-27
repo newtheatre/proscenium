@@ -16,21 +16,21 @@ export default defineEventHandler(async (event) => {
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
   const now = Math.floor(Date.now() / 1000)
-  const cancelling = { status: 'CANCELLED', updated_at: now }
 
   // Two guarded attempts rather than one, because whether the form is already in decides who
   // gets told, and a submit landing between the read and the write would make a read lie.
-  const alreadyOut = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], cancelling)
-  const moved = alreadyOut || await moveRequest(id, ['REQUESTED'], cancelling)
-
-  if (!moved) throw createError({ statusCode: 409, statusMessage: 'That request has already been decided' })
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  const statements = withdrawStatements(id, now, () => auditEntry({
     actorId: account.id,
     action: 'external.request.cancelled',
     target: `external:${id}`,
     detail: { was: request.status },
   }))
+  const [out, , early] = await db.batch(statements.map(statement => db.all(statement)) as unknown as Parameters<typeof db.batch>[0])
+  const alreadyOut = (out as unknown[]).length > 0
+
+  if (!alreadyOut && !(early as unknown[]).length) {
+    throw createError({ statusCode: 409, statusMessage: 'That request has already been decided' })
+  }
 
   // The approvers are told whenever the form is already in, because our arrangement stands
   // until a person withdraws it (C-112 criterion 3).

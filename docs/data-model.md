@@ -2211,9 +2211,13 @@ defect they prevent.
 
 The two directions are not symmetric. Unlisting **frees** the slot the request was holding and
 always succeeds, but is refused when there is no longer time to ask, naming the date the form would
-have had to go in by. Relisting **claims** a slot, so it is `claimSlot` with the predicate on the
+have had to go in by. Relisting **claims** a slot, so it is the slot claim with the predicate on the
 INSERT, it refuses naming the room when somebody else has it, and it lands `CONFIRMED` or
 `PENDING_APPROVAL` according to the policy: choosing the room is not a licence to skip the rules.
+Each direction is one batch with its audit entry (`server/utils/external-writes.ts`, 0049). The
+relist's claim also waits on the request still being live, and the move on the claim, so the two
+land together or not at all and no booking is ever claimed only to be cancelled again. An unlist
+that meets a decision fails its batch on the new request's own primary key (0035).
 Title, purpose, attendees, times and notes cross; the member's `reason` does not, because it
 answers a question the other side never asks.
 
@@ -2231,7 +2235,10 @@ to the union and `reject`/`cancel` ending it. Every write is guarded on the stat
 `refuse-assignment` are both allowed **from `CONFIRMED` as well**, because the union moving us room
 to room after answering is ordinary: a refusal clears `assigned_space_id` and returns the request to
 `AWAITING_EXTERNAL`, and submitting again clears `escalated_at` so the new wait is chased on its own
-terms. `AWAITING_EXTERNAL`
+terms. Each move writes its audit entry in its own batch, only if the move applied (0049), and
+what belongs with it (the assignment row, a refusal's suitability note and that note's own entry)
+lands only once that entry has (`entryLanded()`). The member's withdrawal tries the two steps in
+one batch, at most one can match, and so writes one entry. `AWAITING_EXTERNAL`
 keeps exactly its old meaning, the form is in and they have not answered, so C-118's import no
 longer translates it away.
 

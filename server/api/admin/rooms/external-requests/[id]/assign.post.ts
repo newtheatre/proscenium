@@ -30,21 +30,15 @@ export default defineEventHandler(async (event) => {
   }
 
   const now = Math.floor(Date.now() / 1000)
-  // From CONFIRMED too, and guarded on both: being moved room to room after an answer is
-  // ordinary, and the room we were given has to be correctable (0006, C-120).
-  const moved = await moveRequest(id, ['AWAITING_EXTERNAL', 'CONFIRMED'], {
+  const statements = assignStatements({
     status: 'CONFIRMED',
     assigned_space_id: space.id,
     su_reference: input.suReference ?? request.suReference,
     decided_at: now,
     decided_by: account.id,
     updated_at: now,
-  })
-
-  if (!moved) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
-
-  // Every room offered, kept: asking again must not overwrite what we were given first.
-  await db.insert(schema.externalAssignments).values({
+  }, {
+    // Every room offered, kept: asking again must not overwrite what we were given first.
     id: newId(),
     requestId: id,
     spaceId: space.id,
@@ -52,15 +46,16 @@ export default defineEventHandler(async (event) => {
     reason: input.despite && note ? 'Accepted despite what we know about it' : null,
     recordedBy: account.id,
     recordedAt: now,
-  })
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  }, auditEntry({
     actorId: account.id,
     action: 'external.request.assigned',
     target: `external:${id}`,
     // That a note existed and was overridden, never its wording (0011).
     detail: { space: space.id, overrode: blocksAssignment(note) },
   }))
+  const [moved] = await db.batch(statements.map(statement => db.all(statement)) as unknown as Parameters<typeof db.batch>[0])
+
+  if (!(moved as unknown[]).length) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
 
   await notify(event, {
     type: 'external.request.assigned',

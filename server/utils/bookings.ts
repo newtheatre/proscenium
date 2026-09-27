@@ -46,8 +46,8 @@ export type ClaimOutcome
     | { won: false, why: 'closed' }
 
 // The predicate rides the INSERT, so the check and the write are one statement and cannot be
-// interleaved: room live, nothing booked, nothing closed. Half-open, so back-to-back bookings fit.
-export function claimRoomSlotStatement(id: string, input: ClaimInput): SQL {
+// interleaved: room live, nothing booked, nothing closed, and `onlyIf`. Half-open, as ever.
+export function claimRoomSlotStatement(id: string, input: ClaimInput, onlyIf?: SQL): SQL {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
   return sql`
     INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, reason)
@@ -63,6 +63,7 @@ export function claimRoomSlotStatement(id: string, input: ClaimInput): SQL {
           AND ends_at > ${input.startsAt}
       )
       AND ${roomOpenTerms(input.roomId, input.startsAt, input.endsAt, input.offsets)}
+      ${onlyIf ? sql`AND ${onlyIf}` : sql``}
     RETURNING id
   `
 }
@@ -282,4 +283,9 @@ export async function hasCurrentMembership(event: H3Event, userId: string, now: 
   const term = await longestTerm(userId)
   if (!term) return false
   return isCurrent(term, londonDay(now), await configValue(event, 'MEMBERSHIP_GRACE_DAYS'))
+}
+
+// A claim its caller batched with other writes, and lost, disambiguated as claimSlot's own is (0003).
+export async function whyClaimLost(input: ClaimInput): Promise<Exclude<ClaimOutcome, { won: true }>> {
+  return await whyItFailed(input)
 }
