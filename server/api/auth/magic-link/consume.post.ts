@@ -19,13 +19,17 @@ export default defineEventHandler(async (event) => {
 
   // A link replaces the password step, never the second factor (A-107 criterion 4).
   if (await confirmedFactor(account.id)) {
-    await db.update(schema.users).set({ verified: true }).where(eq(schema.users.id, account.id))
-    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'), auditEntry({
+    const attempt = attemptStatements(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'), auditEntry({
       actorId: account.id,
       action: 'mfa.challenged',
       target: `user:${account.id}`,
     }))
-    return { ok: true, mfaRequired: true as const, attemptId }
+    // The address proven and the challenge it waits on land together, or neither does (0001).
+    await db.batch([
+      db.update(schema.users).set({ verified: true }).where(eq(schema.users.id, account.id)),
+      ...attempt.statements,
+    ])
+    return { ok: true, mfaRequired: true as const, attemptId: attempt.id }
   }
 
   // Consuming the link proves the mailbox, so the address is verified by the act of using it

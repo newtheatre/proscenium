@@ -1,7 +1,11 @@
 import { z } from 'zod'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
+import { nextField, withNext } from '#shared/utils/sign-in'
 
-const body = z.object({ email: z.string().email('Type the email address on your account').max(320, 'Type the email address on your account') })
+const body = z.object({
+  email: z.string().email('Type the email address on your account').max(320, 'Type the email address on your account'),
+  next: nextField,
+})
 const SAME_ANSWER = { ok: true, message: 'If that address has an account, a sign-in link is on its way' }
 
 // Ask for a sign-in link.
@@ -26,7 +30,7 @@ export default defineEventHandler(async (event) => {
     await notify(event, {
       type: 'account.magic-link',
       userId: account.id,
-      context: { name: '', url: `${useRuntimeConfig(event).public.baseURL}/magic?token=${plaintext}`, expiresAt },
+      context: { name: '', url: withNext(`${useRuntimeConfig(event).public.baseURL}/magic?token=${plaintext}`, input.next), expiresAt },
     })
   }
 

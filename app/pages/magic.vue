@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { localPath } from '#shared/utils/local-path'
 import { landingAfterSignIn } from '#shared/utils/night-authority'
+import { withNext } from '#shared/utils/sign-in'
 
 const route = useRoute()
 const { account, refresh } = useAccount()
@@ -35,11 +35,8 @@ onMounted(async () => {
   }
 })
 
-// Only a path on this site: an absolute URL here would make the link an open redirect.
-const nextPath = computed(() => localPath(route.query.next) ?? '/')
-
-const askAgain = computed(() =>
-  nextPath.value === '/' ? '/sign-in?method=link' : `/sign-in?method=link&next=${encodeURIComponent(nextPath.value)}`)
+// The sign-in screen offers the link first, so asking again starts there, still heading for next.
+const askAgain = computed(() => withNext('/sign-in', route.query.next))
 
 async function signedIn(): Promise<void> {
   await refresh()
@@ -85,6 +82,7 @@ useSeoMeta({
       </p>
       <UButton
         :to="askAgain"
+        class="min-h-11"
         data-test="ask-again"
       >
         Ask for a new one
