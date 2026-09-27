@@ -33,6 +33,7 @@ function twoHouses(database: TestDatabase): { mine: ReturnType<typeof tonightsPe
   const mine = tonightsPerformance(database, { suffix: 'mine' })
   const other = tonightsPerformance(database, { suffix: 'other' })
   database.batch([
+    ['INSERT INTO users (id, name, email, verified) VALUES (?, ?, ?, 1)', 'holder', 'Pass holder', 'holder@e2e.newtheatre.org.uk'],
     ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until) VALUES (?, ?, ?, ?, ?)', 'pt-season', 'season', 'Season pass', 1_000, 2_000],
     ['INSERT INTO pass_type_prices (id, pass_type_id, label, price) VALUES (?, ?, ?, 0)', 'price-season', 'pt-season', 'Standard'],
     ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until) VALUES (?, ?, ?, ?, ?)', 'pt-fellowship', 'fellowship', 'Fellowship', 1_000, 2_000],

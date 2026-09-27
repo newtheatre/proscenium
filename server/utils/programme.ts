@@ -118,7 +118,8 @@ export function soldReferences(references = PERFORMANCE_REFERENCES): Performance
 // a bare row count over `tickets` would call an expired hold a sold seat (D-105).
 function heldTerm(reference: PerformanceReference, performanceId: SQL): SQL {
   if (reference.heldBy) return reference.heldBy(performanceId)
-  return sql`(SELECT count(*) FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${performanceId})`
+  // Its own alias, so a caller naming its row after this table still reads its own row.
+  return sql`(SELECT count(*) FROM ${sql.raw(reference.table)} sold_ref WHERE sold_ref.${sql.raw(reference.column)} = ${performanceId})`
 }
 
 // A correlated count per sold table, binding nothing: the parameter count is fixed however many
@@ -132,11 +133,10 @@ export function performanceSoldColumn(alias: string, references = soldReferences
 // id list read back from a result set (0006).
 export function showSoldColumn(alias: string, references = soldReferences()): SQL {
   if (references.length === 0) return sql`0`
-  // Its own alias, never the caller's: a caller passing `sp` for the show would otherwise
-  // collide with this subquery's own performances row.
+  // Its own prefixed alias, so no caller's alias for the show can capture this performances row.
   const terms = references.map(reference => sql`(
-    SELECT coalesce(sum(${heldTerm(reference, sql`sp.id`)}), 0)
-    FROM performances sp WHERE sp.show_id = ${sql.raw(alias)}.id
+    SELECT coalesce(sum(${heldTerm(reference, sql`sold_p.id`)}), 0)
+    FROM performances sold_p WHERE sold_p.show_id = ${sql.raw(alias)}.id
   )`)
   return sql.join(terms, sql` + `)
 }

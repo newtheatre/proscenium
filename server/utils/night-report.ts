@@ -23,6 +23,25 @@ export interface ReportAttendance {
   fellowshipAdmissions: number
 }
 
+// Seats admitted on a pass, and the Fellowship's among them, correlated or bound as the capacity
+// counts are. Their aliases are their own, so a caller's r, t, a or p can never capture them.
+export function passAdmittedSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(SELECT count(*) FROM reservations passadm_r
+    JOIN tickets passadm_t ON passadm_t.reservation_id = passadm_r.id
+    JOIN pass_admissions passadm_a ON passadm_a.ticket_id = passadm_t.id
+    WHERE passadm_r.performance_id = ${performanceId} AND passadm_r.status = 'DOOR' AND passadm_t.refunded_at IS NULL)`
+}
+
+export function fellowshipAdmittedSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(SELECT count(*) FROM reservations fellow_r
+    JOIN tickets fellow_t ON fellow_t.reservation_id = fellow_r.id
+    JOIN pass_admissions fellow_a ON fellow_a.ticket_id = fellow_t.id
+    JOIN passes fellow_p ON fellow_p.id = fellow_a.pass_id
+    JOIN pass_types fellow_pt ON fellow_pt.id = fellow_p.pass_type_id
+    WHERE fellow_r.performance_id = ${performanceId} AND fellow_r.status = 'DOOR' AND fellow_t.refunded_at IS NULL
+      AND fellow_pt.slug = 'fellowship')`
+}
+
 // Every figure is seats, as sold is, never bookings, each from the capacity rule's own helpers;
 // `passAdmissions` is `admitted`'s subset (D-126).
 export function reportAttendanceQuery(performanceId: string): SQL {
@@ -32,16 +51,8 @@ export function reportAttendanceQuery(performanceId: string): SQL {
       ${admittedSeatsSubquery(sql`${performanceId}`)} AS admitted,
       ${noShowSeatsSubquery(sql`${performanceId}`)} AS noShows,
       ${admittedWalkUpSeatsSubquery(sql`${performanceId}`)} AS walkUps,
-      (SELECT count(*) FROM reservations r
-       JOIN tickets t ON t.reservation_id = r.id
-       JOIN pass_admissions a ON a.ticket_id = t.id
-       WHERE r.performance_id = ${performanceId} AND r.status = 'DOOR' AND t.refunded_at IS NULL) AS passAdmissions,
-      (SELECT count(*) FROM reservations r
-       JOIN tickets t ON t.reservation_id = r.id
-       JOIN pass_admissions a ON a.ticket_id = t.id
-       JOIN passes p ON p.id = a.pass_id
-       JOIN pass_types pt ON pt.id = p.pass_type_id
-       WHERE r.performance_id = ${performanceId} AND r.status = 'DOOR' AND t.refunded_at IS NULL AND pt.slug = 'fellowship') AS fellowshipAdmissions
+      ${passAdmittedSeatsSubquery(sql`${performanceId}`)} AS passAdmissions,
+      ${fellowshipAdmittedSeatsSubquery(sql`${performanceId}`)} AS fellowshipAdmissions
   `
 }
 
