@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { saysDay, saysClock, saysDayLong } from '#shared/utils/when'
 import { defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
-import { SHIFT_ROLES, saysShiftRole, saysShiftStatus, shiftDeclineForm } from '#shared/utils/rota'
+import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
-import type { FormSubmitEvent } from '@nuxt/ui'
 import type { BoardEntry } from '#shared/utils/rota-board'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
@@ -192,70 +191,14 @@ async function submitAssign(): Promise<void> {
 }
 
 // Confirming a claim, through E-105's approval route; the waiting filter is where the queue is worked.
-// One at a time, so a second press is ignored rather than meeting a 409.
-const confirmingId = ref<string | null>(null)
-
-async function confirm(shift: RosterShift): Promise<void> {
-  if (confirmingId.value) return
-  confirmingId.value = shift.shiftId
-  failure.value = null
-  try {
-    await $fetch(`/api/admin/rota/approvals/${shift.shiftId}/approve`, { method: 'POST' })
-    toast.add({ title: 'Confirmed', icon: 'i-lucide-check', color: 'success' })
-    await refresh()
-  }
-  catch (error) {
-    // A claimant who no longer qualifies is offered the decline, its reason already written, and
-    // the refusal is said inside that dialogue rather than behind it (issue 1302).
-    const offered = refusalData<{ declineReason?: string }>(error)?.declineReason
-    if (offered) {
-      openDecline(shift, offered)
-      declineFailure.value = refusalText(error)
-    }
-    else {
-      failure.value = refusalText(error)
-    }
-  }
-  finally {
-    confirmingId.value = null
-  }
-}
-
-// Declining a claim carries a reason the claimant reads word for word (E-105 criterion 3).
-const declining = ref<RosterShift | null>(null)
-const declineFailure = ref<string | null>(null)
-const declineWorking = ref(false)
-const decline = reactive<{ reason?: string }>({})
-
-// Every opening sets the reason, so one claimant's text never carries into another's dialogue.
-function openDecline(shift: RosterShift, reason?: string): void {
-  declineFailure.value = null
-  declining.value = shift
-  decline.reason = reason
-}
-
-async function submitDecline(event: FormSubmitEvent<{ reason: string }>): Promise<void> {
-  const shift = declining.value
-  if (!shift || declineWorking.value) return
-  declineWorking.value = true
-  declineFailure.value = null
-  try {
-    await $fetch(`/api/admin/rota/approvals/${shift.shiftId}/decline`, { method: 'POST', body: event.data })
-    toast.add({
-      title: 'Declined',
-      description: `${shift.holderName ?? 'The claimant'} is told why, and the shift stays off the open list until it is reassigned.`,
-      icon: 'i-lucide-x',
-    })
-    declining.value = null
-    await refresh()
-  }
-  catch (error) {
-    declineFailure.value = refusalText(error)
-  }
-  finally {
-    declineWorking.value = false
-  }
-}
+const { confirmingId, confirm, declining, declineOffered, declineFailure, declineWorking, openDecline, closeDecline, submitDecline } = useClaimAnswer<RosterShift>({
+  route: shift => `/api/admin/rota/approvals/${shift.shiftId}`,
+  id: shift => shift.shiftId,
+  confirmedTitle: () => 'Confirmed',
+  declinedDescription: shift => `${shift.holderName ?? 'The claimant'} is told why, and the shift stays off the open list until it is reassigned.`,
+  failure,
+  refresh,
+})
 
 const unconfirming = ref<RosterShift | null>(null)
 const unconfirmFailure = ref<string | null>(null)
@@ -799,41 +742,15 @@ watch(modalOpen, (nowOpen) => {
       @confirm="unconfirm"
     />
 
-    <ConfirmModal
+    <DeclineClaimModal
       :open="declining !== null"
-      name="decline-claim"
       :title="declining ? `Decline ${declining.holderName ?? 'this claim'}` : ''"
-      verb="Decline the claim"
       consequence="Say why: the claimant sees this word for word, and the shift stays off the open list until an officer reassigns it."
-      form="decline-form"
+      :offered="declineOffered"
       :loading="declineWorking"
       :failure="declineFailure"
-      @update:open="value => { if (!value) { declining = null; declineFailure = null } }"
-    >
-      <template #body>
-        <UForm
-          id="decline-form"
-          :schema="shiftDeclineForm"
-          :state="decline"
-          class="space-y-4"
-          @submit="submitDecline"
-        >
-          <UFormField
-            name="reason"
-            label="Reason"
-            required
-          >
-            <UTextarea
-              v-model="decline.reason"
-              data-test="decline-reason"
-              :rows="3"
-              autoresize
-              :maxrows="6"
-              class="w-full"
-            />
-          </UFormField>
-        </UForm>
-      </template>
-    </ConfirmModal>
+      @close="closeDecline"
+      @decline="submitDecline"
+    />
   </div>
 </template>

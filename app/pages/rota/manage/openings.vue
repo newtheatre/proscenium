@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import type { VNode } from 'vue'
 import { fromLondonWallClock, londonClock } from '#shared/utils/london'
 import { saysWhenLong } from '#shared/utils/when'
 import { daysAfter } from '#shared/utils/membership'
@@ -189,6 +190,17 @@ async function standDown(): Promise<void> {
   }
 }
 
+// A queued claim is worked here, where the opening is staffed (E-130 criterion 3), the same way
+// the board works a shift's.
+const { confirmingId, confirm, declining, declineOffered, declineFailure, declineWorking, openDecline, closeDecline, submitDecline } = useClaimAnswer<Slot>({
+  route: slot => `/api/rota/openings/shifts/${slot.slotId}`,
+  id: slot => slot.slotId,
+  confirmedTitle: slot => `${slot.holderName ?? 'The claimant'} confirmed`,
+  declinedDescription: slot => `${slot.holderName ?? 'The claimant'} is told why. The slot is back on offer once they dismiss it or you stand it down.`,
+  failure,
+  refresh,
+})
+
 const adding = ref<string | null>(null)
 
 async function addSlot(opening: Opening): Promise<void> {
@@ -242,6 +254,68 @@ function spanOf(opening: Opening): string {
   return `${opens} to ${londonClock(new Date(opening.endsAt * 1000))}`
 }
 
+// One slot's line: at most two of its actions show at once, whichever its status allows.
+function slotLine(slot: Slot, opening: Opening): VNode {
+  return h('div', { class: 'flex items-center gap-2 text-sm' }, [
+    h('span', {}, `Slot ${slot.slot}`),
+    h(UBadge, {
+      color: slot.status === 'CONFIRMED' ? 'success' : slot.status === 'OPEN' ? 'neutral' : 'warning',
+      variant: 'subtle',
+      size: 'sm',
+    }, () => saysShiftStatus(slot.status)),
+    h('span', { class: 'text-muted' }, slot.holderName ?? 'Nobody yet'),
+    ...(writes.value && slot.status === 'CLAIMED'
+      ? [
+          h(UButton, {
+            'size': 'xs',
+            'color': 'secondary',
+            'variant': 'subtle',
+            'icon': 'i-lucide-check',
+            'loading': confirmingId.value === slot.slotId,
+            'disabled': confirmingId.value !== null && confirmingId.value !== slot.slotId,
+            'data-test': `confirm-${slot.slotId}`,
+            'onClick': () => confirm(slot),
+          }, () => 'Confirm'),
+          h(UButton, {
+            'size': 'xs',
+            'color': 'error',
+            'variant': 'ghost',
+            'icon': 'i-lucide-x',
+            'disabled': confirmingId.value === slot.slotId,
+            'data-test': `decline-${slot.slotId}`,
+            'onClick': () => openDecline(slot),
+          }, () => 'Decline'),
+        ]
+      : []),
+    // Standing down is the officer's way to reopen a declined slot; the member's is to dismiss it (E-114).
+    ...(writes.value && (slot.status === 'CONFIRMED' || slot.status === 'DECLINED')
+      ? [h(UButton, {
+          'size': 'xs',
+          'color': 'neutral',
+          'variant': 'ghost',
+          'data-test': `stand-down-${slot.slotId}`,
+          'onClick': () => {
+            standDownFailure.value = null
+            standingDown.value = slot
+          },
+        }, () => 'Stand down')]
+      : []),
+    // Only an open slot is removed: one with a name on it is stood down first (E-130).
+    ...(writes.value && slot.status === 'OPEN' && opening.status === 'PLANNED'
+      ? [h(UButton, {
+          'size': 'xs',
+          'color': 'neutral',
+          'variant': 'ghost',
+          'data-test': `remove-slot-${slot.slotId}`,
+          'onClick': () => {
+            removeFailure.value = null
+            removing.value = slot
+          },
+        }, () => 'Remove')]
+      : []),
+  ])
+}
+
 const columns: TableColumn<Opening>[] = [
   {
     accessorKey: 'label',
@@ -258,40 +332,7 @@ const columns: TableColumn<Opening>[] = [
     id: 'staffing',
     header: 'Staffing',
     cell: ({ row }) => h('div', { 'class': 'space-y-1', 'data-test': `staffing-${row.original.openingId}` }, [
-      ...slotsOf(row.original.openingId).map(slot => h('div', { class: 'flex items-center gap-2 text-sm' }, [
-        h('span', {}, `Slot ${slot.slot}`),
-        h(UBadge, {
-          color: slot.status === 'CONFIRMED' ? 'success' : slot.status === 'OPEN' ? 'neutral' : 'warning',
-          variant: 'subtle',
-          size: 'sm',
-        }, () => saysShiftStatus(slot.status)),
-        h('span', { class: 'text-muted' }, slot.holderName ?? 'Nobody yet'),
-        ...(writes.value && slot.status !== 'OPEN' && slot.status !== 'CANCELLED'
-          ? [h(UButton, {
-              'size': 'xs',
-              'color': 'neutral',
-              'variant': 'ghost',
-              'data-test': `stand-down-${slot.slotId}`,
-              'onClick': () => {
-                standDownFailure.value = null
-                standingDown.value = slot
-              },
-            }, () => 'Stand down')]
-          : []),
-        // Only an open slot is removed: one with a name on it is stood down first (E-130).
-        ...(writes.value && slot.status === 'OPEN' && row.original.status === 'PLANNED'
-          ? [h(UButton, {
-              'size': 'xs',
-              'color': 'neutral',
-              'variant': 'ghost',
-              'data-test': `remove-slot-${slot.slotId}`,
-              'onClick': () => {
-                removeFailure.value = null
-                removing.value = slot
-              },
-            }, () => 'Remove')]
-          : []),
-      ])),
+      ...slotsOf(row.original.openingId).map(slot => slotLine(slot, row.original)),
       ...(writes.value && row.original.status === 'PLANNED'
         ? [h(UButton, {
             'size': 'xs',
@@ -338,7 +379,7 @@ const columns: TableColumn<Opening>[] = [
 // A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
 // is shown wherever the action was taken.
 const modalOpen = computed(() => planning.value || cancellingOpening.value !== null || standingDown.value !== null
-  || removing.value !== null)
+  || removing.value !== null || declining.value !== null)
 
 watch(modalOpen, (nowOpen) => {
   if (!nowOpen) failure.value = null
@@ -550,6 +591,17 @@ watch(modalOpen, (nowOpen) => {
       :failure="removeFailure"
       @update:open="value => { if (!value) removing = null }"
       @confirm="removeSlot"
+    />
+
+    <DeclineClaimModal
+      :open="declining !== null"
+      :title="declining ? `Decline ${declining.holderName ?? 'this claim'}` : ''"
+      consequence="Say why: the claimant sees this word for word. The slot keeps their name until they dismiss it or you stand it down."
+      :offered="declineOffered"
+      :loading="declineWorking"
+      :failure="declineFailure"
+      @close="closeDecline"
+      @decline="submitDecline"
     />
   </div>
 </template>
