@@ -1,5 +1,6 @@
-import { CONFIG_KEYS } from './config'
+import { CONFIG_KEYS, roleFloor } from './config'
 import { isMonthDay } from './london'
+import { saysRole } from './roles'
 import type { ConfigKey } from './config'
 
 // A value is refused before it is stored, and the refusal names the rule (J-104 criterion 3).
@@ -71,9 +72,21 @@ const PAIRS: Pair[] = [
   },
 ]
 
+// Add-only above 0009's floor, so no save can drop a second factor the treasurer needs (A-112).
+// A key with no floor never reads the value, whatever shape it is.
+function floorProblem(key: ConfigKey, value: string[]): string | null {
+  const missing = roleFloor(key).filter(role => !value.includes(role)).map(saysRole)
+  if (!missing.length) return null
+  const named = missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}`
+  return `${named} must stay on this list: every role touching money, personal data or safety records needs a second factor`
+}
+
 export function configProblem(key: ConfigKey, value: unknown, lookup: ConfigLookup): string | null {
   const parsed = CONFIG_KEYS[key].schema.safeParse(value)
   if (!parsed.success) return `That is not a valid value for ${key}`
+
+  const floor = floorProblem(key, value as string[])
+  if (floor) return floor
 
   if (isDayOfYearKey(key)) {
     const problem = dayOfYearProblem(value as string)

@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { CONFIG_KEYS } from '#shared/utils/config'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { clearConfigOverride } from '#tests/helpers/config'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -90,6 +92,45 @@ describe.skipIf(skip !== null)('saving a flagged key needs a typed confirmation 
   test('an unflagged key needs no confirmation at all', async () => {
     const answered = await send('PUT', '/api/admin/config/HOLD_RELEASE_BATCH_CAP', { value: 150 })
     expect(answered.status).toBe(200)
+  })
+})
+
+// Issue 1357: which keys are flagged is code, and the second-factor roles are one of them, with
+// a floor no confirmation gets below (0009, A-112 criterion 4).
+describe.skipIf(skip !== null)('the flag list and the second-factor roles', () => {
+  const FLOOR = CONFIG_KEYS.PRIVILEGED_ROLES.default
+
+  test('the flag list is not a setting', async () => {
+    expect((await send('PUT', '/api/admin/config/WIDE_BLAST_RADIUS_KEYS', { value: [] })).status).toBe(404)
+    const settings = await (await send('GET', '/api/admin/config')).json() as { settings: { key: string, wideBlastRadius: boolean }[] }
+    expect(settings.settings.some(setting => setting.key === 'WIDE_BLAST_RADIUS_KEYS')).toBe(false)
+    expect(settings.settings.find(setting => setting.key === 'PRIVILEGED_ROLES')?.wideBlastRadius).toBe(true)
+  })
+
+  test('the second-factor roles preview who an added role would refuse', async () => {
+    const answered = await send('GET', '/api/admin/config/PRIVILEGED_ROLES/blast-radius')
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { category: string }).category).toContain('authenticator')
+  })
+
+  test('adding a role needs the typed confirmation, and then saves', async () => {
+    try {
+      expect((await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: [...FLOOR, 'COMMITTEE'] })).status).toBe(400)
+      const answered = await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: [...FLOOR, 'COMMITTEE'], confirmation: 'PRIVILEGED_ROLES' })
+      expect(answered.status).toBe(200)
+    }
+    finally {
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
+    }
+  })
+
+  test('a role on the floor cannot be taken off, however it is confirmed', async () => {
+    const answered = await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', {
+      value: FLOOR.filter(role => role !== 'TREASURER'),
+      confirmation: 'PRIVILEGED_ROLES',
+    })
+    expect(answered.status).toBe(400)
+    expect((await answered.json() as { statusMessage: string }).statusMessage).toContain('Treasurer')
   })
 })
 

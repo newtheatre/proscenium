@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { overrideConfig } from '#tests/helpers/config'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -23,6 +24,9 @@ beforeAll(async () => {
   if (skip) return
   app = await startApp()
   officer = await adminSession(app)
+  // The box office officer and the manager sign in with no authenticator and A-112 is not what this
+  // file proves. The settings route refuses a list below its floor (issue 1357), so it is set here.
+  overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
   member = await registerMember(app, 'ordinary', generatePassword())
 
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
@@ -264,20 +268,13 @@ describe.skipIf(skip !== null)('covered shows extend freely; a removal is what a
     expect((await send('PUT', `/api/admin/pass-types/${id}/shows`, { showIds: [] })).status).toBe(400)
   })
 
-  // MANAGER holds `ticketing.manage` and no `ticketing.write` (0009); PRIVILEGED_ROLES is
-  // narrowed for the request since this account carries no authenticator and A-112 is not what this proves.
+  // MANAGER holds `ticketing.manage` and no `ticketing.write` (0009).
   test('a manager reaches the route on `ticketing.manage` alone', async () => {
     const { id, showId } = await newPassType()
     const second = await newShow()
 
-    await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN'] })
-    try {
-      const answered = await send('PUT', `/api/admin/pass-types/${id}/shows`, { showIds: [showId, second] }, manager.cookie)
-      expect(answered.status).toBe(200)
-    }
-    finally {
-      await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER'] })
-    }
+    const answered = await send('PUT', `/api/admin/pass-types/${id}/shows`, { showIds: [showId, second] }, manager.cookie)
+    expect(answered.status).toBe(200)
   })
 })
 

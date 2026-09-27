@@ -200,6 +200,10 @@ Open questions for the committee:
   2. Google-only Workspace accounts are exempt: Workspace 2-step verification covers them, and they hold no password to steal.
   3. Removing the last factor is refused while the account holds a role that requires one.
   4. Which roles count as privileged is configuration (J-3), and changing it is audited.
+     Amended 26 September 2026 (issue 1357): the roles are chosen from the roles that exist, a
+     save is previewed and typed back (J-105), and the list is add-only above 0009's floor. Every
+     role touching money, personal data or safety records stays on it, and a save leaving one off
+     is refused naming it.
   5. Privileged accounts without a factor appear as a standing warning banner with a count on the admin directory (A-121).
   6. Enrolment has a way out at every step before the codes are shown: somebody who began it by
      mistake, or cannot reach their phone, leaves without an unfinished factor and without

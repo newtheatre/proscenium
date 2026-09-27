@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { NOTIFICATION_TOPICS } from './notifications'
 import { MODULE_ID } from './training'
 import { ROLES } from './roles'
+import type { Role } from './roles'
 import type { NotificationTopic } from './senders'
 
 // Every operational rule with a number in it is a validated key enforced at the write path
@@ -27,6 +28,12 @@ interface ConfigKeyDefinition {
   // offering a choice that decides nothing (J-104 criterion 6).
   plannedFor?: { story: string, issue: number }
 }
+
+// Every role touching money, personal data or safety records (0009). PRIVILEGED_ROLES ships as
+// this and a save can add to it, never take one of these off (A-112 criterion 4, issue 1357).
+export const PRIVILEGED_FLOOR = [
+  'ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER', 'TREASURER', 'BAR_MANAGER', 'FOH_MANAGER', 'SAFETY_OFFICER',
+] as const satisfies readonly Role[]
 
 export const CONFIG_KEYS = {
   // Module D: ticketing
@@ -201,15 +208,6 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'Month and day the year closes, London. The ticket export\'s year runs to the last London instant of it (D-129).',
   },
-  // The keys a save must preview and a typed echo before it takes (J-105 criteria 1, 2, 5).
-  // Itself configuration, so naming a key here is an administrator's audited act, not a deploy.
-  WIDE_BLAST_RADIUS_KEYS: {
-    schema: z.array(z.string()),
-    default: ['REFUND_PAID_REQUIRES_MANAGER', 'RETENTION_ARMED'],
-    workshop: 'people-and-communications',
-    describes: 'Settings that need a blast-radius preview and a typed confirmation before saving.',
-  },
-
   // Module C: spaces
 
   ROOM_MIN_BOOKING_MINUTES: {
@@ -470,10 +468,10 @@ export const CONFIG_KEYS = {
     describes: 'How long a proven credential stays fresh enough to change a security setting or re-assert for a sensitive action before it is asked for again (A-128).',
   },
   PRIVILEGED_ROLES: {
-    schema: z.array(z.string()),
-    default: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER', 'TREASURER', 'BAR_MANAGER', 'FOH_MANAGER', 'SAFETY_OFFICER'],
+    schema: z.array(z.enum(ROLES)),
+    default: [...PRIVILEGED_FLOOR],
     workshop: 'people-and-communications',
-    describes: 'Roles that require a second factor: any role touching money, personal data or safety records (A-112). Changing this is audited.',
+    describes: 'Roles that require a second factor. Every role touching money, personal data or safety records always does, so a role can be added here and none of those taken off (A-112, 0009).',
   },
 
   SIGN_IN_ATTEMPTS_PER_ACCOUNT: {
@@ -831,7 +829,6 @@ export const ENFORCED_KEYS = [
   'PUBLIC_ORDER_SEAT_CAP',
   'YEAR_START',
   'YEAR_END',
-  'WIDE_BLAST_RADIUS_KEYS',
   'REFUND_PAID_REQUIRES_MANAGER',
   'HOLD_RELEASE_MINUTES_BEFORE',
   'HOLD_REMINDER_MINUTES_BEFORE',
@@ -899,7 +896,7 @@ export function plannedFor(key: ConfigKey): { story: string, issue: number } | n
 // Said rather than guessed from a key's name: the screen picks people and roles for exactly these,
 // and the settings list names the people (J-104 criterion 2).
 export const PEOPLE_KEYS = ['BAR_AUTHORISED_TAB_HOLDERS'] as const satisfies readonly ConfigKey[]
-export const ROLE_KEYS = ['BAR_AUTHORISED_TAB_ROLES'] as const satisfies readonly ConfigKey[]
+export const ROLE_KEYS = ['BAR_AUTHORISED_TAB_ROLES', 'PRIVILEGED_ROLES'] as const satisfies readonly ConfigKey[]
 
 export function holdsPeople(key: string): boolean {
   return (PEOPLE_KEYS as readonly string[]).includes(key)
@@ -907,4 +904,34 @@ export function holdsPeople(key: string): boolean {
 
 export function holdsRoles(key: string): boolean {
   return (ROLE_KEYS as readonly string[]).includes(key)
+}
+
+// The roles a save may never take off a key's list; the picker shows them ticked and fixed.
+export function roleFloor(key: string): readonly Role[] {
+  return key === 'PRIVILEGED_ROLES' ? PRIVILEGED_FLOOR : []
+}
+
+// A save of one of these must preview who it reaches and take a typed echo (J-105 criteria 1, 2).
+// Code rather than a setting, so one plain save cannot empty it (J-105 criterion 5, issue 1357).
+export const WIDE_BLAST_RADIUS = ['REFUND_PAID_REQUIRES_MANAGER', 'RETENTION_ARMED', 'PRIVILEGED_ROLES'] as const satisfies readonly ConfigKey[]
+
+export function isWideBlastRadius(key: string): boolean {
+  return (WIDE_BLAST_RADIUS as readonly string[]).includes(key)
+}
+
+// How much one run of a sweep does: a limit on the machinery and not a rule anybody works to, so
+// the screen folds these away (issue 1357). A cap a person meets, such as the tab cap, is a rule.
+export const TECHNICAL_KEYS = [
+  'HOLD_RELEASE_BATCH_CAP',
+  'WAITING_LIST_OFFER_BATCH_CAP',
+  'WAITING_LIST_PURGE_BATCH_CAP',
+  'PASS_REQUEST_EXPIRE_BATCH_CAP',
+  'ROOM_AVAILABILITY_ROW_BOUND',
+  'UNVERIFIED_EXPIRY_CAP',
+  'RETENTION_SWEEP_CAP',
+  'RETENTION_WARNING_CAP',
+] as const satisfies readonly ConfigKey[]
+
+export function isTechnical(key: string): boolean {
+  return (TECHNICAL_KEYS as readonly string[]).includes(key)
 }

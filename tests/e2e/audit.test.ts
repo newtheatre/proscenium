@@ -4,6 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { DEFAULT_PAGE_SIZE } from '#shared/utils/pagination'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
+import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -212,8 +213,7 @@ describe.skipIf(skip !== null)('recording something that happened outside the sy
   // Signing is a property of the entry, not of the role: A-112 already stops a privileged role
   // working without a factor, so this proves the guard that holds when the setting does not.
   test('a signer without an authenticator is refused even where the role would not require one', async () => {
-    const without = ['ADMIN', 'MANAGER', 'TRAINING_MANAGER']
-    expect((await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: without }, cookie)).status).toBe(200)
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN', 'MANAGER', 'TRAINING_MANAGER'])
     try {
       const deputy = await registerMember(app, 'deputy', password)
       expect((await send('POST', '/api/admin/roles', { userId: deputy.id, role: 'THEATRE_MANAGER' }, cookie)).status).toBe(200)
@@ -231,9 +231,7 @@ describe.skipIf(skip !== null)('recording something that happened outside the sy
       expect((await refused.json() as { statusMessage: string }).statusMessage).toMatch(/authenticator/i)
     }
     finally {
-      await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', {
-        value: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER'],
-      }, cookie)
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
     }
   })
 

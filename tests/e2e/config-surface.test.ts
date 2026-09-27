@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { CONFIG_KEYS, CONFIG_KEY_NAMES } from '#shared/utils/config'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
+import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -83,16 +84,6 @@ function auditFor(key: string): { detail: string } | null {
   }
 }
 
-function clearOverride(key: string): void {
-  const database = new Database(app.databaseFile)
-  try {
-    database.query('DELETE FROM config WHERE key = ?').run(key)
-  }
-  finally {
-    database.close()
-  }
-}
-
 describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
   test('every key is listed with its default and whether it is enforced', async () => {
     const listed = await settings()
@@ -125,7 +116,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect(policy.minLength).toBe(raised)
     }
     finally {
-      clearOverride('PASSWORD_MIN_LENGTH')
+      clearConfigOverride(app, 'PASSWORD_MIN_LENGTH')
     }
   })
 
@@ -136,7 +127,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect(JSON.parse(entry!.detail)).toMatchObject({ key: 'BAR_TAB_CAP_PENCE', changes: { value: { from: 2000, to: 2500 } } })
     }
     finally {
-      clearOverride('REFUND_UNPAID_CANCELLATION_FREE')
+      clearConfigOverride(app, 'REFUND_UNPAID_CANCELLATION_FREE')
     }
   })
 
@@ -152,7 +143,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect((await settingFor('NIGHT_REPORT_RECIPIENTS')).value).toEqual(['duty@newtheatre.org.uk'])
     }
     finally {
-      clearOverride('NIGHT_REPORT_RECIPIENTS')
+      clearConfigOverride(app, 'NIGHT_REPORT_RECIPIENTS')
     }
   })
 
@@ -168,7 +159,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect((await settingFor('BAR_TAB_CAP_PENCE')).people).toBeNull()
     }
     finally {
-      clearOverride('BAR_AUTHORISED_TAB_HOLDERS')
+      clearConfigOverride(app, 'BAR_AUTHORISED_TAB_HOLDERS')
     }
   })
 
@@ -179,7 +170,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect(JSON.parse(auditFor('BAR_AUTHORISED_TAB_ROLES')!.detail)).toMatchObject({ changes: { value: { from: [], to: ['COMMITTEE'] } } })
     }
     finally {
-      clearOverride('BAR_AUTHORISED_TAB_ROLES')
+      clearConfigOverride(app, 'BAR_AUTHORISED_TAB_ROLES')
     }
   })
 
@@ -295,8 +286,52 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       expect((await settingFor('REFUND_UNPAID_CANCELLATION_FREE')).value).toBe(false)
     }
     finally {
-      clearOverride('REFUND_UNPAID_CANCELLATION_FREE')
-      clearOverride('YEAR_START')
+      clearConfigOverride(app, 'REFUND_UNPAID_CANCELLATION_FREE')
+      clearConfigOverride(app, 'YEAR_START')
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // Issue 1357: the Theatre Manager reads the settings and changes none, so is shown each value in
+  // words with nothing to press. A-112 is not what this proves, so the list is narrowed for it.
+  test('a reader sees headings and values, no input, and the technical limits folded', async () => {
+    const reader = { ...syntheticPerson(23), email: registrableAddress('reader') }
+    await send('POST', '/api/auth/register', { email: reader.email, name: reader.name, password })
+    markVerified(app, reader.email)
+    const database = new Database(app.databaseFile)
+    try {
+      database.query(`INSERT INTO role_grants (id, user_id, role) SELECT 'reader-grant', id, 'THEATRE_MANAGER' FROM users WHERE email = ?`).run(reader.email)
+    }
+    finally {
+      database.close()
+    }
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', reader.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+      await visit(view, `${app.baseURL}/admin/settings`, '[data-test="setting-PUBLIC_ORDER_SEAT_CAP"]')
+
+      // Folded until opened: how much one run of a sweep does is not a rule anybody works to.
+      expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="setting-HOLD_RELEASE_BATCH_CAP"]\'))')).toBe(false)
+      await click(view, '[data-test="technical-limits"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="setting-HOLD_RELEASE_BATCH_CAP"]\')')
+
+      expect(await textOf(view, '[data-test="setting-PUBLIC_ORDER_SEAT_CAP"]')).toContain('Seats per public order')
+      expect(await textOf(view, '[data-test="key-PUBLIC_ORDER_SEAT_CAP"]')).toContain('PUBLIC_ORDER_SEAT_CAP')
+      expect(await textOf(view, '[data-test="value-HOLD_RELEASE_MINUTES_BEFORE"]')).toContain('15 minutes')
+      expect(await view.evaluate<number>('document.querySelectorAll(\'[data-test^="save-"], [data-test^="revert-"], [data-test^="input-"], [data-test^="toggle-"]\').length')).toBe(0)
+
+      await fill(view, 'input[data-test="config-search"]', 'bank holidays')
+      await waitFor(view, 'document.querySelector(\'[data-test="bank-holiday-sync-status"]\')')
+      expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="bank-holiday-sync-now"]\'))')).toBe(false)
+    }
+    finally {
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
       view.close()
     }
   }, CASE_TIMEOUT_MS)

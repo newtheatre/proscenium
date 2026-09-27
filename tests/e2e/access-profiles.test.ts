@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { ACCESS_FLAG_LABELS, ACCESS_FLAGS } from '#shared/utils/access-profiles'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -22,15 +23,15 @@ let boxOffice: TestMember
 let patron: TestMember
 const patronPassword = generatePassword()
 
-// The officer account carries no authenticator; narrowing PRIVILEGED_ROLES for one request is
-// the same shortcut `tests/e2e/pass-types.test.ts` uses to reach a route without an A-112 dance.
+// The officer account carries no authenticator. PRIVILEGED_ROLES is narrowed in the database for
+// one request, since the settings route refuses a list below its floor (A-112, issue 1357).
 async function withoutSecondFactor<T>(fn: () => Promise<T>): Promise<T> {
-  await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN'] })
+  overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
   try {
     return await fn()
   }
   finally {
-    await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER'] })
+    clearConfigOverride(app, 'PRIVILEGED_ROLES')
   }
 }
 

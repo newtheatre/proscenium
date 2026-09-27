@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { overrideConfig } from '#tests/helpers/config'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -19,22 +20,13 @@ let admin: TestMember
 let accessOfficer: TestMember
 let venueId: string
 
-// The officer account carries no authenticator; narrowing PRIVILEGED_ROLES for one request is
-// the same shortcut tests/e2e/access-profiles.test.ts uses to reach a route without an A-112 dance.
-async function withoutSecondFactor<T>(fn: () => Promise<T>): Promise<T> {
-  await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN'] })
-  try {
-    return await fn()
-  }
-  finally {
-    await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER'] })
-  }
-}
-
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
   admin = await adminSession(app)
+  // Every officer here signs in with no authenticator and A-112 is not what this file proves. The
+  // settings route refuses a list below its floor (issue 1357), so it is narrowed in the database.
+  overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
 
   accessOfficer = await registerMember(app, 'access', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: accessOfficer.id, role: 'ACCESSIBILITY_OFFICER' }, admin.cookie)
@@ -87,10 +79,9 @@ async function verifiedPatron(companions: number, fohNote = 'Aisle seat, assista
   }, patron.cookie)).status).toBe(200)
 
   // A decision sends back the version of the declaration it read (issue 1383).
-  const read = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${patron.id}`, undefined, accessOfficer.cookie))
+  const read = await send('GET', `/api/admin/access-profiles/${patron.id}`, undefined, accessOfficer.cookie)
   const { version } = (await read.json() as { profile: { version: string | null } }).profile
-  const verified = await withoutSecondFactor(() =>
-    send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote, version }, accessOfficer.cookie))
+  const verified = await send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote, version }, accessOfficer.cookie)
   expect(verified.status).toBe(200)
   return patron
 }
