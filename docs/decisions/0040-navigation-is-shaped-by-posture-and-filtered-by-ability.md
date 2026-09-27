@@ -6,6 +6,8 @@
   renames the Tonight group to Rota, and leaves an opened group open
 - Amended: 23 September 2026 by 0090, which retires the Box Office role named in the context below;
   the Front of House Manager now holds the programme's configuration
+- Amended: 26 September 2026 by 0094, under which Tonight is offered by one fact, a confirmed shift
+  in its window or a night permission, first in the account menu, with an on-shift bar and landing
 
 ## Context
 

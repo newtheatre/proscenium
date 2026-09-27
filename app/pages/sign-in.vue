@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
+import { localPath } from '#shared/utils/local-path'
+import { landingAfterSignIn } from '#shared/utils/night-authority'
 import type { AuthFormField, ButtonProps, FormSubmitEvent } from '@nuxt/ui'
 
 // Somebody already signed in has nothing to do here, and typing a second set of details would
@@ -7,7 +9,7 @@ import type { AuthFormField, ButtonProps, FormSubmitEvent } from '@nuxt/ui'
 definePageMeta({ middleware: 'signed-out', docs: '/docs/getting-started/signing-in' })
 
 const route = useRoute()
-const { refresh } = useAccount()
+const { account, refresh } = useAccount()
 
 // The Google route redirects here with a code rather than a sentence, so the wording lives on
 // the page that shows it (A-104).
@@ -57,16 +59,14 @@ const addressField: AuthFormField[] = [
 ]
 
 // Only a path on this site: an absolute URL here would make the sign-in screen an open redirect.
-const nextPath = computed(() => {
-  const next = route.query.next
-  return typeof next === 'string' && /^\/(?!\/)/.test(next) ? next : '/'
-})
+const explicitNext = computed(() => localPath(route.query.next))
 
-// Google keeps the return path across its round trip, so the way back is one click either way.
+// Google keeps the return path across its round trip, so the way back is one click either way, and
+// an explicit next of the home page travels too, since an explicit next always wins (0094).
 const providers = computed<ButtonProps[]>(() => [{
   label: 'Sign in with Google',
   icon: 'i-simple-icons-google',
-  to: nextPath.value === '/' ? '/auth/google' : `/auth/google?next=${encodeURIComponent(nextPath.value)}`,
+  to: explicitNext.value === null ? '/auth/google' : `/auth/google?next=${encodeURIComponent(explicitNext.value)}`,
   external: true,
 }])
 
@@ -122,7 +122,8 @@ async function signInWithPasskey(): Promise<void> {
 
 async function signedIn(): Promise<void> {
   await refresh()
-  await navigateTo(nextPath.value)
+  // An explicit next wins; with none, somebody on shift lands on Tonight (0094).
+  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight))
 }
 
 useSeoMeta({ title: 'Sign in' })

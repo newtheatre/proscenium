@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { heldSeatsSubquery } from './capacity'
+import { firstNameOf } from '#shared/utils/night-hub'
 import { showNightBounds } from '#shared/utils/show-night'
 import type { ConfirmedShiftScope } from './rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
@@ -130,6 +131,15 @@ export function dutyManagersOnCall(team: readonly TonightTeamMember[]): OnCall[]
     seen.set(`${member.name}\u0000${member.phone}`, { name: member.name, phone: member.phone })
   }
   return [...seen.values()]
+}
+
+export interface DutyManagerToTell { firstName: string, phone: string | null }
+
+// Who a volunteer tells when they cannot make tonight, in place of a release the server refuses:
+// the confirmed duty manager, by first name, with the number only where it was shared (A-114).
+export function dutyManagerToTell(team: readonly TonightTeamMember[]): DutyManagerToTell | null {
+  const found = team.find(member => member.role === 'DUTY_MANAGER' && member.filled && firstNameOf(member.name))
+  return found ? { firstName: firstNameOf(found.name) ?? '', phone: found.phone } : null
 }
 
 export interface TonightPerformance {

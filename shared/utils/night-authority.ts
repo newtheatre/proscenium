@@ -1,5 +1,7 @@
 import { auditEntry } from './audit'
+import { localPath } from './local-path'
 import { saysRole } from './roles'
+import { insideWindow } from './rota-times'
 import type { AuditRow } from './audit'
 import type { Permission, Role } from './roles'
 
@@ -48,6 +50,29 @@ export interface NightScope {
 
 export function isNightRole(value: string): value is NightRole {
   return (NIGHT_ROLES as readonly string[]).includes(value)
+}
+
+// On shift is a confirmed shift's own window, widened by the grace, read exactly as the guard reads
+// it, so the chrome never offers Tonight to somebody the guard would send away (0078, 0094).
+export function onShiftAt(
+  windows: readonly { startsAt: number | null, endsAt: number | null }[],
+  at: number,
+  graceMinutes: number,
+): boolean {
+  return windows.some(window => insideWindow(window, at, graceMinutes))
+}
+
+// Somebody can work tonight on a shift in its window, or by a night permission (0044): the one
+// fact the session carries, the menu reads and the hub is offered by (0094).
+export function worksTonight(viewer: { onShiftTonight: boolean, permissions: readonly string[] }): boolean {
+  if (viewer.onShiftTonight) return true
+  return NIGHT_ROLES.some(role => viewer.permissions.includes(NIGHT_ROLE_PERMISSION[role]))
+}
+
+// An explicit `next` on this site always wins, the home page included; with none, somebody on
+// shift lands on Tonight. Anything but a local path is no `next`, or sign-in is an open redirect.
+export function landingAfterSignIn(next: unknown, onShiftTonight: boolean): string {
+  return localPath(next) ?? (onShiftTonight ? '/tonight' : '/')
 }
 
 // Names both ways in, because a volunteer refused at 19:20 needs to know which one to go and get.

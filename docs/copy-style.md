@@ -74,6 +74,7 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Shift | Rota, for one slot | One role on one performance: door, bar, duty manager. |
 | Rota | Shift, for the whole schedule | The schedule and its screens, `/rota/manage/*`. "Your rota", never "your shifts". |
 | Claimed | Filled, on shift, for a claim | A shift somebody has claimed that an officer has not yet confirmed. It is not filled and opens nothing on the night: a show-night list reads "Tomasz Nowak, claimed, not confirmed", never lists a number for it, and a refusal says the shift is claimed and who confirms it (E-112 criterion 2, issue 1303). Filled means confirmed. |
+| On shift | Working tonight, rostered, for somebody holding only a claim | A confirmed shift, on a performance or a bar opening, inside its own hours with the grace either side (0078, 0094). It is what the on-shift bar and the **Next shift** tile say. An officer whose role opens the night without a shift can work tonight but is not on shift, and a claim is neither. |
 | Module | Session, record, certification | The catalogue entry: a course, of kind `MODULE`, `CERTIFICATION` or `BRIEF`. |
 | Session | Module | One scheduled delivery of a module, signed up for and attended or not. |
 | Record | Session, certification | What a member holds once a module is awarded: current, expiring or lapsed. |

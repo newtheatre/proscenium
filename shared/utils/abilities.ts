@@ -1,5 +1,6 @@
 import { defineAbility } from 'nuxt-authorization/utils'
 import type { BouncerAbility } from 'nuxt-authorization/utils'
+import { worksTonight } from './night-authority'
 import { OPERATIONAL_PERMISSIONS } from './roles'
 import type { MembershipState } from './membership'
 import type { Permission } from './roles'
@@ -157,9 +158,9 @@ export const sendAnnouncements = defineAbility((viewer: Viewer) => holds(viewer,
 // The send log, its daily counts and one person's history within it (H-106).
 export const viewCommsOperations = defineAbility((viewer: Viewer) => holds(viewer, 'comms.operations'))
 
-// Tonight is derived from a confirmed shift and expires at 04:00 with nothing to revoke (0014,
-// E-111), so it is read from the request rather than from anything the viewer holds.
-export const workTonight = defineAbility((viewer: Viewer) => viewer.onShiftTonight)
+// A confirmed shift in its window, read from the request and never held, or a night permission
+// (0044): the one fact every Tonight link is offered by (0094).
+export const canWorkTonight = defineAbility((viewer: Viewer) => worksTonight(viewer))
 
 // The officer bypass, which is what a viewer can hold today: the shift branch widens the viewer to
 // carry tonight's night roles, and these three read it then too (0044, show night wave 3).

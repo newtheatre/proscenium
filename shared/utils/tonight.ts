@@ -1,3 +1,4 @@
+import { showNightStartOf } from './show-night'
 import { saysClock } from './when'
 import type { NightRole } from './night-authority'
 
@@ -62,4 +63,21 @@ export function saysTeamHolder(slot: Pick<ContactSlot, 'filled' | 'claimed' | 'n
 // dialler, and a device with no dialler simply does nothing.
 export function telHref(phone: string): string {
   return `tel:${phone.replace(/[^+\d]/g, '')}`
+}
+
+const TONIGHT_TOOL: Record<NightRole, { label: string, to: string }> = {
+  DOOR: { label: 'Open the door screen', to: '/tonight/door' },
+  BAR: { label: 'Open the till', to: '/tonight/till' },
+  DUTY_MANAGER: { label: 'Open tonight', to: '/tonight' },
+}
+
+// The screen tonight's shift opens, in words, for My rota's Tonight card (issue 1305).
+export function tonightToolFor(role: NightRole): { label: string, to: string } {
+  return TONIGHT_TOOL[role]
+}
+
+// The server refuses a release once the shift's show night has begun (E-107 criterion 1), so a
+// screen stops offering one at the same instant: 04:00 on the day, never the curtain (0014).
+export function releaseStillOpen(startsAt: number, at: number): boolean {
+  return at < showNightStartOf(startsAt)
 }

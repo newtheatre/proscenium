@@ -241,15 +241,21 @@ becomes interactive.
   booleans), and `member` and `memberOrGrace` read it; navigation is not filtered by either, so a
   lapsed member sees every member screen and is refused only at the write path it tries
   (`docs/access-matrix.md`, A-129). It also carries `onShiftTonight`, which both resolvers derive
-  from `onShiftTonight` (`server/utils/rota.ts`): a `CONFIRMED` shift on a performance that is not
-  cancelled, inside `showNightBounds(currentShowNight())` (0014). `CLAIMED` does not count, unlike
-  My NNT's accent tile, because authority follows the confirmation rather than the claim (0009,
-  0044); it is what `workTonight` gates the account menu's Tonight entry on (0040). It also carries
-  `keepsBarTab`, which both resolvers derive from `keepsBarTab()` (`server/utils/tab-holders.ts`):
-  an authorised tab holder (`BAR_AUTHORISED_TAB_HOLDERS`, or a live grant of a
-  `BAR_AUTHORISED_TAB_ROLES` role) or anybody with an outstanding tab balance, read live per
-  request (0009, F-108, F-109). `keepBarTab` gates `MY_NAV`'s Bar tab entry only;
-  `/account/bar-tab` still opens to anyone signed in.
+  from `onShiftTonight(event, userId)` (`server/utils/rota.ts`): a `CONFIRMED` shift on a
+  performance that is not cancelled, or a `CONFIRMED` slot on a bar opening that is not, starting
+  inside the current show night (0014, 0077), for an account neither disabled nor erased, and the
+  moment inside that shift's own window widened by `SHIFT_AUTHORITY_GRACE_MINUTES` (`onShiftAt`,
+  the same `insideWindow` the guard reads, 0078). `CLAIMED` never counts, because authority
+  follows the confirmation rather than the claim (0009, 0044). `GET /api/auth/session` adds
+  `canWorkTonight`, `worksTonight()`: on shift, or holding `night.door`, `night.till` or
+  `night.manage`. The `canWorkTonight` ability reads the same function, and gates the account
+  menu's first entry and `MY_NAV`'s Tonight entry; `onShiftTonight` alone shows the 48px
+  `OnShiftBar` on public and member pages, and `landingAfterSignIn` sends a sign-in with no `next`
+  to `/tonight` (0094). It also carries `keepsBarTab`, which both resolvers derive from
+  `keepsBarTab()` (`server/utils/tab-holders.ts`): an authorised tab holder
+  (`BAR_AUTHORISED_TAB_HOLDERS`, or a live grant of a `BAR_AUTHORISED_TAB_ROLES` role) or anybody
+  with an outstanding tab balance, read live per request (0009, F-108, F-109). `keepBarTab` gates
+  `MY_NAV`'s Bar tab entry only; `/account/bar-tab` still opens to anyone signed in.
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).
 - A passkey is a complete sign-in and no challenge follows it: the authenticator verified the
   person before it would sign, so the credential step and the second step happened at once
@@ -1150,8 +1156,14 @@ already hold a claimed or confirmed shift on (`notWorkedBy`, one correlated `NOT
 holds no locked role, so its `officers` is always empty. The
 roles they do not qualify for come from `GET /api/rota/roles`, one card each with the open count
 (`openShiftCountsByRoleQuery`, plus bar opening slots for the bar), the published module and its
-one training action. `GET /api/rota/mine` is a member's own shifts. All three are member-facing
-reads with no write and so carry no audit row (`shared/utils/audit-coverage.ts`).
+one training action. `GET /api/rota/mine` is a member's own shifts and opening slots from the start
+of the current show night on, so tonight's shift stays on the list until 04:00 rather than dropping
+at its curtain, each performance shift with its own window (`windowStartsAt`, `windowEndsAt`). It
+adds `dutyManagers`, keyed by performance, for the member's confirmed non-duty-manager shifts
+tonight: the confirmed duty manager's first name and, only where they shared it, their number
+(`dutyManagerToTell`, A-114), which My rota offers once `releaseStillOpen` is false, the same 04:00
+cut-off the release route refuses at (E-107 criterion 1, 0094). All three are member-facing reads
+with no write and so carry no audit row (`shared/utils/audit-coverage.ts`).
 
 The one training action (`shared/utils/training-action.ts`, issue 1335) is derived, never stored:
 `trainingActionsFor()` in `server/utils/training-signup.ts` reads the sessions a member can see
@@ -1944,8 +1956,9 @@ is the mechanism K-103 set the precedent for landing ahead of the screens that n
 
 `GET /api/my/summary` is the one request `/my` makes. `shared/utils/my-summary.ts` declares
 `MySummary`, a column allow-list for the eight tiles; `server/utils/my-summary.ts` exports the
-pure `assembleMySummary()`, which shapes it from already-fetched facts and derives
-`onShiftTonight`, the membership state word and a room booking's `cancellable` flag, and nothing
+pure `assembleMySummary()`, which shapes it from already-fetched facts, takes `onShiftTonight` from
+the same `onShiftTonight()` the session reads (0094), and derives the membership state word and a
+room booking's `cancellable` flag, and nothing
 in it reaches a database, which is what makes the allow-list provable in a unit test. The
 endpoint itself does the fetching, one bounded read per tile (`myShiftsQuery`, `longestTerm`,
 `ownClaim`, a new `nextRoomBooking`, `listModules`/`modulesHeldBy`/`whatsNextFor`,

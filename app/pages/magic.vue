@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { localPath } from '#shared/utils/local-path'
+import { landingAfterSignIn } from '#shared/utils/night-authority'
+
 const route = useRoute()
-const { refresh } = useAccount()
+const { account, refresh } = useAccount()
 
 type Outcome = 'working' | 'challenge' | 'expired'
 
@@ -33,17 +36,15 @@ onMounted(async () => {
 })
 
 // Only a path on this site: an absolute URL here would make the link an open redirect.
-const nextPath = computed(() => {
-  const next = route.query.next
-  return typeof next === 'string' && /^\/(?!\/)/.test(next) ? next : '/'
-})
+const nextPath = computed(() => localPath(route.query.next) ?? '/')
 
 const askAgain = computed(() =>
   nextPath.value === '/' ? '/sign-in?method=link' : `/sign-in?method=link&next=${encodeURIComponent(nextPath.value)}`)
 
 async function signedIn(): Promise<void> {
   await refresh()
-  await navigateTo(nextPath.value)
+  // An explicit next wins; with none, somebody on shift lands on Tonight (0094).
+  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight))
 }
 
 useSeoMeta({

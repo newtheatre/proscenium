@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
-import { ABILITY_PERMISSIONS, keepBarTab, signedIn, viewReports, workTonight } from '#shared/utils/abilities'
+import { ABILITY_PERMISSIONS, canWorkTonight, keepBarTab, signedIn, viewReports } from '#shared/utils/abilities'
 import { contentPathOf } from '#shared/utils/docs-paths'
 import { PERMISSIONS } from '#shared/utils/roles'
 import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor, navCount } from '#shared/utils/site-nav'
@@ -240,7 +240,7 @@ describe('the members area and the account settings never overlap (K-127 criteri
   test('Tonight is there while the member works tonight, and the bar tab only for somebody who keeps one', () => {
     const conditional = MY_NAV.filter(entry => entry.ability !== signedIn)
     expect(conditional.map(entry => entry.to)).toEqual(['/tonight', '/account/bar-tab'])
-    expect(conditional.find(entry => entry.to === '/tonight')?.ability).toBe(workTonight)
+    expect(conditional.find(entry => entry.to === '/tonight')?.ability).toBe(canWorkTonight)
     expect(conditional.find(entry => entry.to === '/account/bar-tab')).toMatchObject({ label: 'Bar tab', ability: keepBarTab })
   })
 

@@ -1,5 +1,6 @@
 import {
   anybody,
+  canWorkTonight,
   decideRoomRequests,
   exportAgeChecks,
   keepBarTab,
@@ -32,7 +33,6 @@ import {
   viewSettings,
   viewTicketTypes,
   viewTrainingCatalogue,
-  workTonight,
 } from './abilities'
 import type { Viewer } from './abilities'
 import type { BouncerAbility } from 'nuxt-authorization/utils'
@@ -272,7 +272,7 @@ export const MY_NAV: NavEntry[] = [
 
   // Module E: show night
 
-  { label: 'Tonight', icon: 'i-lucide-moon-star', to: '/tonight', ability: workTonight },
+  { label: 'Tonight', icon: 'i-lucide-moon-star', to: '/tonight', ability: canWorkTonight },
   { label: 'Rota', icon: 'i-lucide-clipboard-list', to: '/rota', ability: signedIn, exact: true },
 
   // Module C: spaces. Not exact, so My bookings and the booking form light it too.
@@ -310,8 +310,9 @@ export const ACCOUNT_NAV: NavEntry[] = [
 // The account menu is the only place all four shells are reachable from each other, because it is
 // the one component every shell renders (0040).
 export const SHELL_NAV: NavEntry[] = [
+  // First, for whoever can work tonight: the entry a volunteer arriving at the theatre reaches for (0094).
+  { label: 'Tonight', icon: 'i-lucide-moon-star', to: '/tonight', ability: canWorkTonight },
   { label: 'My NNT', icon: 'i-lucide-house', to: '/my', ability: signedIn },
-  { label: 'Tonight', icon: 'i-lucide-moon-star', to: '/tonight', ability: workTonight },
   { label: 'Manage', icon: 'i-lucide-layout-dashboard', to: '/admin', ability: reachConsole },
   // Reachable whether or not a viewer holds a standing permission, since an operational-only
   // shift is exactly who most needs the page for the screen in front of them (J-109 criterion 1).

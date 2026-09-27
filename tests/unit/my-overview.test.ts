@@ -7,6 +7,7 @@ import type { MySummary } from '#shared/utils/my-summary'
 
 const BASE: MySummary = {
   onShiftTonight: false,
+  shiftIsTonight: false,
   shift: null,
   membership: { state: 'current', until: '2027-07-31', claim: null },
   room: null,

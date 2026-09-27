@@ -87,6 +87,8 @@ export interface MySummaryShift {
 export interface MySummaryInputs {
   now: Date
   viewerId: string
+  // The session's own fact, never a second reckoning of it here (0094).
+  onShiftTonight: boolean
   shift: MySummaryShift | null
   membershipTerm: { startsOn: string, expiresOn: string } | null
   membershipGraceDays: number
@@ -117,9 +119,6 @@ function claimWord(claim: { status: string } | null): 'open' | 'declined' | null
 export function assembleMySummary(input: MySummaryInputs): MySummary {
   const today = londonDay(input.now)
   const state = membershipState(input.membershipTerm, today, input.membershipGraceDays)
-  const onShiftTonight = input.shift !== null
-    && (input.shift.status === 'CLAIMED' || input.shift.status === 'CONFIRMED')
-    && showNightOf(new Date(input.shift.startsAt * 1000)) === showNightOf(input.now)
 
   const nextShow = (() => {
     if (!input.nextShow || input.nextShow.performances.length === 0) return null
@@ -134,7 +133,8 @@ export function assembleMySummary(input: MySummaryInputs): MySummary {
   })()
 
   return {
-    onShiftTonight,
+    onShiftTonight: input.onShiftTonight,
+    shiftIsTonight: input.shift !== null && showNightOf(new Date(input.shift.startsAt * 1000)) === showNightOf(input.now),
     shift: input.shift === null
       ? null
       : {

@@ -3,7 +3,9 @@ import { saysDay, saysWhenLong } from '#shared/utils/when'
 import { ROTA_WEEKS, byNight, rotaWeekSpan, saysRotaWeek } from '#shared/utils/my-rota'
 import { saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import { saysNotOpenYet } from '#shared/utils/rota-readiness'
+import { saysWindow } from '#shared/utils/rota-times'
 import { showNightOf } from '#shared/utils/show-night'
+import { releaseStillOpen, telHref, tonightToolFor } from '#shared/utils/tonight'
 import type { RotaWeek } from '#shared/utils/my-rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { Page } from '#shared/utils/pagination'
@@ -19,7 +21,13 @@ interface MyShift {
   venueName: string
   showTitle: string
   startsAt: number
+  windowStartsAt: number | null
+  windowEndsAt: number | null
 }
+
+interface DutyManagerToTell { firstName: string, phone: string | null }
+
+interface Mine { items: MyShift[], openings: MyOpeningShift[], dutyManagers: Record<string, DutyManagerToTell | null> }
 
 // A slot on a bar opening: labelled by the opening and its venue, because there is no show to
 // name (E-130 criterion 4, 0077).
@@ -57,9 +65,20 @@ interface OpenShift {
 
 const toast = useToast()
 
-const { data: mine, error: mineError, refresh: refreshMine } = await useFetch<{ items: MyShift[], openings: MyOpeningShift[] }>('/api/rota/mine', {
-  default: (): { items: MyShift[], openings: MyOpeningShift[] } => ({ items: [], openings: [] }),
+const { data: mine, error: mineError, refresh: refreshMine } = await useFetch<Mine>('/api/rota/mine', {
+  default: (): Mine => ({ items: [], openings: [], dutyManagers: {} }),
 })
+
+// Tonight's shift stays until 04:00 as a card with its window and its screen; once its show night
+// has begun the server refuses a release, so the duty manager is offered instead (0094, E-107).
+const nowSeconds = Math.floor(Date.now() / 1000)
+const tonight = showNightOf(new Date(nowSeconds * 1000))
+const isTonight = (startsAt: number): boolean => showNightOf(new Date(startsAt * 1000)) === tonight
+
+function windowOf(shift: MyShift): string {
+  if (shift.windowStartsAt === null || shift.windowEndsAt === null) return spanOf(shift.startsAt)
+  return `Tonight, ${saysWindow({ startsAt: shift.windowStartsAt, endsAt: shift.windowEndsAt })}`
+}
 
 const mineFailure = useListFailure(mineError, 'The shifts you hold could not be read.')
 
@@ -97,8 +116,11 @@ const claiming = ref<string | null>(null)
 const releasing = ref<string | null>(null)
 const dismissing = ref<string | null>(null)
 
+// A duty manager's own shift has nobody listed, so its card says to tell the Front of House Manager.
+const tellFor = (shift: MyShift): DutyManagerToTell | null => mine.value.dutyManagers[shift.performanceId] ?? null
+
 function releasable(shift: MyShift): boolean {
-  return shift.status === 'CLAIMED' || shift.status === 'CONFIRMED'
+  return (shift.status === 'CLAIMED' || shift.status === 'CONFIRMED') && releaseStillOpen(shift.startsAt, nowSeconds)
 }
 
 // A release is asked first, the same for a shift and a slot on an opening (E-107 criterion 8); a
@@ -279,11 +301,49 @@ useSeoMeta({ title: 'Rota' })
               </UBadge>
             </p>
             <p class="text-sm text-muted">
-              {{ spanOf(shift.startsAt) }}
+              {{ isTonight(shift.startsAt) ? windowOf(shift) : spanOf(shift.startsAt) }}
             </p>
             <p class="text-sm">
               {{ shift.showTitle }}
             </p>
+            <!-- Tonight's confirmed shift: its own screen, and who to tell in place of a release. -->
+            <div
+              v-if="shift.status === 'CONFIRMED' && isTonight(shift.startsAt)"
+              class="mt-3 flex flex-wrap items-center gap-2"
+              data-test="tonight-card"
+            >
+              <UButton
+                :to="tonightToolFor(shift.role).to"
+                size="lg"
+                icon="i-lucide-moon-star"
+                class="min-h-12"
+                :data-test="`tonight-tool-${shift.shiftId}`"
+              >
+                {{ tonightToolFor(shift.role).label }}
+              </UButton>
+              <UButton
+                v-if="tellFor(shift)?.phone"
+                :to="telHref(tellFor(shift)!.phone!)"
+                external
+                size="lg"
+                color="neutral"
+                variant="subtle"
+                icon="i-lucide-phone"
+                class="min-h-12"
+                data-test="tell-duty-manager"
+              >
+                Tell {{ tellFor(shift)!.firstName }}
+              </UButton>
+              <p
+                v-else
+                class="text-sm text-muted"
+                data-test="tell-duty-manager"
+              >
+                {{ tellFor(shift)
+                  ? `Cannot make it? Tell ${tellFor(shift)!.firstName}, tonight's duty manager.`
+                  : 'Cannot make it? Tell the Front of House Manager.' }}
+              </p>
+            </div>
           </div>
           <UButton
             v-if="releasable(shift)"
@@ -331,9 +391,19 @@ useSeoMeta({ title: 'Rota' })
             <p class="text-sm">
               {{ slot.label }}
             </p>
+            <UButton
+              v-if="slot.status === 'CONFIRMED' && isTonight(slot.startsAt)"
+              :to="tonightToolFor('BAR').to"
+              size="lg"
+              icon="i-lucide-moon-star"
+              class="mt-3 min-h-12"
+              :data-test="`tonight-tool-opening-${slot.slotId}`"
+            >
+              {{ tonightToolFor('BAR').label }}
+            </UButton>
           </div>
           <UButton
-            v-if="slot.status === 'CLAIMED' || slot.status === 'CONFIRMED'"
+            v-if="(slot.status === 'CLAIMED' || slot.status === 'CONFIRMED') && slot.endsAt >= nowSeconds"
             size="sm"
             color="neutral"
             variant="subtle"
