@@ -47,14 +47,17 @@ const performanceItems = computed(() => (show.value?.performances ?? []).map(per
   value: performance.id,
 })))
 
-// Send now for tonight's performance, the digest for anything else, read afresh on every change:
-// a choice of kind clears the performance, so Send now never outlives what chose it.
+// Send now for tonight's performance, the digest for anything else, read afresh on every change of
+// audience, so Send now never outlives the audience it was chosen for.
 function defaultTiming(): SendTiming {
-  const startsAt = show.value?.performances.find(performance => performance.id === performanceId.value)?.startsAt ?? null
+  const chosen = kind.value === 'PERFORMANCE_TICKET_HOLDERS' ? performanceId.value : undefined
+  const startsAt = show.value?.performances.find(performance => performance.id === chosen)?.startsAt ?? null
   return defaultSendTiming(startsAt, new Date())
 }
 
-watch(performanceId, () => {
+// Each source by name, not `audience`: a change of kind clears the performance after that
+// computed's watcher has run, and the audience then no longer reads it to fire again.
+watch([kind, role, sessionId, showId, performanceId], () => {
   timing.value = defaultTiming()
 })
 

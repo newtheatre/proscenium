@@ -101,16 +101,12 @@ export function sendTimingOptions(ticketHolders: boolean, digestMinutes: number 
       ]
 }
 
-// A performance on tonight's show night is news now, so the composer starts on Send now for it.
-export function sendsNowByDefault(performanceStartsAt: number | null, at: Date): boolean {
-  if (performanceStartsAt === null) return false
-  return showNightOf(new Date(performanceStartsAt * 1000)) === showNightOf(at)
-}
-
-// Read afresh on every change, both ways: Send now ignores preferences, so it never outlives the
-// selection that chose it.
+// Send now for a performance on tonight's show night, the digest otherwise. Send now ignores
+// preferences, so the composer reads this afresh on every change and it never outlives its choice.
 export function defaultSendTiming(performanceStartsAt: number | null, at: Date): SendTiming {
-  return sendsNowByDefault(performanceStartsAt, at) ? 'NOW' : 'WITH_DIGEST'
+  return performanceStartsAt !== null && showNightOf(new Date(performanceStartsAt * 1000)) === showNightOf(at)
+    ? 'NOW'
+    : 'WITH_DIGEST'
 }
 
 export const composeAnnouncementForm = z.object({

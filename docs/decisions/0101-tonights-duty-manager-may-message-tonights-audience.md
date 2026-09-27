@@ -33,12 +33,13 @@ behind it is guarded by `requireNightAuthority(event, 'DUTY_MANAGER', { performa
   `admin.ticket-holders.safety-notice` for ticket holders and `admin.safety-notice` for the rota.
   A message about tonight that waits for the next digest has missed the night it was about, and a
   booker's Bookings preference was never meant to keep them from hearing that tonight has moved.
-- The screen shows the count before a word is written, a preview, and a send that names the
-  count. Each draft carries a key the page makes, and each person's copy is claimed under it
-  before it sends (0048), so Send pressed again after a dropped connection reaches only those not
-  yet reached; any change to the draft makes a new key. The send is recorded as `comms.announcement.sent`, the composer's own action, with the
-  performance, the audience, the count and whether a shift or an officer sent it; the subject and
-  the message stay out of the audit trail (0011), in the send log where they already are.
+- The screen shows the count before a word is written, a preview, and a send that names the count.
+  Each draft carries a key the page makes, and each person's copy is claimed under it before it
+  sends (0048), so Send pressed again after a dropped connection reaches only those not yet reached;
+  any change to the draft makes a new key. The send is recorded as `comms.announcement.sent`, the
+  composer's own action, with the performance, the audience, the count and whether a shift or an
+  officer sent it; the subject and the message stay out of the audit trail (0011), in the send log
+  where they already are.
 
 `/comms/announce` also says when a message goes before it goes. The safety tick becomes a choice
 between sending now and sending with the recipient's other messages inside the digest window,

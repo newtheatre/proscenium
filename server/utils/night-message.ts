@@ -47,37 +47,36 @@ export async function previewNightMessage(input: NightMessageInput, night: strin
   return { count: ids.length, rendered }
 }
 
-// Each copy is claimed under the draft before it sends, so a second press of the same draft reaches
-// only those not yet reached and counts them alone (0048). A claim never sent stays PENDING.
-async function sendOnce(event: H3Event, ids: string[], input: NightMessageInput): Promise<number> {
-  const type = nightMessageType(input.audience)
-  let reached = 0
-  for (const userId of ids) {
-    const claim = nightMessageClaim(input.draftKey, userId)
-    if (!await claimNotification({ userId, type, key: claim, recordId: input.performanceId })) continue
-    await notify(event, { type, userId, claim, context: { name: '', subject: input.subject, body: input.body } })
-    reached += 1
-  }
-  return reached
-}
-
 // The announce composer's audit action, so one reading of the audit trail answers both screens;
 // `via` says whether a shift or an officer's standing sent it (0044). Never the officer's prose (0011).
 export async function sendNightMessage(event: H3Event, actorId: string, via: NightAuthorityVia, input: NightMessageInput, night: string): Promise<{ count: number }> {
   const ids = await resolveNightAudience(input.audience, input.performanceId, night)
-  const reached = await sendOnce(event, ids, input)
+  const type = nightMessageType(input.audience)
+  let reached = 0
 
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId,
-    action: 'comms.announcement.sent',
-    detail: {
-      audienceKind: input.audience === 'TICKET_HOLDERS' ? 'PERFORMANCE_TICKET_HOLDERS' : 'PERFORMANCE_ROTA',
-      performanceId: input.performanceId,
-      recipientCount: reached,
-      safetyNotice: true,
-      via,
-    },
-  }))
+  // Each copy is claimed under the draft before it sends, so a second press of the same draft
+  // reaches only those not yet reached (0048); a press that throws part-way still audits what went.
+  try {
+    for (const userId of ids) {
+      const claim = nightMessageClaim(input.draftKey, userId)
+      if (!await claimNotification({ userId, type, key: claim, recordId: input.performanceId })) continue
+      await notify(event, { type, userId, claim, context: { name: '', subject: input.subject, body: input.body } })
+      reached += 1
+    }
+  }
+  finally {
+    await db.insert(schema.auditLog).values(auditEntry({
+      actorId,
+      action: 'comms.announcement.sent',
+      detail: {
+        audienceKind: input.audience === 'TICKET_HOLDERS' ? 'PERFORMANCE_TICKET_HOLDERS' : 'PERFORMANCE_ROTA',
+        performanceId: input.performanceId,
+        recipientCount: reached,
+        safetyNotice: true,
+        via,
+      },
+    }))
+  }
 
   return { count: reached }
 }
