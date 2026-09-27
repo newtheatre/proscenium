@@ -41,8 +41,8 @@ describe('entries chained after one conditional write (0049)', () => {
     await withDatabase((database) => {
       expect(namedSeason(database, 's-1', 'Autumn')).toHaveLength(1)
       run(database, auditIfChanged(auditEntry({ actorId: null, action: 'season.created', target: 'season:s-1' })))
-      run(database, auditIfChanged(auditEntry({ actorId: null, action: 'season.named', target: 'season:s-1' })))
-      expect(trail(database)).toEqual(['season.created', 'season.named'])
+      run(database, auditIfChanged(auditEntry({ actorId: null, action: 'season.updated', target: 'season:s-1' })))
+      expect(trail(database)).toEqual(['season.created', 'season.updated'])
     })
   })
 
@@ -51,7 +51,7 @@ describe('entries chained after one conditional write (0049)', () => {
       namedSeason(database, 's-1', 'Autumn')
       expect(namedSeason(database, 's-2', 'AUTUMN')).toHaveLength(0)
       run(database, auditIfChanged(auditEntry({ actorId: null, action: 'season.created', target: 'season:s-2' })))
-      run(database, auditIfChanged(auditEntry({ actorId: null, action: 'season.named', target: 'season:s-2' })))
+      run(database, auditIfChanged(auditEntry({ actorId: null, action: 'season.updated', target: 'season:s-2' })))
       expect(trail(database)).toEqual([])
     })
   })
