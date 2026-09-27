@@ -75,7 +75,7 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
 - Depends on: I-102, I-103
 - Acceptance criteria:
   1. For any London day, the system derives the expected Z figure purely from ledger entries, split by source (desk collections, walk-ups, bar, tab settlements, pass sales) with comps, discounts and refunds itemised.
-  2. There is no settlement feed to match against: an authorised person enters the reader's actual Z reading as a daily step, and the entry records who and when.
+  2. There is no settlement feed to match against: an authorised person enters the reader's actual Z reading as a daily step, and the entry records who and when. Amended 26 September 2026 (issue 1309): the till close is that step on a night the bar ran, recording the Z its closer keyed, with the close's note, as the night's reading (F-118 criterion 3); a later till close that night supersedes a till's reading, and the Treasurer enters a reading by hand only for a night no till closed, or to correct or write off one (0097).
   3. When expected and actual differ, a variance record is created: date, expected, actual, difference, recorder and a mandatory note; variance records are append-only.
   4. Resolving a variance posts a correction entry or an explicit write-off referencing the variance; a variance is never edited or deleted.
   5. Days with takings but no recorded Z reading surface on the treasurer dashboard until reconciled, and the list is never truncated.

@@ -1159,13 +1159,17 @@ carries: the reader is read once a night, not once a calendar day, so this is ne
 whenever `variance_pence` is not zero · `supersedes_id` NULL, no foreign key (the same
 append-only reasoning as the ledger's own self-references), unique where not null so a reading
 resolves once · `written_off` (a real, nonzero variance accepted rather than restated as zero;
-always names what it resolves) · `created_at`. The daily reconciliation record (I-104); a
-variance is a fact to explain, not an error to suppress, and a correction or a write-off is a
-new row naming the one it resolves, never an edit (0010). Unique where `supersedes_id IS NULL`,
-one per `night`, so a racing second first-reading for a night collides rather than forking the
-chain. `server/utils/night-reconciliation.ts` builds the whole-night expected figure from
-F-118's own bar reconciliation (`server/utils/reconciliation.ts`) rather than a second account
-of the same figures, adding only the desk's own itemised breakdown.
+always names what it resolves) · `till_session_id` NULL (the till close that recorded the
+reading; NULL for finance's own; no foreign key, since adding one would rebuild the table) ·
+`created_at`. The daily reconciliation record (I-104); a variance is a fact to explain, not an
+error to suppress, and a correction or a write-off is a new row naming the one it resolves, never
+an edit (0010). The till close writes the night's reading in its own batch (0097,
+`closeReadingStatement` in `server/utils/till.ts`): the first for the night, or superseding a
+reading an earlier close that night recorded, never one finance recorded, which stands. Unique
+where `supersedes_id IS NULL`, one per `night`, so a racing second first-reading for a night
+collides rather than forking the chain. `server/utils/night-reconciliation.ts` builds the
+whole-night expected figure from F-118's own bar reconciliation (`server/utils/reconciliation.ts`)
+rather than a second account of the same figures, adding only the desk's own itemised breakdown.
 
 ### periods
 `id` PK · `label` · `from_day`, `to_day` (`london_day` format, both inclusive; CHECK

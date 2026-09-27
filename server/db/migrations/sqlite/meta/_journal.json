@@ -855,6 +855,13 @@
       "when": 1790453613760,
       "tag": "0121_each_board_call_belongs_to_one_end",
       "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "6",
+      "when": 1790471179313,
+      "tag": "0122_a_till_close_records_the_nights_reading",
+      "breakpoints": true
     }
   ]
 }

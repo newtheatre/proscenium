@@ -97,7 +97,10 @@ const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconc
           </dl>
         </div>
 
-        <UFormField label="What the reader's Z actually reads">
+        <UFormField
+          label="What the reader's Z actually reads"
+          help="The Treasurer gets this figure, and any note, as the night's reader total, unless they have already recorded tonight's reading themselves."
+        >
           <UInputNumber
             v-model="actualZPounds"
             :min="0"

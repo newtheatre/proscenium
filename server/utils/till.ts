@@ -48,6 +48,21 @@ export function closeSessionStatement(close: SessionClose): SQL {
   `
 }
 
+// The night's reader total for the Treasurer, in the close's own batch and only if this caller's
+// close wrote its audit row. A till's reading supersedes a till's; finance's own always stands (0097).
+export function closeReadingStatement(close: SessionClose, reading: { id: string, auditId: string }): SQL {
+  const live = sql`z.night = ${close.night} AND NOT EXISTS (SELECT 1 FROM z_readings n WHERE n.supersedes_id = z.id)`
+  return sql`
+    INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by, note, written_off, supersedes_id, till_session_id)
+    SELECT ${reading.id}, ${close.night}, ${close.actualZPence}, ${close.expectedPence},
+      ${close.variancePence}, ${close.closedBy}, ${close.varianceNote}, 0,
+      (SELECT z.id FROM z_readings z WHERE ${live}), ${close.id}
+    WHERE EXISTS (SELECT 1 FROM audit_log WHERE id = ${reading.auditId})
+      AND (NOT EXISTS (SELECT 1 FROM z_readings WHERE night = ${close.night})
+        OR EXISTS (SELECT 1 FROM z_readings z WHERE ${live} AND z.till_session_id IS NOT NULL))
+  `
+}
+
 export function sessionByIdQuery(id: string): SQL {
   return sql`SELECT ${SESSION_COLUMNS} FROM till_sessions WHERE id = ${id}`
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `z_readings` ADD `till_session_id` text;
