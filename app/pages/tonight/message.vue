@@ -2,6 +2,7 @@
 import { saysAudienceCount } from '#shared/utils/announcements'
 import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS, saysNightMessageSent } from '#shared/utils/night-message'
 import type { NightAudience } from '#shared/utils/night-message'
+import { openingHouseId } from '#shared/utils/tonight'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/message-tonight-s-audience' })
 useSeoMeta({ title: 'Message tonight\'s audience' })
@@ -24,13 +25,8 @@ const handedOver = typeof route.query.performanceId === 'string' ? route.query.p
 const performanceId = ref<string | null>(null)
 const choices = computed(() => houses.value.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt })))
 
-// Asked here rather than read from the shell's answer, so the houses are as of this visit (0078).
-function readAuthority(): Promise<SettledRead<{ performances: House[] }>> {
-  return settleRead(() => request<{ performances: House[] }>('/api/tonight/authority', { query: { role: 'DUTY_MANAGER' } }))
-}
-
 function chosenHouse(among: House[]): string | null {
-  return handedOver ?? (among.find(one => one.active) ?? among[0])?.id ?? null
+  return handedOver ?? openingHouseId(among)
 }
 
 const audience = ref<NightAudience | null>('TICKET_HOLDERS')
@@ -41,14 +37,18 @@ const countFailure = ref<string | null>(null)
 // Which house and audience the count on screen answers, so the served count is not asked twice.
 let countedFor: string | null = null
 
+function countKey(house: string | null, whom: NightAudience | null): string | null {
+  return house && whom ? `${house}:${whom}` : null
+}
+
 function readCount(house: string, whom: NightAudience): Promise<SettledRead<{ count: number }>> {
   return settleRead(() => request<{ count: number }>('/api/tonight/message/audience', { query: { performanceId: house, audience: whom } }))
 }
 
-function applyCount(answered: SettledRead<{ count: number }> | null, asked: string | null): void {
+function applyCount(answered: SettledRead<{ count: number }>, asked: string | null): void {
   countedFor = asked
-  count.value = answered?.kind === 'READ' ? answered.value.count : null
-  countFailure.value = answered?.kind === 'FAILED' ? answered.failure : null
+  count.value = answered.kind === 'READ' ? answered.value.count : null
+  countFailure.value = answered.kind === 'FAILED' ? answered.failure : null
 }
 
 // The count comes before the message (H-108 criterion 7), asked again whenever the house or the
@@ -56,30 +56,32 @@ function applyCount(answered: SettledRead<{ count: number }> | null, asked: stri
 async function loadCount(): Promise<void> {
   const house = performanceId.value
   const whom = audience.value
-  const asked = house && whom ? `${house}:${whom}` : null
+  const asked = countKey(house, whom)
   if (asked !== null && asked === countedFor) return
-  applyCount(null, null)
+  countedFor = null
+  count.value = null
+  countFailure.value = null
   if (!house || !whom) return
   applyCount(await readCount(house, whom), asked)
 }
 
-// In the served page with the first count, so the form or the refusal is what a phone paints
-// first; the count waits on the house authority names (issue 1521).
+// In the served page with the first count, so the form or the refusal is what a phone paints first.
+// A house the hub handed over is counted beside the authority read; otherwise authority names it.
 const waiting = useServedRead('tonight-message', async () => {
-  const authority = await readAuthority()
-  const house = authority.kind === 'READ' ? chosenHouse(authority.value.performances) : null
   const whom = audience.value
-  const counted = house && whom ? { asked: `${house}:${whom}`, read: await readCount(house, whom) } : null
+  const counting = (house: string | null) => house && whom ? readCount(house, whom).then(read => ({ asked: countKey(house, whom), read })) : null
+  const [authority, handedCount] = await Promise.all([askNightAuthority('DUTY_MANAGER'), counting(handedOver)])
+  const counted = handedCount ?? (authority.kind === 'READ' ? await counting(chosenHouse(authority.value.performances)) : null)
   return { authority, counted }
 }, ({ authority, counted }) => {
   refusal.value = refusalOf(authority)
   if (authority.kind === 'FAILED') {
-    if (!authority.refused) failure.value = authority.failure
+    if (!refusal.value) failure.value = authority.failure
     return
   }
   houses.value = authority.value.performances
   syncedAt.value = authority.at
-  applyCount(counted?.read ?? null, counted?.asked ?? null)
+  if (counted) applyCount(counted.read, counted.asked)
   performanceId.value = chosenHouse(authority.value.performances)
 })
 

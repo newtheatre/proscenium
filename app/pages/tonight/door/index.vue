@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { CAMERA_FALLBACK_SAYS, doorFailureVerdict, doorMissVerdict, doorNameTerm, lookUpOutcome, readScannedCode, saysDoorParty, verdictBuzz, verdictHoldMs } from '#shared/utils/door'
 import { doorStripLine, doorStripNumbers } from '#shared/utils/night-hub'
-import { saysPerformanceChoice } from '#shared/utils/tonight'
+import { openingHouseId, saysPerformanceChoice } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 import type { DoorAdmission, DoorPassCard, DoorTicketFound, DoorVerdict, LookUpHalf, ScannerFailure } from '#shared/utils/door'
 
@@ -9,7 +9,6 @@ definePageMeta({ layout: 'tonight', docs: '/docs/tonight/door' })
 useSeoMeta({ title: 'Door' })
 
 interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
-interface Authority { performanceIds: string[], performances: CoveredPerformance[] }
 interface RefusalData { verdict?: DoorVerdict, reference?: string, holderName?: string | null, partySize?: number, accessWording?: string | null }
 interface HouseView { performanceId: string, house: HubHouse, latecomerPolicy: string | null, intervalCount: number, intervalMinutes: number | null }
 
@@ -22,25 +21,18 @@ const performances = ref<CoveredPerformance[]>([])
 const performanceId = ref('')
 const syncedAt = ref<number | null>(null)
 
-// Asked here rather than read from the shell's answer: a shift opens only inside its own window, so
-// the door's authority is as of this visit, never of when the shell was entered (0078, E-111).
-function readAuthority(): Promise<SettledRead<Authority>> {
-  return settleRead(() => request<Authority>('/api/tonight/authority', { query: { role: 'DOOR' } }))
-}
-
-function applyAuthority(answered: SettledRead<Authority>): void {
+function applyAuthority(answered: SettledRead<NightAuthorityAnswer>): void {
   syncedAt.value = answered.at
   if (answered.kind === 'FAILED') {
     authorised.value = false
     authorityFailure.value = answered.failure
     // Refused outright: one card, and no field or Check left to press (issue 1304).
-    refusal.value = answered.refused ? answered.failure : null
+    refusal.value = refusalOf(answered)
     return
   }
   performances.value = answered.value.performances
-  // The house running now, never whichever id sorted first: a matinee ticket refused at an
-  // evening the volunteer never chose is the bug this closes (issue 901).
-  performanceId.value = (answered.value.performances.find(one => one.active) ?? answered.value.performances[0])?.id ?? ''
+  // A matinee ticket refused at an evening the volunteer never chose is the bug this closes (issue 901).
+  performanceId.value = openingHouseId(answered.value.performances) ?? ''
   authorised.value = true
   authorityFailure.value = null
   refusal.value = null
@@ -60,7 +52,7 @@ async function readHouse(): Promise<HouseView[] | null> {
 
 // In the served page, so the field or the refusal is what a phone paints first (issue 1521).
 const waiting = useServedRead('tonight-door', async () => {
-  const [authority, house] = await Promise.all([readAuthority(), readHouse()])
+  const [authority, house] = await Promise.all([askNightAuthority('DOOR'), readHouse()])
   return { authority, house }
 }, (served) => {
   applyAuthority(served.authority)

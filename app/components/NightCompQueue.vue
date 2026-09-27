@@ -38,10 +38,13 @@ interface Queues { tickets: PendingComp[] | null, bar: PendingBarComp[] | null }
 async function readComps(performanceId: string | null): Promise<Queues | null> {
   if (!performanceId) return null
   const [tickets, bar] = await Promise.all([
-    request<{ items: PendingComp[] }>('/api/box-office/desk/comp-requests', { query: { performanceId } }).catch(() => null),
-    request<{ requests: PendingBarComp[] }>('/api/till/comp-requests', { query: { performanceId } }).catch(() => null),
+    settleRead(() => request<{ items: PendingComp[] }>('/api/box-office/desk/comp-requests', { query: { performanceId } })),
+    settleRead(() => request<{ requests: PendingBarComp[] }>('/api/till/comp-requests', { query: { performanceId } })),
   ])
-  return { tickets: tickets?.items.filter(one => !one.expired) ?? null, bar: bar?.requests.filter(one => !one.request.expired) ?? null }
+  return {
+    tickets: tickets.kind === 'READ' ? tickets.value.items.filter(one => !one.expired) : null,
+    bar: bar.kind === 'READ' ? bar.value.requests.filter(one => !one.request.expired) : null,
+  }
 }
 
 function apply(queues: Queues | null): void {

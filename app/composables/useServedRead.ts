@@ -17,6 +17,7 @@ export function useServedRead<T>(key: string, read: () => Promise<T>, apply: (va
     if (value !== undefined) apply(value as T)
   }, { immediate: true })
 
-  // True only on a phone that navigated here and is still waiting: the screen says Syncing.
-  return computed(() => served.data.value === undefined)
+  // True only on a phone that navigated here and is still waiting: the screen says Syncing. The read
+  // starts before the first render, and any end to it, a throw included, takes Syncing down.
+  return computed(() => served.status.value === 'pending')
 }

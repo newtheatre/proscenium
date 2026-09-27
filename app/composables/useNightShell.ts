@@ -2,6 +2,7 @@ import { DEFAULT_EYEBROW, bindNightEyebrow, bindNightFallbackSubject, bindNightS
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import { hubRefusal } from '#shared/utils/refusals'
 import type { NightHeaderState, NightSubject } from './useNightHeader'
+import type { SettledRead } from '~/utils/refusal'
 import type { NightAuthorityVia, NightRole } from '#shared/utils/night-authority'
 
 // The one show-night header lives in the layout, so every screen carries the same back arrow, the
@@ -30,6 +31,12 @@ export function setNightFallbackSubject(fallback: () => NightSubject | null): vo
 
 export interface NightPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
 
+// What `GET /api/tonight/authority` answers for one role, or with none for the most specific of the
+// three; only the fields a screen reads.
+export interface NightAuthorityAnswer { via: NightAuthorityVia, performanceIds: string[], performances: NightPerformance[] }
+
+export type NightAuthorityAsk = NightRole | 'ANY'
+
 export interface NightAuthority {
   roles: NightRole[]
   via: 'SHIFT' | 'OFFICER' | null
@@ -39,6 +46,8 @@ export interface NightAuthority {
   known: boolean
   // Refused every role for a reason more specific than no shift: what the hub says instead.
   refusal: string | null
+  // Each answer as it came, for a screen's served first read to reuse within the same request.
+  answers: Partial<Record<NightAuthorityAsk, SettledRead<NightAuthorityAnswer>>>
 }
 
 export function useNightAuthority(): Ref<NightAuthority> {
@@ -46,7 +55,7 @@ export function useNightAuthority(): Ref<NightAuthority> {
 }
 
 function unknownNightAuthority(): NightAuthority {
-  return { roles: [], via: null, performances: [], known: false, refusal: null }
+  return { roles: [], via: null, performances: [], known: false, refusal: null, answers: {} }
 }
 
 // Which of tonight's roles the viewer actually holds, asked of the server rather than read from a
@@ -65,17 +74,22 @@ export async function resolveNightAuthority(): Promise<void> {
   }
 
   // A role check is a read, so it records no officer bypass however often a screen makes it (0098).
-  const answers = await Promise.allSettled(NIGHT_ROLES.map(async (role) => {
-    const answered = await request<{ via: NightAuthorityVia, performances: NightPerformance[] }>('/api/tonight/authority', { query: { role } })
-    return { role, via: answered.via, performances: answered.performances }
-  }))
+  // With no role the server ranks the three refusals and names the most specific (issue 1411).
+  const [any, ...byRole] = await Promise.all([
+    askNightAuthorityWith(request, 'ANY'),
+    ...NIGHT_ROLES.map(role => askNightAuthorityWith(request, role)),
+  ])
+  const answers: NightAuthority['answers'] = { ANY: any }
+  NIGHT_ROLES.forEach((role, at) => {
+    answers[role] = byRole[at]
+  })
 
-  const held = answers.flatMap(answer => answer.status === 'fulfilled' ? [answer.value] : [])
-  const known = answers.some(answer => answer.status === 'fulfilled' || refusalStatus(answer.reason) === 403)
-  // Asked with no role, the server ranks the three refusals and names the most specific (issue 1411).
-  const said = held.length === 0 && known
-    ? await request('/api/tonight/authority').then(() => null, (refused: unknown) => refusalText(refused))
-    : null
+  const held = NIGHT_ROLES.flatMap((role) => {
+    const answer = answers[role]
+    return answer?.kind === 'READ' ? [{ role, ...answer.value }] : []
+  })
+  const known = byRole.some(answer => answer.kind === 'READ' || answer.status === 403)
+  const said = held.length === 0 && known && any.kind === 'FAILED' ? any.failure : null
   // A shift is the ordinary way in, so it wins the badge wherever the viewer holds both; a duty
   // manager covering the door is on their own shift, so cover reads as a shift too (0095).
   resolved.value = {
@@ -84,5 +98,17 @@ export async function resolveNightAuthority(): Promise<void> {
     performances: held[0]?.performances ?? [],
     known,
     refusal: hubRefusal(said),
+    answers,
   }
+}
+
+function askNightAuthorityWith(request: ReturnType<typeof useRequestFetch>, role: NightAuthorityAsk): Promise<SettledRead<NightAuthorityAnswer>> {
+  return settleRead(() => request<NightAuthorityAnswer>('/api/tonight/authority', { query: role === 'ANY' ? {} : { role } }))
+}
+
+// A screen's own authority, as of this visit. A served render reuses the answer the shell asked in the
+// same request; a phone always asks afresh, since a shift opens only in its window (0078, E-111).
+export function askNightAuthority(role: NightAuthorityAsk): Promise<SettledRead<NightAuthorityAnswer>> {
+  const seeded = import.meta.server ? useNightAuthority().value.answers[role] : undefined
+  return seeded ? Promise.resolve(seeded) : askNightAuthorityWith(useRequestFetch(), role)
 }

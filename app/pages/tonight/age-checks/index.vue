@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { AGE_CHECK_OUTCOMES, ID_TYPES, REFUSAL_REASONS, ageCheckReady, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { saysClock } from '#shared/utils/when'
-import { saysPerformanceChoice } from '#shared/utils/tonight'
+import { openingHouseId, saysPerformanceChoice } from '#shared/utils/tonight'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/challenge-25' })
@@ -22,16 +22,11 @@ interface Entry {
   createdAt: number
 }
 
-interface Listing { items: Entry[], total: number }
 interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
 
-const request = useRequestFetch()
 const toast = useToast()
 
-const syncedAt = ref<number | null>(null)
-const failure = ref<string | null>(null)
-const busy = ref(false)
-const items = ref<Entry[]>([])
+const { items, failure, syncedAt, busy, read: readRegister, apply: applyRegister, load } = useNightLog<Entry>('/api/tonight/age-checks')
 // Whether anything running tonight authorises the register at all (0009's own limit, not a
 // property of an entry: the row's own `performanceId` may still be null either way).
 const authorised = ref(false)
@@ -40,13 +35,7 @@ const authorityFailure = ref<string | null>(null)
 const refusal = ref<string | null>(null)
 const performances = ref<CoveredPerformance[]>([])
 
-// One question for any of tonight's roles: the server tries a shift before a bypass and answers a
-// refusal about the caller's own position, never the last role's (E-111).
-function readAuthority(): Promise<SettledRead<{ performances: CoveredPerformance[] }>> {
-  return settleRead(() => request<{ performances: CoveredPerformance[] }>('/api/tonight/authority'))
-}
-
-function applyAuthority(answered: SettledRead<{ performances: CoveredPerformance[] }>): void {
+function applyAuthority(answered: SettledRead<NightAuthorityAnswer>): void {
   refusal.value = refusalOf(answered)
   if (answered.kind === 'FAILED') {
     authorityFailure.value = answered.failure
@@ -57,38 +46,16 @@ function applyAuthority(answered: SettledRead<{ performances: CoveredPerformance
   authorityFailure.value = null
 }
 
-function readRegister(): Promise<SettledRead<Listing>> {
-  return settleRead(() => request<Listing>('/api/tonight/age-checks', { query: { pageSize: 100 } }))
-}
-
-function applyRegister(answered: SettledRead<Listing>): void {
-  if (answered.kind === 'FAILED') {
-    failure.value = answered.failure
-    return
-  }
-  failure.value = null
-  items.value = answered.value.items
-  syncedAt.value = answered.at
-}
-
-async function load(): Promise<void> {
-  busy.value = true
-  try {
-    applyRegister(await readRegister())
-  }
-  finally {
-    busy.value = false
-  }
-}
-
-// In the served page, so the register or the refusal is what a phone paints first (issue 1521).
+// In the served page, so the register or the refusal is what a phone paints first. Asked with no
+// role: the server tries a shift before a bypass and refuses about the caller's own position (E-111).
 const waiting = useServedRead('tonight-age-checks', async () => {
-  const [authority, register] = await Promise.all([readAuthority(), readRegister()])
+  const [authority, register] = await Promise.all([askNightAuthority('ANY'), readRegister()])
   return { authority, register }
 }, (served) => {
   applyAuthority(served.authority)
   applyRegister(served.register)
 })
+const settling = computed(() => busy.value || waiting.value)
 
 const performanceOptions = computed(() => [
   { label: 'No performance (checked outside a show)', value: '' },
@@ -106,7 +73,7 @@ interface FormState {
 }
 
 const blankForm = (): FormState => ({
-  performanceId: (performances.value.find(one => one.active) ?? performances.value[0])?.id ?? '',
+  performanceId: openingHouseId(performances.value) ?? '',
   outcome: 'ACCEPTED',
   idType: null,
   reason: null,
@@ -238,9 +205,9 @@ async function submitCorrect(): Promise<void> {
       title="Challenge 25 register"
       :refused="refusal"
       hint="Every entry stays visible once filed. A mistake is corrected with a new entry, never an edit."
-      :empty="!busy && !waiting && items.length === 0"
+      :empty="!settling && items.length === 0"
       :stale="syncedAt"
-      :busy="busy || waiting"
+      :busy="settling"
     >
       <UAlert
         v-if="failure"

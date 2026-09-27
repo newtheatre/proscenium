@@ -69,8 +69,8 @@ function apply({ named, settled }: ChecklistRead): void {
     ambiguous.value = true
     refusal.value = null
   }
-  else if (settled.refused) {
-    refusal.value = settled.failure
+  else if (settled.status === 403) {
+    refusal.value = refusalOf(settled)
     ambiguous.value = false
   }
   else failure.value = settled.failure
@@ -88,6 +88,7 @@ async function load(): Promise<void> {
 
 // In the served page, so the list, the switcher or the refusal is what a phone paints first.
 const waiting = useServedRead('tonight-checklist', read, apply)
+const settling = computed(() => busy.value || waiting.value)
 
 function choose(chosen: string): void {
   performanceId.value = chosen
@@ -106,9 +107,9 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
     title="Checklist"
     :refused="refusal"
     hint="Tick each item, or say why it cannot be done tonight. The night closes from the night report."
-    :empty="!busy && !waiting && items.length === 0"
+    :empty="!settling && items.length === 0"
     :stale="syncedAt"
-    :busy="busy || waiting"
+    :busy="settling"
   >
     <UAlert
       v-if="failure"

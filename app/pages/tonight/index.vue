@@ -81,8 +81,8 @@ function apply(read: HubRead): void {
 const waiting = useServedRead('tonight-hub', readHub, apply)
 
 // Roles that land after the first read, on a phone arriving from elsewhere, need not wait a poll.
-watch(dutyManager, async (holds) => {
-  const items = holds ? await readChecklist() : null
+watch(dutyManager, async () => {
+  const items = await readChecklist()
   if (items) checklist.value = items
 })
 watch(onTheBar, async (holds) => {

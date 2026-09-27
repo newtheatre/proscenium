@@ -1023,19 +1023,22 @@ namespace does not call the guard. Beside the ids it answers with
 `activePerformanceId()`'s own answer, so a picker names a show and a curtain rather than a database
 id and a screen opening cold starts on the house running now (E-127 criterion 2).
 
-The show-night shell asks it once for each role from `app/middleware/night-authority.global.ts` into
-the shared `useNightAuthority()` state (`asksNightAuthority()` in `shared/utils/night-shell.ts`,
-issue 1521). It is awaited only while the server renders a `/tonight` screen, so the served page
-draws the hub's tiles, the on-shift badge and the running house already, and hydration takes that
-answer from the payload. A phone is never held on it: arriving from another layout, it is asked
-behind the page and the hub draws every tile until it lands, as with no signal. A page that only
-wears the shell (the SumUp return, a session register) is not held on the server either and asks
-behind itself on the phone. A signed-out viewer is not asked about at all, since every role would
-answer 401, which says nothing. The screens that need a role's own answer (the door's covered
-houses, the duty manager's houses on the audience message, the unscoped answer the log and the
-register read) still ask for it themselves, in the same read as their first data: a shift opens only
-inside its own window (0078), so a screen's authority is as of that visit, never of when the shell
-was entered.
+The show-night shell asks it once for each role, and once with none, from
+`app/middleware/night-authority.global.ts` into the shared `useNightAuthority()` state
+(`asksNightAuthority()` in `shared/utils/night-shell.ts`, issue 1521), keeping each answer as it
+came. It is awaited only while the server renders a `/tonight` screen, so the served page draws the
+hub's tiles, the on-shift badge and the running house already, and hydration takes that answer from
+the payload. A phone is never held on it: arriving from another layout, it is asked behind the page
+and the hub draws every tile until it lands, as with no signal. A page that only wears the shell
+(the SumUp return, a session register) is not held on the server either and asks behind itself on
+the phone. A signed-out viewer is not asked about at all, since every role would answer 401, which
+says nothing. The screens that need a role's own answer (the door's covered houses, the duty
+manager's houses on the audience message, the unscoped answer the log and the register read) take it
+through `askNightAuthority()`: a served render reuses the answer the shell asked in that same
+request, and a phone asks afresh on every visit, since a shift opens only inside its own window
+(0078), so a screen's authority is as of that visit, never of when the shell was entered. The
+glance's served read likewise skips the duty manager's route where the shell's answer in that
+request already refused the role; its polls ask again.
 
 ## The door (D-126, E-127, E-129)
 
@@ -1360,12 +1363,14 @@ turns `NightStale` amber rather than clearing anything, because a spinner is exa
 3 refuses. The first read goes through `useServedRead()`, a lazy `useAsyncData` the server render
 waits for and ships in the page, so the first load shows none either; on a navigation inside the
 shell it arrives after the screen draws, which says Syncing meanwhile, rather than holding the phone
-on the network. Every read settles through `settleRead()` (`app/utils/refusal.ts`), and the hub's
-staleness through `hubHouseAfter()` in `shared/utils/night-hub.ts` (issue 1521). A caller
-`requireNightAuthority` refuses is shown the hub's own fallback links instead of a failure banner,
-which is how `/tonight` still serves a DOOR or BAR shift holder who is not tonight's duty manager.
-Content warnings, the latecomer policy and the age guidance are read straight from `showWarnings()`
-and the show row, the same source the public show page reads, so neither can drift from the other.
+on the network. Every read on the screens served this way settles through `settleRead()`
+(`app/utils/refusal.ts`), and the hub's staleness through `hubHouseAfter()` in
+`shared/utils/night-hub.ts` (issue 1521); the night report still reads the older way, which
+`docs/known-issues.md` records. A caller `requireNightAuthority` refuses is shown the hub's own
+fallback links instead of a failure banner, which is how `/tonight` still serves a DOOR or BAR shift
+holder who is not tonight's duty manager. Content warnings, the latecomer policy and the age
+guidance are read straight from `showWarnings()` and the show row, the same source the public show
+page reads, so neither can drift from the other.
 
 A quick link to the backstage board is not on the screen yet: E-120 has not built its destination
 (`docs/known-issues.md`). Till, the incident log, the Challenge 25 register and the checklist are

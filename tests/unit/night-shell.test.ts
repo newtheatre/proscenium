@@ -305,6 +305,18 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     expect(served).toContain('onServerPrefetch(')
   })
 
+  test('a screen\'s served authority reuses the answer the shell asked in the same request, and a phone asks afresh', async () => {
+    const shell = await read('app/composables/useNightShell.ts')
+    expect(shell).toContain('const seeded = import.meta.server ? useNightAuthority().value.answers[role] : undefined')
+    for (const [path, role] of [['app/pages/tonight/door/index.vue', 'DOOR'], ['app/pages/tonight/message.vue', 'DUTY_MANAGER'], ['app/pages/tonight/incidents/index.vue', 'ANY'], ['app/pages/tonight/age-checks/index.vue', 'ANY']] as const) {
+      expect(`${path}: ${(await read(path)).includes(`askNightAuthority('${role}')`)}`).toBe(`${path}: true`)
+    }
+  })
+
+  test('Syncing follows the read itself, so a read that ends in any way takes it down', async () => {
+    expect(await read('app/composables/useServedRead.ts')).toContain('served.status.value === \'pending\'')
+  })
+
   const SERVED = [
     'app/pages/tonight/index.vue',
     'app/pages/tonight/glance.vue',

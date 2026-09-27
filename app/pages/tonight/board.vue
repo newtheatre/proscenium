@@ -45,7 +45,7 @@ function apply(answered: SettledRead<Board>): void {
   if (answered.kind === 'FAILED') {
     failure.value = answered.failure
     // Refused outright: one card, none of the board's controls (issue 1304).
-    if (answered.refused) refusal.value = answered.failure
+    refusal.value = refusalOf(answered) ?? refusal.value
     return
   }
   messages.value = answered.value.messages

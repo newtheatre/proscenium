@@ -98,7 +98,7 @@ describe('a settled show-night read', () => {
     const settled = await settleRead(async () => {
       throw refused(403, 'This needs a confirmed door shift')
     })
-    expect(settled).toMatchObject({ kind: 'FAILED', failure: 'This needs a confirmed door shift', refused: true, status: 403 })
+    expect(settled).toMatchObject({ kind: 'FAILED', failure: 'This needs a confirmed door shift', status: 403 })
     expect(refusalOf(settled)).toBe('This needs a confirmed door shift')
   })
 
@@ -106,7 +106,7 @@ describe('a settled show-night read', () => {
     const settled = await settleRead(async () => {
       throw refused(400, 'Choose a performance')
     })
-    expect(settled).toMatchObject({ kind: 'FAILED', refused: false, status: 400 })
+    expect(settled).toMatchObject({ kind: 'FAILED', status: 400 })
     expect(refusalOf(settled)).toBeNull()
   })
 
@@ -114,6 +114,7 @@ describe('a settled show-night read', () => {
     const settled = await settleRead(async () => {
       throw new TypeError('fetch failed')
     }, '')
-    expect(settled).toMatchObject({ kind: 'FAILED', failure: '', refused: false, status: undefined })
+    expect(settled).toMatchObject({ kind: 'FAILED', failure: '', status: undefined })
+    expect(refusalOf(settled)).toBeNull()
   })
 })

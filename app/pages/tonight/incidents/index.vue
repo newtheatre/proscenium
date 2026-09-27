@@ -22,15 +22,10 @@ interface Entry {
   reviewed: boolean
 }
 
-interface Listing { items: Entry[], total: number }
-
 const request = useRequestFetch()
 const toast = useToast()
 
-const syncedAt = ref<number | null>(null)
-const failure = ref<string | null>(null)
-const busy = ref(false)
-const items = ref<Entry[]>([])
+const { items, failure, syncedAt, busy, read: readLog, apply: applyLog, load } = useNightLog<Entry>('/api/tonight/incidents')
 // What tonight's log is scoped to, resolved once on load: none of BAR, DOOR or DUTY_MANAGER is
 // asked to name a performance, so the first role that resolves says which ones are running.
 const performanceIds = ref<string[]>([])
@@ -45,22 +40,14 @@ const refusal = ref<string | null>(null)
 const nightAuthority = useNightAuthority()
 const offersReview = computed(() => nightAuthority.value.roles.includes('DUTY_MANAGER'))
 
-interface Covered { performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }
-
-// One question for any of tonight's roles: the server tries a shift before a bypass and answers a
-// refusal about the caller's own position, never the last role's (E-111).
-function readAuthority(): Promise<SettledRead<Covered>> {
-  return settleRead(() => request<Covered>('/api/tonight/authority'))
-}
-
-function applyAuthority(answered: SettledRead<Covered>): void {
+function applyAuthority(answered: SettledRead<NightAuthorityAnswer>): void {
   refusal.value = refusalOf(answered)
   if (answered.kind === 'FAILED') {
     authorityFailure.value = answered.failure
     return
   }
   performanceIds.value = answered.value.performanceIds
-  performances.value = answered.value.performances ?? []
+  performances.value = answered.value.performances
   authorityFailure.value = null
 }
 
@@ -75,40 +62,17 @@ async function readTeam(): Promise<TeamSlot[]> {
   return read.kind === 'READ' ? contactRoster(read.value.performances.flatMap(performance => performance.team)) : []
 }
 
-function readLog(): Promise<SettledRead<Listing>> {
-  return settleRead(() => request<Listing>('/api/tonight/incidents', { query: { pageSize: 100 } }))
-}
-
-function applyLog(answered: SettledRead<Listing>): void {
-  if (answered.kind === 'FAILED') {
-    failure.value = answered.failure
-    return
-  }
-  failure.value = null
-  items.value = answered.value.items
-  syncedAt.value = answered.at
-}
-
-async function load(): Promise<void> {
-  busy.value = true
-  try {
-    applyLog(await readLog())
-  }
-  finally {
-    busy.value = false
-  }
-}
-
-// In the served page, so the team, the log or the refusal is what a phone paints first: none of
-// the three waits on another's answer (issue 1521).
+// In the served page, so the team, the log or the refusal is what a phone paints first; none of the
+// three waits on another's. Asked with no role, the server refuses about the caller's own position.
 const waiting = useServedRead('tonight-incidents', async () => {
-  const [authority, log, roster] = await Promise.all([readAuthority(), readLog(), readTeam()])
+  const [authority, log, roster] = await Promise.all([askNightAuthority('ANY'), readLog(), readTeam()])
   return { authority, log, roster }
 }, (served) => {
   applyAuthority(served.authority)
   applyLog(served.log)
   team.value = served.roster
 })
+const settling = computed(() => busy.value || waiting.value)
 
 const performanceOptions = computed(() => performanceIds.value.map((id) => {
   const named = performances.value.find(one => one.id === id)
@@ -223,9 +187,9 @@ async function submitCorrect(): Promise<void> {
       title="Contacts and incidents"
       :refused="refusal"
       hint="Every entry is timed, named and printed in the night report. A mistake is corrected with a new entry, never an edit."
-      :empty="!busy && !waiting && items.length === 0"
+      :empty="!settling && items.length === 0"
       :stale="syncedAt"
-      :busy="busy || waiting"
+      :busy="settling"
     >
       <div class="space-y-5">
         <section>

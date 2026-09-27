@@ -61,14 +61,21 @@ type GlanceRead
   = { kind: 'READ', data: DutyManagerTonight, dutyManager: boolean, at: number }
     | { kind: 'FAILED', failure: string, refusal?: string | null, at: number }
 
+const authority = useNightAuthority()
+
 async function read(): Promise<GlanceRead> {
-  const managing = await settleRead(() => request<DutyManagerTonight>('/api/tonight/duty-manager', { query: { access: 1 } }))
-  if (managing.kind === 'READ') return { kind: 'READ', data: managing.value, dutyManager: true, at: managing.at }
-  // The last-fetched values stay on screen; NightStale says they are no longer current.
-  if (!managing.refused) return { kind: 'FAILED', failure: managing.failure, at: managing.at }
+  // Served, the shell's answer is from this very request, so a known refusal needs no second asking;
+  // a poll asks again, since a duty manager's window can open while the glance is open (0078).
+  const refusedHere = import.meta.server && authority.value.known && !authority.value.roles.includes('DUTY_MANAGER')
+  if (!refusedHere) {
+    const managing = await settleRead(() => request<DutyManagerTonight>('/api/tonight/duty-manager', { query: { access: 1 } }))
+    if (managing.kind === 'READ') return { kind: 'READ', data: managing.value, dutyManager: true, at: managing.at }
+    // The last-fetched values stay on screen; NightStale says they are no longer current.
+    if (!refusalOf(managing)) return { kind: 'FAILED', failure: managing.failure, at: managing.at }
+  }
   const reading = await settleRead(() => request<DutyManagerTonight>('/api/tonight/house', { query: { access: 1 } }))
   if (reading.kind === 'READ') return { kind: 'READ', data: reading.value, dutyManager: false, at: reading.at }
-  return { kind: 'FAILED', failure: reading.failure, refusal: reading.refused ? reading.failure : null, at: reading.at }
+  return { kind: 'FAILED', failure: reading.failure, refusal: refusalOf(reading), at: reading.at }
 }
 
 const { now, stamp } = useNightClock()
