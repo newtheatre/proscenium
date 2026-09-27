@@ -1428,7 +1428,7 @@ to `night_reports` itself (E-124 criterion 5); more than one addendum is allowed
 ### night_report_deliveries  APPEND-ONLY
 `id` PK · `report_id` → night_reports restrict · `addendum_id` → night_report_addenda restrict,
 NULL (the original send has none) · `recipient` (an email address, not a `users` FK: the
-configured standing list and the closer's own address both land here) · `status` CHECK
+addresses of the named roles' holders and the closer's own address both land here) · `status` CHECK
 `SENT|FAILED` · `error` NULL · `sent_at` NULL · `created_at`. One row per delivery attempt per
 recipient, never updated: a retry is a new row, the same shape as every other append-only trail
 in this module (E-124 criterion 4). Automatic retry-until-delivered and the operations-dashboard

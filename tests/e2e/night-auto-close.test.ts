@@ -124,12 +124,20 @@ describe.skipIf(skip !== null)('auto-close within 24 hours (criteria 1, 2, 4)', 
       headers: { 'content-type': 'application/json', 'cookie': admin.cookie },
       body: JSON.stringify({ userId: officer.id, role: 'FOH_MANAGER' }),
     })
-    const recipient = `standing-${crypto.randomUUID().slice(0, 8)}@e2e.newtheatre.org.uk`
-    await fetch(`${app.baseURL}/api/admin/config/NIGHT_REPORT_RECIPIENTS`, {
+    // The standing list names a role, and the report reaches whoever holds it (issue 1356).
+    const standing = await registerMember(app, 'auto-close-standing', generatePassword())
+    await fetch(`${app.baseURL}/api/admin/roles`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'cookie': admin.cookie },
+      body: JSON.stringify({ userId: standing.id, role: 'SAFETY_OFFICER' }),
+    })
+    const recipient = standing.email
+    const stored = await fetch(`${app.baseURL}/api/admin/config/NIGHT_REPORT_ROLES`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'cookie': admin.cookie },
-      body: JSON.stringify({ value: [recipient] }),
+      body: JSON.stringify({ value: ['SAFETY_OFFICER'] }),
     })
+    expect(stored.status).toBe(200)
 
     const suffix = `auto-close-officer-${crypto.randomUUID().slice(0, 8)}`
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { night: OLD_NIGHT, suffix }))
@@ -151,7 +159,7 @@ describe.skipIf(skip !== null)('auto-close within 24 hours (criteria 1, 2, 4)', 
       expect(await mailboxSubjectFor(officer.email)).toMatch(/unclosed night/i)
     }
     finally {
-      write('DELETE FROM config WHERE key = ?', 'NIGHT_REPORT_RECIPIENTS')
+      write('DELETE FROM config WHERE key = ?', 'NIGHT_REPORT_ROLES')
     }
   })
 })

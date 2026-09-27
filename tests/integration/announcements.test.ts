@@ -34,10 +34,11 @@ function read<T>(database: TestDatabase, statement: SQL): T[] {
 
 let personSeq = 0
 
-function person(database: TestDatabase, over: { anonymisedAt?: number } = {}): string {
+// Signed in once unless said otherwise: an account nobody has claimed holds no role (0088).
+function person(database: TestDatabase, over: { anonymisedAt?: number, pending?: boolean } = {}): string {
   const id = `u-${++personSeq}`
-  database.batch([['INSERT INTO users (id, name, email, verified, anonymised_at) VALUES (?, ?, ?, 1, ?)',
-    id, `Someone ${id}`, `${id}@e2e.newtheatre.org.uk`, over.anonymisedAt ?? null]])
+  database.batch([['INSERT INTO users (id, name, email, verified, anonymised_at, last_login_at) VALUES (?, ?, ?, 1, ?, ?)',
+    id, `Someone ${id}`, `${id}@e2e.newtheatre.org.uk`, over.anonymisedAt ?? null, over.pending ? null : 1_600_000_000]])
   return id
 }
 
@@ -78,6 +79,21 @@ describe('role holders (criterion 1)', () => {
 
       const ids = read<{ id: string }>(database, roleHoldersQuery('BAR_MANAGER', 1_700_000_000)).map(row => row.id)
       expect(ids).toEqual([live])
+    })
+  })
+
+  test('a grant on an account nobody has signed into yet is not holding (0088)', async () => {
+    await withDatabase(async (database) => {
+      const claimed = person(database)
+      const pending = person(database, { pending: true })
+
+      database.batch([
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-4', claimed, 'BAR_MANAGER', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-5', pending, 'BAR_MANAGER', null],
+      ])
+
+      const ids = read<{ id: string }>(database, roleHoldersQuery('BAR_MANAGER', 1_700_000_000)).map(row => row.id)
+      expect(ids).toEqual([claimed])
     })
   })
 })

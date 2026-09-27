@@ -112,7 +112,7 @@ describe('which keys a public page may quote at all', () => {
 
   // A page a visitor reads may not publish a setting that names people (0011, 0024).
   test('a key holding personal data never resolves, whatever its value', () => {
-    expect(policyValueFor('NIGHT_REPORT_RECIPIENTS', { ...state, sensitive: true })).toBeNull()
+    expect(policyValueFor('BAR_AUTHORISED_TAB_HOLDERS', { ...state, sensitive: true })).toBeNull()
   })
 
   test('a key nobody has set does not resolve, because there is no rule to quote', () => {
@@ -147,10 +147,10 @@ describe('what CI refuses in a page (criterion 3)', () => {
     expect(policyTokenProblem('ROOM_MAX_HOURS', { known: false, sensitive: false })).toContain('ROOM_MAX_HOURS')
   })
 
-  // The build refuses this rather than leaving it to the renderer: a page naming the night report
-  // recipients would publish committee addresses the moment somebody previewed it.
+  // The build refuses this rather than leaving it to the renderer: a page naming the tab holders
+  // would publish who they are the moment somebody previewed it.
   test('a key holding personal data is refused at the build, not only at render', () => {
-    expect(policyTokenProblem('NIGHT_REPORT_RECIPIENTS', { known: true, sensitive: true }))
+    expect(policyTokenProblem('BAR_AUTHORISED_TAB_HOLDERS', { known: true, sensitive: true }))
       .toContain('personal data')
   })
 })

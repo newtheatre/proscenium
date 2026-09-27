@@ -46,6 +46,16 @@ export function usableAccountWhere(): SQL {
   return and(eq(schema.users.disabled, false), held())!
 }
 
+// A live grant of one of `roles` on a usable account, for a statement over users under any alias:
+// its own FROM, keyed by that row's id, the roles one JSON parameter (0009, 0088, 0006).
+export function holdsLiveGrant(userId: SQL, roles: readonly string[], now: number): SQL {
+  return sql`exists (select 1 from ${schema.roleGrants}
+    join ${schema.users} on ${schema.users.id} = ${schema.roleGrants.userId}
+    where ${schema.roleGrants.userId} = ${userId}
+      and ${schema.roleGrants.role} in (select value from json_each(${JSON.stringify(roles)}))
+      and ${live(now)} and ${usableAccountWhere()})`
+}
+
 // Usable for the last-IT-Manager guard: live, on a usable account.
 export function usableHolderWhere(role: string, now: number): SQL {
   return and(
