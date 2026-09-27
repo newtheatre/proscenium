@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { formatLondon } from '#shared/utils/london'
 import { COMMITTED_SHIFT_STATUSES, saysShiftRole } from '#shared/utils/rota'
 
@@ -20,26 +19,29 @@ export default defineEventHandler(async (event) => {
   // because it is what the delete route's own refusal promises (E-102 criterion 4).
   const holders = active.filter(shift => COMMITTED_SHIFT_STATUSES.includes(shift.status) && shift.userId !== null)
 
-  // The predicate rides the UPDATE, so two officers cancelling at once write one cancellation and
-  // one audit entry rather than two (0003).
-  await db.batch([
-    db.run(sql`UPDATE performances SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${id} AND status <> 'CANCELLED'`),
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'performance.cancelled',
+    target: `performance:${id}`,
+    detail: {
+      showId: held.showId,
+      night: performanceNight(held.startsAt),
+      // Counted from the tables that reference the performance, so it is nought only while no
+      // such table exists (D-121 criterion 5).
+      ticketsOwedARefund: held.soldTickets,
+      shiftsCancelled: active.length,
+    },
+  })
+
+  // The predicate rides the UPDATE and the audit rides its `changes()`, so two officers cancelling
+  // at once write one cancellation and one audit entry, and the second is told so (0003, 0049).
+  const [cancelled] = await db.batch([
+    db.all<{ id: string }>(cancelPerformanceStatement(id)),
+    db.run(auditIfChanged(entry)),
     // The rota goes with the performance, in the same batch (E-102 criterion 4).
     db.run(cancelShiftsStatement(id)),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'performance.cancelled',
-      target: `performance:${id}`,
-      detail: {
-        showId: held.showId,
-        night: performanceNight(held.startsAt),
-        // Counted from the tables that reference the performance, so it is nought only while no
-        // such table exists (D-121 criterion 5).
-        ticketsOwedARefund: held.soldTickets,
-        shiftsCancelled: active.length,
-      },
-    })),
   ])
+  if (cancelled.length === 0) throw createError({ statusCode: 409, statusMessage: 'This performance is already cancelled' })
 
   // The show is off, so a shift preference cannot silence this: somebody would otherwise turn up.
   const when = formatLondon(new Date(held.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })

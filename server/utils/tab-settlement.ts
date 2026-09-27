@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
 import { newId } from '#server/utils/accounts'
+import { auditIfRow } from '#server/utils/audit'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
 import { noSuch } from '#server/utils/no-such'
 import { auditEntry } from '#shared/utils/audit'
@@ -294,12 +295,9 @@ export async function voidTabCharge(
       WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})
     `))
   }
-  statements.push(db.insert(schema.auditLog).values(auditEntry({
-    actorId,
-    action: 'bar.tab-charge.voided',
-    target: `ledger-entry:${entryId}`,
-    detail: { voidEntryId: posted.id },
-  })))
+  // Logged only if the void entry was posted: a settlement winning the race posts nothing (0049).
+  const entry = auditEntry({ actorId, action: 'bar.tab-charge.voided', target: `ledger-entry:${entryId}`, detail: { voidEntryId: posted.id } })
+  statements.push(db.run(auditIfRow(entry, 'ledger_entries', posted.id)))
 
   try {
     await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])

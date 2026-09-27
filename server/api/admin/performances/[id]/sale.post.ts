@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { performanceSaleForm } from '#shared/utils/programme'
 
 // Put one performance on or off sale, independently of its show and of every other performance
@@ -32,15 +31,19 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await db.batch([
-    db.run(sql`UPDATE performances SET status = ${status}, updated_at = unixepoch() WHERE id = ${id} AND status <> 'CANCELLED'`),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: onSale ? 'performance.on-sale' : 'performance.off-sale',
-      target: `performance:${id}`,
-      detail: { showId: held.showId, night: performanceNight(held.startsAt), soldTickets: held.soldTickets },
-    })),
-  ])
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: onSale ? 'performance.on-sale' : 'performance.off-sale',
+    target: `performance:${id}`,
+    detail: { showId: held.showId, night: performanceNight(held.startsAt), soldTickets: held.soldTickets },
+  })
+  // From the status read above, so a double click or a cancel landing meanwhile changes nothing (0049).
+  const applied = await auditedWrite(db.all<{ id: string }>(performanceSaleStatement(id, held.status, status)), entry)
+  if (!applied) {
+    const now = await performanceById(id)
+    if (now?.status === 'CANCELLED') throw createError({ statusCode: 409, statusMessage: 'This performance has been cancelled' })
+    throw createError({ statusCode: 409, statusMessage: onSale ? 'This performance is already on sale' : 'This performance is already off sale' })
+  }
 
   return { ok: true, status }
 })

@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
-import { auditedWrite } from './audit'
+import { auditWhere, auditedWrite } from './audit'
 import { capacityAllows, heldSeatsQuery, passBookingColumn, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
 import { configValue } from './configuration'
 import { admittedAtColumn } from './door-search'
@@ -14,6 +14,7 @@ import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
 import type { ReservationSource, TicketTypeCount } from '#shared/utils/reservations'
 import type { PriceSource, TicketTypeAccessKind, TicketTypeRestriction } from '#shared/utils/ticket-types'
+import type { AuditRow } from '#shared/utils/audit'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
@@ -485,34 +486,28 @@ export interface EditReservationTicketsResult {
   applied: boolean
 }
 
-// Every added and removed line shares one guard, evaluated against the *desired total*, not the
-// delta: capacity is asked once, for the shape the booking ends up in (D-110 criterion 2).
-export async function editReservationTickets(input: EditReservationTicketsInput): Promise<EditReservationTicketsResult> {
+// One guard for every line and the audit written first under it, against the *desired total*:
+// no line moves it, so the audit row says whether the whole edit applied (D-110 criterion 2, 0049).
+export function editTicketsStatements(input: EditReservationTicketsInput, entry: AuditRow): SQL[] {
   const guard = sql`${capacityAllows(input.performanceId, input.capacity, input.desiredTotal, input.reservationId)} AND ${reservationIsPending(input.reservationId)}`
+  return [
+    auditWhere(entry, guard),
+    sql`UPDATE reservations SET updated_at = unixepoch() WHERE id = ${input.reservationId} AND status = 'PENDING'`,
+    ...ticketAdditionQueries(input.additions, guard),
+    ...ticketRemovalQueries(input.reservationId, input.removals, guard),
+  ]
+}
 
-  await db.batch([
-    db.run(sql`UPDATE reservations SET updated_at = unixepoch() WHERE id = ${input.reservationId} AND status = 'PENDING'`),
-    ...ticketAdditionQueries(input.additions, guard).map(statement => db.run(statement)),
-    ...ticketRemovalQueries(input.reservationId, input.removals, guard).map(statement => db.run(statement)),
-  ])
-
-  // Read back rather than trusted: the guard is identical everywhere, so the final total is
-  // either the desired one or nothing moved (criterion 2). The audit rides that same fact.
-  const after = await currentTicketLines(input.reservationId)
-  const total = after.reduce((sum, line) => sum + line.quantity, 0)
-  const applied = total === input.desiredTotal
-
-  if (applied) {
-    const entry = auditEntry({
-      actorId: input.actorId,
-      action: 'reservation.tickets-changed',
-      target: `reservation:${input.reservationId}`,
-      detail: { desiredTotal: input.desiredTotal },
-    })
-    await db.run(sql`INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)})`)
-  }
-
-  return { applied }
+export async function editReservationTickets(input: EditReservationTicketsInput): Promise<EditReservationTicketsResult> {
+  const entry = auditEntry({
+    actorId: input.actorId,
+    action: 'reservation.tickets-changed',
+    target: `reservation:${input.reservationId}`,
+    detail: { desiredTotal: input.desiredTotal },
+  })
+  const [statement, ...rest] = editTicketsStatements(input, entry)
+  const [audited] = await db.batch([db.all<{ id: string }>(statement!), ...rest.map(one => db.run(one))])
+  return { applied: audited.length > 0 }
 }
 
 // The hold releases the instant status leaves `HOLDING_STATUSES`, so cancelling frees capacity

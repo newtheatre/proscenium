@@ -6,6 +6,21 @@ import { seconds } from './list-filters'
 import type { PerformanceSaleState, PerformanceStatus, SalesChannel, ShowStatus } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
+// Cancelling, only from a status that is not already cancelled, so a second cancel matches nothing.
+export function cancelPerformanceStatement(performanceId: string): SQL {
+  return sql`UPDATE performances SET status = 'CANCELLED', updated_at = unixepoch() WHERE id = ${performanceId} AND status <> 'CANCELLED' RETURNING id`
+}
+
+// On or off sale from the status the officer saw, so a double click or a cancel landing mid-request
+// changes nothing and says so (D-121, 0049).
+export function performanceSaleStatement(performanceId: string, from: PerformanceStatus, to: PerformanceStatus): SQL {
+  return sql`
+    UPDATE performances SET status = ${to}, updated_at = unixepoch()
+    WHERE id = ${performanceId} AND status = ${from} AND status <> 'CANCELLED'
+    RETURNING id
+  `
+}
+
 // Reading the programme (build-order contract d). The show-night boundary is
 // `shared/utils/show-night.ts`'s alone; nothing here restates it (E-110, 0014).
 

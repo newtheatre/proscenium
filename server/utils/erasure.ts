@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { PERSONAL_TABLES } from '#shared/utils/personal-data'
 import { erasureStatements } from '#shared/utils/erasure'
 
@@ -16,17 +16,22 @@ export async function eraseAccount(userId: string, actorId: string | null): Prom
   const statements = erasureStatements(userId, now)
 
   const writes = statements.map(statement => db.run(statement))
-  const record = db.insert(schema.auditLog).values(auditEntry({
+  const entry = auditEntry({
     actorId,
     // A null actor is the system, and an automatic erasure is not an administrator's act (0026).
     action: actorId === null ? 'account.erased.system' : actorId === userId ? 'account.erased' : 'account.erased.admin',
     target: `user:${userId}`,
     detail: { tables: PERSONAL_TABLES.length },
-  }))
+  })
+  // Directly after the tombstone, whose predicate is `anonymised_at is null`: a second erasure
+  // racing this one changes nothing and logs nothing (0049).
+  const record = db.all<{ id: string }>(auditWhere(entry, sql`changes() = 1`))
 
   // The last IT Manager is guarded on the batch itself, so an erasure racing a revoke cannot
   // leave the system without one (A-120 criterion 5).
-  await batchKeepingAnItManager(keepsAnItManagerWhere(userId, now), [...writes, record], () => refuseStranding(PROTECTED_ROLE, userId, 'erasing'))
+  const results = await batchKeepingAnItManager(keepsAnItManagerWhere(userId, now), [...writes, record], () => refuseStranding(PROTECTED_ROLE, userId, 'erasing'))
+  const logged = results.at(-1) as unknown[]
+  if (logged.length === 0) return { erased: false, alreadyErased: true }
 
   return { erased: true, alreadyErased: false }
 }

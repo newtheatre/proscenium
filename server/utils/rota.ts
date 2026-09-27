@@ -143,6 +143,11 @@ export function dropExternalTemplateStatements(venueId: string, entry: AuditRow)
   ]
 }
 
+// A venue we run: an external one holds no template (E-101 criterion 5), whatever the read said.
+export function templateVenueIsOurs(venueId: string): SQL {
+  return sql`EXISTS (SELECT 1 FROM venues WHERE id = ${venueId} AND is_external = 0)`
+}
+
 // A template is replaced whole: the slots are one thing an officer edits, and a partial save
 // would leave a venue with a role it had already taken off the list. None lands on an external venue.
 export function replaceTemplateStatements(venueId: string, slots: TemplateSlot[], actorId: string): [SQL, ...SQL[]] {
@@ -150,7 +155,7 @@ export function replaceTemplateStatements(venueId: string, slots: TemplateSlot[]
     INSERT INTO shift_templates (id, venue_id, role, "count", starts_before_doors_minutes, ends_after_end_minutes, updated_by, updated_at)
     SELECT lower(hex(randomblob(16))), ${venueId}, ${slot.role}, ${slot.count},
            ${slot.startsBeforeDoorsMinutes ?? null}, ${slot.endsAfterEndMinutes ?? null}, ${actorId}, unixepoch()
-    WHERE EXISTS (SELECT 1 FROM venues WHERE id = ${venueId} AND is_external = 0)
+    WHERE ${templateVenueIsOurs(venueId)}
   `)
   return [sql`DELETE FROM shift_templates WHERE venue_id = ${venueId}`, ...written]
 }

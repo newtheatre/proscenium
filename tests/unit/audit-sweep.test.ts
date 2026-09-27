@@ -20,13 +20,20 @@ describe('every site audits through the write, never beside it', () => {
     ['8. planning a bar opening', 'server/api/rota/openings/index.post.ts', 'auditIfRow(entry, \'bar_openings\', openingId)'],
     ['9. a venue\'s shift template', 'server/api/admin/rota/templates/[venueId]/index.put.ts', 'auditWhere(entry, templateVenueIsOurs(venueId))'],
     ['10. removing the authenticator app', 'server/api/account/mfa/index.delete.ts', 'auditWhere(entry, sql`changes() = 1`)'],
-    ['6. claiming an account with Google', 'server/routes/auth/google.get.ts', 'auditedWrite('],
   ]
 
   test.each(SITES)('%s', async (_, path, shape) => {
     const route = await source(path)
     expect(route).toContain(shape)
     expect(route).not.toContain('db.insert(schema.auditLog)')
+  })
+
+  // A new account and a session started are unconditional writes, so they keep their own rows.
+  test('6. a Google claim logs only through its own write, and a lost one is settled by the account', async () => {
+    const route = await source('server/routes/auth/google.get.ts')
+    expect(route).toContain('const claimed = await auditedWrite(')
+    expect(route).toContain('afterLostGoogleClaim(current?.googleSub ?? null, identity.sub)')
+    expect(route.match(/action: outcome\.action === 'claim-pending'/g)).toHaveLength(1)
   })
 
   test('the walk-in logs only through the write that took, the first or the rejoin', async () => {
@@ -37,7 +44,7 @@ describe('every site audits through the write, never beside it', () => {
   test('3. a ticket edit reports applied from its audit row, not from a read-back total', async () => {
     const edit = body(await source('server/utils/reservations.ts'), 'editReservationTickets')
     expect(edit).toContain('editTicketsStatements(input, entry)')
-    expect(edit).not.toContain('desiredTotal')
+    expect(edit).not.toContain('currentTicketLines(')
     expect(edit).not.toContain('INSERT INTO audit_log')
   })
 

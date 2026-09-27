@@ -79,3 +79,9 @@ export function googleRoundTripStart(query: Record<string, unknown>): GoogleRoun
   if (query.code !== undefined || query.error !== undefined) return null
   return { next: localPath(query.next), reauth: query.reauth === '1' }
 }
+
+// A claim that lost its race to a second callback: the account now holds this same Google identity,
+// so the person signs in with no second claim logged; any other answer is linked elsewhere (A-104).
+export function afterLostGoogleClaim(currentSub: string | null, sub: string): 'SIGN_IN' | 'REFUSE' {
+  return currentSub === sub ? 'SIGN_IN' : 'REFUSE'
+}
