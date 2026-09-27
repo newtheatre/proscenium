@@ -13,6 +13,9 @@ definePageMeta({ layout: 'console', title: 'Room requests', middleware: 'console
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
+
+// A status line can be a sentence; it wraps inside its badge rather than widening the table.
+const WRAPPING_BADGE = { class: 'max-w-full', ui: { label: 'whitespace-normal' } }
 const UCheckbox = resolveComponent('UCheckbox')
 
 interface Failure { reason: string, says: string }
@@ -370,12 +373,13 @@ const columns = computed<TableColumn<Request>[]>(() => [
   {
     id: 'why',
     header: 'Status',
+    meta: { class: { td: 'whitespace-normal' } },
     cell: ({ row }) => (row.original.kind === 'unlisted'
       ? h('div', { class: 'space-y-1' }, [
           h('div', { class: 'flex flex-wrap gap-1' }, [
-            h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => saysExternalStatus(row.original.status)),
+            h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', ...WRAPPING_BADGE }, () => saysExternalStatus(row.original.status)),
             row.original.preferredWarning
-              ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => row.original.preferredWarning!)
+              ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm', ...WRAPPING_BADGE }, () => row.original.preferredWarning!)
               : null,
           ]),
           row.original.formDueBy
@@ -387,7 +391,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
           h('div', { class: 'flex flex-wrap gap-1' }, [
             ...(row.original.sensitive ? [h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Always asks')] : []),
             ...(row.original.failures ?? []).map(fail =>
-              h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', title: fail.says }, () => fail.says)),
+              h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', title: fail.says, ...WRAPPING_BADGE }, () => fail.says)),
           ]),
           row.original.reason ? h('p', { class: 'text-sm' }, row.original.reason) : null,
         ])),
@@ -407,13 +411,16 @@ const columns = computed<TableColumn<Request>[]>(() => [
             row.original.status === 'AWAITING_EXTERNAL' || row.original.status === 'CONFIRMED'
               ? h(UButton, { 'size': 'sm', 'variant': 'subtle', 'data-test': `assign-${row.original.id}`, 'onClick': () => begin('assign', row.original) }, () => row.original.status === 'CONFIRMED' ? 'Change room' : 'Record room')
               : null,
-            row.original.status === 'AWAITING_EXTERNAL' || row.original.status === 'CONFIRMED'
-              ? h(UButton, { 'size': 'sm', 'color': 'neutral', 'variant': 'ghost', 'data-test': `refuse-${row.original.id}`, 'onClick': () => begin('refuse', row.original) }, () => 'Send back')
-              : null,
             row.original.status === 'REQUESTED' || row.original.status === 'AWAITING_EXTERNAL'
               ? h(UButton, { 'size': 'sm', 'color': 'error', 'variant': 'ghost', 'data-test': `turn-down-${row.original.id}`, 'onClick': () => begin('reject', row.original) }, () => 'Turn down')
               : null,
-            h(UButton, { 'size': 'sm', 'color': 'neutral', 'variant': 'ghost', 'data-test': `relist-${row.original.id}`, 'onClick': () => beginMove('relist', row.original) }, () => 'Use one of ours'),
+            // At most three in line (K-123 criterion 10): the rarer answers wait under More actions.
+            rowOverflow(row.original.id, [
+              ...(row.original.status === 'AWAITING_EXTERNAL' || row.original.status === 'CONFIRMED'
+                ? [{ label: 'Send back', onSelect: () => begin('refuse', row.original) }]
+                : []),
+              { label: 'Use one of ours', onSelect: () => beginMove('relist', row.original) },
+            ]),
           ]
         : [
             h(UButton, {
@@ -439,13 +446,9 @@ const columns = computed<TableColumn<Request>[]>(() => [
               'data-test': `reject-${row.original.id}`,
               'onClick': () => askToReject([row.original.id]),
             }, () => 'Reject'),
-            h(UButton, {
-              'size': 'sm',
-              'color': 'neutral',
-              'variant': 'ghost',
-              'data-test': `unlist-${row.original.id}`,
-              'onClick': () => beginMove('unlist', row.original),
-            }, () => 'Not one of ours'),
+            rowOverflow(row.original.id, [
+              { label: 'Not one of ours', onSelect: () => beginMove('unlist', row.original) },
+            ]),
           ]),
     } satisfies TableColumn<Request>]
     : [{

@@ -212,7 +212,7 @@ const columns: TableColumn<Closure>[] = [
     meta: { class: { td: 'whitespace-nowrap text-sm' } },
     cell: ({ row }) => saysSpan(new Date(row.original.startsAt * 1000), new Date(row.original.endsAt * 1000)),
   },
-  { accessorKey: 'reason', header: 'Why', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
+  { accessorKey: 'reason', header: 'Why', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-normal` } } },
   { accessorKey: 'by', header: 'Closed by', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } } },
   {
     id: 'remove',
