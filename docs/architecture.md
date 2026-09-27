@@ -1157,7 +1157,10 @@ performance never sees a second row appear, because there was never a second row
 (E-107 criterion 4). The predicate is the same `NOT EXISTS` claiming uses, so a member cannot be
 assigned onto a second shift on a performance they already hold one on; the assignment re-checks
 the same live eligibility gate self-claiming does, carries the same `holdsGate` predicate on its
-own UPDATE (issue 1302), and refuses the same way a self-claim would.
+own UPDATE (issue 1302), and refuses the same way a self-claim would. An ad hoc shift that names
+somebody (`POST /api/admin/rota/shifts/add`, `addShiftStatement`) is confirmed at once in the same
+way, so its `INSERT ... SELECT` carries `holdsGate` whenever a person is named, and an insert that
+matches nothing answers the same 403; a shift naming nobody is added open with no gate.
 A disabled account is refused before either check runs: a training gap and a disabled account are
 different reasons, and the route names the one that actually applies (0009). Both the outgoing and
 the incoming holder are emailed (`shift.removed`, `shift.assigned`), and

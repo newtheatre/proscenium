@@ -12,20 +12,20 @@ export default defineEventHandler(async (event) => {
   if (!performance) throw noSuch('performance')
   if (performance.status === 'CANCELLED') throw createError({ statusCode: 409, statusMessage: 'This performance has been cancelled' })
 
+  const today = londonToday()
+  const refusedTraining = createError({
+    statusCode: 403,
+    statusMessage: `That member does not currently qualify for a ${saysShiftRole(input.role).toLowerCase()} shift`,
+  })
   let subject = null
   if (input.userId) {
     subject = await findById(input.userId)
     if (!subject || subject.anonymisedAt !== null) throw noSuch('member')
     if (subject.disabled) throw createError({ statusCode: 403, statusMessage: 'That account is disabled and cannot be assigned a shift' })
-
-    const eligibilities = await shiftEligibilities(event, input.userId, londonToday())
-    if (!eligibilities[input.role].eligible) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: `That member does not currently qualify for a ${saysShiftRole(input.role).toLowerCase()} shift`,
-      })
-    }
+    if (!(await shiftEligibilities(event, input.userId, today))[input.role].eligible) throw refusedTraining
   }
+  // The same gate rides the insert, so a record lapsing after this check confirms nobody (#1302).
+  const gate = { moduleId: (await shiftRoleRules(event))[input.role], today }
 
   const shiftId = newId()
   const entry = auditEntry({
@@ -36,7 +36,11 @@ export default defineEventHandler(async (event) => {
   })
 
   const offsets = await shiftOffsetDefaults(event)
-  await withShiftConstraints(() => auditedWrite(db.run(addShiftStatement(shiftId, input, resolved.account.id, offsets)), entry))
+  const added = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(addShiftStatement(shiftId, input, resolved.account.id, offsets, gate)), entry))
+  if (!added) {
+    if (input.userId) throw refusedTraining
+    throw noSuch('performance')
+  }
 
   if (subject) {
     const when = formatLondon(new Date(performance.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
