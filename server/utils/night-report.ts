@@ -239,13 +239,13 @@ export async function reportOfficerBypasses(performanceId: string, venueId: stri
   return rows.map(row => ({ ...row, confirmedShift: Boolean(row.confirmedShift) }))
 }
 
-export interface ReportDoorCover { officerName: string | null }
+export interface ReportDoorCover { name: string | null }
 
 // Who covered the door from the duty manager's shift on this performance, read from the one target
 // the guard writes for the venue's night (0095, E-123 criterion 1). Three parameters (0006).
 export function reportDoorCoversQuery(performanceId: string, venueId: string, night: string): SQL {
   return sql`
-    SELECT u.name AS officerName
+    SELECT u.name AS name
     FROM audit_log a
     LEFT JOIN users u ON u.id = a.actor_id
     WHERE a.action = ${DOOR_COVER_ACTION} AND a.target = ${doorCoverTarget(night, venueId)}

@@ -24,7 +24,7 @@ interface Report {
   milestones: { id: string, label: string, composedAt: number, supersededBy: string | null }[]
   staffing: { shiftId: string, role: ShiftRole, slot: number, status: ShiftStatus, name: string | null, officerBypass?: boolean }[]
   bypasses?: OfficerBypassLine[]
-  covers?: { officerName: string | null }[]
+  covers?: { name: string | null }[]
   bar: { revenuePence: number, itemsSold: number }
   access: { verified: number }
   checklist: { id: string, label: string, exempted: boolean, exemptReason: string | null }[]
@@ -296,7 +296,7 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
             v-for="(cover, index) in report.covers"
             :key="`cover-${index}`"
           >
-            {{ saysDoorCover(cover.officerName) }}
+            {{ saysDoorCover(cover.name) }}
           </li>
         </ul>
         <ul class="space-y-1 text-sm">

@@ -76,15 +76,20 @@ export function landingAfterSignIn(next: unknown, onShiftTonight: boolean): stri
   return localPath(next) ?? (onShiftTonight ? '/tonight' : '/')
 }
 
+// A confirmed duty manager for the door's performance; the first name only for somebody on tonight's
+// team there, since anyone signed in can be refused at the door (issue 1306).
+export interface DoorHelp { firstName: string | null }
+
 // Names both ways in, because a volunteer refused at 19:20 needs to know which one to go and get.
 // The administrator is not offered: "become an administrator" is not advice (0044).
-export function nightAuthorityRefusal(role: NightRole, dutyManager: string | null = null): { statusCode: 403, statusMessage: string } {
+export function nightAuthorityRefusal(role: NightRole, dutyManager: DoorHelp | null = null): { statusCode: 403, statusMessage: string } {
   // The bar has a third way in, because an evening with no performance still opens a bar (0077).
   const tonight = role === 'BAR'
     ? `on one of tonight's performances or on tonight's bar opening`
     : `on one of tonight's performances`
-  // Tonight's confirmed duty manager covers the door, so a door refusal says who is there (0095).
-  const cover = role === 'DOOR' && dutyManager ? `. ${dutyManager}, tonight's duty manager, can open the door` : ''
+  // Tonight's confirmed duty manager covers the door, so a door refusal says who can open it (0095).
+  const who = dutyManager?.firstName ? `${dutyManager.firstName}, tonight's duty manager,` : 'Tonight\'s duty manager'
+  const cover = role === 'DOOR' && dutyManager ? `. ${who} can open the door` : ''
   return {
     statusCode: 403,
     statusMessage: `This needs ${NIGHT_ROLE_WORDS[role]} ${tonight}, or ${NIGHT_ROLE_OFFICER[role].words}${cover}`,

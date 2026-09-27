@@ -876,7 +876,7 @@ enforcement (E-111 criterion 5, restated in 0040): the three abilities in
 | --- | --- |
 | `NightRole` | `DUTY_MANAGER`, `DOOR` or `BAR`. A door shift does not open the till, and neither does the front of house officer's role. |
 | `NightScope` | `{ night?, venueId?, performanceId? }`. All optional: the common case is tonight, at the one venue running. |
-| The resolution | `{ account, night, role, venueId, performanceIds, via, shiftId?, openingId? }`, where `via` is `SHIFT` or `OFFICER`. |
+| The resolution | `{ account, night, role, venueId, performanceIds, via, shiftId?, openingId? }`, where `via` is `SHIFT`, `OFFICER` or `COVER` (tonight's duty manager covering the door, 0095). |
 | A refusal | 403 naming both ways in, the shift and the officer role, or the hours the shift is worked. An administrator is never offered as the way out. |
 
 `night` comes from `currentShowNight()` and nothing else, so authority expires at 04:00 with
@@ -939,14 +939,19 @@ houses gets, because resolving both at once would be inventing authority nobody 
 released or reassigned shift stops resolving on its very next request, because the query reads
 `shifts.status` live rather than a snapshot taken at sign-in (E-111 criterion 3).
 
-DOOR also resolves on cover (0095): after the caller's own door shift and before any bypass,
+DOOR also resolves on cover (0095): after every role's own shift and before any bypass,
 `throughCover` asks the same shift lookup for a confirmed `DUTY_MANAGER` shift in its window,
 scoped as the request is, so it opens the door and pass admission for the duty manager's own
-performance and never another, and never the till. It resolves with `via: 'COVER'`. The first act
+performance and never another, and never the till. In `requireAnyNightAuthority` it is a step of
+its own between the shift loop and the bypass loop, so a duty manager logging an age check
+resolves as `DUTY_MANAGER` and records no cover. It resolves with `via: 'COVER'`. The first act
 writes `night.door-cover` once per duty manager, night and venue (`doorCoverStatement`, whose "not
-already written" predicate rides the insert), and a read records nothing, as a bypass does under
-0098. A door refusal with nothing else to say names tonight's confirmed duty manager for the
-request's performance or venue (`dutyManagerTonight`), who can open it.
+already written" predicate rides the insert), its detail naming every performance the duty
+manager holds a confirmed shift on at that venue that night, so a two-house day's second report
+reads it too; a read records nothing, as a bypass does under 0098. A door refusal with nothing
+else to say points to tonight's confirmed duty manager for the request's performance or venue
+(`dutyManagerTonight`, which leaves out a disabled or erased account): by first name to somebody
+holding a confirmed shift there, and as "tonight's duty manager" to anybody else.
 
 `GET /api/tonight/authority?role=&night=&venueId=&performanceId=` is that resolution as a route; with
 no `role` it asks `requireAnyNightAuthority` over all three and answers with the `role` that

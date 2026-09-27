@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { doorCoverStatement } from '#server/utils/door-cover'
+import { doorCoverStatement, dutyManagerTonightQuery } from '#server/utils/door-cover'
 import { reportDoorCoversQuery } from '#server/utils/night-report'
 import { doorCoverEntry, DOOR_COVER_ACTION } from '#shared/utils/night-authority'
+import { showNightBounds } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { race } from '#tests/helpers/race'
@@ -67,7 +68,75 @@ describe('the night report names who covered the door (E-123 criterion 1, 0095)'
       run(database, doorCoverStatement(doorCoverEntry(other, tonight.night, 'venue-elsewhere', [tonight.performanceId])))
 
       const found = run(database, reportDoorCoversQuery(tonight.performanceId, tonight.venueId, tonight.night))
-      expect(found).toEqual([{ officerName: 'Rowan Ellis' }])
+      expect(found).toEqual([{ name: 'Rowan Ellis' }])
+    })
+  })
+
+  // One row a night and venue, so it names every house the duty manager runs there: covering the
+  // matinee's door still puts the cover on the evening's report (issue 1306 review).
+  test('on a two-house day, the second house\'s report names the cover too', async () => {
+    await withDatabase((database) => {
+      const matinee = tonightsPerformance(database, { suffix: 'matinee' })
+      const evening = tonightsPerformance(database, { suffix: 'evening', venueId: matinee.venueId })
+      const rowan = person(database, 'rowan', 'Rowan Ellis')
+      run(database, doorCoverStatement(doorCoverEntry(rowan, matinee.night, matinee.venueId, [matinee.performanceId, evening.performanceId])))
+      run(database, doorCoverStatement(doorCoverEntry(rowan, matinee.night, matinee.venueId, [evening.performanceId])))
+
+      expect(run(database, reportDoorCoversQuery(evening.performanceId, evening.venueId, evening.night))).toEqual([{ name: 'Rowan Ellis' }])
+      expect(run(database, reportDoorCoversQuery(matinee.performanceId, matinee.venueId, matinee.night))).toEqual([{ name: 'Rowan Ellis' }])
+    })
+  })
+})
+
+// Who a door refusal points to: tonight's confirmed duty manager for the request's scope, named
+// only to somebody on a confirmed shift there (0095, issue 1306 review).
+describe('tonight\'s duty manager for a door refusal', () => {
+  function shift(database: TestDatabase, id: string, performanceId: string, role: string, userId: string, status = 'CONFIRMED'): void {
+    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
+      id, performanceId, role, userId, status]])
+  }
+
+  function asked(database: TestDatabase, askerId: string, night: string, scope: { venueId?: string, performanceId?: string }): { name: string, onTeam: number }[] {
+    const { from, to } = showNightBounds(night)
+    return run(database, dutyManagerTonightQuery(askerId, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000), scope)) as { name: string, onTeam: number }[]
+  }
+
+  test('the confirmed duty manager on this performance, and whether the asker works it', async () => {
+    await withDatabase((database) => {
+      const house = tonightsPerformance(database)
+      const rowan = person(database, 'rowan', 'Rowan Ellis')
+      const barkeep = person(database, 'barkeep')
+      const stranger = person(database, 'stranger')
+      shift(database, 'dm', house.performanceId, 'DUTY_MANAGER', rowan)
+      shift(database, 'bar', house.performanceId, 'BAR', barkeep)
+
+      expect(asked(database, barkeep, house.night, { performanceId: house.performanceId })).toEqual([{ name: 'Rowan Ellis', onTeam: 1 }])
+      expect(asked(database, stranger, house.night, { performanceId: house.performanceId })).toEqual([{ name: 'Rowan Ellis', onTeam: 0 }])
+    })
+  })
+
+  test('not a claim, another performance, a cancelled one, or an account disabled or erased', async () => {
+    await withDatabase((database) => {
+      const house = tonightsPerformance(database, { suffix: 'house' })
+      const studio = tonightsPerformance(database, { suffix: 'studio' })
+      const dark = tonightsPerformance(database, { suffix: 'dark' })
+      const late = tonightsPerformance(database, { suffix: 'late', venueId: house.venueId })
+      const early = tonightsPerformance(database, { suffix: 'early', venueId: house.venueId })
+      database.batch([['UPDATE performances SET status = ? WHERE id = ?', 'CANCELLED', dark.performanceId]])
+      const asker = person(database, 'asker')
+      shift(database, 'claimed', house.performanceId, 'DUTY_MANAGER', person(database, 'claimant'), 'CLAIMED')
+      shift(database, 'elsewhere', studio.performanceId, 'DUTY_MANAGER', person(database, 'elsewhere'))
+      shift(database, 'cancelled', dark.performanceId, 'DUTY_MANAGER', person(database, 'dark'))
+      shift(database, 'disabled', late.performanceId, 'DUTY_MANAGER', person(database, 'disabled'))
+      shift(database, 'erased', early.performanceId, 'DUTY_MANAGER', person(database, 'erased'))
+      database.batch([
+        ['UPDATE users SET disabled = 1 WHERE id = ?', 'disabled'],
+        ['UPDATE users SET anonymised_at = unixepoch() WHERE id = ?', 'erased'],
+      ])
+
+      expect(asked(database, asker, house.night, { performanceId: house.performanceId })).toEqual([])
+      expect(asked(database, asker, house.night, { venueId: house.venueId })).toEqual([])
+      expect(asked(database, asker, dark.night, { performanceId: dark.performanceId })).toEqual([])
     })
   })
 })

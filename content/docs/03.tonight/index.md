@@ -34,7 +34,8 @@ which is how the committee sees a rota that is not being kept; looking at a scre
   manager's role"** (or the same for a bar shift and the Bar Manager, or for a duty manager
   shift): nothing tonight gives you this screen. Find the person named, or ask the officer to assign you the shift on
   the rota. The IT Manager is never offered as the answer to a rota that is wrong. At the door the
-  refusal also names tonight's duty manager, who can open the door for their own performance.
+  refusal also says tonight's duty manager can open it for their own performance, by first name
+  if you hold a confirmed shift on that performance yourself.
 - **"Your door shift tonight is claimed, not confirmed yet: the Front of House Manager confirms
   it on the rota"** (or the same for a bar or duty manager shift): you claimed the shift, and it
   is waiting for an officer. A claim opens nothing until it is confirmed; ask the Front of House

@@ -220,21 +220,23 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['pass.redeemed'],
     via: ['server/utils/pass-redemption.ts'],
   },
+  // Nothing is admitted here, but it is the first act at the door, so the guard records there.
   {
     route: 'server/api/tonight/door/resolve.post.ts',
-    exempt: 'turns a decoded code into the reference the scan routes take; nothing is admitted here',
+    actions: ['night.officer-bypass', 'night.door-cover'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   { route: 'server/api/tonight/door/passes/search.get.ts', exempt: 'reads tonight\'s pass holders for the door to choose from' },
   { route: 'server/api/tonight/door/tickets/search.get.ts', exempt: 'reads tonight\'s tickets by name or reference for the door to choose from' },
   {
     route: 'server/api/tonight/door/passes/scan.post.ts',
-    actions: ['pass.redeemed', 'reservation.admitted', 'night.door-cover'],
-    via: ['server/utils/pass-redemption.ts', 'server/utils/door.ts', 'shared/utils/night-authority.ts'],
+    actions: ['pass.redeemed', 'reservation.admitted', 'night.officer-bypass', 'night.door-cover'],
+    via: ['server/utils/pass-redemption.ts', 'server/utils/door.ts', 'server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   {
     route: 'server/api/tonight/door/tickets/scan.post.ts',
-    actions: ['reservation.admitted', 'night.door-cover'],
-    via: ['server/utils/door.ts', 'shared/utils/night-authority.ts'],
+    actions: ['reservation.admitted', 'night.officer-bypass', 'night.door-cover'],
+    via: ['server/utils/door.ts', 'server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   { route: 'server/api/admin/programme/shows.get.ts', exempt: 'reads the show picker, drafts included' },
   { route: 'server/api/admin/venues/index.get.ts', exempt: 'reads the venues a performance may be put in' },

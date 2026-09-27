@@ -38,18 +38,23 @@ describe('the night report says who covered the door, in words (E-123)', () => {
   })
 })
 
-describe('a door refusal names tonight\'s duty manager, who can open it (issue 1306)', () => {
-  test('named where one is confirmed tonight', () => {
-    const refusal = nightAuthorityRefusal('DOOR', 'Rowan')
+describe('a door refusal points to tonight\'s duty manager, who can open it (issue 1306)', () => {
+  test('by first name to somebody on tonight\'s team there', () => {
+    const refusal = nightAuthorityRefusal('DOOR', { firstName: 'Rowan' })
     expect(refusal.statusCode).toBe(403)
     expect(refusal.statusMessage).toContain('a confirmed door shift')
     expect(refusal.statusMessage).toContain('Rowan, tonight\'s duty manager, can open the door')
   })
 
+  test('by the job alone to anybody else, never by name', () => {
+    const refusal = nightAuthorityRefusal('DOOR', { firstName: null })
+    expect(refusal.statusMessage).toContain('. Tonight\'s duty manager can open the door')
+  })
+
   test('the plain refusal where nobody is, and never for the till or the duty manager\'s own screens', () => {
     expect(nightAuthorityRefusal('DOOR')).toEqual(nightAuthorityRefusal('DOOR', null))
-    expect(nightAuthorityRefusal('DOOR').statusMessage).not.toContain('tonight\'s duty manager')
-    expect(nightAuthorityRefusal('BAR', 'Rowan').statusMessage).not.toContain('Rowan')
-    expect(nightAuthorityRefusal('DUTY_MANAGER', 'Rowan').statusMessage).not.toContain('Rowan')
+    expect(nightAuthorityRefusal('DOOR').statusMessage.toLowerCase()).not.toContain('tonight\'s duty manager')
+    expect(nightAuthorityRefusal('BAR', { firstName: 'Rowan' }).statusMessage).not.toContain('Rowan')
+    expect(nightAuthorityRefusal('DUTY_MANAGER', { firstName: 'Rowan' }).statusMessage).not.toContain('Rowan')
   })
 })
