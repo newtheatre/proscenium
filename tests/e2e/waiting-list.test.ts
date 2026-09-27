@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
+import { expectOneWinner, race } from '#tests/helpers/race'
 import { registrableAddress } from '#tests/helpers/seed'
 import { click, fill, fillNumber, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -401,5 +402,70 @@ describe.skipIf(skip !== null)('an exchange offers the seats it frees to the wai
     const sent = await letters(app)
     expect(sent.some(text => text.includes(waiter) && text.includes('first refusal'))).toBe(true)
     expect(sent.some(text => text.includes(mover) && text.includes('/qr/'))).toBe(true)
+  }, CASE_TIMEOUT_MS)
+})
+
+function trailFor(action: string, entryId: string): { detail: string | null }[] {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query('SELECT detail FROM audit_log WHERE action = ? AND target = ?')
+      .all(action, `waiting-list-entry:${entryId}`) as { detail: string | null }[]
+  }
+  finally {
+    database.close()
+  }
+}
+
+// 0049: an offer and a claim each write their trail row in the same batch as the change, so two
+// runs at once record one offer, and two claims at once record one claim, naming its booking.
+describe.skipIf(skip !== null)('an offer and a claim are recorded once, however many race (criteria 2, 3)', () => {
+  test('two offer runs at once make one offer and one trail row', async () => {
+    const { performanceId } = await bookableShow()
+    expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
+      performanceId, partySize: 1, guest: { name: 'Ada Raced', email: `raced-${crypto.randomUUID().slice(0, 8)}@example.invalid` },
+    }, '')).status).toBe(200)
+
+    const runs = await race(2, () => send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`))
+    const offered = await Promise.all(runs.map(async run => (await run.json() as { offered: number }).offered))
+    expect(offered.reduce((total, one) => total + one, 0)).toBe(1)
+
+    const [entry] = entriesFor(performanceId)
+    expect(entry?.status).toBe('OFFERED')
+    expect(trailFor('waiting-list.offered', entry!.id)).toHaveLength(1)
+  }, CASE_TIMEOUT_MS)
+
+  test('two claims at once make one booking, and one trail row naming it', async () => {
+    const { performanceId } = await bookableShow()
+    const email = `claims-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
+      performanceId, partySize: 1, guest: { name: 'Ada Twice', email },
+    }, '')).status).toBe(200)
+    expect(await (await send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`)).json()).toEqual({ offered: 1 })
+
+    const letter = (await letters(app)).find(text => text.includes(email)) ?? ''
+    const token = letter.match(/\/waiting-list\/entry\/(\S+)/)?.[1]
+    expect(token).toBeDefined()
+    const shown = await fetch(`${app.baseURL}/api/waiting-list/${token}`)
+    const { ticketTypes } = await shown.json() as { ticketTypes: { id: string }[] }
+
+    const claims = await race(2, () => fetch(`${app.baseURL}/api/waiting-list/${token}/claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lines: [{ ticketTypeId: ticketTypes[0]!.id, quantity: 1 }] }),
+    }))
+    expectOneWinner(claims)
+
+    const [entry] = entriesFor(performanceId)
+    expect(entry?.status).toBe('CLAIMED')
+    const trail = trailFor('waiting-list.claimed', entry!.id)
+    expect(trail).toHaveLength(1)
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const row = database.query('SELECT claimed_reservation_id AS reservationId FROM waiting_list WHERE id = ?').get(entry!.id) as { reservationId: string }
+      expect(JSON.parse(trail[0]!.detail ?? '{}')).toEqual({ reservationId: row.reservationId })
+    }
+    finally {
+      database.close()
+    }
   }, CASE_TIMEOUT_MS)
 })

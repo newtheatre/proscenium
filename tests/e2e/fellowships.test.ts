@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
+import { expectOneWinner, race } from '#tests/helpers/race'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -142,6 +143,21 @@ describe.skipIf(skip !== null)('recording the roll of Fellows (A-127)', () => {
 
     expect((await roll('?show=current')).items.some(fellow => fellow.id === id)).toBe(false)
     expect((await roll('?show=revoked')).items.some(fellow => fellow.id === id)).toBe(true)
+  })
+
+  // The predicate rides the UPDATE, so of two officers revoking at once one wins and the other is
+  // refused, and the trail carries one revocation, the winner's (0003, 0049).
+  test('two revocations at once leave one, and one trail row', async () => {
+    const alumna = await registerMember(app, 'raced-fellow', password, { signIn: false })
+    const { id } = await (await record(alumna.id)).json() as { id: string }
+
+    const answers = await race(2, index => send('POST', `/api/admin/fellowships/${id}/revoke`, { reason: `Reason ${index}.` }, cookie))
+    expectOneWinner(answers)
+
+    const trail = read<{ n: number }>('SELECT count(*) AS n FROM audit_log WHERE action = ? AND target = ?', 'fellowship.revoked', `fellowship:${id}`)
+    expect(trail?.n).toBe(1)
+    const held = read<{ reason: string }>('SELECT revocation_reason AS reason FROM fellowships WHERE id = ?', id)!
+    expect(held.reason).toBe(`Reason ${answers.findIndex(answer => answer.status === 200)}.`)
   })
 
   test('recording one needs the permission', async () => {
