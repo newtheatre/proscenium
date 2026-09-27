@@ -2160,9 +2160,10 @@ INSERT, it refuses naming the room when somebody else has it, and it lands `CONF
 Title, purpose, attendees, times and notes cross; the member's `reason` does not, because it
 answers a question the other side never asks.
 
-**The screens never say "the union", and never "ask the union".** A member books *a room not
-listed here*; the estate calls these *rooms we do not manage*. The Students' Union is named only
-where a person needs to know whose form it is and who decides. The identifiers keep `external`,
+**One name on every screen.** A member asks for *a Students' Union room* (`SU_ROOM_ASK`) and both
+sides list *Students' Union rooms* (`SU_ROOMS`); a status says whose move it is, "Waiting on the
+Theatre Manager" or "Waiting on the Students' Union" (issue 1346). Prose that describes rather than
+names, such as "a room we do not manage" in an email, stays. The identifiers keep `external`,
 which is the domain word and is not read by anybody outside this repository.
 
 The lifecycle is `REQUESTED → AWAITING_EXTERNAL → CONFIRMED`, with `refuse-assignment` looping back

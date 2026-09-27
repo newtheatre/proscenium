@@ -124,7 +124,9 @@ describe('a group is a job, and the order never varies (0040)', () => {
 describe('a sidebar label is the title the page gives itself (0082)', () => {
   function titleOf(source: string): string | null {
     const meta = /definePageMeta\(\{[\s\S]*?\}\)/.exec(source)?.[0] ?? ''
-    return /title:\s*'([^']*)'/.exec(meta)?.[1] ?? null
+    // An escaped quote, as in "Students' Union rooms", is part of the title, not its end.
+    const found = /title:\s*'((?:[^'\\]|\\.)*)'/.exec(meta)?.[1]
+    return found === undefined ? null : found.replace(/\\(.)/g, '$1')
   }
 
   test('every console entry reads exactly as its page does', async () => {

@@ -1,3 +1,4 @@
+import { SU_ROOMS } from './external-requests'
 import type { ListSpec } from './list-filters'
 
 // The triage queue's declaration (K-129, C-109, C-120): when, kind and which room. The cap and
@@ -21,7 +22,7 @@ export const roomsQueueList = {
       options: [
         { value: 'all', label: 'All rooms' },
         { value: 'room', label: 'Our rooms' },
-        { value: 'unlisted', label: 'Students\' Union rooms' },
+        { value: 'unlisted', label: SU_ROOMS },
       ],
       operators: ['is'],
       icon: 'i-lucide-filter',

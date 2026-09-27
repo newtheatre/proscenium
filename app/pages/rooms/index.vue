@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { formatLondon, fromLondonWallClock, londonWeekday } from '#shared/utils/london'
 import { closedOn, dateStrip } from '#shared/utils/rooms'
+import { addDays } from '#shared/utils/series'
 import { SU_ROOM_ASK } from '#shared/utils/external-requests'
+import { londonDate } from '#shared/utils/working-days'
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import type { GridColumn, GridRoom } from '~/components/RoomGrid.vue'
 
@@ -46,19 +48,13 @@ const roomId = ref(EVERY_ROOM)
 const everyRoom = computed(() => roomId.value === EVERY_ROOM)
 
 function todayInLondon(): string {
-  return formatLondon(new Date(), { year: 'numeric', month: '2-digit', day: '2-digit' })
-    .split('/').reverse().join('-')
+  return londonDate(new Date())
 }
 
 // Midday, so which London day a date names cannot be moved by a clock change.
 function noonOn(day: string): Date {
   const [year, month, date] = day.split('-').map(Number)
   return fromLondonWallClock(year!, month!, date!, 12)
-}
-
-function addDays(day: string, count: number): string {
-  const [year, month, date] = day.split('-').map(Number)
-  return new Date(Date.UTC(year!, month! - 1, date! + count)).toISOString().slice(0, 10)
 }
 
 // Monday to Sunday, which is how a rehearsal week reads.
@@ -135,7 +131,7 @@ function move(by: number): void {
 
 // A day on a phone is one tap: the coming fortnight as a strip, and a picker for anything further
 // (issue 1346, C-102). The strip always starts today, so it never scrolls away from it.
-const strip = computed(() => dateStrip(todayInLondon()))
+const strip = dateStrip(todayInLondon())
 
 // Anything past the fortnight, from the picker, which always shows the day on screen.
 const picked = computed<string | undefined>({

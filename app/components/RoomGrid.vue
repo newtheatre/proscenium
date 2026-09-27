@@ -228,7 +228,7 @@ function labelOf(column: GridColumn, minutes: number): string {
 
     <!-- Its own scroll box, so the room names can stay pinned at its top down a long day (issue 1346). -->
     <div
-      class="max-h-[75vh] overflow-auto"
+      class="max-h-[75vh] scroll-pt-20 overflow-auto"
       data-test="grid-scroll"
       @pointerup="dragging = null"
       @pointerleave="dragging = null"

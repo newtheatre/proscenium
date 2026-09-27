@@ -1,6 +1,6 @@
 ---
 title: Spaces
-description: The rooms we control, the request queue, every booking, closures, the rooms we do not manage and the utilisation report.
+description: The rooms we control, the request queue, every booking, closures, the Students' Union rooms and the utilisation report.
 module: Spaces
 audience: committee
 updatedOn: 2026-09-27

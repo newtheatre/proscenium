@@ -13,7 +13,7 @@ export const spaces: Shot[] = [
     width: CONSOLE_WIDTH,
     annotations: [
       { selector: '[data-test="toolbar-search"]', label: 'Search' },
-      { selector: '[data-test="to-other-rooms"]', label: 'Other rooms' },
+      { selector: '[data-test="to-other-rooms"]', label: 'Students\' Union rooms' },
       { selector: '[data-test="add-room"]', label: 'Add a room' },
       { selector: '[data-test="rooms-table"]', label: 'The estate' },
       { selector: '[data-test^="edit-room-"]', label: 'Edit' },

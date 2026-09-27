@@ -61,6 +61,7 @@ describe('the screens', () => {
 
   test('the console calls its catalogue the same', async () => {
     expect(await read('shared/utils/site-nav.ts')).not.toContain('\'Other rooms\'')
-    expect(await read('app/pages/rooms/manage/other.vue')).toContain('SU_ROOMS')
+    // The member's own calendar feed names an unassigned ask the same way.
+    expect(await read('server/routes/rooms/feed/[token]/calendar.ics.get.ts')).not.toContain('not listed here')
   })
 })
