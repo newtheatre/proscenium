@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { STOCK_COUNTED_QUERY, checkIdHeld, pouredByColumn, readPouredBy, readRestrictedPours, readTillServings, restrictedPoursColumn, retireItemStatements, servingsAvailableQuery, tillServingsQuery, withoutCheckIdPredicate } from '#server/utils/bar-linkage'
+import { STOCK_COUNTED_QUERY, checkIdHeld, pourSizesColumn, pouredByColumn, readPouredBy, readRestrictedPours, readTillServings, restrictedPoursColumn, retireItemStatements, servingsAvailableQuery, tillServingsQuery, withoutCheckIdPredicate } from '#server/utils/bar-linkage'
 import type { TillServings, TillServingsRow } from '#server/utils/bar-linkage'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -100,6 +100,28 @@ describe('the stock list says what pours each item (F-128 criterion 3)', () => {
         [`UPDATE product_variants SET status = 'RETIRED' WHERE product_id = 'prod-gin'`],
       ])
       expect(pouredBy(database, 'item-gin')).toEqual([])
+    })
+  })
+
+  // Issue 1350: a write-off offers the amounts the bar actually pours from the item, one chip per
+  // quantity, so a spilt glass is two taps rather than arithmetic.
+  test('an item lists the quantities its live sizes pour, once each, choices included', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      insert(database, 'bar_products', { id: 'prod-old', category_id: 'cat-1', name: 'Old gin', status: 'RETIRED' })
+      insert(database, 'product_variants', { id: 'var-old', product_id: 'prod-old', serving_kind: 'item', label: 'Large', sort: 0 })
+      insert(database, 'variant_components', { id: 'c-old', variant_id: 'var-old', item_id: 'item-gin', qty: 70 })
+
+      const read = (itemId: string): number[] => {
+        const [statement, ...parameters] = boundStatement(database, pourSizesColumn('i'))
+        const [row] = rows<{ sizes: string }>(database, `SELECT ${statement} AS sizes FROM bar_items i WHERE i.id = ?`, ...parameters, itemId)
+        return JSON.parse(row?.sizes ?? '[]') as number[]
+      }
+      // The Negroni's 25 ml and the single's are one chip; the retired product's 70 ml is none.
+      expect(read('item-gin')).toEqual([25, 50])
+      expect(read('item-tonic')).toEqual([200])
+      const [, ...parameters] = boundStatement(database, pourSizesColumn('i'))
+      expect(parameters).toEqual([])
     })
   })
 

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { HAND_ENTERED_KINDS, KINDS_NEEDING_A_REASON, MOVEMENT_WRITERS, deliveryCost, movementForm, says } from '#shared/utils/bar'
+import { HAND_ENTERED_KINDS, KINDS_NEEDING_A_REASON, MOVEMENT_WRITERS, REVERSIBLE_KINDS, deliveryCost, movementForm, says } from '#shared/utils/bar'
 
 // Record a stock movement by hand: a delivery, wastage, an adjustment, or a reversal of one of
 // them. The row is the record, so nothing here writes a second one to the trail (0010).
@@ -78,6 +78,14 @@ async function reversalTarget(input: { kind: string, itemId: string, qty: number
   // well as at the unique index that stops the same movement being reversed twice.
   if (original.kind === 'REVERSAL') {
     throw createError({ statusCode: 409, statusMessage: 'A reversal is not itself reversed: record what actually happened instead' })
+  }
+  // The money for a sale or a comp stays in the ledger, so its stock comes back only with it
+  // (F-114 criterion 4 as amended, issue 1350).
+  if (!REVERSIBLE_KINDS.includes(original.kind)) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `${says(original.kind)} stock comes back only with its money, so it is never reversed here: an unsettled tab charge is voided from its tab, which credits both`,
+    })
   }
   if (original.itemId !== input.itemId || original.qty !== -input.qty) {
     throw createError({

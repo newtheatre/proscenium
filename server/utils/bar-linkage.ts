@@ -34,6 +34,24 @@ export function pouredByColumn(alias: string): SQL {
   )`
 }
 
+// The quantities poured from an item by a live size of a product still on the catalogue, directly
+// or as a choice, once each (issue 1350). A column over the row, binding nothing (0006).
+export function pourSizesColumn(alias: string): SQL {
+  const item = sql.raw(`${alias}.id`)
+  // A component names an item or a choice group, never both, so one pass covers either (0017).
+  return sql`(
+    SELECT json_group_array(qty) FROM (
+      SELECT DISTINCT coalesce(g.qty, c.qty) AS qty
+      FROM variant_components c
+      JOIN product_variants v ON v.id = c.variant_id AND v.status = 'ACTIVE'
+      JOIN bar_products p ON p.id = v.product_id AND p.status <> 'RETIRED'
+      LEFT JOIN choice_group_items g ON g.choice_group_id = c.choice_group_id AND g.item_id = ${item}
+      WHERE c.item_id = ${item} OR g.item_id IS NOT NULL
+      ORDER BY qty
+    )
+  )`
+}
+
 // SQLite hands back json_group_array as text, and an empty group as an empty array.
 function readJsonArray<T>(value: string | null): T[] {
   if (!value) return []
@@ -42,6 +60,7 @@ function readJsonArray<T>(value: string | null): T[] {
 }
 
 export const readPouredBy = (value: string | null): PouredBy[] => readJsonArray(value)
+export const readPourSizes = (value: string | null): number[] => readJsonArray(value)
 
 // The other direction: the items a product's live sizes deplete, or offer as a choice. A subquery
 // over the product it is handed, so it binds nothing per product or item (0006).

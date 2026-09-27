@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { REASONS_BY_KIND, says, saysDeliveryCost, saysMovementSource, saysQuantity } from '#shared/utils/bar'
+import { REASONS_BY_KIND, REVERSIBLE_KINDS, says, saysDeliveryCost, saysMovementSource, saysQuantity } from '#shared/utils/bar'
 import { saysWhen } from '#shared/utils/when'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
 import type { FilterOption } from '#shared/utils/list-filters'
@@ -126,7 +126,8 @@ const columns: TableColumn<StockMovement>[] = [
     id: 'act',
     header: ACTIONS_HEADER,
     meta: { class: { td: 'text-right whitespace-nowrap' } },
-    cell: ({ row }) => (row.original.kind === 'REVERSAL' || row.original.reversed
+    // A sale or a comp comes back only with its money, so it is never offered (issue 1350).
+    cell: ({ row }) => (!REVERSIBLE_KINDS.includes(row.original.kind) || row.original.reversed
       ? null
       : h(resolveComponent('UButton'), {
           'size': 'sm',

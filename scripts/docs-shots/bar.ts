@@ -81,9 +81,10 @@ export const bar: Shot[] = [
     annotations: [
       { selector: '[data-test="add-item"]', label: 'Add a stocked item' },
       { selector: '[data-test^="poured-by-"]', label: 'Poured by' },
-      { selector: '[data-test^="move-"]', label: 'Record a movement' },
+      { selector: '[data-test^="deliver-"]', label: 'Delivery' },
+      { selector: '[data-test^="write-off-"]', label: 'Write off' },
       { selector: '[data-test^="edit-"]', label: 'Edit' },
-      { selector: '[data-test^="status-"]:not([data-test^="status-badge-"])', label: 'Retire' },
+      { selector: '[data-test^="more-"]', label: 'More actions' },
     ],
   },
   {
