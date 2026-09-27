@@ -9,6 +9,9 @@ type Profile = z.output<typeof profileForm>
 
 const toast = useToast()
 const { refresh } = useAccount()
+
+// The address change can ask for Google and come back here, so the return is read here (A-128).
+useReauthenticateReturn()
 const loading = ref(true)
 const saving = ref(false)
 

@@ -16,7 +16,7 @@ const MEMBER_DIRECTORIES = [
   'app/components/my',
 ]
 
-const MEMBER_FILES = ['app/components/AccountSettings.vue', 'app/components/RoomGrid.vue', 'app/components/ReadFailure.vue']
+const MEMBER_FILES = ['app/components/AccountSettings.vue', 'app/components/EmailChange.vue', 'app/components/RoomGrid.vue', 'app/components/ReadFailure.vue']
 
 // The shared helpers the member screens read their sentences out of. site-nav.ts is not among
 // them: it holds the console's labels too, and those are the console's own register.

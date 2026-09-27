@@ -385,14 +385,11 @@ describe('a member page is compact on a phone (0104, issue 1342)', () => {
   })
 })
 
-// Security's heading is #1344's to settle, with the rest of that page.
-const HEADING_SETTLED_ELSEWHERE = new Set(['/account/security'])
-
 describe('a member nav label is the heading of the page it opens (issue 1342)', () => {
   test('every standing entry, every account entry and the bar tab', async () => {
     const entries = [...MY_NAV.filter(one => one.ability === signedIn || one.to === '/account/bar-tab'), ...ACCOUNT_NAV]
     const wrong: string[] = []
-    for (const entry of entries.filter(one => !HEADING_SETTLED_ELSEWHERE.has(one.to))) {
+    for (const entry of entries) {
       const title = headerTitle(await Bun.file(await pageFor(entry.to)).text())
       if (title !== entry.label) wrong.push(`${entry.to}: "${entry.label}" opens "${title}"`)
     }

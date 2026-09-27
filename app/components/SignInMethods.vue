@@ -10,6 +10,9 @@ import type { SignInMethod } from '#shared/utils/sign-in-methods'
 // page knows, so a passkey is never offered first and then taken away (issue 1344).
 const props = defineProps<{ authenticatorFirst: boolean | null }>()
 
+// A change of way in can change whether a role's authenticator is needed, so the page re-reads.
+const emit = defineEmits<{ changed: [] }>()
+
 const toast = useToast()
 const { account } = useAccount()
 const methods = ref<SignInMethod[]>([])
@@ -62,6 +65,7 @@ async function setPassword(): Promise<void> {
     wantedPassword.value = ''
     toast.add({ title: answer.added ? 'Password added' : 'Password changed', icon: 'i-lucide-key-round', color: 'success' })
     await load()
+    emit('changed')
   }
   catch (error) {
     if (needsReauthentication(error)) {
@@ -81,8 +85,9 @@ const { register, isSupported } = useWebAuthn({ registerEndpoint: '/api/auth/pas
 const enrolling = ref(false)
 
 // The passkey is this viewer's next step unless a role's authenticator comes first (issue 1344).
-const passkeyNext = computed(() => !loading.value && props.authenticatorFirst !== null && securityNextStep({
-  authenticatorRequired: props.authenticatorFirst,
+const ready = computed(() => !loading.value && props.authenticatorFirst !== null)
+const passkeyNext = computed(() => ready.value && securityNextStep({
+  authenticatorRequired: props.authenticatorFirst === true,
   authenticatorConfirmed: false,
   passkeySupported: isSupported.value,
   holdsPasskey: methods.value.some(method => method.kind === 'passkey'),
@@ -96,6 +101,7 @@ async function addPasskey(): Promise<void> {
     await register({ userName: account.value.user?.email ?? '', displayName: account.value.user?.name })
     toast.add({ title: 'Passkey added', icon: 'i-lucide-fingerprint', color: 'success' })
     await load()
+    emit('changed')
   }
   catch (error) {
     if (needsReauthentication(error)) {
@@ -134,6 +140,7 @@ async function remove(method: SignInMethod): Promise<void> {
     removing.value = null
     toast.add({ title: `${method.label} removed`, icon: 'i-lucide-check', color: 'success' })
     await load()
+    emit('changed')
   }
   catch (error) {
     if (needsReauthentication(error)) {
@@ -253,7 +260,7 @@ onMounted(load)
       </p>
 
       <UButton
-        v-if="isSupported && authenticatorFirst !== null && !passkeyNext && !loading"
+        v-if="ready && isSupported && !passkeyNext"
         icon="i-lucide-fingerprint"
         color="neutral"
         variant="subtle"
@@ -264,7 +271,7 @@ onMounted(load)
         Add a passkey
       </UButton>
       <p
-        v-else-if="!isSupported"
+        v-else-if="ready && !isSupported"
         class="text-sm text-muted"
       >
         This browser cannot hold a passkey.

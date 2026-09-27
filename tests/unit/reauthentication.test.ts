@@ -82,3 +82,13 @@ describe('a stale confirmation is refused (criterion 5)', () => {
     expect(isFresh(1_000, 10, 1_000 + 60 * 60)).toBe(false)
   })
 })
+
+// Criterion 4: Google's round trip comes back to the page that asked, so each page whose action can
+// ask for it reads the return. The address change is on Profile (issue 1344).
+describe('a page that can send somebody to Google to confirm reads the return', () => {
+  test('Security and Profile both do', async () => {
+    for (const page of ['app/pages/account/security.vue', 'app/pages/account/profile.vue']) {
+      expect(`${page}: ${(await Bun.file(page).text()).includes('useReauthenticateReturn()')}`).toBe(`${page}: true`)
+    }
+  })
+})

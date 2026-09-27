@@ -256,6 +256,8 @@ describe.skipIf(skip !== null)('the security page leads with the viewer\'s next 
     const { view } = await registerAndSignIn('ordered')
     try {
       await visit(view, `${app.baseURL}/account/security`, '[data-test="methods"]')
+      // The authenticator card is a second read, so it may land after the list.
+      await waitFor(view, 'document.querySelector(\'[data-test="begin"]\')')
       expect(await textOf(view, '[data-test="account-security-page"] h1')).toBe('Security')
       expect(await view.evaluate<boolean>(before('[data-test="methods"]', '[data-test="new-password"]'))).toBe(true)
       expect(await view.evaluate<boolean>(before('[data-test="methods"]', '[data-test="begin"]'))).toBe(true)
@@ -308,6 +310,8 @@ describe.skipIf(skip !== null)('the security page leads with the viewer\'s next 
       await visit(view, `${app.baseURL}/account/profile`, '[data-test="profile-form"]')
       await waitFor(view, 'document.querySelector(\'[data-test="new-email"]\')')
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="change-email"]'))`)).toBe(true)
+      // Outside the profile form, so Enter in the address cannot submit the profile.
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="profile-form"] [data-test="new-email"]') === null`)).toBe(true)
     }
     finally {
       view.close()

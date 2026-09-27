@@ -30,6 +30,11 @@ async function load(): Promise<void> {
   step.value = state.value.confirmed ? 'active' : 'none'
 }
 
+// After a way in changes: the step is left alone, so an enrolment in progress survives.
+async function reread(): Promise<void> {
+  state.value = await $fetch<FactorState>('/api/account/mfa')
+}
+
 const reauthenticating = ref(false)
 const pending = ref<(() => Promise<void>) | null>(null)
 
@@ -174,7 +179,10 @@ useSeoMeta({ title: 'Security' })
     title="Security"
     description="The ways into your account, and what protects them."
   >
-    <SignInMethods :authenticator-first="state === null ? null : authenticatorFirst" />
+    <SignInMethods
+      :authenticator-first="state === null ? null : authenticatorFirst"
+      @changed="reread"
+    />
 
     <UPageCard
       class="mt-6"
