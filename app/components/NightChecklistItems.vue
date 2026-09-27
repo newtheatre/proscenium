@@ -128,8 +128,8 @@ async function submitExempt(): Promise<void> {
           Tick
         </UButton>
       </div>
-      <!-- Any open item, one that ticks itself included, takes an exception with a reason
-           (E-114 criterion 5, issue 1296); only the Tick is withheld from a system item. -->
+      <!-- Any open item takes an exception with a reason, a system one included (E-114 criterion 5,
+           issue 1296), except the incidents item Sign off and close answers itself (issue 1315). -->
       <UButton
         v-if="!entry.done && !answeredAtSignOff(entry)"
         color="neutral"

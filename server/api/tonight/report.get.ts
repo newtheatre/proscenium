@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // When the curtain comes down, the screen's cue to offer Sign off and close (issue 1315, 0078).
-  const times = await tonightPerformance(target)
+  const [times, compiled] = await Promise.all([tonightPerformance(target), compileNightReport(target, resolved.venueId, resolved.night)])
   const curtainDownAt = times ? performanceEnd(times) : null
-  return { ...(await compileNightReport(target, resolved.venueId, resolved.night)), curtainDownAt, signedOff: null, addenda: [] }
+  return { ...compiled, curtainDownAt, signedOff: null, addenda: [] }
 })
