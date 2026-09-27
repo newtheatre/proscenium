@@ -10,6 +10,8 @@ const MEMBERS = 'app/pages/people/members.vue'
 const MONEY = 'app/pages/money/index.vue'
 const SHOWS = 'app/pages/money/shows.vue'
 const REPORTS = 'app/pages/money/reports.vue'
+const BAR_REPORTS = 'app/pages/bar/reports.vue'
+const TILL_CLOSE = 'app/components/till/CloseModal.vue'
 const RECONCILIATION = 'app/pages/money/reconciliation.vue'
 const PERIOD_FORM = 'app/composables/usePeriodForm.ts'
 const PERIOD_FIELDS = 'app/components/PeriodFields.vue'
@@ -17,6 +19,23 @@ const PERIOD_FIELDS = 'app/components/PeriodFields.vue'
 const MONEY_SCREENS = [MONEY, SHOWS, REPORTS, RECONCILIATION]
 const OVERVIEW = 'app/pages/admin/index.vue'
 const NEEDS_YOU = 'app/components/money/NightsNeedingYou.vue'
+
+// Issue 1362 (K-128): a money screen says a source, a period and a day in words, never as stored.
+describe('money screens read in words', () => {
+  test('the dashboard names a source and its range in words', async () => {
+    const source = await read(MONEY)
+    expect(source).toContain('saysEntrySource(')
+    expect(source).not.toMatch(/\{\{\s*data\.fromDay\s*\}\}/)
+    expect(source).not.toMatch(/=>\s*row\.original\.source\b(?!\s*as)/)
+  })
+
+  test('the reconciliation sheet is headed for what it holds, and the Z is called one on both screens', async () => {
+    const source = await read(RECONCILIATION)
+    expect(source).not.toContain('Desk, by kind')
+    expect(source).toContain('label="Reader total (Z)"')
+    expect(await read(TILL_CLOSE)).toContain('label="Reader total (Z)"')
+  })
+})
 
 // Issue 1360 (I-104 criteria 4 and 5): a night needing a reading is where the Treasurer looks,
 // linked to its own reconciliation; a variance is said as the figure is typed; a write-off is a note.
@@ -157,7 +176,22 @@ describe('the period controls ask the question themselves (I-105 criterion 6)', 
     expect(form).toContain('monthChoices')
     expect(form).toContain('yearChoices(')
     expect(await read(PERIOD_FIELDS)).toMatch(/<USelect\s+v-if="kind === 'MONTH'"\s+v-model="month"/)
-    expect(await read(SHOWS)).toContain('yearChoices(')
+  })
+
+  // Issue 1362 (0087): a money screen offers the season, through the one shared set of controls.
+  test('revenue by show offers every period, the season included, through the shared controls', async () => {
+    const source = await read(SHOWS)
+    expect(source).toContain('<PeriodFields')
+    expect(source).toContain('/api/admin/finance/seasons')
+    expect(source).not.toContain('yearChoices(')
+  })
+
+  // Issue 1362 (I-105 criterion 6, F-119): bar reports opens on tonight and asks the question itself.
+  test('bar reports opens on tonight, with nothing to press to read it', async () => {
+    const source = await read(BAR_REPORTS)
+    expect(source).not.toContain('Refresh')
+    expect(source).toMatch(/ref<[^>]*>\('NIGHT'\)/)
+    expect(source).toContain('currentShowNight()')
   })
 
   test('no money screen leaves a number spinner on a period control', async () => {
