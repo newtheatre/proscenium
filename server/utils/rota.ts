@@ -396,6 +396,10 @@ const where = (terms: SQL[]): SQL => (terms.length ? sql` WHERE ${sql.join(terms
 
 export interface OpenShiftFilters {
   role?: ShiftRole
+  // The roles a member may claim, at most three; an empty list lists nothing (issue 1335).
+  roles?: ShiftRole[]
+  // Leaves out a performance this member already works, since a second shift is refused (E-104 c3).
+  notWorkedBy?: string
   // Inclusive unix-second bounds. Absent means no further narrowing beyond `now`.
   from?: number
   to?: number
@@ -409,6 +413,15 @@ function openShiftTerms(filters: OpenShiftFilters, now: number): SQL[] {
     sql`p.starts_at >= ${Math.max(now, filters.from ?? now)}`,
   ]
   if (filters.role) terms.push(sql`s.role = ${filters.role}`)
+  if (filters.roles) {
+    terms.push(filters.roles.length === 0 ? sql`0` : sql`s.role IN (${sql.join(filters.roles.map(one => sql`${one}`), sql`, `)})`)
+  }
+  if (filters.notWorkedBy) {
+    terms.push(sql`NOT EXISTS (
+      SELECT 1 FROM shifts worked WHERE worked.performance_id = s.performance_id
+        AND worked.user_id = ${filters.notWorkedBy} AND worked.status IN ('CLAIMED', 'CONFIRMED')
+    )`)
+  }
   if (filters.to !== undefined) terms.push(sql`p.starts_at <= ${filters.to}`)
   return terms
 }
@@ -434,6 +447,17 @@ export function openShiftsQuery(filters: OpenShiftFilters, now: number, limit: n
     ${where(openShiftTerms(filters, now))}
     ORDER BY p.starts_at, s.role, s.slot
     LIMIT ${limit} OFFSET ${offset}
+  `
+}
+
+// How many shifts of each role are open from now on, for the cards a locked role gets (issue 1335).
+export function openShiftCountsByRoleQuery(now: number): SQL {
+  return sql`
+    SELECT s.role AS role, count(*) AS total
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    ${where(openShiftTerms({}, now))}
+    GROUP BY s.role
   `
 }
 

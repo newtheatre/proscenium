@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { saysWhenLong } from '#shared/utils/when'
-import { saysShiftRole, saysShiftStatus, SHIFT_ROLES } from '#shared/utils/rota'
+import { saysDay, saysWhenLong } from '#shared/utils/when'
+import { ROTA_WEEKS, byNight, rotaWeekSpan, saysRotaWeek } from '#shared/utils/my-rota'
+import { saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import { saysNotOpenYet } from '#shared/utils/rota-readiness'
+import { showNightOf } from '#shared/utils/show-night'
+import type { RotaWeek } from '#shared/utils/my-rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 import type { Page } from '#shared/utils/pagination'
+import type { TrainingAction } from '#shared/utils/training-action'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/my-rota' })
 
@@ -39,8 +43,6 @@ interface OpenOpeningShift {
   venueName: string
   startsAt: number
   endsAt: number
-  eligible: boolean
-  unlockedBy: { moduleId: string, moduleName: string } | null
 }
 
 interface OpenShift {
@@ -51,8 +53,6 @@ interface OpenShift {
   venueName: string
   showTitle: string
   startsAt: number
-  eligible: boolean
-  unlockedBy: { moduleId: string, moduleName: string } | null
 }
 
 const toast = useToast()
@@ -63,20 +63,35 @@ const { data: mine, error: mineError, refresh: refreshMine } = await useFetch<{ 
 
 const mineFailure = useListFailure(mineError, 'The shifts you hold could not be read.')
 
-const role = ref<ShiftRole | undefined>(undefined)
+const week = ref<RotaWeek>('ALL')
 const page = ref(1)
 
-type OpenShifts = Page<OpenShift> & { openings: OpenOpeningShift[], officers: string[] }
+type OpenShifts = Page<OpenShift> & { openings: OpenOpeningShift[] }
 
+// Only what this member can take: the roles they qualify for, and never a performance they already
+// work, chosen by week and read by night (issue 1335, E-103 criterion 2 as trimmed).
 const { data, status, error, refresh } = await useFetch<OpenShifts>('/api/rota/shifts', {
-  query: computed(() => ({ role: role.value, page: page.value })),
-  watch: [role, page],
-  default: (): OpenShifts => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1, openings: [], officers: [] }),
+  query: computed(() => ({ claimable: 'true', page: page.value, ...rotaWeekSpan(week.value, showNightOf(new Date())) })),
+  watch: [week, page],
+  default: (): OpenShifts => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1, openings: [] }),
 })
 
-const notOpenYet = computed(() => saysNotOpenYet(data.value.officers))
+const openFailure = useListFailure(error, 'The shifts you can take could not be read.')
+const nights = computed(() => byNight(data.value.items))
 
-const openFailure = useListFailure(error, 'The open shifts could not be read.')
+interface RoleCard { role: ShiftRole, openShifts: number, module: { id: string, name: string } | null, action: TrainingAction | null }
+
+// Said once per role rather than on every locked row: what opens it, and the one thing to do.
+const { data: locked, refresh: refreshRoles } = await useFetch<{ roles: RoleCard[], officers: string[] }>('/api/rota/roles', {
+  default: () => ({ roles: [] as RoleCard[], officers: [] as string[] }),
+})
+
+const notOpenYet = computed(() => saysNotOpenYet(locked.value.officers))
+
+function chooseWeek(one: RotaWeek): void {
+  week.value = one
+  page.value = 1
+}
 
 const claiming = ref<string | null>(null)
 const releasing = ref<string | null>(null)
@@ -216,11 +231,6 @@ function spanOf(startsAt: number): string {
   return saysWhenLong(startsAt)
 }
 
-function selectRole(one: ShiftRole | undefined): void {
-  role.value = one
-  page.value = 1
-}
-
 useSeoMeta({ title: 'Rota' })
 </script>
 
@@ -231,7 +241,7 @@ useSeoMeta({ title: 'Rota' })
   >
     <UPageHeader
       title="Rota"
-      description="Shifts you already hold, and open ones you currently qualify for. What is locked names what would unlock it."
+      description="Shifts you hold, the ones you can take, and what would open the roles you cannot take yet."
       :ui="MEMBER_PAGE_HEADER"
     />
 
@@ -348,33 +358,26 @@ useSeoMeta({ title: 'Rota' })
       </ul>
     </section>
 
-    <section class="mt-10">
+    <section
+      class="mt-10"
+      data-test="shifts-you-can-take"
+    >
       <h2 class="text-lg font-semibold">
-        Open shifts
+        Shifts you can take
       </h2>
 
       <UFieldGroup class="mt-4">
         <UButton
-          :color="role === undefined ? 'primary' : 'neutral'"
-          variant="outline"
-          :aria-pressed="role === undefined"
-          :icon="role === undefined ? 'i-lucide-check' : undefined"
-          data-test="role-filter-all"
-          @click="selectRole(undefined)"
-        >
-          All roles
-        </UButton>
-        <UButton
-          v-for="one in SHIFT_ROLES"
+          v-for="one in ROTA_WEEKS"
           :key="one"
-          :color="role === one ? 'primary' : 'neutral'"
+          :color="week === one ? 'primary' : 'neutral'"
           variant="outline"
-          :aria-pressed="role === one"
-          :icon="role === one ? 'i-lucide-check' : undefined"
-          :data-test="`role-filter-${one}`"
-          @click="selectRole(one)"
+          :aria-pressed="week === one"
+          :icon="week === one ? 'i-lucide-check' : undefined"
+          :data-test="`week-${one}`"
+          @click="chooseWeek(one)"
         >
-          {{ saysShiftRole(one) }}
+          {{ saysRotaWeek(one) }}
         </UButton>
       </UFieldGroup>
 
@@ -386,7 +389,7 @@ useSeoMeta({ title: 'Rota' })
           name="i-lucide-loader-circle"
           class="animate-spin"
         />
-        <span>Reading the open shifts.</span>
+        <span>Reading the shifts you can take.</span>
       </div>
 
       <ReadFailure
@@ -401,68 +404,52 @@ useSeoMeta({ title: 'Rota' })
         class="mt-8 text-sm text-muted"
         data-test="open-shifts-empty"
       >
-        No shifts are open. A shift appears here as soon as one is put up, and taking it adds it
-        to your rota.
+        Nothing you can take {{ week === 'ALL' ? 'is open' : `is open ${saysRotaWeek(week).toLowerCase()}` }}. A shift
+        appears here as soon as one is put up for a role you hold the training for, and a night you
+        already work is left out.
       </p>
 
-      <ul
+      <div
         v-else
-        class="mt-8 divide-y divide-default"
+        class="mt-6 space-y-6"
         data-test="open-shifts-list"
       >
-        <li
-          v-for="shift in data.items"
-          :key="shift.shiftId"
-          class="flex flex-wrap items-start gap-3 py-4"
-          :data-test="`open-shift-${shift.shiftId}`"
+        <section
+          v-for="group in nights"
+          :key="group.night"
+          :data-test="`night-${group.night}`"
         >
-          <div class="min-w-0 flex-1">
-            <p class="flex flex-wrap items-center gap-2 font-medium">
-              {{ saysShiftRole(shift.role) }}, {{ shift.venueName }}
-              <UBadge
-                :color="shift.eligible ? 'success' : 'neutral'"
-                variant="subtle"
-                size="sm"
-                :data-test="`eligibility-${shift.shiftId}`"
+          <h3 class="text-base font-semibold">
+            {{ saysDay(group.night) }}
+          </h3>
+          <ul class="mt-2 divide-y divide-default">
+            <li
+              v-for="shift in group.items"
+              :key="shift.shiftId"
+              class="flex flex-wrap items-center gap-3 py-3"
+              :data-test="`open-shift-${shift.shiftId}`"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="font-medium">
+                  {{ saysShiftRole(shift.role) }}, {{ shift.venueName }}
+                </p>
+                <p class="text-sm text-muted">
+                  {{ spanOf(shift.startsAt) }} · {{ shift.showTitle }}
+                </p>
+              </div>
+              <UButton
+                size="lg"
+                class="min-h-12"
+                :loading="claiming === shift.shiftId"
+                :data-test="`claim-${shift.shiftId}`"
+                @click="claim(shift)"
               >
-                {{ shift.eligible ? 'You qualify' : 'Locked' }}
-              </UBadge>
-            </p>
-            <p class="text-sm text-muted">
-              {{ spanOf(shift.startsAt) }}
-            </p>
-            <p class="text-sm">
-              {{ shift.showTitle }}
-            </p>
-            <p
-              v-if="!shift.eligible && shift.unlockedBy"
-              class="mt-1 text-sm"
-              :data-test="`unlock-${shift.shiftId}`"
-            >
-              Unlocked by
-              <ULink :to="`/training/modules/${shift.unlockedBy.moduleId}`">
-                {{ shift.unlockedBy.moduleName }}
-              </ULink>
-            </p>
-            <p
-              v-else-if="!shift.eligible"
-              class="mt-1 text-sm text-muted"
-              :data-test="`unlock-${shift.shiftId}`"
-            >
-              {{ notOpenYet }}
-            </p>
-          </div>
-          <UButton
-            v-if="shift.eligible"
-            size="sm"
-            :loading="claiming === shift.shiftId"
-            :data-test="`claim-${shift.shiftId}`"
-            @click="claim(shift)"
-          >
-            Claim
-          </UButton>
-        </li>
-      </ul>
+                Claim
+              </UButton>
+            </li>
+          </ul>
+        </section>
+      </div>
 
       <section
         v-if="data.openings.length && page === 1 && status !== 'pending'"
@@ -480,47 +467,20 @@ useSeoMeta({ title: 'Rota' })
           <li
             v-for="slot in data.openings"
             :key="slot.slotId"
-            class="flex flex-wrap items-start gap-3 py-4"
+            class="flex flex-wrap items-center gap-3 py-3"
             :data-test="`open-opening-${slot.slotId}`"
           >
             <div class="min-w-0 flex-1">
-              <p class="flex flex-wrap items-center gap-2 font-medium">
+              <p class="font-medium">
                 Bar, {{ slot.venueName }}
-                <UBadge
-                  :color="slot.eligible ? 'success' : 'neutral'"
-                  variant="subtle"
-                  size="sm"
-                >
-                  {{ slot.eligible ? 'You qualify' : 'Locked' }}
-                </UBadge>
               </p>
               <p class="text-sm text-muted">
-                {{ spanOf(slot.startsAt) }}
-              </p>
-              <p class="text-sm">
-                {{ slot.label }}
-              </p>
-              <p
-                v-if="!slot.eligible && slot.unlockedBy"
-                class="mt-1 text-sm"
-                :data-test="`unlock-opening-${slot.slotId}`"
-              >
-                Unlocked by
-                <ULink :to="`/training/modules/${slot.unlockedBy.moduleId}`">
-                  {{ slot.unlockedBy.moduleName }}
-                </ULink>
-              </p>
-              <p
-                v-else-if="!slot.eligible"
-                class="mt-1 text-sm text-muted"
-                :data-test="`unlock-opening-${slot.slotId}`"
-              >
-                {{ notOpenYet }}
+                {{ spanOf(slot.startsAt) }} · {{ slot.label }}
               </p>
             </div>
             <UButton
-              v-if="slot.eligible"
-              size="sm"
+              size="lg"
+              class="min-h-12"
               :loading="claiming === slot.slotId"
               :data-test="`claim-opening-${slot.slotId}`"
               @click="claimOpening(slot)"
@@ -532,7 +492,7 @@ useSeoMeta({ title: 'Rota' })
       </section>
 
       <div
-        v-if="data.items.length"
+        v-if="data.pages > 1"
         class="mt-6 flex justify-center"
       >
         <UPagination
@@ -540,6 +500,54 @@ useSeoMeta({ title: 'Rota' })
           :total="data.total"
           :items-per-page="data.pageSize"
         />
+      </div>
+    </section>
+
+    <section
+      v-if="locked.roles.length > 0"
+      class="mt-10"
+      data-test="roles-you-could-take"
+    >
+      <h2 class="text-lg font-semibold">
+        Roles you could take
+      </h2>
+      <p class="mt-1 text-sm text-muted">
+        Each needs a piece of training you do not hold yet. Doing it opens every shift of that role.
+      </p>
+      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        <UPageCard
+          v-for="card in locked.roles"
+          :key="card.role"
+          variant="outline"
+          :title="saysShiftRole(card.role)"
+          :description="card.openShifts === 0 ? 'No shifts open at the moment.' : `${plural(card.openShifts, 'shift')} open.`"
+          :data-test="`role-card-${card.role}`"
+        >
+          <p
+            v-if="card.module"
+            class="text-sm"
+          >
+            Opened by
+            <ULink :to="`/training/modules/${card.module.id}`">
+              {{ card.module.name }}
+            </ULink>
+          </p>
+          <p
+            v-else
+            class="text-sm text-muted"
+          >
+            {{ notOpenYet }}
+          </p>
+          <TrainingModuleAction
+            v-if="card.module && card.action"
+            class="mt-3"
+            :module-id="card.module.id"
+            :module-name="card.module.name"
+            :action="card.action"
+            large
+            @changed="refreshRoles()"
+          />
+        </UPageCard>
       </div>
     </section>
 

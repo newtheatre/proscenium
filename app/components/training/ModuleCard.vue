@@ -2,6 +2,7 @@
 import { describeExpiry, saysDeliveryMode, saysKind } from '#shared/utils/training'
 import { saysDay } from '#shared/utils/when'
 import type { DeliveryMode, ExpiryMode, ModuleKind } from '#shared/utils/training'
+import type { TrainingAction } from '#shared/utils/training-action'
 
 // One catalogue card, calm (no marquee, sticker or spotlight): the public catalogue spends its
 // whole budget on the hero and nowhere else (G-128, K-101).
@@ -23,9 +24,11 @@ const props = defineProps<{
   nextSession: NextSession | null
   signedIn: boolean
   requested: boolean | null
+  // Null when signed out, or for a module the member already holds (issue 1335).
+  action: TrainingAction | null
 }>()
 
-const emit = defineEmits<{ requested: [] }>()
+const emit = defineEmits<{ changed: [] }>()
 
 const nextSessionLine = computed(() => {
   if (!props.nextSession) return 'No session scheduled'
@@ -116,20 +119,23 @@ const nextSessionLine = computed(() => {
       </div>
     </dl>
 
-    <template #footer>
-      <TrainingRequestModule
-        v-if="signedIn"
+    <template
+      v-if="(signedIn && action) || !signedIn"
+      #footer
+    >
+      <TrainingModuleAction
+        v-if="signedIn && action"
         :module-id="id"
         :module-name="name"
-        :requested="requested === true"
-        @requested="emit('requested')"
+        :action="action"
+        @changed="emit('changed')"
       />
       <ULink
-        v-else
+        v-else-if="!signedIn"
         to="/sign-in"
         class="text-sm"
       >
-        Sign in to request
+        Sign in to take it
       </ULink>
     </template>
   </UPageCard>

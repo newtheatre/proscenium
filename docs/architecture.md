@@ -1127,13 +1127,30 @@ Which training module gates which role is committee configuration, three keys,
 null rule refuses eligibility rather than granting it to everyone: an unnamed or unreadable rule is
 the safer failure (criterion 4).
 
-`GET /api/rota/shifts?role=&from=&to=&page=` is the open-shift list, paged in SQL and gated live;
-each locked row carries the module id and name that would unlock it, or neither when nothing a
+`GET /api/rota/shifts?role=&from=&to=&page=` is the open-shift list, paged in SQL and gated live.
+`from` and `to` are show nights, held whole from 04:00 to 04:00 as the rota board's window is
+(`rotaNightBounds()` in `shared/utils/my-rota.ts`, 0014), so a shift at 00:30 on a Monday is in the
+week of the Sunday night it belongs to. Each locked row carries the module id and name that would unlock it, or neither when nothing a
 member can act on is named: no module, or one that is a draft, retired or not in the catalogue
 (criterion 2). Where any role is in that state the list also carries `officers`, the names of the
 live Front of House Manager grants (at most three), which the screen names as the person to ask.
-`GET /api/rota/mine` is a member's own shifts. Both are member-facing reads with no write and so
-carry no audit row (`shared/utils/audit-coverage.ts`).
+`claimable=true` is what Rota asks for (issue 1335): only the roles the caller qualifies for
+(`roles` on `openShiftTerms`, bound once per role) and never a performance or bar opening they
+already hold a claimed or confirmed shift on (`notWorkedBy`, one correlated `NOT EXISTS`); it
+holds no locked role, so its `officers` is always empty. The
+roles they do not qualify for come from `GET /api/rota/roles`, one card each with the open count
+(`openShiftCountsByRoleQuery`, plus bar opening slots for the bar), the published module and its
+one training action. `GET /api/rota/mine` is a member's own shifts. All three are member-facing
+reads with no write and so carry no audit row (`shared/utils/audit-coverage.ts`).
+
+The one training action (`shared/utils/training-action.ts`, issue 1335) is derived, never stored:
+`trainingActionsFor()` in `server/utils/training-signup.ts` reads the sessions a member can see
+and their open asks once, and answers per module: their own sign-up first (a held place, even on a
+later session, ahead of a waiting position), then the soonest session open to them (Sign up, or
+Join the waiting list when full), then Ask, or Asked once they have. `/api/training/next`,
+`/api/training/records` (for an expired or expiring record), `/api/training/catalogue` (signed in)
+and `/api/rota/roles` all carry it, so Training, the catalogue, the module page and Rota offer the
+same thing.
 
 ### Show-night readiness (issue 1318)
 

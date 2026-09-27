@@ -524,6 +524,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/rota/templates/[venueId]/index.delete.ts', actions: ['shift-template.removed'] },
   { route: 'server/api/admin/rota/templates/[venueId]/stamp.post.ts', actions: ['shift.stamped'] },
   { route: 'server/api/rota/shifts.get.ts', exempt: 'reads the open-shift list, gated live against your own training records' },
+  { route: 'server/api/rota/roles.get.ts', exempt: 'reads the roles you do not yet qualify for, and what would open each' },
   { route: 'server/api/rota/mine.get.ts', exempt: 'reads your own shifts' },
   { route: 'server/api/rota/shifts/[id]/claim.post.ts', actions: ['shift.claimed'] },
   { route: 'server/api/rota/shifts/[id]/release.post.ts', actions: ['shift.released'] },

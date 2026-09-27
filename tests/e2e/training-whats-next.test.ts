@@ -112,6 +112,35 @@ const nextIds = async (): Promise<string[]> => {
   return ((await answered.json() as { items: { id: string }[] }).items).map(item => item.id)
 }
 
+// Issue 1335, G-102 criterion 6: each suggestion carries the one action that acts on it, and
+// Ask only when no session is open (G-104 criterion 4 as amended).
+describe.skipIf(skip !== null)('each suggestion carries its one action', () => {
+  interface Suggested { id: string, action: { kind: string, session?: { id: string } } }
+  const suggestions = async (): Promise<Suggested[]> =>
+    (await (await send('GET', '/api/training/next', undefined, memberCookie)).json() as { items: Suggested[] }).items
+
+  test('Ask with no session, Sign up once one opens, and You have a place after signing up', async () => {
+    const module = await addModule()
+    expect((await suggestions()).find(item => item.id === module)?.action).toEqual({ kind: 'ASK' })
+
+    const scheduled = await send('POST', '/api/admin/training/sessions', {
+      heldOn: daysFrom(10), startsAt: '19:00', endsAt: '21:00', capacity: 5, moduleIds: [module],
+    })
+    expect(scheduled.status).toBe(200)
+    const { id } = await scheduled.json() as { id: string }
+    expect((await suggestions()).find(item => item.id === module)?.action).toMatchObject({ kind: 'SIGN_UP', session: { id } })
+
+    expect((await send('POST', `/api/training/sessions/${id}/signup`, {}, memberCookie)).status).toBe(200)
+    expect((await suggestions()).find(item => item.id === module)?.action).toMatchObject({ kind: 'PLACED', session: { id } })
+  })
+
+  test('the catalogue carries the same action for a signed-in member', async () => {
+    const module = await addModule()
+    const catalogue = await (await send('GET', '/api/training/catalogue', undefined, memberCookie)).json() as { items: Suggested[] }
+    expect(catalogue.items.find(item => item.id === module)?.action).toEqual({ kind: 'ASK' })
+  })
+})
+
 describe.skipIf(skip !== null)('the path is computed, never stored (G-102)', () => {
   test('a module with an unheld prerequisite is off the list, and holding it puts it on', async () => {
     const foundation = await addModule()

@@ -21,10 +21,15 @@ export default defineEventHandler(async (event) => {
   const named = new Map(departments.map(department => [department.code, department.name]))
 
   const today = londonToday()
-  const prerequisites = await prerequisitesOf(items.map(module => module.id))
-  const held = account ? await modulesHeldBy(account.id, today) : null
-  const nextSessions = await nextOpenSessions(today)
-  const requested = account ? await openRequestsOf(account.id) : null
+  const closesHours = await configValue(event, 'SESSION_SIGNUP_CLOSES_HOURS')
+  const [prerequisites, held, nextSessions, requested] = await Promise.all([
+    prerequisitesOf(items.map(module => module.id)),
+    account ? modulesHeldBy(account.id, today) : null,
+    nextOpenSessions(today),
+    account ? openRequestsOf(account.id) : null,
+  ])
+  // The one thing a signed-in member can do about each module they do not hold (issue 1335).
+  const actionFor = account && requested ? await trainingActionsFor(account.id, today, closesHours, requested) : null
 
   return {
     items: items.map(module => ({
@@ -48,6 +53,7 @@ export default defineEventHandler(async (event) => {
       held: held ? held.has(module.id) : null,
       nextSession: nextSessions.get(module.id) ?? null,
       requested: requested ? requested.has(module.id) : null,
+      action: actionFor && !held?.has(module.id) ? actionFor(module.id) : null,
     })),
     departments: departments
       .filter(department => items.some(module => module.department === department.code))

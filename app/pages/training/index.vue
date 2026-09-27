@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { REQUEST_NOTE_LIMIT, saysKind, saysRequestStatus, saysSource, saysState } from '#shared/utils/training'
+import { saysKind, saysRequestStatus, saysSource, saysState } from '#shared/utils/training'
 import { saysDay } from '#shared/utils/when'
 import type { RecordState } from '#shared/utils/training'
+import type { TrainingAction } from '#shared/utils/training-action'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/my-training' })
 
@@ -16,6 +17,7 @@ interface Record {
   source: string
   state: RecordState | null
   held: boolean
+  action: TrainingAction | null
 }
 
 const request = useRequestFetch()
@@ -28,6 +30,7 @@ interface NextStep {
   department: string
   kind: string
   safetyCritical: boolean
+  action: TrainingAction
 }
 
 const { data, status, error: recordsError, refresh: refreshRecords } = await useAsyncData(
@@ -69,47 +72,16 @@ interface Ask {
   reason: string | null
 }
 
-const toast = useToast()
-const asking = ref<string | null>(null)
-const note = ref('')
-const failure = ref<string | null>(null)
-
 const { data: asks, refresh: refreshAsks } = await useAsyncData(
   'training-requests',
   () => request<{ items: Ask[] }>('/api/training/requests'),
   { default: () => ({ items: [] as Ask[] }) },
 )
 
-const openAsks = computed(() => new Set(
-  asks.value.items.filter(one => one.status === 'OPEN').map(one => one.moduleId),
-))
-
 // What is expired, and what is expiring, said before anything else. Their absence would otherwise
 // read as "nothing is expiring", which is not an answer a failed read may give.
 const expired = computed(() => data.value.items.filter(one => one.state === 'EXPIRED'))
 const expiring = computed(() => data.value.items.filter(one => one.state === 'EXPIRING'))
-
-async function askFor(moduleId: string): Promise<void> {
-  failure.value = null
-  try {
-    await $fetch('/api/training/requests', {
-      method: 'POST',
-      body: { moduleId, note: note.value.trim() || undefined },
-    })
-    toast.add({
-      title: 'Asked',
-      description: 'The department lead will see it on their board.',
-      icon: 'i-lucide-check',
-      color: 'success',
-    })
-    asking.value = null
-    note.value = ''
-    await refreshAsks()
-  }
-  catch (error) {
-    failure.value = refusalText(error)
-  }
-}
 
 // Asked before it happens, the same as every other withdrawal a member makes (G-104 criterion 8).
 const withdrawing = ref<Ask | null>(null)
@@ -154,7 +126,7 @@ interface SignedUp {
   modules: { id: string, name: string }[]
 }
 
-const { data: sessions } = await useAsyncData(
+const { data: sessions, refresh: refreshSessions } = await useAsyncData(
   'training-my-sessions',
   () => request<{ items: SignedUp[] }>('/api/training/sessions'),
   { default: () => ({ items: [] as SignedUp[] }) },
@@ -162,11 +134,16 @@ const { data: sessions } = await useAsyncData(
 
 const signedUpTo = computed(() => sessions.value.items.filter(session => session.myPosition !== null))
 
-const { data: next } = await useAsyncData(
+const { data: next, refresh: refreshNext } = await useAsyncData(
   'training-next',
   () => request<{ items: NextStep[] }>('/api/training/next'),
   { default: () => ({ items: [] as NextStep[] }) },
 )
+
+// A sign-up or an ask made from a suggestion shows everywhere it belongs on the page at once.
+async function changedAction(): Promise<void> {
+  await Promise.all([refreshRecords(), refreshNext(), refreshSessions(), refreshAsks()])
+}
 
 const badge = (state: RecordState): 'success' | 'warning' | 'neutral' =>
   state === 'VALID' ? 'success' : state === 'EXPIRING' ? 'warning' : 'neutral'
@@ -193,15 +170,6 @@ const SECOND_PAGE = [{ label: 'Training sessions', to: '/training/sessions', ico
       :ui="MEMBER_PAGE_HEADER"
     />
 
-    <UAlert
-      v-if="failure"
-      class="mt-6"
-      data-test="failure"
-      color="error"
-      variant="subtle"
-      :description="failure"
-    />
-
     <!-- Anything needing attention comes first: it is why a member opens this page at all. -->
     <UAlert
       v-if="expired.length > 0"
@@ -216,20 +184,22 @@ const SECOND_PAGE = [{ label: 'Training sessions', to: '/training/sessions', ico
         <p>
           It has not been taken away: it has stopped counting towards the things that need it.
         </p>
-        <div class="mt-2 flex flex-wrap gap-2">
-          <UButton
+        <ul class="mt-2 space-y-2">
+          <li
             v-for="record in expired"
             :key="record.id"
-            size="xs"
-            color="error"
-            variant="outline"
-            :disabled="openAsks.has(record.moduleId)"
-            :data-test="`ask-expired-${record.moduleId}`"
-            @click="asking = record.moduleId"
+            class="flex flex-wrap items-center gap-2"
+            :data-test="`renew-expired-${record.moduleId}`"
           >
-            {{ openAsks.has(record.moduleId) ? `Asked for ${record.moduleName}` : `Ask for ${record.moduleName}` }}
-          </UButton>
-        </div>
+            <span class="font-medium">{{ record.moduleName }}</span>
+            <TrainingModuleAction
+              :module-id="record.moduleId"
+              :module-name="record.moduleName"
+              :action="record.action ?? { kind: 'ASK' }"
+              @changed="changedAction"
+            />
+          </li>
+        </ul>
       </template>
     </UAlert>
 
@@ -247,20 +217,22 @@ const SECOND_PAGE = [{ label: 'Training sessions', to: '/training/sessions', ico
           {{ expiring.length === 1 ? 'It still counts' : 'They still count' }} until the date shown, so
           there is nothing to do today.
         </p>
-        <div class="mt-2 flex flex-wrap gap-2">
-          <UButton
+        <ul class="mt-2 space-y-2">
+          <li
             v-for="record in expiring"
             :key="record.id"
-            size="xs"
-            color="warning"
-            variant="outline"
-            :disabled="openAsks.has(record.moduleId)"
-            :data-test="`ask-expiring-${record.moduleId}`"
-            @click="asking = record.moduleId"
+            class="flex flex-wrap items-center gap-2"
+            :data-test="`renew-expiring-${record.moduleId}`"
           >
-            {{ openAsks.has(record.moduleId) ? `Asked for ${record.moduleName}` : `Ask for ${record.moduleName}` }}
-          </UButton>
-        </div>
+            <span class="font-medium">{{ record.moduleName }}</span>
+            <TrainingModuleAction
+              :module-id="record.moduleId"
+              :module-name="record.moduleName"
+              :action="record.action ?? { kind: 'ASK' }"
+              @changed="changedAction"
+            />
+          </li>
+        </ul>
       </template>
     </UAlert>
 
@@ -501,16 +473,13 @@ const SECOND_PAGE = [{ label: 'Training sessions', to: '/training/sessions', ico
             </p>
           </div>
 
-          <UButton
-            size="xs"
-            color="neutral"
-            variant="outline"
-            :disabled="openAsks.has(step.id)"
-            :data-test="`ask-next-${step.id}`"
-            @click="asking = step.id"
-          >
-            {{ openAsks.has(step.id) ? `Asked for ${step.name}` : `Ask for ${step.name}` }}
-          </UButton>
+          <TrainingModuleAction
+            :module-id="step.id"
+            :module-name="step.name"
+            :action="step.action"
+            large
+            @changed="changedAction"
+          />
         </li>
       </ul>
     </section>
@@ -565,45 +534,6 @@ const SECOND_PAGE = [{ label: 'Training sessions', to: '/training/sessions', ico
         </li>
       </ul>
     </section>
-
-    <UModal
-      :open="asking !== null"
-      title="Ask for this to be taught"
-      description="It tells the department there is demand. It does not hold you a place, and it never expires on its own."
-      @update:open="value => { if (!value) asking = null }"
-    >
-      <template #body>
-        <UFormField
-          label="Anything worth saying"
-          hint="Optional"
-          description="When you are free, why you need it, who else wants it."
-        >
-          <UTextarea
-            v-model="note"
-            :rows="3"
-            :maxlength="REQUEST_NOTE_LIMIT"
-            class="w-full"
-            data-test="ask-note"
-          />
-        </UFormField>
-
-        <div class="mt-4 flex flex-wrap gap-2">
-          <UButton
-            data-test="ask-submit"
-            @click="asking && askFor(asking)"
-          >
-            Ask
-          </UButton>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            @click="asking = null"
-          >
-            Back
-          </UButton>
-        </div>
-      </template>
-    </UModal>
 
     <ConfirmModal
       v-model:open="withdrawOpen"
