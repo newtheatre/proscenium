@@ -1,4 +1,5 @@
-import { holdsTheClose, nightSignOffForm, saysIncidentsMoved } from '#shared/utils/night-signoff'
+import { holdsTheClose, nightSignOffForm, saysIncidentsMoved, signOffTooEarly } from '#shared/utils/night-signoff'
+import { performanceEnd } from '#shared/utils/rota-times'
 
 // Sign off and close (issue 1315, E-124, E-114 criteria 3 and 4): the gate, then one batch that
 // freezes the report, closes the checklist and reviews its incidents, race-safe by predicate (0006).
@@ -14,6 +15,11 @@ export default defineEventHandler(async (event) => {
 
   const already = 'This performance has already been signed off'
   if (await reportForPerformance(target)) throw createError({ statusCode: 409, statusMessage: already })
+
+  // Hiding the button is never the enforcement (E-111 criterion 5): the same curtain the report reads.
+  const times = await tonightPerformance(target)
+  const early = signOffTooEarly(times ? performanceEnd(times) : null, Math.floor(Date.now() / 1000))
+  if (early) throw createError({ statusCode: 409, statusMessage: early })
 
   const compiled = await compileNightReport(target, resolved.venueId, resolved.night)
   const holding = compiled.checklist.filter(holdsTheClose)

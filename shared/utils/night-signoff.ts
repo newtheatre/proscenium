@@ -69,3 +69,9 @@ export function saysIncidentsMoved(shown: number, logged: number): string {
 export function saysSignOffOpens(curtainDownAt: number): string {
   return `Sign off and close opens at ${saysClock(curtainDownAt)}, once the curtain is down.`
 }
+
+// The route's refusal before the curtain, the moment the screen stops hiding the button; a
+// performance with no times to reckon from is not held, as the screen does not hold it.
+export function signOffTooEarly(curtainDownAt: number | null, at: number): string | null {
+  return curtainDownAt !== null && at < curtainDownAt ? saysSignOffOpens(curtainDownAt) : null
+}
