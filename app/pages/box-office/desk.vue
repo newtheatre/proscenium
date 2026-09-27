@@ -491,23 +491,31 @@ const resultColumns: TableColumn<SearchRow>[] = [
   {
     id: 'reference',
     header: 'Booking',
+    meta: { class: { td: 'whitespace-normal' } },
     cell: ({ row }) => h('div', {}, [
       h('div', { class: 'font-mono' }, row.original.reference),
-      // Below sm the booker is hidden: shown here instead, so a phone keeps the state, the total
-      // and Open in view without losing what it said (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.bookerName),
+      // While the table is narrow the booker is hidden: shown here instead, so the state, the total
+      // and Open stay in view beside the Tonight card and on a phone (K-123 criterion 10, issue 922).
+      h('div', { class: `${SHOW_BELOW_TABLE_2XL} text-xs text-muted` }, row.original.bookerName),
     ]),
   },
-  { id: 'booker', header: 'Booked by', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.bookerName },
+  {
+    id: 'booker',
+    header: 'Booked by',
+    meta: { class: { th: HIDE_BELOW_TABLE_2XL, td: `${HIDE_BELOW_TABLE_2XL} whitespace-normal` } },
+    cell: ({ row }) => row.original.bookerName,
+  },
   {
     id: 'status',
     header: 'State',
+    meta: { class: { td: 'whitespace-normal' } },
     // A pass booking owes nothing, so it reads as settled rather than unpaid (issue 1390).
     cell: ({ row }) => byPass(row.original)
-      ? h(UBadge, { color: 'success', variant: 'subtle' }, () => BY_PASS)
+      ? h(UBadge, { color: 'success', variant: 'subtle', ...WRAPPING_BADGE }, () => BY_PASS)
       : h(UBadge, {
           color: statusColor[row.original.status] ?? 'neutral',
           variant: 'subtle',
+          ...WRAPPING_BADGE,
         }, () => saysDeskStatus(row.original.status)),
   },
   { id: 'total', header: 'Total', meta: RIGHT_ALIGNED, cell: ({ row }) => saysPrice(row.original.totalPence) },
@@ -721,6 +729,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
         <UTable
           :data="results"
           :columns="resultColumns"
+          class="@container"
           data-test="desk-results"
         >
           <template #empty>

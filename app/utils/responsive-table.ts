@@ -14,6 +14,14 @@ export const RIGHT_ALIGNED = { class: { th: 'text-right', td: 'text-right whites
 // The same figure column where a phone drops it and the primary cell's own line carries it.
 export const RIGHT_ALIGNED_HIDE_BELOW_SM = { class: { th: `${HIDE_BELOW_SM} text-right`, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }
 
+// A table beside another card fits by its own width, since the sidebar resizes: its UTable carries
+// `@container`, and the primary cell's SHOW_BELOW_TABLE_2XL line carries what the column said.
+export const HIDE_BELOW_TABLE_2XL = 'hidden @2xl:table-cell'
+export const SHOW_BELOW_TABLE_2XL = '@2xl:hidden'
+
+// A badge that can run to a sentence wraps inside its cell rather than widening the table.
+export const WRAPPING_BADGE = { class: 'max-w-full', ui: { label: 'whitespace-normal' } }
+
 // A column of row actions ends the row as a figure does, but its buttons keep the body face.
 export const ACTIONS_COLUMN = { class: { th: 'text-right', td: 'text-right whitespace-nowrap' } }
 

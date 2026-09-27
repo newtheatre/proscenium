@@ -13,9 +13,6 @@ definePageMeta({ layout: 'console', title: 'Room requests', middleware: 'console
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
-
-// A status line can be a sentence; it wraps inside its badge rather than widening the table.
-const WRAPPING_BADGE = { class: 'max-w-full', ui: { label: 'whitespace-normal' } }
 const UCheckbox = resolveComponent('UCheckbox')
 
 interface Failure { reason: string, says: string }
