@@ -145,8 +145,7 @@ export const bar: Shot[] = [
     width: CONSOLE_WIDTH,
     annotations: [
       { selector: '[data-test="period-kind"]', label: 'Period kind' },
-      { selector: '[data-test="period-from"]', label: 'The dates' },
-      { selector: '[data-test="refresh-report"]', label: 'Refresh' },
+      { selector: '[data-test="period-night"]', label: 'The night' },
       { selector: '[data-test="export-sales"]', label: 'Export CSV' },
       { selector: '[data-test="gp-summary"]', label: 'Gross profit summary' },
     ],

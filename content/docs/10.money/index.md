@@ -50,14 +50,14 @@ Box Office Manager gave it on the [seasons](/docs/box-office/seasons) screen.
 
 ![The money dashboard with the period kind (1), the period's own controls (2), revenue by source (3) and the other figures (4)](/images/docs/money/dashboard.png)
 
-1. **Period kind**: DAY, WEEK, MONTH, TERM, SEASON or YEAR. A day or a week takes a date; a
+1. **Period kind**: Day, Week, Month, Term, Season or Year. A day or a week takes a date; a
    month takes a month and a calendar year; a term, a season and a year are each chosen from a
    list of themselves.
 2. **Month** and **Calendar year** are each a list, and a **Year** reads as the two calendar
    years it spans, "2025/26". A term has no rule behind it: its range is whatever was typed when
-   the term was defined on the [periods](/docs/money/periods) screen, so TERM appears only once
+   the term was defined on the [periods](/docs/money/periods) screen, so Term appears only once
    at least one term exists. A **Season** is listed by name, newest first, retired ones included,
-   and SEASON appears only once at least one season exists.
+   and Season appears only once at least one season exists.
    Changing any of these reads the ledger again at once; there is nothing else to press. Every
    figure is a query, so a sale made a moment ago is already in the next read.
 3. **Revenue by source**: what each surface took on a card, Desk, Till and so on. With
@@ -73,7 +73,7 @@ Box Office Manager gave it on the [seasons](/docs/box-office/seasons) screen.
    with no reading has no variance to add yet, so when the period holds any, a line beneath says
    how many the open variance leaves out, and the Treasurer's copy links to reconciling them.
 
-The range the figures cover is printed above them, from and to, as London dates.
+The range the figures cover is printed above them, from and to, as London days such as **Sat 1 Aug 2026**.
 
 Beneath the period controls, **Needs you: nights to reconcile** lists every night that took card
 money with no Z reading, and every night whose reading still disagrees with what we expect,

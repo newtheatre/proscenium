@@ -24,6 +24,7 @@ export const money: Shot[] = [
     marker: '[data-test="period-year"]',
     width: CONSOLE_WIDTH,
     annotations: [
+      { selector: '[data-test="period-kind"]', label: 'Period kind' },
       { selector: '[data-test="period-year"]', label: 'Year' },
       { selector: '[data-test="show-row"]', label: 'A show\'s row' },
       { selector: '[data-test="section-passes"]', label: 'Pass utilisation' },
