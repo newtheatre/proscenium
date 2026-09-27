@@ -3,6 +3,7 @@ import { isFresh } from '#shared/utils/freshness'
 import { generateRecoveryCodes, normaliseRecoveryCode } from '#shared/utils/recovery-codes'
 import { verifyCode } from '#shared/utils/totp'
 import type { AuditRow } from '#shared/utils/audit'
+import type { BatchItem } from 'drizzle-orm/batch'
 import type { H3Event } from 'h3'
 
 // Enrolment, recovery and the challenge, kept together because minting codes is part of
@@ -58,19 +59,28 @@ export async function mintRecoveryCodes(userId: string, entry: AuditRow): Promis
   return codes
 }
 
-// A proven first credential waiting on its second factor (A-111).
-export async function openAttempt(userId: string, minutes: number, entry: AuditRow): Promise<string> {
+// A proven first credential waiting on its second factor (A-111), as statements, so a route that
+// writes something else first opens it in the same batch and cannot leave half of it done (0001).
+export function attemptStatements(userId: string, minutes: number, entry: AuditRow): { id: string, statements: BatchItem<'sqlite'>[] } {
   const id = crypto.randomUUID().replaceAll('-', '')
-  await db.batch([
-    // One outstanding attempt per account: starting again abandons the last.
-    db.delete(schema.mfaAttempts).where(eq(schema.mfaAttempts.userId, userId)),
-    db.insert(schema.mfaAttempts).values({
-      id,
-      userId,
-      expiresAt: Math.floor(Date.now() / 1000) + minutes * 60,
-    }),
-    db.insert(schema.auditLog).values(entry),
-  ])
+  return {
+    id,
+    statements: [
+      // One outstanding attempt per account: starting again abandons the last.
+      db.delete(schema.mfaAttempts).where(eq(schema.mfaAttempts.userId, userId)),
+      db.insert(schema.mfaAttempts).values({
+        id,
+        userId,
+        expiresAt: Math.floor(Date.now() / 1000) + minutes * 60,
+      }),
+      db.insert(schema.auditLog).values(entry),
+    ],
+  }
+}
+
+export async function openAttempt(userId: string, minutes: number, entry: AuditRow): Promise<string> {
+  const { id, statements } = attemptStatements(userId, minutes, entry)
+  await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   return id
 }
 

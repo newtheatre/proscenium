@@ -204,12 +204,13 @@ describe('where a volunteer on shift looks (issue 1305)', () => {
   test('every place a next is read uses the one local-path rule, never a regex of its own', async () => {
     for (const file of ['app/pages/sign-in.vue', 'app/pages/magic.vue', 'app/middleware/signed-out.ts', 'server/routes/auth/google.get.ts', 'server/middleware/google-return.ts']) {
       const source = await read(file)
-      expect(source).toContain('localPath(')
+      // withNext is localPath underneath (0103).
+      expect(source).toMatch(/localPath\(|withNext\(/)
       expect(source).not.toContain('(?!\\/)')
     }
   })
 
   test('an explicit next of the home page still travels with the Google link', async () => {
-    expect(await read('app/pages/sign-in.vue')).toContain('explicitNext.value === null ? \'/auth/google\'')
+    expect(await read('app/pages/sign-in.vue')).toContain('withNext(\'/auth/google\', route.query.next)')
   })
 })

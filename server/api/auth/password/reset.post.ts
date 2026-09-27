@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { passwordProblem } from '#shared/utils/auth'
+import type { BatchItem } from 'drizzle-orm/batch'
 
 const body = z.object({
   token: z.string().min(20, 'Open the link from the email again').max(200, 'Open the link from the email again'),
@@ -29,10 +30,17 @@ export default defineEventHandler(async (event) => {
 
   // The mailbox proved it and the password is chosen, so this browser signs in; a second factor
   // still has its own step, as after a sign-in link (0103, A-107 criterion 4).
-  const challenged = await confirmedFactor(account.id)
   const now = Math.floor(Date.now() / 1000)
+  const attempt = await confirmedFactor(account.id)
+    ? attemptStatements(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'), auditEntry({
+        actorId: account.id,
+        action: 'mfa.challenged',
+        target: `user:${account.id}`,
+      }))
+    : null
 
-  await db.batch([
+  // The password and the challenge it waits on land together, or neither does (0001).
+  const statements: BatchItem<'sqlite'>[] = [
     // Bumping the epoch ends every other session on the account (0007, A-108 criterion 4).
     db.update(schema.users)
       .set({
@@ -40,7 +48,7 @@ export default defineEventHandler(async (event) => {
         passwordSetAt: now,
         verified: true,
         sessionEpoch: sql`${schema.users.sessionEpoch} + 1`,
-        ...(challenged ? {} : { lastLoginAt: now }),
+        ...(attempt ? {} : { lastLoginAt: now }),
       })
       .where(eq(schema.users.id, account.id)),
     db.insert(schema.auditLog).values(auditEntry({
@@ -48,19 +56,13 @@ export default defineEventHandler(async (event) => {
       action: input.kind === 'SET_PASSWORD' ? 'password.set' : 'password.reset',
       target: `user:${account.id}`,
     })),
-    ...(challenged
-      ? []
+    ...(attempt
+      ? attempt.statements
       : [db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started.magic-link', target: `user:${account.id}` }))]),
-  ])
+  ]
+  await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
 
-  if (challenged) {
-    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'), auditEntry({
-      actorId: account.id,
-      action: 'mfa.challenged',
-      target: `user:${account.id}`,
-    }))
-    return { ok: true, mfaRequired: true as const, attemptId }
-  }
+  if (attempt) return { ok: true, mfaRequired: true as const, attemptId: attempt.id }
 
   // Read back rather than rebuilt, so the session carries the epoch the batch has just moved on.
   await startSession(event, (await findById(account.id))!, 'magic-link')

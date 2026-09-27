@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import * as z from 'zod'
-import { localPath } from '#shared/utils/local-path'
 import { landingAfterSignIn } from '#shared/utils/night-authority'
 import { withNext } from '#shared/utils/sign-in'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
@@ -45,8 +44,7 @@ onMounted(async () => {
 // A sign-in link confirms the address as it signs in, so it is the fresh send an expired link
 // offers rather than a dead end (A-102 criterion 3, 0103).
 async function sendLink(payload: FormSubmitEvent<z.output<typeof addressOnly>>): Promise<void> {
-  const next = localPath(route.query.next) ?? undefined
-  const result = await $fetch<{ message: string }>('/api/auth/magic-link/request', { method: 'POST', body: { ...payload.data, next } })
+  const result = await $fetch<{ message: string }>('/api/auth/magic-link/request', { method: 'POST', body: { ...payload.data, next: route.query.next } })
   notice.value = result.message
   outcome.value = 'sent'
 }
@@ -79,13 +77,13 @@ useSeoMeta({
         Address confirmed
       </h1>
       <p class="text-muted">
-        Your account is ready. Sign in to carry on.
+        {{ account.signedIn ? 'Your new address is confirmed.' : 'Your account is ready. Sign in to carry on.' }}
       </p>
       <UButton
-        :to="withNext('/sign-in', route.query.next)"
+        :to="account.signedIn ? landingAfterSignIn(route.query.next, account.onShiftTonight) : withNext('/sign-in', route.query.next)"
         class="min-h-11"
       >
-        Sign in
+        {{ account.signedIn ? 'Carry on' : 'Sign in' }}
       </UButton>
     </div>
 

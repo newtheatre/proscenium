@@ -10,6 +10,8 @@ function registration(event: H3Event) {
     password: useRuntimeConfig(event).session.password,
     maxAge: VERIFY_TOKEN_HOURS * 60 * 60,
     cookie: { sameSite: 'lax', path: '/' },
+    // The cookie alone: h3 would otherwise also read a sealed value from a request header.
+    sessionHeader: false,
   })
 }
 

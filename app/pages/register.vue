@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import { passwordProblem } from '#shared/utils/auth'
-import { localPath } from '#shared/utils/local-path'
 import { saysPasswordPolicy } from '#shared/utils/password-messages'
 import { withNext } from '#shared/utils/sign-in'
 import type { AuthFormField, FormError, FormSubmitEvent } from '@nuxt/ui'
@@ -46,7 +45,7 @@ async function register(payload: FormSubmitEvent<z.output<typeof schema>>): Prom
   notice.value = null
   try {
     // The confirmation link returns to where the visitor set out from (0103).
-    const result = await $fetch('/api/auth/register', { method: 'POST', body: { ...payload.data, next: localPath(route.query.next) ?? undefined } })
+    const result = await $fetch('/api/auth/register', { method: 'POST', body: { ...payload.data, next: route.query.next } })
     message.value = result.message
     done.value = true
   }

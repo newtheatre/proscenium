@@ -105,8 +105,7 @@ const SIGNED_IN = 'document.querySelector(\'[data-test="account-menu"]\')'
 
 // The link a message carried, read back from the mail sink as a person reads their inbox, and
 // opened on this app whatever base the message was addressed from.
-async function linkSentTo(email: string, path: string): Promise<string> {
-  const pattern = new RegExp(`https?://\\S*${path}\\?token=\\S+`)
+async function linkSentTo(email: string, path: string, pattern = new RegExp(`https?://\\S*${path}\\?token=\\S+`)): Promise<string> {
   const deadline = Date.now() + 15_000
   while (Date.now() < deadline) {
     const found = (await letters(app))
@@ -120,6 +119,22 @@ async function linkSentTo(email: string, path: string): Promise<string> {
     await Bun.sleep(200)
   }
   throw new Error(`no ${path} link reached ${email}`)
+}
+
+// The one cookie of that name a response set, as the browser would store it.
+function registrationCookie(response: Response): string {
+  return response.headers.getSetCookie().find(line => line.startsWith('nnt-registered=')) ?? ''
+}
+
+// A trigger standing in for a failed write, so a test can see what the rest of a batch left.
+function refuseChallengesFor(email: string): () => void {
+  const name = `refuse_challenge_${crypto.randomUUID().replaceAll('-', '')}`
+  withDatabase((database) => {
+    const { id } = database.query('SELECT id FROM users WHERE email = ?').get(email) as { id: string }
+    database.run(`CREATE TRIGGER ${name} BEFORE INSERT ON mfa_attempts WHEN NEW.user_id = '${id}'
+      BEGIN SELECT RAISE(ABORT, 'refused for the test'); END`)
+  }, false)
+  return () => withDatabase(database => database.run(`DROP TRIGGER IF EXISTS ${name}`), false)
 }
 
 // A row the box office made for a ticket guest: a name, an address and no way to sign in.
@@ -503,6 +518,25 @@ describe.skipIf(skip !== null)('every emailed link carries next (0103)', () => {
     }
   }, CASE_TIMEOUT_MS)
 
+  test('registering a guest address sends a claim link that carries next', async () => {
+    const email = address('claim-next')
+    guest(email)
+    await send('POST', '/api/auth/register', { email, name: syntheticPerson(3).name, password, next: '/my' })
+    expect(await linkSentTo(email, '/reset')).toContain('next=%2Fmy')
+  }, CASE_TIMEOUT_MS)
+
+  test('registering an address that has an account sends a sign-in link that carries next', async () => {
+    const email = await registerFresh('exists-next')
+    await send('POST', '/api/auth/register', { email, name: syntheticPerson(4).name, password, next: '/account/profile' })
+    expect(await linkSentTo(email, '/sign-in', /https?:\/\/\S*\/sign-in\?next=\S+/)).toContain('next=%2Faccount%2Fprofile')
+  }, CASE_TIMEOUT_MS)
+
+  test('a resent confirmation carries next', async () => {
+    const email = await registerFresh('resend-next', false)
+    await send('POST', '/api/auth/verify/resend', { email, next: '/my' })
+    expect(await linkSentTo(email, '/verify', /https?:\/\/\S*\/verify\?token=\S*next=%2Fmy/)).toContain('next=%2Fmy')
+  }, CASE_TIMEOUT_MS)
+
   // Registering, then choosing, then signing in was three passwords for one guest (issue 1339).
   test('a guest claiming their bookings chooses a password once and is signed in', async () => {
     const email = address('claim')
@@ -541,6 +575,133 @@ describe.skipIf(skip !== null)('every emailed link carries next (0103)', () => {
     finally {
       view.close()
     }
+  }, CASE_TIMEOUT_MS)
+})
+
+// The browser that registered holds the address sealed; the answer must not differ by branch, and
+// the cookie must never stand in for a second factor or a changed address (0103, A-101 c2, A-115).
+describe.skipIf(skip !== null)('the registering browser\'s cookie (0103)', () => {
+  const register = (email: string): Promise<Response> =>
+    send('POST', '/api/auth/register', { email, name: syntheticPerson(Math.floor(Math.random() * 1_000_000)).name, password })
+
+  const attributes = (line: string): string[] =>
+    line.split(';').slice(1).map(part => part.trim().split('=')[0]!.toLowerCase()).sort()
+
+  test('every branch sets it with the same attributes: HttpOnly, Secure and SameSite=Lax', async () => {
+    const existing = await registerFresh('cookie-existing')
+    const guestAddress = address('cookie-guest')
+    guest(guestAddress)
+
+    const lines = [
+      registrationCookie(await register(address('cookie-new'))),
+      registrationCookie(await register(existing)),
+      registrationCookie(await register(guestAddress)),
+      registrationCookie(await register(`cookie-${Math.random().toString(36).slice(2)}@example.com`)),
+    ]
+
+    for (const line of lines) {
+      expect(line.length).toBeGreaterThan('nnt-registered='.length)
+      expect(attributes(line)).toEqual(attributes(lines[0]!))
+      expect(line.toLowerCase()).toContain('samesite=lax')
+    }
+    expect(attributes(lines[0]!)).toEqual(expect.arrayContaining(['httponly', 'secure', 'samesite']))
+  }, CASE_TIMEOUT_MS)
+
+  test('the first confirmation signs in and spends it, so what the browser then holds signs in nobody', async () => {
+    const email = address('cookie-spent')
+    const cookie = registrationCookie(await register(email)).split(';')[0]!
+    const first = newToken()
+    await plantToken(email, 'EMAIL_VERIFY', first, 60)
+
+    const confirmed = await send('POST', '/api/auth/verify', { token: first }, cookie)
+    expect(await confirmed.json()).toMatchObject({ signedIn: true })
+    expect(confirmed.headers.getSetCookie().some(line => line.startsWith('nnt-session='))).toBe(true)
+
+    const held = registrationCookie(confirmed).split(';')[0]!
+    expect(held).toBe('nnt-registered=')
+    const second = newToken()
+    await plantToken(email, 'EMAIL_VERIFY', second, 60)
+    expect(await (await send('POST', '/api/auth/verify', { token: second }, held)).json()).toMatchObject({ signedIn: false })
+  }, CASE_TIMEOUT_MS)
+
+  test('a link bound to an address confirms without signing in, even in the registering browser', async () => {
+    const email = address('cookie-bound')
+    const cookie = registrationCookie(await register(email)).split(';')[0]!
+    const token = newToken()
+    const hash = await sha256(token)
+    withDatabase((database) => {
+      const { id } = database.query('SELECT id FROM users WHERE email = ?').get(email) as { id: string }
+      database.query('DELETE FROM auth_tokens WHERE user_id = ? AND kind = ?').run(id, 'EMAIL_VERIFY')
+      database.query('INSERT INTO auth_tokens (id, user_id, kind, token_hash, email, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(crypto.randomUUID().replaceAll('-', ''), id, 'EMAIL_VERIFY', hash, email, Math.floor(Date.now() / 1000) + 3600)
+    }, false)
+
+    const answered = await send('POST', '/api/auth/verify', { token }, cookie)
+    expect(await answered.json()).toMatchObject({ signedIn: false })
+    expect(answered.headers.getSetCookie().some(line => line.startsWith('nnt-session='))).toBe(false)
+    expect(verifiedFlag(email)).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
+  test('an account with a confirmed factor is confirmed and not signed in, even in the registering browser', async () => {
+    const email = address('cookie-factor')
+    const cookie = registrationCookie(await register(email)).split(';')[0]!
+    markVerified(app, email)
+    await withFactor(email)
+    withDatabase(database => database.query('UPDATE users SET verified = 0 WHERE email = ?').run(email), false)
+    const token = newToken()
+    await plantToken(email, 'EMAIL_VERIFY', token, 60)
+
+    const answered = await send('POST', '/api/auth/verify', { token }, cookie)
+    expect(await answered.json()).toMatchObject({ signedIn: false })
+    expect(answered.headers.getSetCookie().some(line => line.startsWith('nnt-session='))).toBe(false)
+    expect(verifiedFlag(email)).toBe(1)
+  }, CASE_TIMEOUT_MS)
+})
+
+// Each route that opens a challenge writes it in the batch that holds the rest, so a failed
+// challenge write leaves the password and the address as they were (0001).
+describe.skipIf(skip !== null)('a challenge that cannot be written leaves nothing half done (0001)', () => {
+  const passwordOf = (email: string): string =>
+    withDatabase(database => (database.query('SELECT password FROM users WHERE email = ?').get(email) as { password: string }).password)
+  const auditCount = (email: string, action: string): number =>
+    withDatabase(database => (database.query(`SELECT count(*) n FROM audit_log l JOIN users u ON l.target = 'user:' || u.id
+      WHERE u.email = ? AND l.action = ?`).get(email, action) as { n: number }).n)
+
+  test('a reset on an account with a factor sets no password when its challenge fails', async () => {
+    const email = await registerFresh('atomic-reset')
+    await withFactor(email)
+    const before = passwordOf(email)
+    const token = newToken()
+    await plantToken(email, 'PASSWORD_RESET', token, 60)
+
+    const allow = refuseChallengesFor(email)
+    try {
+      const answered = await send('POST', '/api/auth/password/reset', { token, password: generatePassword() })
+      expect(answered.status).toBeGreaterThanOrEqual(500)
+    }
+    finally {
+      allow()
+    }
+    expect(passwordOf(email)).toBe(before)
+    expect(auditCount(email, 'password.reset')).toBe(0)
+  }, CASE_TIMEOUT_MS)
+
+  test('a sign-in link on an account with a factor proves nothing when its challenge fails', async () => {
+    const email = await registerFresh('atomic-magic')
+    await withFactor(email)
+    withDatabase(database => database.query('UPDATE users SET verified = 0 WHERE email = ?').run(email), false)
+    const token = newToken()
+    await plantToken(email, 'MAGIC_LINK', token, 60)
+
+    const allow = refuseChallengesFor(email)
+    try {
+      const answered = await send('POST', '/api/auth/magic-link/consume', { token })
+      expect(answered.status).toBeGreaterThanOrEqual(500)
+    }
+    finally {
+      allow()
+    }
+    expect(verifiedFlag(email)).toBe(0)
   }, CASE_TIMEOUT_MS)
 })
 

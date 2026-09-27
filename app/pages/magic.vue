@@ -82,6 +82,7 @@ useSeoMeta({
       </p>
       <UButton
         :to="askAgain"
+        class="min-h-11"
         data-test="ask-again"
       >
         Ask for a new one

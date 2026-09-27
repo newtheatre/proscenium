@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import { normaliseEmail } from '#shared/utils/auth'
-import { localPath } from '#shared/utils/local-path'
 import { landingAfterSignIn } from '#shared/utils/night-authority'
 import { wayInFor, withNext } from '#shared/utils/sign-in'
 import type { FormError } from '@nuxt/ui'
@@ -109,8 +108,7 @@ async function ask(path: string, email: string, doing: 'link' | 'reset'): Promis
   notice.value = null
   working.value = doing
   try {
-    const next = localPath(route.query.next) ?? undefined
-    const result = await $fetch<{ message: string }>(path, { method: 'POST', body: { email, next } })
+    const result = await $fetch<{ message: string }>(path, { method: 'POST', body: { email, next: route.query.next } })
     sent.value = result.message
     step.value = 'sent'
   }

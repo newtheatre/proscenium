@@ -25,11 +25,10 @@ export default defineEventHandler(async (event) => {
   const registeredHere = await takeRegistration(event)
   const signsIn = Boolean(account && claimed.email === null && registeredHere === normaliseEmail(account.email)
     && !account.disabled && account.anonymisedAt === null && !await confirmedFactor(account.id))
-  const now = Math.floor(Date.now() / 1000)
 
   await db.batch([
     db.delete(schema.authTokens).where(eq(schema.authTokens.userId, claimed.userId)),
-    db.update(schema.users).set(signsIn ? { verified: true, lastLoginAt: now } : { verified: true }).where(eq(schema.users.id, claimed.userId)),
+    db.update(schema.users).set({ verified: true, ...(signsIn ? { lastLoginAt: Math.floor(Date.now() / 1000) } : {}) }).where(eq(schema.users.id, claimed.userId)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: claimed.userId,
       action: 'account.verified',
