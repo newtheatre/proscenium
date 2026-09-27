@@ -14,3 +14,24 @@ export function sessionFacts(facts: ViewerFacts) {
   const { id: _, ...shared } = facts
   return { ...shared, canWorkTonight: worksTonight(facts) }
 }
+
+export type SessionFacts = ReturnType<typeof sessionFacts>
+
+// A signed-out snapshot, typed from the answer, so a fact added there must be given a value here.
+export const NO_SESSION_FACTS: SessionFacts = {
+  permissions: [],
+  holdsRole: false,
+  onShiftTonight: false,
+  canWorkTonight: false,
+  leadsDepartment: false,
+  isTrainer: false,
+  keepsBarTab: false,
+  membershipState: { kind: 'none' },
+}
+
+// The chrome's viewer, rebuilt from the session answer: the same shape the server resolver holds,
+// read from the account snapshot rather than the cookie (0007, 0009).
+export function viewerFromSession(id: string, facts: SessionFacts): Viewer {
+  const { holdsRole: _, canWorkTonight: __, ...viewer } = facts
+  return { id, ...viewer }
+}
