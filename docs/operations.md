@@ -757,12 +757,16 @@ anyone owing on an unsettled tab are exempt, recomputed every run rather than re
 
 Each run is capped twice: `RETENTION_WARNING_CAP` (100) warnings and `RETENTION_SWEEP_CAP` (200)
 anonymisations. A cap refuses the surplus rather than queuing it, so the next run finds the same
-accounts still due and takes the next slice; the digest names the cap it hit.
+accounts still due and takes the next slice; the digest names the cap it hit and any account the
+IT Manager guard refused.
 
 To run it by hand, `POST /_nitro/tasks/retention:sweep`. The result reports `armed`, the counts for
 each window, `anonymised`, `refused`, `warningsCappedAt`, `anonymisationsCappedAt`, `wouldAnonymise`
-and `digests`. `refused` counts armed erasures that were refused. Each one is left for the next
-run to find again, and the run carries on past it rather than stopping (A-120 criterion 6).
+and `digests`. `refused` counts armed erasures the IT Manager guard refused (its 409): each is left
+for the next run to find again, and the run carries on past it (A-120 criterion 6). Anything else
+that goes wrong in an erasure is a fault, not a refusal: it stops the run, reaches Workers Logs,
+and no digest goes out, so a missing digest is the alarm. The unverified-account expiry in
+`daily:sweeps` erases through the same helper, `eraseEach`, and treats a fault the same way.
 
 ### backup (05:00 Monday) and the restore drill (K-108, J-107)
 
