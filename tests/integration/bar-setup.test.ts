@@ -260,7 +260,7 @@ describe('nothing partial survives a collision (F-127 criterion 4)', () => {
       apply(database, planProductSetup(CIDER, context()))
 
       const again = planProductSetup(
-        { ...CIDER, item: { mode: 'NEW', item: { name: 'Cider 440ml can (2)', unit: 'ITEM' } } } as ProductSetupInput,
+        { ...CIDER, item: { mode: 'NEW', item: { name: 'Cider 440ml can (2)', unit: 'ITEM', ageRestricted: true, allergenState: 'UNKNOWN' } } } as ProductSetupInput,
         context(),
       )
       apply(database, again)
