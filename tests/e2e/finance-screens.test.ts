@@ -76,8 +76,10 @@ describe.skipIf(skip !== null)('/money: the dashboard over one of the theatre\'s
     seasonRow('screens-season-stuff', 'StuFF 2019 (screens)', '2019-05-13', '2019-05-19')
     const answered = await send('GET', '/api/admin/finance/season?kind=SEASON&seasonId=screens-season-stuff', undefined, treasurer.cookie)
     expect(answered.status).toBe(200)
-    const { summary } = await answered.json() as { summary: { fromDay: string, toDay: string } }
+    const { summary } = await answered.json() as { summary: { fromDay: string, toDay: string, revenueTotalPence: number, revenueBySource: { totalPence: number }[] } }
     expect(summary).toMatchObject({ fromDay: '2019-05-13', toDay: '2019-05-19' })
+    // The total row's figure arrives with the rows and equals them.
+    expect(summary.revenueTotalPence).toBe(summary.revenueBySource.reduce((sum, row) => sum + row.totalPence, 0))
   })
 
   test('a season no row carries is refused rather than read as some other range', async () => {

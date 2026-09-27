@@ -69,6 +69,7 @@ export interface SeasonSummary {
   fromDay: string
   toDay: string
   revenueBySource: RevenueBySource[]
+  revenueTotalPence: number
   refundsPence: number
   compsPence: number
   discountsPence: number
