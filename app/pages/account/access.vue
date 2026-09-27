@@ -59,6 +59,8 @@ async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<
   }
   catch (error) {
     toast.add({ title: refusalText(error), color: 'error' })
+    // Decided while this was being saved: show what stands now, so the member saves over that.
+    if (refusalStatus(error) === 409) await load()
   }
   finally {
     saving.value = false
