@@ -135,6 +135,15 @@ const building = (field: FilterField): boolean => {
   return operator !== undefined && operator !== UNSET && operator !== 'empty'
 }
 
+// Every control inside one UFormField takes its id, so each past the first gets a field of its own,
+// with its own id and a name a screen reader says (K-101, as issue 1333 found).
+const OWN_FIELD = { labelWrapper: 'sr-only', container: 'mt-0' }
+
+function valueLabel(field: FilterField, index: 0 | 1): string {
+  if (index === 1) return `${field.label} to`
+  return drafts[field.key]?.operator === 'between' ? `${field.label} from` : `${field.label} to match`
+}
+
 const sortItems = computed(() => props.spec.sort.fields.map(field => ({ label: field.label, value: field.key })))
 const directionItems = [
   { label: 'Ascending', value: 'asc' },
@@ -160,14 +169,20 @@ const directionItems = [
           data-test="list-sort"
           @update:model-value="(key: string) => emit('sort', { key, direction: sort.direction })"
         />
-        <USelect
-          :model-value="sort.direction"
-          :items="directionItems"
-          value-key="value"
+        <UFormField
+          label="Sort order"
+          :ui="OWN_FIELD"
           class="w-36"
-          data-test="list-direction"
-          @update:model-value="(direction: string) => emit('sort', { key: sort.key, direction: direction === 'desc' ? 'desc' : 'asc' })"
-        />
+        >
+          <USelect
+            :model-value="sort.direction"
+            :items="directionItems"
+            value-key="value"
+            class="w-full"
+            data-test="list-direction"
+            @update:model-value="(direction: string) => emit('sort', { key: sort.key, direction: direction === 'desc' ? 'desc' : 'asc' })"
+          />
+        </UFormField>
       </div>
     </UFormField>
 
@@ -203,92 +218,128 @@ const directionItems = [
 
         <template v-if="building(field)">
           <!-- A short closed list is a select; a long or searchable one is a menu (0032). -->
-          <USelect
-            v-if="field.kind === 'list' && drafts[field.key]!.operator !== 'any'"
-            :model-value="drafts[field.key]!.values[0] || undefined"
-            :items="options[field.key]"
-            value-key="value"
-            placeholder="Choose one"
-            class="w-full"
-            :data-test="`filter-${field.key}-value`"
-            @update:model-value="(value: string) => setValue(field, 0, value)"
-          />
-
-          <USelectMenu
-            v-else-if="(field.kind === 'list' || isMenu(field)) && drafts[field.key]!.operator === 'any'"
-            :model-value="drafts[field.key]!.values"
-            :items="options[field.key]"
-            value-key="value"
-            multiple
-            placeholder="Choose some"
-            class="w-full"
-            :data-test="`filter-${field.key}-value`"
-            @update:model-value="(values: string[]) => setValues(field, values)"
-          />
-
-          <USelectMenu
-            v-else-if="isMenu(field)"
-            :model-value="drafts[field.key]!.values[0]"
-            :items="options[field.key]"
-            value-key="value"
-            placeholder="Choose one"
-            class="w-full"
-            :data-test="`filter-${field.key}-value`"
-            @update:model-value="(value: string) => setValue(field, 0, value)"
-          />
-
-          <template v-else-if="isReference(field)">
-            <UInputTags
-              v-if="drafts[field.key]!.operator === 'any' && drafts[field.key]!.values.length"
-              :model-value="drafts[field.key]!.values"
-              :display-value="(id: string) => names[id] ?? 'Chosen'"
-              readonly
+          <UFormField
+            v-if="field.kind === 'list' || isMenu(field)"
+            :label="valueLabel(field, 0)"
+            :ui="OWN_FIELD"
+          >
+            <USelect
+              v-if="field.kind === 'list' && drafts[field.key]!.operator !== 'any'"
+              :model-value="drafts[field.key]!.values[0] || undefined"
+              :items="options[field.key]"
+              value-key="value"
+              placeholder="Choose one"
               class="w-full"
+              :data-test="`filter-${field.key}-value`"
+              @update:model-value="(value: string) => setValue(field, 0, value)"
+            />
+
+            <USelectMenu
+              v-else-if="drafts[field.key]!.operator === 'any'"
+              :model-value="drafts[field.key]!.values"
+              :items="options[field.key]"
+              value-key="value"
+              multiple
+              placeholder="Choose some"
+              class="w-full"
+              :data-test="`filter-${field.key}-value`"
               @update:model-value="(values: string[]) => setValues(field, values)"
             />
-            <PersonPicker
-              v-if="field.kind === 'person'"
-              :data-test="`filter-${field.key}-value`"
-              @chosen="pick => addPick(field, pick)"
-            />
-            <SpacePicker
+
+            <USelectMenu
               v-else
+              :model-value="drafts[field.key]!.values[0]"
+              :items="options[field.key]"
+              value-key="value"
+              placeholder="Choose one"
+              class="w-full"
               :data-test="`filter-${field.key}-value`"
-              @chosen="pick => addPick(field, pick)"
+              @update:model-value="(value: string) => setValue(field, 0, value)"
             />
+          </UFormField>
+
+          <template v-else-if="isReference(field)">
+            <UFormField
+              v-if="drafts[field.key]!.operator === 'any' && drafts[field.key]!.values.length"
+              :label="`${field.label} chosen`"
+              :ui="OWN_FIELD"
+            >
+              <UInputTags
+                :model-value="drafts[field.key]!.values"
+                :display-value="(id: string) => names[id] ?? 'Chosen'"
+                readonly
+                class="w-full"
+                @update:model-value="(values: string[]) => setValues(field, values)"
+              />
+            </UFormField>
+            <UFormField
+              :label="valueLabel(field, 0)"
+              :ui="OWN_FIELD"
+            >
+              <PersonPicker
+                v-if="field.kind === 'person'"
+                :data-test="`filter-${field.key}-value`"
+                @chosen="pick => addPick(field, pick)"
+              />
+              <SpacePicker
+                v-else
+                :data-test="`filter-${field.key}-value`"
+                @chosen="pick => addPick(field, pick)"
+              />
+            </UFormField>
           </template>
 
           <template v-else-if="field.kind === 'date-range'">
-            <DateField
-              :model-value="drafts[field.key]!.values[0] || undefined"
-              :data-test="`filter-${field.key}-value`"
-              @update:model-value="value => setValue(field, 0, value)"
-            />
-            <DateField
+            <UFormField
+              :label="valueLabel(field, 0)"
+              :ui="OWN_FIELD"
+            >
+              <DateField
+                :model-value="drafts[field.key]!.values[0] || undefined"
+                :data-test="`filter-${field.key}-value`"
+                @update:model-value="value => setValue(field, 0, value)"
+              />
+            </UFormField>
+            <UFormField
               v-if="drafts[field.key]!.operator === 'between'"
-              :model-value="drafts[field.key]!.values[1] || undefined"
-              :data-test="`filter-${field.key}-to`"
-              @update:model-value="value => setValue(field, 1, value)"
-            />
+              :label="valueLabel(field, 1)"
+              :ui="OWN_FIELD"
+            >
+              <DateField
+                :model-value="drafts[field.key]!.values[1] || undefined"
+                :data-test="`filter-${field.key}-to`"
+                @update:model-value="value => setValue(field, 1, value)"
+              />
+            </UFormField>
           </template>
 
           <!-- A number is sent when the reader leaves the box or presses enter, not per keystroke. -->
           <template v-else-if="field.kind === 'number-range'">
-            <UInputNumber
-              :model-value="drafts[field.key]!.values[0] ? Number(drafts[field.key]!.values[0]) : undefined"
-              class="w-full"
-              :data-test="`filter-${field.key}-value`"
-              @update:model-value="value => hold(field, 0, value)"
-              @change="commit(field)"
-            />
-            <UInputNumber
+            <UFormField
+              :label="valueLabel(field, 0)"
+              :ui="OWN_FIELD"
+            >
+              <UInputNumber
+                :model-value="drafts[field.key]!.values[0] ? Number(drafts[field.key]!.values[0]) : undefined"
+                class="w-full"
+                :data-test="`filter-${field.key}-value`"
+                @update:model-value="value => hold(field, 0, value)"
+                @change="commit(field)"
+              />
+            </UFormField>
+            <UFormField
               v-if="drafts[field.key]!.operator === 'between'"
-              :model-value="drafts[field.key]!.values[1] ? Number(drafts[field.key]!.values[1]) : undefined"
-              class="w-full"
-              :data-test="`filter-${field.key}-to`"
-              @update:model-value="value => hold(field, 1, value)"
-              @change="commit(field)"
-            />
+              :label="valueLabel(field, 1)"
+              :ui="OWN_FIELD"
+            >
+              <UInputNumber
+                :model-value="drafts[field.key]!.values[1] ? Number(drafts[field.key]!.values[1]) : undefined"
+                class="w-full"
+                :data-test="`filter-${field.key}-to`"
+                @update:model-value="value => hold(field, 1, value)"
+                @change="commit(field)"
+              />
+            </UFormField>
           </template>
         </template>
       </div>

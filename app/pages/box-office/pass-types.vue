@@ -495,11 +495,14 @@ const columns: TableColumn<PassType>[] = [
             />
           </UFormField>
 
-          <UFormField
-            label="Price points"
-            name="prices"
-            description="At least one, each with its own label."
-          >
+          <!-- Not a UFormField: every input inside one takes the field's id, so each price point's two would share it (K-101, issue 1333). -->
+          <fieldset data-test="pass-type-prices">
+            <legend class="mb-1 text-sm font-medium text-default">
+              Price points
+            </legend>
+            <p class="mb-2 text-sm text-muted">
+              At least one, each with its own label.
+            </p>
             <div class="space-y-2">
               <div
                 v-for="(row, index) in priceRows"
@@ -510,6 +513,7 @@ const columns: TableColumn<PassType>[] = [
                   v-model="row.label"
                   placeholder="Standard"
                   class="flex-1"
+                  :aria-label="`Price point ${index + 1}: label`"
                   :data-test="`pass-type-price-label-${index}`"
                 />
                 <UInputNumber
@@ -518,6 +522,7 @@ const columns: TableColumn<PassType>[] = [
                   :step="0.01"
                   :format-options="{ style: 'currency', currency: 'GBP' }"
                   class="w-40"
+                  :aria-label="`Price point ${index + 1}: price`"
                   :data-test="`pass-type-price-amount-${index}`"
                 />
                 <UButton
@@ -540,7 +545,7 @@ const columns: TableColumn<PassType>[] = [
                 Add a price point
               </UButton>
             </div>
-          </UFormField>
+          </fieldset>
 
           <UFormField
             v-if="!editing"

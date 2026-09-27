@@ -442,7 +442,11 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
           />
         </UFormField>
 
-        <UFormField label="Material links">
+        <!-- Not a UFormField: every input inside one takes the field's id, so each link's two would share it (K-101, issue 1333). -->
+        <fieldset data-test="material-links">
+          <legend class="mb-1 text-sm font-medium text-default">
+            Material links
+          </legend>
           <div class="space-y-2">
             <div
               v-for="(material, index) in state.materials"
@@ -452,12 +456,14 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
               <UInput
                 v-model="material.label"
                 placeholder="What it is"
+                :aria-label="`Material link ${index + 1}: what it is`"
                 :data-test="`material-label-${index}`"
               />
               <UInput
                 v-model="material.url"
                 placeholder="https://"
                 class="flex-1"
+                :aria-label="`Material link ${index + 1}: address`"
                 :data-test="`material-url-${index}`"
               />
               <UButton
@@ -480,7 +486,7 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
               Add a link
             </UButton>
           </div>
-        </UFormField>
+        </fieldset>
       </UForm>
     </template>
 
