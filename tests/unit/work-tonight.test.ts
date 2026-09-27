@@ -139,7 +139,7 @@ describe('a release is offered only until the shift\'s show night begins (E-107 
   // A slot on a bar opening has the same cut-off as a shift, not the opening's closing time.
   test('a slot on a bar opening is offered for release on the same rule', async () => {
     const source = await Bun.file('app/pages/rota/index.vue').text()
-    expect(source).toContain('releaseStillOpen(slot.startsAt, nowSeconds)')
+    expect(source).toContain('v-if="releasable(slot)"')
     expect(source).not.toContain('slot.endsAt >= nowSeconds')
   })
 })

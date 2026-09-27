@@ -593,6 +593,8 @@ describe('a holder releases their own slot until the night begins (E-107 criteri
 
       expect(run(database, releaseOpeningShiftStatement(slot!.id, 'one', NIGHT_START))).toHaveLength(0)
       expect(run(database, releaseOpeningShiftStatement(slot!.id, 'one', CLOSES_AT + 3600))).toHaveLength(0)
+      // A night already over stays refused: the comparison is later-than, not merely different.
+      expect(run(database, releaseOpeningShiftStatement(slot!.id, 'one', Math.floor(showNightBounds(NIGHT).to.getTime() / 1000)))).toHaveLength(0)
       expect(slotsOn(database, openingId)[0]).toMatchObject({ user_id: 'one', status: 'CONFIRMED' })
     })
   })

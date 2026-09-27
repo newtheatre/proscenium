@@ -119,8 +119,9 @@ const dismissing = ref<string | null>(null)
 // A duty manager's own shift has nobody listed, so its card says to tell the Front of House Manager.
 const tellFor = (shift: MyShift): DutyManagerToTell | null => mine.value.dutyManagers[shift.performanceId] ?? null
 
-function releasable(shift: MyShift): boolean {
-  return (shift.status === 'CLAIMED' || shift.status === 'CONFIRMED') && releaseStillOpen(shift.startsAt, nowSeconds)
+// One rule for a shift and for a slot on an opening, so the two buttons cannot drift apart.
+function releasable(held: Pick<MyShift, 'status' | 'startsAt'>): boolean {
+  return (held.status === 'CLAIMED' || held.status === 'CONFIRMED') && releaseStillOpen(held.startsAt, nowSeconds)
 }
 
 // A release is asked first, the same for a shift and a slot on an opening (E-107 criterion 8); a
@@ -403,7 +404,7 @@ useSeoMeta({ title: 'Rota' })
             </UButton>
           </div>
           <UButton
-            v-if="(slot.status === 'CLAIMED' || slot.status === 'CONFIRMED') && releaseStillOpen(slot.startsAt, nowSeconds)"
+            v-if="releasable(slot)"
             size="sm"
             color="neutral"
             variant="subtle"
