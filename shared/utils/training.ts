@@ -63,11 +63,13 @@ export function plannerModuleOptions(modules: readonly { id: string, name: strin
   ]
 }
 
-// A new module starts in the one department the catalogue is filtered to, and in none otherwise.
-export function departmentFromFilter(conditions: readonly FilterCondition[]): string | null {
+// A new module starts in the one department the catalogue is filtered to, if it is one on offer:
+// a code kept in a bookmark may since have been retired or never been led by this reader.
+export function departmentFromFilter(conditions: readonly FilterCondition[], offered: readonly string[]): string | null {
   const department = conditions.find(condition => condition.key === 'department')
   if (!department || department.operator === 'not' || department.values.length !== 1) return null
-  return department.values[0] ?? null
+  const code = department.values[0] ?? null
+  return code !== null && offered.includes(code) ? code : null
 }
 
 export interface ExpiryPolicy {

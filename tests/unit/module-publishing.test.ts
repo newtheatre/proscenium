@@ -25,16 +25,23 @@ describe('the planner offers what can be taught, and says why a draft cannot', (
 })
 
 describe('a new module starts in the department the list is filtered to', () => {
+  const OFFERED = ['TECH', 'FOH']
+
   test('one department asked for is the one chosen', () => {
-    expect(departmentFromFilter([{ key: 'department', operator: 'is', values: ['TECH'] }])).toBe('TECH')
-    expect(departmentFromFilter([{ key: 'department', operator: 'any', values: ['FOH'] }])).toBe('FOH')
+    expect(departmentFromFilter([{ key: 'department', operator: 'is', values: ['TECH'] }], OFFERED)).toBe('TECH')
+    expect(departmentFromFilter([{ key: 'department', operator: 'any', values: ['FOH'] }], OFFERED)).toBe('FOH')
   })
 
   test('no filter, several departments or an exclusion choose nothing', () => {
-    expect(departmentFromFilter([])).toBeNull()
-    expect(departmentFromFilter([{ key: 'department', operator: 'any', values: ['TECH', 'FOH'] }])).toBeNull()
-    expect(departmentFromFilter([{ key: 'department', operator: 'not', values: ['TECH'] }])).toBeNull()
-    expect(departmentFromFilter([{ key: 'kind', operator: 'is', values: ['BRIEF'] }])).toBeNull()
+    expect(departmentFromFilter([], OFFERED)).toBeNull()
+    expect(departmentFromFilter([{ key: 'department', operator: 'any', values: ['TECH', 'FOH'] }], OFFERED)).toBeNull()
+    expect(departmentFromFilter([{ key: 'department', operator: 'not', values: ['TECH'] }], OFFERED)).toBeNull()
+    expect(departmentFromFilter([{ key: 'kind', operator: 'is', values: ['BRIEF'] }], OFFERED)).toBeNull()
+  })
+
+  // A bookmark can name a department since retired, or one this reader does not lead.
+  test('a department the list does not offer chooses nothing', () => {
+    expect(departmentFromFilter([{ key: 'department', operator: 'is', values: ['OLD'] }], OFFERED)).toBeNull()
   })
 })
 
@@ -50,7 +57,16 @@ describe('the screens', () => {
     expect(source).toMatch(/v-if="module"[\s\S]{0,200}name="status"/)
   })
 
-  test('the planner lists drafts through the one helper', async () => {
-    expect(await Bun.file(PLANNER).text()).toContain('plannerModuleOptions(')
+  // The first submit button is the form's default, which Enter in any field presses.
+  test('Enter in a field saves a draft, never publishes', async () => {
+    const source = await Bun.file(EDITOR).text()
+    expect(source.indexOf('data-test="module-draft"')).toBeLessThan(source.indexOf('data-test="module-publish"'))
+  })
+
+  test('the planner and the session page list drafts through the one helper', async () => {
+    const planner = await Bun.file(PLANNER).text()
+    expect(planner).toContain('plannerModuleOptions(')
+    expect(await Bun.file('app/pages/training/manage/sessions/[id].vue').text()).toContain('plannerModuleOptions(')
+    expect(planner).toMatch(/v-if="teachable.length === 0 && drafts > 0"[\s\S]{0,600}data-test="sessions-only-drafts"/)
   })
 })

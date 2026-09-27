@@ -173,7 +173,7 @@ const columns: TableColumn<CatalogueModule>[] = [
           data-test="add-module"
           icon="i-lucide-plus"
           :disabled="departments.length === 0"
-          @click="emit('add', departmentFromFilter(conditions))"
+          @click="emit('add', departmentFromFilter(conditions, departments.map(one => one.code)))"
         >
           Add a module
         </UButton>

@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
       actorId: resolved.account.id,
       action: 'module.created',
       target: `module:${input.id}`,
-      detail: { department: input.department, kind: input.kind, safetyCritical: input.safetyCritical },
+      detail: { department: input.department, kind: input.kind, status: input.status, safetyCritical: input.safetyCritical },
     })),
   ])
 

@@ -493,7 +493,7 @@ const columns: TableColumn<Session>[] = [
       color="neutral"
       variant="subtle"
       icon="i-lucide-info"
-      :description="`Only drafts are in the catalogue (${plural(drafts, 'module')}). Publish one on the catalogue to schedule it.`"
+      :description="`Every module a session could teach is still a draft (${plural(drafts, 'module')}). Publish one on the catalogue first.`"
       :actions="[{ label: 'Open the catalogue', to: '/training/manage', color: 'neutral', variant: 'outline' }]"
       data-test="sessions-only-drafts"
     />

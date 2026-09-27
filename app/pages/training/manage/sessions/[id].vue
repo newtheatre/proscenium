@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { can, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { saysDay } from '#shared/utils/when'
-import { SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysGaps, saysSessionStatus } from '#shared/utils/training'
+import { SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, plannerModuleOptions, saysGaps, saysSessionStatus } from '#shared/utils/training'
 import type { MemberLacking } from '#shared/utils/training'
 
 definePageMeta({ layout: 'console', title: 'Session', middleware: 'console', docs: '/docs/training/sessions' })
@@ -160,13 +160,15 @@ const previewFailure = ref<string | null>(null)
 const modulesFailure = ref<string | null>(null)
 const modulesResult = ref<string | null>(null)
 
-// What may be taught: active, and not proved by experience rather than by a session (G-112 c3).
-// What it teaches now is always offered too, so a module retired since can still be taken off.
+// The planner's own list (G-112 c3), plus what the session teaches now, always enabled, so a
+// module retired or unpublished since can still be taken off.
 const teachableOptions = computed(() => {
-  const teachable = catalogue.value.filter(module => module.status === 'ACTIVE' && !module.signoffRequired)
-  const offered = new Set(teachable.map(module => module.id))
-  return [...teachable, ...(data.value?.modules ?? []).filter(module => !offered.has(module.id))]
-    .map(module => ({ label: `${module.id} ${module.name}`, value: module.id }))
+  const current = new Set((data.value?.modules ?? []).map(module => module.id))
+  const options = plannerModuleOptions(catalogue.value)
+    .map(option => (current.has(option.value) ? { ...option, disabled: false } : option))
+  const listed = new Set(options.map(option => option.value))
+  return [...options, ...(data.value?.modules ?? []).filter(module => !listed.has(module.id))
+    .map(module => ({ label: `${module.id} ${module.name}`, value: module.id, disabled: false }))]
 })
 
 const modulesUnchanged = computed(() => {

@@ -494,18 +494,9 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
       >
         Save the module
       </UButton>
-      <!-- Publishing is the button pressed, so the next step (a session) finds it (issue 1354). -->
+      <!-- Publishing is the button pressed (issue 1354). The draft comes first in the markup, as the
+        form's default button, so Enter in a field saves a draft; publishing is drawn first. -->
       <template v-else>
-        <UButton
-          type="submit"
-          form="module-form"
-          :loading="saving && state.status === 'ACTIVE'"
-          :disabled="saving"
-          data-test="module-publish"
-          @click="state.status = 'ACTIVE'"
-        >
-          Add and publish
-        </UButton>
         <UButton
           type="submit"
           form="module-form"
@@ -517,6 +508,17 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
           @click="state.status = 'DRAFT'"
         >
           Save as a draft
+        </UButton>
+        <UButton
+          type="submit"
+          form="module-form"
+          class="order-first"
+          :loading="saving && state.status === 'ACTIVE'"
+          :disabled="saving"
+          data-test="module-publish"
+          @click="state.status = 'ACTIVE'"
+        >
+          Add and publish
         </UButton>
       </template>
       <UButton

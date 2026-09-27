@@ -558,6 +558,9 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
 
     expect(read<{ status: string, department: string }>('SELECT status, department FROM modules WHERE id = ?', id))
       .toEqual({ status: 'DRAFT', department })
+    // Whether a module was published when it was added is on the trail.
+    const created = read<{ detail: string }>(`SELECT detail FROM audit_log WHERE action = 'module.created' AND target = ?`, `module:${id}`)
+    expect(JSON.parse(created!.detail).status).toBe('DRAFT')
   }, CASE_TIMEOUT_MS)
 
   test('a brief is not offered what a brief cannot have', async () => {
