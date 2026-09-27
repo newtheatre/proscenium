@@ -22,6 +22,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       # The production build is the hard gate: a red build means a broken deploy.
+      # Its heap is raised in package.json's build script: the Nuxt build outgrew the smaller one.
       - name: Build
         run: bun run build
 
