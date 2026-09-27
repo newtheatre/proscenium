@@ -45,6 +45,7 @@ export default defineOAuthGoogleEventHandler({
     const name = String(user.name ?? identity.email)
     const now = Math.floor(Date.now() / 1000)
 
+    let lostClaim = false
     if (outcome.action === 'create') {
       // Verified by Google and password-less by construction; the CHECK refuses one anyway (0008).
       await db.batch([
@@ -57,7 +58,7 @@ export default defineOAuthGoogleEventHandler({
     else if (outcome.action !== 'sign-in') {
       // Claiming marks the account verified: Google has proven the address (A-104). Logged only if
       // this callback took the claim; the account's state rides the claim, so a beaten one takes nothing.
-      const claimed = await auditedWrite(
+      lostClaim = !await auditedWrite(
         db.all<{ id: string }>(googleClaimStatement(userId, identity.sub, now)),
         auditEntry({
           actorId: userId,
@@ -65,18 +66,13 @@ export default defineOAuthGoogleEventHandler({
           target: `user:${userId}`,
         }),
       )
-      if (!claimed) {
-        // An erasure or a disable that beat the claim is refused as any unusable account is (A-122);
-        // otherwise a second callback that lost signs in only as the same identity.
-        const current = await findById(userId)
-        if (!current || current.anonymisedAt !== null || current.disabled) return sendRedirect(event, '/sign-in?refused=account')
-        if (afterLostGoogleClaim(current.googleSub, identity.sub) === 'REFUSE') return sendRedirect(event, '/sign-in?refused=linked-elsewhere')
-      }
     }
 
-    // An erasure or a disable landing since the read leaves nothing to sign in to, and says no more (A-122).
+    // An erasure or a disable landing since the read, or beating the claim, is refused as any unusable
+    // account is (A-122); a claim that lost otherwise signs in only if the identity that beat it is this one.
     const account = await findById(userId)
     if (!account || account.anonymisedAt !== null || account.disabled) return sendRedirect(event, '/sign-in?refused=account')
+    if (lostClaim && afterLostGoogleClaim(account.googleSub, identity.sub) === 'REFUSE') return sendRedirect(event, '/sign-in?refused=linked-elsewhere')
 
     const asked = getCookie(event, RETURN_COOKIE)
     // Only a path on this site, so the return trip cannot be pointed at somebody else's.
