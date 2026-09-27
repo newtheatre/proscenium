@@ -117,6 +117,16 @@ export function policyValueFor(key: string, state: PolicyKeyState): PolicyValue 
   return { text: formatPolicyValue(key, state.value), enforced: state.enforced }
 }
 
+const UNIT_WORD = /^\s*(minutes?|hours?|days?|weeks?|months?|years?|per ?cent|percent|%|pence|pounds?)(?![a-z])/i
+
+// The value already renders with its unit (`formatPolicyValue`), so the prose naming it again
+// reads "15 minutes minutes". `following` is the text straight after the token.
+export function repeatedUnitProblem(key: string, following: string): string | null {
+  const carries = unitOf(key) !== null || key.endsWith('_PENCE') || key.endsWith('_PERCENT')
+  const word = carries ? following.match(UNIT_WORD)?.[1] : undefined
+  return word ? `\`${key}\` renders with its own unit, so "${word}" after it says it twice` : null
+}
+
 // What CI refuses in `content/`, so the build and the renderer agree on what a page may quote
 // (criterion 3). A sensitive key is refused outright: a public page may never name people.
 export function policyTokenProblem(key: string, state: { known: boolean, sensitive: boolean }): string | null {

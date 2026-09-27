@@ -168,7 +168,7 @@ forbids, and it is why the resolver handles the binding node rather than trustin
 | Piece | Where | Does |
 | --- | --- | --- |
 | The token rules | `shared/utils/policy-tokens.ts` | Finds tokens in a parsed page, formats a value for what its key measures (hours, minutes, days, weeks, months, years, pence, per cent, yes or no, a list read as a sentence), and decides what a page may quote at all. Pure, so the CI check, the endpoint and the page cannot disagree. |
-| The build check | `scripts/check-content-tokens.ts` | Refuses a token naming a key the schema does not have, and refuses one naming a key that holds personal data, before it can reach a page a visitor reads. |
+| The build check | `scripts/check-content-tokens.ts` | Refuses a token naming a key the schema does not have, and refuses one naming a key that holds personal data, before it can reach a page a visitor reads. Refuses a unit word straight after a token whose value already renders with its unit (`repeatedUnitProblem()`). |
 | The values | `GET /api/policies/values?path=...` | Answers with the live value of every setting **that page** names, keyed on the page rather than on a list of keys from the caller, so it cannot become a way to read the settings surface. Never cached. |
 | The rendering | `app/pages/[...slug].vue` | Substitutes each token before `ContentRenderer` sees the page. |
 
