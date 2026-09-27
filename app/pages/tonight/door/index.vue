@@ -17,6 +17,7 @@ const request = useRequestFetch()
 
 const authorised = ref(false)
 const authorityFailure = ref<string | null>(null)
+const refusal = ref<string | null>(null)
 const performances = ref<CoveredPerformance[]>([])
 const performanceId = ref('')
 const syncedAt = ref<Date | null>(null)
@@ -32,10 +33,13 @@ async function resolveAuthority(): Promise<void> {
     performanceId.value = (resolved.performances.find(one => one.active) ?? resolved.performances[0])?.id ?? ''
     authorised.value = true
     authorityFailure.value = null
+    refusal.value = null
   }
   catch (refused) {
     authorised.value = false
     authorityFailure.value = refusalText(refused)
+    // Refused outright: one card, and no field or Check left to press (issue 1304).
+    refusal.value = refusalStatus(refused) === 403 ? authorityFailure.value : null
   }
   finally {
     syncedAt.value = new Date()
@@ -263,6 +267,7 @@ onBeforeUnmount(() => {
 <template>
   <NightScreen
     title="Door"
+    :refused="refusal"
     hint="Scan the code, or type the reference or a name. Refused? Send them to the bar."
     :stale="syncedAt"
     :busy="busy"

@@ -32,14 +32,23 @@ which is how the committee sees a rota that is not being kept; looking at a scre
 
 - **"This needs a confirmed door shift on one of tonight's performances, or the front of house
   manager's role"** (or the same for a bar shift and the Bar Manager, or for a duty manager
-  shift): nothing tonight gives you this screen. Find the person named, or ask the officer to assign you the shift on
-  the rota. The IT Manager is never offered as the answer to a rota that is wrong. At the door the
-  refusal also says tonight's duty manager can open it for their own performance, by first name
-  if you hold a confirmed shift on that performance yourself.
+  shift): nothing tonight gives you this screen. It shows as one card in place of the screen,
+  naming tonight's duty manager to ask, with **Back to tonight**; none of the screen's own buttons is
+  left to press. Find the person named, or ask the officer to assign you the shift on the rota. The
+  IT Manager is never offered as the answer to a rota that is wrong. At the door the refusal also
+  says tonight's duty manager can open it for their own performance, by first name if you hold a
+  confirmed shift on that performance yourself.
+- **"You are not on shift tonight."** on the hub: no role tonight opens any of the screens, so the
+  hub shows **Emergency** and one card with **My rota**, where your shifts and the open ones are.
+  Where you do hold something tonight that does not open a screen yet, such as a shift whose hours
+  have not started or a claim not yet confirmed, the card says that instead, in the words below.
 - **"Your door shift tonight is claimed, not confirmed yet: the Front of House Manager confirms
   it on the rota"** (or the same for a bar or duty manager shift): you claimed the shift, and it
   is waiting for an officer. A claim opens nothing until it is confirmed; ask the Front of House
   Manager to confirm it on the rota board.
+- **"Your shift opens this from 18:30 to 23:00, and it is outside those hours"**: your shift is
+  confirmed, and it opens its screens only between those times. Come back then; until then the
+  hub's card says the same.
 - **"Nothing is running tonight, so there is nothing to take charge of"**: no performance at
   any venue tonight, or the only one is cancelled. Check the programme.
 - **"Show-night tools open for tonight only, and that night has ended"**: the screen was open
@@ -72,7 +81,7 @@ desk, on any day: take the person's booking reference and pass it to the Front o
 
 ## The hub
 
-![The hub with the on-shift badge (1), the performance switcher (2), the house numbers (3), the Door tile (4) and the Emergency tile (5)](/images/docs/show-night/hub.png)
+![The hub with the on-shift badge (1), the performance switcher (2), the house numbers (3), your own job's tile (4) and the Emergency tile (5)](/images/docs/show-night/hub.png)
 
 1. **The badge** says how you got in: **On shift** with your first name, or **Officer** when a
    role opened the screen with no shift behind it.
@@ -85,19 +94,28 @@ desk, on any day: take the person's booking reference and pass it to the Front o
    They refresh on their own every 20 seconds; a dropped connection leaves the last numbers on
    screen with a warning rather than a spinner, and the **Last synced** line at the top of every
    screen says how old what you are looking at is. Any of tonight's shifts sees them.
-4. **Door** opens [the door](/docs/tonight/door), for tickets and passes alike.
+4. **Your own job**, first and in gold. For the Front of House Manager, who holds the door and the
+   duty manager's screens, it is **Tonight at a glance**; on a door shift it is **Door**, which
+   opens [the door](/docs/tonight/door) for tickets and passes alike.
 5. **Emergency** opens [the emergency card](/docs/tonight/emergency), which is cached on
    the phone the moment any show-night screen opens.
 
-Every destination of the night is a tile, in the order they are pressed on a night: **Door**,
-**Till** (for a bar shift or the Bar manager only), **Tonight at a glance**, **Checklist**,
-**Night report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, and **Emergency**
-last. The **Checklist** tile says what is left on it: **3 pre-show items left**
-before the house opens, **2 post-show items left** after, **All ticked** when nothing is
-outstanding. On a matinee day the **Tonight at a glance**, **Checklist**, **Night report** and
-**Contacts and incidents** tiles carry the house you chose on the switcher, so each opens on it. The line at the
-foot of the hub is the rule the whole night runs on: the door never sells tickets; unpaid and
-walk-up customers go to the bar.
+Each tile appears where your own shift or role opens it, and your own job comes first, in gold:
+**Door** on a door shift, **Till** on a bar shift, **Tonight at a glance** for the duty manager.
+The rest follow in the order they are pressed on a night: **Door**, **Till**, **Tonight at a
+glance**, **Checklist**, **Night report**, **Challenge 25**, **Backstage**, **Contacts and
+incidents**, and **Emergency**, always there and always last. Until the phone knows your roles,
+or with no signal, every tile shows, and each screen still checks for itself. The **Checklist**
+tile says what is left on it: **3 pre-show items left** before the house opens, **2 post-show
+items left** after, **All ticked** when nothing is outstanding. On a matinee day the **Tonight at
+a glance**, **Checklist**, **Night report** and **Contacts and incidents** tiles carry the house
+you chose on the switcher, so each opens on it. The line at the foot of the hub is the rule the
+whole night runs on: the door never sells tickets; unpaid and walk-up customers go to the bar.
+
+The duty manager also sees **Waiting on you** above the tiles whenever a comp request is
+waiting, with its value, who asked and **Approve** or **Decline**, the same queue
+[the glance](/docs/tonight/tonight-at-a-glance) carries. An ask lapses in minutes, so it waits
+where the duty manager already is.
 
 From house open (doors, or curtain where no doors time is set) the hub shows a warning naming any
 required pre-show checklist item that is still not done.

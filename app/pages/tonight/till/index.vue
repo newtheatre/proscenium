@@ -18,6 +18,7 @@ useSeoMeta({ title: 'Till' })
 const {
   syncedAt,
   failure,
+  failureStatus,
   busy,
   session,
   venueId,
@@ -497,6 +498,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         : 'One till for the whole night. Everyone at this bar sells against it.'"
       :stale="session ? catalogue.cachedAt.value : syncedAt"
       :busy="busy || catalogue.pending.value"
+      :refused="failure && !needsVenue && !failure.enrolPath && failureStatus === 403 ? failure.message : null"
     >
       <TillEarlierNights
         v-model:notes="earlierNotes"

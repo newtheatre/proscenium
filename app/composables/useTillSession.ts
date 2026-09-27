@@ -23,6 +23,8 @@ export function useTillSession() {
   const syncedAt = ref<Date | null>(null)
   // Carries the enrol path a console list already reads the same way (0040, issue 897).
   const failure = ref<ListFailure | null>(null)
+  // A 403 alone draws the refusal card in place of the till (issue 1304); anything else is a line.
+  const failureStatus = ref<number | null>(null)
   const busy = ref(false)
   const session = ref<TillSession | null>(null)
   const venueId = ref<string | null>(null)
@@ -31,6 +33,7 @@ export function useTillSession() {
   async function load(): Promise<void> {
     busy.value = true
     failure.value = null
+    failureStatus.value = null
     let askAgain = false
     try {
       const status = await request<{ night: string, venueId: string, session: TillSession | null, sumupEnabled: boolean }>('/api/till', {
@@ -55,6 +58,7 @@ export function useTillSession() {
         return
       }
       failure.value = listFailureFrom(refused)
+      failureStatus.value = refusalStatus(refused) ?? null
       // A recognised refusal is still a completed sync, so NightStale is not left saying "not yet
       // synced" forever (matching /tonight/index.vue's own shape).
       if (refusalStatus(refused) === 401 || refusalStatus(refused) === 403) syncedAt.value = new Date()
@@ -115,6 +119,7 @@ export function useTillSession() {
   async function open(): Promise<void> {
     busy.value = true
     failure.value = null
+    failureStatus.value = null
     try {
       const opened = await request<{ session: TillSession }>('/api/till', {
         method: 'POST',
@@ -126,6 +131,7 @@ export function useTillSession() {
     }
     catch (refused) {
       failure.value = listFailureFrom(refused)
+      failureStatus.value = refusalStatus(refused) ?? null
     }
     finally {
       busy.value = false
@@ -228,6 +234,7 @@ export function useTillSession() {
     changeVenue,
     syncedAt,
     failure,
+    failureStatus,
     busy,
     session,
     venueId,

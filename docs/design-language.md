@@ -144,7 +144,7 @@ from Nuxt UI's structural components:
 | Show night | `tonight` | A plain dark subtree, because a phone held in a foyer is not a dashboard. The SumUp return screen (`/pay/return/[token]`) wears it too: it is a till operator's screen, and the signed key in its path is what it answers on, so the shell must not depend on a session (F-124 criterion 3) |
 | The backstage board | `backstage` | The same dark subtree with nothing in it at all: no header, no footer, no link off the board (E-120 criterion 6) |
 | The way in (`/sign-in`, `/register`, `/reset`, `/verify`, `/magic`) | `default` | The site header and footer as usual, with `WayIn.vue` drawing the page: a spotlight ground carrying the wordmark over one `UPageCard`. All five wear it, the last three being the screens a person reaches from an email, so the shape lives in one component rather than in five pages. The `signed-out` middleware sends a visitor who already has a session on to `next` or home |
-| The error page (`app/error.vue`) | `default`, through `NuxtLayout` | The same `WayIn` shape inside the site chrome, so a mistyped URL costs the page and not the rest of the site. No status code is shown (`copy-style.md` section 6), and three ways on are offered: what's on, get involved and home. A second-factor refusal keeps its enrolment button above them (A-112, K-133) |
+| The error page (`app/error.vue`) | `default`, through `NuxtLayout` | The same `WayIn` shape inside the site chrome, so a mistyped URL costs the page and not the rest of the site. No status code is shown (`copy-style.md` section 6), and three ways on are offered: what's on, get involved and home. A second-factor refusal keeps its enrolment button above them (A-112, K-133). A signed-in refusal from the console names who the screen is for, read from the same ability the navigation uses (`rolesThatReach()`, never the IT Manager), and offers My NNT and Tonight instead (issue 1304) |
 
 The shell follows the posture of the work, not the URL, and which shell a screen takes is a
 decision record rather than a habit (`decisions/0040-navigation-is-shaped-by-posture-and-filtered-by-ability.md`).
@@ -173,11 +173,14 @@ Nine rules follow:
    line and the on-shift badge. A screen says what goes in it through `setNightEyebrow` (which
    `NightScreen` calls with its own title) and `setNightSubject` (which the screens that know
    tonight's show call), and a screen that names nothing still sits under the running house: the
-shell fills the title and the line in from the performance `/api/tonight/authority` marks active,
-so no page draws a heading of its own. The hub at `/tonight` is the night's
-   destinations, one `NightTile` card each, ordered by how often a tile is tapped on a night and
-   with Emergency last and red; a tile appears or does not by the viewer's own resolved authority
-   (the till), never to hold the grid to a count. A titled block is `NightBlock`, a single number
+   shell fills the title and the line in from the performance `/api/tonight/authority` marks active,
+   or, before any house is open, tonight's first, so no page draws a heading of its own. The hub at
+   `/tonight` is the night's destinations, one `NightTile` card each: each tile appears where the
+   viewer's own resolved authority opens it (`hubTiles()`), the viewer's own job first and in gold,
+   the rest in the order a night taps them, Emergency always and last and red. Until the roles are
+   known, or with no signal, every tile shows, since each screen guards itself; with no role at all
+   the hub is one card and My rota. The duty manager's comp requests wait on the hub too, as
+   `NightCompQueue` under Waiting on you (issue 1304). A titled block is `NightBlock`, a single number
    is `NightKpi` and the matinee-day picker is `NightPerformanceSwitcher`; none of the four is in
    the expressive kit, and all four are show-night only.
 4. **The show-night screens are phone-first and work offline.** They cache their night on open
@@ -190,7 +193,9 @@ so no page draws a heading of its own. The hub at `/tonight` is the night's
    for it field by field. The shells stand on `min-h-dvh` rather than `min-h-screen`, and the
    pinned area pads by `env(safe-area-inset-bottom)`, so a phone's own browser chrome and home
    indicator never sit on top of the action under the thumb. `tests/unit/night-shell.test.ts`
-   holds all three.
+   holds all three. A screen that refuses the viewer passes `refused` to `NightScreen`, which draws
+   `NightRefusal` in place of the work: where you stand, tonight's duty manager by first name, and
+   Back to tonight, with none of the refused screen's controls left to press (issue 1304).
 5. **Navigation is declared once and filtered by ability.** Every destination in the console
    sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu, the
    public header (`HEADER_NAV`, a derived slice of `PUBLIC_NAV`) and the footer comes from

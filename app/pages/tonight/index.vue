@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { HUB_KPI_LABELS, checklistHint, hubKpis, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, checklistHint, hubKpis, hubTiles, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
 import { activePerformanceId } from '#shared/utils/tonight'
-import type { HubHouse } from '#shared/utils/night-hub'
+import type { HubHouse, HubTileId } from '#shared/utils/night-hub'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight' })
 useSeoMeta({ title: 'Tonight' })
@@ -30,19 +30,30 @@ const stale = ref(false)
 const staleReason = ref('')
 const asked = ref(false)
 
-const authority = useNightAuthority()
 const chosenId = ref<string | null>(null)
 
 let timer: ReturnType<typeof setInterval> | undefined
+
+const authority = useNightAuthority()
+const dutyManager = computed(() => authority.value.roles.includes('DUTY_MANAGER'))
+
+// The duty manager's alone to read: any other shift would be refused on every poll. Best-effort,
+// since E-114 criterion 6 is a warning and never blocks the house numbers above it.
+async function loadChecklist(): Promise<void> {
+  if (!dutyManager.value) return
+  try {
+    checklist.value = (await request<{ items: ChecklistEntry[] }>('/api/tonight/checklist')).items
+  }
+  catch {
+    // The banner keeps what it last read.
+  }
+}
 
 // Neither fetch depends on the other's answer, so they run together. The checklist one still
 // runs before house open, so its banner has data the instant `houseOpen` turns true.
 async function load(): Promise<void> {
   // The house is every role's to read, so a door or bar shift sees the numbers too (issue 1307).
-  const [houseFetch, checklistFetch] = await Promise.allSettled([
-    request<HouseTonight>('/api/tonight/house'),
-    request<{ items: ChecklistEntry[] }>('/api/tonight/checklist'),
-  ])
+  const [houseFetch] = await Promise.allSettled([request<HouseTonight>('/api/tonight/house'), loadChecklist()])
 
   if (houseFetch.status === 'fulfilled') {
     data.value = houseFetch.value
@@ -64,12 +75,13 @@ async function load(): Promise<void> {
     }
   }
 
-  // Best-effort: a screen that cannot reach the checklist still shows the rest (E-114 criterion 6
-  // is a warning, not a blocker of the house numbers above it).
-  if (checklistFetch.status === 'fulfilled') checklist.value = checklistFetch.value.items
-
   asked.value = true
 }
+
+// The roles arrive after the first load, so the duty manager's banner need not wait for a poll.
+watch(dutyManager, (holds) => {
+  if (holds) loadChecklist()
+})
 
 const performances = computed(() => data.value?.performances ?? [])
 
@@ -96,7 +108,22 @@ const incompletePre = computed(() => checklist.value.filter(item => item.phase =
 // Only the screens that already take a performance carry it; the rest resolve tonight's own.
 const scoped = (to: string): string => selectedId.value ? `${to}?performanceId=${selectedId.value}` : to
 
-const showsTill = computed(() => authority.value.roles.includes('BAR'))
+// Each tile where the viewer's own authority opens it; every tile until the roles are known, or
+// with no signal, since each screen guards itself anyway (issue 1304, E-111 criterion 5).
+const tiles = computed(() => hubTiles(authority.value.known ? authority.value.roles : null))
+const noRole = computed(() => authority.value.known && authority.value.roles.length === 0)
+
+const HUB_TILES: Record<HubTileId, { label: string, hint: string, icon: string, to: string, scoped: boolean }> = {
+  'door': { label: 'Door', hint: 'QR · ref · name', icon: 'i-lucide-scan-line', to: '/tonight/door', scoped: false },
+  'till': { label: 'Till', hint: 'Bar sales', icon: 'i-lucide-store', to: '/tonight/till', scoped: false },
+  'glance': { label: 'Tonight at a glance', hint: 'Numbers · show info', icon: 'i-lucide-gauge', to: '/tonight/glance', scoped: true },
+  'checklist': { label: 'Checklist', hint: '', icon: 'i-lucide-list-checks', to: '/tonight/checklist', scoped: true },
+  'report': { label: 'Night report', hint: 'Read · sign off', icon: 'i-lucide-file-signature', to: '/tonight/report', scoped: true },
+  'age-checks': { label: 'Challenge 25', hint: 'Log a check · register', icon: 'i-lucide-id-card', to: '/tonight/age-checks', scoped: false },
+  'backstage': { label: 'Backstage', hint: 'House open · clearance', icon: 'i-lucide-messages-square', to: '/tonight/board', scoped: false },
+  'contacts': { label: 'Contacts and incidents', hint: 'Who\'s on · log', icon: 'i-lucide-phone', to: '/tonight/incidents', scoped: true },
+  'emergency': { label: 'Emergency', hint: 'Evac · first aid · 999', icon: 'i-lucide-siren', to: '/tonight/emergency', scoped: false },
+}
 
 onMounted(() => {
   load()
@@ -163,82 +190,59 @@ onUnmounted(() => {
       />
     </div>
 
+    <!-- The duty manager's comps wait here too, since an ask lapses in minutes (issue 1304). -->
+    <NightCompQueue
+      v-if="dutyManager"
+      title="Waiting on you"
+      test-id="hub-waiting-on-you"
+      :performance-id="selectedId"
+      :houses="performances"
+    />
+
+    <!-- No role tonight: one card rather than tiles that each refuse (issue 1304). -->
+    <div
+      v-if="noRole"
+      class="space-y-3 rounded-xl bg-elevated p-4 ring-1 ring-default"
+      data-test="hub-no-role"
+    >
+      <p
+        class="font-semibold"
+        data-test="hub-no-role-says"
+      >
+        {{ authority.refusal ?? 'You are not on shift tonight.' }}
+      </p>
+      <p class="text-sm text-muted">
+        Your shifts, and the ones still open, are on your rota.
+      </p>
+      <UButton
+        to="/rota"
+        size="xl"
+        block
+        icon="i-lucide-calendar-days"
+        class="min-h-12"
+        data-test="hub-my-rota"
+      >
+        My rota
+      </UButton>
+    </div>
+
     <div
       class="grid grid-cols-2 gap-3"
       data-test="tonight-hub"
     >
-      <!-- Ordered by how often a tile is tapped on a night, with Emergency last and red so a
-           thumb reaching for it in the dark never lands on it by accident (E-112 criterion 1). -->
-      <!-- One door for tickets and passes alike, found by QR, reference or name (issue 1301). -->
+      <!-- The viewer's own job first and in gold, then the rest in the order a night taps them,
+           Emergency last and red so a thumb in the dark never lands on it by accident (E-112 1). -->
       <NightTile
-        label="Door"
-        hint="QR · ref · name"
-        icon="i-lucide-scan-line"
-        tone="gold"
-        to="/tonight/door"
-        data-test="tile-door"
-      />
-      <!-- A bar shift works the till from here rather than from a menu it cannot see (F-101). -->
-      <NightTile
-        v-if="showsTill"
-        label="Till"
-        hint="Bar sales"
-        icon="i-lucide-store"
-        to="/tonight/till"
-        data-test="tile-till"
-      />
-      <NightTile
-        label="Tonight at a glance"
-        hint="Numbers · show info"
-        icon="i-lucide-gauge"
-        :to="scoped('/tonight/glance')"
-        data-test="tile-glance"
-      />
-      <NightTile
-        label="Checklist"
-        :hint="checklistHint(checklist, houseOpen)"
-        icon="i-lucide-list-checks"
-        :to="scoped('/tonight/checklist')"
-        data-test="tile-checklist"
-      />
-      <NightTile
-        label="Night report"
-        hint="Read · sign off"
-        icon="i-lucide-file-signature"
-        :to="scoped('/tonight/report')"
-        data-test="tile-report"
-      />
-      <NightTile
-        label="Challenge 25"
-        hint="Log a check · register"
-        icon="i-lucide-id-card"
-        to="/tonight/age-checks"
-        data-test="tile-age-checks"
-      />
-      <NightTile
-        label="Backstage"
-        hint="House open · clearance"
-        icon="i-lucide-messages-square"
-        to="/tonight/board"
-        data-test="tile-backstage"
-      />
-      <NightTile
-        label="Contacts and incidents"
-        hint="Who's on · log"
-        icon="i-lucide-phone"
-        :to="scoped('/tonight/incidents')"
-        data-test="tile-contacts"
-      />
-      <NightTile
-        label="Emergency"
-        hint="Evac · first aid · 999"
-        icon="i-lucide-siren"
-        tone="danger"
-        to="/tonight/emergency"
-        data-test="tile-emergency"
+        v-for="tile in tiles"
+        :key="tile.id"
+        :label="HUB_TILES[tile.id].label"
+        :hint="tile.id === 'checklist' ? checklistHint(checklist, houseOpen) : HUB_TILES[tile.id].hint"
+        :icon="HUB_TILES[tile.id].icon"
+        :tone="tile.id === 'emergency' ? 'danger' : tile.gold ? 'gold' : 'neutral'"
+        :to="HUB_TILES[tile.id].scoped ? scoped(HUB_TILES[tile.id].to) : HUB_TILES[tile.id].to"
+        :data-test="`tile-${tile.id}`"
       />
     </div>
-
     <p class="pt-2 text-center text-sm text-muted">
       The door never sells tickets: unpaid and walk-ups go to the bar.
     </p>

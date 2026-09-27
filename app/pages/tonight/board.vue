@@ -30,6 +30,7 @@ const boardCode = ref<string | null>(null)
 const syncedAt = ref<Date | null>(null)
 const busy = ref(true)
 const failure = ref<string | null>(null)
+const refusal = ref<string | null>(null)
 const freeText = ref('')
 
 // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
@@ -42,9 +43,12 @@ async function load(): Promise<void> {
     milestoneTypes.value = answered.milestoneTypes
     syncedAt.value = new Date()
     failure.value = null
+    refusal.value = null
   }
   catch (error) {
     failure.value = refusalText(error)
+    // Refused outright: one card, none of the board's controls (issue 1304).
+    if (refusalStatus(error) === 403) refusal.value = failure.value
   }
   finally {
     busy.value = false
@@ -164,6 +168,7 @@ async function reset(): Promise<void> {
 <template>
   <NightScreen
     title="Backstage"
+    :refused="refusal"
     :stale="syncedAt"
     :busy="busy"
   >

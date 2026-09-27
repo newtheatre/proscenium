@@ -149,6 +149,13 @@ failed check has no wording of its own, the sentence comes from the house error 
 `shared/utils/house-errors.ts`, registered once on each side, so a reader never sees the
 validation library's own English.
 
+On the `tonight` shell a refusal names a person, never a committee role: a refused show-night
+screen says where the volunteer stands, then "Ask Rowan, tonight's duty manager." (by first name
+from tonight's rota, or "Ask tonight's duty manager." where there is none), then Back to tonight
+(`NightRefusal`, issue 1304). A signed-in refusal from the console says who the screen is for
+("This screen is for the Front of House Manager."), never "ask the IT Manager", who holds every
+permission and is the one person least likely to be in the room.
+
 ## 5a. The member shell's settled words
 
 The K-128 sweep of the member shell (issue 1153 item 8) settled the wordings that were said
