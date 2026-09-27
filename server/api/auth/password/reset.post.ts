@@ -27,17 +27,42 @@ export default defineEventHandler(async (event) => {
   const problem = passwordProblem(account.email, input.password, await passwordPolicy(event))
   if (problem) throw createError({ statusCode: 400, statusMessage: explainPasswordProblem(problem) })
 
+  // The mailbox proved it and the password is chosen, so this browser signs in; a second factor
+  // still has its own step, as after a sign-in link (0103, A-107 criterion 4).
+  const challenged = await confirmedFactor(account.id)
+  const now = Math.floor(Date.now() / 1000)
+
   await db.batch([
     // Bumping the epoch ends every other session on the account (0007, A-108 criterion 4).
     db.update(schema.users)
-      .set({ password: await hashPassword(input.password), passwordSetAt: Math.floor(Date.now() / 1000), verified: true, sessionEpoch: sql`${schema.users.sessionEpoch} + 1` })
+      .set({
+        password: await hashPassword(input.password),
+        passwordSetAt: now,
+        verified: true,
+        sessionEpoch: sql`${schema.users.sessionEpoch} + 1`,
+        ...(challenged ? {} : { lastLoginAt: now }),
+      })
       .where(eq(schema.users.id, account.id)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: account.id,
       action: input.kind === 'SET_PASSWORD' ? 'password.set' : 'password.reset',
       target: `user:${account.id}`,
     })),
+    ...(challenged
+      ? []
+      : [db.insert(schema.auditLog).values(auditEntry({ actorId: account.id, action: 'session.started.magic-link', target: `user:${account.id}` }))]),
   ])
 
-  return { ok: true }
+  if (challenged) {
+    const attemptId = await openAttempt(account.id, await configValue(event, 'MFA_ATTEMPT_MINUTES'), auditEntry({
+      actorId: account.id,
+      action: 'mfa.challenged',
+      target: `user:${account.id}`,
+    }))
+    return { ok: true, mfaRequired: true as const, attemptId }
+  }
+
+  // Read back rather than rebuilt, so the session carries the epoch the batch has just moved on.
+  await startSession(event, (await findById(account.id))!, 'magic-link')
+  return { ok: true, mfaRequired: false as const }
 })

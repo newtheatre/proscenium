@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import { passwordProblem } from '#shared/utils/auth'
+import { localPath } from '#shared/utils/local-path'
 import { saysPasswordPolicy } from '#shared/utils/password-messages'
+import { withNext } from '#shared/utils/sign-in'
 import type { AuthFormField, FormError, FormSubmitEvent } from '@nuxt/ui'
 
 // Somebody already signed in has nothing to do here, and typing a second set of details would
 // make a second account by mistake (issue 925).
 definePageMeta({ middleware: 'signed-out' })
 
+const route = useRoute()
 const policy = usePasswordPolicy()
 
 const schema = z.object({
@@ -42,7 +45,8 @@ function checkPassword(state: Partial<z.output<typeof schema>>): FormError[] {
 async function register(payload: FormSubmitEvent<z.output<typeof schema>>): Promise<void> {
   notice.value = null
   try {
-    const result = await $fetch('/api/auth/register', { method: 'POST', body: payload.data })
+    // The confirmation link returns to where the visitor set out from (0103).
+    const result = await $fetch('/api/auth/register', { method: 'POST', body: { ...payload.data, next: localPath(route.query.next) ?? undefined } })
     message.value = result.message
     done.value = true
   }
@@ -83,7 +87,7 @@ useSeoMeta({ title: 'Create an account' })
         <UButton
           variant="link"
           class="min-h-11 justify-start px-0"
-          to="/sign-in"
+          :to="withNext('/sign-in', route.query.next)"
         >
           I already have an account
         </UButton>
@@ -102,8 +106,8 @@ useSeoMeta({ title: 'Create an account' })
         {{ message }}
       </p>
       <p class="text-sm text-muted">
-        Registering does not sign you in. Follow the link in the message to confirm your address,
-        and you are done.
+        Follow the link in the message to confirm your address. Opened in this browser, it signs you
+        in as well.
       </p>
     </div>
   </WayIn>

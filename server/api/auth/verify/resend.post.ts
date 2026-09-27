@@ -1,7 +1,11 @@
 import { z } from 'zod'
 import { normaliseEmail } from '#shared/utils/auth'
+import { nextField } from '#shared/utils/sign-in'
 
-const body = z.object({ email: z.string().email('Type the email address on your account').max(320, 'Type the email address on your account') })
+const body = z.object({
+  email: z.string().email('Type the email address on your account').max(320, 'Type the email address on your account'),
+  next: nextField,
+})
 
 // Ask for a fresh verification message.
 export default defineEventHandler(async (event) => {
@@ -22,7 +26,7 @@ export default defineEventHandler(async (event) => {
   // Enumeration-safe: the same answer whether or not the address has an account, and whether
   // or not it was already verified.
   if (account && !account.verified) {
-    await sendVerification(event, account.id)
+    await sendVerification(event, account.id, { next: input.next })
   }
 
   return { ok: true, message: 'If that address needs confirming, a new link is on its way' }

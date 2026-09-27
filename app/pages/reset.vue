@@ -1,21 +1,26 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import { passwordProblem } from '#shared/utils/auth'
+import { landingAfterSignIn } from '#shared/utils/night-authority'
 import { saysPasswordPolicy } from '#shared/utils/password-messages'
+import { withNext } from '#shared/utils/sign-in'
 import type { AuthFormField, FormError, FormSubmitEvent } from '@nuxt/ui'
 
 const route = useRoute()
 const policy = usePasswordPolicy()
+const { account, refresh } = useAccount()
+const toast = useToast()
 
 // A link from the console sets a first password rather than replacing one, and claims a token of
 // its own kind (A-121 criterion 3).
 const settingFirst = computed(() => route.query.kind === 'set')
 const tokenKind = computed(() => (settingFirst.value ? 'SET_PASSWORD' : 'PASSWORD_RESET'))
 
-type Outcome = 'choosing' | 'done' | 'expired'
+type Outcome = 'choosing' | 'challenge' | 'expired'
 
 const outcome = ref<Outcome>('choosing')
 const notice = ref('')
+const attemptId = ref('')
 
 const schema = z.object({ password: z.string().min(1, 'Choose a password') })
 
@@ -47,8 +52,13 @@ async function reset(payload: FormSubmitEvent<z.output<typeof schema>>): Promise
   }
 
   try {
-    await $fetch('/api/auth/password/reset', { method: 'POST', body: { token, password: payload.data.password, kind: tokenKind.value } })
-    outcome.value = 'done'
+    const result = await $fetch('/api/auth/password/reset', { method: 'POST', body: { token, password: payload.data.password, kind: tokenKind.value } })
+    if (result.mfaRequired) {
+      attemptId.value = result.attemptId
+      outcome.value = 'challenge'
+      return
+    }
+    await signedIn()
   }
   catch (error) {
     const text = refusalText(error)
@@ -59,6 +69,13 @@ async function reset(payload: FormSubmitEvent<z.output<typeof schema>>): Promise
       outcome.value = 'expired'
     }
   }
+}
+
+// Choosing the password is the sign-in, so nobody types it again straight after (0103).
+async function signedIn(): Promise<void> {
+  await refresh()
+  toast.add({ title: 'Password set', description: 'Every other session on your account has ended.', color: 'success' })
+  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight))
 }
 
 useSeoMeta({ title: 'Set a new password' })
@@ -77,29 +94,19 @@ useSeoMeta({ title: 'Set a new password' })
     <UAuthForm
       v-if="outcome === 'choosing'"
       :title="settingFirst ? 'Choose your password' : 'Set a new password'"
-      :description="settingFirst ? 'We made you an account. Choose a password and it is ready to use.' : 'Setting a new password signs you out everywhere else.'"
+      :description="settingFirst ? 'We made you an account. Choose a password and you are signed in.' : 'Setting a new password signs you in here and out everywhere else.'"
       :schema="schema"
       :fields="fields"
       :validate="checkPassword"
-      :submit="{ label: 'Set my password' }"
+      :submit="{ label: 'Set my password', class: 'min-h-11' }"
       @submit="reset"
     />
 
-    <div
-      v-else-if="outcome === 'done'"
-      data-test="reset-done"
-      class="space-y-3"
-    >
-      <h1 class="nnt-headline text-xl">
-        Password set
-      </h1>
-      <p class="text-muted">
-        Every other session on your account has ended. Sign in with the new password.
-      </p>
-      <UButton to="/sign-in">
-        Sign in
-      </UButton>
-    </div>
+    <MfaChallenge
+      v-else-if="outcome === 'challenge'"
+      :attempt-id="attemptId"
+      @answered="signedIn"
+    />
 
     <div
       v-else
@@ -113,7 +120,8 @@ useSeoMeta({ title: 'Set a new password' })
         {{ notice }}
       </p>
       <UButton
-        to="/sign-in?method=reset"
+        :to="withNext('/sign-in?method=reset', route.query.next)"
+        class="min-h-11"
         data-test="ask-again"
       >
         Ask for a new one

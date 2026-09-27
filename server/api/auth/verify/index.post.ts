@@ -15,23 +15,32 @@ export default defineEventHandler(async (event) => {
 
   // A link bound to an address confirms that address and no other: changing again between the
   // send and the click leaves the older link inert (A-115 criterion 1).
-  if (claimed.email !== null) {
-    const account = await findById(claimed.userId)
-    if (!account || normaliseEmail(account.email) !== normaliseEmail(claimed.email)) {
-      throw createError({ statusCode: 410, statusMessage: 'That link was for a different address. Ask for a new one.' })
-    }
+  const account = await findById(claimed.userId)
+  if (claimed.email !== null && (!account || normaliseEmail(account.email) !== normaliseEmail(claimed.email))) {
+    throw createError({ statusCode: 410, statusMessage: 'That link was for a different address. Ask for a new one.' })
   }
+
+  // Opened in the browser that registered, the link is a sign-in as well; anywhere else, or for a
+  // changed address, it only confirms, and a second factor always keeps its own step (0103).
+  const registeredHere = await takeRegistration(event)
+  const signsIn = Boolean(account && claimed.email === null && registeredHere === normaliseEmail(account.email)
+    && !account.disabled && account.anonymisedAt === null && !await confirmedFactor(account.id))
+  const now = Math.floor(Date.now() / 1000)
 
   await db.batch([
     db.delete(schema.authTokens).where(eq(schema.authTokens.userId, claimed.userId)),
-    db.update(schema.users).set({ verified: true }).where(eq(schema.users.id, claimed.userId)),
+    db.update(schema.users).set(signsIn ? { verified: true, lastLoginAt: now } : { verified: true }).where(eq(schema.users.id, claimed.userId)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: claimed.userId,
       action: 'account.verified',
       target: `user:${claimed.userId}`,
       detail: changes({ verified: [false, true] }),
     })),
+    ...(signsIn
+      ? [db.insert(schema.auditLog).values(auditEntry({ actorId: claimed.userId, action: 'session.started.magic-link', target: `user:${claimed.userId}` }))]
+      : []),
   ])
 
-  return { ok: true }
+  if (signsIn) await startSession(event, { ...account!, verified: true }, 'magic-link')
+  return { ok: true, signedIn: signsIn }
 })

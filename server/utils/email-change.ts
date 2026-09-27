@@ -42,6 +42,6 @@ export async function changeEmail(event: H3Event, account: AccountRow, next: str
   ])
 
   // Bound to the address it was issued for, so a link cannot be replayed onto a later one.
-  await sendVerification(event, account.id, wanted)
+  await sendVerification(event, account.id, { boundTo: wanted })
   return { changed: true }
 }

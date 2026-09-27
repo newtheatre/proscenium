@@ -91,7 +91,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/auth/password/forgot.post.ts',
     exempt: 'issues a token and asks for a message; the send is recorded in notification_log',
   },
-  { route: 'server/api/auth/password/reset.post.ts', actions: ['password.set', 'password.reset'] },
+  { route: 'server/api/auth/password/reset.post.ts', actions: ['password.set', 'password.reset', 'session.started.magic-link', 'mfa.challenged'] },
   { route: 'server/api/auth/register.post.ts', actions: ['account.registered'], via: ['server/utils/accounts.ts'] },
   { route: 'server/api/auth/sign-in.post.ts', actions: ['session.started', 'mfa.challenged'] },
   { route: 'server/api/account/methods/[id].delete.ts', actions: ['account.method.removed'] },
@@ -108,7 +108,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/room-feed.get.ts', exempt: 'says whether your own feed exists' },
   { route: 'server/api/account/room-feed.post.ts', actions: ['account.calendar-feed.issued'] },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
-  { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified'] },
+  { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified', 'session.started.magic-link'] },
   {
     route: 'server/api/auth/verify/resend.post.ts',
     exempt: 'issues a token and asks for a message; the send is recorded in notification_log',

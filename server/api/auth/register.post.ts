@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { nextField, withNext } from '#shared/utils/sign-in'
 
 // The schema guards shape and the outer limit; the length policy lives in passwordProblem so
 // there is one place to change it and no second copy to drift (0012).
@@ -7,6 +8,7 @@ const body = z.object({
   email: z.string().email('That does not look like an email address. Check it and try again.').max(320, 'That does not look like an email address. Check it and try again.'),
   name: z.string().trim().min(1, 'Type your name').max(200, 'That is too long'),
   password: z.string().min(1, 'Choose a password').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long'),
+  next: nextField,
 })
 
 // One answer for every outcome, so the caller cannot tell which branch ran.
@@ -19,6 +21,9 @@ export default defineEventHandler(async (event) => {
 
   const problem = passwordProblem(email, input.password, await passwordPolicy(event))
   if (problem) throw createError({ statusCode: 400, statusMessage: explainPasswordProblem(problem) })
+
+  // Whatever branch runs below, so the cookie says no more than the answer does (0103).
+  await rememberRegistration(event, email)
 
   // An address no message could ever reach gets the ordinary answer and no account: a row that
   // can never verify is a dead account, not a courtesy (A-101 criterion 3).
@@ -36,7 +41,7 @@ export default defineEventHandler(async (event) => {
       userId: existing.id,
       context: {
         name: existing.name,
-        url: `${useRuntimeConfig(event).public.baseURL}/reset?token=${plaintext}&kind=set`,
+        url: withNext(`${useRuntimeConfig(event).public.baseURL}/reset?token=${plaintext}&kind=set`, input.next),
         expiresAt,
       },
     })
@@ -45,12 +50,12 @@ export default defineEventHandler(async (event) => {
     await notify(event, {
       type: 'account.exists',
       userId: existing.id,
-      context: { name: '', signInUrl: `${useRuntimeConfig(event).public.baseURL}/sign-in` },
+      context: { name: '', signInUrl: withNext(`${useRuntimeConfig(event).public.baseURL}/sign-in`, input.next) },
     })
   }
   else {
     const id = await createAccount({ email, name: input.name, passwordHash: await hashPassword(input.password) })
-    await sendVerification(event, id)
+    await sendVerification(event, id, { next: input.next })
   }
 
   return accepted()
