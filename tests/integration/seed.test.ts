@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { seed } from '../../scripts/seed/index'
 import { createTestDatabase, rows } from '#tests/helpers/database'
+import { REASONS_BY_KIND } from '#shared/utils/bar'
+import type { MovementReason, StockMovementKind } from '#shared/utils/bar'
 import type { SeedResult } from '../../scripts/seed/index'
 import type { TestDatabase } from '#tests/helpers/database'
 
@@ -175,6 +177,17 @@ describe('the seed fills the screens', () => {
     expect(counts(`comp_requests WHERE status = 'PENDING'`)).toBeGreaterThan(0)
     expect(counts(`comp_requests WHERE status = 'APPROVED'`)).toBeGreaterThan(0)
     expect(counts(`comp_requests WHERE status = 'DECLINED'`)).toBeGreaterThan(0)
+  })
+
+  // A seeded movement is one the write path would have accepted, or the movements screen shows
+  // developers a reason no operator can record (F-204).
+  test('every seeded movement gives a reason its kind accepts', () => {
+    const movements = rows<{ kind: StockMovementKind, reason: MovementReason }>(
+      database,
+      `SELECT DISTINCT kind, reason FROM stock_movements WHERE reason IS NOT NULL`,
+    )
+    expect(movements.length).toBeGreaterThan(0)
+    expect(movements.filter(({ kind, reason }) => !REASONS_BY_KIND[kind]?.includes(reason))).toEqual([])
   })
 
   test('it commits no credential and prints every one it made', () => {
