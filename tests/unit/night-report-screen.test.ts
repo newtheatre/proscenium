@@ -48,8 +48,8 @@ describe('the report screen (issue 1053)', () => {
 
   test('is a tile on the hub, carrying the performance the hub is showing', async () => {
     const source = await Bun.file(HUB).text()
-    expect(source).toContain('scoped(\'/tonight/report\')')
-    expect(source).toContain('data-test="tile-report"')
+    // Drawn from the hub's tile table since issue 1304, still scoped to the house on screen.
+    expect(source).toContain('to: \'/tonight/report\', scoped: true, testId: \'report\'')
   })
 })
 

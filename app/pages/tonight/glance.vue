@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { saysWarningLevel } from '#shared/utils/content-warnings'
 import { saysClock } from '#shared/utils/when'
-import { HUB_KPI_LABELS, compApprovalLine, groupedBoardCode, housePercentLine, hubKpis, nightHeaderLine, passPressureAdvice, runningTimeLine, saysSeatsLeft } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, groupedBoardCode, housePercentLine, hubKpis, nightHeaderLine, passPressureAdvice, runningTimeLine, saysSeatsLeft } from '#shared/utils/night-hub'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { saysShiftRole } from '#shared/utils/rota'
-import { saysPrice } from '#shared/utils/ticket-types'
 import { activePerformanceId, saysTeamHolder } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 import type { ShiftRole } from '#shared/utils/rota'
@@ -41,10 +40,10 @@ const POLL_MS = 20_000
 
 const route = useRoute()
 const request = useRequestFetch()
-const toast = useToast()
 const data = ref<DutyManagerTonight | null>(null)
 const syncedAt = ref<Date | null>(null)
 const failure = ref<string | null>(null)
+const refusal = ref<string | null>(null)
 const asked = ref(false)
 
 // The hub hands the house over in the query, so a matinee day opens on the one that was chosen
@@ -52,32 +51,6 @@ const asked = ref(false)
 const chosenId = ref<string | null>(typeof route.query.performanceId === 'string' ? route.query.performanceId : null)
 
 let timer: ReturnType<typeof setInterval> | undefined
-
-// The two pending queues the duty manager decides (D-117, F-110): tickets at the box office and
-// drinks at the till. Each is hidden when its own route refuses this viewer, never pre-judged.
-interface PendingComp {
-  id: string
-  // A bar ask carries the house it was made at; null is a night with no house there (F-126).
-  performanceId?: string | null
-  requestedBy: string
-  requestedByName: string
-  reason: string
-  expired: boolean
-}
-interface PendingBarComp { request: PendingComp, priced: { totalPence: number, lines: { productName: string, variantLabel: string, qty: number }[] } }
-
-const ticketComps = ref<PendingComp[] | null>(null)
-const barComps = ref<PendingBarComp[] | null>(null)
-const viewer = useViewer()
-
-async function loadComps(performanceId: string): Promise<void> {
-  const [tickets, bar] = await Promise.all([
-    request<{ items: PendingComp[] }>('/api/box-office/desk/comp-requests', { query: { performanceId } }).catch(() => null),
-    request<{ requests: PendingBarComp[] }>('/api/till/comp-requests', { query: { performanceId } }).catch(() => null),
-  ])
-  ticketComps.value = tickets?.items.filter(one => !one.expired) ?? null
-  barComps.value = bar?.requests.filter(one => !one.request.expired) ?? null
-}
 
 // A door or bar shift reads the same house and show information with none of the duty manager's
 // controls, and the access wording only at the door (issue 1307, D-127 criterion 3).
@@ -112,6 +85,8 @@ async function loadReadOnly(): Promise<void> {
   }
   catch (refused) {
     failure.value = refusalText(refused)
+    // No shift tonight at all: one card in place of the glance (issue 1304).
+    refusal.value = refusalStatus(refused) === 403 ? failure.value : null
   }
 }
 
@@ -120,79 +95,6 @@ const activeId = computed(() => activePerformanceId(performances.value, Date.now
 const selectedId = computed(() => chosenId.value ?? activeId.value)
 const selected = computed(() => performances.value.find(one => one.performanceId === selectedId.value) ?? null)
 const kpis = computed(() => selected.value ? hubKpis(selected.value.house) : null)
-
-const pendingComps = computed(() => [
-  ...(ticketComps.value ?? []).map(one => ({ queue: 'TICKET' as const, request: one, priced: null })),
-  ...(barComps.value ?? []).map(row => ({ queue: 'BAR' as const, request: row.request, priced: row.priced })),
-])
-
-const deciding = ref<string | null>(null)
-const approving = ref<{ queue: 'TICKET' | 'BAR', id: string, line: string } | null>(null)
-const approveFailure = ref<string | null>(null)
-const declining = ref<{ queue: 'TICKET' | 'BAR', id: string } | null>(null)
-const declineReason = ref('')
-const declineFailure = ref<string | null>(null)
-
-// Which house an ask was made at, in words. The queue is the venue's whole night, so on a
-// two-house day this is what says which one a row belongs to (F-126).
-function houseOf(performanceId: string | null | undefined): string | null {
-  const house = performances.value.find(one => one.performanceId === performanceId)
-  return house ? `${house.showTitle}, ${timeOf(house.startsAt)}` : null
-}
-
-const compRoute = (queue: 'TICKET' | 'BAR', id: string): string =>
-  (queue === 'TICKET' ? `/api/box-office/desk/comp-requests/${id}` : `/api/till/comp-requests/${id}`)
-
-// One tap gives money away, so the amount and who asked are read back first; declining already
-// stops for a reason, and this is the other half of that pair (issue 1150 item 10).
-function openApprove(queue: 'TICKET' | 'BAR', id: string, requestedByName: string, totalPence: number | null): void {
-  approving.value = { queue, id, line: compApprovalLine(requestedByName, totalPence) }
-  approveFailure.value = null
-}
-
-async function approveComp(): Promise<void> {
-  const target = approving.value
-  if (!target) return
-  deciding.value = target.id
-  approveFailure.value = null
-  try {
-    await $fetch(`${compRoute(target.queue, target.id)}/approve`, { method: 'POST' })
-    toast.add({ title: 'Comp approved', icon: 'i-lucide-check', color: 'success' })
-    approving.value = null
-    if (selectedId.value) await loadComps(selectedId.value)
-  }
-  catch (refused) {
-    approveFailure.value = refusalText(refused)
-  }
-  finally {
-    deciding.value = null
-  }
-}
-
-function openDecline(queue: 'TICKET' | 'BAR', id: string): void {
-  declining.value = { queue, id }
-  declineReason.value = ''
-  declineFailure.value = null
-}
-
-async function declineComp(): Promise<void> {
-  const target = declining.value
-  if (!target || !declineReason.value.trim()) return
-  deciding.value = target.id
-  declineFailure.value = null
-  try {
-    await $fetch(`${compRoute(target.queue, target.id)}/decline`, { method: 'POST', body: { reason: declineReason.value.trim() } })
-    toast.add({ title: 'Comp declined', icon: 'i-lucide-check', color: 'success' })
-    declining.value = null
-    if (selectedId.value) await loadComps(selectedId.value)
-  }
-  catch (refused) {
-    declineFailure.value = refusalText(refused)
-  }
-  finally {
-    deciding.value = null
-  }
-}
 
 setNightSubject(() => ({
   title: selected.value?.showTitle ?? 'Tonight',
@@ -237,16 +139,9 @@ function hideCode(): void {
   boardCodeFailure.value = null
 }
 
-// The queues ride the same poll as the numbers, so a request asked for mid-interval appears
-// without the duty manager reloading anything.
 async function refresh(): Promise<void> {
   await load()
-  if (selectedId.value && dutyManager.value) await loadComps(selectedId.value)
 }
-
-watch(selectedId, (id) => {
-  if (id && dutyManager.value) loadComps(id)
-})
 
 onMounted(() => {
   refresh()
@@ -260,6 +155,7 @@ onUnmounted(() => {
 <template>
   <NightScreen
     title="Tonight at a glance"
+    :refused="refusal"
     :stale="syncedAt"
     :busy="!asked"
   >
@@ -344,73 +240,12 @@ onUnmounted(() => {
           </p>
         </NightBlock>
 
-        <!-- Both queues in one place, because the person deciding is one person: the box office
-             asks for a ticket and the till asks for a round, and neither waits on the other. -->
-        <NightBlock
-          v-if="pendingComps.length"
+        <NightCompQueue
+          v-if="dutyManager"
           title="Comp requests"
-          data-test="glance-comp-requests"
-        >
-          <ul class="space-y-3">
-            <li
-              v-for="pending in pendingComps"
-              :key="pending.request.id"
-              class="space-y-2 rounded-lg bg-default p-3"
-              :data-test="`comp-request-${pending.request.id}`"
-            >
-              <p class="font-semibold">
-                {{ pending.queue === 'TICKET' ? 'Ticket' : 'Bar' }}<span v-if="pending.priced"> · {{ saysPrice(pending.priced.totalPence) }}</span>
-              </p>
-              <p class="text-sm">
-                {{ pending.request.reason }}
-              </p>
-              <p
-                v-if="pending.priced"
-                class="text-sm text-muted"
-              >
-                {{ pending.priced.lines.map(line => `${line.qty} × ${line.productName}, ${line.variantLabel}`).join(' · ') }}
-              </p>
-              <p class="font-mono text-xs text-muted">
-                asked by {{ pending.request.requestedByName }}
-              </p>
-              <p
-                v-if="houseOf(pending.request.performanceId)"
-                class="text-xs text-muted"
-                :data-test="`comp-house-${pending.request.id}`"
-              >
-                Asked at {{ houseOf(pending.request.performanceId) }}
-              </p>
-              <p
-                v-if="viewer && viewer.id === pending.request.requestedBy"
-                class="text-sm text-muted"
-              >
-                Your own request: somebody else decides it.
-              </p>
-              <div
-                v-else
-                class="flex flex-wrap gap-2"
-              >
-                <UButton
-                  color="secondary"
-                  class="min-h-12"
-                  :data-test="`approve-comp-${pending.request.id}`"
-                  @click="openApprove(pending.queue, pending.request.id, pending.request.requestedByName, pending.priced?.totalPence ?? null)"
-                >
-                  Approve
-                </UButton>
-                <UButton
-                  color="neutral"
-                  variant="outline"
-                  class="min-h-12"
-                  :data-test="`decline-comp-${pending.request.id}`"
-                  @click="openDecline(pending.queue, pending.request.id)"
-                >
-                  Decline
-                </UButton>
-              </div>
-            </li>
-          </ul>
-        </NightBlock>
+          :performance-id="selectedId"
+          :houses="performances"
+        />
 
         <NightBlock
           title="Pass pressure"
@@ -600,102 +435,6 @@ onUnmounted(() => {
         Nothing running tonight.
       </p>
     </div>
-
-    <UModal
-      :open="approving !== null"
-      title="Approve this comp"
-      :description="approving?.line"
-      @update:open="approving = null"
-    >
-      <template #body>
-        <div
-          class="space-y-4"
-          data-test="approve-comp-form"
-        >
-          <UAlert
-            v-if="approveFailure"
-            data-test="approve-comp-failure"
-            color="error"
-            variant="subtle"
-            :description="approveFailure"
-          />
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              color="secondary"
-              class="min-h-12"
-              :loading="deciding !== null"
-              data-test="approve-comp-submit"
-              @click="approveComp()"
-            >
-              Approve the comp
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              class="min-h-12"
-              @click="approving = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
-        </div>
-      </template>
-    </UModal>
-
-    <UModal
-      :open="declining !== null"
-      title="Decline this comp"
-      description="The person who asked sees the reason you give."
-      @update:open="declining = null"
-    >
-      <template #body>
-        <form
-          class="space-y-4"
-          data-test="decline-comp-form"
-          @submit.prevent="declineComp"
-        >
-          <UAlert
-            v-if="declineFailure"
-            data-test="decline-comp-failure"
-            color="error"
-            variant="subtle"
-            :description="declineFailure"
-          />
-
-          <UFormField
-            label="Why"
-            required
-          >
-            <UInput
-              v-model="declineReason"
-              class="w-full"
-              data-test="decline-comp-reason"
-            />
-          </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              class="min-h-12"
-              :loading="deciding !== null"
-              :disabled="!declineReason.trim()"
-              data-test="decline-comp-submit"
-            >
-              Decline the comp
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              class="min-h-12"
-              @click="declining = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
-        </form>
-      </template>
-    </UModal>
 
     <template #actions>
       <!-- The duty manager's route answering is the fact this viewer can close tonight (0009). -->

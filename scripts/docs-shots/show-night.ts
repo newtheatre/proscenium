@@ -17,7 +17,8 @@ export const showNight: Shot[] = [
       { selector: '[data-test="night-shift-badge"]', label: 'How you got in' },
       { selector: '[data-test="performance-switcher"]', label: 'Which performance' },
       { selector: '[data-test="tonight-kpis"]', label: 'House numbers' },
-      { selector: '[data-test="tile-door"]', label: 'Door' },
+      // The viewer's own job leads the grid in gold (issue 1304).
+      { selector: '[data-test="tonight-hub"] > a:first-child', label: 'Your own job' },
       { selector: '[data-test="tile-emergency"]', label: 'Emergency' },
     ],
   },

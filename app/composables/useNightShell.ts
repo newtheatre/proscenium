@@ -33,10 +33,13 @@ export interface NightAuthority {
   roles: NightRole[]
   via: 'SHIFT' | 'OFFICER' | null
   performances: NightPerformance[]
+  // Whether any role had a definite answer for a signed-in viewer: until one does, signed out, or
+  // with no signal, `roles` is not yet known and a screen drawing by role draws all (issue 1304).
+  known: boolean
 }
 
 export function useNightAuthority(): Ref<NightAuthority> {
-  return useState<NightAuthority>('nnt-night-authority', () => ({ roles: [], via: null, performances: [] }))
+  return useState<NightAuthority>('nnt-night-authority', () => ({ roles: [], via: null, performances: [], known: false }))
 }
 
 // Which of tonight's roles the viewer actually holds, asked of the server rather than read from a
@@ -59,6 +62,7 @@ export function resolveNightAuthority(): void {
       roles: held.map(one => one.role),
       via: held.some(one => one.via !== 'OFFICER') ? 'SHIFT' : (held.length > 0 ? 'OFFICER' : null),
       performances: held[0]?.performances ?? [],
+      known: answers.some(answer => answer.status === 'fulfilled' || refusalStatus(answer.reason) === 403),
     }
   })
 }

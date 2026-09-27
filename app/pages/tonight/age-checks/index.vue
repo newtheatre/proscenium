@@ -218,6 +218,7 @@ async function submitCorrect(): Promise<void> {
   <div>
     <NightScreen
       title="Challenge 25 register"
+      :refused="authorityFailure"
       hint="Every entry stays visible once filed. A mistake is corrected with a new entry, never an edit."
       :stale="syncedAt"
       :busy="busy"

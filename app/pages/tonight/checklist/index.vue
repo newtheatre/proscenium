@@ -34,6 +34,8 @@ const toast = useToast()
 
 const syncedAt = ref<Date | null>(null)
 const failure = ref<string | null>(null)
+// Refused outright: one card, and no Close the night left to press (issue 1304).
+const refusal = ref<string | null>(null)
 const busy = ref(true)
 const items = ref<Entry[]>([])
 // Read from the server on every load, never only from `closeNight()`'s own response: otherwise
@@ -76,6 +78,7 @@ async function load(): Promise<void> {
     // More than one house is running and nothing named one: the switcher is the answer, not a
     // refusal with nothing to tap (issue 1150 item 4).
     if (!performanceId.value && refusalStatus(refused) === 400) ambiguous.value = true
+    else if (refusalStatus(refused) === 403) refusal.value = refusalText(refused)
     else failure.value = refusalText(refused)
   }
   finally {
@@ -168,6 +171,7 @@ async function closeNight(): Promise<void> {
   <div>
     <NightScreen
       title="Checklist"
+      :refused="refusal"
       hint="Tick each item, or make an exception with a reason. An item that ticks itself needs a reason only if it cannot clear."
       :stale="syncedAt"
       :busy="busy"

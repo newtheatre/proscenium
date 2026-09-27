@@ -40,6 +40,7 @@ const toast = useToast()
 const syncedAt = ref<Date | null>(null)
 const busy = ref(true)
 const failure = ref<string | null>(null)
+const refusal = ref<string | null>(null)
 const report = ref<Report | null>(null)
 const performanceId = ref<string | null>(typeof route.query.performanceId === 'string' ? route.query.performanceId : null)
 const ambiguous = ref(false)
@@ -81,6 +82,8 @@ async function load(): Promise<void> {
   catch (refused) {
     ambiguous.value = !performanceId.value && refusalStatus(refused) === 400
     failure.value = refusalText(refused)
+    // Refused outright: one card, and no sign-off left to press (issue 1304).
+    refusal.value = refusalStatus(refused) === 403 ? failure.value : null
   }
   finally {
     busy.value = false
@@ -162,6 +165,7 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
 <template>
   <NightScreen
     title="Night report"
+    :refused="refusal"
     hint="The report fills itself in. Read it through, add a closing note and sign it off."
     :stale="syncedAt"
     :busy="busy"

@@ -143,6 +143,52 @@ export function seesAccessTonight(role: NightRole): boolean {
   return role === 'DOOR' || role === 'DUTY_MANAGER'
 }
 
+// The hub's destinations and the roles whose authority opens each (E-112 criterion 1, issue 1304).
+// Emergency answers anyone, and a tile nobody's authority opens is not drawn at all.
+export type HubTileId = 'door' | 'till' | 'glance' | 'checklist' | 'report' | 'age-checks' | 'backstage' | 'contacts' | 'emergency'
+
+const HUB_TILE_ROLES: Record<HubTileId, readonly NightRole[] | 'ANYONE'> = {
+  'door': ['DOOR'],
+  'till': ['BAR'],
+  'glance': ['DUTY_MANAGER', 'DOOR', 'BAR'],
+  'checklist': ['DUTY_MANAGER'],
+  'report': ['DUTY_MANAGER'],
+  'age-checks': ['DUTY_MANAGER', 'DOOR', 'BAR'],
+  'backstage': ['DUTY_MANAGER'],
+  'contacts': ['DUTY_MANAGER', 'DOOR', 'BAR'],
+  'emergency': 'ANYONE',
+}
+
+const HUB_TILE_ORDER = Object.keys(HUB_TILE_ROLES) as HubTileId[]
+
+// The job a role is there to do, first and in gold; the duty manager's runs the night.
+const OWN_JOB: [NightRole, HubTileId][] = [['DUTY_MANAGER', 'glance'], ['DOOR', 'door'], ['BAR', 'till']]
+
+// `null` is roles not yet known, or a phone offline: every tile then, since each screen guards
+// itself (E-111 criterion 5) and a missing tile is worse than a refused one.
+export function hubTiles(roles: readonly NightRole[] | null): { id: HubTileId, gold: boolean }[] {
+  if (roles === null) return HUB_TILE_ORDER.map(id => ({ id, gold: false }))
+  const opens = (id: HubTileId): boolean => {
+    const needs = HUB_TILE_ROLES[id]
+    return needs === 'ANYONE' || needs.some(role => roles.includes(role))
+  }
+  const own = OWN_JOB.find(([role]) => roles.includes(role))?.[1] ?? null
+  const rest = HUB_TILE_ORDER.filter(id => id !== own && opens(id)).map(id => ({ id, gold: false }))
+  return own ? [{ id: own, gold: true }, ...rest] : rest
+}
+
+// The header's show on a screen that names none: the house whose doors are open now, or before
+// any is, tonight's first (issue 1304).
+export function runningPerformance<T extends { active: boolean }>(performances: readonly T[]): T | null {
+  return performances.find(one => one.active) ?? performances[0] ?? null
+}
+
+// Who a refused volunteer turns to: tonight's duty manager, by first name where the rota has one.
+export function whoCanHelpTonight(team: readonly { role: string, filled: boolean, name: string | null }[] | null): string {
+  const first = firstNameOf(team?.find(member => member.role === 'DUTY_MANAGER' && member.filled)?.name)
+  return first ? `Ask ${first}, tonight's duty manager.` : 'Ask tonight\'s duty manager.'
+}
+
 /** Two groups of three, so the backstage code can be read out over a headset. */
 export function groupedBoardCode(code: string): string {
   const digits = code.replace(/\s+/g, '')

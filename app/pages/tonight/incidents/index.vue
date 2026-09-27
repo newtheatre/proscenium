@@ -223,6 +223,7 @@ async function submitCorrect(): Promise<void> {
   <div>
     <NightScreen
       title="Contacts and incidents"
+      :refused="authorityFailure"
       :stale="syncedAt"
       :busy="busy"
     >

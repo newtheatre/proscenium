@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { saysScreenIsFor } from '#shared/utils/refusals'
 import type { NuxtError } from '#app'
+import type { Role } from '#shared/utils/roles'
 
 // Inside the site chrome, so a mistyped show URL costs the page and not the rest of the theatre
 // (K-133). No status code reaches the reader: copy-style section 6.
@@ -12,7 +14,7 @@ const SAYS: Record<number, { title: string, says: string }> = {
   },
   403: {
     title: 'That is not yours to open',
-    says: 'Your account does not hold the permission this screen needs. If you think it should, ask the IT Manager.',
+    says: 'Your account does not open this screen.',
   },
   404: {
     title: 'There is nothing here',
@@ -31,17 +33,46 @@ const shown = computed(() => {
       says: 'This role needs an authenticator app before it can be used. Set one up, then come back and try again.',
     }
   }
+  // A signed-in refusal names who the screen is for, never the IT Manager (issue 1304, K-133).
+  if (props.error.statusCode === 403 && forRoles.value) {
+    return { title: 'That is not yours to open', says: `${saysScreenIsFor(forRoles.value)} Ask them if you need something from it.` }
+  }
   return SAYS[props.error.statusCode ?? 0] ?? {
     title: 'Something went wrong',
     says: 'That did not work. Try again, and tell the IT Manager if it keeps happening.',
   }
 })
 
-const WAYS_ON = [
+// The roles a console refusal carries, read defensively: a server-rendered error's data arrives
+// as text.
+const forRoles = computed<Role[] | null>(() => {
+  const data = typeof props.error.data === 'string' ? safeParse(props.error.data) : props.error.data
+  const roles = (data as { roles?: unknown } | null | undefined)?.roles
+  return Array.isArray(roles) && roles.length > 0 ? roles as Role[] : null
+})
+
+function safeParse(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  }
+  catch {
+    return null
+  }
+}
+
+const { account } = useAccount()
+
+const PUBLIC_WAYS = [
   { to: '/whats-on', label: 'See what\'s on' },
   { to: '/get-involved', label: 'Get involved' },
   { to: '/', label: 'Go to the home page' },
 ]
+
+// Somebody signed in who was refused is on their way somewhere of their own: their page, or the
+// night they may be working (issue 1304).
+const WAYS_ON = computed(() => props.error.statusCode === 403 && account.value.signedIn
+  ? [{ to: '/my', label: 'My NNT' }, { to: '/tonight', label: 'Tonight' }]
+  : PUBLIC_WAYS)
 </script>
 
 <template>
