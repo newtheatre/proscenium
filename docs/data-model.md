@@ -1049,7 +1049,13 @@ for exactly this (0033). A buyer is chosen through `GET
 not the second (K-123 criterion 1).
 
 **Requesting online, and fulfilling at the desk (criterion 3).** `POST /api/account/passes/request`
-writes a `pass_requests` row and nothing else: no capacity, no cap, no pass. `GET
+writes a `pass_requests` row and nothing else: no capacity, no cap, no pass. One statement
+(`requestPassStatement()`) is the refusal for a second open request, through the partial unique
+index `ON CONFLICT ... DO NOTHING`, and for a pass type already held, as its own `NOT EXISTS`
+predicate, so a double tap writes one row (issue 1331). `DELETE /api/account/passes/requests/[id]`
+withdraws the member's own still-`PENDING` request; it deletes the row, since the status CHECK has
+no withdrawn value to add without a rebuild (0010), and the audit trail keeps
+`pass.request.withdrawn`. `GET
 /api/box-office/desk/passes/[passTypeId]/requests` lists pending ones by name, oldest first; the
 issue route takes an optional `requestId` and marks it `FULFILLED` in the same batch as the pass
 insert, guarded on the entry actually posting, so a request is never marked fulfilled against an
@@ -1095,7 +1101,9 @@ cancels it through the ordinary self-service path (D-110) like any other unpaid-
 ### pass_requests
 `id` PK · request → decision workflow (`status` CHECK `PENDING|FULFILLED|DECLINED|EXPIRED`,
 `note` scrub, `decided_by` restrict, `pass_id` restrict, NULL until fulfilled). A request is not
-a pass; `(status = 'FULFILLED') = (pass_id IS NOT NULL)` is a CHECK, not a convention.
+a pass; `(status = 'FULFILLED') = (pass_id IS NOT NULL)` is a CHECK, not a convention. Partial
+UNIQUE `pass_requests_one_open` (`user_id`, `pass_type_id`) WHERE `status = 'PENDING'`: one open
+request per account and pass type (issue 1331).
 
 ## The ledger (module I)
 

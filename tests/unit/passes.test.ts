@@ -137,11 +137,11 @@ describe('a pass or a request status reads as a sentence, never the raw enum (is
 // figure, never that an officer grants it.
 describe('a request says where it is paid for, and what it costs', () => {
   test('one price is quoted alone', () => {
-    expect(saysPayAtDesk([{ label: 'Standard', price: 2500 }])).toBe('Pay £25.00 at the box office desk')
+    expect(saysPayAtDesk([{ price: 2500 }])).toBe('Pay £25.00 at the box office desk')
   })
 
   test('several prices are offered as alternatives, cheapest first', () => {
-    expect(saysPayAtDesk([{ label: 'Standard', price: 3500 }, { label: 'Member', price: 2500 }]))
+    expect(saysPayAtDesk([{ price: 3500 }, { price: 2500 }]))
       .toBe('Pay £25.00 or £35.00 at the box office desk')
   })
 
