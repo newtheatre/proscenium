@@ -76,6 +76,7 @@ async function sendDigest(event: H3Event | undefined, at: Date, run: RetentionRu
         window: run.window,
         final: run.final,
         anonymised: run.anonymised,
+        refused: run.refused,
         wouldAnonymise: run.wouldAnonymise.length,
         warningsCappedAt: run.warningsCappedAt,
         anonymisationsCappedAt: run.anonymisationsCappedAt,
@@ -90,7 +91,7 @@ export interface RetentionRun {
   window: number
   final: number
   anonymised: number
-  // Due and armed, but the erasure was refused: left for the next run to find again.
+  // Due and armed, but the IT Manager guard refused the erasure: left for the next run to find.
   refused: number
   // Dry-run only: who a real arming would have anonymised this run.
   wouldAnonymise: string[]
@@ -144,20 +145,11 @@ export async function sweepRetention(event: H3Event | undefined, at: Date = new 
   const capped = due.slice(0, anonymiseCap)
   if (due.length > anonymiseCap) run.anonymisationsCappedAt = anonymiseCap
 
-  // Counted rather than thrown, as the unverified sweep does: one refusal must not stop the rest
-  // of the run (A-120 criterion 6).
-  for (const row of capped) {
-    if (!armed) {
-      run.wouldAnonymise.push(row.id)
-      continue
-    }
-    try {
-      const outcome = await eraseAccount(row.id, null)
-      if (outcome.erased) run.anonymised++
-    }
-    catch {
-      run.refused++
-    }
+  if (!armed) run.wouldAnonymise = capped.map(row => row.id)
+  else {
+    const { erased, refused } = await eraseEach(capped.map(row => row.id))
+    run.anonymised = erased
+    run.refused = refused
   }
 
   await sendDigest(event, at, run)

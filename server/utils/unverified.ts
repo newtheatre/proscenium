@@ -24,18 +24,6 @@ export async function expireUnverifiedAccounts(now: Date = new Date()): Promise<
     .orderBy(asc(schema.users.createdAt))
     .limit(cap)
 
-  // Counted rather than thrown: eraseAccount refuses the last administrator, and one refusal
-  // must not stop the rest of the run.
-  let erased = 0
-  let refused = 0
-  for (const row of rows) {
-    try {
-      if ((await eraseAccount(row.id, null)).erased) erased += 1
-    }
-    catch {
-      refused += 1
-    }
-  }
-
+  const { erased, refused } = await eraseEach(rows.map(row => row.id))
   return { eligible: rows.length, erased, refused, cap }
 }
