@@ -127,7 +127,7 @@ describe('the closures table and the requests queue fit without scrolling sidewa
   test('a request status wraps, its long badges included', async () => {
     const source = await Bun.file(REQUESTS).text()
     expect(source).toContain(`header: 'Status',\n    meta: { class: { td: 'whitespace-normal' } },`)
-    expect(source).toContain(`const WRAPPING_BADGE = { class: 'max-w-full', ui: { label: 'whitespace-normal' } }`)
+    expect(source.match(/\.\.\.WRAPPING_BADGE/g) ?? []).toHaveLength(3)
   })
 
   test('a request row keeps three actions in line and the rest behind More actions', async () => {

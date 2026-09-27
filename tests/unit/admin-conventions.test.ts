@@ -537,8 +537,19 @@ describe('every console list is a UTable the shell knows about (K-123 criteria 9
 
   test('a table of more than three columns says which of them a phone drops', async () => {
     const wide = (await tables()).filter(file => columnEntries(file.source)
-      .some(entries => entries.length > 3 && !entries.some(entry => entry.includes('HIDE_BELOW_SM'))))
+      .some(entries => entries.length > 3 && !entries.some(entry => /HIDE_BELOW_SM|HIDE_BELOW_TABLE_/.test(entry))))
     expect(wide.map(file => file.path).filter(path => !TABLES_AWAITING_A_NARROW_VIEW.includes(path))).toEqual([])
+  })
+
+  // Without a container above it, a column hidden by its table's width is hidden at every width.
+  // Every table in such a file measures itself, so a second table cannot lend the first its container.
+  test('a column hidden by its table\'s width sits in a table that measures itself', async () => {
+    const offenders = (await tables()).filter((file) => {
+      if (!/(?:HIDE|SHOW)_BELOW_TABLE_/.test(file.source)) return false
+      const tags = file.source.match(/<UTable\b[^>]*>/g) ?? []
+      return tags.length === 0 || tags.some(tag => !/\sclass="[^"]*@container\b/.test(tag))
+    })
+    expect(offenders.map(file => file.path)).toEqual([])
   })
 
   test('a row of more than three actions puts the rest behind an overflow', async () => {
@@ -565,7 +576,7 @@ const RIGHT_HEADER = /th:\s*[`'][^`']*text-right/
 describe('a figure column lines its header up with its figures', () => {
   test('the shared figure shapes right-align the header, and the action shape is not monospace', async () => {
     const shapes = await Bun.file('app/utils/responsive-table.ts').text()
-    for (const name of ['RIGHT_ALIGNED', 'RIGHT_ALIGNED_HIDE_BELOW_SM', 'ACTIONS_COLUMN']) {
+    for (const name of ['RIGHT_ALIGNED', 'RIGHT_ALIGNED_HIDE_BELOW_SM', 'RIGHT_ALIGNED_HIDE_BELOW_TABLE_MD', 'ACTIONS_COLUMN']) {
       expect(shapes).toMatch(new RegExp(`export const ${name} = \\{ class: \\{ th: [\`'][^\`']*text-right`))
     }
     expect(shapes).not.toMatch(/export const ACTIONS_COLUMN = [^\n]*font-mono/)
@@ -587,6 +598,29 @@ describe('a figure column lines its header up with its figures', () => {
   // Rule 6: no screen writes a shape out again, and one built from another's parts is written out.
   test('no table composes a column shape from a shared one\'s parts', async () => {
     const offenders = (await tables()).filter(file => /\b(?:RIGHT_ALIGNED\w*|ACTIONS_COLUMN)\.class\./.test(file.source))
+    expect(offenders.map(file => file.path)).toEqual([])
+  })
+})
+
+// A table beside another card fits by its own width, since the sidebar resizes and no window
+// width says how much the card has (K-123 criterion 9, the desk results).
+describe('a table narrows by its own width, and its cells wrap by one shape', () => {
+  test('a column hidden by its table\'s width and the line that carries it turn at the same width', async () => {
+    const shapes = await Bun.file('app/utils/responsive-table.ts').text()
+    const hides = [...shapes.matchAll(/export const HIDE_BELOW_TABLE_(\w+) = 'hidden @(\w+):table-cell'/g)]
+      .map(([, name, width]) => [name!, width!])
+    const shows = [...shapes.matchAll(/export const SHOW_BELOW_TABLE_(\w+) = '@(\w+):hidden'/g)]
+      .map(([, name, width]) => [name!, width!])
+    expect(hides.length).toBeGreaterThan(0)
+    // A shape written any other way is not read above, so it is counted here and fails the rule.
+    expect(hides).toHaveLength([...shapes.matchAll(/export const HIDE_BELOW_TABLE_/g)].length)
+    expect(shows).toHaveLength([...shapes.matchAll(/export const SHOW_BELOW_TABLE_/g)].length)
+    for (const [name, width] of hides) expect(name.toLowerCase()).toBe(width)
+    expect(shows).toEqual(hides)
+  })
+
+  test('a badge that wraps inside its cell takes the one wrapping shape', async () => {
+    const offenders = (await tables()).filter(file => /label:\s*[`'][^`']*whitespace-normal/.test(file.source))
     expect(offenders.map(file => file.path)).toEqual([])
   })
 })
