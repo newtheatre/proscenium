@@ -70,6 +70,8 @@ async function saveCopy(): Promise<void> {
         bookingClosesHoursBefore: copy.bookingClosesHoursBefore,
         categoryId: copy.categoryId,
         seasonId: copy.seasonId,
+        // The season this form loaded, so a save never undoes one set since (D-131 criterion 2).
+        loadedSeasonId: props.show.seasonId,
       },
     })
     toast.add({ title: 'Show changed', icon: 'i-lucide-check', color: 'success' })

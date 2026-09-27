@@ -12,7 +12,7 @@ import { showsList } from '#shared/utils/shows-list'
 import { posterUrl } from '#shared/utils/seo'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { AdminPerformance, AdminShow, ShowStatus, ShowVenue, ShowsStandingCounts } from '#shared/utils/programme'
+import type { AdminPerformance, AdminShow, ShowStatus, ShowUpdateInput, ShowVenue, ShowsStandingCounts } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
 // Reading and counting the programme for its administration (D-121, D-112). "Has sold tickets" is
@@ -299,6 +299,31 @@ export async function showById(id: string): Promise<AdminShow | undefined> {
     FROM shows s WHERE s.id = ${id}
   `)
   return row ? readShow(row) : undefined
+}
+
+// The season is written only where the form changed it, and then only over the one it loaded, so
+// a save never undoes a season set since; the address is held once (D-131 criterion 2, 0003).
+export function updateShowStatement(id: string, input: ShowUpdateInput): SQL {
+  const seasonId = input.seasonId ?? null
+  const loaded = input.loadedSeasonId
+  return sql`
+    UPDATE shows
+    SET slug = ${input.slug},
+        title = ${input.title},
+        subtitle = ${input.subtitle ?? null},
+        description = ${input.description ?? null},
+        long_description = ${input.longDescription ?? null},
+        age_guidance = ${input.ageGuidance ?? null},
+        latecomer_policy = ${input.latecomerPolicy ?? null},
+        category_id = ${input.categoryId ?? null},
+        season_id = CASE WHEN ${seasonId} IS ${loaded} THEN season_id ELSE ${seasonId} END,
+        booking_closes_hours_before = ${input.bookingClosesHoursBefore ?? null},
+        updated_at = unixepoch()
+    WHERE id = ${id}
+      AND NOT EXISTS (SELECT 1 FROM shows WHERE slug = ${input.slug} AND id <> ${id})
+      AND (${seasonId} IS ${loaded} OR season_id IS ${loaded})
+    RETURNING id, season_id AS seasonId
+  `
 }
 
 // The blob key, which no payload carries: the poster routes need the key itself to replace or

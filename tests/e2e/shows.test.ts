@@ -616,6 +616,17 @@ describe.skipIf(skip !== null)('a show takes the season its first performance fa
     expect(entry?.detail.filledFrom).toBe(nightOf(curtain))
   })
 
+  test('a Details form loaded before the first performance filled the season does not undo it', async () => {
+    const curtain = nextWeek(120 * 24)
+    const season = await seasonAround(curtain)
+    const id = await newShow()
+    const title = (await detail(id)).show.title
+    await addPerformance(id, { startsAt: curtain })
+
+    expect((await send('PUT', `/api/admin/shows/${id}`, { title, slug: slugged(title), ageGuidance: '12 and over', seasonId: null, loadedSeasonId: null })).status).toBe(200)
+    expect((await detail(id)).show).toMatchObject({ ageGuidance: '12 and over', seasonId: season.id })
+  })
+
   test('a run fills the season once, from its earliest night', async () => {
     const curtain = nextWeek(90 * 24)
     const season = await seasonAround(curtain)
