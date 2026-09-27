@@ -1,4 +1,4 @@
-import { PERIOD_KINDS, periodQuery } from '#shared/utils/season-dashboard'
+import { PERIOD_KINDS, periodQuery, saysPeriodKind } from '#shared/utils/season-dashboard'
 import { calendarYearChoices, currentYear, monthChoices, yearChoices } from '#shared/utils/year'
 import type { PeriodChoices, PeriodInput, PeriodKind } from '#shared/utils/season-dashboard'
 
@@ -24,7 +24,7 @@ export async function usePeriodForm(key: string, choices: () => Promise<PeriodCh
   const customRange = options.customRange ?? false
   const selectableKinds = computed(() => (options.kinds ?? PERIOD_KINDS).filter(one =>
     (one !== 'TERM' || customRange || terms.value.length > 0) && (one !== 'SEASON' || seasons.value.length > 0)))
-  const kindItems = computed(() => selectableKinds.value.map(one => ({ label: options.labels?.[one] ?? one, value: one })))
+  const kindItems = computed(() => selectableKinds.value.map(one => ({ label: options.labels?.[one] ?? saysPeriodKind(one), value: one })))
   const termItems = computed(() => terms.value.map(one => ({ label: one.label, value: one.id })))
   const seasonItems = computed(() => seasons.value.map(one => ({ label: one.name, value: one.id })))
 

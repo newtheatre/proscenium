@@ -230,7 +230,8 @@ describe.skipIf(skip !== null)('access is limited to the bar manager, the treasu
 })
 
 describe.skipIf(skip !== null)('the screen', () => {
-  test('a sale appears in the sales section once refreshed', async () => {
+  // Issue 1362: the screen opens on tonight and reads it, with no Refresh to press (I-105 c6).
+  test('a sale tonight is in the sales section as the screen opens', async () => {
     const { venueId, performanceId } = programme(`report-screen-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aStockedProduct(500, 100)
     await openTill(venueId, performanceId)
@@ -244,9 +245,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
     await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
-    await click(view, '[data-test="refresh-report"]')
-    await waitFor(view, `document.querySelector('[data-test="section-sales"]')`)
-    expect(await textOf(view, '[data-test="section-sales"]')).toContain('£5.00')
+    expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="refresh-report"]\'))')).toBe(false)
+    await waitFor(view, `document.querySelector('[data-test="section-sales"]')?.innerText.includes('£5.00')`)
     view.close()
   }, 120_000)
 
@@ -267,12 +267,13 @@ describe.skipIf(skip !== null)('the screen', () => {
       `JSON.stringify([...document.querySelectorAll('label')].map(el => el.textContent.trim()))`,
     )) as string[]
 
-    // Custom is the default: From and To are two identical date controls unless each says which.
-    expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'From', 'To']))
-
-    await pickOption(view, '[data-test="period-kind"]', 'Night')
+    // Tonight is the default (issue 1362); a custom range's From and To each say which they are.
     await waitFor(view, `document.querySelector('[data-test="period-night"]')`)
     expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'Night']))
+
+    await pickOption(view, '[data-test="period-kind"]', 'Custom range')
+    await waitFor(view, `document.querySelector('[data-test="period-from"]')`)
+    expect(await labelTexts()).toEqual(expect.arrayContaining(['Period', 'From', 'To']))
 
     await pickOption(view, '[data-test="period-kind"]', 'Year')
     await waitFor(view, `document.querySelector('[data-test="period-year"]')`)
@@ -291,11 +292,12 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
     await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
-    // Nothing this suite writes ever lands here.
+    // Nothing this suite writes ever lands here; a changed date reads the report again itself.
+    await pickOption(view, '[data-test="period-kind"]', 'Custom range')
+    await waitFor(view, `document.querySelector('[data-test="period-from"]')`)
     await fillDate(view, '[data-test="period-from"]', '2030-01-01')
     await fillDate(view, '[data-test="period-to"]', '2030-01-02')
-    await click(view, '[data-test="refresh-report"]')
-    await waitFor(view, `document.querySelector('[data-test="section-sales"]')`)
+    await waitFor(view, `document.querySelector('[data-test="section-sales"]')?.innerText.includes('Nothing sold in this period.')`)
 
     expect(await textOf(view, '[data-test="section-sales"]')).toContain('Nothing sold in this period.')
     expect(await view.evaluate<number>(
@@ -318,7 +320,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
     await waitFor(view, `document.querySelector('[data-test="section-sales"]')`)
 
-    await pickOption(view, '[data-test="period-kind"]', 'Night')
+    await pickOption(view, '[data-test="period-kind"]', 'Week')
     // Present immediately: a refetch dims the table rather than removing the whole report while
     // its new period is pending.
     expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="section-sales"]')`)).toBe(true)

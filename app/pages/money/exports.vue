@@ -77,7 +77,7 @@ const periodForm = await usePeriodForm('su-export-period-choices', () => request
   .then(response => ({ terms: [], seasons: response.seasons })), {
   kinds: SU_EXPORT_KINDS,
   customRange: true,
-  labels: { YEAR: 'Year', SEASON: 'Season', TERM: 'Custom range' },
+  labels: { TERM: 'Custom range' },
 })
 const { complete, query } = periodForm
 const params = computed(() => (complete.value ? query.value : null))

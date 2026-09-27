@@ -1,25 +1,19 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
+import { saysEntrySource } from '#shared/utils/ledger'
+import { saysDay } from '#shared/utils/when'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
 import { entriesHref } from '#shared/utils/ledger-entries-list'
 import type { EntriesFilters } from '#shared/utils/ledger-entries-list'
-import type { FinanceSeason, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
-import type { Period } from '#shared/utils/period-locks'
+import type { RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Money dashboard', middleware: 'console', docs: '/docs/money' })
 
 const request = useRequestFetch()
 
-// A term and a season are read here through the finance gate, the one this screen already holds.
-const periodForm = await usePeriodForm('finance-period-choices', () => Promise.all([
-  request<{ periods: Period[] }>('/api/admin/finance/terms'),
-  request<{ seasons: FinanceSeason[] }>('/api/admin/finance/seasons'),
-]).then(([terms, seasons]) => ({
-  terms: terms.periods.map(({ id, label, fromDay, toDay }) => ({ id, label, fromDay, toDay })),
-  seasons: seasons.seasons,
-})))
+const periodForm = await useFinancePeriodForm('finance-period-choices')
 const query = periodForm.query
 
 const { data, status, error } = await useAsyncData(
@@ -41,7 +35,7 @@ function entriesUrl(filters: EntriesFilters = {}): string {
 const UButton = resolveComponent('UButton')
 
 const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
-  { id: 'source', header: 'Source', cell: ({ row }) => row.original.source },
+  { id: 'source', header: 'Source', cell: ({ row }) => saysEntrySource(row.original.source) },
   { id: 'amount', header: 'Amount', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.totalPence) },
   ...(mayDrillDown.value
     ? [{
@@ -93,7 +87,7 @@ const figures = computed(() => (data.value
 
     <template v-else-if="status !== 'pending' && data">
       <p class="text-sm text-muted">
-        {{ data.fromDay }} to {{ data.toDay }}
+        {{ saysDay(data.fromDay, { year: true }) }} to {{ saysDay(data.toDay, { year: true }) }}
       </p>
 
       <section

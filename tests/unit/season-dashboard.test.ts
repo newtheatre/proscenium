@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { periodForm, periodQuery } from '#shared/utils/season-dashboard'
+import { PERIOD_KINDS, periodForm, periodQuery, saysPeriodKind } from '#shared/utils/season-dashboard'
 
 describe('a money dashboard period', () => {
   test('a day takes a date', () => {
@@ -57,5 +57,12 @@ describe('a period as a query string', () => {
   ] as const)('%o is sent as %o', (period, sent) => {
     expect(periodQuery(period)).toEqual(sent)
     expect(periodForm.parse(periodQuery(period))).toEqual(period)
+  })
+})
+
+// Issue 1362 (K-128): the period kind picker says Day and Season, never DAY and SEASON.
+describe('a period kind reads as a word', () => {
+  test('every kind has a word of its own, none of them the stored value', () => {
+    expect(PERIOD_KINDS.map(saysPeriodKind)).toEqual(['Day', 'Week', 'Month', 'Term', 'Season', 'Year'])
   })
 })

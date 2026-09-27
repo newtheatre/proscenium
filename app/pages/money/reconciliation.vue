@@ -79,7 +79,7 @@ const expectedRows = computed<ExpectedRow[]>(() => {
 const expectedColumns: TableColumn<ExpectedRow>[] = [
   {
     id: 'label',
-    header: 'Desk, by kind',
+    header: 'Takings',
     cell: ({ row }) => h('span', { class: row.original.strong ? 'font-semibold' : undefined }, row.original.label),
   },
   {
@@ -258,7 +258,7 @@ function writeOff(): Promise<void> {
             <p class="text-sm text-muted">
               {{ varianceNow === 0
                 ? `We now expect ${saysMoney(current.readerPence)}, which is what the reader showed. Checking again records the same figure and closes the variance.`
-                : 'Once the missing sale or refund is in the ledger, check again: the same reader figure is recorded against what we expect then, with nothing retyped.' }}
+                : 'Once the missing sale or refund is in the ledger, check again: the same reader total is recorded against what we expect then, with nothing retyped.' }}
             </p>
             <UButton
               color="neutral"
@@ -307,7 +307,7 @@ function writeOff(): Promise<void> {
             {{ current ? 'Correct the reading' : 'Record this night\'s reading' }}
           </h2>
           <UFormField
-            label="Reader figure"
+            label="Reader total (Z)"
             description="As the reader shows it, in pounds and pence."
           >
             <div class="flex flex-wrap items-center gap-2">

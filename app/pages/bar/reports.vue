@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { h } from 'vue'
+import { h, onBeforeUnmount, onMounted } from 'vue'
 import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
+import { currentShowNight } from '#shared/utils/show-night'
 import { currentYear, yearChoices } from '#shared/utils/year'
 import type {
   BarReport,
@@ -30,8 +31,8 @@ const periodKindOptions = REPORT_PERIOD_KINDS.map(value => ({ label: saysReportP
 const request = useRequestFetch()
 
 const today = londonDay(new Date())
-const kind = ref<(typeof REPORT_PERIOD_KINDS)[number]>('CUSTOM')
-const night = ref(today)
+const kind = ref<(typeof REPORT_PERIOD_KINDS)[number]>('NIGHT')
+const night = ref(currentShowNight())
 const day = ref(today)
 const year = ref(currentYear())
 const years = yearChoices(year.value)
@@ -62,6 +63,24 @@ const { data, status, error, refresh } = await useAsyncData(
   () => request<{ report: BarReport }>('/api/admin/bar/reports', { query: query.value }).then(response => response.report),
   { watch: [query] },
 )
+
+// Tonight keeps growing, so the report reads again whenever the screen is come back to, the way
+// the member's tab does, rather than offering a button to press (I-105 criterion 6).
+function onReturnToTab(): void {
+  if (document.visibilityState === 'visible') void refresh()
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', onReturnToTab)
+  window.addEventListener('focus', onReturnToTab)
+  window.addEventListener('pageshow', onReturnToTab)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onReturnToTab)
+  window.removeEventListener('focus', onReturnToTab)
+  window.removeEventListener('pageshow', onReturnToTab)
+})
 
 const reportFailure = useListFailure(error, 'The report could not be read.')
 const loading = computed(() => status.value === 'pending')
@@ -203,13 +222,6 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
             />
           </UFormField>
         </template>
-        <UButton
-          data-test="refresh-report"
-          variant="subtle"
-          @click="refresh()"
-        >
-          Refresh
-        </UButton>
       </template>
     </AdminToolbar>
 

@@ -104,7 +104,7 @@ const description = computed(() => (props.earlier
         </div>
 
         <UFormField
-          label="What the reader's Z actually reads"
+          label="Reader total (Z)"
           help="The Treasurer gets this figure, and any note, as the night's reader total, unless they have already recorded tonight's reading themselves."
         >
           <UInputNumber
