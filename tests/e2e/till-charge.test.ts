@@ -439,4 +439,43 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£3.00')`)
     view.close()
   }, 120_000)
+
+  // A charge the reader took and the till did not record is abandoned only with a word on the
+  // money (F-124 criterion 4), so each listed one carries its own note, apart from any other's.
+  test('a mismatched charge in the unanswered list takes its own note and is abandoned with it', async () => {
+    const { venueId } = programme('charge-screen-mismatch-note')
+    const opened = await (await openTill(venueId)).json() as { session: { id: string, night: string } }
+    const database = new Database(app.databaseFile)
+    const ids = [`mismatch-a-${venueId}`, `mismatch-b-${venueId}`]
+    try {
+      for (const id of ids) {
+        database.query(`INSERT INTO sumup_attempts (id, till_session_id, venue_id, night, created_by, basket, expected_total_pence, status, kind, error)
+          VALUES (?, ?, ?, ?, ?, '{}', 250, 'MISMATCH', 'TYPED', 'The sale could not be recorded')`).run(id, opened.session.id, venueId, opened.session.night, barManager.id)
+      }
+    }
+    finally {
+      database.close()
+    }
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, '[data-test="till-open"]')
+    const [first, second] = ids
+    await waitFor(view, `document.querySelector('[data-test="sumup-open-note-${first}"]') && document.querySelector('[data-test="sumup-open-note-${second}"]')`)
+    await fill(view, `[data-test="sumup-open-note-${first}"]`, 'Refunded on the reader at the bar')
+    await click(view, `[data-test="sumup-open-abandoned-${first}"]`)
+    await waitFor(view, `!document.querySelector('[data-test="sumup-open-${first}"]')`)
+
+    const abandoned = query<{ status: string, resolution_note: string | null }>(app, 'SELECT status, resolution_note FROM sumup_attempts WHERE id = ?', first)
+    expect(abandoned).toEqual({ status: 'ABANDONED', resolution_note: 'Refunded on the reader at the bar' })
+    // The other row's note is its own, still empty: the first one's words never answered it.
+    expect(await view.evaluate<string>(`document.querySelector('[data-test="sumup-open-note-${second}"]').value`)).toBe('')
+    expect(query<{ status: string }>(app, 'SELECT status FROM sumup_attempts WHERE id = ?', second)!.status).toBe('MISMATCH')
+    view.close()
+  }, 120_000)
 })
