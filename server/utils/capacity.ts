@@ -38,7 +38,7 @@ export function heldSeatsQuery(performanceId: string): SQL {
 }
 
 // The same predicate correlated to one booking: its party, where a row count would call a refunded
-// seat somebody arriving. Its own aliases, so a caller's `r.id` binds to the caller's row (#1295).
+// seat somebody arriving.
 export function heldSeatsForReservation(reservationId: SQL): SQL {
   return sql`(
     SELECT count(*) FROM ${sql.raw(TICKETS)} party_t
@@ -100,12 +100,12 @@ export function admittedSeatsSubquery(performanceId: SQL): SQL {
 // which the night report counts beside "in" without counting a walk-up sold but not yet in (D-126).
 export function admittedWalkUpSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.status = 'DOOR'
-      AND r.source = 'DOOR'
+    SELECT count(*) FROM ${sql.raw(TICKETS)} walkin_t
+    JOIN ${sql.raw(RESERVATIONS)} walkin_r ON walkin_r.id = walkin_t.reservation_id
+    WHERE walkin_t.performance_id = ${performanceId}
+      AND walkin_t.refunded_at IS NULL
+      AND walkin_r.status = 'DOOR'
+      AND walkin_r.source = 'DOOR'
   )`
 }
 
@@ -113,11 +113,11 @@ export function admittedWalkUpSeatsSubquery(performanceId: SQL): SQL {
 // falls as the door admits people (issue 1296). A pass seat owes nothing though it stays PENDING.
 export function noShowSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND (r.status IN ('NO_SHOW', 'COLLECTED') OR (r.status = 'PENDING' AND ${ticketOnPass(sql`t.id`)}))
+    SELECT count(*) FROM ${sql.raw(TICKETS)} noshow_t
+    JOIN ${sql.raw(RESERVATIONS)} noshow_r ON noshow_r.id = noshow_t.reservation_id
+    WHERE noshow_t.performance_id = ${performanceId}
+      AND noshow_t.refunded_at IS NULL
+      AND (noshow_r.status IN ('NO_SHOW', 'COLLECTED') OR (noshow_r.status = 'PENDING' AND ${ticketOnPass(sql`noshow_t.id`)}))
   )`
 }
 
