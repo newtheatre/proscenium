@@ -1,4 +1,5 @@
 import { checklistScopeForm } from '#shared/utils/checklist'
+import type { TonightChecklist } from '#shared/utils/checklist'
 
 // This performance's checklist, stamped from the current configuration the first time it is read
 // (E-114 criteria 1, 2, 3). Carries the close, so a reload does not forget it is already closed.
@@ -19,5 +20,5 @@ export default defineEventHandler(async (event) => {
     closeFor(target),
     tillLeftOpen(resolved.venueId, resolved.night),
   ])
-  return { performanceId: target, night: resolved.night, venueId: resolved.venueId, items, close, till }
+  return { performanceId: target, night: resolved.night, venueId: resolved.venueId, items, close, till } satisfies TonightChecklist
 })

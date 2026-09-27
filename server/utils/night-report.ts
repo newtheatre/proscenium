@@ -5,7 +5,7 @@ import { admittedSeatsSubquery, admittedWalkUpSeatsSubquery, heldSeatsSubquery, 
 import { cardSalesQuery } from './reconciliation'
 import { DOOR_COVER_ACTION, NIGHT_ROLES, OFFICER_BYPASS_ACTION, doorCoverTarget, officerBypassTarget } from '#shared/utils/night-authority'
 import { showNightBounds } from '#shared/utils/show-night'
-import type { ChecklistEntry } from './checklist'
+import type { ChecklistEntry } from '#shared/utils/checklist'
 import type { OfficerBypassLine } from '#shared/utils/night-authority'
 import type { SQL } from 'drizzle-orm'
 

@@ -6,7 +6,7 @@ import { OFFICER_SIGN_OFF_NOTICE, holdsTheClose, openAtClose, saysSignOffOpens, 
 import { saysShiftRole } from '#shared/utils/rota'
 import { saysTeamHolder } from '#shared/utils/tonight'
 import { saysClock } from '#shared/utils/when'
-import type { Phase, SystemCheck } from '#shared/utils/checklist'
+import type { ChecklistEntry } from '#shared/utils/checklist'
 import type { Category, Severity } from '#shared/utils/incidents'
 import type { OfficerBypassLine } from '#shared/utils/night-authority'
 import type { NightReportSigner } from '#shared/utils/night-signoff'
@@ -28,17 +28,7 @@ interface Report {
   covers?: { name: string | null }[]
   bar: { revenuePence: number, itemsSold: number }
   access: { verified: number }
-  checklist: {
-    id: string
-    phase: Phase
-    label: string
-    required: boolean
-    systemCheck: SystemCheck | null
-    done: boolean
-    tickedByName: string | null
-    exempted: boolean
-    exemptReason: string | null
-  }[]
+  checklist: Pick<ChecklistEntry, 'id' | 'phase' | 'label' | 'required' | 'systemCheck' | 'done' | 'tickedByName' | 'exempted' | 'exemptReason'>[]
   // A draft's alone: when Sign off and close is offered (issue 1315).
   curtainDownAt?: number | null
   signedOff: { closingNote: string, signedByName: string | null, signedVia: NightReportSigner, signedAt: number } | null

@@ -2,33 +2,11 @@
 import { saysNightClosed, saysPhase } from '#shared/utils/checklist'
 import { holdsTheClose } from '#shared/utils/night-signoff'
 import { saysTillLeftOpen } from '#shared/utils/till'
-import type { Phase, SystemCheck } from '#shared/utils/checklist'
+import type { ChecklistClose, ChecklistEntry, Phase, TonightChecklist } from '#shared/utils/checklist'
 import type { TillLeftOpen } from '#shared/utils/till'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/checklist' })
 useSeoMeta({ title: 'Checklist' })
-
-interface Entry {
-  id: string
-  itemId: string
-  phase: Phase
-  label: string
-  required: boolean
-  systemCheck: SystemCheck | null
-  done: boolean
-  tickedByName: string | null
-  tickedAt: number | null
-  exempted: boolean
-  exemptReason: string | null
-  exemptedByName: string | null
-  exemptedAt: number | null
-}
-
-interface CloseInfo {
-  closedAt: number
-  closedByName: string | null
-  automatic: boolean
-}
 
 const route = useRoute()
 const request = useRequestFetch()
@@ -38,10 +16,10 @@ const failure = ref<string | null>(null)
 // Refused outright: one card, and nothing left to tick (issue 1304).
 const refusal = ref<string | null>(null)
 const busy = ref(true)
-const items = ref<Entry[]>([])
+const items = ref<ChecklistEntry[]>([])
 // Read from the server on every load: Sign off and close on the night report is what closes it
 // (issue 1315), and this screen only says so.
-const close = ref<CloseInfo | null>(null)
+const close = ref<ChecklistClose | null>(null)
 // Advisory: only the bar closes a till, so this line ticks itself and never holds the close
 // (F-102 criterion 5, issue 1316).
 const till = ref<TillLeftOpen | null>(null)
@@ -64,7 +42,7 @@ async function load(): Promise<void> {
   busy.value = true
   failure.value = null
   try {
-    const listed = await request<{ performanceId: string, items: Entry[], close: CloseInfo | null, till: TillLeftOpen }>(
+    const listed = await request<TonightChecklist>(
       '/api/tonight/checklist',
       { query: performanceId.value ? { performanceId: performanceId.value } : {} },
     )

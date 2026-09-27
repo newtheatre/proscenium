@@ -6,7 +6,7 @@ import { checklistEntryDone } from '#shared/utils/checklist'
 import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import type { ListClause } from './list-filters'
 import type { AuditActionName } from '#shared/utils/audit-actions'
-import type { ChecklistItemInput, Phase, SystemCheck } from '#shared/utils/checklist'
+import type { ChecklistClose, ChecklistEntry, ChecklistItemInput, Phase, SystemCheck } from '#shared/utils/checklist'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { SQL } from 'drizzle-orm'
 
@@ -265,22 +265,6 @@ async function evaluate(check: SystemCheck, performanceId: string): Promise<bool
   }
 }
 
-export interface ChecklistEntry {
-  id: string
-  itemId: string
-  phase: Phase
-  label: string
-  required: boolean
-  systemCheck: SystemCheck | null
-  done: boolean
-  tickedByName: string | null
-  tickedAt: number | null
-  exempted: boolean
-  exemptReason: string | null
-  exemptedByName: string | null
-  exemptedAt: number | null
-}
-
 // This performance's checklist, stamped if it is not already, every system-verified item read
 // live rather than stored (criterion 3). At most two distinct checks exist, so each resolves once.
 export async function checklistFor(performanceId: string): Promise<ChecklistEntry[]> {
@@ -338,14 +322,6 @@ export function exemptStatement(stampId: string, performanceId: string, reason: 
   `
 }
 
-export interface ChecklistCloseRow {
-  performanceId: string
-  // Null for a night that closed itself: nobody closed it (E-125 criterion 2).
-  closedByName: string | null
-  closedAt: number
-  automatic: boolean
-}
-
 // A person's close, or else a report that froze itself. SYSTEM writes no close row and reviews no
 // incident, since `closed_by` names a person and its report lists what was left (E-125).
 export function closeForQuery(performanceId: string): SQL {
@@ -364,8 +340,8 @@ export function closeForQuery(performanceId: string): SQL {
   `
 }
 
-export async function closeFor(performanceId: string): Promise<ChecklistCloseRow | null> {
-  const [row] = await db.all<Omit<ChecklistCloseRow, 'automatic'> & { automatic: number }>(closeForQuery(performanceId))
+export async function closeFor(performanceId: string): Promise<ChecklistClose | null> {
+  const [row] = await db.all<Omit<ChecklistClose, 'automatic'> & { automatic: number }>(closeForQuery(performanceId))
   return row ? { ...row, automatic: row.automatic === 1 } : null
 }
 
