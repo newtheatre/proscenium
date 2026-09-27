@@ -140,11 +140,11 @@ export async function offerWaitingList(event: H3Event | undefined, performanceId
   for (const candidate of candidates) {
     if (candidate.partySize > remaining) break
 
-    const claimed = await db.all<{ id: string }>(offerEntryStatement(candidate.id, now, expiresAt))
-    if (claimed.length === 0) continue
-
+    // The offer and its trail row land together or not at all (0049); a run that lost the entry
+    // to another changes nothing and records nothing.
     const entry = auditEntry({ actorId: null, action: 'waiting-list.offered', target: `waiting-list-entry:${candidate.id}` })
-    await db.run(sql`INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${entry.detail !== null ? JSON.stringify(entry.detail) : null})`)
+    const claimed = await auditedWrite(db.all<{ id: string }>(offerEntryStatement(candidate.id, now, expiresAt)), entry)
+    if (!claimed) continue
 
     remaining -= candidate.partySize
     offered.push({ id: candidate.id, userId: candidate.userId, showTitle: performance.showTitle, startsAt: performance.startsAt, expiresAt, partySize: candidate.partySize })
@@ -367,15 +367,19 @@ export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEn
     return { applied: false, refusal: 'This performance no longer has room for that party. Contact the box office directly.' }
   }
 
-  await db.run(sql`UPDATE waiting_list SET claimed_reservation_id = ${result.id}, updated_at = unixepoch() WHERE id = ${entry.id} AND status = 'CLAIMED'`)
-
-  const claimEntry = auditEntry({
+  // The entry names its booking and the trail records the claim in one batch (0049). Nothing
+  // moves a CLAIMED entry, so a miss here is a fault to see in the log, not a refusal.
+  const recorded = await auditedWrite(db.all<{ id: string }>(sql`
+    UPDATE waiting_list SET claimed_reservation_id = ${result.id}, updated_at = unixepoch()
+    WHERE id = ${entry.id} AND status = 'CLAIMED'
+    RETURNING id
+  `), auditEntry({
     actorId: entry.userId,
     action: 'waiting-list.claimed',
     target: `waiting-list-entry:${entry.id}`,
     detail: { reservationId: result.id },
-  })
-  await db.run(sql`INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (${claimEntry.id}, ${claimEntry.actorId}, ${claimEntry.action}, ${claimEntry.target}, ${JSON.stringify(claimEntry.detail)})`)
+  }))
+  if (!recorded) console.error(`[waiting-list] entry ${entry.id} left CLAIMED before it could name reservation ${result.id}`)
 
   return { applied: true, reservation: result }
 }

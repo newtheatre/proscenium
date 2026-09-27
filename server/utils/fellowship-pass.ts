@@ -6,6 +6,7 @@ import { auditEntry } from '#shared/utils/audit'
 import { generatePassReference } from '#shared/utils/passes'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { AuditRow } from '#shared/utils/audit'
+import type { SQL } from 'drizzle-orm'
 
 // D-130: the lifetime entitlement a fellowship carries (0023). `slug = 'fellowship'` is what
 // server/utils/pass-redemption.ts reads to cover every show and mask the type name.
@@ -88,6 +89,16 @@ export async function fellowshipPassStatements(userId: string, actorId: string |
       `),
     ],
   }
+}
+
+// A revocation is a second fact beside the award, never a correction to it (A-127 criterion 4).
+// `revoked_at IS NULL` rides the write, so of two officers revoking at once the second changes nothing.
+export function revokeFellowshipStatement(id: string, actorId: string, reason: string, at: number): SQL {
+  return sql`
+    UPDATE fellowships SET revoked_at = ${at}, revoked_by = ${actorId}, revocation_reason = ${reason}
+    WHERE id = ${id} AND revoked_at IS NULL
+    RETURNING id
+  `
 }
 
 // D-130 criterion 4: revocation stops future admissions and rewrites nothing already taken. The
