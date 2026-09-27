@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { registerOpenable } from '#shared/utils/training'
 
 // Open the register. This is the moment a session stops being a plan: the modules freeze and
@@ -44,22 +44,12 @@ export default defineEventHandler(async (event) => {
 
   if (session.registerOpenedAt !== null) return { ok: true, alreadyOpen: true }
 
-  // Criterion 4. The stamp is a conditional write, so two devices opening at once produce one open
-  // register: the loser's update matches nothing.
-  const now = Math.floor(Date.now() / 1000)
-  const opened = await db.update(schema.trainingSessions)
-    .set({ registerOpenedAt: now, registerOpenedBy: resolved.account.id, updatedAt: now })
-    .where(and(eq(schema.trainingSessions.id, id), isNull(schema.trainingSessions.registerOpenedAt)))
-    .returning({ id: schema.trainingSessions.id })
-
-  if (opened.length === 0) return { ok: true, alreadyOpen: true }
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  const opened = await auditedWrite(db.all(openRegisterStatement(id, resolved.account.id, Math.floor(Date.now() / 1000))), auditEntry({
     actorId: resolved.account.id,
     action: 'register.opened',
     target: `session:${id}`,
     detail: { heldOn: session.heldOn },
   }))
 
-  return { ok: true, alreadyOpen: false }
+  return { ok: true, alreadyOpen: !opened }
 })

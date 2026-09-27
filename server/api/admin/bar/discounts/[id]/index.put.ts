@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { discountForm } from '#shared/utils/discounts'
 
@@ -18,23 +17,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: `A discount cannot exceed ${cap}%: ${input.name} asked for ${input.percent}%` })
   }
 
-  // The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
-  // moment refuses rather than reaching the unique index (0003, 0006).
-  const updated = await db.all<{ id: string }>(sql`
-    UPDATE discounts
-    SET name = ${input.name}, percent = ${input.percent}, updated_by = ${resolved.account.id}, updated_at = unixepoch()
-    WHERE id = ${id}
-      AND NOT EXISTS (SELECT 1 FROM discounts WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
-    RETURNING id
-  `)
-
-  if (updated.length === 0) {
-    const taken = await discountNamed(input.name, id)
-    if (!taken) throw noSuch('discount')
-    throw createError({ statusCode: 409, statusMessage: `A discount is already called ${taken.name}` })
-  }
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  const entry = auditEntry({
     actorId: resolved.account.id,
     action: 'bar.discount.updated',
     target: `bar-discount:${id}`,
@@ -42,7 +25,17 @@ export default defineEventHandler(async (event) => {
       name: [held.name, input.name],
       percent: [held.percent, input.percent],
     }),
-  }))
+  })
+  const updated = await auditedWrite(
+    db.all(renameDiscountStatement({ id, name: input.name, percent: input.percent, actorId: resolved.account.id })),
+    entry,
+  )
+
+  if (!updated) {
+    const taken = await discountNamed(input.name, id)
+    if (!taken) throw noSuch('discount')
+    throw createError({ statusCode: 409, statusMessage: `A discount is already called ${taken.name}` })
+  }
 
   return { ok: true }
 })

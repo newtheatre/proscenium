@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import type { Discount } from '#shared/utils/discounts'
 
 // Reading and finding a bar discount. Applying one to a sale is `server/utils/sale.ts`'s, since
@@ -18,6 +19,18 @@ export async function discountNamed(name: string, exceptId?: string): Promise<Di
     SELECT ${DISCOUNT_COLUMNS} FROM discounts d WHERE d.name = ${name} COLLATE NOCASE${except} LIMIT 1
   `)
   return row
+}
+
+// The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
+// moment refuses rather than reaching the unique index (0003, 0006); audited in its batch (0049).
+export function renameDiscountStatement(edit: { id: string, name: string, percent: number, actorId: string }): SQL {
+  return sql`
+    UPDATE discounts
+    SET name = ${edit.name}, percent = ${edit.percent}, updated_by = ${edit.actorId}, updated_at = unixepoch()
+    WHERE id = ${edit.id}
+      AND NOT EXISTS (SELECT 1 FROM discounts WHERE name = ${edit.name} COLLATE NOCASE AND id <> ${edit.id})
+    RETURNING id
+  `
 }
 
 export async function activeDiscounts(): Promise<Discount[]> {

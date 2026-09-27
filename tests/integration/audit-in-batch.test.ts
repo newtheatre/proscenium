@@ -30,7 +30,7 @@ const trail = (database: TestDatabase, action: string): { target: string, detail
 
 describe('editing a bar discount audits only the edit that landed (F-117)', () => {
   const edit = (database: TestDatabase, id: string, name: string): void => {
-    const entry = auditEntry({ actorId: 'u-1', action: 'bar.discount.updated', target: `bar-discount:${id}`, detail: null })
+    const entry = auditEntry({ actorId: 'u-1', action: 'bar.discount.updated', target: `bar-discount:${id}` })
     database.batch([
       boundStatement(database, renameDiscountStatement({ id, name, percent: 15, actorId: 'u-1' })),
       boundStatement(database, auditIfChanged(entry)),
@@ -56,7 +56,7 @@ describe('editing a bar discount audits only the edit that landed (F-117)', () =
 
 describe('opening a register audits the open that landed, once (G-115 criterion 4)', () => {
   const open = (database: TestDatabase, auditId: string): void => {
-    const entry = { ...auditEntry({ actorId: 'u-1', action: 'register.opened', target: 'session:s-1', detail: null }), id: auditId }
+    const entry = { ...auditEntry({ actorId: 'u-1', action: 'register.opened', target: 'session:s-1' }), id: auditId }
     database.batch([
       boundStatement(database, openRegisterStatement('s-1', 'u-1', 1000)),
       boundStatement(database, auditIfChanged(entry)),
