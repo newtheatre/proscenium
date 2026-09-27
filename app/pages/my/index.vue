@@ -31,9 +31,7 @@ const failure = useListFailure(error, 'Your overview could not be read.')
 // The order is a fact about the data, not about the template: what is soonest leads, and a tile
 // with nothing behind it is a line on one list instead (K-127 criterion 6, issue 1153 item 3).
 const split = computed(() => splitMyTiles(summary.value))
-const things = computed(() => split.value.things
-  .filter((name): name is keyof typeof MY_THINGS_TO_DO => name in MY_THINGS_TO_DO)
-  .map(name => ({ name, ...MY_THINGS_TO_DO[name] })))
+const things = computed(() => split.value.things.map(name => ({ name, ...MY_THINGS_TO_DO[name] })))
 
 const greeting = computed(() => {
   const name = account.value.user?.name

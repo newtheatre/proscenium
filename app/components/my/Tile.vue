@@ -6,11 +6,9 @@ withDefaults(defineProps<{
   to: string
   label: string
   highlight?: boolean
-  empty?: boolean
-  emptyTitle?: string
   // A server route rather than a page: the link loads it rather than routing in the app.
   external?: boolean
-}>(), { highlight: false, empty: false, emptyTitle: undefined, external: false })
+}>(), { highlight: false, external: false })
 </script>
 
 <template>
@@ -25,16 +23,7 @@ withDefaults(defineProps<{
       :ui="{ root: 'h-full min-h-12', container: 'h-full' }"
     >
       <div class="flex flex-1 flex-col gap-4">
-        <UEmpty
-          v-if="empty"
-          variant="naked"
-          size="sm"
-          :title="emptyTitle"
-        />
-        <div
-          v-else
-          class="flex-1"
-        >
+        <div class="flex-1">
           <slot />
         </div>
         <span class="text-sm font-medium text-primary">

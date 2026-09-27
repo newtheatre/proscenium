@@ -21,10 +21,10 @@ show tonight and Bar tab if you keep one. On a phone the same list is in the hea
 bookings is reached from Rooms, and Training sessions from Training. Access requirements is one of
 your account settings. The help icon at the top right of each screen opens its page here.
 
-![My NNT on a phone, with the membership tile (1), the training tile (2) and Things you can do (3)](/images/docs/members/my.png)
+![My NNT on a phone, with the training tile (1), the membership tile (2) and Things you can do (3)](/images/docs/members/my.png)
 
-1. **Membership** says whether the membership is current, in grace or lapsed.
-2. **Training** counts what the member holds and names what they could do next.
+1. **Training** counts what the member holds and names what they could do next.
+2. **Membership** says whether the membership is current, in grace or lapsed.
 3. **Things you can do** is one line for each tile with nothing behind it, each saying what would
    be there, with the whole line a link to the one thing that fills it.
 

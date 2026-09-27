@@ -133,6 +133,11 @@ describe.skipIf(skip !== null)('a signed-in person\'s own bookings (issue 1332)'
       await visit(view, `${app.baseURL}/my`, '[data-test="my-page"]')
       await waitFor(view, `document.querySelector('[data-test="my-tile-tickets"]')`)
       expect(await textOf(view, '[data-test="my-tile-tickets"]')).toContain(title)
+
+      // One link, and it loads the booking's link route: routed in the app it would find no page.
+      expect(await view.evaluate<number>(`document.querySelectorAll('[data-test="my-tile-tickets"] a').length`)).toBe(1)
+      await click(view, '[data-test="my-tile-tickets"] a')
+      await waitFor(view, `location.pathname === '/qr' && document.body.innerText.includes('${reference}')`)
     }
     finally {
       view.close()

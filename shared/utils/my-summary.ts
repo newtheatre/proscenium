@@ -32,6 +32,9 @@ export const MY_TILES = ['shift', 'room', 'tickets', 'training', 'membership', '
 
 export type MyTileName = (typeof MY_TILES)[number]
 
+// Membership always says where it stands, so it is the one tile that never becomes a line.
+export type MyThingName = Exclude<MyTileName, 'membership'>
+
 // A session is a London wall clock, so it becomes an instant before it can sort against a shift's
 // epoch seconds (0014).
 function sessionAt(session: { heldOn: string, startsAt: string }): number {
@@ -40,8 +43,7 @@ function sessionAt(session: { heldOn: string, startsAt: string }): number {
   return Math.floor(fromLondonWallClock(year!, month!, day!, hour ?? 0, minute ?? 0).getTime() / 1000)
 }
 
-// The overview leads with what is soonest, then the standing order (K-127 criterion 6). Every tile
-// keeps its place either way: one with nothing behind it says what would fill it.
+// The overview leads with what is soonest, then the standing order (K-127 criterion 6).
 export function orderMyTiles(summary: MySummary): MyTileName[] {
   const soon = new Map<MyTileName, number>()
   if (summary.shift) soon.set('shift', summary.shift.startsAt)
@@ -57,28 +59,30 @@ export function orderMyTiles(summary: MySummary): MyTileName[] {
 
 // A tile with nothing behind it. Membership always says where it stands, and a shift tile with no
 // shift still leads to tonight while the member is on shift at a bar opening.
-function tileIsEmpty(summary: MySummary, name: MyTileName): boolean {
-  if (name === 'shift') return !summary.shift && !summary.onShiftTonight
-  if (name === 'room') return !summary.room
-  if (name === 'tickets') return !summary.ticket
-  if (name === 'training') return summary.training.held === 0 && summary.training.available === 0 && !summary.training.nextStep
-  if (name === 'passes') return summary.passes.active.length === 0 && !summary.passes.request
-  if (name === 'notifications') return summary.notifications.length === 0
-  if (name === 'show') return !summary.nextShow
-  return false
+const EMPTY_WHEN: Record<MyThingName, (summary: MySummary) => boolean> = {
+  shift: summary => !summary.shift && !summary.onShiftTonight,
+  room: summary => !summary.room,
+  tickets: summary => !summary.ticket,
+  training: summary => summary.training.held === 0 && summary.training.available === 0
+    && !summary.training.nextStep && !summary.training.nextSession,
+  passes: summary => summary.passes.active.length === 0 && !summary.passes.request,
+  notifications: summary => summary.notifications.length === 0,
+  show: summary => !summary.nextShow,
 }
+
+const tileIsEmpty = (summary: MySummary, name: MyTileName): boolean => name !== 'membership' && EMPTY_WHEN[name](summary)
 
 // The tiles with something behind them, soonest first, and the rest as one list in the standing
 // order (K-127 criterion 6, issue 1153 item 3).
-export function splitMyTiles(summary: MySummary): { tiles: MyTileName[], things: MyTileName[] } {
+export function splitMyTiles(summary: MySummary): { tiles: MyTileName[], things: MyThingName[] } {
   return {
     tiles: orderMyTiles(summary).filter(name => !tileIsEmpty(summary, name)),
-    things: MY_TILES.filter(name => tileIsEmpty(summary, name)),
+    things: MY_TILES.filter((name): name is MyThingName => name !== 'membership' && tileIsEmpty(summary, name)),
   }
 }
 
 // A line on the list: what would be there, and the one action that fills it.
-export const MY_THINGS_TO_DO: Record<Exclude<MyTileName, 'membership'>, { says: string, label: string, to: string }> = {
+export const MY_THINGS_TO_DO: Record<MyThingName, { says: string, label: string, to: string }> = {
   shift: { says: 'You have no shift claimed.', label: 'See open shifts', to: '/rota' },
   room: { says: 'You have no room booked.', label: 'Book a room', to: '/rooms' },
   tickets: { says: 'You have no bookings to come.', label: 'Book a show', to: '/whats-on' },

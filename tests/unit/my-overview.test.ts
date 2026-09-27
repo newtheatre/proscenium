@@ -109,9 +109,14 @@ describe('empty tiles become one list of things you can do (K-127 criterion 6, i
     expect(splitMyTiles({ ...EMPTY, passes: { active: [], request: { state: 'PENDING' } } }).tiles).toContain('passes')
   })
 
+  test('a session booked with nothing held keeps the training tile, and it leads as the soonest', () => {
+    const booked = { id: 't1', moduleName: 'Working at height', heldOn: '2026-10-14', startsAt: '18:00', place: null }
+    expect(splitMyTiles({ ...EMPTY, training: { ...EMPTY.training, nextSession: booked } }).tiles[0]).toBe('training')
+  })
+
   test('every line says what would be there and names one action with somewhere to go', () => {
     for (const thing of splitMyTiles(EMPTY).things) {
-      const line = MY_THINGS_TO_DO[thing as keyof typeof MY_THINGS_TO_DO]
+      const line = MY_THINGS_TO_DO[thing]
       expect(`${thing}: ${line.says.endsWith('.')}`).toBe(`${thing}: true`)
       expect(`${thing}: ${line.to.startsWith('/')}`).toBe(`${thing}: true`)
       expect(line.label.length).toBeGreaterThan(0)
