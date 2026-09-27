@@ -91,6 +91,18 @@ export const bar: Shot[] = [
     ],
   },
   {
+    name: 'bar/allergens',
+    persona,
+    url: '/bar/stock/allergens',
+    marker: '[data-test^="allergen-row-"]',
+    width: CONSOLE_WIDTH,
+    annotations: [
+      { selector: '[data-test^="allergen-row-"]', label: 'One stocked item' },
+      { selector: '[data-test$="-RECORDED"]', label: 'The answer' },
+      { selector: '[data-test^="allergen-note-"]', label: 'The note staff read out' },
+    ],
+  },
+  {
     name: 'bar/movements',
     persona,
     url: '/bar/stock/movements',
