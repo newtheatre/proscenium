@@ -3,6 +3,7 @@ import { saysMoney } from '#shared/utils/bar'
 import { MAX_BASKET_LINE_QTY, lineNeedsCheckId, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
 import { refusalText, writeFailureText } from '../utils/refusal'
 import type { ComputedRef, Ref } from 'vue'
+import { AGE_CHECK_PRODUCT_MAX } from '#shared/utils/age-checks'
 import type { InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
 import type { PricedBasket, PricedLine, SaleChoice, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
 
@@ -261,7 +262,9 @@ export function useTillBasket(deps: TillBasketDeps) {
         reason: outcome.reason,
         description: outcome.description,
         notes: outcome.notes,
-        product: names || null,
+        // Held to the register's own cap, so a long round never loses the entry; the screen
+        // above still names every line.
+        product: names ? names.slice(0, AGE_CHECK_PRODUCT_MAX) : null,
         performanceId: null,
       })
     }
