@@ -18,6 +18,9 @@ const { data, error } = await useAsyncData(
 
 setNightSubject(() => ({ title: 'Stocktake', meta: data.value.stocktake ? `Opened ${saysWhen(data.value.stocktake.openedAt)}` : null }))
 
+// Somebody not on tonight's bar is refused the screen in place of the work (issue 1304).
+const refusal = computed(() => (error.value && refusalStatus(error.value) === 403 ? refusalText(error.value) : null))
+
 // Each line saves on its own, and the register's answer replaces that one line only (issue 1321).
 function saved(line: StocktakeLine): void {
   data.value = { ...data.value, lines: data.value.lines.map(one => (one.itemId === line.itemId ? line : one)) }
@@ -25,7 +28,10 @@ function saved(line: StocktakeLine): void {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-md space-y-4">
+  <NightScreen
+    title="Stocktake"
+    :refused="refusal"
+  >
     <UAlert
       v-if="error"
       data-test="stocktake-refusal"
@@ -56,5 +62,5 @@ function saved(line: StocktakeLine): void {
         @saved="saved"
       />
     </template>
-  </div>
+  </NightScreen>
 </template>
