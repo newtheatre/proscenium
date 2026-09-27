@@ -1,10 +1,14 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { newId } from './accounts'
+import { auditIfChanged } from './audit'
+import { closeStatement, reviewIncidentsStatement } from './checklist'
 import { configValue } from './configuration'
 import { sendRaw } from './notify'
 import { holdsLiveGrant } from './roles-register'
+import { REVIEWED_AT_SIGN_OFF } from '#shared/utils/night-signoff'
 import type { NightReport } from './night-report'
+import type { AuditRow } from '#shared/utils/audit'
 import type { NightAuthorityVia } from '#shared/utils/night-authority'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
@@ -65,18 +69,51 @@ export interface NightSignOffInput {
   report: NightReport
   signedBy: string | null
   signedVia: NightReportSignedVia
+  // The incidents the signer's report listed; a count that moved since refuses the freeze.
+  incidentsSeen?: number
 }
 
 // Predicated on no existing row for this performance, `closeStatement`'s own shape (E-114): a
 // second sign-off for the same one returns nothing rather than racing the unique index (0006).
 export function signOffStatement(input: NightSignOffInput): SQL {
+  const seen = input.incidentsSeen === undefined
+    ? sql``
+    : sql` AND (SELECT count(*) FROM incidents WHERE performance_id = ${input.performanceId}) = ${input.incidentsSeen}`
   return sql`
     INSERT INTO night_reports (id, performance_id, venue_id, night, closing_note, report, signed_by, signed_via)
     SELECT ${input.id}, ${input.performanceId}, ${input.venueId}, ${input.night}, ${input.closingNote},
            ${JSON.stringify(input.report)}, ${input.signedBy}, ${input.signedVia}
-    WHERE NOT EXISTS (SELECT 1 FROM night_reports WHERE performance_id = ${input.performanceId})
+    WHERE NOT EXISTS (SELECT 1 FROM night_reports WHERE performance_id = ${input.performanceId})${seen}
     RETURNING id
   `
+}
+
+export interface SignOffAndCloseInput extends Omit<NightSignOffInput, 'signedBy' | 'incidentsSeen'> {
+  signedBy: string
+  incidentsSeen: number
+  closeId: string
+  signedEntry: AuditRow
+  closedEntry: AuditRow
+}
+
+// Sign off and close, in batch order (issue 1315): the freeze decides and its entry follows it,
+// then the close and the incident reviews, each written only beside the report it froze (0049).
+export function signOffAndCloseStatements(input: SignOffAndCloseInput): [SQL, ...SQL[]] {
+  return [
+    signOffStatement(input),
+    auditIfChanged(input.signedEntry),
+    closeStatement(input.performanceId, input.signedBy, input.closeId, input.id),
+    auditIfChanged(input.closedEntry),
+    reviewIncidentsStatement(input.performanceId, input.signedBy, input.id),
+  ]
+}
+
+// The frozen copy reads the incidents item as the same batch leaves it: reviewed.
+export function reviewedAtSignOff(report: NightReport): NightReport {
+  return {
+    ...report,
+    checklist: report.checklist.map(entry => entry.systemCheck === REVIEWED_AT_SIGN_OFF ? { ...entry, done: true } : entry),
+  }
 }
 
 export interface AddendumRow { id: string, note: string, addedByName: string, addedAt: number }

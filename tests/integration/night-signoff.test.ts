@@ -5,11 +5,16 @@ import {
   deliveriesForReportQuery,
   reportForPerformanceQuery,
   reportRoleHoldersQuery,
+  reviewedAtSignOff,
+  signOffAndCloseStatements,
   signOffStatement,
 } from '#server/utils/night-signoff'
+import { recordIncidentStatement } from '#server/utils/incidents'
+import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
+import type { ChecklistEntry } from '#server/utils/checklist'
 import type { NightReport } from '#server/utils/night-report'
 import type { SQL } from 'drizzle-orm'
 
@@ -336,5 +341,90 @@ describe('reportRoleHoldersQuery', () => {
       expect(addresses(database, ['FOH_MANAGER', 'SAFETY_OFFICER'])).toEqual(['both@e2e.newtheatre.org.uk'])
       expect(addresses(database, [])).toEqual([])
     })
+  })
+})
+
+// Issue 1315: one Sign off and close freezes the report, closes the checklist and reviews the
+// incidents the report listed, or writes none of the three (E-124 criterion 1, 0006).
+describe('Sign off and close, one batch (E-124 criterion 1, E-114 criterion 3, issue 1315)', () => {
+  const at = Math.floor(Date.now() / 1000)
+
+  function signOffAndClose(database: TestDatabase, input: { reportId: string, performanceId: string, venueId: string, night: string, signedBy: string, incidentsSeen: number }): Record<string, unknown>[] {
+    const [freeze, ...rest] = signOffAndCloseStatements({
+      id: input.reportId,
+      performanceId: input.performanceId,
+      venueId: input.venueId,
+      night: input.night,
+      closingNote: 'A quiet house',
+      report: { ...REPORT, performanceId: input.performanceId },
+      signedBy: input.signedBy,
+      signedVia: 'SHIFT',
+      incidentsSeen: input.incidentsSeen,
+      closeId: `close-${input.reportId}`,
+      signedEntry: auditEntry({ actorId: input.signedBy, action: 'night-report.signed', target: `performance:${input.performanceId}` }),
+      closedEntry: auditEntry({ actorId: input.signedBy, action: 'checklist.closed', target: `performance:${input.performanceId}` }),
+    })
+    let frozen: Record<string, unknown>[] = []
+    database.raw.transaction(() => {
+      frozen = run(database, freeze)
+      for (const statement of rest) run(database, statement)
+    })()
+    return frozen
+  }
+
+  const count = (database: TestDatabase, statement: string, ...parameters: unknown[]): number =>
+    rows<{ n: number }>(database, statement, ...parameters)[0]!.n
+
+  const written = (database: TestDatabase, performanceId: string): Record<string, number> => ({
+    reports: count(database, 'SELECT count(*) AS n FROM night_reports WHERE performance_id = ?', performanceId),
+    closes: count(database, 'SELECT count(*) AS n FROM checklist_closes WHERE performance_id = ?', performanceId),
+    signed: count(database, `SELECT count(*) AS n FROM audit_log WHERE action = 'night-report.signed' AND target = ?`, `performance:${performanceId}`),
+    closed: count(database, `SELECT count(*) AS n FROM audit_log WHERE action = 'checklist.closed' AND target = ?`, `performance:${performanceId}`),
+    reviewed: count(database, `SELECT count(*) AS n FROM audit_log a JOIN incidents i ON a.target = 'incident:' || i.id
+      WHERE a.action = 'incident.reviewed' AND i.performance_id = ?`, performanceId),
+  })
+
+  test('the report it listed is what it reviews: all three are written together', async () => {
+    await withDatabase((database) => {
+      const dm = person(database, 'closer')
+      const { performanceId, venueId, night } = house(database, 'signoff-close')
+      run(database, recordIncidentStatement(dm, performanceId, 'SAFETY', 'NOTE', 'A spill', at, 'in-1').statement)
+      run(database, recordIncidentStatement(dm, performanceId, 'MEDICAL', 'NOTE', 'A faint', at, 'in-2').statement)
+
+      expect(signOffAndClose(database, { reportId: 'report-close', performanceId, venueId, night, signedBy: dm, incidentsSeen: 2 })).toHaveLength(1)
+      expect(written(database, performanceId)).toEqual({ reports: 1, closes: 1, signed: 1, closed: 1, reviewed: 2 })
+    })
+  })
+
+  test('an incident logged after the report was read refuses the lot: nothing frozen, closed or reviewed', async () => {
+    await withDatabase((database) => {
+      const dm = person(database, 'closer-late')
+      const { performanceId, venueId, night } = house(database, 'signoff-late')
+      run(database, recordIncidentStatement(dm, performanceId, 'SAFETY', 'NOTE', 'A spill', at, 'in-late').statement)
+
+      expect(signOffAndClose(database, { reportId: 'report-late', performanceId, venueId, night, signedBy: dm, incidentsSeen: 0 })).toHaveLength(0)
+      expect(written(database, performanceId)).toEqual({ reports: 0, closes: 0, signed: 0, closed: 0, reviewed: 0 })
+    })
+  })
+
+  test('a second sign-off for the same performance writes nothing more', async () => {
+    await withDatabase((database) => {
+      const dm = person(database, 'closer-twice')
+      const { performanceId, venueId, night } = house(database, 'signoff-twice')
+      run(database, recordIncidentStatement(dm, performanceId, 'SAFETY', 'NOTE', 'A spill', at, 'in-twice').statement)
+
+      expect(signOffAndClose(database, { reportId: 'report-first', performanceId, venueId, night, signedBy: dm, incidentsSeen: 1 })).toHaveLength(1)
+      expect(signOffAndClose(database, { reportId: 'report-second', performanceId, venueId, night, signedBy: dm, incidentsSeen: 1 })).toHaveLength(0)
+      expect(written(database, performanceId)).toEqual({ reports: 1, closes: 1, signed: 1, closed: 1, reviewed: 1 })
+    })
+  })
+
+  test('the frozen copy reads the incidents item as done, the one the same batch answered', () => {
+    const item = (systemCheck: ChecklistEntry['systemCheck']): ChecklistEntry => ({
+      id: `stamp-${systemCheck ?? 'hand'}`, itemId: 'item', phase: 'POST', label: 'An item', required: true, systemCheck, done: false,
+      tickedByName: null, tickedAt: null, exempted: false, exemptReason: null, exemptedByName: null, exemptedAt: null,
+    })
+    const settled = reviewedAtSignOff({ ...REPORT, checklist: [item('INCIDENTS_REVIEWED'), item('NO_SHOW_HOLDS_RELEASED'), item(null)] })
+    expect(settled.checklist.map(entry => entry.done)).toEqual([true, false, false])
   })
 })

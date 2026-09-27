@@ -9,6 +9,7 @@ import {
   itemsForVenueQuery,
   noShowHoldsReleasedQuery,
   retireItemStatement,
+  reviewIncidentsStatement,
   stampStatement,
   stampsForPerformanceQuery,
   tickStatement,
@@ -400,14 +401,24 @@ describe('the incidents-reviewed system check (criterion 3)', () => {
   })
 })
 
-describe('the close-night action (criterion 4)', () => {
-  test('closes once and is idempotent, decided from RETURNING', async () => {
+// The close and the reviews are written only beside the report their batch froze, so a refused
+// sign-off leaves neither behind (issue 1315, E-124 criterion 1).
+function frozen(database: TestDatabase, reportId: string, performanceId: string, signedBy: string): void {
+  database.batch([[`INSERT INTO night_reports (id, performance_id, venue_id, night, closing_note, report, signed_by, signed_via)
+    SELECT ?, p.id, p.venue_id, '2026-09-26', 'Closed', '{}', ?, 'SHIFT' FROM performances p WHERE p.id = ?`,
+  reportId, signedBy, performanceId]])
+}
+
+describe('the close, written by Sign off and close (criterion 4, issue 1315)', () => {
+  test('closes once beside the report it names, decided from RETURNING', async () => {
     await withDatabase((database) => {
       const officer = person(database, 'officer')
       const { performanceId } = tonightsPerformance(database)
 
-      expect(run(database, closeStatement(performanceId, officer, 'cc-1'))).toHaveLength(1)
-      expect(run(database, closeStatement(performanceId, officer, 'cc-2'))).toHaveLength(0)
+      expect(run(database, closeStatement(performanceId, officer, 'cc-0', 'no-such-report'))).toHaveLength(0)
+      frozen(database, 'nr-1', performanceId, officer)
+      expect(run(database, closeStatement(performanceId, officer, 'cc-1', 'nr-1'))).toHaveLength(1)
+      expect(run(database, closeStatement(performanceId, officer, 'cc-2', 'nr-1'))).toHaveLength(0)
     })
   })
 
@@ -418,9 +429,64 @@ describe('the close-night action (criterion 4)', () => {
       const venue = testVenue(database)
       const matinee = tonightsPerformance(database, { suffix: 'matinee', venueId: venue.id, curtainHoursAfterNightStart: 10 })
       const evening = tonightsPerformance(database, { suffix: 'evening', venueId: venue.id, curtainHoursAfterNightStart: 15.5 })
+      frozen(database, 'nr-matinee', matinee.performanceId, officer)
+      frozen(database, 'nr-evening', evening.performanceId, officer)
 
-      expect(run(database, closeStatement(matinee.performanceId, officer, 'cc-matinee'))).toHaveLength(1)
-      expect(run(database, closeStatement(evening.performanceId, officer, 'cc-evening'))).toHaveLength(1)
+      expect(run(database, closeStatement(matinee.performanceId, officer, 'cc-matinee', 'nr-matinee'))).toHaveLength(1)
+      expect(run(database, closeStatement(evening.performanceId, officer, 'cc-evening', 'nr-evening'))).toHaveLength(1)
+    })
+  })
+})
+
+describe('the incidents reviewed in one set-based write (criterion 3, issue 1315, 0006)', () => {
+  const at = Math.floor(Date.now() / 1000)
+  const reviews = (database: TestDatabase, incidentId: string): number =>
+    rows<{ n: number }>(database, `SELECT count(*) AS n FROM audit_log WHERE action = 'incident.reviewed' AND target = ?`, `incident:${incidentId}`)[0]!.n
+
+  test('every incident on the performance is reviewed by the one statement, attributed to the closer', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      const { performanceId } = tonightsPerformance(database)
+      run(database, recordIncidentStatement(officer, performanceId, 'SAFETY', 'NOTE', 'A spill', at, 'in-1').statement)
+      run(database, recordIncidentStatement(officer, performanceId, 'MEDICAL', 'NOTE', 'A faint', at, 'in-2').statement)
+      frozen(database, 'nr-1', performanceId, officer)
+
+      run(database, reviewIncidentsStatement(performanceId, officer, 'nr-1'))
+      expect([reviews(database, 'in-1'), reviews(database, 'in-2')]).toEqual([1, 1])
+      expect(run(database, incidentsReviewedQuery(performanceId))[0]?.unreviewed).toBe(0)
+      const actors = rows<{ actor_id: string }>(database, `SELECT actor_id FROM audit_log WHERE action = 'incident.reviewed'`)
+      expect(actors.every(row => row.actor_id === officer)).toBe(true)
+    })
+  })
+
+  test('one already reviewed on the log gains no second review', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      const { performanceId } = tonightsPerformance(database)
+      run(database, recordIncidentStatement(officer, performanceId, 'SAFETY', 'NOTE', 'A spill', at, 'in-1').statement)
+      database.batch([['INSERT INTO audit_log (id, actor_id, action, target) VALUES (?, ?, ?, ?)', 'al-1', officer, 'incident.reviewed', 'incident:in-1']])
+      frozen(database, 'nr-1', performanceId, officer)
+
+      run(database, reviewIncidentsStatement(performanceId, officer, 'nr-1'))
+      expect(reviews(database, 'in-1')).toBe(1)
+    })
+  })
+
+  test('nothing is reviewed without the report, nor on another performance', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      const matinee = tonightsPerformance(database, { suffix: 'matinee', venueId: venue.id, curtainHoursAfterNightStart: 10 })
+      const evening = tonightsPerformance(database, { suffix: 'evening', venueId: venue.id, curtainHoursAfterNightStart: 15.5 })
+      run(database, recordIncidentStatement(officer, matinee.performanceId, 'SAFETY', 'NOTE', 'A spill', at, 'in-matinee').statement)
+      run(database, recordIncidentStatement(officer, evening.performanceId, 'SAFETY', 'NOTE', 'A spill', at, 'in-evening').statement)
+
+      run(database, reviewIncidentsStatement(matinee.performanceId, officer, 'nr-matinee'))
+      expect(reviews(database, 'in-matinee')).toBe(0)
+
+      frozen(database, 'nr-matinee', matinee.performanceId, officer)
+      run(database, reviewIncidentsStatement(matinee.performanceId, officer, 'nr-matinee'))
+      expect([reviews(database, 'in-matinee'), reviews(database, 'in-evening')]).toEqual([1, 0])
     })
   })
 })

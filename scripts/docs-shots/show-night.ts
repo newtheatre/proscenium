@@ -147,12 +147,15 @@ export const showNight: Shot[] = [
     name: 'show-night/checklist',
     persona: foh,
     url: '/tonight/checklist',
-    marker: '[data-test="close-night"]',
+    marker: '[data-test="checklist-list"], [data-test="checklist-performance-switcher"]',
     width: PHONE_WIDTH,
+    height: 1800,
+    // The seed runs two houses tonight, so the first is chosen to show the list itself.
+    after: 'document.querySelector(\'[data-test="checklist-performance-switcher"] [data-test^="choose-"]\')?.click()',
     annotations: [
-      // The list where one performance runs; the house to choose where two do.
-      { selector: '[data-test="checklist-list"], [data-test="checklist-performance-switcher"], [data-test="checklist-failure"]', label: 'The checklist' },
-      { selector: '[data-test="close-night"]', label: 'Close the night' },
+      { selector: '[data-test="checklist-list"]', label: 'The checklist' },
+      // Nothing that ends the night is pinned here: it closes on the night report (issue 1315).
+      { selector: '[data-test="checklist-closes-on-report"]', label: 'On to the night report' },
     ],
   },
   {

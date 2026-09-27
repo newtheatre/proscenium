@@ -102,16 +102,18 @@ desk, on any day: take the person's booking reference and pass it to the Front o
    the phone the moment any show-night screen opens.
 
 Each tile appears where your own shift or role opens it, and your own job comes first, in gold:
-**Door** on a door shift, **Till** on a bar shift, **Tonight at a glance** for the duty manager.
-The rest follow in the order they are pressed on a night: **Door**, **Till**, **Tonight at a
-glance**, **Checklist**, **Night report**, **Challenge 25**, **Backstage**, **Contacts and
-incidents**, and **Emergency**, always there and always last. Until the phone knows your roles,
-or with no signal, every tile shows, and each screen still checks for itself. The **Checklist**
-tile says what is left on it: **3 pre-show items left** before the house opens, **2 post-show
-items left** after, **All ticked** when nothing is outstanding. On a matinee day the **Tonight at
-a glance**, **Checklist**, **Night report** and **Contacts and incidents** tiles carry the house
-you chose on the switcher, so each opens on it. The line at the foot of the hub is the rule the
-whole night runs on: the door never sells tickets; unpaid and walk-up customers go to the bar.
+**Door** on a door shift, **Till** on a bar shift, **Tonight at a glance** for the duty manager
+until the curtain comes down on the performance you are looking at, and **Night report** after it,
+reading **Sign off and close**, since that is where the night ends. The rest follow in the order
+they are pressed on a night: **Door**, **Till**, **Tonight at a glance**, **Checklist**, **Night
+report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, and **Emergency**, always
+there and always last. Until the phone knows your roles, or with no signal, every tile shows, and
+each screen still checks for itself. The **Checklist** tile says what is left on it: **3 pre-show
+items left** before the house opens, **2 post-show items left** after, **All ticked** when nothing
+is outstanding. On a matinee day the **Tonight at a glance**, **Checklist**, **Night report** and
+**Contacts and incidents** tiles carry the house you chose on the switcher, so each opens on it. The
+line at the foot of the hub is the rule the whole night runs on: the door never sells tickets;
+unpaid and walk-up customers go to the bar.
 
 The duty manager also sees **Waiting on you** above the tiles whenever a comp request is
 waiting, with its value, who asked and **Approve** or **Decline**, the same queue
@@ -140,7 +142,7 @@ required pre-show checklist item that is still not done.
   The pre-show and post-show checklist, exceptions, and closing the night.
   ::
   ::card{icon="i-lucide-file-signature" title="Night report" to="/docs/tonight/night-report"}
-  Tonight's report as it fills in, the closing note and signing the night off.
+  Tonight's report as it fills in, what is left after the curtain, and Sign off and close.
   ::
   ::card{icon="i-lucide-phone" title="Contacts and incidents" to="/docs/tonight/contacts-and-incidents"}
   Who is on tonight, the incident log and a one-press near miss.
@@ -152,7 +154,7 @@ required pre-show checklist item that is still not done.
   House open, clearance and the calls between front of house and the wings.
   ::
   ::card{icon="i-lucide-moon-star" title="Closing the night" to="/docs/tonight/closing-the-night"}
-  Unanswered card charges, closing the till, the post-show checklist and the night report.
+  Unanswered card charges, closing the till, then Sign off and close on the night report.
   ::
 ::
 

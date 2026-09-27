@@ -391,9 +391,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   {
+    // Sign off and close: the checklist close and the incident reviews ride the same batch (issue 1315).
     route: 'server/api/tonight/report/sign-off.post.ts',
-    actions: ['night-report.signed', 'night.officer-bypass'],
-    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+    actions: ['night-report.signed', 'checklist.closed', 'incident.reviewed', 'night.officer-bypass'],
+    via: ['server/utils/checklist.ts', 'server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   {
     route: 'server/api/tonight/age-checks/index.get.ts',
@@ -448,11 +449,6 @@ export const AUDIT_COVERAGE: Coverage[] = [
   {
     route: 'server/api/tonight/checklist/[stampId]/exempt.post.ts',
     actions: ['checklist.exempted', 'night.officer-bypass'],
-    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
-  },
-  {
-    route: 'server/api/tonight/checklist/close.post.ts',
-    actions: ['checklist.closed', 'night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   { route: 'server/api/admin/checklist/index.get.ts', exempt: 'reads every venue\'s checklist, including a venue with none' },

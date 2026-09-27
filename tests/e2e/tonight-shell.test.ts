@@ -173,7 +173,7 @@ describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 ite
     try {
       await visit(view, `${app.baseURL}/tonight/glance`)
       expect(await textOf(view, '[data-test="night-actions"]')).toContain('Refresh the numbers')
-      expect(await textOf(view, '[data-test="night-actions"]')).not.toContain('Close the night')
+      expect(await textOf(view, '[data-test="night-actions"]')).not.toContain('Night report')
     }
     finally {
       view.close()

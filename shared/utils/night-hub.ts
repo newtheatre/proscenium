@@ -1,8 +1,10 @@
 import { saysLatecomerPolicy } from './programme'
+import { performanceEnd } from './rota-times'
 import { plural } from './text'
 import { saysPrice } from './ticket-types'
 import { saysClock, saysDay } from './when'
 import type { NightRole } from './night-authority'
+import type { PerformanceTimes } from './rota-times'
 
 // What the show-night header and the hub's tiles read (E-112). Pure: the numbers and the wording
 // are decided here so one test holds them, and the screens only place them.
@@ -161,20 +163,28 @@ const HUB_TILE_ROLES: Record<HubTileId, readonly NightRole[] | 'ANYONE'> = {
 
 const HUB_TILE_ORDER = Object.keys(HUB_TILE_ROLES) as HubTileId[]
 
-// The job a role is there to do, first and in gold; the duty manager's runs the night.
+// The job a role is there to do, first and in gold; the duty manager's runs the night, and after
+// the curtain it is the night report, which ends it (issue 1315).
 const OWN_JOB: [NightRole, HubTileId][] = [['DUTY_MANAGER', 'glance'], ['DOOR', 'door'], ['BAR', 'till']]
 
 // `null` is roles not yet known, or a phone offline: every tile then, since each screen guards
 // itself (E-111 criterion 5) and a missing tile is worse than a refused one.
-export function hubTiles(roles: readonly NightRole[] | null): { id: HubTileId, gold: boolean }[] {
+export function hubTiles(roles: readonly NightRole[] | null, curtainDown = false): { id: HubTileId, gold: boolean }[] {
   if (roles === null) return HUB_TILE_ORDER.map(id => ({ id, gold: false }))
   const opens = (id: HubTileId): boolean => {
     const needs = HUB_TILE_ROLES[id]
     return needs === 'ANYONE' || needs.some(role => roles.includes(role))
   }
-  const own = OWN_JOB.find(([role]) => roles.includes(role))?.[1] ?? null
+  const job = OWN_JOB.find(([role]) => roles.includes(role))?.[1] ?? null
+  const own = job === 'glance' && curtainDown ? 'report' : job
   const rest = HUB_TILE_ORDER.filter(id => id !== own && opens(id)).map(id => ({ id, gold: false }))
   return own ? [{ id: own, gold: true }, ...rest] : rest
+}
+
+// Its running time and intervals past curtain up, or curtain up itself where none is recorded,
+// 0078's own fallback. Nothing that ends the night is pinned before it (issue 1315).
+export function curtainIsDown(performance: PerformanceTimes, at: number): boolean {
+  return at >= performanceEnd(performance)
 }
 
 // Who a refused volunteer turns to: tonight's duty manager, by first name where the rota has one.

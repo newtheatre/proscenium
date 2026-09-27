@@ -1416,7 +1416,9 @@ criterion 3), unless an exception with a reason answers it first, as any item's 
 `id` PK · `performance_id` → performances restrict, UNIQUE · `closed_by` restrict · `closed_at`.
 The UNIQUE on `performance_id` makes closing idempotent, the same guarantee `night_reports`' own
 PK gives its close. The close-night action itself (E-114 criterion 4; performance-keyed since
-E-128); blocked while a required item across either phase is neither ticked nor exempted.
+E-128); blocked while a required item across either phase is neither ticked nor exempted. Written
+since issue 1315 only by Sign off and close, in the batch that freezes `night_reports`, and only
+beside the report row that batch wrote.
 
 ### night_reports  APPEND-ONLY
 `id` PK · `performance_id` → performances restrict, UNIQUE · `venue_id` → venues restrict ·

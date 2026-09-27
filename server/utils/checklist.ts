@@ -5,6 +5,7 @@ import { listedVenue } from './venues'
 import { checklistEntryDone } from '#shared/utils/checklist'
 import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import type { ListClause } from './list-filters'
+import type { AuditActionName } from '#shared/utils/audit-actions'
 import type { ChecklistItemInput, Phase, SystemCheck } from '#shared/utils/checklist'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { SQL } from 'drizzle-orm'
@@ -235,6 +236,20 @@ export function incidentsReviewedQuery(performanceId: string): SQL {
   `
 }
 
+// Every incident on this performance not yet reviewed, reviewed in one set-based write beside the
+// report `reportId` names, so a refused sign-off reviews nothing (issue 1315, 0006).
+export function reviewIncidentsStatement(performanceId: string, reviewedBy: string, reportId: string): SQL {
+  const action: AuditActionName = 'incident.reviewed'
+  return sql`
+    INSERT INTO audit_log (id, actor_id, action, target, detail)
+    SELECT lower(hex(randomblob(16))), ${reviewedBy}, ${action}, 'incident:' || i.id, NULL
+    FROM incidents i
+    WHERE i.performance_id = ${performanceId}
+      AND EXISTS (SELECT 1 FROM night_reports nr WHERE nr.id = ${reportId})
+      AND NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.action = ${action} AND a.target = 'incident:' || i.id)
+  `
+}
+
 export async function incidentsReviewed(performanceId: string): Promise<boolean> {
   const [row] = await db.all<{ unreviewed: number }>(incidentsReviewedQuery(performanceId))
   return (row?.unreviewed ?? 0) === 0
@@ -338,11 +353,14 @@ export async function closeFor(performanceId: string): Promise<ChecklistCloseRow
   return row ?? null
 }
 
-export function closeStatement(performanceId: string, closedBy: string, id: string): SQL {
+// Written only by Sign off and close, beside the report its batch froze (issue 1315): a refused
+// sign-off leaves no close behind, and a second one closes nothing twice.
+export function closeStatement(performanceId: string, closedBy: string, id: string, reportId: string): SQL {
   return sql`
     INSERT INTO checklist_closes (id, performance_id, closed_by)
     SELECT ${id}, ${performanceId}, ${closedBy}
     WHERE NOT EXISTS (SELECT 1 FROM checklist_closes WHERE performance_id = ${performanceId})
+      AND EXISTS (SELECT 1 FROM night_reports WHERE id = ${reportId})
     RETURNING id
   `
 }
