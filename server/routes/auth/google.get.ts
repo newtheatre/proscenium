@@ -1,7 +1,7 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { localPath } from '#shared/utils/local-path'
 import { landingAfterSignIn } from '#shared/utils/night-authority'
-import { afterLostGoogleClaim } from '#shared/utils/google-sign-in'
+import { afterLostGoogleClaim, googleClaimStatement } from '#shared/utils/google-sign-in'
 import type { CandidateAccount } from '#shared/utils/google-sign-in'
 
 function candidate(row: { id: string, googleSub: string | null, disabled: boolean, anonymisedAt: number | null } | undefined): CandidateAccount | null {
@@ -56,12 +56,9 @@ export default defineOAuthGoogleEventHandler({
     }
     else if (outcome.action !== 'sign-in') {
       // Claiming marks the account verified: Google has proven the address (A-104). Logged only if
-      // this callback took the claim; a second callback that lost signs in only as the same identity.
+      // this callback took the claim; the account's state rides the claim, so a beaten one takes nothing.
       const claimed = await auditedWrite(
-        db.update(schema.users)
-          .set({ googleSub: identity.sub, verified: true, pendingGoogleEmail: null, googleLinkedAt: now })
-          .where(and(eq(schema.users.id, userId), isNull(schema.users.googleSub)))
-          .returning({ id: schema.users.id }),
+        db.all<{ id: string }>(googleClaimStatement(userId, identity.sub, now)),
         auditEntry({
           actorId: userId,
           action: outcome.action === 'claim-pending' ? 'account.google.claimed.pending' : 'account.google.claimed',
@@ -69,13 +66,17 @@ export default defineOAuthGoogleEventHandler({
         }),
       )
       if (!claimed) {
-        const [current] = await db.select({ googleSub: schema.users.googleSub }).from(schema.users).where(eq(schema.users.id, userId)).limit(1)
-        if (afterLostGoogleClaim(current?.googleSub ?? null, identity.sub) === 'REFUSE') return sendRedirect(event, '/sign-in?refused=linked-elsewhere')
+        // An erasure or a disable that beat the claim is refused as any unusable account is (A-122);
+        // otherwise a second callback that lost signs in only as the same identity.
+        const current = await findById(userId)
+        if (!current || current.anonymisedAt !== null || current.disabled) return sendRedirect(event, '/sign-in?refused=account')
+        if (afterLostGoogleClaim(current.googleSub, identity.sub) === 'REFUSE') return sendRedirect(event, '/sign-in?refused=linked-elsewhere')
       }
     }
 
+    // An erasure or a disable landing since the read leaves nothing to sign in to, and says no more (A-122).
     const account = await findById(userId)
-    if (!account) return sendRedirect(event, '/sign-in?refused=account')
+    if (!account || account.anonymisedAt !== null || account.disabled) return sendRedirect(event, '/sign-in?refused=account')
 
     const asked = getCookie(event, RETURN_COOKIE)
     // Only a path on this site, so the return trip cannot be pointed at somebody else's.

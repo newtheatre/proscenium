@@ -17,4 +17,12 @@ describe('the Google callback after a claim that an erasure or a disable beat', 
     const route = await source('server/routes/auth/google.get.ts')
     expect(route).toContain('if (!account || account.anonymisedAt !== null || account.disabled) return sendRedirect(event, \'/sign-in?refused=account\')')
   })
+
+  // Checked before a lost claim is read as linked elsewhere, which would be the wrong refusal.
+  test('a claim an erasure or a disable beat is refused as unusable before it is read as linked elsewhere', async () => {
+    const route = await source('server/routes/auth/google.get.ts')
+    const refusedAccount = route.indexOf('if (!current || current.anonymisedAt !== null || current.disabled) return sendRedirect(event, \'/sign-in?refused=account\')')
+    expect(refusedAccount).toBeGreaterThan(-1)
+    expect(refusedAccount).toBeLessThan(route.indexOf('afterLostGoogleClaim(current.googleSub, identity.sub)'))
+  })
 })

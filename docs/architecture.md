@@ -269,6 +269,15 @@ becomes interactive.
   with an outstanding tab balance, read live per request (0009, F-108, F-109). `keepBarTab` gates
   `MY_NAV`'s Bar tab entry only; `/account/bar-tab` still opens to anyone signed in.
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).
+- A Google sign-in that claims an existing account (A-104) reads it through
+  `resolveGoogleSignIn`, which refuses one disabled or erased, and then claims it with
+  `googleClaimStatement`, whose UPDATE carries `google_sub IS NULL AND anonymised_at IS NULL AND
+  disabled = 0` (0003). An erasure or a disable landing between the read and the claim leaves the
+  claim matching nothing, so a tombstone never answers to a Google identity again. The callback
+  then re-reads the account and, finding it erased or disabled, redirects to
+  `/sign-in?refused=account`, with no session and the same code any unusable account gets, which
+  names no account state (A-122). Only a live account whose claim lost is settled by
+  `afterLostGoogleClaim`: signed in as the same identity, or refused as linked elsewhere.
 - A passkey is a complete sign-in and no challenge follows it: the authenticator verified the
   person before it would sign, so the credential step and the second step happened at once
   (A-105). `nuxt-auth-utils` verifies both ceremonies with `requireUserVerification: false`, so

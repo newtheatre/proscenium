@@ -39,13 +39,14 @@ export function erasureStatements(userId: string, now: number): SQL[] {
     }
   }
 
-  // The trail keeps who did what and when; only an entry that picked up an identifying value in
-  // its detail is rewritten, and it is rewritten to the same thing every time.
+  // Only an entry whose detail picked up an identifying value, and only while the account is live:
+  // a second erasure racing the first would otherwise rewrite the first one's own row (0011).
   statements.push(sql`
     update audit_log set detail = ${REDACTED}
     where (actor_id = ${userId} or target = ${`user:${userId}`})
       and detail is not null
       and detail != ${REDACTED}
+      and exists (select 1 from users where id = ${userId} and anonymised_at is null)
   `)
 
   // Last, so a failure above leaves no tombstone: the row is the thing every guard reads.
