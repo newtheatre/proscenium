@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { defaultSendTiming, sendTimingOptions, sendsNowByDefault } from '#shared/utils/announcements'
+import { defaultSendTiming, sendTimingOptions } from '#shared/utils/announcements'
 import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS, nightMessageClaim, nightMessageForm, nightMessageType, saysNightMessageSent } from '#shared/utils/night-message'
 import { showNightBounds } from '#shared/utils/show-night'
 
@@ -50,6 +50,21 @@ describe('tonight\'s message reaches each person once per draft (0101, 0048)', (
     expect(source.match(/draftKey\.value = crypto\.randomUUID\(\)/g)?.length).toBeGreaterThanOrEqual(2)
     expect(source).not.toContain('Look in the send log')
   })
+
+  // The end-to-end pin runs nightly, so the claim-then-send order is also held here on every push.
+  test('the send claims each copy first, sends under that claim, and counts only those it reached', async () => {
+    const source = await read('server/utils/night-message.ts')
+    expect(source).toMatch(/if \(!await claimNotification\(\{[^}]*key: claim[^}]*\}\)\) continue/)
+    expect(source).toContain('notify(event, { type, userId, claim,')
+    expect(source).toContain('recipientCount: reached')
+    expect(source).toContain('return { count: reached }')
+  })
+
+  test('a press that fails part-way still audits the copies it sent', async () => {
+    const source = await read('server/utils/night-message.ts')
+    expect(source).toMatch(/\}\s*finally \{\s*await db\.insert\(schema\.auditLog\)\.values\(auditEntry\(\{/)
+    expect(source).not.toContain('sendOnce(')
+  })
 })
 
 describe('the announce composer says when a message goes (issue 1327)', () => {
@@ -78,8 +93,12 @@ describe('the announce composer says when a message goes (issue 1327)', () => {
     expect(defaultSendTiming(null, during)).toBe('WITH_DIGEST')
   })
 
-  test('the composer resets the timing on every change of performance, and on starting again', async () => {
+  // Every source by name, not the `audience` computed: a change of kind clears the performance
+  // after that computed's watcher has run, and the audience then no longer reads it.
+  test('the composer resets the timing on every change of audience, and on starting again', async () => {
     const source = await read('app/pages/comms/announce.vue')
+    expect(source).toMatch(/watch\(\[kind, role, sessionId, showId, performanceId\], \(\) => \{\s*timing\.value = defaultTiming\(\)/)
+    expect(source).not.toContain('watch(performanceId, () => {')
     expect(source.match(/timing\.value = defaultTiming\(\)/g)?.length).toBe(2)
     expect(source).toContain('defaultSendTiming(')
     expect(source).not.toContain('timing.value = \'NOW\'')
@@ -88,15 +107,6 @@ describe('the announce composer says when a message goes (issue 1327)', () => {
 
   test('before the window is known the choice still stands, naming the digest instead', () => {
     expect(sendTimingOptions(true, null)[1]!.label).toBe('Send with their booking messages, in the next digest')
-  })
-
-  test('a message about tonight\'s performance goes now unless the officer says otherwise', () => {
-    const night = '2026-10-17'
-    const curtain = Math.floor(showNightBounds(night).from.getTime() / 1000) + 15.5 * 3600
-    const during = new Date((curtain - 3600) * 1000)
-    expect(sendsNowByDefault(curtain, during)).toBe(true)
-    expect(sendsNowByDefault(curtain + 86_400, during)).toBe(false)
-    expect(sendsNowByDefault(null, during)).toBe(false)
   })
 
   test('the composer offers the choice in those words, where the tick box was', async () => {
