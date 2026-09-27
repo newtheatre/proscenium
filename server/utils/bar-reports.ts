@@ -154,7 +154,7 @@ const compsScope = (fromAt: number, toAt: number): SQL => sql`
 
 // The id breaks the tie: two comps in the same second have no other order, and a page boundary
 // between them would otherwise repeat one row and drop another (criterion 2).
-export function compsQuery(fromAt: number, toAt: number, limit: number, offset: number): SQL {
+export function compsReportQuery(fromAt: number, toAt: number, limit: number, offset: number): SQL {
   return sql`
     SELECT e.id AS entryId, e.happened_at AS happenedAt, e.comp_reason AS reason, u.name AS approvedByName,
            coalesce((SELECT sum(l.unit_price_pence * l.qty) FROM ledger_lines l WHERE l.entry_id = e.id), 0) AS foregonePence
@@ -170,7 +170,7 @@ export function compsCountQuery(fromAt: number, toAt: number): SQL {
 
 export async function compsReport(fromAt: number, toAt: number, paging: ReportPaging): Promise<Page<CompRow>> {
   const [counted] = await db.all<{ total: number }>(compsCountQuery(fromAt, toAt))
-  const items = await db.all<CompRow>(compsQuery(fromAt, toAt, paging.pageSize, offsetFor(paging.page, paging.pageSize)))
+  const items = await db.all<CompRow>(compsReportQuery(fromAt, toAt, paging.pageSize, offsetFor(paging.page, paging.pageSize)))
   return envelope(items, counted?.total ?? 0, paging.page, paging.pageSize)
 }
 
@@ -199,7 +199,7 @@ export async function wastageReport(fromAt: number, toAt: number): Promise<Wasta
   return db.all<WastageRow>(wastageQuery(fromAt, toAt))
 }
 
-export function discountsQuery(fromAt: number, toAt: number): SQL {
+export function discountsReportQuery(fromAt: number, toAt: number): SQL {
   return sql`
     SELECT l.discount_id AS discountId, max(l.discount_percent) AS percent,
            coalesce(d.name, '(deleted discount)') AS discountName,
@@ -214,7 +214,7 @@ export function discountsQuery(fromAt: number, toAt: number): SQL {
 }
 
 export async function discountsReport(fromAt: number, toAt: number): Promise<DiscountRow[]> {
-  return db.all<DiscountRow>(discountsQuery(fromAt, toAt))
+  return db.all<DiscountRow>(discountsReportQuery(fromAt, toAt))
 }
 
 export async function barReport(period: ReportPeriodInput, paging: ReportPaging): Promise<BarReport> {
