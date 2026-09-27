@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
 import { decisionPredicate, savePredicate } from '#server/utils/access-profiles'
+import { auditIfChanged } from '#server/utils/audit'
+import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -32,11 +34,7 @@ function verify(database: TestDatabase, userId: string, version: string | null):
     WHERE user_id = ${userId} AND ${decisionPredicate(NOW, version)}
     RETURNING user_id AS userId
   `)
-  run(database, sql`
-    INSERT INTO audit_log (id, actor_id, action, target, detail)
-    SELECT ${crypto.randomUUID()}, NULL, 'access-profile.verified', ${`user:${userId}`}, NULL
-    WHERE changes() = 1
-  `)
+  run(database, auditIfChanged(auditEntry({ actorId: null, action: 'access-profile.verified', target: `user:${userId}` })))
   return written
 }
 
@@ -48,11 +46,7 @@ function save(database: TestDatabase, userId: string, status: string, version: s
     WHERE user_id = ${userId} AND ${savePredicate(status, version)}
     RETURNING user_id AS userId
   `)
-  run(database, sql`
-    INSERT INTO audit_log (id, actor_id, action, target, detail)
-    SELECT ${crypto.randomUUID()}, ${userId}, 'access-profile.updated', ${`user:${userId}`}, NULL
-    WHERE changes() = 1
-  `)
+  run(database, auditIfChanged(auditEntry({ actorId: userId, action: 'access-profile.updated', target: `user:${userId}`, detail: { wasVerified: false } })))
   return written
 }
 
@@ -88,6 +82,31 @@ describe('a decision lands only on the declaration the officer read (issue 1383)
     }
   })
 
+  test('a row never encrypted matches a null version and nothing else', async () => {
+    const database = await createTestDatabase()
+    try {
+      declared(database, 'u-bare', null, null)
+      const touch = (version: string | null): unknown[] => run(database, sql`
+        UPDATE access_profiles SET updated_at = ${NOW} WHERE user_id = ${'u-bare'} AND ${decisionPredicate(NOW, version)}
+        RETURNING user_id AS userId
+      `)
+      expect(touch('x')).toEqual([])
+      expect(touch(null)).toHaveLength(1)
+
+      const saveOver = (version: string | null): unknown[] => run(database, sql`
+        UPDATE access_profiles SET updated_at = ${NOW} WHERE user_id = ${'u-bare'} AND ${savePredicate('PENDING', version)}
+        RETURNING user_id AS userId
+      `)
+      expect(saveOver('x')).toEqual([])
+      expect(saveOver(null)).toHaveLength(1)
+    }
+    finally {
+      database.close()
+    }
+  })
+})
+
+describe('a member\'s save lands only on the declaration it read (0003)', () => {
   test('an officer\'s verify after the member read refuses the member\'s save, and the verify stands', async () => {
     const database = await createTestDatabase()
     try {
@@ -112,22 +131,6 @@ describe('a decision lands only on the declaration the officer read (issue 1383)
       declared(database, 'u-saver', 'c1', 'iv-read')
       expect(save(database, 'u-saver', 'PENDING', 'iv-read')).toHaveLength(1)
       expect(rows(database, `SELECT id FROM audit_log WHERE action = 'access-profile.updated' AND target = ?`, 'user:u-saver')).toHaveLength(1)
-    }
-    finally {
-      database.close()
-    }
-  })
-
-  test('a row never encrypted matches a null version and nothing else', async () => {
-    const database = await createTestDatabase()
-    try {
-      declared(database, 'u-bare', null, null)
-      const touch = (version: string | null): unknown[] => run(database, sql`
-        UPDATE access_profiles SET updated_at = ${NOW} WHERE user_id = ${'u-bare'} AND ${decisionPredicate(NOW, version)}
-        RETURNING user_id AS userId
-      `)
-      expect(touch('x')).toEqual([])
-      expect(touch(null)).toHaveLength(1)
     }
     finally {
       database.close()

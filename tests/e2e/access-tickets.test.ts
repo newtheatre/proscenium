@@ -76,6 +76,7 @@ async function verifiedPatron(companions: number, fohNote = 'Aisle seat, assista
     requesterNote: 'Uses a wheelchair',
     accessCardNumber: null,
     consent: true,
+    version: null,
   }, patron.cookie)).status).toBe(200)
 
   // A decision sends back the version of the declaration it read (issue 1383).
