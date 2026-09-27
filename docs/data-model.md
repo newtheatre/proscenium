@@ -2927,7 +2927,9 @@ officer acts rather than looks (0098).
 Trigger-enforced: rows are never deleted, and no field may be rewritten except `detail`. The
 aim is that `detail` never carries identifying values (0011), but aim is not guarantee, so
 erasure can redact one that has. Everything that says what happened, and when, and to whom it
-was done, survives the redaction. A correction supersedes with a new entry.
+was done, survives the redaction. Only the erasure that finds the account live redacts: the
+statement carries `anonymised_at IS NULL` on the user, so a second erasure racing the first
+cannot rewrite the first one's own `account.erased` row. A correction supersedes with a new entry.
 
 Two registries govern what may be written. `shared/utils/audit-actions.ts` is the closed catalogue
 of actions: each carries a label and the module it belongs to, and `auditEntry` refuses a name that

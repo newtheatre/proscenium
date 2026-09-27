@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm'
 import { isWorkspaceEmail } from './auth'
+import type { SQL } from 'drizzle-orm'
 import { localPath } from './local-path'
 
 // What a Google sign-in resolves to, before anything is written. Kept pure so the order in
@@ -84,4 +86,14 @@ export function googleRoundTripStart(query: Record<string, unknown>): GoogleRoun
 // so the person signs in with no second claim logged; any other answer is linked elsewhere (A-104).
 export function afterLostGoogleClaim(currentSub: string | null, sub: string): 'SIGN_IN' | 'REFUSE' {
   return currentSub === sub ? 'SIGN_IN' : 'REFUSE'
+}
+
+// Claiming an account for a Google identity. The account's own state rides the write, so an
+// erasure or a disable landing after the read leaves nothing to claim (A-104, 0003, 0011).
+export function googleClaimStatement(userId: string, sub: string, now: number): SQL {
+  return sql`
+    UPDATE users SET google_sub = ${sub}, verified = 1, pending_google_email = NULL, google_linked_at = ${now}
+    WHERE id = ${userId} AND google_sub IS NULL AND anonymised_at IS NULL AND disabled = 0
+    RETURNING id
+  `
 }
