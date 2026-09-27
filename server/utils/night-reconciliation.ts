@@ -195,6 +195,14 @@ export function resolvedReaderPence(input: RecordZReadingInput, superseded: { re
 export function zReadingStatement(input: ZReadingWrite, actorId: string, expectedPence: number, id = newId()): PreparedZReading {
   const variancePence = input.readerPence - expectedPence
 
+  // The figure the screen showed is the one the press meant: a sale since would restate it (0005).
+  if (input.expectedPence !== undefined && input.expectedPence !== expectedPence) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `The screen expected ${saysMoney(input.expectedPence)}; the ledger now reads ${saysMoney(expectedPence)}. `
+        + 'Nothing was written off: check the night and try again.',
+    })
+  }
   if (variancePence !== 0 && !input.note) {
     throw createError({
       statusCode: 400,
@@ -215,7 +223,8 @@ export function zReadingStatement(input: ZReadingWrite, actorId: string, expecte
     ? sql`
         INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by, note, written_off, supersedes_id)
         SELECT ${values}, ${input.supersedesId}
-        WHERE EXISTS (SELECT 1 FROM z_readings WHERE id = ${input.supersedesId} AND night = ${input.night})
+        WHERE EXISTS (SELECT 1 FROM z_readings WHERE id = ${input.supersedesId} AND night = ${input.night}
+            AND (${input.writtenOff ? 1 : 0} = 0 OR written_off = 0))
           AND NOT EXISTS (SELECT 1 FROM z_readings WHERE supersedes_id = ${input.supersedesId})
         RETURNING id
       `

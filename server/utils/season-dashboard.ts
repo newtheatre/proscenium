@@ -5,6 +5,8 @@ import { createError } from 'h3'
 // Bun, where nothing is auto-imported (0055).
 import { committeeYearEnd, fromLondonWallClock, startOfLondonDay } from '#shared/utils/london'
 import { foregone } from './finance-reports'
+import { nightsMissingAReading } from './night-reconciliation'
+import { nightsWithin } from '#shared/utils/night-reconciliation'
 import { londonDayOf } from '#shared/utils/ledger'
 import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
 import { aliasColumns, whereFrom } from './list-filters'
@@ -122,11 +124,12 @@ export function openVarianceQuery(fromDay: string, toDay: string): SQL {
 
 export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary> {
   const bounds = await resolvePeriodBounds(period)
-  const [bySource, [refunds], [openVariance], theForegone] = await Promise.all([
+  const [bySource, [refunds], [openVariance], theForegone, missing] = await Promise.all([
     db.all<RevenueBySource>(revenueBySourceQuery(bounds.fromAt, bounds.toAt)),
     db.all<{ refundsPence: number }>(seasonRefundsQuery(bounds.fromAt, bounds.toAt)),
     db.all<{ openVariancePence: number }>(openVarianceQuery(bounds.fromDay, bounds.toDay)),
     foregone({ scope: 'PERIOD', from: bounds.fromDay, to: bounds.toDay }),
+    nightsMissingAReading(),
   ])
   return {
     fromDay: bounds.fromDay,
@@ -136,6 +139,7 @@ export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary>
     compsPence: theForegone.compsPence,
     discountsPence: theForegone.discountsPence,
     openVariancePence: openVariance?.openVariancePence ?? 0,
+    unreconciledNights: nightsWithin(missing, bounds.fromDay, bounds.toDay),
   }
 }
 

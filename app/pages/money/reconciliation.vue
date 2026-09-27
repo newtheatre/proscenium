@@ -32,6 +32,13 @@ const note = ref('')
 const writeOffNote = ref('')
 const saving = ref<'record' | 'check' | 'write-off' | null>(null)
 
+// The page stays mounted as the night changes, so what was typed for one night is cleared.
+watch(night, () => {
+  readerFigure.value = ''
+  note.value = ''
+  writeOffNote.value = ''
+})
+
 interface ReconciliationResponse { night: string, expected: NightExpected, current: ZReading | null, history: ZReading[] }
 
 const { data, status, error, refresh } = await useAsyncData(
@@ -145,11 +152,12 @@ function checkAgain(): Promise<void> {
 
 // The route reads the figure back from the reading it resolves, so nothing is retyped.
 function writeOff(): Promise<void> {
-  if (!current.value || !writeOffNote.value.trim()) return Promise.resolve()
+  if (!current.value || !data.value || !writeOffNote.value.trim()) return Promise.resolve()
   return post('write-off', {
     supersedesId: current.value.id,
     writtenOff: true,
     note: writeOffNote.value.trim(),
+    expectedPence: data.value.expected.expectedPence,
   })
 }
 </script>

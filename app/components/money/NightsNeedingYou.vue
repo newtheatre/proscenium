@@ -36,6 +36,7 @@ const nights = computed(() => nightsNeedingYou(data.value))
       >
         <ULink
           :to="reconciliationHref(entry.night)"
+          exact-query
           :data-test="`needs-you-${entry.night}`"
         >
           {{ saysDay(entry.night) }}
