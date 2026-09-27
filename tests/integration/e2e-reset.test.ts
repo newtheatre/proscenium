@@ -41,7 +41,8 @@ describe('the e2e reset leaves what a fresh migration seeds (question 12)', () =
       }
     }
     finally {
-      rmSync(file, { force: true })
+      rmSync(file, { force: true, maxRetries: 5, retryDelay: 200 })
     }
-  })
+  // Two whole migration runs, the file's and the reset's own snapshot, so the default is too short.
+  }, 120_000)
 })
