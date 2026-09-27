@@ -3,7 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { can, nameTrainers, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { saysDay } from '#shared/utils/when'
-import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
+import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, plannerModuleOptions, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { SessionInput } from '#shared/utils/training'
@@ -84,13 +84,10 @@ const { data: catalogue } = await useAsyncData(
   { default: () => ({ items: [] as Module[] }) },
 )
 
-// What may be taught: active, and not proved by experience rather than by a session (G-112 c3).
-const teachable = computed(() => catalogue.value.items.filter(module =>
-  module.status === 'ACTIVE' && !module.signoffRequired))
-
 // The catalogue runs to dozens, so this is searched rather than scanned.
-const teachableOptions = computed(() => teachable.value
-  .map(module => ({ label: `${module.id} ${module.name}`, value: module.id })))
+const teachableOptions = computed(() => plannerModuleOptions(catalogue.value.items))
+const teachable = computed(() => teachableOptions.value.filter(option => !option.disabled))
+const drafts = computed(() => teachableOptions.value.length - teachable.value.length)
 
 // The training officer names who teaches; a trainer always teaches what they schedule, so they are
 // not offered the choice (G-112 as amended, issue 1336).
@@ -490,6 +487,16 @@ const columns: TableColumn<Session>[] = [
         </UButton>
       </template>
     </AdminToolbar>
+
+    <UAlert
+      v-if="teachable.length === 0 && drafts > 0"
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-info"
+      :description="`Only drafts are in the catalogue (${plural(drafts, 'module')}). Publish one on the catalogue to schedule it.`"
+      :actions="[{ label: 'Open the catalogue', to: '/training/manage', color: 'neutral', variant: 'outline' }]"
+      data-test="sessions-only-drafts"
+    />
 
     <UTable
       :data="shown"

@@ -27,6 +27,8 @@ const props = defineProps<{
   module: CatalogueModule | null
   departments: Department[]
   candidates: CatalogueModule[]
+  // The department the catalogue is filtered to, which a new module starts in (issue 1354).
+  department?: string | null
 }>()
 
 const emit = defineEmits<{ 'update:open': [boolean], 'saved': [], 'failed': [message: string] }>()
@@ -112,7 +114,7 @@ watch(() => props.open, (isOpen) => {
         sort: module.sort,
         materials: module.materials.map(material => ({ ...material })),
       }
-    : { department: props.departments[0]?.code ?? '' })
+    : { department: props.department ?? props.departments[0]?.code ?? '' })
 })
 
 // Records against the module fix what it means, so the screen says so rather than offering an edit
@@ -178,7 +180,8 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
     else {
       await $fetch('/api/admin/training/modules', { method: 'POST', body: event.data })
     }
-    toast.add({ title: props.module ? 'Module changed' : 'Module added', icon: 'i-lucide-check', color: 'success' })
+    const title = props.module ? 'Module changed' : event.data.status === 'ACTIVE' ? 'Module added and published' : 'Module saved as a draft'
+    toast.add({ title, icon: 'i-lucide-check', color: 'success' })
     emit('update:open', false)
     emit('saved')
   }
@@ -345,6 +348,7 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
         </UFormField>
 
         <UFormField
+          v-if="module"
           label="Status"
           name="status"
           required
@@ -408,20 +412,6 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
             placeholder="A current first aid at work certificate"
             class="w-full"
             data-test="module-external-evidence"
-          />
-        </UFormField>
-
-        <UFormField
-          label="Where it sits in the list"
-          name="sort"
-          description="Lower comes first. Modules sharing a number fall back to their published id."
-        >
-          <UInputNumber
-            v-model="state.sort"
-            :min="0"
-            :max="9999"
-            class="w-full"
-            data-test="module-sort"
           />
         </UFormField>
 
@@ -496,13 +486,39 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
 
     <template #footer>
       <UButton
+        v-if="module"
         type="submit"
         form="module-form"
         :loading="saving"
         data-test="module-submit"
       >
-        {{ module ? 'Save the module' : 'Add the module' }}
+        Save the module
       </UButton>
+      <!-- Publishing is the button pressed, so the next step (a session) finds it (issue 1354). -->
+      <template v-else>
+        <UButton
+          type="submit"
+          form="module-form"
+          :loading="saving && state.status === 'ACTIVE'"
+          :disabled="saving"
+          data-test="module-publish"
+          @click="state.status = 'ACTIVE'"
+        >
+          Add and publish
+        </UButton>
+        <UButton
+          type="submit"
+          form="module-form"
+          color="neutral"
+          variant="outline"
+          :loading="saving && state.status === 'DRAFT'"
+          :disabled="saving"
+          data-test="module-draft"
+          @click="state.status = 'DRAFT'"
+        >
+          Save as a draft
+        </UButton>
+      </template>
       <UButton
         color="neutral"
         variant="ghost"

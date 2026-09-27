@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { BOUND_PARAMETER_CHUNK } from './approvals'
 import { isMonthDay } from './london'
 import { saysRole } from './roles'
+import type { FilterCondition } from './list-filters'
 
 // The catalogue's vocabulary and its expiry arithmetic. Nothing here stores a state: a record's
 // validity is derived from its dates every time it is read, never written to a column (0018).
@@ -46,6 +47,27 @@ export function saysLifecycle(status: string): string {
   if (status === 'ACTIVE') return 'Active'
   if (status === 'RETIRED') return 'Retired'
   return 'Draft'
+}
+
+export interface PlannerOption { label: string, value: string, disabled: boolean }
+
+// What a session can teach (G-112 c3), with a draft listed but not offered, so the planner says
+// why the module just added is missing rather than seeming not to have it (issue 1354).
+export function plannerModuleOptions(modules: readonly { id: string, name: string, status: string, signoffRequired: boolean }[]): PlannerOption[] {
+  const listed = modules.filter(module => !module.signoffRequired && (module.status === 'ACTIVE' || module.status === 'DRAFT'))
+  return [
+    ...listed.filter(module => module.status === 'ACTIVE')
+      .map(module => ({ label: `${module.id} ${module.name}`, value: module.id, disabled: false })),
+    ...listed.filter(module => module.status === 'DRAFT')
+      .map(module => ({ label: `${module.id} ${module.name} (a draft: publish it to schedule it)`, value: module.id, disabled: true })),
+  ]
+}
+
+// A new module starts in the one department the catalogue is filtered to, and in none otherwise.
+export function departmentFromFilter(conditions: readonly FilterCondition[]): string | null {
+  const department = conditions.find(condition => condition.key === 'department')
+  if (!department || department.operator === 'not' || department.values.length !== 1) return null
+  return department.values[0] ?? null
 }
 
 export interface ExpiryPolicy {
