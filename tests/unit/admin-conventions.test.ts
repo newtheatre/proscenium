@@ -548,10 +548,10 @@ describe('every console list is a UTable the shell knows about (K-123 criteria 9
   })
 })
 
-// Each column's own meta written out in place, with the header it sits under: the nearest header
-// before it, since a column is written id, header, meta, cell.
-function inlineColumnMetas(source: string): { header: string, meta: string }[] {
-  return [...source.matchAll(/meta:\s*(\{\s*class:\s*\{(?:\$\{[^}]*\}|[^}])*\}\s*\})/g)].map(match => ({
+// Each column's meta, written out in place or named, with the header it sits under: the nearest
+// header before it, since a column is written id, header, meta, cell.
+function columnMetas(source: string): { header: string, meta: string }[] {
+  return [...source.matchAll(/meta:\s*(\{\s*class:\s*\{(?:\$\{[^}]*\}|[^}])*\}\s*\}|\w+)/g)].map(match => ({
     header: [...source.slice(0, match.index).matchAll(/header:\s*([^,\n]+)/g)].at(-1)?.[1] ?? '',
     meta: match[1]!,
   }))
@@ -565,24 +565,28 @@ const RIGHT_HEADER = /th:\s*[`'][^`']*text-right/
 describe('a figure column lines its header up with its figures', () => {
   test('the shared figure shapes right-align the header, and the action shape is not monospace', async () => {
     const shapes = await Bun.file('app/utils/responsive-table.ts').text()
-    for (const name of ['RIGHT_ALIGNED', 'RIGHT_ALIGNED_HIDE_BELOW_SM']) {
+    for (const name of ['RIGHT_ALIGNED', 'RIGHT_ALIGNED_HIDE_BELOW_SM', 'ACTIONS_COLUMN']) {
       expect(shapes).toMatch(new RegExp(`export const ${name} = \\{ class: \\{ th: [\`'][^\`']*text-right`))
     }
-    const actions = shapes.match(/export const ACTIONS_COLUMN = (\{[^\n]*\})/)?.[1] ?? ''
-    expect(actions).toContain('text-right')
-    expect(actions).not.toContain('font-mono')
+    expect(shapes).not.toMatch(/export const ACTIONS_COLUMN = [^\n]*font-mono/)
   })
 
   test('no column right-aligns its figures under a header left behind', async () => {
-    const offenders = (await tables()).flatMap(file => inlineColumnMetas(file.source)
+    const offenders = (await tables()).flatMap(file => columnMetas(file.source)
       .filter(({ header, meta }) => RIGHT_CELLS.test(meta) && !RIGHT_HEADER.test(meta) && !header.includes('ACTIONS_HEADER'))
       .map(({ header }) => `${file.path}: ${header}`))
     expect(offenders).toEqual([])
   })
 
   test('a column of row actions never takes a figure shape', async () => {
-    const offenders = (await tables()).filter(file => /header:\s*ACTIONS_HEADER,\s*meta:\s*RIGHT_ALIGNED/.test(file.source)
-      || inlineColumnMetas(file.source).some(({ header, meta }) => header.includes('ACTIONS_HEADER') && meta.includes('font-mono')))
+    const offenders = (await tables()).filter(file => columnMetas(file.source)
+      .some(({ header, meta }) => header.includes('ACTIONS_HEADER') && /RIGHT_ALIGNED|font-mono/.test(meta)))
+    expect(offenders.map(file => file.path)).toEqual([])
+  })
+
+  // Rule 6: no screen writes a shape out again, and one built from another's parts is written out.
+  test('no table composes a column shape from a shared one\'s parts', async () => {
+    const offenders = (await tables()).filter(file => /\b(?:RIGHT_ALIGNED\w*|ACTIONS_COLUMN)\.class\./.test(file.source))
     expect(offenders.map(file => file.path)).toEqual([])
   })
 })
