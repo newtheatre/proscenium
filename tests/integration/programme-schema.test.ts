@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { showNightBounds } from '#shared/utils/show-night'
+import { showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
 import { performancesOnNightQuery } from '#server/utils/performances'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -333,7 +333,7 @@ describe('performancesOnNight is a window, not a day and not a venue (E-127 crit
 
   // A matinee, an evening in the same venue, and a second venue at the same time as the evening.
   function seedNight(database: TestDatabase): void {
-    const from = Math.floor(showNightBounds(NIGHT).from.getTime() / 1000)
+    const from = showNightOpensAt(NIGHT)
     insert(database, 'venues', { id: 'v1', name: 'The Theatre', capacity: 120 })
     insert(database, 'venues', { id: 'v2', name: 'The Studio', capacity: 40 })
     insert(database, 'shows', { id: 's1', slug: 'the-seagull', title: 'The Seagull', status: 'PUBLISHED' })

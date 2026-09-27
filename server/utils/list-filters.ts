@@ -3,7 +3,7 @@ import { and, getTableColumns, sql } from 'drizzle-orm'
 // Named rather than auto-imported: `tests/` typechecks this file under Bun (CONTRIBUTING, 0055).
 import { MAX_SEARCH_COLUMNS, capOf, conditionsOf, fieldOf } from '#shared/utils/list-filters'
 import { endOfLondonDay, startOfLondonDay } from '#shared/utils/london'
-import { showNightBounds } from '#shared/utils/show-night'
+import { showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
 import type { Column, SQL, Table } from 'drizzle-orm'
 import type { FilterCondition, FilterField, ListQuery, ListSpec, SortDirection, SortField } from '#shared/utils/list-filters'
 
@@ -105,7 +105,7 @@ function unixDayPredicate(condition: FilterCondition, column: Reference): SQL {
 // starting at 01:00 belongs to the night that began the evening before (0014, K-129).
 function nightPredicate(condition: FilterCondition, column: Reference): SQL {
   const [first, second] = condition.values as [string, string]
-  const from = (night: string): number => seconds(showNightBounds(night).from)
+  const from = showNightOpensAt
   const to = (night: string): number => seconds(showNightBounds(night).to)
   switch (condition.operator) {
     case 'is': return sql`${column} >= ${from(first)} AND ${column} < ${to(first)}`

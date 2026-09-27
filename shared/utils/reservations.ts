@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { saysClock, saysWhen } from './when'
 import { saysRole } from './roles'
-import { showNightBounds, showNightOf } from './show-night'
+import { showNightOf, showNightOpensAt } from './show-night'
 import { plural } from './text'
 import { saysPrice } from './ticket-types'
 
@@ -232,7 +232,7 @@ export interface QrStatusDisplay {
 // A person's own bookings are listed from the start of tonight's show night, so tonight's stays in
 // reach through the interval and until 04:00 (issue 1332, 0014).
 export function ownBookingsFrom(now: Date): number {
-  return Math.floor(showNightBounds(showNightOf(now)).from.getTime() / 1000)
+  return showNightOpensAt(showNightOf(now))
 }
 
 // A self-served pass (D-125) is PENDING with no hold and nothing owed; any other PENDING booking,

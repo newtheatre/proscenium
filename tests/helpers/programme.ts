@@ -1,4 +1,4 @@
-import { showNightBounds, showNightOf } from '#shared/utils/show-night'
+import { showNightBounds, showNightOf, showNightOpensAt } from '#shared/utils/show-night'
 import type { BoundStatement } from './database'
 
 // A venue, a show and a performance inside tonight's show night, for every suite that needs one
@@ -87,7 +87,7 @@ export function tonightsPerformance(into: AcceptsStatements, options: TonightsPe
   const suffix = options.suffix ?? 'a'
   const hours = options.curtainHoursAfterNightStart ?? defaultCurtainHours(night, now)
   // Rounded down, so a curtain seeded in the night's last second never lands on the next night's start.
-  const startsAt = Math.floor(showNightBounds(night).from.getTime() / 1000) + Math.floor(hours * 3600)
+  const startsAt = showNightOpensAt(night) + Math.floor(hours * 3600)
 
   const venueId = options.venueId ?? `venue-${suffix}`
   const showId = `show-${suffix}`

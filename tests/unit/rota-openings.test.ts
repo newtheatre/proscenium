@@ -8,12 +8,12 @@ import {
   openingUnconfirmRefusal,
   saysBarOpeningStatus,
 } from '#shared/utils/rota-openings'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 
 // What a bar opening names, and what it refuses to name (E-130, 0077).
 
 const NIGHT = currentShowNight()
-const NIGHT_START = Math.floor(showNightBounds(NIGHT).from.getTime() / 1000)
+const NIGHT_START = showNightOpensAt(NIGHT)
 
 const PLANNED = {
   venueId: 'venue-a',

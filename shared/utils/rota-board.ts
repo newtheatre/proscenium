@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { daysAfter, londonDayField } from './membership'
-import { showNightBounds, showNightOf } from './show-night'
+import { showNightBounds, showNightOf, showNightOpensAt } from './show-night'
 
 // The rota board's window (E-107 criterion 7). A window of show nights, not calendar days, so a
 // performance running past midnight belongs to the evening it started (0014).
@@ -23,7 +23,7 @@ export function defaultBoardWindow(at: Date): BoardWindow {
 // Unix seconds, `from` inclusive and `to` exclusive: the last night is held whole to its 04:00.
 export function boardWindowBounds(window: BoardWindow): BoardBounds {
   return {
-    from: Math.floor(showNightBounds(window.from).from.getTime() / 1000),
+    from: showNightOpensAt(window.from),
     to: Math.floor(showNightBounds(window.to).to.getTime() / 1000),
   }
 }

@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { aliasColumns, seconds, whereFrom } from './list-filters'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { aliasColumns, whereFrom } from './list-filters'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import { venuesList } from '#shared/utils/venues-list'
 import type { SQL } from 'drizzle-orm'
 import type { ListClause } from './list-filters'
@@ -135,7 +135,7 @@ export async function venueNamed(name: string, exceptId?: string): Promise<Admin
 // An external venue is staffed ad hoc, so a Set-up screen lists it once a performance there from
 // tonight onwards has a shift, or while it holds what that screen configures (issue 1318). Reads `vp`.
 export function listedVenue(configured: SQL): SQL {
-  const from = seconds(showNightBounds(currentShowNight()).from)
+  const from = showNightOpensAt(currentShowNight())
   return sql`(vp.is_external = 0 OR ${configured} OR EXISTS (
     SELECT 1 FROM shifts staffed JOIN performances sp ON sp.id = staffed.performance_id
     WHERE sp.venue_id = vp.id AND sp.status <> 'CANCELLED' AND staffed.status <> 'CANCELLED'

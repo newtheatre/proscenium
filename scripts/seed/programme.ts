@@ -2,7 +2,7 @@
 // performances land in the past, tonight and the future, and in every status a screen shows.
 
 import { daysAfter } from '../../shared/utils/membership'
-import { currentShowNight, showNightBounds, showNightOf } from '../../shared/utils/show-night'
+import { currentShowNight, showNightBounds, showNightOf, showNightOpensAt } from '../../shared/utils/show-night'
 import { PASS_ADMISSION_TICKET_TYPE_NAME } from '../../shared/utils/ticket-types'
 import { ensure, holds, insert, insertOnly, seedId, seedReference } from './statements'
 import { personIn } from './people'
@@ -221,7 +221,7 @@ function termAfter(day: string): string {
 }
 
 function curtainOf(night: string, hours: number): number {
-  return Math.floor(showNightBounds(night).from.getTime() / 1000) + Math.round(hours * 3600)
+  return showNightOpensAt(night) + Math.round(hours * 3600)
 }
 
 export function seedProgramme(target: SeedTarget, people: People, now: number): Programme {

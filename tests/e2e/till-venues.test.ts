@@ -5,7 +5,7 @@ import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { TillVenueOption } from '#shared/utils/till'
@@ -47,7 +47,7 @@ beforeAll(async () => {
     }
     // Anchored to the night's own 04:00 start, so a run just after it does not seed an opening
     // that falls outside the night it belongs to (0014).
-    const nightStart = Math.floor(showNightBounds(night).from.getTime() / 1000)
+    const nightStart = showNightOpensAt(night)
     const opensAt = Math.max(nightStart + 60, Math.floor(Date.now() / 1000) - 3600)
     database.query(`INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at)
                     VALUES (?, ?, ?, ?, ?, ?)`)

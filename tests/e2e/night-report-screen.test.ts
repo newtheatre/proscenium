@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { registerMember } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { showNightBounds, showNightOf } from '#shared/utils/show-night'
+import { showNightOf, showNightOpensAt } from '#shared/utils/show-night'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
@@ -50,7 +50,7 @@ function read<T>(statement: string, ...parameters: unknown[]): T[] {
 // Half of tonight so far, with no running time: a curtain already down whenever the suite runs (0078).
 function curtainAlreadyDown(): number {
   const now = new Date()
-  return (now.getTime() - showNightBounds(showNightOf(now)).from.getTime()) / 3_600_000 / 2
+  return (now.getTime() / 1000 - showNightOpensAt(showNightOf(now))) / 3600 / 2
 }
 
 async function dutyManagerOn(suffix: string, curtains: (number | undefined)[]): Promise<{ id: string, password: string, email: string, venueId: string, performanceIds: string[] }> {

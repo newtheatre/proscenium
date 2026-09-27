@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { announceShowsQuery, audienceQuery, performanceTicketHoldersQuery, showTicketHoldersQuery } from '#server/utils/announcements'
-import { showNightBounds } from '#shared/utils/show-night'
+import { showNightOpensAt } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
@@ -25,10 +25,6 @@ function ids(database: TestDatabase, statement: SQL): string[] {
 }
 
 let seq = 0
-
-function nightOpensAt(night: string): number {
-  return Math.floor(showNightBounds(night).from.getTime() / 1000)
-}
 
 function booker(database: TestDatabase, over: { verified?: boolean, anonymisedAt?: number } = {}): string {
   const id = `u-th-${++seq}`
@@ -76,7 +72,7 @@ describe('ticket holders for a performance (criterion 8)', () => {
       booking(database, tonight.performanceId, booker(database), 'EXPIRED')
       booking(database, tonight.performanceId, booker(database), 'NO_SHOW')
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, nightOpensAt(tonight.night)))).toEqual([pending, collected, door].sort())
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightOpensAt(tonight.night)))).toEqual([pending, collected, door].sort())
     })
   })
 
@@ -88,7 +84,7 @@ describe('ticket holders for a performance (criterion 8)', () => {
       booking(database, tonight.performanceId, booker(database), 'COLLECTED', [true, true])
       booking(database, tonight.performanceId, partlyRefunded, 'COLLECTED', [true, false])
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, nightOpensAt(tonight.night)))).toEqual([partlyRefunded])
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightOpensAt(tonight.night)))).toEqual([partlyRefunded])
     })
   })
 
@@ -101,7 +97,7 @@ describe('ticket holders for a performance (criterion 8)', () => {
       booking(database, tonight.performanceId, booker(database, { anonymisedAt: 1_700_000_000 }), 'COLLECTED')
       booking(database, tonight.performanceId, null, 'COLLECTED')
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, nightOpensAt(tonight.night)))).toEqual([guest])
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightOpensAt(tonight.night)))).toEqual([guest])
     })
   })
 
@@ -115,7 +111,7 @@ describe('ticket holders for a performance (criterion 8)', () => {
       booking(database, tonight.performanceId, twice, 'PENDING')
       booking(database, later, booker(database), 'COLLECTED')
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, nightOpensAt(tonight.night)))).toEqual([twice])
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightOpensAt(tonight.night)))).toEqual([twice])
     })
   })
 
@@ -126,7 +122,7 @@ describe('ticket holders for a performance (criterion 8)', () => {
       const holder = booker(database)
       booking(database, tonight.performanceId, holder, 'COLLECTED')
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, nightOpensAt(tonight.night)))).toEqual([holder])
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightOpensAt(tonight.night)))).toEqual([holder])
     })
   })
 })
@@ -143,7 +139,7 @@ describe('only a performance still to come has an audience (criterion 8)', () =>
       const been = booker(database)
       booking(database, tonight.performanceId, coming, 'COLLECTED')
       booking(database, lastNight, been, 'COLLECTED')
-      const from = nightOpensAt(tonight.night)
+      const from = showNightOpensAt(tonight.night)
 
       expect(ids(database, performanceTicketHoldersQuery(lastNight, from))).toEqual([])
       expect(ids(database, showTicketHoldersQuery(tonight.showId, from))).toEqual([coming])
@@ -158,7 +154,7 @@ describe('only a performance still to come has an audience (criterion 8)', () =>
       booking(database, lastNight, booker(database), 'COLLECTED')
       database.batch([['DELETE FROM performances WHERE id = ?', tonight.performanceId]])
 
-      expect(ids(database, showTicketHoldersQuery(tonight.showId, nightOpensAt(tonight.night)))).toEqual([])
+      expect(ids(database, showTicketHoldersQuery(tonight.showId, showNightOpensAt(tonight.night)))).toEqual([])
     })
   })
 
@@ -169,7 +165,7 @@ describe('only a performance still to come has an audience (criterion 8)', () =>
       const holder = booker(database)
       booking(database, tonight.performanceId, holder, 'COLLECTED')
 
-      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, nightOpensAt(tonight.night)))).toEqual([holder])
+      expect(ids(database, performanceTicketHoldersQuery(tonight.performanceId, showNightOpensAt(tonight.night)))).toEqual([holder])
     })
   })
 })
@@ -190,7 +186,7 @@ describe('ticket holders for a show (criterion 8)', () => {
       booking(database, later, both, 'COLLECTED')
       booking(database, elsewhere.performanceId, booker(database), 'COLLECTED')
 
-      expect(ids(database, showTicketHoldersQuery(tonight.showId, nightOpensAt(tonight.night)))).toEqual([firstNight, secondNight, both].sort())
+      expect(ids(database, showTicketHoldersQuery(tonight.showId, showNightOpensAt(tonight.night)))).toEqual([firstNight, secondNight, both].sort())
     })
   })
 
@@ -201,10 +197,10 @@ describe('ticket holders for a show (criterion 8)', () => {
       const tonight = tonightsPerformance(database)
       for (let night = 1; night <= 120; night++) laterPerformance(database, tonight, `performance-run-${night}`, night)
 
-      const [, ...parameters] = boundStatement(database, showTicketHoldersQuery(tonight.showId, nightOpensAt(tonight.night)))
-      expect(parameters).toEqual([tonight.showId, nightOpensAt(tonight.night)])
-      const [, ...performanceParameters] = boundStatement(database, performanceTicketHoldersQuery(tonight.performanceId, nightOpensAt(tonight.night)))
-      expect(performanceParameters).toEqual([tonight.performanceId, nightOpensAt(tonight.night)])
+      const [, ...parameters] = boundStatement(database, showTicketHoldersQuery(tonight.showId, showNightOpensAt(tonight.night)))
+      expect(parameters).toEqual([tonight.showId, showNightOpensAt(tonight.night)])
+      const [, ...performanceParameters] = boundStatement(database, performanceTicketHoldersQuery(tonight.performanceId, showNightOpensAt(tonight.night)))
+      expect(performanceParameters).toEqual([tonight.performanceId, showNightOpensAt(tonight.night)])
     })
   })
 
@@ -231,7 +227,7 @@ describe('the announce composer\'s show picker', () => {
       const over = tonightsPerformance(database, { suffix: 'over' })
       database.batch([['UPDATE performances SET starts_at = ? WHERE id = ?', over.startsAt - 86_400, over.performanceId]])
 
-      const [query, ...parameters] = boundStatement(database, announceShowsQuery('test show', nightOpensAt(tonight.night)))
+      const [query, ...parameters] = boundStatement(database, announceShowsQuery('test show', showNightOpensAt(tonight.night)))
       const found = rows<{ showId: string, performanceId: string }>(database, query, ...parameters)
       expect(found.map(row => row.performanceId)).toEqual([tonight.performanceId])
       expect(found.map(row => row.showId)).not.toContain(draft.showId)
@@ -244,12 +240,12 @@ describe('the announce composer\'s show picker', () => {
       laterPerformance(database, tonight, 'performance-later')
       database.batch([['UPDATE performances SET status = ? WHERE id = ?', 'CANCELLED', 'performance-later']])
 
-      const [query, ...parameters] = boundStatement(database, announceShowsQuery('test show', nightOpensAt(tonight.night)))
+      const [query, ...parameters] = boundStatement(database, announceShowsQuery('test show', showNightOpensAt(tonight.night)))
       const found = rows<{ showId: string, performanceId: string }>(database, query, ...parameters)
       expect(found.map(row => row.showId)).toEqual([tonight.showId, tonight.showId])
       expect(found.map(row => row.performanceId).sort()).toEqual([tonight.performanceId, 'performance-later'].sort())
 
-      const [none, ...noParameters] = boundStatement(database, announceShowsQuery('rigging', nightOpensAt(tonight.night)))
+      const [none, ...noParameters] = boundStatement(database, announceShowsQuery('rigging', showNightOpensAt(tonight.night)))
       expect(rows(database, none, ...noParameters)).toEqual([])
     })
   })

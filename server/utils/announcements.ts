@@ -11,7 +11,7 @@ import { londonDay } from '#shared/utils/membership'
 import { announcementType } from '#shared/utils/announcements'
 import { HOLDING_STATUSES } from '#shared/utils/capacity'
 import { messageType } from '#shared/utils/notifications'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import type { AnnounceShowOption, AudienceDefinition, ComposeAnnouncementInput } from '#shared/utils/announcements'
 import type { Outcome } from './notify'
 import type { Rendered } from '#server/utils/templates'
@@ -97,11 +97,6 @@ export function showTicketHoldersQuery(showId: string, from: number): SQL {
   return ticketHoldersQuery(sql`SELECT p.id FROM performances p WHERE p.show_id = ${showId} AND p.starts_at >= ${from}`)
 }
 
-// Epoch seconds at which a show night opens, 04:00 London (0014).
-function nightOpensAt(night: string): number {
-  return Math.floor(showNightBounds(night).from.getTime() / 1000)
-}
-
 export interface AnnounceSessionOption {
   id: string
   title: string
@@ -162,7 +157,7 @@ export function announceShowsQuery(term: string, from: number): SQL {
 }
 
 export async function announceShows(term: string): Promise<AnnounceShowOption[]> {
-  const found = await db.all<AnnounceShowRow>(announceShowsQuery(term, nightOpensAt(currentShowNight())))
+  const found = await db.all<AnnounceShowRow>(announceShowsQuery(term, showNightOpensAt(currentShowNight())))
   const shows = new Map<string, AnnounceShowOption>()
   for (const row of found) {
     const show = shows.get(row.showId) ?? { id: row.showId, title: row.title, performances: [] }
@@ -183,8 +178,8 @@ export function audienceQuery(audience: AudienceDefinition, context: AudienceCon
   if (audience.kind === 'ALL_CURRENT_MEMBERS') return allCurrentMembersQuery(context.today, context.graceDays)
   if (audience.kind === 'ROLE_HOLDERS') return roleHoldersQuery(audience.role, context.nowEpoch)
   if (audience.kind === 'TONIGHT_ROTA') return tonightsRotaQuery(context.night)
-  if (audience.kind === 'PERFORMANCE_TICKET_HOLDERS') return performanceTicketHoldersQuery(audience.performanceId, nightOpensAt(context.night))
-  if (audience.kind === 'SHOW_TICKET_HOLDERS') return showTicketHoldersQuery(audience.showId, nightOpensAt(context.night))
+  if (audience.kind === 'PERFORMANCE_TICKET_HOLDERS') return performanceTicketHoldersQuery(audience.performanceId, showNightOpensAt(context.night))
+  if (audience.kind === 'SHOW_TICKET_HOLDERS') return showTicketHoldersQuery(audience.showId, showNightOpensAt(context.night))
   return sessionSignupsQuery(audience.sessionId)
 }
 

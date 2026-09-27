@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { autoCloseDeadline, autoCloseFrom } from '#server/utils/night-auto-close'
-import { showNightBounds } from '#shared/utils/show-night'
+import { showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
 
 // The 24-hour cut is a show-night boundary, not a wall-clock day (0014): pure, no database.
 
@@ -19,7 +19,7 @@ describe('autoCloseFrom (criterion 1 as amended)', () => {
 describe('autoCloseDeadline (criterion 1)', () => {
   test('the deadline is 24 hours after the night\'s own end, not the performance\'s start', () => {
     const night = '2026-09-01'
-    const startsAt = Math.floor(showNightBounds(night).from.getTime() / 1000) + 15 * 3600
+    const startsAt = showNightOpensAt(night) + 15 * 3600
     const { night: resolved, deadline } = autoCloseDeadline(startsAt)
 
     expect(resolved).toBe(night)
@@ -37,9 +37,9 @@ describe('autoCloseDeadline (criterion 1)', () => {
 
   test('the deadline crosses a DST transition correctly, both directions', () => {
     // Clocks go forward 29 March 2026: that night is 23 hours long, not 24.
-    const spring = autoCloseDeadline(Math.floor(showNightBounds('2026-03-28').from.getTime() / 1000) + 15 * 3600)
+    const spring = autoCloseDeadline(showNightOpensAt('2026-03-28') + 15 * 3600)
     // Clocks go back 25 October 2026: that night is 25 hours long, not 24.
-    const autumn = autoCloseDeadline(Math.floor(showNightBounds('2026-10-24').from.getTime() / 1000) + 15 * 3600)
+    const autumn = autoCloseDeadline(showNightOpensAt('2026-10-24') + 15 * 3600)
 
     expect(spring.deadline).toBe(showNightBounds('2026-03-28').to.getTime() + 24 * 60 * 60 * 1000)
     expect(autumn.deadline).toBe(showNightBounds('2026-10-24').to.getTime() + 24 * 60 * 60 * 1000)

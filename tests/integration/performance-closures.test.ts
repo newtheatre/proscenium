@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { performancesOnRoomsQuery } from '#server/utils/performance-closures'
-import { showNightBounds, showNightOf } from '#shared/utils/show-night'
+import { showNightOf, showNightOpensAt } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -10,7 +10,7 @@ import type { SQL } from 'drizzle-orm'
 // the programme holds (0006), from the venue's `room_id` (0043).
 
 const NIGHT = showNightOf(new Date('2026-10-06T12:00:00Z'))
-const NIGHT_START = Math.floor(showNightBounds(NIGHT).from.getTime() / 1000)
+const NIGHT_START = showNightOpensAt(NIGHT)
 const DAY_AFTER = NIGHT_START + 86_400
 const OFFSETS = { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }
 
