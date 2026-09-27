@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { nightsWithTakings, outstandingNights, resolvedReaderPence, zReadingStatement } from '#server/utils/night-reconciliation'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { liveVariance, nightFromQuery, nightsNeedingYou, reconciliationHref, recordZReadingForm } from '#shared/utils/night-reconciliation'
+import { liveVariance, nightFromQuery, nightsNeedingYou, nightsWithin, reconciliationHref, recordZReadingForm, zNightQuery } from '#shared/utils/night-reconciliation'
 import { FIRST_RECONCILED_NIGHT } from '#shared/utils/show-night'
 
 // I-104: the reader keys in what it shows; a variance needs a note before it can be recorded,
@@ -76,6 +76,17 @@ describe('the reader figure a reading records', () => {
   test('a write-off with no reading to resolve is refused', () => {
     expect(refusal(() => resolvedReaderPence({ ...reading, writtenOff: true, note: 'x' }, null))).toContain('names the variance')
   })
+
+  // The button said "Write off £X": a sale landing since would write off a different sum under the
+  // same note, so a moved expected figure refuses, quoting both (0005's rule, sale.ts's shape).
+  test('a write-off whose screen expected another figure is refused, quoting both', () => {
+    const said = refusal(() => zReadingStatement(
+      { ...reading, readerPence: 5000, supersedesId: 'z-1', note: 'Accepted', writtenOff: true, expectedPence: 4200 }, 'u-1', 4500))
+    expect(said).toContain('£42.00')
+    expect(said).toContain('£45.00')
+    expect(refusal(() => zReadingStatement(
+      { ...reading, readerPence: 5000, supersedesId: 'z-1', note: 'Accepted', writtenOff: true, expectedPence: 4500 }, 'u-1', 4500))).toBe('')
+  })
 })
 
 // Issue 1360: a night is reached by its address from wherever it is listed, and the screen says
@@ -86,6 +97,21 @@ describe('the reconciliation screen\'s own arithmetic', () => {
     expect(nightFromQuery(['2026-09-05'], '2026-09-27')).toBe('2026-09-05')
     expect(nightFromQuery('5 September', '2026-09-27')).toBe('2026-09-27')
     expect(nightFromQuery(undefined, '2026-09-27')).toBe('2026-09-27')
+  })
+
+  test('an impossible date in the address is no night at all', () => {
+    expect(nightFromQuery('2026-13-45', '2026-09-27')).toBe('2026-09-27')
+    expect(nightFromQuery('2026-02-30', '2026-09-27')).toBe('2026-09-27')
+    expect(recordZReadingForm.safeParse({ night: '2026-02-30', readerPence: 0 }).success).toBe(false)
+    expect(zNightQuery.safeParse({ night: '2026-13-45' }).success).toBe(false)
+    expect(zNightQuery.safeParse({ night: '2026-09-05' }).success).toBe(true)
+  })
+
+  // Issue 1360: "Open variance £0.00" beside nights with no reading reads as all clear.
+  test('the nights with no reading are counted within the dashboard\'s own range', () => {
+    const missing = [{ night: '2026-08-31' }, { night: '2026-09-05' }, { night: '2026-09-30' }, { night: '2026-10-01' }]
+    expect(nightsWithin(missing, '2026-09-01', '2026-09-30')).toBe(2)
+    expect(nightsWithin([], '2026-09-01', '2026-09-30')).toBe(0)
   })
 
   test('a listed night links to its own reconciliation', () => {

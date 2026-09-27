@@ -48,6 +48,22 @@ describe('nights needing a reading are listed where the Treasurer looks', () => 
     for (const action of ['correct-reading', 'check-again', 'write-off']) expect(source).toContain(`data-test="${action}"`)
     expect(source).not.toContain('<UCheckbox')
     expect(source).toMatch(/writtenOff: true,\s*note:/)
+    expect(source).toMatch(/writtenOff: true,\s*note: [^\n]+\n\s*expectedPence:/)
+  })
+
+  test('a figure or a note typed for one night never carries into another', async () => {
+    expect(await read(RECONCILIATION)).toMatch(/watch\(night, \(\) => \{[^}]*readerFigure\.value = ''[^}]*writeOffNote\.value = ''/)
+  })
+
+  test('the night open on the screen is the only one shown as active in the list', async () => {
+    expect(await read(NEEDS_YOU)).toContain('exact-query')
+  })
+
+  // Issue 1360: "Open variance £0.00" beside nights with no reading reads as all clear.
+  test('the dashboard says how many nights in its range have no reading beside the open variance', async () => {
+    const source = await read(MONEY)
+    expect(source).toContain('data-test="unreconciled-nights"')
+    expect(source).toContain('unreconciledNights')
   })
 })
 
