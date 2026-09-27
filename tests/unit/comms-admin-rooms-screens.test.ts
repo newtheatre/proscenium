@@ -84,6 +84,16 @@ describe('the settings screen reads as rules', () => {
     expect(await read('app/components/settings/RolesField.vue')).toMatch(/disabled: props\.fixed/)
   })
 
+  // J-105 criterion 6: a flagged revert opens the same preview and typed echo a flagged save does.
+  test('reverting a flagged setting asks for the typed confirmation, and the route checks it', async () => {
+    const source = await read(SETTINGS)
+    expect(source).toMatch(/async function revert\(setting: Setting\): Promise<void> \{\s*if \(setting\.wideBlastRadius\)/)
+    expect(source).toContain('body: { confirmation }')
+    const route = await read('server/api/admin/config/[key]/revert.post.ts')
+    expect(route).toContain('requireBlastRadiusConfirmation(')
+    expect(await read('server/api/admin/config/[key].put.ts')).toContain('requireBlastRadiusConfirmation(')
+  })
+
   // A list stored below the floor would otherwise refuse every save with no way to put it right.
   test('a floor role stored off the list can be ticked back, so the save that repairs it is possible', async () => {
     expect(await read('app/components/settings/RolesField.vue'))
