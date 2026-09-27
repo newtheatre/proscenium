@@ -2,8 +2,16 @@ import { describe, expect, test } from 'bun:test'
 import { doorPartyQuery } from '#server/utils/door'
 import { accessBookingsQuery } from '#server/utils/tonight-glance'
 import { tillBookingByIdQuery } from '#server/utils/till-bookings'
-import { ticketInsertQueries } from '#server/utils/capacity'
-import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import {
+  admittedSeatsSubquery,
+  heldAccessSeatsSubquery,
+  heldSeatsOfKindSubquery,
+  heldSeatsSubquery,
+  ticketInsertQueries,
+  unpaidSeatsSubquery,
+  walkUpSeatsSubquery,
+} from '#server/utils/capacity'
+import { boundStatement, createTestDatabase, rows, sql } from '#tests/helpers/database'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -75,6 +83,39 @@ describe('each booking counts its own seats as its party (#1295)', () => {
       const performanceId = tonightsHouse(database)
       expect(read(database, accessBookingsQuery(performanceId)))
         .toMatchObject([{ name: 'Mira Pair', party: 2 }, { name: 'Sol Single', party: 1 }])
+    })
+  })
+})
+
+// The bug #1295 fixed in one count lived in its siblings too: a caller correlating through its own
+// `r` or `t` was captured by the subquery's. Correlated or bound, every house count now agrees.
+describe('the house counts ignore a caller\'s own aliases (#1295)', () => {
+  const COUNTS: [string, (performanceId: SQL) => SQL][] = [
+    ['held', performanceId => heldSeatsSubquery(performanceId)],
+    ['unpaid', unpaidSeatsSubquery],
+    ['admitted', admittedSeatsSubquery],
+    ['walk-up', walkUpSeatsSubquery],
+    ['held of a kind', performanceId => heldSeatsOfKindSubquery(performanceId, 'SINGLE')],
+    ['held for access', heldAccessSeatsSubquery],
+  ]
+
+  // A second house with seats of every sort, so a count that escapes its correlation reads them.
+  function secondHouse(database: TestDatabase): void {
+    const { performanceId } = tonightsPerformance(database, { suffix: 'other' })
+    booking(database, 'rother', performanceId, 'Otto Other', 4, 'PENDING')
+    booking(database, 'rdoor', performanceId, 'Dora Door', 1, 'DOOR')
+    database.batch([['UPDATE reservations SET source = ? WHERE id = ?', 'DOOR', 'rdoor']])
+  }
+
+  test.each(COUNTS)('%s: through the caller\'s r or t, the same as bound to the performance', async (_, count) => {
+    await withDatabase((database) => {
+      const performanceId = tonightsHouse(database)
+      secondHouse(database)
+      const [bound] = read<{ n: number }>(database, sql`SELECT ${count(sql`${performanceId}`)} AS n`)
+      const [viaR] = read<{ n: number }>(database, sql`SELECT ${count(sql`r.performance_id`)} AS n FROM reservations r WHERE r.id = 'rpair'`)
+      const [viaT] = read<{ n: number }>(database, sql`SELECT ${count(sql`t.performance_id`)} AS n FROM tickets t WHERE t.id = 'rsolo-t0'`)
+      expect(viaR!.n).toBe(bound!.n)
+      expect(viaT!.n).toBe(bound!.n)
     })
   })
 })
