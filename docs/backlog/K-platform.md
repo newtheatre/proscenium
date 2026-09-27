@@ -71,6 +71,10 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
   4. A scripted walkthrough of the admit, sale and age-check flows is run one-handed on a
      physical phone before any release that changes those screens, and the walkthrough is part
      of the release checklist.
+  5. A show-night screen serves the viewer's authority and its first data in the page itself, so
+     what a phone paints before any script runs is the screen the viewer will use: no tile, control
+     or badge is drawn and then taken away, or held back and then added. Added 27 September 2026
+     (issue 1521).
 - Source: Prompt Book K-1, P8 (show night is hostile territory); audit PR-5, PR-9; Get-In part 5
   (standards)
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { HUB_KPI_LABELS, checklistHint, compApprovalLine, doorStripLine, doorStripNumbers, firstNameOf, groupedBoardCode, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysIntervals, saysSeatsLeft, seesAccessTonight, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, compApprovalLine, doorStripLine, doorStripNumbers, firstNameOf, groupedBoardCode, hubHouseAfter, hubHouseRefused, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysIntervals, saysSeatsLeft, seesAccessTonight, staleBannerLine } from '#shared/utils/night-hub'
 
 // The show-night hub's wording and numbers (E-112, E-127, issue 905). The screens place these; what
 // they say is decided here, so one test holds it.
@@ -128,6 +128,40 @@ describe('the stale banner (E-112 criterion 3)', () => {
   test('no reason leaves the sentence alone', () => {
     expect(staleBannerLine(null)).toBe('Showing what was last loaded')
     expect(staleBannerLine('')).toBe('Showing what was last loaded')
+  })
+})
+
+// One rule for every read of the house, the served one and each poll after it, so the page the
+// server sends and the page a poll leaves behind cannot disagree about staleness (issue 1521).
+describe('what a read of the house leaves on the hub (E-112 criterion 3, issue 1521)', () => {
+  const at = Date.UTC(2026, 10, 5, 19, 20)
+  const house = { night: '2026-11-05' }
+
+  test('a read replaces the numbers, stamps the moment and clears any staleness', () => {
+    const stale = { house: { night: '2026-11-04' }, syncedAt: at - 60_000, stale: true, staleReason: 'The connection dropped.' }
+    expect(hubHouseAfter(stale, { kind: 'READ', house }, at)).toEqual({ house, syncedAt: at, stale: false, staleReason: '' })
+  })
+
+  test('a refusal is a definite answer, so it counts as synced and keeps what was there', () => {
+    const shown = { house, syncedAt: at - 20_000, stale: true, staleReason: 'Gone' }
+    expect(hubHouseAfter(shown, { kind: 'REFUSED' }, at)).toEqual({ house, syncedAt: at, stale: false, staleReason: '' })
+  })
+
+  test('anything else keeps the last numbers and their moment, and says they are stale', () => {
+    const shown = { house, syncedAt: at - 20_000, stale: false, staleReason: '' }
+    expect(hubHouseAfter(shown, { kind: 'FAILED', reason: 'The connection dropped.' }, at))
+      .toEqual({ house, syncedAt: at - 20_000, stale: true, staleReason: 'The connection dropped.' })
+  })
+
+  test('a first read that fails leaves nothing synced, never a moment it did not have', () => {
+    expect(hubHouseAfter(NO_HUB_HOUSE, { kind: 'FAILED', reason: '' }, at)).toEqual({ house: null, syncedAt: null, stale: true, staleReason: '' })
+  })
+
+  test('signed out or on no shift is a refusal; a server fault or no answer at all is a failure', () => {
+    expect(hubHouseRefused(401, 'Sign in')).toEqual({ kind: 'REFUSED' })
+    expect(hubHouseRefused(403, 'No shift')).toEqual({ kind: 'REFUSED' })
+    expect(hubHouseRefused(500, 'Broken')).toEqual({ kind: 'FAILED', reason: 'Broken' })
+    expect(hubHouseRefused(undefined, '')).toEqual({ kind: 'FAILED', reason: '' })
   })
 })
 

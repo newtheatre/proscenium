@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { effectScope, nextTick, ref } from 'vue'
-import { NIGHT_STALE_AFTER_MS, NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, lastSyncedLabel, nightFreshness, staleAnnouncement } from '#shared/utils/night-shell'
+import { NIGHT_STALE_AFTER_MS, NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, asksNightAuthority, lastSyncedLabel, nightFreshness, staleAnnouncement } from '#shared/utils/night-shell'
 import { bindNightEyebrow, bindNightFallbackSubject, bindNightSubject } from '#composables/useNightHeader'
 import type { NightHeaderState } from '#composables/useNightHeader'
 
@@ -255,5 +255,54 @@ describe('the show-night shell stands on the visible viewport (K-102, design-lan
     for (const layout of LAYOUTS) {
       expect(`${layout}: ${(await read(layout)).includes(SHELL_CLASS)}`).toBe(`${layout}: true`)
     }
+  })
+})
+
+// Issue 1521: the hub served every tile, then pruned them once the roles came back after mount. The
+// roles are asked before the first screen draws, and a screen's first data rides the served page.
+describe('a show-night screen is served as the viewer will use it (issue 1521)', () => {
+  const move = (to: unknown, from: unknown, server: boolean, hydrating: boolean): boolean =>
+    asksNightAuthority({ to, from, server, hydrating })
+
+  test('the server always asks, so the served page carries the viewer\'s roles', () => {
+    expect(move('tonight', undefined, true, false)).toBe(true)
+    expect(move('tonight', 'tonight', true, false)).toBe(true)
+  })
+
+  test('hydrating, the phone takes the server\'s answer and asks nothing again', () => {
+    expect(move('tonight', undefined, false, true)).toBe(false)
+  })
+
+  test('coming in from another layout asks before the screen draws; moving within the shell keeps it', () => {
+    expect(move('tonight', 'member', false, false)).toBe(true)
+    expect(move('tonight', undefined, false, false)).toBe(true)
+    expect(move('tonight', 'tonight', false, false)).toBe(false)
+  })
+
+  test('nothing outside the shell asks', () => {
+    expect(move('member', 'tonight', true, false)).toBe(false)
+    expect(move(undefined, undefined, false, false)).toBe(false)
+  })
+
+  test('the roles are asked by a route middleware, never from a mount the server does not run', async () => {
+    expect(await Bun.file('app/middleware/night-authority.global.ts').exists()).toBe(true)
+    expect(await read('app/composables/useNightShell.ts')).not.toContain('onMounted')
+    expect(await read(LAYOUT)).not.toContain('resolveNightAuthority()')
+  })
+
+  const SERVED = [
+    'app/pages/tonight/index.vue',
+    'app/pages/tonight/glance.vue',
+    'app/pages/tonight/door/index.vue',
+    'app/pages/tonight/board.vue',
+    'app/pages/tonight/checklist/index.vue',
+    'app/pages/tonight/incidents/index.vue',
+    'app/pages/tonight/age-checks/index.vue',
+    'app/pages/tonight/message.vue',
+    'app/components/NightCompQueue.vue',
+  ]
+
+  test.each(SERVED)('%s reads its first data while the server renders', async (path) => {
+    expect(await read(path)).toContain('await useAsyncData(')
   })
 })
