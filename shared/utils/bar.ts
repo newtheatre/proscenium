@@ -756,7 +756,7 @@ export function presetForCategory(name: string): MeasurePresetId | null {
 
 // The shape a category's drinks are usually sold in, which the set-up marks once the category is
 // chosen (issue 1349): packaged things are sold as themselves, the rest by measure.
-export function suggestedShape(categoryName: string): Exclude<ProductShape, 'UNSET' | 'RECIPE'> | null {
+export function suggestedShape(categoryName: string): 'SIMPLE' | 'MEASURED' | null {
   const preset = presetForCategory(categoryName)
   if (!preset) return null
   return preset === 'PACKAGED' ? 'SIMPLE' : 'MEASURED'

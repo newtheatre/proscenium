@@ -391,6 +391,12 @@ describe.skipIf(skip !== null)('set-up starts from the category and says what it
 
       await fill(view, '[data-test="setup-name"]', 'Review Merlot')
       await waitFor(view, `document.querySelector('[data-test="setup-item-name"]')?.value === 'Review Merlot 750ml'`)
+
+      // A name typed by hand is kept whatever the product is renamed to afterwards.
+      await fill(view, '[data-test="setup-item-name"]', 'Cellar Merlot')
+      await fill(view, '[data-test="setup-name"]', 'Review Merlot reserve')
+      await Bun.sleep(300)
+      expect(await view.evaluate<string>(`document.querySelector('[data-test="setup-item-name"]').value`)).toBe('Cellar Merlot')
     }
     finally {
       view.close()

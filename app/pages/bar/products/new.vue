@@ -209,7 +209,7 @@ function fillFrom(id: MeasurePresetId | null): void {
       pricePounds: asPounds(defaults.value.get(size.servingKind)),
       chosen: shape.value !== 'SIMPLE' || index === 0,
     }))
-    if (chosen && itemMode.value === 'NEW' && (newItem.name === '' || newItem.name === suggestedItemName.value)) {
+    if (chosen && itemMode.value === 'NEW' && !itemNamedByHand.value) {
       newItem.unit = shape.value === 'SIMPLE' ? 'ITEM' : chosen.unit
       newItem.containerMl = shape.value === 'SIMPLE' ? null : chosen.containerMl
     }
@@ -219,24 +219,22 @@ function fillFrom(id: MeasurePresetId | null): void {
   })
 }
 
-function suggestedFor(id: string): MeasurePresetId | null {
-  const category = categories.value.items.find(item => item.id === id)
-  return category ? presetForCategory(category.name) : null
-}
-
 // The category comes first, and the shape its drinks are usually sold in is marked (issue 1349).
 const chosenCategory = computed(() => categories.value.items.find(item => item.id === product.categoryId) ?? null)
 const suggested = computed(() => (chosenCategory.value ? suggestedShape(chosenCategory.value.name) : null))
+const suggestedPreset = computed(() => (chosenCategory.value ? presetForCategory(chosenCategory.value.name) : null))
 
-// A new stocked item is named after the product until somebody names it otherwise (issue 1349).
+// A new stocked item is named after the product until somebody types a name of their own, in
+// whichever mode was showing when the product changed (issue 1349).
+const itemNamedByHand = ref(false)
 const suggestedItemName = computed(() => defaultItemName({
   productName: product.name,
   shape: shape.value,
   containerMl: newItem.unit === 'ML' ? newItem.containerMl : null,
   servingKind: shape.value === 'SIMPLE' ? sizes.value.find(size => size.chosen)?.servingKind ?? null : null,
 }))
-watch(suggestedItemName, (next, previous) => {
-  if (itemMode.value === 'NEW' && (newItem.name === '' || newItem.name === previous)) newItem.name = next
+watch([suggestedItemName, itemMode], ([next, mode]) => {
+  if (mode === 'NEW' && !itemNamedByHand.value) newItem.name = next
 })
 
 // The reads race each other when somebody arrows through the list, so a stale answer is dropped
@@ -244,7 +242,7 @@ watch(suggestedItemName, (next, previous) => {
 watch(() => product.categoryId, async (id) => {
   await readDefaults(id)
   if (id !== product.categoryId || touched.value) return
-  if (shape.value === 'MEASURED') fillFrom(suggestedFor(id) ?? preset.value)
+  if (shape.value === 'MEASURED') fillFrom(suggestedPreset.value ?? preset.value)
   if (shape.value === 'SIMPLE') fillFrom('PACKAGED')
   if (shape.value === 'RECIPE') fillFrom(null)
 })
@@ -256,14 +254,13 @@ watch(() => product.allergenState, (state) => {
 function start(chosen: ProductShape): void {
   shape.value = chosen
   failure.value = null
-  product.categoryId = product.categoryId || categoryOptions.value[0]?.value || ''
   if (chosen === 'SIMPLE') {
     // Whole items only: the shape is about a thing that leaves the shelf, not a measure of one.
     Object.assign(newItem, { unit: 'ITEM', containerMl: null })
     existingItemId.value = ''
     fillFrom('PACKAGED')
   }
-  if (chosen === 'MEASURED') fillFrom(suggestedFor(product.categoryId))
+  if (chosen === 'MEASURED') fillFrom(suggestedPreset.value)
   if (chosen === 'RECIPE') fillFrom(null)
 }
 
@@ -499,6 +496,16 @@ function moveFocus(step: number): void {
             {{ category.name }}
           </UButton>
         </div>
+        <p
+          v-if="categories.items.length === 0"
+          class="text-sm text-muted"
+          data-test="setup-no-categories"
+        >
+          There are no product categories yet. <ULink
+            to="/bar/categories"
+            class="underline"
+          >Add one</ULink> first, then come back to set the product up.
+        </p>
       </div>
 
       <p
@@ -686,6 +693,7 @@ function moveFocus(step: number): void {
                 v-model="newItem.name"
                 class="w-full"
                 data-test="setup-item-name"
+                @update:model-value="value => itemNamedByHand = value !== '' && value !== suggestedItemName"
               />
             </UFormField>
 
