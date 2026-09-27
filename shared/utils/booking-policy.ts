@@ -20,6 +20,9 @@ export const REFUSALS = [
 
 export type Refusal = (typeof REFUSALS)[number]
 
+// The policy's own words, which the form also shows before it is filled in (A-129 c2, issue 1338).
+export const BOOKING_NO_MEMBERSHIP = 'Booking a room needs a current membership. Renew it at the Students\' Union.'
+
 // A lapsed membership is not something an approver can wave through, so it alone is not divertible
 // into a request (C-105 criterion 4, C-108).
 const NOT_DIVERTIBLE: readonly Refusal[] = ['NO_MEMBERSHIP', 'IN_THE_PAST', 'ROOM_RETIRED']
@@ -118,7 +121,7 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
   const weekday = londonWeekday(proposal.startsAt)
 
   if (!context.hasMembership) {
-    fail('NO_MEMBERSHIP', 'Booking a room needs a current membership. Renew it at the Students\' Union.')
+    fail('NO_MEMBERSHIP', BOOKING_NO_MEMBERSHIP)
   }
   if (proposal.endsAt.getTime() <= context.now.getTime()) {
     fail('IN_THE_PAST', 'That slot has already happened')

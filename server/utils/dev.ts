@@ -1,6 +1,7 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, gte } from 'drizzle-orm'
 // The writer's own constant, so the tools cannot read a path the centre stopped writing to.
 import { MAILBOX } from './mailbox'
+import { daysAfter, londonDay } from '#shared/utils/membership'
 import { PERSONAS, PERSONA_PASSWORD, PERSONA_TOTP_SECRET } from '#shared/utils/personas'
 import { PROTECTED_ROLE } from '#shared/utils/roles'
 
@@ -72,6 +73,25 @@ async function confirmSecondFactor(userId: string): Promise<void> {
   }).onConflictDoNothing()
 }
 
+// The same term `bun run seed` gives a current member, begun two months ago with ten to run, and
+// only where no term still runs: a held booker whose term lapsed gets a new one (issue 1338).
+async function ensureCurrentMembership(userId: string): Promise<void> {
+  const today = londonDay(new Date())
+  const [running] = await db.select({ id: schema.memberships.id })
+    .from(schema.memberships)
+    .where(and(eq(schema.memberships.userId, userId), gte(schema.memberships.expiresOn, today)))
+    .limit(1)
+  if (running) return
+  await db.insert(schema.memberships).values({
+    id: newId(),
+    userId,
+    startsOn: daysAfter(today, -60),
+    expiresOn: daysAfter(today, 300),
+    source: 'MANUAL',
+    confirmedAt: Math.floor(Date.now() / 1000),
+  })
+}
+
 // The persona accounts only, idempotently. The rest of the seed is `bun run seed`, which cannot
 // run from here: its builders read as they write, and D1 in a worker is async (operations.md).
 export async function seedPersonas(): Promise<{ made: number, held: number }> {
@@ -90,6 +110,7 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
       // A database seeded before the factor was added to this branch still holds this persona
       // without one (#927): a held persona needs it just as much as a freshly made one.
       if (persona.shape === 'full') await confirmSecondFactor(existing.id)
+      if (persona.membership === 'CURRENT') await ensureCurrentMembership(existing.id)
       continue
     }
 
@@ -117,6 +138,7 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
     // by hand every reseed is exactly what this file exists to save (K-124 criterion 1).
     if (persona.shape === 'full') await confirmSecondFactor(id)
     if (persona.shape === 'tombstone') await eraseAccount(id, null)
+    if (persona.membership === 'CURRENT') await ensureCurrentMembership(id)
   }
 
   const { mkdir, writeFile } = await import('node:fs/promises')

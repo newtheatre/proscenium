@@ -397,7 +397,7 @@ onMounted(() => {
             </UFormField>
             <UFormField
               name="purpose"
-              label="What it is for"
+              label="What the room is for"
               required
             >
               <USelect

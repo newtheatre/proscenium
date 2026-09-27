@@ -55,6 +55,11 @@ export function describePurpose(value: string | null): string {
   return value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ')
 }
 
+// The name is optional, so a booking or a request left unnamed is called by its purpose (issue 1338).
+export function nameOrPurpose(title: string, purpose: string): string {
+  return title.trim() || describePurpose(purpose)
+}
+
 // What a member reads for a booking's state. A cancellation carrying a conversion pointer was
 // moved rather than withdrawn, and reading it as "Cancelled" would say the opposite (C-123).
 export function saysBookingState(booking: { status: string, convertedToRequestId?: string | null }): string {

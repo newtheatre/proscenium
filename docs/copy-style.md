@@ -214,6 +214,13 @@ types.vue`, `pass-types.vue`, `venues.vue`, `seasons.vue` and several bar screen
 `'Delete'` for a retiring action. The named form wins: "Delete" tells nobody what is about to
 happen to a row other things may point at.
 
+Two fields on one form never share a question. If a reader could give the same answer to both,
+one of them goes, or becomes something else. The booking form and the form for a room not listed
+here asked "What it is for" of a free title and "What the room is for" of a closed list; each now
+asks the list once, as chips, and the title is "A name for it", optional, falling back to the
+purpose's own words when left empty. The change form on `rooms/mine.vue` still asks both, and is
+the next to follow.
+
 One marquee CTA per public view (`docs/design-language.md`): `app/pages/index.vue` already keeps
 to it, and its comment above `<template #links>` names the budget explicitly.
 

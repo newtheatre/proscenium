@@ -46,4 +46,23 @@ describe('a seeded persona already carries a second factor', () => {
     const admins = await request(app, 'GET', '/api/admin/accounts', undefined, cookie)
     expect(admins.status).toBe(200)
   })
+
+  // Issue 1338: the room forms refuse before they open without a membership, so the persona
+  // their pictures are taken as holds a current one, made or already held.
+  test.skipIf(Boolean(skip))('the booker holds a current membership, and the ordinary member none', async () => {
+    await request(app, 'POST', '/api/dev/seed')
+    await request(app, 'POST', '/api/dev/seed')
+    const tools = await (await request(app, 'GET', '/api/dev')).json() as Tools
+
+    const stateOf = async (email: string): Promise<string> => {
+      const persona = tools.personas.find(one => one.email === email)
+      const signedIn = await request(app, 'POST', '/api/dev/sign-in-as', { userId: persona!.account!.id })
+      const cookie = (signedIn.headers.get('set-cookie') ?? '').split(';')[0]!
+      const session = await (await request(app, 'GET', '/api/auth/session', undefined, cookie)).json() as { membershipState: { kind: string } }
+      return session.membershipState.kind
+    }
+
+    expect(await stateOf('dev-booker@e2e.newtheatre.org.uk')).toBe('current')
+    expect(await stateOf('dev-member@e2e.newtheatre.org.uk')).toBe('none')
+  })
 })

@@ -8,6 +8,8 @@ export interface Persona {
   describes: string
   // A guest holds no password, and a tombstone is anonymised. Both are real states of an account.
   shape: 'full' | 'guest' | 'tombstone'
+  // Absent is no membership at all, which is what most personas should show a screen.
+  membership?: 'CURRENT'
 }
 
 export const PERSONA_PASSWORD = 'development-only-password'
@@ -25,6 +27,10 @@ export const PERSONAS: Persona[] = [
   { email: 'dev-member@e2e.newtheatre.org.uk', name: 'Mel Member (dev)', role: null, shape: 'full', describes: 'An ordinary account: no roles, nothing in the admin screens.' },
   { email: 'dev-guest@e2e.newtheatre.org.uk', name: 'Gus Guest (dev)', role: null, shape: 'guest', describes: 'No password and no way in, the way guest checkout leaves one (A-116).' },
   { email: 'dev-erased@e2e.newtheatre.org.uk', name: 'Term Tombstone (dev)', role: null, shape: 'tombstone', describes: 'Anonymised, so every screen has to keep working around it (0011).' },
+
+  // Module C: spaces
+
+  { email: 'dev-booker@e2e.newtheatre.org.uk', name: 'Bea Booker (dev)', role: null, shape: 'full', membership: 'CURRENT', describes: 'An ordinary member holding a current membership, so the room forms open rather than refuse (issue 1338).' },
 
   // Module D: ticketing
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  assignForm, EXTERNAL_REFUSALS, externalRequestForm, judgeExternal, refusalToAct, refuseAssignmentForm,
+  assignForm, EXTERNAL_REFUSALS, earliestAskDay, externalRequestForm, judgeExternal, refusalToAct, refuseAssignmentForm,
   saysExternalStatus,
 } from '#shared/utils/external-requests'
 
@@ -25,6 +25,38 @@ describe('what is needed before anybody will answer', () => {
     const failures = judgeExternal(span(1), CONTEXT)
     expect(failures.map(one => one.reason)).toContain('SHORT_NOTICE')
     expect(failures[0]!.says).toContain('3 working days')
+  })
+
+  // Issue 1338: a refusal for too little notice names the day that would have been enough.
+  test('too little notice names the earliest day that can be asked for', () => {
+    // Monday 1 March 2027 at noon: three working days on is Thursday 4 March.
+    const failures = judgeExternal(span(1), CONTEXT)
+    expect(failures.find(one => one.reason === 'SHORT_NOTICE')?.says).toContain('The earliest day you can ask for is Thursday 4 March')
+  })
+
+  test('the earliest day steps over a weekend and a bank holiday', () => {
+    expect(earliestAskDay(NOW, 3, HOLIDAYS)).toBe('2027-03-04')
+    // Thursday 25 March: Friday 26 is a bank holiday and 29 is Easter Monday, so the third
+    // working day after it is Thursday 1 April.
+    expect(earliestAskDay(new Date('2027-03-25T12:00:00Z'), 3, HOLIDAYS)).toBe('2027-04-01')
+  })
+
+  // The day on the screen is one the server accepts: Thursday has three working days, Wednesday two.
+  test('the earliest day passes the notice and the day before does not', () => {
+    expect(judgeExternal(span(3), CONTEXT).map(one => one.reason)).not.toContain('SHORT_NOTICE')
+    expect(judgeExternal(span(2), CONTEXT).map(one => one.reason)).toContain('SHORT_NOTICE')
+  })
+
+  // Wednesday 20 December 2028 with the holidays known only to Boxing Day: Friday 22 is counted
+  // and short, but the day that would be enough is past what anybody can count.
+  test('past the bank holidays\' reach no earliest day is named, here or on the screen', () => {
+    const now = new Date('2028-12-20T12:00:00Z')
+    const shortOfTheList = { ...CONTEXT, now, holidays: ['2028-12-25', '2028-12-26'] }
+    const friday = { startsAt: new Date('2028-12-22T18:00:00Z'), endsAt: new Date('2028-12-22T20:00:00Z') }
+
+    const refusal = judgeExternal(friday, shortOfTheList).find(one => one.reason === 'SHORT_NOTICE')
+    expect(refusal?.says).toEndWith('Weekends and bank holidays do not count.')
+    expect(earliestAskDay(now, 3, shortOfTheList.holidays)).toBeNull()
   })
 
   test('beyond the horizon is refused', () => {

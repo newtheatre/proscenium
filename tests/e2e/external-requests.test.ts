@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { saysDayLong } from '#shared/utils/when'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -127,6 +128,21 @@ async function ask(over: Record<string, unknown> = {}, as = member.cookie): Prom
 
 const statusOf = (id: string): string | undefined =>
   read<{ status: string }>('SELECT status FROM external_requests WHERE id = ?', id)?.status
+
+// Issue 1338: the earliest day is named before the form and in a refusal for too little notice.
+describe.skipIf(skip !== null)('the earliest day a union room can be asked for', () => {
+  test('the room policy names it, and a request for tomorrow is refused naming it', async () => {
+    const policy = await (await send('GET', '/api/rooms/policy', undefined, member.cookie)).json() as { externalEarliestDay: string | null }
+    expect(policy.externalEarliestDay).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+
+    const refused = await send('POST', '/api/rooms/external-requests', {
+      title: 'Too soon', purpose: 'REHEARSAL', ...span(1),
+    }, member.cookie)
+    expect(refused.status).toBe(422)
+    const body = await refused.json() as { data: { failures: { reason: string, says: string }[] } }
+    expect(body.data.failures.find(one => one.reason === 'SHORT_NOTICE')?.says).toContain(`The earliest day you can ask for is ${saysDayLong(policy.externalEarliestDay!)}.`)
+  })
+})
 
 describe.skipIf(skip !== null)('asking, with an optional preference (criterion 1)', () => {
   test('a member asks and nothing is held', async () => {
