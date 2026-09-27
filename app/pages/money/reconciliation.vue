@@ -97,7 +97,7 @@ const historyColumns: TableColumn<ZReading>[] = [
   {
     id: 'reader',
     header: 'Reader',
-    meta: { class: { td: 'text-right whitespace-nowrap font-mono' } },
+    meta: RIGHT_ALIGNED,
     cell: ({ row }) => h('div', {}, [
       h('div', {}, saysMoney(row.original.readerPence)),
       // Below sm who entered it and their note are hidden: shown here instead, so a phone keeps

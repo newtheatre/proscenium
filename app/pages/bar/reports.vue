@@ -159,8 +159,8 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
       h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.percent}%, applied ${plural(row.original.timesApplied, 'time')}`),
     ]),
   },
-  { id: 'percent', header: 'Percent', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => `${row.original.percent}%` },
-  { id: 'timesApplied', header: 'Times applied', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => String(row.original.timesApplied) },
+  { id: 'percent', header: 'Percent', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => `${row.original.percent}%` },
+  { id: 'timesApplied', header: 'Times applied', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => String(row.original.timesApplied) },
   { id: 'givenAway', header: 'Given away', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.discountedPence) },
 ]
 </script>

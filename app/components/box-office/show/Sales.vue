@@ -37,21 +37,21 @@ const columns = computed<TableColumn<AdminPerformance>[]>(() => [
   {
     id: 'capacity',
     header: 'Capacity',
-    meta: { class: { th: 'text-right', td: 'text-right whitespace-nowrap' } },
+    meta: RIGHT_ALIGNED,
     footer: () => figure(`${capacityTotal.value}`),
     cell: ({ row }) => {
       const capacity = capacityOf(row.original)
-      if (row.original.externalBookingUrl) return h('span', { class: 'text-sm text-muted' }, 'Externally ticketed')
+      if (row.original.externalBookingUrl) return h('span', { class: 'font-sans text-sm text-muted' }, 'Externally ticketed')
       return figure(capacity === null ? 'Uncapped' : `${capacity}`)
     },
   },
   {
     id: 'sold',
     header: 'Sold',
-    meta: { class: { th: 'text-right', td: 'text-right whitespace-nowrap' } },
+    meta: RIGHT_ALIGNED,
     footer: () => figure(`${soldTotal.value}`),
     cell: ({ row }) => {
-      if (row.original.externalBookingUrl) return h('span', { class: 'text-sm text-muted' }, 'n/a')
+      if (row.original.externalBookingUrl) return h('span', { class: 'font-sans text-sm text-muted' }, 'n/a')
       const share = soldShare(row.original.soldTickets, capacityOf(row.original) ?? 0)
       return h('div', { class: 'flex flex-col items-end gap-1' }, [
         figure(`${row.original.soldTickets}`),
@@ -62,20 +62,20 @@ const columns = computed<TableColumn<AdminPerformance>[]>(() => [
   {
     id: 'unpaid',
     header: 'Unpaid',
-    meta: { class: { th: 'text-right', td: 'text-right whitespace-nowrap' } },
+    meta: RIGHT_ALIGNED,
     footer: () => figure(`${unpaidTotal.value}`),
     cell: ({ row }) => (row.original.externalBookingUrl
-      ? h('span', { class: 'text-sm text-muted' }, 'n/a')
+      ? h('span', { class: 'font-sans text-sm text-muted' }, 'n/a')
       : figure(`${row.original.unpaidTickets}`)),
   },
   {
     id: 'remaining',
     header: 'Left',
-    meta: { class: { th: 'text-right', td: 'text-right whitespace-nowrap' } },
+    meta: RIGHT_ALIGNED,
     cell: ({ row }) => {
       const capacity = capacityOf(row.original)
-      if (row.original.externalBookingUrl) return h('span', { class: 'text-sm text-muted' }, 'n/a')
-      if (capacity === null) return h('span', { class: 'text-sm text-muted' }, 'No limit')
+      if (row.original.externalBookingUrl) return h('span', { class: 'font-sans text-sm text-muted' }, 'n/a')
+      if (capacity === null) return h('span', { class: 'font-sans text-sm text-muted' }, 'No limit')
       return figure(`${Math.max(capacity - row.original.soldTickets, 0)}`)
     },
   },

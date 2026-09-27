@@ -514,7 +514,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
   {
     id: 'act',
     header: ACTIONS_HEADER,
-    meta: RIGHT_ALIGNED,
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => h(UButton, {
       'size': 'sm',
       'loading': openingId.value === row.original.id,

@@ -89,8 +89,8 @@ const performanceColumns: TableColumn<PerformanceReportRow>[] = [
   },
   { id: 'sold', header: 'Sold', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.sold) },
   { id: 'admitted', header: 'Admitted', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.admitted) },
-  { id: 'noShows', header: 'No-shows', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => String(row.original.noShows) },
-  { id: 'unfilledSlots', header: 'Unfilled slots', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => String(row.original.unfilledSlots) },
+  { id: 'noShows', header: 'No-shows', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => String(row.original.noShows) },
+  { id: 'unfilledSlots', header: 'Unfilled slots', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => String(row.original.unfilledSlots) },
   { id: 'officerBypass', header: 'Officer bypass', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => yesNo(row.original.officerBypass) },
   { id: 'autoClosed', header: 'Closed automatically', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => yesNo(row.original.autoClosed) },
 ]

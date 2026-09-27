@@ -119,7 +119,7 @@ const columns: TableColumn<StockMovement>[] = [
   {
     id: 'cost',
     header: 'Cost',
-    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
+    meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
     cell: ({ row }) => saysDeliveryCost(row.original),
   },
   {

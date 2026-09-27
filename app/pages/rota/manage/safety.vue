@@ -94,7 +94,7 @@ const severityColumns: TableColumn<SeverityRow>[] = [
   {
     id: 'routing',
     header: 'Routes to follow-up',
-    meta: { class: { td: 'text-right' } },
+    meta: { class: { th: 'text-right', td: 'text-right' } },
     cell: ({ row }) => h(USwitch, {
       'modelValue': row.original.requiresFollowUp,
       'disabled': writes.value === false,

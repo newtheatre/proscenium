@@ -107,7 +107,7 @@ const columns: TableColumn<HolderRow>[] = [
   {
     id: 'outstanding',
     header: 'Outstanding',
-    meta: { class: { td: 'text-right whitespace-nowrap' } },
+    meta: RIGHT_ALIGNED,
     cell: ({ row }) => saysMoney(row.original.outstandingPence),
   },
   {
