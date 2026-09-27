@@ -195,14 +195,14 @@ describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 ite
     }
   }, CASE_TIMEOUT_MS)
 
-  test('the incident log pins the incident, with the near miss one tap on from it', async () => {
+  // Issue 1317: one sheet for anything worth writing down, a near miss already chosen.
+  test('the incident log pins one Log something', async () => {
     const view = await openView(PHONE)
     try {
       await visit(view, `${app.baseURL}/tonight/incidents`)
       const pinned = await textOf(view, '[data-test="night-actions"]')
-      expect(pinned).toContain('Log an incident')
-      expect(pinned).toContain('Report a near miss')
-      expect(pinned.indexOf('Log an incident')).toBeLessThan(pinned.indexOf('Report a near miss'))
+      expect(pinned).toContain('Log something')
+      expect(pinned).not.toContain('Report a near miss')
     }
     finally {
       view.close()
