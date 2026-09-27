@@ -58,9 +58,19 @@ export interface NavEntry {
   count?: NavCount
 }
 
-export const NAV_COUNTS = ['membership-claims', 'access-profiles'] as const
+export const NAV_COUNTS = ['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests'] as const
 
 export type NavCount = (typeof NAV_COUNTS)[number]
+
+// What the overview calls each queue, and the view that opens on it: the entry carrying its count,
+// which a test holds them to (issue 1358).
+export const NAV_QUEUES: Record<NavCount, { says: string, to: string }> = {
+  'membership-claims': { says: 'Membership claims to record', to: '/people/members?filter=awaiting-record' },
+  'access-profiles': { says: 'Access declarations to verify', to: '/box-office/access-profiles' },
+  'room-requests': { says: 'Room requests to decide', to: '/rooms/manage/requests' },
+  'training-requests': { says: 'Training requests to answer', to: '/training/manage/requests' },
+  'pass-requests': { says: 'Pass requests to fulfil', to: '/box-office/desk-passes' },
+}
 
 // What a group or an entry shows: the sum of the counts its visible entries carry (A-130).
 export function navCount(items: readonly NavEntry[], counts: Partial<Record<NavCount, number>>): number {
@@ -126,7 +136,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Desk', icon: 'i-lucide-ticket-check', to: '/box-office/desk', ability: viewProgramme, section: 'Every day' },
       // A noun beside Desk, rather than the console's one verb label: the screen is a desk of its
       // own, with its own table and its own refusals (0082).
-      { label: 'Pass desk', icon: 'i-lucide-ticket-plus', to: '/box-office/desk-passes', ability: viewProgramme, section: 'Every day' },
+      { label: 'Pass desk', icon: 'i-lucide-ticket-plus', to: '/box-office/desk-passes', ability: viewProgramme, section: 'Every day', count: 'pass-requests' },
       { label: 'Shows', icon: 'i-lucide-drama', to: '/box-office/shows', ability: viewProgramme, section: 'Every day' },
       // A declaration waits on somebody to be met in person, so it is daily work (issue 1334).
       { label: 'Access profiles', icon: 'i-lucide-accessibility', to: '/box-office/access-profiles', ability: verifyAccessProfiles, section: 'Every day', count: 'access-profiles' },
@@ -168,7 +178,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     icon: 'i-lucide-door-open',
     prefix: '/rooms/manage',
     items: [
-      { label: 'Room requests', icon: 'i-lucide-inbox', to: '/rooms/manage/requests', ability: decideRoomRequests, section: 'Every day' },
+      { label: 'Room requests', icon: 'i-lucide-inbox', to: '/rooms/manage/requests', ability: decideRoomRequests, section: 'Every day', count: 'room-requests' },
       { label: 'Bookings', icon: 'i-lucide-calendar-search', to: '/rooms/manage/bookings', ability: viewRooms, section: 'Every day' },
       { label: 'Closures', icon: 'i-lucide-construction', to: '/rooms/manage/closures', ability: viewRooms, section: 'Every day' },
       { label: 'Utilisation', icon: 'i-lucide-chart-column', to: '/rooms/manage/utilisation', ability: viewRooms, section: 'Every day' },
@@ -186,7 +196,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     items: [
       { label: 'Records', icon: 'i-lucide-clipboard-check', to: '/training/manage/records', ability: viewTrainingCatalogue, section: 'Every day' },
       { label: 'Sessions', icon: 'i-lucide-calendar-days', to: '/training/manage/sessions', ability: runTrainingSessions, section: 'Every day' },
-      { label: 'Requests', icon: 'i-lucide-hand', to: '/training/manage/requests', ability: viewTrainingCatalogue, section: 'Every day' },
+      { label: 'Requests', icon: 'i-lucide-hand', to: '/training/manage/requests', ability: viewTrainingCatalogue, section: 'Every day', count: 'training-requests' },
       { label: 'Catalogue', icon: 'i-lucide-library', to: '/training/manage', ability: viewTrainingCatalogue, exact: true, section: 'Set-up' },
       { label: 'Departments', icon: 'i-lucide-building-2', to: '/training/manage/departments', ability: viewTrainingCatalogue, section: 'Set-up' },
     ],
