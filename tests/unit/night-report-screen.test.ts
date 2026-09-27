@@ -9,6 +9,7 @@ import {
   saysSignedOff,
   tenderTotalPence,
 } from '#shared/utils/night-signoff'
+import { saysNightClosed } from '#shared/utils/checklist'
 import type { Phase, SystemCheck } from '#shared/utils/checklist'
 
 // The duty manager's own sign-off screen (E-124 criteria 1 and 2, E-123 criterion 4, issue 1053):
@@ -199,5 +200,16 @@ describe('nothing final is pinned before the curtain (issue 1315)', () => {
     const source = await Bun.file(ROWS).text()
     expect(source).toContain('Clears at Sign off and close')
     expect(source).toContain('v-if="!entry.done && !answeredAtSignOff(entry)"')
+  })
+})
+
+describe('the checklist says how the night closed (E-125 criterion 2)', () => {
+  test('by the person who signed it off, or automatically with nobody named', () => {
+    expect(saysNightClosed({ closedByName: 'Rowan Ellis', automatic: false })).toBe('Tonight is closed, by Rowan Ellis.')
+    expect(saysNightClosed({ closedByName: null, automatic: true })).toBe('Tonight closed automatically.')
+  })
+
+  test('the screen says it in those words', async () => {
+    expect(await Bun.file(CHECKLIST).text()).toContain('saysNightClosed(close)')
   })
 })

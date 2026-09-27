@@ -39,6 +39,11 @@ export function saysBlockedClose(labels: readonly string[]): string {
     + 'tick or make an exception'
 }
 
+// How the night closed: by whoever signed it off, or by itself with nobody named (E-125).
+export function saysNightClosed(close: { closedByName: string | null, automatic: boolean }): string {
+  return close.automatic ? 'Tonight closed automatically.' : `Tonight is closed, by ${close.closedByName ?? 'a former member'}.`
+}
+
 const LABEL_LIMIT = 200
 
 export const checklistItemForm = z.object({

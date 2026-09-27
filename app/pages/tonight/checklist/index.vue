@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysPhase } from '#shared/utils/checklist'
+import { saysNightClosed, saysPhase } from '#shared/utils/checklist'
 import { holdsTheClose } from '#shared/utils/night-signoff'
 import { saysTillLeftOpen } from '#shared/utils/till'
 import type { Phase, SystemCheck } from '#shared/utils/checklist'
@@ -26,7 +26,8 @@ interface Entry {
 
 interface CloseInfo {
   closedAt: number
-  closedByName: string
+  closedByName: string | null
+  automatic: boolean
 }
 
 const route = useRoute()
@@ -144,7 +145,7 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
         data-test="checklist-closed"
         color="success"
         variant="subtle"
-        :description="`Tonight is closed, by ${close.closedByName}.`"
+        :description="saysNightClosed(close)"
       />
 
       <section

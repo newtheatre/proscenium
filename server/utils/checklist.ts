@@ -340,17 +340,33 @@ export function exemptStatement(stampId: string, performanceId: string, reason: 
 
 export interface ChecklistCloseRow {
   performanceId: string
-  closedByName: string
+  // Null for a night that closed itself: nobody closed it (E-125 criterion 2).
+  closedByName: string | null
   closedAt: number
+  automatic: boolean
+}
+
+// A person's close, or else a report that froze itself. SYSTEM writes no close row and reviews no
+// incident, since `closed_by` names a person and its report lists what was left (E-125).
+export function closeForQuery(performanceId: string): SQL {
+  return sql`
+    SELECT performanceId, closedByName, closedAt, automatic FROM (
+      SELECT cc.performance_id AS performanceId, u.name AS closedByName, cc.closed_at AS closedAt, 0 AS automatic
+      FROM checklist_closes cc JOIN users u ON u.id = cc.closed_by
+      WHERE cc.performance_id = ${performanceId}
+      UNION ALL
+      SELECT nr.performance_id, NULL, nr.signed_at, 1
+      FROM night_reports nr
+      WHERE nr.performance_id = ${performanceId} AND nr.signed_via = 'SYSTEM'
+    )
+    ORDER BY automatic
+    LIMIT 1
+  `
 }
 
 export async function closeFor(performanceId: string): Promise<ChecklistCloseRow | null> {
-  const [row] = await db.all<ChecklistCloseRow>(sql`
-    SELECT cc.performance_id AS performanceId, u.name AS closedByName, cc.closed_at AS closedAt
-    FROM checklist_closes cc JOIN users u ON u.id = cc.closed_by
-    WHERE cc.performance_id = ${performanceId}
-  `)
-  return row ?? null
+  const [row] = await db.all<Omit<ChecklistCloseRow, 'automatic'> & { automatic: number }>(closeForQuery(performanceId))
+  return row ? { ...row, automatic: row.automatic === 1 } : null
 }
 
 // Written only by Sign off and close, beside the report its batch froze (issue 1315): a refused

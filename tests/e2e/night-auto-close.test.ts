@@ -124,6 +124,24 @@ describe.skipIf(skip !== null)('auto-close within 24 hours (criteria 1, 2, 4)', 
     expect(compiled.checklist.some(entry => !entry.done && !entry.exempted)).toBe(true)
   })
 
+  // Nobody closed it, so SYSTEM writes no close row and reviews no incident; the report lists what
+  // was left, and the checklist reads the report as the night's close (E-125 criterion 2).
+  test('the automatic close writes no close and no review, and its report keeps what was left', async () => {
+    const reporter = await registerMember(app, 'auto-close-reporter', generatePassword())
+    const suffix = `auto-close-left-${crypto.randomUUID().slice(0, 8)}`
+    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { night: OLD_NIGHT, suffix }))
+    write(`INSERT INTO incidents (id, performance_id, reported_by, category, severity, body) VALUES (?, ?, ?, 'SAFETY', 'NOTE', 'A spill')`,
+      `incident-${suffix}`, performanceId, reporter.id)
+
+    await runCloseTask()
+
+    expect(read('SELECT id FROM night_reports WHERE performance_id = ?', performanceId)).toHaveLength(1)
+    expect(read('SELECT id FROM checklist_closes WHERE performance_id = ?', performanceId)).toEqual([])
+    expect(read(`SELECT id FROM audit_log WHERE action = 'incident.reviewed' AND target = ?`, `incident:incident-${suffix}`)).toEqual([])
+    const [frozen] = read<{ report: string }>('SELECT report FROM night_reports WHERE performance_id = ?', performanceId)
+    expect((JSON.parse(frozen!.report) as { incidents: { id: string }[] }).incidents.map(one => one.id)).toContain(`incident-${suffix}`)
+  })
+
   test('re-running the task never produces a second report (criterion 4)', async () => {
     const suffix = `auto-close-idempotent-${crypto.randomUUID().slice(0, 8)}`
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { night: OLD_NIGHT, suffix }))

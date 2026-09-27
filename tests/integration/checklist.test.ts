@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   checklistVenuesClause,
+  closeForQuery,
   closeStatement,
   ensureStampedStatement,
   exemptStatement,
@@ -487,6 +488,40 @@ describe('the incidents reviewed in one set-based write (criterion 3, issue 1315
       frozen(database, 'nr-matinee', matinee.performanceId, officer)
       run(database, reviewIncidentsStatement(matinee.performanceId, officer, 'nr-matinee'))
       expect([reviews(database, 'in-matinee'), reviews(database, 'in-evening')]).toEqual([1, 0])
+    })
+  })
+})
+
+// E-125: a night that froze itself has no person to name, so no close row is written for it; the
+// one reader of "is this night closed" answers from the report instead.
+describe('a night that closed itself reads as closed (E-125 criterion 2)', () => {
+  function report(database: TestDatabase, performanceId: string, signedBy: string | null, signedVia: string): void {
+    database.batch([[`INSERT INTO night_reports (id, performance_id, venue_id, night, closing_note, report, signed_by, signed_via)
+      SELECT ?, p.id, p.venue_id, '2026-09-26', 'Closed', '{}', ?, ? FROM performances p WHERE p.id = ?`,
+    `nr-${performanceId}`, signedBy, signedVia, performanceId]])
+  }
+
+  test('an automatically closed report is the close, naming nobody', async () => {
+    await withDatabase((database) => {
+      const { performanceId } = tonightsPerformance(database)
+      report(database, performanceId, null, 'SYSTEM')
+
+      const [close] = run(database, closeForQuery(performanceId))
+      expect(close).toMatchObject({ performanceId, closedByName: null, automatic: 1 })
+      expect(rows(database, 'SELECT id FROM checklist_closes WHERE performance_id = ?', performanceId)).toEqual([])
+    })
+  })
+
+  test('a person\'s close is the answer wherever there is one, and a night neither closed nor frozen has none', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      const closed = tonightsPerformance(database, { suffix: 'closed' })
+      const open = tonightsPerformance(database, { suffix: 'open' })
+      report(database, closed.performanceId, officer, 'SHIFT')
+      run(database, closeStatement(closed.performanceId, officer, 'cc-closed', `nr-${closed.performanceId}`))
+
+      expect(run(database, closeForQuery(closed.performanceId))[0]).toMatchObject({ closedByName: 'Someone officer', automatic: 0 })
+      expect(run(database, closeForQuery(open.performanceId))).toEqual([])
     })
   })
 })

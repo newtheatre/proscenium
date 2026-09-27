@@ -1441,7 +1441,9 @@ The UNIQUE on `performance_id` makes closing idempotent, the same guarantee `nig
 PK gives its close. The close-night action itself (E-114 criterion 4; performance-keyed since
 E-128); blocked while a required item across either phase is neither ticked nor exempted. Written
 since issue 1315 only by Sign off and close, in the batch that freezes `night_reports`, and only
-beside the report row that batch wrote.
+beside the report row that batch wrote. A night that closed itself (E-125) has no row here:
+`closed_by` names a person, and `closeFor()` reads the `SYSTEM` report as that night's close
+instead.
 
 ### night_reports  APPEND-ONLY
 `id` PK · `performance_id` → performances restrict, UNIQUE · `venue_id` → venues restrict ·
