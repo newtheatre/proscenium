@@ -1,6 +1,6 @@
 import { deskSaleForm } from '#shared/utils/desk'
 import { saleRefusal } from '#shared/utils/programme'
-import { holdExpiresAt, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
+import { holdExpiresAt } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 
 // A walk-up sale: the reservation is created and paid for in one flow, source DOOR at creation,
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const capacity = effectiveCapacity(performance)
-  const releaseMinutes = resolveHoldReleaseMinutes(performance.holdReleaseMinutesBefore, await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE'))
+  const releaseMinutes = await holdReleaseMinutesFor(event, performance)
   const booker = await guestAccount(input.guest.email, input.guest.name)
 
   const outcome = await sellWalkUp({

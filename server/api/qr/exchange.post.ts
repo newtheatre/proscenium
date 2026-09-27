@@ -70,6 +70,12 @@ export default defineEventHandler(async (event) => {
   // cookie has to move to the new booking, or the booker would be looking at the old one.
   rememberQrToken(event, qrToken)
 
+  // Frees the seats this booking held (D-113 criterion 2). Offered ahead of the confirmation, so a
+  // send that fails never leaves the freed seats unoffered until the next sweep (issue 1328).
+  const waitingListCap = await configValue(event, 'WAITING_LIST_OFFER_BATCH_CAP')
+  const waitingListRun = await offerWaitingList(event, reservation.performanceId, new Date(), waitingListCap)
+  await notifyWaitingListOffers(event, waitingListRun.offered)
+
   // The batch committed, so the exchange is real: send after, never before (0003). The new QR
   // is the e-ticket re-issue criterion 4 asks for; the old one now reads Exchanged when presented.
   if (reservation.userId) {
@@ -82,11 +88,6 @@ export default defineEventHandler(async (event) => {
       qrToken,
     })
   }
-
-  // Frees the seats this booking held, the same as a plain self-cancel does (D-113 criterion 2).
-  const waitingListCap = await configValue(event, 'WAITING_LIST_OFFER_BATCH_CAP')
-  const waitingListRun = await offerWaitingList(event, reservation.performanceId, new Date(), waitingListCap)
-  await notifyWaitingListOffers(event, waitingListRun.offered)
 
   return {
     reference: result.reservation.reference,

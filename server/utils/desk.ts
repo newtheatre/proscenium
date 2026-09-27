@@ -4,7 +4,8 @@ import { doorWordingFor } from './access-profiles'
 import { admittedSeatsSubquery, heldAccessSeatsSubquery, heldSeatsOfKindSubquery, heldSeatsSubquery, passBookingColumn, ticketOnPass, unpaidSeatsSubquery, walkUpSeatsSubquery } from './capacity'
 import { configValue } from './configuration'
 import { pendingTicketCompRequestForReservation } from './ticket-comps'
-import { holdExpiresAt, looksLikeReference, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
+import { holdReleaseMinutesFor } from './reservations'
+import { holdExpiresAt, looksLikeReference } from '#shared/utils/reservations'
 import type { DeskHouse, DeskStatusFilter } from '#shared/utils/desk'
 import type { TicketTypeAccessKind } from '#shared/utils/ticket-types'
 import type { TicketCompRequest } from '#shared/utils/ticket-comps'
@@ -206,7 +207,7 @@ export async function deskSummary(event: H3Event | undefined, performanceId: str
   )
   if (!row) return undefined
   const { startsAt, holdReleaseMinutesBefore, ...counts } = row
-  const releaseMinutes = resolveHoldReleaseMinutes(holdReleaseMinutesBefore, await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE'))
+  const releaseMinutes = await holdReleaseMinutesFor(event, { holdReleaseMinutesBefore })
   const onShift = await db.all<{ name: string }>(onShiftQuery(performanceId))
   return {
     ...counts,

@@ -16,10 +16,7 @@ export default defineEventHandler(async (event) => {
   const performance = await performanceById(reservation.performanceId)
   if (!performance) throw noSuch('performance')
 
-  const releaseMinutes = resolveHoldReleaseMinutes(
-    performance.holdReleaseMinutesBefore,
-    await configValue(event, 'HOLD_RELEASE_MINUTES_BEFORE'),
-  )
+  const releaseMinutes = await holdReleaseMinutesFor(event, performance)
   const capacity = effectiveCapacity(performance)
   const ticketCount = reservation.tickets.length
 
