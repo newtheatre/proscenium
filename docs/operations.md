@@ -760,7 +760,9 @@ anonymisations. A cap refuses the surplus rather than queuing it, so the next ru
 accounts still due and takes the next slice; the digest names the cap it hit.
 
 To run it by hand, `POST /_nitro/tasks/retention:sweep`. The result reports `armed`, the counts for
-each window, `warningsCappedAt`, `anonymisationsCappedAt`, `wouldAnonymise` and `digests`.
+each window, `anonymised`, `refused`, `warningsCappedAt`, `anonymisationsCappedAt`, `wouldAnonymise`
+and `digests`. `refused` counts armed erasures that were refused. Each one is left for the next
+run to find again, and the run carries on past it rather than stopping (A-120 criterion 6).
 
 ### backup (05:00 Monday) and the restore drill (K-108, J-107)
 
