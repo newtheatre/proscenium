@@ -3,6 +3,7 @@ import { isMonthDay, londonParts } from '#shared/utils/london'
 import { saysRole } from '#shared/utils/roles'
 import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, mayRecordByAddress, missingPrerequisites, saysGaps } from '#shared/utils/training'
 import type { AcademicYear, ExpiryMode, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
+import { demandScope } from './training-demand'
 import type { Authority } from '#server/utils/authorise'
 import type { SQL, SQLWrapper } from 'drizzle-orm'
 import type { H3Event } from 'h3'
@@ -580,7 +581,7 @@ export async function requireCatalogueReader(event: H3Event): Promise<CatalogueA
 }
 
 // Whose catalogue a reader may see: everybody's for an officer, their own for a lead.
-export function scopeToLeadOf(resolved: CatalogueAuthority): string | undefined {
+export function scopeToLeadOf(resolved: Authority): string | undefined {
   return resolved.permissions.has('training.read') ? undefined : resolved.account.id
 }
 
@@ -849,14 +850,9 @@ export interface DemandRow {
   requesters: { id: string, userId: string, name: string, note: string | null }[]
 }
 
-// The board a lead answers, busiest first. Scoped by subquery when the reader is a lead rather
-// than an officer, so no parameter count grows with how many departments they steward (0003).
+// The board a lead answers, busiest first, scoped as the overview's count is.
 export async function demandBoard(leadOf: string | undefined, limit = 20): Promise<DemandRow[]> {
-  const scope = leadOf === undefined
-    ? sql`1 = 1`
-    : sql`m.department in (
-        select department from department_leads
-        where user_id = ${leadOf} and (expires_at is null or expires_at > unixepoch()))`
+  const scope = demandScope(leadOf)
 
   const modules = await db.all<{ moduleId: string, moduleName: string, department: string, waiting: number }>(sql`
     select r.module_id as moduleId, m.name as moduleName, m.department as department,

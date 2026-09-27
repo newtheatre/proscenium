@@ -51,6 +51,8 @@ const capRemaining = computed(() => {
 })
 
 const requests = ref<PendingRequest[]>([])
+// The sidebar counts pending requests, so fulfilling one moves it too (A-130 criterion 11, issue 1358).
+const nav = useNavCounts()
 async function loadRequests(): Promise<void> {
   if (!passTypeId.value) {
     requests.value = []
@@ -104,7 +106,7 @@ async function issue(): Promise<void> {
     toast.add({ title: `${passName} issued`, icon: 'i-lucide-check', color: 'success' })
     buyerId.value = undefined
     requestId.value = undefined
-    await Promise.all([refreshPassTypes(), loadRequests()])
+    await Promise.all([refreshPassTypes(), loadRequests(), nav.refresh()])
   }
   catch (error) {
     issueFailure.value = refusalText(error)

@@ -820,6 +820,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   // Module K: platform
 
   { route: 'server/api/admin/backups/index.get.ts', exempt: 'reads drill status for the dashboard' },
+  { route: 'server/api/admin/waiting.get.ts', exempt: 'counts the queues the caller decides, for the sidebar and the overview' },
+  { route: 'server/api/admin/overview.get.ts', exempt: 'reads unfinished set-up and tonight\'s performances for the overview' },
   { route: 'server/api/admin/backups/drills/index.get.ts', exempt: 'reads recorded drills' },
   { route: 'server/api/admin/backups/drills/index.post.ts', actions: ['backup.drill-recorded'] },
 

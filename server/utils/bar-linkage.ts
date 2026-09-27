@@ -192,7 +192,9 @@ export async function tillServings(): Promise<TillServings> {
 }
 
 // Until a stocktake is applied every item reads nought, so on-hand is not yet a balance (0080).
-export const STOCK_COUNTED_QUERY = sql`SELECT EXISTS (SELECT 1 FROM stocktakes WHERE status = 'APPLIED') AS counted`
+export const STOCK_COUNTED = sql`EXISTS (SELECT 1 FROM stocktakes WHERE status = 'APPLIED')`
+
+export const STOCK_COUNTED_QUERY = sql`SELECT ${STOCK_COUNTED} AS counted`
 
 export async function stockCounted(): Promise<boolean> {
   const [row] = await db.all<{ counted: number }>(STOCK_COUNTED_QUERY)
