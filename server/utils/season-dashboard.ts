@@ -9,7 +9,9 @@ import { nightsMissingAReading } from './night-reconciliation'
 import { nightsWithin } from '#shared/utils/night-reconciliation'
 import { londonDayOf } from '#shared/utils/ledger'
 import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
-import { aliasColumns, whereFrom } from './list-filters'
+import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import type { EntrySource, Tender } from '#shared/utils/ledger'
+import type { LedgerEntryRow } from '#shared/utils/ledger-entries-list'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { FinanceSeason, PeriodInput, RangedPeriod, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { ListClause } from './list-filters'
@@ -143,23 +145,113 @@ export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary>
   }
 }
 
-export interface SeasonEntry { id: string, happenedAt: number, source: string, tender: string, totalPence: number }
+// What an entry's lines were, each a subquery on `le` rather than a join: an entry keeps one row
+// however many lines it holds (issue 1361, 0006).
+const linesOf = (from: SQL): SQL => sql`(SELECT ${from} FROM ledger_lines ll WHERE ll.entry_id = le.id)`
+const showsOf = sql`(SELECT group_concat(s.title) FROM ledger_lines ll
+  JOIN performances p ON p.id = ll.performance_id JOIN shows s ON s.id = p.show_id WHERE ll.entry_id = le.id)`
+const referencesOf = sql`(SELECT group_concat(r.reference) FROM ledger_lines ll
+  JOIN reservations r ON r.id = ll.reservation_id WHERE ll.entry_id = le.id)`
 
-// The drill-down list's own declaration (K-129, I-105 criterion 3): when, source and tender are
-// filters a treasurer picks, never a query string edited by hand.
+// Any of the kinds, as one subquery: the list is capped at the kinds there are (0006).
+function hasKind(kinds: readonly string[]): SQL {
+  return sql`EXISTS (SELECT 1 FROM ledger_lines ll WHERE ll.entry_id = le.id
+    AND ll.kind IN (${sql.join(kinds.map(kind => sql`${kind}`), sql`, `)}))`
+}
+
+// The drill-down list's own declaration (K-129, I-105 criterion 3): when, source, tender, what was
+// sold and whether it was discounted are filters a treasurer picks, never a query string by hand.
 export function ledgerEntriesClause(query: ListQuery): ListClause {
-  return whereFrom(ledgerEntriesList, query, { column: aliasColumns('le') })
+  return whereFrom(ledgerEntriesList, query, {
+    column: aliasColumns('le'),
+    search: [referencesOf, showsOf],
+    fields: {
+      kind: condition => (condition.operator === 'not' ? sql`NOT ${hasKind(condition.values)}` : hasKind(condition.values)),
+      discounted: yesNo(sql`EXISTS (SELECT 1 FROM ledger_lines ll WHERE ll.entry_id = le.id AND ll.discount_pence > 0)`),
+    },
+  })
 }
 
 const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
 
 export function ledgerEntriesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
-    SELECT le.id AS id, le.happened_at AS happenedAt, le.source AS source, le.tender AS tender, le.total_pence AS totalPence
+    SELECT le.id AS id, le.happened_at AS happenedAt, le.source AS source, le.tender AS tender, le.total_pence AS totalPence,
+      ${linesOf(sql`group_concat(DISTINCT ll.kind)`)} AS kinds,
+      ${linesOf(sql`coalesce(sum(ll.qty), 0)`)} AS items,
+      (SELECT s.title FROM ledger_lines ll JOIN performances p ON p.id = ll.performance_id JOIN shows s ON s.id = p.show_id
+        WHERE ll.entry_id = le.id ORDER BY ll.id LIMIT 1) AS showTitle,
+      (SELECT r.reference FROM ledger_lines ll JOIN reservations r ON r.id = ll.reservation_id
+        WHERE ll.entry_id = le.id ORDER BY ll.id LIMIT 1) AS reference
     FROM ledger_entries le${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
+}
+
+export interface LedgerEntryDetail {
+  id: string
+  happenedAt: number
+  source: EntrySource
+  tender: Tender
+  totalPence: number
+  takenBy: string | null
+  compReason: string | null
+  compApprovedBy: string | null
+  discountPercent: number | null
+  discountPence: number | null
+  tabDebtor: string | null
+  voidReason: string | null
+  voidOfEntryId: string | null
+  reversesEntryId: string | null
+}
+
+// One entry with the people on it, named: finance.read alone reaches this (I-105 criterion 5).
+export function ledgerEntryDetailQuery(id: string): SQL {
+  return sql`
+    SELECT le.id AS id, le.happened_at AS happenedAt, le.source AS source, le.tender AS tender, le.total_pence AS totalPence,
+      taker.name AS takenBy, le.comp_reason AS compReason, approver.name AS compApprovedBy,
+      le.discount_percent AS discountPercent, le.discount_pence AS discountPence, debtor.name AS tabDebtor,
+      le.void_reason AS voidReason, le.void_of_entry_id AS voidOfEntryId, le.reverses_entry_id AS reversesEntryId
+    FROM ledger_entries le
+    LEFT JOIN users taker ON taker.id = le.actor_id
+    LEFT JOIN users approver ON approver.id = le.comp_approved_by
+    LEFT JOIN users debtor ON debtor.id = le.tab_debtor_id
+    WHERE le.id = ${id}
+  `
+}
+
+export interface LedgerEntryLine {
+  id: string
+  kind: string
+  qty: number
+  unitPricePence: number | null
+  amountPence: number
+  discountPence: number | null
+  showTitle: string | null
+  startsAt: number | null
+  reference: string | null
+}
+
+export function ledgerEntryLinesQuery(id: string): SQL {
+  return sql`
+    SELECT ll.id AS id, ll.kind AS kind, ll.qty AS qty, ll.unit_price_pence AS unitPricePence, ll.amount_pence AS amountPence,
+      ll.discount_pence AS discountPence, s.title AS showTitle, p.starts_at AS startsAt, r.reference AS reference
+    FROM ledger_lines ll
+    LEFT JOIN performances p ON p.id = ll.performance_id
+    LEFT JOIN shows s ON s.id = p.show_id
+    LEFT JOIN reservations r ON r.id = ll.reservation_id
+    WHERE ll.entry_id = ${id}
+    ORDER BY ll.id
+  `
+}
+
+export async function ledgerEntryDetail(id: string): Promise<(LedgerEntryDetail & { lines: LedgerEntryLine[] }) | null> {
+  const [[entry], lines] = await Promise.all([
+    db.all<LedgerEntryDetail>(ledgerEntryDetailQuery(id)),
+    db.all<LedgerEntryLine>(ledgerEntryLinesQuery(id)),
+  ])
+  return entry ? { ...entry, lines } : null
 }
 
 export async function countLedgerEntries(clause: ListClause): Promise<number> {
@@ -167,9 +259,9 @@ export async function countLedgerEntries(clause: ListClause): Promise<number> {
   return Number(row?.total ?? 0)
 }
 
-export async function ledgerEntries(clause: ListClause, limit: number, offset: number): Promise<{ items: SeasonEntry[], total: number }> {
+export async function ledgerEntries(clause: ListClause, limit: number, offset: number): Promise<{ items: LedgerEntryRow[], total: number }> {
   const [items, total] = await Promise.all([
-    db.all<SeasonEntry>(ledgerEntriesQuery(clause, limit, offset)),
+    db.all<LedgerEntryRow>(ledgerEntriesQuery(clause, limit, offset)),
     countLedgerEntries(clause),
   ])
   return { items, total }

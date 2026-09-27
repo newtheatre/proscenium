@@ -106,7 +106,10 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
       <h2 class="font-semibold">
         SU export
       </h2>
-      <AdminToolbar :filterable="false">
+      <AdminToolbar
+        :filterable="false"
+        :searchable="false"
+      >
         <template #actions>
           <PeriodFields :form="periodForm" />
           <UButton

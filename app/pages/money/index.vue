@@ -2,6 +2,9 @@
 import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
+import { entriesHref } from '#shared/utils/ledger-entries-list'
+import type { EntriesFilters } from '#shared/utils/ledger-entries-list'
+import type { EntrySource } from '#shared/utils/ledger'
 import type { FinanceSeason, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { Period } from '#shared/utils/period-locks'
 import type { TableColumn } from '@nuxt/ui'
@@ -31,14 +34,9 @@ const summaryFailure = computed(() => (error.value ? refusalText(error.value, 'T
 const mayDrillDown = computed(() => can(useViewer().value, viewFinanceReports))
 
 // The drill-down page owns its own declaration (K-129): the range travels as its happenedAt
-// filter, the day the dashboard already resolved, never the period's own kind and day pair.
-function entriesUrl(source?: string): string {
-  if (!data.value) return '/money/entries'
-  const params = new URLSearchParams({
-    happenedAt: data.value.fromDay === data.value.toDay ? data.value.fromDay : `between:${data.value.fromDay},${data.value.toDay}`,
-  })
-  if (source) params.set('source', source)
-  return `/money/entries?${params.toString()}`
+// filter, and each figure the filters its own query uses, so the list adds up to it (issue 1361).
+function entriesUrl(filters: EntriesFilters = {}): string {
+  return data.value ? entriesHref(data.value, filters) : '/money/entries'
 }
 
 const UButton = resolveComponent('UButton')
@@ -54,7 +52,7 @@ const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
         cell: ({ row }: { row: { original: RevenueBySource } }) => h(UButton, {
           size: 'sm',
           variant: 'subtle',
-          to: entriesUrl(row.original.source),
+          to: entriesUrl({ source: row.original.source as EntrySource, tender: 'CARD' }),
         }, () => 'Entries'),
       }]
     : []),
@@ -64,10 +62,11 @@ const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
 // as a description list (design language rule 6).
 const figures = computed(() => (data.value
   ? [
-      { label: 'Refunds', test: 'refunds-pence', pence: data.value.refundsPence },
-      { label: 'Forgone comps', test: 'comps-pence', pence: data.value.compsPence },
-      { label: 'Forgone discounts', test: 'discounts-pence', pence: data.value.discountsPence },
-      { label: 'Open variance', test: 'open-variance-pence', pence: data.value.openVariancePence },
+      { label: 'Refunds', test: 'refunds-pence', pence: data.value.refundsPence, to: entriesUrl({ kind: 'REFUND', tender: 'CARD' }) },
+      { label: 'Forgone comps', test: 'comps-pence', pence: data.value.compsPence, to: entriesUrl({ tender: 'COMP' }) },
+      { label: 'Forgone discounts', test: 'discounts-pence', pence: data.value.discountsPence, to: entriesUrl({ discounted: true }) },
+      // A variance is a reading against the ledger, not an entry, so it opens the readings.
+      { label: 'Open variance', test: 'open-variance-pence', pence: data.value.openVariancePence, to: '/money/reconciliation' },
     ]
   : []))
 </script>
@@ -135,7 +134,16 @@ const figures = computed(() => (data.value
               :data-test="figure.test"
               class="text-right font-mono whitespace-nowrap"
             >
-              {{ saysMoney(figure.pence) }}
+              <ULink
+                v-if="mayDrillDown"
+                :to="figure.to"
+                :aria-label="`${figure.label}: ${saysMoney(figure.pence)}, open what it is made of`"
+              >
+                {{ saysMoney(figure.pence) }}
+              </ULink>
+              <template v-else>
+                {{ saysMoney(figure.pence) }}
+              </template>
             </dd>
           </div>
         </dl>

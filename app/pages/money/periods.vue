@@ -189,7 +189,10 @@ async function confirmReopen(): Promise<void> {
       :description="locksFailure"
     />
 
-    <AdminToolbar :filterable="false">
+    <AdminToolbar
+      :filterable="false"
+      :searchable="false"
+    >
       <template #actions>
         <UButton
           v-if="mayClose"
