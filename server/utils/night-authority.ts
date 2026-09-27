@@ -144,6 +144,8 @@ export interface NightAuthorityOptions { recordsRead?: boolean }
 interface Caller { resolved: Authority, tonight: string }
 interface Refusal { kind: NightRefusalKind, error: unknown }
 
+const isAuthority = (answer: NightAuthority | ShiftBranch): answer is NightAuthority => 'via' in answer
+
 // Identity first, so a signed-out caller is told that and cannot read tonight's date off which
 // refusal it gets back; then the night asked about, which is tonight or nothing (E-111 criterion 2).
 async function callerTonight(event: H3Event, scope: NightScope): Promise<Caller> {
@@ -159,9 +161,39 @@ async function callerTonight(event: H3Event, scope: NightScope): Promise<Caller>
   return { resolved, tonight }
 }
 
+// Tonight's confirmed duty manager opens the door for their own performance and window, after
+// every shift and before any bypass, recorded once when they act (0095, E-111 criterion 1).
+async function throughCover(event: H3Event, { resolved, tonight }: Caller, scope: NightScope, options: NightAuthorityOptions): Promise<NightAuthority | ShiftBranch> {
+  const held = await shiftHeldTonight(event, resolved.account.id, 'DUTY_MANAGER', tonight, scope)
+  if (!held.coverage) return held
+  if (bypassIsRecorded(event.method, options.recordsRead)) {
+    // Written once a night and venue, so it names every house this duty manager runs there.
+    const { from, to } = showNightBounds(tonight)
+    const own = await confirmedShiftsTonight(
+      resolved.account.id, 'DUTY_MANAGER', Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000),
+      { venueId: held.coverage.venueId },
+    )
+    await recordDoorCover(doorCoverEntry(resolved.account.id, tonight, held.coverage.venueId, own.map(row => row.performanceId)))
+  }
+  return {
+    account: resolved.account,
+    night: tonight,
+    role: 'DOOR',
+    venueId: held.coverage.venueId,
+    performanceIds: held.coverage.performanceIds,
+    via: 'COVER',
+    shiftId: held.shiftId,
+  }
+}
+
 // The shift branch alone (0044): the authority a confirmed shift in its window gives, or what the
 // lookup found short of it, so a refusal is only worked out when one is thrown (0078).
-async function throughShift(event: H3Event, { resolved, tonight }: Caller, role: NightRole, scope: NightScope): Promise<NightAuthority | ShiftBranch> {
+async function throughShift(
+  event: H3Event,
+  { resolved, tonight }: Caller,
+  role: NightRole,
+  scope: NightScope,
+): Promise<NightAuthority | ShiftBranch> {
   const held = await shiftHeldTonight(event, resolved.account.id, role, tonight, scope)
   if (!held.coverage) return held
   return {
@@ -183,10 +215,10 @@ async function shiftRefusal({ resolved, tonight }: Caller, role: NightRole, scop
   if (await claimedShiftTonight(resolved.account.id, role, tonight, scope)) {
     return { kind: 'CLAIMED', error: createError(claimedShiftRefusal(role)) }
   }
-  return { kind: 'NO_SHIFT', error: createError(nightAuthorityRefusal(role)) }
+  // The door points to tonight's duty manager, who can open it for their own performance (0095).
+  const dutyManager = role === 'DOOR' ? await dutyManagerTonight(resolved.account.id, tonight, scope) : null
+  return { kind: 'NO_SHIFT', error: createError(nightAuthorityRefusal(role, dutyManager)) }
 }
-
-const isAuthority = (answer: NightAuthority | ShiftBranch): answer is NightAuthority => 'via' in answer
 
 // The officer branch (0044), for a caller holding the role's permission: a standing grant being
 // used, so it carries the second factor that grant carries elsewhere (A-112).
@@ -221,15 +253,21 @@ export async function requireNightAuthority(
   options: NightAuthorityOptions = {},
 ): Promise<NightAuthority> {
   const caller = await callerTonight(event, scope)
-  const answer = await throughShift(event, caller, role, scope)
+  let answer = await throughShift(event, caller, role, scope)
   if (isAuthority(answer)) return answer
+  if (role === 'DOOR') {
+    const cover = await throughCover(event, caller, scope, options)
+    if (isAuthority(cover)) return cover
+    // The door's own hours win; with none, a duty manager outside theirs is told those.
+    if (!answer.outsideWindow) answer = cover
+  }
   // An officer holding tonight's shift at the wrong hour keeps their bypass all the same (0078).
   if (!caller.resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) throw (await shiftRefusal(caller, role, scope, answer)).error
   return throughBypass(event, caller, role, scope, options)
 }
 
-// For a screen more than one role reaches (E-118 criterion 4). Every role's shift is tried before
-// any role's bypass, so an officer on shift resolves as the shift and records no bypass (0098).
+// For a screen more than one role reaches (E-118 criterion 4). Every role's shift is tried, then
+// door cover, then any bypass, so a shift that answers records neither (0095, 0098).
 export async function requireAnyNightAuthority(
   event: H3Event,
   roles: NightRole[],
@@ -244,6 +282,17 @@ export async function requireAnyNightAuthority(
       const answer = await throughShift(event, caller, role, scope)
       if (isAuthority(answer)) return answer
       short.push({ role, held: answer })
+    }
+    catch (error) {
+      refusals.push({ kind: 'ASKED', error })
+    }
+  }
+  if (roles.includes('DOOR')) {
+    try {
+      const cover = await throughCover(event, caller, scope, options)
+      if (isAuthority(cover)) return cover
+      const door = short.find(one => one.role === 'DOOR')
+      if (door && !door.held.outsideWindow) door.held = cover
     }
     catch (error) {
       refusals.push({ kind: 'ASKED', error })

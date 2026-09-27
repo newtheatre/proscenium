@@ -8,6 +8,8 @@
   the bypass no longer reaches it
 - Amended: 26 September 2026 by 0098, under which a bypass is recorded when the officer acts, not
   when a screen looks, and the night report lists every role an officer stood in for
+- Amended: 26 September 2026 by 0095, under which tonight's confirmed duty manager also opens the
+  door for their own performance and window, as cover recorded once, never the till
 
 ## Context
 

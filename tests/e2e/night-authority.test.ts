@@ -60,6 +60,17 @@ function programme(suffix: string, status: 'ON_SALE' | 'CANCELLED' = 'ON_SALE'):
   }
 }
 
+// A second performance at a venue already running tonight: a matinee day (E-127).
+function secondHouse(venueId: string, suffix: string): string {
+  const database = new Database(app.databaseFile)
+  try {
+    return tonightsPerformance(sqliteTarget(database), { suffix, venueId }).performanceId
+  }
+  finally {
+    database.close()
+  }
+}
+
 const ask = (query: string, as?: string): Promise<Response> =>
   request(app, 'GET', `/api/tonight/authority?${query}`, undefined, as)
 
@@ -641,5 +652,99 @@ describe.skipIf(skip !== null)('the session says who can work tonight (0094, iss
 
   test('an ordinary member with nothing tonight is neither', async () => {
     expect(await facts(member.cookie)).toEqual({ onShiftTonight: false, canWorkTonight: false })
+  })
+})
+
+function covers(actorId: string): { target: string, detail: string }[] {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database
+      .query('SELECT target, detail FROM audit_log WHERE action = ? AND actor_id = ?')
+      .all('night.door-cover', actorId) as { target: string, detail: string }[]
+  }
+  finally {
+    database.close()
+  }
+}
+
+// Tonight's confirmed duty manager covers the door for their own performance and window, never
+// the till, and is recorded once as cover rather than as an officer bypass (0095, issue 1306).
+describe.skipIf(skip !== null)('the duty manager covers the door (0095, E-111 criterion 1 as amended)', () => {
+  let hall: { venueId: string, performanceId: string }
+  let dutyManager: TestMember
+  let dutyManagerShift = ''
+
+  beforeAll(async () => {
+    if (skip) return
+    hall = programme('cover-hall')
+    dutyManager = await registerMember(app, 'cover-dm', generatePassword())
+    dutyManagerShift = shiftFor(hall.performanceId, 'DUTY_MANAGER', dutyManager.id)
+  }, BOOT_TIMEOUT_MS)
+
+  test('the door opens on the duty manager\'s own performance, as cover', async () => {
+    const response = await ask(`role=DOOR&performanceId=${hall.performanceId}`, dutyManager.cookie)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ role: 'DOOR', via: 'COVER', venueId: hall.venueId, performanceIds: [hall.performanceId] })
+  })
+
+  test('not on another performance, and never the till', async () => {
+    expect((await ask(`role=DOOR&performanceId=${house.performanceId}`, dutyManager.cookie)).status).toBe(403)
+    expect((await ask(`role=BAR&performanceId=${hall.performanceId}`, dutyManager.cookie)).status).toBe(403)
+  })
+
+  test('acting at the door records cover once, and no officer bypass', async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect((await resolveAtDoor(hall.performanceId, dutyManager.cookie)).status).toBe(200)
+    }
+    const written = covers(dutyManager.id)
+    expect(written).toHaveLength(1)
+    expect(written[0]!.target).toBe(`door-cover:${night}:${hall.venueId}`)
+    expect(bypasses(dutyManager.id)).toEqual([])
+  })
+
+  // Anyone signed in can be refused at the door, so only tonight's team there is told the name.
+  test('somebody refused at that door is told the duty manager can open it, by name only if on the team', async () => {
+    const firstName = dutyManager.name.split(' ')[0]!
+    const stranger = await message(await ask(`role=DOOR&performanceId=${hall.performanceId}`, member.cookie))
+    expect(stranger).toContain('. Tonight\'s duty manager can open the door')
+    expect(stranger).not.toContain(firstName)
+
+    const barkeep = await registerMember(app, 'cover-barkeep', generatePassword())
+    shiftFor(hall.performanceId, 'BAR', barkeep.id)
+    const colleague = await ask(`role=DOOR&performanceId=${hall.performanceId}`, barkeep.cookie)
+    expect(colleague.status).toBe(403)
+    expect(await message(colleague)).toContain(`${firstName}, tonight's duty manager, can open the door`)
+  })
+
+  // A screen several roles reach tries every role's own shift before cover (issue 1306 review).
+  test('a duty manager logging an age check is the duty manager, and covers nothing', async () => {
+    const own = await registerMember(app, 'cover-ages-dm', generatePassword())
+    shiftFor(programme('cover-ages').performanceId, 'DUTY_MANAGER', own.id)
+    const logged = await request(app, 'POST', '/api/tonight/age-checks', {
+      performanceId: null, outcome: 'ACCEPTED', idType: 'PASSPORT', reason: null, description: 'Tall, grey coat', product: 'Cider', notes: null,
+    }, own.cookie)
+    expect(logged.status).toBe(200)
+    expect(covers(own.id)).toEqual([])
+  })
+
+  // One row a night and venue, naming every house the duty manager runs there (issue 1306 review).
+  test('on a two-house day, cover at the first door names both houses', async () => {
+    const own = await registerMember(app, 'cover-two-dm', generatePassword())
+    const matinee = programme('cover-matinee')
+    const evening = secondHouse(matinee.venueId, 'cover-evening')
+    shiftFor(matinee.performanceId, 'DUTY_MANAGER', own.id)
+    shiftFor(evening, 'DUTY_MANAGER', own.id)
+
+    expect((await resolveAtDoor(matinee.performanceId, own.cookie)).status).toBe(200)
+    const [written] = covers(own.id)
+    expect((JSON.parse(written!.detail) as { performanceIds: string[] }).performanceIds.sort())
+      .toEqual([matinee.performanceId, evening].sort())
+  })
+
+  test('outside the duty manager\'s own hours the door stays shut', async () => {
+    const now = Math.floor(Date.now() / 1000)
+    setShiftWindow(dutyManagerShift, now + 6 * 3600, now + 9 * 3600)
+    expect((await ask(`role=DOOR&performanceId=${hall.performanceId}`, dutyManager.cookie)).status).toBe(403)
+    setShiftWindow(dutyManagerShift, now - 3600, now + 6 * 3600)
   })
 })

@@ -3,7 +3,7 @@ title: Tonight
 description: The phone screens a show night runs on, who they open for, and the hub they all start from.
 module: Show night
 audience: member
-updatedOn: 2026-09-26
+updatedOn: 2026-09-27
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -33,7 +33,9 @@ which is how the committee sees a rota that is not being kept; looking at a scre
 - **"This needs a confirmed door shift on one of tonight's performances, or the front of house
   manager's role"** (or the same for a bar shift and the Bar Manager, or for a duty manager
   shift): nothing tonight gives you this screen. Find the person named, or ask the officer to assign you the shift on
-  the rota. The IT Manager is never offered as the answer to a rota that is wrong.
+  the rota. The IT Manager is never offered as the answer to a rota that is wrong. At the door the
+  refusal also says tonight's duty manager can open it for their own performance, by first name
+  if you hold a confirmed shift on that performance yourself.
 - **"Your door shift tonight is claimed, not confirmed yet: the Front of House Manager confirms
   it on the rota"** (or the same for a bar or duty manager shift): you claimed the shift, and it
   is waiting for an officer. A claim opens nothing until it is confirmed; ask the Front of House
@@ -53,13 +55,15 @@ which is how the committee sees a rota that is not being kept; looking at a scre
 
 | Screen | A shift of | Or the role |
 | --- | --- | --- |
-| The door | Door | Front of house manager |
+| The door | Door, or the duty manager's own shift on that performance | Front of house manager |
 | Checklist, Night report, Backstage, and the glance's comp requests, rota and backstage code | Duty manager | Front of house manager |
 | The till | Bar | Bar manager |
 | Tonight at a glance and the hub's house numbers (access wording for the door and duty manager only), Contacts and incidents, Challenge 25, Emergency | Any of the three | Either |
 
 A door shift does not open the till, and the Front of house manager's role does not either; the
-roles are not interchangeable. The show night runs from 04:00 to 04:00, so a performance that
+roles are not interchangeable. The one crossing is the duty manager covering the door: their
+confirmed shift opens the door and pass admission for their own performance, inside their own
+hours, and nothing more. The show night runs from 04:00 to 04:00, so a performance that
 finishes at 01:00 is still tonight, and a screen left open past 04:00 is refused rather than
 quietly moved on to the next night.
 

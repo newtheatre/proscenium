@@ -880,7 +880,7 @@ enforcement (E-111 criterion 5, restated in 0040): the three abilities in
 | --- | --- |
 | `NightRole` | `DUTY_MANAGER`, `DOOR` or `BAR`. A door shift does not open the till, and neither does the front of house officer's role. |
 | `NightScope` | `{ night?, venueId?, performanceId? }`. All optional: the common case is tonight, at the one venue running. |
-| The resolution | `{ account, night, role, venueId, performanceIds, via, shiftId?, openingId? }`, where `via` is `SHIFT` or `OFFICER`. |
+| The resolution | `{ account, night, role, venueId, performanceIds, via, shiftId?, openingId? }`, where `via` is `SHIFT`, `OFFICER` or `COVER` (tonight's duty manager covering the door, 0095). |
 | A refusal | 403 naming both ways in, the shift and the officer role, or the hours the shift is worked. An administrator is never offered as the way out. |
 
 `night` comes from `currentShowNight()` and nothing else, so authority expires at 04:00 with
@@ -942,6 +942,20 @@ one night with nothing to narrow the request is refused the same 400 an officer 
 houses gets, because resolving both at once would be inventing authority nobody asked for. A
 released or reassigned shift stops resolving on its very next request, because the query reads
 `shifts.status` live rather than a snapshot taken at sign-in (E-111 criterion 3).
+
+DOOR also resolves on cover (0095): after every role's own shift and before any bypass,
+`throughCover` asks the same shift lookup for a confirmed `DUTY_MANAGER` shift in its window,
+scoped as the request is, so it opens the door and pass admission for the duty manager's own
+performance and never another, and never the till. In `requireAnyNightAuthority` it is a step of
+its own between the shift loop and the bypass loop, so a duty manager logging an age check
+resolves as `DUTY_MANAGER` and records no cover. It resolves with `via: 'COVER'`. The first act
+writes `night.door-cover` once per duty manager, night and venue (`doorCoverStatement`, whose "not
+already written" predicate rides the insert), its detail naming every performance the duty
+manager holds a confirmed shift on at that venue that night, so a two-house day's second report
+reads it too; a read records nothing, as a bypass does under 0098. A door refusal with nothing
+else to say points to tonight's confirmed duty manager for the request's performance or venue
+(`dutyManagerTonight`, which leaves out a disabled or erased account): by first name to somebody
+holding a confirmed shift there, and as "tonight's duty manager" to anybody else.
 
 `GET /api/tonight/authority?role=&night=&venueId=&performanceId=` is that resolution as a route; with
 no `role` it asks `requireAnyNightAuthority` over all three and answers with the `role` that
@@ -1698,7 +1712,7 @@ real SQL:
 | Incidents | `incidents`, `incident_severity_config`, `incident_followup_closures` | The full chain, each flagged with its follow-up requirement and closure state whichever way it sits. Closes the known-issues gap E-116 criterion 4 left open. |
 | Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |
 | Milestones | `backstage_messages` | Venue and night, not performance: the board is E-120's own scope, so a matinee day's two reports read the same timeline and the reader judges which call belonged to which house from the clock. Closes the known-issues gap E-121 criterion 1 left open. |
-| Staffing | `shifts`, `audit_log` | One row per stamped slot, unfilled ones naming nobody. Beside it, `bypasses`: one line per `night.officer-bypass` row on the three targets `requireNightAuthority` writes for the venue's night (`night:{night}:{venueId}:{role}`), matched against this performance inside the bypass's own recorded `performanceIds`, naming the role, the officer and whether a confirmed shift of that role was on the performance (0098). |
+| Staffing | `shifts`, `audit_log` | One row per stamped slot, unfilled ones naming nobody. Beside it, `bypasses`: one line per `night.officer-bypass` row on the three targets `requireNightAuthority` writes for the venue's night (`night:{night}:{venueId}:{role}`), matched against this performance inside the bypass's own recorded `performanceIds`, naming the role, the officer and whether a confirmed shift of that role was on the performance (0098). And `covers`: the duty manager who covered the door, from the `night.door-cover` row for the venue's night whose `performanceIds` hold this performance (0095). |
 | Bar summary | `ledger_lines` | Revenue and items sold from this performance's `TILL`-sourced lines, alongside takings rather than instead of it. |
 | Access | `access_profiles`, `reservations`, `tickets` | A verified count only, never a need or an identity (criterion 3, D-127 criterion 3's own counts-only rule). |
 

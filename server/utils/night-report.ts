@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import { checklistFor } from './checklist'
 import { heldSeatsSubquery } from './capacity'
 import { cardSalesQuery } from './reconciliation'
-import { NIGHT_ROLES, OFFICER_BYPASS_ACTION, officerBypassTarget } from '#shared/utils/night-authority'
+import { DOOR_COVER_ACTION, NIGHT_ROLES, OFFICER_BYPASS_ACTION, doorCoverTarget, officerBypassTarget } from '#shared/utils/night-authority'
 import { showNightBounds } from '#shared/utils/show-night'
 import type { ChecklistEntry } from './checklist'
 import type { OfficerBypassLine } from '#shared/utils/night-authority'
@@ -239,6 +239,25 @@ export async function reportOfficerBypasses(performanceId: string, venueId: stri
   return rows.map(row => ({ ...row, confirmedShift: Boolean(row.confirmedShift) }))
 }
 
+export interface ReportDoorCover { name: string | null }
+
+// Who covered the door from the duty manager's shift on this performance, read from the one target
+// the guard writes for the venue's night (0095, E-123 criterion 1). Three parameters (0006).
+export function reportDoorCoversQuery(performanceId: string, venueId: string, night: string): SQL {
+  return sql`
+    SELECT u.name AS name
+    FROM audit_log a
+    LEFT JOIN users u ON u.id = a.actor_id
+    WHERE a.action = ${DOOR_COVER_ACTION} AND a.target = ${doorCoverTarget(night, venueId)}
+      AND EXISTS (SELECT 1 FROM json_each(a.detail, '$.performanceIds') pids WHERE pids.value = ${performanceId})
+    ORDER BY u.name
+  `
+}
+
+export async function reportDoorCovers(performanceId: string, venueId: string, night: string): Promise<ReportDoorCover[]> {
+  return db.all<ReportDoorCover>(reportDoorCoversQuery(performanceId, venueId, night))
+}
+
 export interface ReportBarSummary { revenuePence: number, itemsSold: number }
 
 // Items sold, the one figure `barReconciliation` does not carry (criterion 1 names it
@@ -292,6 +311,7 @@ export interface NightReport {
   milestones: ReportMilestone[]
   staffing: ReportStaffingRow[]
   bypasses: OfficerBypassLine[]
+  covers: ReportDoorCover[]
   bar: ReportBarSummary
   access: ReportAccess
   checklist: ChecklistEntry[]
@@ -300,7 +320,7 @@ export interface NightReport {
 // The whole report, one call, every section its own query run together (criterion 4: a draft
 // before close and a frozen read after E-124 exists run this identically).
 export async function compileNightReport(performanceId: string, venueId: string, night: string): Promise<NightReport> {
-  const [attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, bar, access, checklist] = await Promise.all([
+  const [attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, covers, bar, access, checklist] = await Promise.all([
     reportAttendance(performanceId),
     reportTakings(performanceId, night),
     reportIncidents(performanceId),
@@ -308,11 +328,12 @@ export async function compileNightReport(performanceId: string, venueId: string,
     reportMilestones(venueId, night),
     reportStaffing(performanceId),
     reportOfficerBypasses(performanceId, venueId, night),
+    reportDoorCovers(performanceId, venueId, night),
     reportBarSummary(night),
     reportAccess(performanceId),
     // Performance-scoped like every other section here (E-128); an exception's reason now
     // prints here, closing the gap E-114 criterion 5 left open.
     checklistFor(performanceId),
   ])
-  return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, bar, access, checklist }
+  return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, covers, bar, access, checklist }
 }
