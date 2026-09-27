@@ -166,7 +166,7 @@ describe('nothing final is pinned before the curtain (issue 1315)', () => {
   test('the report puts the open items in place, with Tick', async () => {
     const source = await Bun.file(PAGE).text()
     expect(source).toContain('<NightChecklistItems')
-    expect(source).toContain('openAtClose(report.checklist)')
+    expect(source).toContain('openAtClose(report.value?.checklist ?? [])')
   })
 
   test('the glance pins Night report after the curtain, and never Close the night', async () => {
@@ -193,5 +193,11 @@ describe('nothing final is pinned before the curtain (issue 1315)', () => {
     expect(source).toContain('Can\'t do this?')
     expect(source).toContain('variant="link"')
     expect(source).not.toContain('Make an exception')
+  })
+
+  test('the incidents item waits for the sign-off and takes no exception', async () => {
+    const source = await Bun.file(ROWS).text()
+    expect(source).toContain('Clears at Sign off and close')
+    expect(source).toContain('v-if="!entry.done && !answeredAtSignOff(entry)"')
   })
 })

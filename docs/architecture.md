@@ -1538,16 +1538,21 @@ audit entry rather than a column on `incidents`, which cannot be touched post-in
 acknowledgement, not E-116's later severity-routed resolution, which is a separate workflow this
 does not build. `/tonight/incidents` offers it per entry to a caller who resolved duty manager
 authority, reading the same acknowledgement back as a `reviewed` flag on each row of
-`GET /api/tonight/incidents`.
+`GET /api/tonight/incidents`. Since issue 1315 marking each one is optional: Sign off and close
+reviews every incident on the performance in one set-based write (`reviewIncidentsStatement()`,
+an `INSERT ... SELECT` over `incidents` skipping any already reviewed, 0006), so the
+incidents-reviewed item never holds the close.
 
-`POST /api/tonight/checklist/close` recomputes every required item across both phases; anything
-neither ticked nor exempted refuses with a 409 naming it by label (criterion 4), and a second
-close reads back the first's `checklist_closes` row rather than refusing (idempotent, matching
-`night_reports`' own PK guarantee). `/tonight` shows a warning banner for incomplete required
-pre-show items from house open, `doors_at` where a performance sets one, curtain otherwise
-(criterion 6). None of the four routes carries a performance picker yet (`docs/known-issues.md`),
-so a matinee day falls back to the same single-performance resolution `GET /api/tonight/report`
-uses and refuses ambiguity outright once a second performance is running.
+There is no close route of its own since issue 1315: the close is `closeStatement()`, written
+only inside Sign off and close's batch and only beside the report that batch froze (below, E-124).
+The gate is `holdsTheClose()` (`shared/utils/night-signoff.ts`): every required item across both
+phases neither ticked nor exempted refuses with a 409 naming it by label (criterion 4), except
+the incidents-reviewed item the same batch answers. `/tonight` shows a warning banner for
+incomplete required pre-show items from house open, `doors_at` where a performance sets one,
+curtain otherwise (criterion 6), and reads the checklist only for a viewer holding the duty
+manager's role. The checklist screen and the night report share one row component,
+`NightChecklistItems`: Tick where a hand may tick, and a quiet "Can't do this?" line that opens the
+exception, never a second button of equal weight.
 
 `/rota/manage/checklists` is the committee's own screen; `/tonight/checklist` is the duty
 manager's. Both, and the pure statement and query builders they call, are guarded the same way
@@ -1742,11 +1747,21 @@ distribution attempt).
 Sign-off is `requireNightAuthority(event, 'DUTY_MANAGER', ...)`, the same shift-or-officer guard
 `GET /api/tonight/report` itself uses, so `signedVia` is exactly `resolved.via`: `SHIFT` or
 `OFFICER`, flagging an officer standing in for the duty manager without a separate column
-(criterion 2). It refuses with 409 until `checklist_closes` carries a row for this performance
-(criterion 1, E-114's own gate, performance-scoped since E-128). The insert is `signOffStatement`'s
-own predicate, `WHERE NOT EXISTS`, so two concurrent sign-offs for the same performance produce
-exactly one row and the loser reads 409, the same race-safety a checklist or till close already
-carries.
+(criterion 2).
+
+Sign-off is the close-night action since issue 1315 (criterion 1 as amended, E-114 criteria 3 and
+4). The route compiles the report, refuses with 409 while `holdsTheClose()` finds a required item
+open, naming it, then writes `signOffAndCloseStatements()` as one `db.batch`, in order: the freeze
+(`signOffStatement`), its `night-report.signed` entry through `auditIfChanged()`, the checklist
+close, its `checklist.closed` entry, and the incident reviews. The close and the reviews each carry
+`EXISTS` on the report row this batch writes, so a refused freeze leaves neither behind (0049). The
+screen sends `incidentsSeen`, the number of incidents the report it showed listed, and the freeze
+is predicated on the performance still having exactly that many, so an incident logged between
+reading and pressing refuses the whole batch with `saysIncidentsMoved()` rather than reviewing an
+entry nobody read. The frozen copy reads the incidents item done (`reviewedAtSignOff()`), which is
+how the same batch leaves it. The freeze's own `WHERE NOT EXISTS` means two concurrent sign-offs
+for the same performance produce exactly one row and the loser reads 409, the same race-safety a
+till close carries.
 
 Distribution is `distributeReport()`: the addresses of every account holding a live grant of a
 role named in `NIGHT_REPORT_ROLES` (unset until a workshop confirms it), read by
@@ -1775,12 +1790,21 @@ own `night_report_deliveries` rows distinguishing it from the original send.
 frozen `report` column is what returns, verbatim, with `signedOff` and `addenda` alongside it,
 rather than the live queries recomputing over data that has moved on since the freeze (criterion
 5, "a frozen report is immutable"). Before sign-off, the response is the live draft above with
-`signedOff: null` and `addenda: []`, so a caller reads one shape either way.
+`signedOff: null`, `addenda: []` and `curtainDownAt`, the performance's `performanceEnd()`
+(running time and intervals past curtain up, curtain up where none is recorded, 0078), so a
+caller reads one shape either way.
 
 `/tonight/report` is the duty manager's screen over both routes (issue 1053), a tile on the hub
-carrying the house the hub is showing. It reads the draft, takes the closing note and posts it
-with the `performanceId` it read. A 409 rereads the report: the frozen report arriving answers a
-lost race, and otherwise the refusal is the checklist gate, shown with a link to the checklist. A
+carrying the house the hub is showing. Nothing that ends the night is pinned before
+`curtainDownAt`, on this screen or any other (issue 1315): until then the draft says when Sign off
+and close opens, and the hub and the glance keep their daytime shape, `curtainIsDown()` in
+`shared/utils/night-hub.ts` deciding for both. After it the hub leads the duty manager with the
+Night report tile in gold, the glance pins Night report, and this screen lists `openAtClose()`
+(every post-show item still open, and any required pre-show one) with Tick in place above the
+figures, and pins Sign off and close, greyed out while the note is empty or an item holds the
+close. It posts the closing note with the `performanceId` and `incidentsSeen` it read. A 409
+rereads the report: the frozen report arriving answers a lost race, and otherwise the refusal
+names what is still open or what moved, and the reread list shows it. A
 400 with no `performanceId` is a matinee day opened cold and shows the performance switcher, or
 the refusal itself when authority lists no house to choose. The screen asks `GET
 /api/tonight/authority` for `DUTY_MANAGER` on the performance it shows, asking again on a switch,

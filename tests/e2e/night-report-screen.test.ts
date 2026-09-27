@@ -58,7 +58,7 @@ async function dutyManagerOn(suffix: string, curtains: (number | undefined)[]): 
   const member = await registerMember(app, `report-screen-${suffix}`, password)
   const database = new Database(app.databaseFile)
   const performanceIds: string[] = []
-  let venueId = ''
+  let venueId: string
   try {
     const target = sqliteTarget(database)
     const venue = testVenue(target, { suffix: `report-screen-${suffix}` })

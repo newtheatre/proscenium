@@ -180,9 +180,13 @@ Nine rules follow:
    the rest in the order a night taps them, Emergency always and last and red. Until the roles are
    known, or with no signal, every tile shows, since each screen guards itself; with no role at all
    the hub is one card and My rota. The duty manager's comp requests wait on the hub too, as
-   `NightCompQueue` under Waiting on you (issue 1304). A titled block is `NightBlock`, a single number
-   is `NightKpi` and the matinee-day picker is `NightPerformanceSwitcher`; none of the four is in
-   the expressive kit, and all four are show-night only.
+   `NightCompQueue` under Waiting on you (issue 1304). Nothing that ends the night is pinned before
+   the curtain, on any screen: after it the duty manager's own job is the night report, which leads
+   the hub, is what the glance pins, and pins Sign off and close itself (`curtainIsDown()`, issue
+   1315). A titled block is `NightBlock`, a single number is `NightKpi`, a checklist row is
+   `NightChecklistItems` (Tick, and a quiet "Can't do this?" line for the exception) and the
+   matinee-day picker is `NightPerformanceSwitcher`; none of the five is in the expressive kit, and
+   all five are show-night only.
 4. **The show-night screens are phone-first and work offline.** They cache their night on open
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
    looks right on a desk monitor is wrong for the surface it is on. Every control on one clears

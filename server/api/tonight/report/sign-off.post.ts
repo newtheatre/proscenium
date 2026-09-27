@@ -1,7 +1,7 @@
-import { nightSignOffForm } from '#shared/utils/night-signoff'
+import { holdsTheClose, nightSignOffForm, saysIncidentsMoved } from '#shared/utils/night-signoff'
 
-// Sign off tonight's report: the checklist gate, then the freeze (E-124 criteria 1, 2, 3).
-// A second sign-off for the same performance refuses, race-safe by predicate (0006).
+// Sign off and close (issue 1315, E-124, E-114 criteria 3 and 4): the gate, then one batch that
+// freezes the report, closes the checklist and reviews its incidents, race-safe by predicate (0006).
 export default defineEventHandler(async (event) => {
   const input = await readValidatedBodyOrThrow(event, nightSignOffForm)
   const resolved = await requireNightAuthority(event, 'DUTY_MANAGER', input.performanceId ? { performanceId: input.performanceId } : {})
@@ -12,32 +12,51 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'More than one performance is running tonight: name the performance' })
   }
 
-  const closed = await closeFor(target)
-  if (!closed) throw createError({ statusCode: 409, statusMessage: 'This performance\'s checklist has not been closed yet' })
+  const already = 'This performance has already been signed off'
+  if (await reportForPerformance(target)) throw createError({ statusCode: 409, statusMessage: already })
 
-  const report = await compileNightReport(target, resolved.venueId, resolved.night)
+  const compiled = await compileNightReport(target, resolved.venueId, resolved.night)
+  const holding = compiled.checklist.filter(holdsTheClose)
+  if (holding.length > 0) {
+    throw createError({ statusCode: 409, statusMessage: saysBlockedClose(holding.map(item => item.label)) })
+  }
+  if (compiled.incidents.length !== input.incidentsSeen) {
+    throw createError({ statusCode: 409, statusMessage: saysIncidentsMoved(input.incidentsSeen, compiled.incidents.length) })
+  }
+
   const id = newId()
-  const entry = auditEntry({
-    actorId: resolved.account.id,
-    action: 'night-report.signed',
-    target: `performance:${target}`,
-    detail: { night: resolved.night, via: resolved.via },
+  const [freeze, ...then] = signOffAndCloseStatements({
+    id,
+    performanceId: target,
+    venueId: resolved.venueId,
+    night: resolved.night,
+    closingNote: input.closingNote,
+    report: reviewedAtSignOff(compiled),
+    signedBy: resolved.account.id,
+    signedVia: resolved.via,
+    incidentsSeen: input.incidentsSeen,
+    closeId: newId(),
+    signedEntry: auditEntry({
+      actorId: resolved.account.id,
+      action: 'night-report.signed',
+      target: `performance:${target}`,
+      detail: { night: resolved.night, via: resolved.via },
+    }),
+    closedEntry: auditEntry({
+      actorId: resolved.account.id,
+      action: 'checklist.closed',
+      target: `performance:${target}`,
+      detail: { night: resolved.night },
+    }),
   })
 
-  const signed = await auditedWrite(
-    db.all<{ id: string }>(signOffStatement({
-      id,
-      performanceId: target,
-      venueId: resolved.venueId,
-      night: resolved.night,
-      closingNote: input.closingNote,
-      report,
-      signedBy: resolved.account.id,
-      signedVia: resolved.via,
-    })),
-    entry,
-  )
-  if (!signed) throw createError({ statusCode: 409, statusMessage: 'This performance has already been signed off' })
+  const [frozen] = await db.batch([db.all<{ id: string }>(freeze), ...then.map(statement => db.run(statement))])
+  if (!Array.isArray(frozen) || frozen.length === 0) {
+    // Lost to a second sign-off, or an incident logged between the read above and the batch.
+    if (await reportForPerformance(target)) throw createError({ statusCode: 409, statusMessage: already })
+    const logged = (await reportIncidents(target)).length
+    throw createError({ statusCode: 409, statusMessage: saysIncidentsMoved(input.incidentsSeen, logged) })
+  }
 
   // The sign-off is written by this point, so an error here would tell a duty manager the write
   // failed when it did not; the letter is what is missed, and a reload finds the report (K-128).

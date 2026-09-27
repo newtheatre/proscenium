@@ -2,10 +2,11 @@
 import { saysMoney } from '#shared/utils/bar'
 import { saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysDoorCover, saysOfficerBypass } from '#shared/utils/night-authority'
-import { OFFICER_SIGN_OFF_NOTICE, saysSignedOff, tenderTotalPence } from '#shared/utils/night-signoff'
+import { OFFICER_SIGN_OFF_NOTICE, holdsTheClose, openAtClose, saysSignOffOpens, saysSignedOff, tenderTotalPence } from '#shared/utils/night-signoff'
 import { saysShiftRole } from '#shared/utils/rota'
 import { saysTeamHolder } from '#shared/utils/tonight'
 import { saysClock } from '#shared/utils/when'
+import type { Phase, SystemCheck } from '#shared/utils/checklist'
 import type { Category, Severity } from '#shared/utils/incidents'
 import type { OfficerBypassLine } from '#shared/utils/night-authority'
 import type { NightReportSigner } from '#shared/utils/night-signoff'
@@ -27,7 +28,19 @@ interface Report {
   covers?: { name: string | null }[]
   bar: { revenuePence: number, itemsSold: number }
   access: { verified: number }
-  checklist: { id: string, label: string, exempted: boolean, exemptReason: string | null }[]
+  checklist: {
+    id: string
+    phase: Phase
+    label: string
+    required: boolean
+    systemCheck: SystemCheck | null
+    done: boolean
+    tickedByName: string | null
+    exempted: boolean
+    exemptReason: string | null
+  }[]
+  // A draft's alone: when Sign off and close is offered (issue 1315).
+  curtainDownAt?: number | null
   signedOff: { closingNote: string, signedByName: string | null, signedVia: NightReportSigner, signedAt: number } | null
   addenda: { id: string, note: string, addedByName: string, addedAt: number }[]
 }
@@ -128,46 +141,60 @@ const figures = computed(() => {
   ]
 })
 
+// Read every half minute, so Sign off and close arrives when the curtain comes down on a screen
+// already open. A draft that names no curtain is never held back by one (0078).
+const now = ref(Date.now() / 1000)
+let clock: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  clock = setInterval(() => (now.value = Date.now() / 1000), 30_000)
+})
+onUnmounted(() => {
+  if (clock) clearInterval(clock)
+})
+
+const curtainDownAt = computed(() => report.value?.curtainDownAt ?? null)
+const curtainDown = computed(() => curtainDownAt.value === null || now.value >= curtainDownAt.value)
+// After the curtain the post-show items sit here with Tick in place, and the incidents are the
+// sign-off's own to review (issue 1315, E-114 criterion 3).
+const openItems = computed(() => openAtClose(report.value?.checklist ?? []))
+const holding = computed(() => (report.value?.checklist ?? []).filter(holdsTheClose))
+
 const closingNote = ref('')
 const signing = ref(false)
 const signFailure = ref<string | null>(null)
-const checklistOpen = ref(false)
 
 // Every outcome rereads the report: a 409 that lost the race is answered by the frozen report
-// arriving, and one that did not is the checklist gate, which the screen then points at.
+// arriving, and one that did not names what moved, which the reread list then shows.
 async function signOff(): Promise<void> {
   signing.value = true
   signFailure.value = null
-  checklistOpen.value = false
   try {
     const answered = await $fetch<{ ok: true, notice?: string }>('/api/tonight/report/sign-off', {
       method: 'POST',
-      body: { performanceId: performanceId.value ?? undefined, closingNote: closingNote.value },
+      body: {
+        performanceId: performanceId.value ?? undefined,
+        closingNote: closingNote.value,
+        incidentsSeen: report.value?.incidents.length ?? 0,
+      },
     })
-    toast.add({ title: answered.notice ?? 'Night report signed off', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: answered.notice ?? 'Night signed off and closed', icon: 'i-lucide-check', color: 'success' })
   }
   catch (refused) {
     signFailure.value = writeFailureText(refused, 'Reload to see whether the report is signed off.')
-    checklistOpen.value = refusalStatus(refused) === 409
   }
   finally {
     await load()
-    if (signedOff.value) {
-      signFailure.value = null
-      checklistOpen.value = false
-    }
+    if (signedOff.value) signFailure.value = null
     signing.value = false
   }
 }
-
-const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?performanceId=${performanceId.value}` : '/tonight/checklist')
 </script>
 
 <template>
   <NightScreen
     title="Night report"
     :refused="refusal"
-    hint="The report fills itself in. Read it through, add a closing note and sign it off."
+    hint="The report fills itself in. After the curtain, answer what is left, add a closing note, and sign off and close."
     :stale="syncedAt"
     :busy="busy"
   >
@@ -208,6 +235,27 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
         :description="signedOff.closingNote"
       />
 
+      <p
+        v-if="!signedOff && !curtainDown && curtainDownAt !== null"
+        class="text-sm text-muted"
+        data-test="sign-off-opens"
+      >
+        {{ saysSignOffOpens(curtainDownAt) }}
+      </p>
+
+      <div
+        v-if="!signedOff && curtainDown && openItems.length > 0"
+        data-test="report-open-items"
+      >
+        <NightBlock title="Still to do">
+          <NightChecklistItems
+            :items="openItems"
+            :performance-id="performanceId"
+            @changed="load"
+          />
+        </NightBlock>
+      </div>
+
       <NightBlock
         v-for="block in figures"
         :key="block.title"
@@ -232,6 +280,12 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
           class="text-sm text-muted"
         >
           None logged.
+        </p>
+        <p
+          v-else-if="!signedOff"
+          class="mb-2 text-xs text-muted"
+        >
+          Sign off and close marks each one reviewed.
         </p>
         <ul class="space-y-2">
           <li
@@ -370,7 +424,7 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
       </NightBlock>
 
       <form
-        v-if="!signedOff"
+        v-if="!signedOff && curtainDown"
         class="space-y-3"
         data-test="sign-off-form"
         @submit.prevent="signOff"
@@ -397,32 +451,19 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
           color="error"
           variant="subtle"
           :description="signFailure"
-        >
-          <template
-            v-if="checklistOpen"
-            #actions
-          >
-            <UButton
-              :to="checklistLink"
-              color="neutral"
-              variant="subtle"
-              data-test="open-checklist"
-            >
-              Open the checklist
-            </UButton>
-          </template>
-        </UAlert>
+        />
       </form>
     </div>
 
+    <!-- Nothing that ends the night is pinned before the curtain (issue 1315). -->
     <template
-      v-if="report && !signedOff"
+      v-if="report && !signedOff && curtainDown"
       #actions
     >
       <NightAction
-        label="Sign off"
+        label="Sign off and close"
         icon="i-lucide-signature"
-        :disabled="closingNote.trim().length === 0"
+        :disabled="closingNote.trim().length === 0 || holding.length > 0"
         :loading="signing"
         data-test="sign-off"
         @press="signOff"

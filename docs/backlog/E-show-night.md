@@ -232,7 +232,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Acceptance criteria:
   1. The committee configures per-venue pre-show and post-show checklist items (text, order, required flag); changes apply from the next show night and are audited.
   2. Each tick records who ticked it and when; items cannot be ticked before the show night begins at 04:00.
-  3. System-verified items (all no-show holds released, all of tonight's incidents reviewed) tick themselves from data and cannot be hand-ticked.
+  3. System-verified items (all no-show holds released, all of tonight's incidents reviewed) tick themselves from data and cannot be hand-ticked. Amended 27 September 2026 (issue 1315): tonight's incidents never hold the close, since Sign off and close on the night report reviews every incident the report listed in one set-based write, in the same batch as the close and the freeze; one reviewed earlier on the incident log gains no second review, and an incident logged after the report was read refuses the sign-off until it has been read.
   4. The close-night action is blocked while any required item is unticked, and the block names the missing items.
   5. The exception path: the duty manager may close over an incomplete item only by recording a reason per item; every exception prints in the night report and appears in the FOH officer's digest.
   6. Incomplete required pre-show items show as a warning banner on the tonight screen from house open.
@@ -370,7 +370,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As tonight's duty manager, I want to sign off the night and have the report distribute itself so that the evening's record carries my name and reaches the people who need it.
 - Depends on: E-114, E-123, H-105 (criterion 4's automatic retry until delivered and its operations-dashboard surfacing are H-105 and H-106's own build, not this story's; omitted from this line originally, corrected once building the story found it)
 - Acceptance criteria:
-  1. Sign-off requires the E-114 checklist gate; the duty manager adds a closing note and signs, and the report freezes into an append-only row uniquely keyed to the performance, so a second report for the same night is impossible.
+  1. Sign-off requires the E-114 checklist gate; the duty manager adds a closing note and signs, and the report freezes into an append-only row uniquely keyed to the performance, so a second report for the same night is impossible. Amended 27 September 2026 (issue 1315): sign-off is the close-night action. After the last curtain the report carries the post-show items still open with Tick in place, and one Sign off and close answers the gate, closes the checklist, reviews the listed incidents and freezes the report in one batch; a required item still open refuses naming it. Nothing that ends the night is pinned on any screen before the curtain, which is the performance's running time and intervals past curtain up, or curtain up where none is recorded (0078).
   2. Sign-off is available only under live shift authority (E-111); an officer closing instead of the duty manager is recorded and flagged as such.
   3. On freeze the report emails the configured recipients plus the closer; the recipient list is committee configuration.
      Amended 27 September 2026 (issue 1356): the recipients are chosen by role, not by address.

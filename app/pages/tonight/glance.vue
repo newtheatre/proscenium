@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysWarningLevel } from '#shared/utils/content-warnings'
 import { saysClock } from '#shared/utils/when'
-import { HUB_KPI_LABELS, groupedBoardCode, housePercentLine, hubKpis, nightHeaderLine, passPressureAdvice, runningTimeLine, saysSeatsLeft } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, curtainIsDown, groupedBoardCode, housePercentLine, hubKpis, nightHeaderLine, passPressureAdvice, runningTimeLine, saysSeatsLeft } from '#shared/utils/night-hub'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { saysShiftRole } from '#shared/utils/rota'
 import { activePerformanceId, saysTeamHolder } from '#shared/utils/tonight'
@@ -97,6 +97,8 @@ const activeId = computed(() => activePerformanceId(performances.value, Date.now
 const selectedId = computed(() => chosenId.value ?? activeId.value)
 const selected = computed(() => performances.value.find(one => one.performanceId === selectedId.value) ?? null)
 const kpis = computed(() => selected.value ? hubKpis(selected.value.house) : null)
+// Read afresh on every poll, since `selected` is a new object each time (issue 1315, 0078).
+const curtainDown = computed(() => selected.value ? curtainIsDown(selected.value, Date.now() / 1000) : false)
 
 setNightSubject(() => ({
   title: selected.value?.showTitle ?? 'Tonight',
@@ -435,14 +437,15 @@ onUnmounted(() => {
     </div>
 
     <template #actions>
-      <!-- The duty manager's route answering is the fact this viewer can close tonight (0009). -->
+      <!-- The duty manager's route answering is the fact this viewer can close tonight (0009), and
+           nothing that ends the night is pinned before the curtain (issue 1315). -->
       <NightAction
-        v-if="dutyManager"
-        label="Close the night"
-        icon="i-lucide-moon-star"
+        v-if="dutyManager && curtainDown"
+        label="Night report"
+        icon="i-lucide-file-signature"
         color="neutral"
         variant="outline"
-        :to="selectedId ? `/tonight/checklist?performanceId=${selectedId}` : '/tonight/checklist'"
+        :to="selectedId ? `/tonight/report?performanceId=${selectedId}` : '/tonight/report'"
       />
       <NightAction
         v-else

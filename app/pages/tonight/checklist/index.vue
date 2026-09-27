@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { saysPhase } from '#shared/utils/checklist'
+import { holdsTheClose } from '#shared/utils/night-signoff'
 import { saysTillLeftOpen } from '#shared/utils/till'
 import type { Phase, SystemCheck } from '#shared/utils/checklist'
 import type { TillLeftOpen } from '#shared/utils/till'
@@ -30,16 +31,15 @@ interface CloseInfo {
 
 const route = useRoute()
 const request = useRequestFetch()
-const toast = useToast()
 
 const syncedAt = ref<Date | null>(null)
 const failure = ref<string | null>(null)
-// Refused outright: one card, and no Close the night left to press (issue 1304).
+// Refused outright: one card, and nothing left to tick (issue 1304).
 const refusal = ref<string | null>(null)
 const busy = ref(true)
 const items = ref<Entry[]>([])
-// Read from the server on every load, never only from `closeNight()`'s own response: otherwise
-// a reload forgets the night is closed and re-enables the close action (E-114 follow-up).
+// Read from the server on every load: Sign off and close on the night report is what closes it
+// (issue 1315), and this screen only says so.
 const close = ref<CloseInfo | null>(null)
 // Advisory: only the bar closes a till, so this line ticks itself and never holds the close
 // (F-102 criterion 5, issue 1316).
@@ -96,303 +96,120 @@ onMounted(load)
 
 const preItems = computed(() => items.value.filter(item => item.phase === 'PRE'))
 const postItems = computed(() => items.value.filter(item => item.phase === 'POST'))
-const outstandingRequired = computed(() => items.value.filter(item => item.required && !item.done))
-
-const saving = ref(false)
-// Per row, not per screen: one flag spun every Tick on the list when one was pressed (issue 1150
-// item 4).
-const savingId = ref<string | null>(null)
-
-async function tick(entry: Entry): Promise<void> {
-  saving.value = true
-  savingId.value = entry.id
-  try {
-    await $fetch(`/api/tonight/checklist/${entry.id}/tick`, { method: 'POST', body: { performanceId: performanceId.value ?? undefined } })
-    await load()
-  }
-  catch (refused) {
-    toast.add({ title: 'Could not tick that item', description: refusalText(refused), icon: 'i-lucide-x', color: 'error' })
-  }
-  finally {
-    saving.value = false
-    savingId.value = null
-  }
-}
-
-const exempting = ref<Entry | null>(null)
-const exemptReason = ref('')
-const exemptFailure = ref<string | null>(null)
-
-function openExempt(entry: Entry): void {
-  exempting.value = entry
-  exemptReason.value = ''
-  exemptFailure.value = null
-}
-
-async function submitExempt(): Promise<void> {
-  if (!exempting.value) return
-  saving.value = true
-  exemptFailure.value = null
-  try {
-    await $fetch(`/api/tonight/checklist/${exempting.value.id}/exempt`, { method: 'POST', body: { performanceId: performanceId.value ?? undefined, reason: exemptReason.value } })
-    exempting.value = null
-    await load()
-  }
-  catch (refused) {
-    exemptFailure.value = refusalText(refused)
-  }
-  finally {
-    saving.value = false
-  }
-}
-
-const closeFailure = ref<string | null>(null)
-
-// Always resyncs, success or refusal: a race can still 409 even with `close` read live, and the
-// server's own state answers that, not a guess.
-async function closeNight(): Promise<void> {
-  saving.value = true
-  closeFailure.value = null
-  try {
-    await $fetch('/api/tonight/checklist/close', { method: 'POST', body: { performanceId: performanceId.value ?? undefined } })
-    toast.add({ title: 'Night closed', icon: 'i-lucide-check', color: 'success' })
-  }
-  catch (refused) {
-    closeFailure.value = refusalText(refused)
-  }
-  finally {
-    await load()
-    if (close.value) closeFailure.value = null
-    saving.value = false
-  }
-}
+// Tonight's incidents are reviewed by the sign-off itself, so they never count as open here.
+const outstandingRequired = computed(() => items.value.filter(holdsTheClose))
+const reportLink = computed(() => performanceId.value ? `/tonight/report?performanceId=${performanceId.value}` : '/tonight/report')
 </script>
 
 <template>
-  <div>
-    <NightScreen
-      title="Checklist"
-      :refused="refusal"
-      hint="Tick each item, or make an exception with a reason. An item that ticks itself needs a reason only if it cannot clear."
-      :stale="syncedAt"
-      :busy="busy"
+  <NightScreen
+    title="Checklist"
+    :refused="refusal"
+    hint="Tick each item, or say why it cannot be done tonight. The night closes from the night report."
+    :stale="syncedAt"
+    :busy="busy"
+  >
+    <UAlert
+      v-if="failure"
+      data-test="checklist-failure"
+      color="error"
+      variant="subtle"
+      :description="failure"
+    />
+
+    <!-- A matinee day opened cold: name the house rather than refuse into a dead end. -->
+    <div
+      v-else-if="ambiguous"
+      class="space-y-3"
+      data-test="checklist-performance-switcher"
+    >
+      <p class="text-sm text-muted">
+        More than one performance is running tonight. Choose the one you are closing.
+      </p>
+      <NightPerformanceSwitcher
+        :performances="choices"
+        :selected-id="performanceId"
+        @choose="choose"
+      />
+    </div>
+
+    <div
+      v-else
+      class="space-y-6"
+      data-test="checklist-list"
     >
       <UAlert
-        v-if="failure"
-        data-test="checklist-failure"
-        color="error"
+        v-if="close"
+        data-test="checklist-closed"
+        color="success"
         variant="subtle"
-        :description="failure"
+        :description="`Tonight is closed, by ${close.closedByName}.`"
       />
 
-      <!-- A matinee day opened cold: name the house rather than refuse into a dead end. -->
-      <div
-        v-else-if="ambiguous"
-        class="space-y-3"
-        data-test="checklist-performance-switcher"
+      <section
+        v-for="(phaseItems, phase) in { PRE: preItems, POST: postItems }"
+        :key="phase"
       >
-        <p class="text-sm text-muted">
-          More than one performance is running tonight. Choose the one you are closing.
-        </p>
-        <NightPerformanceSwitcher
-          :performances="choices"
-          :selected-id="performanceId"
-          @choose="choose"
-        />
-      </div>
-
-      <div
-        v-else
-        class="space-y-6"
-        data-test="checklist-list"
-      >
-        <UAlert
-          v-if="close"
-          data-test="checklist-closed"
-          color="success"
-          variant="subtle"
-          :description="`Tonight is closed, by ${close.closedByName}.`"
-        />
-
-        <section
-          v-for="(phaseItems, phase) in { PRE: preItems, POST: postItems }"
-          :key="phase"
-        >
-          <h2 class="mb-2 text-sm font-semibold text-muted">
-            {{ saysPhase(phase as Phase) }}
-          </h2>
-          <p
-            v-if="phaseItems.length === 0"
-            class="text-sm text-muted"
-          >
-            Nothing on this list yet. Ask the Safety Officer to add the items.
-          </p>
-          <ul class="space-y-2">
-            <li
-              v-for="entry in phaseItems"
-              :key="entry.id"
-              class="flex items-start justify-between gap-2 rounded-lg border border-default p-3"
-              :data-test="`checklist-item-${entry.id}`"
-            >
-              <div class="min-w-0">
-                <p class="text-sm font-medium">
-                  {{ entry.label }}
-                  <span
-                    v-if="!entry.required"
-                    class="text-xs text-muted"
-                  >(optional)</span>
-                </p>
-                <p
-                  v-if="entry.exempted"
-                  class="text-xs text-muted"
-                >
-                  Exception: {{ entry.exemptReason }}
-                </p>
-                <p
-                  v-else-if="entry.systemCheck"
-                  class="text-xs text-muted"
-                >
-                  Ticks itself: {{ entry.done ? 'clear' : 'not yet clear' }}
-                </p>
-                <p
-                  v-else-if="entry.tickedByName"
-                  class="text-xs text-muted"
-                >
-                  Ticked by {{ entry.tickedByName }}
-                </p>
-              </div>
-              <!-- An item that ticks itself but cannot clear tonight takes an exception like any
-                   other; only the Tick is withheld from it (E-114 criteria 3 and 5, issue 1296). -->
-              <div class="flex shrink-0 items-center gap-2">
-                <UIcon
-                  v-if="entry.done"
-                  name="i-lucide-check"
-                  class="size-5 text-success"
-                />
-                <template v-else>
-                  <UButton
-                    v-if="!entry.systemCheck"
-                    class="min-h-12 min-w-12 justify-center"
-                    :loading="savingId === entry.id"
-                    :disabled="saving && savingId !== entry.id"
-                    :data-test="`tick-${entry.id}`"
-                    @click="tick(entry)"
-                  >
-                    Tick
-                  </UButton>
-                  <UButton
-                    color="neutral"
-                    variant="ghost"
-                    class="min-h-12 min-w-12 justify-center"
-                    :data-test="`exempt-${entry.id}`"
-                    @click="openExempt(entry)"
-                  >
-                    Make an exception
-                  </UButton>
-                </template>
-              </div>
-            </li>
-            <!-- Read from the bar's own sessions, never stamped: nothing to tick and no exception to
-                 take, since only the bar can close a till (F-102 criterion 5, issue 1316). -->
-            <li
-              v-if="phase === 'POST' && till"
-              class="flex items-start justify-between gap-2 rounded-lg border border-default p-3"
-              data-test="checklist-till"
-            >
-              <div class="min-w-0">
-                <p class="text-sm font-medium">
-                  The till is closed
-                </p>
-                <p class="text-xs text-muted">
-                  {{ tillSaid ?? 'Ticks itself: clear' }}
-                </p>
-              </div>
-              <UIcon
-                v-if="!tillSaid"
-                name="i-lucide-check"
-                class="size-5 shrink-0 text-success"
-              />
-            </li>
-          </ul>
-        </section>
-
-        <UAlert
-          v-if="closeFailure"
-          data-test="close-failure"
-          color="error"
-          variant="subtle"
-          :description="closeFailure"
-        />
+        <h2 class="mb-2 text-sm font-semibold text-muted">
+          {{ saysPhase(phase as Phase) }}
+        </h2>
         <p
-          v-else-if="outstandingRequired.length > 0"
+          v-if="phaseItems.length === 0"
           class="text-sm text-muted"
         >
-          {{ plural(outstandingRequired.length, 'required item') }} still open. Tick or make an exception.
+          Nothing on this list yet. Ask the Safety Officer to add the items.
         </p>
-      </div>
-
-      <!-- Disabled rather than refused on press, with the server's own 409 still behind it: the
-           screen already knows what is open, so the press need not go and ask (E-114 criterion 4). -->
-      <template #actions>
-        <NightAction
-          label="Close the night"
-          icon="i-lucide-door-closed"
-          color="primary"
-          :disabled="!!close || ambiguous || outstandingRequired.length > 0"
-          :loading="saving"
-          data-test="close-night"
-          @press="closeNight"
+        <NightChecklistItems
+          :items="phaseItems"
+          :performance-id="performanceId"
+          @changed="load"
         />
-      </template>
-    </NightScreen>
-
-    <UModal
-      :open="exempting !== null"
-      :title="exempting ? `Exception: ${exempting.label}` : ''"
-      description="This names who and why, and it stays on the list."
-      @update:open="exempting = null"
-    >
-      <template #body>
-        <form
-          class="space-y-4"
-          data-test="exempt-form"
-          @submit.prevent="submitExempt"
+        <!-- Read from the bar's own sessions, never stamped: nothing to tick and no exception to
+             take, since only the bar can close a till (F-102 criterion 5, issue 1316). -->
+        <div
+          v-if="phase === 'POST' && till"
+          class="mt-2 flex items-start justify-between gap-2 rounded-lg border border-default p-3"
+          data-test="checklist-till"
         >
-          <UAlert
-            v-if="exemptFailure"
-            data-test="exempt-failure"
-            color="error"
-            variant="subtle"
-            :description="exemptFailure"
-          />
-
-          <UFormField label="Why">
-            <UTextarea
-              v-model="exemptReason"
-              :rows="3"
-              class="w-full"
-              data-test="exempt-reason"
-            />
-          </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="exempt-submit"
-            >
-              Make the exception
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="exempting = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
+          <div class="min-w-0">
+            <p class="text-sm font-medium">
+              The till is closed
+            </p>
+            <p class="text-xs text-muted">
+              {{ tillSaid ?? 'Ticks itself: clear' }}
+            </p>
           </div>
-        </form>
-      </template>
-    </UModal>
-  </div>
+          <UIcon
+            v-if="!tillSaid"
+            name="i-lucide-check"
+            class="size-5 shrink-0 text-success"
+          />
+        </div>
+      </section>
+
+      <!-- Nothing final is pinned here: Sign off and close on the night report ends the night,
+           and only after the curtain (issue 1315). -->
+      <div
+        v-if="!close"
+        class="space-y-2"
+        data-test="checklist-closes-on-report"
+      >
+        <p class="text-sm text-muted">
+          <template v-if="outstandingRequired.length > 0">
+            {{ plural(outstandingRequired.length, 'required item') }} still open.
+          </template>
+          The night closes with Sign off and close on the night report.
+        </p>
+        <UButton
+          :to="reportLink"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-file-signature"
+          class="min-h-12"
+        >
+          Night report
+        </UButton>
+      </div>
+    </div>
+  </NightScreen>
 </template>

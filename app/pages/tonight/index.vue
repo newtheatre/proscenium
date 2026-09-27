@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { HUB_KPI_LABELS, checklistHint, hubKpis, hubTiles, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, checklistHint, curtainIsDown, hubKpis, hubTiles, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
 import { activePerformanceId } from '#shared/utils/tonight'
 import type { HubHouse, HubTileId } from '#shared/utils/night-hub'
 
@@ -12,6 +12,9 @@ interface Performance {
   venueName: string
   startsAt: number
   doorsAt: number | null
+  durationMinutes: number | null
+  intervalCount: number
+  intervalMinutes: number | null
   house: HubHouse
 }
 interface HouseTonight { night: string, venueId: string, performances: Performance[] }
@@ -108,9 +111,11 @@ const incompletePre = computed(() => checklist.value.filter(item => item.phase =
 // Only the screens that already take a performance carry it; the rest resolve tonight's own.
 const scoped = (to: string): string => selectedId.value ? `${to}?performanceId=${selectedId.value}` : to
 
+// After the house on screen comes down, the duty manager's own job is the report (issue 1315).
+const curtainDown = computed(() => selected.value ? curtainIsDown(selected.value, Date.now() / 1000) : false)
 // Each tile where the viewer's own authority opens it; every tile until the roles are known, or
 // with no signal, since each screen guards itself anyway (issue 1304, E-111 criterion 5).
-const tiles = computed(() => hubTiles(authority.value.known ? authority.value.roles : null))
+const tiles = computed(() => hubTiles(authority.value.known ? authority.value.roles : null, curtainDown.value))
 const noRole = computed(() => authority.value.known && authority.value.roles.length === 0)
 
 const HUB_TILES: Record<HubTileId, { label: string, hint: string, icon: string, to: string, scoped: boolean }> = {
@@ -118,11 +123,18 @@ const HUB_TILES: Record<HubTileId, { label: string, hint: string, icon: string, 
   'till': { label: 'Till', hint: 'Bar sales', icon: 'i-lucide-store', to: '/tonight/till', scoped: false },
   'glance': { label: 'Tonight at a glance', hint: 'Numbers · show info', icon: 'i-lucide-gauge', to: '/tonight/glance', scoped: true },
   'checklist': { label: 'Checklist', hint: '', icon: 'i-lucide-list-checks', to: '/tonight/checklist', scoped: true },
-  'report': { label: 'Night report', hint: 'Read · sign off', icon: 'i-lucide-file-signature', to: '/tonight/report', scoped: true },
+  'report': { label: 'Night report', hint: 'The draft so far', icon: 'i-lucide-file-signature', to: '/tonight/report', scoped: true },
   'age-checks': { label: 'Challenge 25', hint: 'Log a check · register', icon: 'i-lucide-id-card', to: '/tonight/age-checks', scoped: false },
   'backstage': { label: 'Backstage', hint: 'House open · clearance', icon: 'i-lucide-messages-square', to: '/tonight/board', scoped: false },
   'contacts': { label: 'Contacts and incidents', hint: 'Who\'s on · log', icon: 'i-lucide-phone', to: '/tonight/incidents', scoped: true },
   'emergency': { label: 'Emergency', hint: 'Evac · first aid · 999', icon: 'i-lucide-siren', to: '/tonight/emergency', scoped: false },
+}
+
+// A tile says what is left rather than repeating its own name (issue 1150 item 3).
+function tileHint(id: HubTileId): string {
+  if (id === 'checklist') return checklistHint(checklist.value, houseOpen.value)
+  if (id === 'report' && curtainDown.value) return 'Sign off and close'
+  return HUB_TILES[id].hint
 }
 
 onMounted(() => {
@@ -236,7 +248,7 @@ onUnmounted(() => {
         v-for="tile in tiles"
         :key="tile.id"
         :label="HUB_TILES[tile.id].label"
-        :hint="tile.id === 'checklist' ? checklistHint(checklist, houseOpen) : HUB_TILES[tile.id].hint"
+        :hint="tileHint(tile.id)"
         :icon="HUB_TILES[tile.id].icon"
         :tone="tile.id === 'emergency' ? 'danger' : tile.gold ? 'gold' : 'neutral'"
         :to="HUB_TILES[tile.id].scoped ? scoped(HUB_TILES[tile.id].to) : HUB_TILES[tile.id].to"
