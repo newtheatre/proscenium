@@ -305,7 +305,7 @@ const columns: TableColumn<Member>[] = [
   {
     id: 'open',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => h(UButton, {
       'to': `/people/accounts/${row.original.userId}`,
       'variant': 'ghost',
@@ -392,7 +392,7 @@ const outcomeColumn: TableColumn<Claim> = {
 const decideColumn: TableColumn<Claim> = {
   id: 'decide',
   header: ACTIONS_HEADER,
-  meta: { class: { td: 'text-right whitespace-nowrap' } },
+  meta: ACTIONS_COLUMN,
   cell: ({ row }) => (writes.value === false
     ? null
     : h('div', { class: 'flex justify-end gap-2' }, [

@@ -162,7 +162,7 @@ const priceColumns: TableColumn<CategoryPrice>[] = [
         : null,
     ]),
   },
-  { id: 'price', header: 'Price', cell: ({ row }) => saysMoney(row.original.pricePence) },
+  { id: 'price', header: 'Price', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.pricePence) },
 ]
 
 const listingFailure = useListFailure(error, 'The categories could not be read.')
@@ -204,7 +204,7 @@ const columns: TableColumn<BarCategory>[] = [
   {
     id: 'act',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right whitespace-nowrap' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
       h(resolveComponent('UButton'), {
         'size': 'sm',

@@ -2,7 +2,7 @@
 // The pictures in the operator documentation, captured from a seeded dev server with numbered
 // badges drawn over the elements each page talks about (0076). CI never runs this; the PNGs are committed.
 
-import { openView, visit } from '../tests/helpers/webview'
+import { openView, visit, waitFor } from '../tests/helpers/webview'
 import { PERSONAS } from '../shared/utils/personas'
 import { codeForStep, stepFor } from '../shared/utils/totp'
 import { SHOTS } from './docs-shots/index'
@@ -119,6 +119,9 @@ async function become(email: string): Promise<void> {
 
 const failures: string[] = []
 
+// Long enough for a page to step through a fortnight of nights looking for one with a show.
+const READY_TIMEOUT_MS = 20_000
+
 // The dev server answers 503 for a moment after a rebuild, so a screen that never hydrates is
 // asked for once more before the shot counts as failed.
 async function open(shot: Shot): Promise<void> {
@@ -142,6 +145,7 @@ for (const shot of selected) {
       await view.evaluate(`(() => { ${shot.after} })()`)
       await Bun.sleep(1200)
     }
+    if (shot.ready) await waitFor(view, shot.ready, READY_TIMEOUT_MS)
     // The dev server's DevTools float a timing badge over the foot of every page, covering whatever
     // sits there, so it is taken off the page before the picture rather than off the server.
     await view.evaluate(`(document.getElementById('nuxt-devtools-container')?.remove(), true)`)

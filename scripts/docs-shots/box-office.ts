@@ -3,6 +3,13 @@ import type { Shot } from './types'
 
 const persona = 'dev-foh@e2e.newtheatre.org.uk'
 
+// Presses the desk's own next-night button until a night with a performance is showing, for up to
+// a fortnight of nights, so the picture never depends on which night the seed ran.
+export const DESK_FINDS_A_NIGHT = `const step = (left) => { `
+  + `if (document.querySelector('[data-test="desk-performance"]') || left === 0) return; `
+  + `document.querySelector('[data-test="desk-next-night"]')?.click(); `
+  + `setTimeout(() => step(left - 1), 800) }; step(14)`
+
 export const boxOffice: Shot[] = [
   {
     name: 'box-office/desk',
@@ -10,6 +17,10 @@ export const boxOffice: Shot[] = [
     url: '/box-office/desk',
     marker: '[data-test="desk-page"]',
     width: CONSOLE_WIDTH,
+    // A seed run on another show night can leave tonight with no performance: step on to the
+    // next night that has one, as an officer would, rather than picture an empty desk.
+    after: DESK_FINDS_A_NIGHT,
+    ready: `document.querySelector('[data-test="desk-summary"]')`,
     annotations: [
       { selector: '[data-test="desk-night"]', label: 'The night' },
       { selector: '[data-test="desk-performance"]', label: 'Performance' },

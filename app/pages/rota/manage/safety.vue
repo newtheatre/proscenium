@@ -125,7 +125,7 @@ const openColumns = computed<TableColumn<OpenItem>[]>(() => [
     ? [{
         id: 'act',
         header: ACTIONS_HEADER,
-        meta: { class: { td: 'text-right whitespace-nowrap' } },
+        meta: ACTIONS_COLUMN,
         cell: ({ row }: { row: { original: OpenItem } }) => h(UButton, {
           'size': 'sm',
           'variant': 'subtle',

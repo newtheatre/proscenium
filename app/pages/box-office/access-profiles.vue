@@ -151,7 +151,7 @@ const columns: TableColumn<Summary>[] = [
   {
     id: 'open',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => h(UButton, {
       'variant': 'subtle',
       'size': 'sm',

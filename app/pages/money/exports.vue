@@ -68,7 +68,7 @@ const columns: TableColumn<NominalMapping>[] = [
   { id: 'kind', header: 'Ledger line' },
   { id: 'source', header: 'Source', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   { id: 'code', header: 'SU nominal code' },
-  { id: 'act', header: ACTIONS_HEADER },
+  { id: 'act', header: ACTIONS_HEADER, meta: ACTIONS_COLUMN },
 ]
 
 // The yearly return is the reason this screen exists, so it opens on this year (I-108 criterion 4).

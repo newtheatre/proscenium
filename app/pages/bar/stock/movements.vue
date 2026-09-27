@@ -113,7 +113,7 @@ const columns: TableColumn<StockMovement>[] = [
   {
     id: 'qty',
     header: 'Quantity',
-    meta: { class: { td: 'whitespace-nowrap' } },
+    meta: RIGHT_ALIGNED,
     cell: ({ row }) => `${row.original.qty > 0 ? '+' : ''}${saysQuantity(row.original.qty, row.original.unit)}`,
   },
   {
@@ -125,7 +125,7 @@ const columns: TableColumn<StockMovement>[] = [
   {
     id: 'act',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right whitespace-nowrap' } },
+    meta: ACTIONS_COLUMN,
     // A sale or a comp comes back only with its money, so it is never offered (issue 1350).
     cell: ({ row }) => (!REVERSIBLE_KINDS.includes(row.original.kind) || row.original.reversed
       ? null

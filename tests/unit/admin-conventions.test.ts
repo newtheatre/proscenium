@@ -584,15 +584,32 @@ describe('a figure column lines its header up with its figures', () => {
 
   test('no column right-aligns its figures under a header left behind', async () => {
     const offenders = (await tables()).flatMap(file => columnMetas(file.source)
-      .filter(({ header, meta }) => RIGHT_CELLS.test(meta) && !RIGHT_HEADER.test(meta) && !header.includes('ACTIONS_HEADER'))
+      .filter(({ meta }) => RIGHT_CELLS.test(meta) && !RIGHT_HEADER.test(meta))
       .map(({ header }) => `${file.path}: ${header}`))
     expect(offenders).toEqual([])
   })
 
-  test('a column of row actions never takes a figure shape', async () => {
-    const offenders = (await tables()).filter(file => columnMetas(file.source)
-      .some(({ header, meta }) => header.includes('ACTIONS_HEADER') && /RIGHT_ALIGNED|font-mono/.test(meta)))
-    expect(offenders.map(file => file.path)).toEqual([])
+  // Pinned by name: nothing in a column's source marks it as figures, so no scan finds one left
+  // unshaped (0032, K-101).
+  test('a price or a quantity column takes a figure shape', async () => {
+    const figures: [string, string][] = [
+      ['app/pages/bar/categories.vue', `'Price'`],
+      ['app/pages/bar/products/[id].vue', `'Price'`],
+      ['app/pages/bar/stock/index.vue', `'On hand'`],
+      ['app/pages/bar/stock/index.vue', `'Par level'`],
+      ['app/pages/bar/stock/movements.vue', `'Quantity'`],
+    ]
+    for (const [path, header] of figures) {
+      const metas = columnMetas(await Bun.file(path).text()).filter(one => one.header === header).map(one => one.meta)
+      expect({ path, header, metas }).toEqual({ path, header, metas: [expect.stringMatching(/^RIGHT_ALIGNED(?:_HIDE_BELOW_SM)?$/)] })
+    }
+  })
+
+  // Rule 6 for actions too: a column of row actions takes the one shape, never a copy of it.
+  test('a column of row actions takes ACTIONS_COLUMN', async () => {
+    const offenders = (await tables()).flatMap(file => [...file.source.matchAll(/header:\s*ACTIONS_HEADER\b(?!,\s*meta:\s*ACTIONS_COLUMN\b)/g)]
+      .map(() => file.path))
+    expect(offenders).toEqual([])
   })
 
   // Rule 6: no screen writes a shape out again, and one built from another's parts is written out.

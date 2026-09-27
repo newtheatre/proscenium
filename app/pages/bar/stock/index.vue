@@ -329,14 +329,16 @@ const columns: TableColumn<StockItem>[] = [
   {
     id: 'onHand',
     header: 'On hand',
-    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
+    meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
     cell: ({ row }) => saysQuantity(row.original.onHand, row.original.unit),
   },
   {
     id: 'par',
     header: 'Par level',
-    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
-    cell: ({ row }) => (row.original.parQty === null ? 'Not set' : saysQuantity(row.original.parQty, row.original.unit)),
+    meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
+    cell: ({ row }) => (row.original.parQty === null
+      ? h('span', { class: 'font-sans' }, 'Not set')
+      : saysQuantity(row.original.parQty, row.original.unit)),
   },
   {
     id: 'pouredBy',
@@ -372,7 +374,7 @@ const columns: TableColumn<StockItem>[] = [
   {
     id: 'act',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right whitespace-nowrap' } },
+    meta: ACTIONS_COLUMN,
     // The two movements a bar records by hand sit on the row; an adjustment, a retirement and a
     // deletion are rarer and go behind More actions (issue 1350, K-123 criterion 10).
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [

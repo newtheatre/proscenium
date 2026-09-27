@@ -485,7 +485,7 @@ const columns: TableColumn<ProductVariant>[] = [
   {
     id: 'act',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right whitespace-nowrap' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
       h(UButton, {
         'size': 'sm',
@@ -553,7 +553,7 @@ const priceColumns: TableColumn<VariantPrice>[] = [
         : null,
     ]),
   },
-  { id: 'price', header: 'Price', cell: ({ row }) => saysMoney(row.original.pricePence) },
+  { id: 'price', header: 'Price', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.pricePence) },
 ]
 </script>
 
