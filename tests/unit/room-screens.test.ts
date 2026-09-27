@@ -113,6 +113,33 @@ describe('what a submit does (C-105 criteria 7 and 8, C-120 criterion 7, issue 1
   })
 })
 
+// The two officer queues fit the console's width with their row actions in view, as Rooms does
+// (issue 922, K-123 criterion 10): long text wraps, and a row keeps three actions in line at most.
+describe('the closures table and the requests queue fit without scrolling sideways', () => {
+  const CLOSURES = 'app/pages/rooms/manage/closures.vue'
+  const REQUESTS = 'app/pages/rooms/manage/requests.vue'
+
+  test('a closure reason wraps beside the span, who closed it and Reopen', async () => {
+    const source = await Bun.file(CLOSURES).text()
+    expect(source).toContain(`{ accessorKey: 'reason', header: 'Why', meta: { class: { th: HIDE_BELOW_SM, td: \`\${HIDE_BELOW_SM} whitespace-normal\` } } }`)
+  })
+
+  test('a request status wraps, its long badges included', async () => {
+    const source = await Bun.file(REQUESTS).text()
+    expect(source).toContain(`header: 'Status',\n    meta: { class: { td: 'whitespace-normal' } },`)
+    expect(source).toContain(`const WRAPPING_BADGE = { class: 'max-w-full', ui: { label: 'whitespace-normal' } }`)
+  })
+
+  test('a request row keeps three actions in line and the rest behind More actions', async () => {
+    const source = await Bun.file(REQUESTS).text()
+    expect(source).toContain('rowOverflow(row.original.id, [')
+    expect(source).toContain(`label: 'Not one of ours'`)
+    expect(source).toContain(`label: 'Use one of ours'`)
+    expect(source).toContain(`label: 'Send back'`)
+    expect(source).not.toContain(`() => 'Not one of ours'`)
+  })
+})
+
 describe('a segmented toggle is not colour alone (K-101, issue 1153 item 5)', () => {
   test('every toggle says which one is pressed and marks it visibly', async () => {
     const offenders: string[] = []
