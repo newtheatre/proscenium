@@ -352,6 +352,38 @@ export async function reservationForDoor(reference: string): Promise<DoorReserva
   return row
 }
 
+export interface OwnBookingRow {
+  id: string
+  reference: string
+  status: string
+  showTitle: string
+  venueName: string
+  startsAt: number
+  totalPence: number
+  holdExpiresAt: number | null
+}
+
+// A signed-in person's own live bookings from `from` on, soonest first, bound by `limit` rather
+// than by how many they hold (issue 1332, 0006).
+export function ownBookingsQuery(userId: string, from: number, limit: number): SQL {
+  return sql`
+    SELECT r.id AS id, r.reference AS reference, r.status AS status, s.title AS showTitle,
+           v.name AS venueName, p.starts_at AS startsAt, r.hold_expires_at AS holdExpiresAt,
+           (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence
+    FROM reservations r
+    JOIN performances p ON p.id = r.performance_id
+    JOIN shows s ON s.id = p.show_id
+    JOIN venues v ON v.id = p.venue_id
+    WHERE r.user_id = ${userId} AND r.status IN ('PENDING', 'COLLECTED') AND p.starts_at >= ${from}
+    ORDER BY p.starts_at, r.reference
+    LIMIT ${limit}
+  `
+}
+
+export async function ownBookings(userId: string, from: number, limit: number): Promise<OwnBookingRow[]> {
+  return db.all<OwnBookingRow>(ownBookingsQuery(userId, from, limit))
+}
+
 export interface SelfServiceReservation {
   id: string
   reference: string

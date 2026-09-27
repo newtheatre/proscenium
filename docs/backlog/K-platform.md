@@ -666,9 +666,11 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
 - Depends on: A-129
 - Acceptance criteria:
   1. `/my` in the `member` layout is a grid of tiles of differing sizes: next shift, next room
-     booking, training progress and next session, passes, membership state, recent
-     notifications, the next show on sale. Each tile reads an existing endpoint; a summary
-     endpoint is added only if the page would otherwise make more than five requests.
+     booking, tickets (the next booking still to come), training progress and next session,
+     passes, membership state, recent notifications, the next show on sale. Each tile reads an
+     existing endpoint; a summary endpoint is added only if the page would otherwise make more
+     than five requests. Amended 26 September 2026 (issue 1332): the tickets tile, once a
+     member's own bookings had an answer.
   2. `MEMBER_NAV` becomes `MY_NAV` (the members area) and `ACCOUNT_NAV` (profile, access
      requirements, sign-in and security, notifications). The sub-nav renders the first, the
      account menu the second, the footer both, and `tests/unit/site-nav.test.ts` covers both
@@ -685,7 +687,8 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
   5. `scripts/shots.ts` captures the member screens too, and before-and-after captures are
      attached to the pull request.
   6. The overview leads with what is soonest (the next shift, the next room booking, the next
-     training session), then the standing tiles in one fixed order. A tile with nothing behind
+     booking still to come, the next training session), then the standing tiles in one fixed
+     order. A tile with nothing behind
      it says what would be there and the one action that fills it, or does not exist. One
      control shape per action kind across the grid, no raw enum value on a tile, and the
      member is named in a sentence rather than a fragment.
@@ -693,8 +696,8 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
      the read fails, never its empty state: the empty state's words promise there is nothing,
      which is untrue of a read that did not finish.
 - Source: Pre-cutover review, 10 September 2026; 0040 named the member's own pages as needing
-  shaping and left it to do; issue 1342 (criteria 2 and 3, from the MVP flow review of 25
-  September 2026).
+  shaping and left it to do; issues 1342 (criteria 2 and 3) and 1332 (criteria 1 and 6), from
+  the MVP flow review of 25 September 2026.
 
 ## K-128: One voice across every screen
 

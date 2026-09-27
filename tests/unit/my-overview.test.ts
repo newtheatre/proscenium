@@ -13,6 +13,7 @@ const BASE: MySummary = {
   room: null,
   training: { held: 3, available: 7, nextStep: null, nextSession: null },
   passes: { active: [], request: null },
+  ticket: null,
   notifications: [],
   nextShow: null,
 }
@@ -26,8 +27,15 @@ describe('the overview leads with what is soonest (K-127 criterion 6, issue 1153
     expect(orderMyTiles(BASE)).toEqual([...MY_TILES])
   })
 
-  test('there is no tile for tickets, which nothing answers', () => {
-    expect(MY_TILES).not.toContain('tickets' as never)
+  // Issue 1332: a member's own next booking now has an answer, so it has a tile (K-127 criterion 1).
+  test('a booking takes its place by when the performance is, not by the standing order', () => {
+    const summary: MySummary = {
+      ...BASE,
+      shift: { shiftId: 's1', role: 'Front of house', showTitle: 'Blue Stockings', venueName: 'Main', startsAt: WEDNESDAY + hours(24), status: 'CONFIRMED' },
+      ticket: { reference: 'K7M4PQ', showTitle: 'The Tempest', venueName: 'Main', startsAt: WEDNESDAY, url: '/qr/r-1.sig' },
+    }
+    expect(MY_TILES).toContain('tickets')
+    expect(orderMyTiles(summary).slice(0, 2)).toEqual(['tickets', 'shift'])
   })
 
   test('a room booking sooner than the shift is placed before it', () => {
@@ -121,7 +129,8 @@ describe('a failed read is a failure, not an empty estate (K-127 criterion 7, is
     expect(source).toContain('Try again')
   })
 
-  test('the dead tickets tile is gone', async () => {
-    expect(await Bun.file('app/components/my/tiles/Tickets.vue').exists()).toBe(false)
+  // Issue 1332 revives the tile issue 1153 removed, now that the summary answers it.
+  test('the tickets tile reads the summary it is given', async () => {
+    expect(await Bun.file('app/components/my/tiles/Tickets.vue').text()).toContain('summary.ticket')
   })
 })

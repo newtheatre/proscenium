@@ -3,6 +3,7 @@ import type * as z from 'zod'
 import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
 import { SAYS_BEFORE_YOU_COME } from '#shared/utils/content-warnings'
 import { qrStatusDisplay, reservationResendForm, saysExchangeNight } from '#shared/utils/reservations'
+import type { OwnBookingListing } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 
@@ -65,16 +66,31 @@ async function loadBooking(): Promise<void> {
   outcome.value = 'found'
 }
 
+// A signed-in visitor sees their own bookings whatever the cookie holds: under the one it opened,
+// or in place of asking for a reference the account already knows (issue 1332).
+const { account } = useAccount()
+const ownBookings = ref<OwnBookingListing[] | null>(null)
+const otherBookings = computed(() => ownBookings.value?.filter(own => own.reference !== booking.value?.reference) ?? [])
+
+async function loadOwnBookings(): Promise<void> {
+  if (!account.value.signedIn) return
+  ownBookings.value = await $fetch<{ bookings: OwnBookingListing[] }>('/api/account/bookings')
+    .then(answer => answer.bookings)
+    .catch(() => null)
+}
+
 // The exchanged cookie names the booking; a missing or spent one is an invitation to resend,
 // never a dead end (D-108 criterion 2 sits next to criterion 4 for exactly this reason).
 onMounted(async () => {
   made.value = null
+  const own = loadOwnBookings()
   try {
     await loadBooking()
   }
   catch {
     outcome.value = 'resend'
   }
+  await own
 })
 
 async function resend(payload: FormSubmitEvent<z.output<typeof reservationResendForm>>): Promise<void> {
@@ -130,7 +146,7 @@ async function saveEdit(): Promise<void> {
     await $fetch('/api/qr/tickets', { method: 'PUT', body: { lines, reference: booking.value?.reference } })
     editing.value = false
     justMade.value = null
-    await loadBooking()
+    await Promise.all([loadBooking(), loadOwnBookings()])
   }
   catch (error) {
     editFailure.value = refusalText(error)
@@ -151,7 +167,7 @@ async function cancelBooking(): Promise<void> {
     await $fetch('/api/qr/cancel', { method: 'POST', body: { reference: booking.value?.reference } })
     cancelConfirming.value = false
     justMade.value = null
-    await loadBooking()
+    await Promise.all([loadBooking(), loadOwnBookings()])
   }
   catch (error) {
     cancelFailure.value = refusalText(error)
@@ -194,7 +210,7 @@ async function submitExchange(): Promise<void> {
     await $fetch('/api/qr/exchange', { method: 'POST', body: { performanceId: exchangeChoice.value, reference: booking.value?.reference } })
     exchanging.value = false
     justMade.value = null
-    await loadBooking()
+    await Promise.all([loadBooking(), loadOwnBookings()])
   }
   catch (error) {
     exchangeFailure.value = refusalText(error)
@@ -447,6 +463,14 @@ useSeoMeta({ title: 'Your booking' })
           </div>
         </div>
 
+        <OwnBookings
+          v-if="otherBookings.length > 0"
+          :bookings="otherBookings"
+          heading="Your other bookings"
+          level="h2"
+          class="border-t border-default pt-4"
+        />
+
         <ConfirmModal
           v-model:open="cancelConfirming"
           name="cancel-booking"
@@ -476,10 +500,37 @@ useSeoMeta({ title: 'Your booking' })
         data-test="qr-resend"
         class="space-y-4"
       >
+        <OwnBookings
+          v-if="ownBookings"
+          :bookings="ownBookings"
+          heading="Your bookings"
+          level="h1"
+          class="border-b border-default pb-4"
+        >
+          <p
+            v-if="ownBookings.length === 0"
+            class="text-sm text-muted"
+          >
+            You have no bookings still to come. <NuxtLink
+              to="/whats-on"
+              class="underline"
+            >See what is on</NuxtLink>.
+          </p>
+          <p class="text-sm text-muted">
+            Passes you hold, each with its QR code, are under <NuxtLink
+              to="/account/passes"
+              class="underline"
+            >Passes</NuxtLink>.
+          </p>
+        </OwnBookings>
+
         <div class="space-y-2">
-          <h1 class="nnt-headline text-xl">
+          <component
+            :is="ownBookings ? 'h2' : 'h1'"
+            class="nnt-headline text-xl"
+          >
             {{ resendHeadline }}
-          </h1>
+          </component>
           <p class="text-muted">
             Enter your booking reference and the email address you booked with, and a fresh copy of
             your confirmation, with the same QR, is on its way.

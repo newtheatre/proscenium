@@ -21,13 +21,14 @@ export interface MySummary {
     active: { id: string, typeName: string, covers: string | null, status: string }[]
     request: { state: string } | null
   }
+  // The next booking still to come, opened through its own link route (issue 1332).
+  ticket: { reference: string, showTitle: string, venueName: string, startsAt: number, url: string } | null
   notifications: { id: string, title: string, link: string | null, createdAt: number }[]
   nextShow: { slug: string, title: string, firstAt: number, lastAt: number, availability: Availability } | null
 }
 
-// The tiles, in the order they stand when nothing is coming up (K-127 criterion 6). There is no
-// tile for tickets: nothing answers a member's own bookings, and an empty tile would promise one.
-export const MY_TILES = ['shift', 'room', 'training', 'membership', 'passes', 'notifications', 'show'] as const
+// The tiles, in the order they stand when nothing is coming up (K-127 criterion 6).
+export const MY_TILES = ['shift', 'room', 'tickets', 'training', 'membership', 'passes', 'notifications', 'show'] as const
 
 export type MyTileName = (typeof MY_TILES)[number]
 
@@ -45,6 +46,7 @@ export function orderMyTiles(summary: MySummary): MyTileName[] {
   const soon = new Map<MyTileName, number>()
   if (summary.shift) soon.set('shift', summary.shift.startsAt)
   if (summary.room) soon.set('room', summary.room.startsAt)
+  if (summary.ticket) soon.set('tickets', summary.ticket.startsAt)
   if (summary.training.nextSession) soon.set('training', sessionAt(summary.training.nextSession))
 
   const timely = [...soon.entries()]

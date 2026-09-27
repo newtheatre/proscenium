@@ -11,6 +11,7 @@ import {
   nothingToCollect,
   otherBookingReason,
   overCapReason,
+  ownBookingsFrom,
   passBookingReason,
   passCollectReason,
   pastCurtainReason,
@@ -21,6 +22,7 @@ import {
   reservationResendForm,
   sameNightReason,
   saysExchangeNight,
+  saysTotalDue,
   ticketEditDelta,
   totalTickets,
 } from '#shared/utils/reservations'
@@ -28,6 +30,22 @@ import type { BookableTicketTypeRow } from '#server/utils/reservations'
 
 // D-104 as pure rules. What the database enforces is in tests/integration/capacity.test.ts, and
 // the contended case is the named race in tests/integration/races-capacity.test.ts.
+
+// Issue 1332, 0014: a person's own list starts at tonight's show night, which runs 04:00 to 04:00
+// London time, so tonight's booking is still listed at 01:30 and gone from the list at 04:30.
+describe('a person\'s own bookings are listed from the start of tonight\'s show night', () => {
+  test('01:30 BST still belongs to the night before', () => {
+    expect(ownBookingsFrom(new Date('2026-09-27T00:30:00Z'))).toBe(Date.parse('2026-09-26T03:00:00Z') / 1000)
+  })
+
+  test('04:30 BST is a new night', () => {
+    expect(ownBookingsFrom(new Date('2026-09-27T03:30:00Z'))).toBe(Date.parse('2026-09-27T03:00:00Z') / 1000)
+  })
+
+  test('in GMT the night starts at 04:00 UTC', () => {
+    expect(ownBookingsFrom(new Date('2026-11-10T03:30:00Z'))).toBe(Date.parse('2026-11-09T04:00:00Z') / 1000)
+  })
+})
 
 describe('a reservation reference is short, no-look-alike and never a credential', () => {
   test('every character comes from the no-look-alike alphabet, at the fixed length', () => {
@@ -176,6 +194,14 @@ describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', (
     expect(passCollectReason(null, 0)).toContain('pass')
     expect(passCollectReason(1_900_000_000, 0)).toBeNull()
     expect(passCollectReason(null, 900)).toBeNull()
+  })
+
+  // The booking page and the account's own list say the same figure from the same rule (issue 1332).
+  test('only a PENDING booking with something to collect has a total due', () => {
+    expect(saysTotalDue('PENDING', 1_900_000_000, 900)).toBe('£9.00')
+    expect(saysTotalDue('PENDING', 1_900_000_000, 0)).toBe('£0.00')
+    expect(saysTotalDue('PENDING', null, 0)).toBeNull()
+    expect(saysTotalDue('COLLECTED', null, 900)).toBeNull()
   })
 
   // Issue 1329: one cookie names one booking, so a page showing another is refused, not obeyed.

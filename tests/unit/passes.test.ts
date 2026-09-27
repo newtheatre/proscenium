@@ -9,6 +9,7 @@ import {
   passSaleRefusal,
   requestPassForm,
   saysPassStatus,
+  showsPassQr,
 } from '#shared/utils/passes'
 
 // D-124 as pure rules. The database enforcement (the cap, the race) is in
@@ -92,6 +93,27 @@ describe('a request names only which product (criterion 3)', () => {
 
   test('a price or a buyer would be a different shape entirely, and is refused', () => {
     expect(requestPassForm.safeParse({ passTypeId: 'pt-1', userId: 'u-1' }).success).toBe(false)
+  })
+})
+
+// Issue 1332: nothing sets EXPIRED (docs/known-issues.md), so the dates decide too; a pass the
+// door would refuse as cancelled, expired or archived is never offered to be shown.
+describe('the account offers a pass\'s QR only while the door would admit it', () => {
+  const live = { status: 'ACTIVE', passTypeStatus: 'ON_SALE', validUntil: 2_000 }
+
+  test('an active pass not past its end date shows its QR, before its season starts included', () => {
+    expect(showsPassQr(live, 1_000)).toBe(true)
+    expect(showsPassQr(live, 2_000)).toBe(true)
+  })
+
+  test('a cancelled or expired pass shows none', () => {
+    expect(showsPassQr({ ...live, status: 'CANCELLED' }, 1_000)).toBe(false)
+    expect(showsPassQr({ ...live, status: 'EXPIRED' }, 1_000)).toBe(false)
+  })
+
+  test('an active pass past its end date, or of an archived type, shows none', () => {
+    expect(showsPassQr(live, 2_001)).toBe(false)
+    expect(showsPassQr({ ...live, passTypeStatus: 'CLOSED' }, 1_000)).toBe(false)
   })
 })
 

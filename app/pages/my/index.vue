@@ -15,6 +15,7 @@ const EMPTY: MySummary = {
   room: null,
   training: { held: 0, available: 0, nextStep: null, nextSession: null },
   passes: { active: [], request: null },
+  ticket: null,
   notifications: [],
   nextShow: null,
 }
@@ -70,6 +71,10 @@ const greeting = computed(() => {
         />
         <MyTilesRoomBooking
           v-else-if="tile === 'room'"
+          :summary="summary"
+        />
+        <MyTilesTickets
+          v-else-if="tile === 'tickets'"
           :summary="summary"
         />
         <MyTilesTraining

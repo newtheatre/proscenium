@@ -20,6 +20,7 @@ const BASE: MySummaryInputs = {
   nextSession: null,
   passes: [],
   passRequest: null,
+  ticket: null,
   notifications: [],
   nextShow: null,
 }
@@ -49,6 +50,16 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
     const shape = JSON.stringify(summary)
     expect(shape).not.toContain('studentId')
     expect(shape).not.toContain('"notes"')
+  })
+
+  // Issue 1332: the next booking is named and opened, never priced or pinned to an id.
+  test('the next booking carries what the tile shows and the link that opens it, nothing more', () => {
+    const summary = assembleMySummary({
+      ...BASE,
+      ticket: { id: 'r-1', reference: 'K7M4PQ', showTitle: 'The Tempest', venueName: 'Main', startsAt: 1_790_000_000, url: '/qr/r-1.sig' },
+    })
+    expect(summary.ticket).toEqual({ reference: 'K7M4PQ', showTitle: 'The Tempest', venueName: 'Main', startsAt: 1_790_000_000, url: '/qr/r-1.sig' })
+    expect(assembleMySummary(BASE).ticket).toBeNull()
   })
 
   // 0094: the accent is the one "on shift" fact the session and the hub read, never a second one.

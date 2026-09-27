@@ -19,6 +19,8 @@ interface HeldPass {
   priceLabel: string
   pricePaid: number
   status: PassStatus
+  // Null for a pass the door would refuse as cancelled, expired or archived (issue 1332).
+  qrSvg: string | null
 }
 
 interface OwnRequest {
@@ -103,17 +105,34 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
 
         <ul
           v-if="data.passes.length > 0"
-          class="space-y-2 text-sm"
+          class="space-y-4 text-sm"
         >
           <li
             v-for="pass in data.passes"
             :key="pass.id"
-            class="flex items-center justify-between"
+            class="space-y-2"
           >
-            <span>{{ pass.passTypeName }} ({{ pass.priceLabel }}, {{ saysPrice(pass.pricePaid) }}), reference {{ pass.reference }}</span>
-            <UBadge :color="statusColor[pass.status] ?? 'neutral'">
-              {{ saysPassStatus(pass.status) }}
-            </UBadge>
+            <div class="flex items-center justify-between gap-3">
+              <span>{{ pass.passTypeName }} ({{ pass.priceLabel }}, {{ saysPrice(pass.pricePaid) }}), reference {{ pass.reference }}</span>
+              <UBadge :color="statusColor[pass.status] ?? 'neutral'">
+                {{ saysPassStatus(pass.status) }}
+              </UBadge>
+            </div>
+            <div
+              v-if="pass.qrSvg"
+              class="flex flex-wrap items-center gap-4"
+            >
+              <img
+                :src="`data:image/svg+xml;base64,${pass.qrSvg}`"
+                :alt="`QR code for pass ${pass.reference}`"
+                width="160"
+                height="160"
+                :data-test="`account-pass-qr-${pass.id}`"
+              >
+              <p class="text-muted">
+                Show at the door, on this screen or saved as an image.
+              </p>
+            </div>
           </li>
         </ul>
         <p

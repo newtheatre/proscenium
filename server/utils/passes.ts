@@ -139,6 +139,8 @@ export interface HeldPass {
   priceLabel: string
   pricePaid: number
   status: string
+  passTypeStatus: string
+  validUntil: number
   createdAt: number
 }
 
@@ -147,7 +149,8 @@ export interface HeldPass {
 export function heldPassesQuery(userId: string): SQL {
   return sql`
     SELECT p.id AS id, p.reference AS reference, t.name AS passTypeName, pr.label AS priceLabel,
-           p.price_paid AS pricePaid, p.status AS status, p.created_at AS createdAt
+           p.price_paid AS pricePaid, p.status AS status, t.status AS passTypeStatus,
+           t.valid_until AS validUntil, p.created_at AS createdAt
     FROM passes p
     JOIN pass_types t ON t.id = p.pass_type_id
     JOIN pass_type_prices pr ON pr.id = p.pass_type_price_id
