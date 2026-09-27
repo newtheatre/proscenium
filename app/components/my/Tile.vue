@@ -8,7 +8,9 @@ withDefaults(defineProps<{
   highlight?: boolean
   empty?: boolean
   emptyTitle?: string
-}>(), { highlight: false, empty: false, emptyTitle: undefined })
+  // A server route rather than a page: the link loads it rather than routing in the app.
+  external?: boolean
+}>(), { highlight: false, empty: false, emptyTitle: undefined, external: false })
 </script>
 
 <template>
@@ -17,6 +19,7 @@ withDefaults(defineProps<{
       :title="title"
       :to="to"
       :aria-label="`${title}: ${label}`"
+      :external="external"
       :highlight="highlight"
       highlight-color="primary"
       :ui="{ root: 'h-full min-h-12', container: 'h-full' }"

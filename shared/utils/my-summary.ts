@@ -60,6 +60,7 @@ export function orderMyTiles(summary: MySummary): MyTileName[] {
 function tileIsEmpty(summary: MySummary, name: MyTileName): boolean {
   if (name === 'shift') return !summary.shift && !summary.onShiftTonight
   if (name === 'room') return !summary.room
+  if (name === 'tickets') return !summary.ticket
   if (name === 'training') return summary.training.held === 0 && summary.training.available === 0 && !summary.training.nextStep
   if (name === 'passes') return summary.passes.active.length === 0 && !summary.passes.request
   if (name === 'notifications') return summary.notifications.length === 0
@@ -80,6 +81,7 @@ export function splitMyTiles(summary: MySummary): { tiles: MyTileName[], things:
 export const MY_THINGS_TO_DO: Record<Exclude<MyTileName, 'membership'>, { says: string, label: string, to: string }> = {
   shift: { says: 'You have no shift claimed.', label: 'See open shifts', to: '/rota' },
   room: { says: 'You have no room booked.', label: 'Book a room', to: '/rooms' },
+  tickets: { says: 'You have no bookings to come.', label: 'Book a show', to: '/whats-on' },
   training: { says: 'You have no training recorded yet.', label: 'See what we teach', to: '/training/modules' },
   passes: { says: 'You hold no pass.', label: 'See passes', to: '/account/passes' },
   notifications: { says: 'Nothing new has come in.', label: 'Choose what we email you about', to: '/account/notifications' },

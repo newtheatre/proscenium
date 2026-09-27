@@ -87,7 +87,7 @@ describe('empty tiles become one list of things you can do (K-127 criterion 6, i
   test('with nothing behind them, every tile but membership is a line on the list, in the standing order', () => {
     const { tiles, things } = splitMyTiles(EMPTY)
     expect(tiles).toEqual(['membership'])
-    expect(things).toEqual(['shift', 'room', 'training', 'passes', 'notifications', 'show'])
+    expect(things).toEqual(['shift', 'room', 'tickets', 'training', 'passes', 'notifications', 'show'])
   })
 
   test('a tile with something behind it stays a tile, and keeps its place by what is soonest', () => {
@@ -98,7 +98,7 @@ describe('empty tiles become one list of things you can do (K-127 criterion 6, i
     }
     const { tiles, things } = splitMyTiles(summary)
     expect(tiles).toEqual(['room', 'membership', 'passes'])
-    expect(things).toEqual(['shift', 'training', 'notifications', 'show'])
+    expect(things).toEqual(['shift', 'tickets', 'training', 'notifications', 'show'])
   })
 
   test('on shift tonight with no shift to show is still a tile: it is where tonight is reached', () => {
