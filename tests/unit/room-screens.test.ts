@@ -80,12 +80,19 @@ describe('what a submit does (C-105 criteria 7 and 8, C-120 criterion 7, issue 1
 
   // Issue 1338, docs/copy-style.md section 8: two fields never ask one question.
   test('what the room is for is asked once, as chips, with an optional name beside it', async () => {
-    for (const path of [BOOK, EXTERNAL]) {
+    for (const path of [BOOK, EXTERNAL, MINE]) {
       const source = await read(path)
       expect(source).toContain('<PurposeChips')
       expect(source).not.toContain('label="What it is for"')
       expect(source).toContain('label="A name for it"')
     }
+  })
+
+  // The change form on My bookings asks the same questions as the form that made the request.
+  test('changing a request asks what for by chips, and names it through the one fallback', async () => {
+    const source = await read(MINE)
+    expect(source).toContain('test-prefix="edit"')
+    expect(source).toContain('nameOrPurpose(')
   })
 
   test('the unlisted-room form names the earliest day it can be asked for', async () => {
