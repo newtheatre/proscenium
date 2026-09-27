@@ -383,6 +383,19 @@ describe('a member page is compact on a phone (0104, issue 1342)', () => {
     const layout = templateOf(await Bun.file('app/layouts/member.vue').text())
     expect(layout).toMatch(/:menu="\{\s*title:\s*'[A-Z][^']*'/)
   })
+
+  // The same missing keys name every layout's phone menu: header.title for a UHeader and
+  // dashboardSidebar.title for the console's sidebar (K-101).
+  test('every layout that draws a phone menu names it in words', async () => {
+    const unnamed: string[] = []
+    for (const name of await Array.fromAsync(new Bun.Glob('*.vue').scan('app/layouts'))) {
+      const layout = templateOf(await Bun.file(`app/layouts/${name}`).text())
+      for (const opening of layout.match(/<(UHeader|UDashboardSidebar)\b[^>]*>/g) ?? []) {
+        if (!/:menu="\{\s*title:\s*'[A-Z][^']*',\s*description:\s*'[A-Z][^']*'/.test(opening)) unnamed.push(`${name}: ${opening.split(/\s/)[0]}`)
+      }
+    }
+    expect(unnamed).toEqual([])
+  })
 })
 
 describe('a member nav label is the heading of the page it opens (issue 1342)', () => {
