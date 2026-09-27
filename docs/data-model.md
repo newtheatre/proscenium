@@ -745,7 +745,12 @@ means through the door, whoever booked, and a walk-up is `source = 'DOOR'`. The 
 Each of these counts is correlated into a caller's own query, so each aliases its own tables with
 a prefix (`held_t`, `unpaid_r`, `kind_tt` and so on): a bare `r` or `t` would bind a caller's
 `r.performance_id` to the count's own row and read the whole house, the bug #1295 found in the
-party count. `tests/unit/capacity-aliases.test.ts` refuses a bare alias in that file.
+party count. `tests/unit/capacity-aliases.test.ts` refuses a bare alias in that file. The counts
+correlated outside that file alias privately too: the programme's sold counts open a show's
+performances as `sold_p` and a bare-counted reference as `sold_ref` (`server/utils/programme.ts`),
+and the night report's `passAdmittedSeatsSubquery()` and `fellowshipAdmittedSeatsSubquery()` use
+`passadm_` and `fellow_` (`server/utils/night-report.ts`); `tests/integration/subquery-aliases.test.ts`
+pins them.
 
 **Booking (D-104).** `POST /api/reservations` is the one write path, deliberately public: a
 signed-in caller attaches to their own account, and a guest supplies a name and an email, which
