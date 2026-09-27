@@ -20,16 +20,7 @@ const POINTER_ONLY = /\bhover:|group-hover:|@(mouseenter|mouseover|mouseleave|db
 // and a width `@media` rule. A container's `@md:` or `@min-[...]:` passes, as does any other media query.
 const WINDOW_WIDTH = /(?<![\w@-])(?:max-)?(?:sm|md|lg|xl|2xl):|(?<![\w@-])(?:min|max)-\[[^\]]+\]:|@media[^{]*\bwidth\b/
 
-// Tailwind's container scale in rem, which both `max-w-*` and the `@*:` variants read.
-const CONTAINER_REM: Record<string, number> = {
-  '3xs': 16, '2xs': 18, 'xs': 20, 'sm': 24, 'md': 28, 'lg': 32, 'xl': 36,
-  '2xl': 42, '3xl': 48, '4xl': 56, '5xl': 64, '6xl': 72, '7xl': 80,
-}
-const capOf = (source: string): number | undefined => CONTAINER_REM[source.match(/\bmax-w-([\w-]+)/)?.[1] ?? '']
-
 const STOCKTAKE_COUNTS = 'app/components/stocktake/Counts.vue'
-// What the flexible first column keeps for the item's name once the fixed columns are paid for.
-const ROOM_FOR_A_NAME_REM = 10
 
 // Nuxt's own names for the application's components, from the declarations `nuxt prepare` writes
 // on install, so the walk below never has to reimplement Nuxt's naming.
@@ -48,26 +39,19 @@ async function componentFiles(): Promise<Map<string, string>> {
 async function tonightTree(): Promise<Map<string, string>> {
   const named = await componentFiles()
   const tag = new RegExp(`<(?:Lazy|lazy-)?(${[...named.keys()].join('|')})[\\s/>]`, 'g')
-  const sources = new Map<string, string>()
   const queue = [LAYOUT]
   for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/pages', onlyFiles: true })) {
-    const path = `app/pages/${entry.replaceAll('\\', '/')}`
-    const source = await read(path)
-    if (/layout:\s*'tonight'/.test(source)) {
-      sources.set(path, source)
-      queue.push(path)
-    }
+    if (/layout:\s*'tonight'/.test(await read(`app/pages/${entry}`))) queue.push(`app/pages/${entry}`)
   }
-  const seen = new Set<string>()
+  const tree = new Map<string, string>()
   while (queue.length > 0) {
     const file = queue.pop()!
-    if (seen.has(file)) continue
-    seen.add(file)
-    const source = sources.get(file) ?? await read(file)
-    sources.set(file, source)
+    if (tree.has(file)) continue
+    const source = await read(file)
+    tree.set(file, source)
     for (const [, name] of source.matchAll(tag)) queue.push(named.get(name!)!)
   }
-  return new Map([...sources].sort(([a], [b]) => a.localeCompare(b)))
+  return tree
 }
 
 describe('the stale label (K-102, "last synced HH:MM")', () => {
@@ -147,29 +131,15 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     expect(source).not.toContain('UDashboard')
   })
 
-  // The desktop layout is the adaptation: the column is capped and centred, and nothing in the
-  // shell starts from a wide layout and squeezes down.
-  test('the shell adapts upwards from the phone, never downwards from a desk', async () => {
-    const files = [LAYOUT, ...COMPONENTS.map(name => `app/components/${name}.vue`)]
-    const offenders: string[] = []
-    for (const file of files) {
-      const source = await read(file)
-      source.split('\n').forEach((line, index) => {
-        if (/\bmax-(sm|md|lg|xl):/.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`)
-      })
-    }
-    expect(offenders).toEqual([])
-    expect(await component('NightScreen')).toMatch(/\bmax-w-/)
-  })
-
   // Issue 1520: every page on the tonight layout is a capped column at any window width, so what
   // changes shape inside it must key to its container; a window variant fires while it is still narrow.
   test('every page on the tonight layout is a capped column, laid out by container and never by window', async () => {
+    expect(await component('NightScreen')).toMatch(/\bmax-w-/)
     const tree = await tonightTree()
     expect([...tree.keys()]).toContain(STOCKTAKE_COUNTS)
     const offenders: string[] = []
     for (const [file, source] of tree) {
-      if (file.startsWith('app/pages/') && !source.includes('<NightScreen') && capOf(source) === undefined) {
+      if (file.startsWith('app/pages/') && !source.includes('<NightScreen') && !/\bmax-w-/.test(source)) {
         offenders.push(`${file}: neither a NightScreen nor a capped column`)
       }
       source.split('\n').forEach((line, index) => {
@@ -179,22 +149,11 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     expect(offenders).toEqual([])
   })
 
-  test('a stocktake line takes its three columns only where its container holds them', async () => {
+  // Whether the three columns fit is proved in a browser (tests/e2e/bar-stocktakes.test.ts).
+  test('a stocktake line takes its columns from its container', async () => {
     const source = await read(STOCKTAKE_COUNTS)
     expect(source).toMatch(/class="@container\b/)
-    const line = source.match(/class="([^"]*@[\w-]+:grid-cols-[^"]*)"/)?.[1] ?? ''
-    const grid = line.match(/@([\w-]+):grid-cols-\[minmax\(0,1fr\)((?:_minmax\(0,[\d.]+rem\))+)\]/)
-    expect(grid).not.toBeNull()
-    const [, size, fixed] = grid!
-    const fixedRem = [...fixed!.matchAll(/([\d.]+)rem/g)].reduce((sum, [, rem]) => sum + Number(rem), 0)
-    const gaps = fixed!.split('_').length - 1
-    // Tailwind spacing is a quarter rem a step; the list's border is a pixel each side.
-    const step = (utility: string): number => Number(line.match(new RegExp(`(?:^|\\s)${utility}-(\\d+)(?:\\s|$)`))?.[1] ?? 0) / 4
-    const needed = fixedRem + gaps * step('gap') + 2 * step('p') + 2 / 16 + ROOM_FOR_A_NAME_REM
-    expect(CONTAINER_REM[size!]).toBeGreaterThanOrEqual(needed)
-    const column = capOf(await component('NightScreen'))
-    expect(column).toBeDefined()
-    expect(CONTAINER_REM[size!]).toBeGreaterThan(column!)
+    expect(source).toMatch(/@3xl:grid-cols-/)
   })
 
   // The hub is the exception, and only the hub: it is the navigation rather than a screen with

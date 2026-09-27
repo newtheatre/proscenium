@@ -6,7 +6,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
-import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, openSignedOutView, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
@@ -115,23 +115,9 @@ function movementsFor(itemId: string): { qty: number, kind: string, refTable: st
   }
 }
 
-// The Bar Manager signed in on a screen of the given size. A view that fails to sign in is closed
-// here, since the caller never receives it to close.
-async function signedIn(width = 375, height = 812): Promise<Bun.WebView> {
-  const screen = await openSignedOutView(app.baseURL, { width, height })
-  try {
-    await visit(screen, `${app.baseURL}/sign-in`)
-    await fill(screen, 'form input[type="email"]', barManager.email)
-    await fill(screen, 'form input[type="password"]', barPassword)
-    await click(screen, 'form button[type="submit"]')
-    await waitFor(screen, `document.querySelector('[data-test="account-menu"]')`)
-    return screen
-  }
-  catch (failure) {
-    screen.close()
-    throw failure
-  }
-}
+// The Bar Manager, signed in on a screen of the given size.
+const signedIn = (width = 375, height = 812): Promise<Bun.WebView> =>
+  signInView(app.baseURL, barManager.email, barPassword, { width, height })
 
 describe.skipIf(skip !== null)('opening a stocktake captures on-hand at that moment (F-115 criterion 1)', () => {
   test('a line is captured with the current on-hand, unaffected by a later delivery', async () => {
@@ -845,7 +831,13 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
   const overlaps = (a: Box, b: Box): boolean =>
     a.right > a.left && b.right > b.left && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
 
-  test('on tonight\'s screen, at a desk and on a phone, no part of a line sits on another', async () => {
+  function clashes(where: string, line: LineLayout): string[] {
+    const parts = { name: line.name, fields: line.fields, figures: line.figures }
+    const pairs = [['name', 'fields'], ['name', 'figures'], ['fields', 'figures']] as const
+    return pairs.filter(([a, b]) => overlaps(parts[a], parts[b])).map(([a, b]) => `${where}: ${a} over ${b}`)
+  }
+
+  test('no part of a line sits on another on tonight\'s screen, and the console keeps one row at a desk', async () => {
     const uncounted = await anItem({ containerMl: 750 })
     const counted = await anItem({ containerMl: 700 })
     await deliver(counted.id, 2100)
@@ -854,39 +846,28 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
     try {
       expect((await count(opened.stocktake.id, [{ itemId: counted.id, counted: 1750 }])).status).toBe(200)
       screen = await signedIn(1280, 800)
+      const found: string[] = []
       for (const [width, height] of [[1280, 800], [360, 740]] as const) {
-        await screen.resize(width, height)
+        if (width !== 1280) await screen.resize(width, height)
         await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${uncounted.id}"]`)
         await waitFor(screen, `document.querySelector('[data-test="variance-${counted.id}"]')`)
         for (const item of [uncounted, counted]) {
           const line = await layoutOf(screen, item.id)
-          const at = `${width}px, ${item.name}`
-          expect(`${at}: name over fields ${overlaps(line.name, line.fields)}`).toBe(`${at}: name over fields false`)
-          expect(`${at}: name over figures ${overlaps(line.name, line.figures)}`).toBe(`${at}: name over figures false`)
-          expect(`${at}: fields over figures ${overlaps(line.fields, line.figures)}`).toBe(`${at}: fields over figures false`)
-          expect(line.inputs).toHaveLength(2)
-          for (const input of line.inputs) expect(input).toBeGreaterThanOrEqual(USABLE_FIELD_PX)
+          const where = `${width}px, ${item.name}`
+          found.push(...clashes(where, line))
+          if (line.inputs.length !== 2) found.push(`${where}: ${line.inputs.length} count fields`)
+          for (const input of line.inputs) {
+            if (input < USABLE_FIELD_PX) found.push(`${where}: a count field ${Math.round(input)}px wide`)
+          }
         }
       }
-    }
-    finally {
-      screen?.close()
-      await apply(opened.stocktake.id)
-    }
-  }, 120_000)
+      expect(found).toEqual([])
 
-  // The console's column is wide at a desk, so there the line keeps its three columns side by side.
-  test('on the console at a desk, a line\'s name, fields and figures still share one row', async () => {
-    const item = await anItem({ containerMl: 700 })
-    await deliver(item.id, 2100)
-    const opened = await open()
-    let screen: Bun.WebView | undefined
-    try {
-      expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 1750 }])).status).toBe(200)
-      screen = await signedIn(1280, 800)
-      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
-      await waitFor(screen, `document.querySelector('[data-test="variance-${item.id}"]')`)
-      const line = await layoutOf(screen, item.id)
+      // The console's column is wide at a desk, so there the line keeps its three columns in a row.
+      await screen.resize(1280, 800)
+      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${counted.id}"]`)
+      await waitFor(screen, `document.querySelector('[data-test="variance-${counted.id}"]')`)
+      const line = await layoutOf(screen, counted.id)
       expect(line.fields.left).toBeGreaterThanOrEqual(line.name.right)
       expect(line.figures.left).toBeGreaterThanOrEqual(line.fields.right)
       expect(line.fields.top).toBeLessThan(line.name.bottom)

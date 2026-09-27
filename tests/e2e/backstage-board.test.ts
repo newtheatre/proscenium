@@ -7,7 +7,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { LAST_NIGHTS_BOARD } from '#shared/utils/backstage'
 import { daysAfter } from '#shared/utils/membership'
 import { currentShowNight } from '#shared/utils/show-night'
-import { click, fill, openSignedOutView, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openView, signInView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -387,13 +387,8 @@ describe.skipIf(skip !== null)('the current state fits the column it is given (i
       wings.close()
     }
 
-    const desk = await openSignedOutView(app.baseURL, { width: 1280, height: 800 })
+    const desk = await signInView(app.baseURL, manager.email, password, { width: 1280, height: 800 })
     try {
-      await visit(desk, `${app.baseURL}/sign-in`)
-      await fill(desk, 'form input[type="email"]', manager.email)
-      await fill(desk, 'form input[type="password"]', password)
-      await click(desk, 'form button[type="submit"]')
-      await waitFor(desk, `document.querySelector('[data-test="account-menu"]')`)
       await visit(desk, `${app.baseURL}/tonight/board`, '[data-test="board-current"]')
       await waitFor(desk, BOTH_CALLS, 30_000)
       stacked(await desk.evaluate<Box[]>(ENDS))
