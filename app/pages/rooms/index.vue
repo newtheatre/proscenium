@@ -258,10 +258,10 @@ useSeoMeta({ title: 'Rooms' })
 
     <div
       v-if="shown === 'day'"
-      class="mt-3 flex items-center gap-2"
+      class="mt-3 space-y-2"
     >
       <div
-        class="flex flex-1 gap-1 overflow-x-auto pb-1"
+        class="flex gap-1 overflow-x-auto pb-1"
         role="group"
         aria-label="The coming fortnight"
         data-test="date-strip"
@@ -281,11 +281,14 @@ useSeoMeta({ title: 'Rooms' })
           <span class="text-sm font-semibold">{{ one.date }}</span>
         </UButton>
       </div>
-      <DateField
-        v-model="picked"
-        aria-label="Another day"
-        data-test="calendar-pick-day"
-      />
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-muted">Or another day</span>
+        <DateField
+          v-model="picked"
+          aria-label="Another day"
+          data-test="calendar-pick-day"
+        />
+      </div>
     </div>
 
     <p
