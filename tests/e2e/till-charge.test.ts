@@ -495,3 +495,48 @@ describe.skipIf(skip !== null)('the screen', () => {
     view.close()
   }, 120_000)
 })
+
+// Every bar's charges are listed at every till, since they share the one reader (issue 1308), so a
+// row another bar started says which bar, and this till's own rows say nothing extra.
+describe.skipIf(skip !== null)('another bar\'s unanswered charge names its bar', () => {
+  test('the list carries each charge\'s bar, and the till names only another bar\'s', async () => {
+    const { variantId } = await aSellableProduct({ name: named('Two bars') })
+    const house = programme('charge-other-bar-house')
+    const studio = programme('charge-other-bar-studio')
+    await openTill(house.venueId)
+    await openTill(studio.venueId)
+    const houseName = query<{ name: string }>(app, 'SELECT name FROM venues WHERE id = ?', house.venueId)!.name
+    const studioName = query<{ name: string }>(app, 'SELECT name FROM venues WHERE id = ?', studio.venueId)!.name
+    const start = async (venueId: string): Promise<string> => {
+      const started = await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 250 }, barManager.cookie)
+      expect(started.status).toBe(200)
+      return (await started.json() as { id: string }).id
+    }
+    const atHouse = await start(house.venueId)
+    const atStudio = await start(studio.venueId)
+
+    try {
+      const listed = await send('GET', `/api/till/payments?venueId=${house.venueId}`, undefined, barManager.cookie)
+      const { attempts } = await listed.json() as { attempts: { id: string, venueId: string, venueName: string }[] }
+      expect(attempts.find(attempt => attempt.id === atStudio)).toMatchObject({ venueId: studio.venueId, venueName: studioName })
+
+      const view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', barManager.email)
+      await fill(view, 'form input[type="password"]', barPassword)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      await visit(view, `${app.baseURL}/tonight/till?venueId=${house.venueId}`, '[data-test="till-open"]')
+      await waitFor(view, `document.querySelector('[data-test="sumup-open-${atStudio}"]') && document.querySelector('[data-test="sumup-open-${atHouse}"]')`)
+      expect(await textOf(view, `[data-test="sumup-open-${atStudio}"]`)).toContain(studioName)
+      expect(await textOf(view, `[data-test="sumup-open-${atHouse}"]`)).not.toContain(houseName)
+      view.close()
+    }
+    finally {
+      // Nothing left waiting on tonight's shared reader for a later close in this file to trip on.
+      await answerCharge(app, atHouse, 'declined', barManager.cookie)
+      await answerCharge(app, atStudio, 'declined', barManager.cookie)
+    }
+  }, 120_000)
+})
