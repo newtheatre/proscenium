@@ -165,6 +165,14 @@ export function pruneNightCache(store: NightCacheStore, night: string): string[]
   return dropped
 }
 
+// Signing out takes every night off the device: a shared phone must not show the next person what
+// the last one was shown, such as a duty manager's number (A-114). Keys not ours stay.
+export function clearNightCache(store: NightCacheStore): string[] {
+  const dropped = nightCacheKeysIn(store)
+  for (const key of dropped) store.removeItem(key)
+  return dropped
+}
+
 // A failure leaves the last good night where it was and rejects, so the screen keeps rendering
 // what it had (K-103 criterion 2). It answers even when the device refused to store the result.
 export async function refreshNightCache<T>(store: NightCacheStore, key: NightCacheKey, loader: () => Promise<T>, at: Date = new Date()): Promise<NightCacheEntry<T>> {

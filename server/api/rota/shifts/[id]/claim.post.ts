@@ -34,8 +34,8 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // The duty manager's answer lands only if this claim took the shift (issue 1310).
-  const answer = shareNumber === undefined ? [] : [db.run(shareNumberStatement(id, account.id, shareNumber))]
+  // The duty manager's answer lands only behind this claim's own audit row (issue 1310).
+  const answer = shareNumber === undefined ? [] : [db.run(shareNumberStatement(entry.id, account.id, shareNumber))]
   const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(claimShiftStatement(id, account.id, status)), entry, ...answer))
 
   if (!applied) {

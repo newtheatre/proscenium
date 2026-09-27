@@ -1573,10 +1573,11 @@ new primary key as something to copy rather than to invent. Corrected to `lower(
 per migrated row; the append-only triggers are hand-added after generation, as this whole family
 of tables requires (0010).
 
-`GET /api/tonight/emergency` answers `{ cards }` to any signed-in account (`requireAccount`, issue
-1310): one card for every venue `venuesTonightQuery` finds running tonight, a venue with a
-non-cancelled performance or bar opening in the night, where an external venue counts only once a
-shift is held on its performance or its card has been filed. A venue with no card yet is still
+`GET /api/tonight/emergency` answers `{ viewerId, cards }` to any signed-in account
+(`requireAccount`, issue 1310): one card for every venue `venuesTonightQuery` finds running
+tonight, a venue with a non-cancelled performance or bar opening in the night, where an external
+venue counts only once its performance tonight carries a shift that is not cancelled (as
+`listedVenue` reads it) or its card has been filed. A venue with no card yet is still
 listed, its fields null, so nobody is shown another building's address. Each card carries two
 derived fields. `dutyManagers` is `dutyManagersOnCall` over the venue's team, but only where
 `requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'], { venueId })` answers, and it
@@ -1599,14 +1600,20 @@ with a whole-night key (screen `emergency-cards`), so any show-night screen, not
 signed in opens. `/tonight/emergency` then reads that same key through `useNightCache`, which is
 what makes the card open with no round trip after a device restart, exactly the old estate's gap
 the criterion names. Whole-night rather than venue-scoped, since the answer already holds every
-venue running tonight.
+venue running tonight. A phone may be shared, so the copy it keeps is stamped with `viewerId` and
+the screen shows its duty managers' numbers only to that account (`emergencyCardsFor`); anybody
+else sees the same cards without them. Signing out (`AuthStatus.vue`) clears every night key on
+the device (`clearNightCache`), and `/tonight/emergency` carries the `signed-in` middleware, so a
+signed-out visitor is sent to sign in rather than shown a cached card.
 
 `POST /api/rota/shifts/[id]/claim` takes an optional `{ shareNumber }` (`shiftClaimForm`). My
 rota asks it of a duty manager shift before the claim goes, with neither answer selected, and the
 answer is the profile's own shift-contact consent: `shareNumberStatement` upserts
 `shift_contact_preferences` in the claim's own batch, after the claim and its audit row, behind
-an `EXISTS` on the shift now being this account's, so a claim that lost changes nobody's consent
-(0003). The claim's audit detail records `sharesNumber`, never the number.
+an `EXISTS` on that audit row (written only if the claim changed the shift, the pattern
+`closeReadingStatement` uses), so a refused claim, a lost race or a stale re-claim of your own
+shift changes nobody's consent (0003). The claim's audit detail records `sharesNumber`, never the
+number.
 
 ### The backstage board's join (E-120)
 

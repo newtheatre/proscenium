@@ -44,6 +44,17 @@ export function cardAddressDraft(cardAddress: string | null, venueAddress: strin
   return cardAddress ?? venueAddress ?? ''
 }
 
+// A cached answer outlives the person who fetched it on a shared phone, so its duty managers'
+// numbers show only to that account; everybody else keeps the addresses without them (A-114).
+export function emergencyCardsFor<T extends { dutyManagers: unknown[] | null }>(
+  answer: { viewerId: string, cards: T[] } | null,
+  viewerId: string | null,
+): T[] | null {
+  if (!answer) return null
+  if (viewerId !== null && answer.viewerId === viewerId) return answer.cards
+  return answer.cards.map(card => ({ ...card, dutyManagers: null }))
+}
+
 // A first name and the jobs they hold tonight: the card is read by anyone signed in (issue 1310).
 export interface FirstAider { firstName: string, roles: ShiftRole[] }
 

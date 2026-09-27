@@ -138,7 +138,7 @@ export function dutyManagersOnCall(team: readonly TonightTeamMember[]): OnCall[]
 export interface VenueTonight { venueId: string, venueName: string }
 
 // Every venue running tonight, read by anyone signed in (E-113 criterion 2 as amended, 0077). An
-// external venue counts once we staff it or have filed its card: until then its own rules apply.
+// external venue counts once its rota has a shift or its card is filed: until then its own rules apply.
 export function venuesTonightQuery(from: number, to: number): SQL {
   const opening = sql`EXISTS (
     SELECT 1 FROM bar_openings o
@@ -205,15 +205,13 @@ export async function firstAidersTonight(venueId: string, from: number, to: numb
   return readFirstAiders(await db.all<{ name: string, roles: string }>(firstAidersTonightQuery(venueId, from, to, moduleId, today)))
 }
 
-// The answer a duty manager gives at the claim, batched after the claim and written only if that
-// claim took the shift, so a lost race changes nobody's consent (A-114, 0003).
-export function shareNumberStatement(shiftId: string, userId: string, visible: boolean): SQL {
+// The answer a duty manager gives at the claim, behind the claim's own audit row, so a refused
+// claim, a lost race or a stale re-claim of your own shift changes nobody's consent (A-114, 0003).
+export function shareNumberStatement(auditId: string, userId: string, visible: boolean): SQL {
   return sql`
     INSERT INTO shift_contact_preferences (user_id, visible, updated_at)
     SELECT ${userId}, ${visible ? 1 : 0}, unixepoch()
-    WHERE EXISTS (
-      SELECT 1 FROM shifts WHERE id = ${shiftId} AND user_id = ${userId} AND status IN ('CLAIMED', 'CONFIRMED')
-    )
+    WHERE EXISTS (SELECT 1 FROM audit_log WHERE id = ${auditId})
     ON CONFLICT (user_id) DO UPDATE SET visible = excluded.visible, updated_at = excluded.updated_at
   `
 }

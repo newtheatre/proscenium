@@ -67,7 +67,8 @@ describe('the card is primed and read for anyone, under one key (E-113 criterion
 // On a shared phone the cached card outlives the person who fetched it, so its numbers go with
 // them: a copy stamped for another account keeps its addresses and loses the numbers (A-114).
 describe('a cached card\'s numbers are the fetching account\'s alone', () => {
-  const answer = {
+  interface Card { venueId: string, address: string, dutyManagers: { name: string, phone: string }[] | null }
+  const answer: { viewerId: string, cards: Card[] } = {
     viewerId: 'rowan',
     cards: [{ venueId: 'house', address: 'Cherry Tree Hill', dutyManagers: [{ name: 'Rowan Ellis', phone: '07700 900333' }] }],
   }

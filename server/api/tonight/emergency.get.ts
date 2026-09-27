@@ -6,15 +6,19 @@ import type { OnCall, VenueTonight } from '#server/utils/tonight'
 // Every venue running tonight, to anyone signed in, cached on the device by any show-night screen
 // (E-113 criteria 2, 4 as amended by issue 1310). The building's card is whoever holds the phone's.
 export default defineEventHandler(async (event) => {
-  await requireAccount(event)
+  const account = await requireAccount(event)
   const { from, to } = showNightBounds(currentShowNight())
   const [start, end] = [Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)]
   const firstAidModule = await configValueIfSet(event, 'FIRST_AID_MODULE')
 
   const venues = await venuesTonight(start, end)
   const cards = await Promise.all(venues.map(venue => cardTonight(event, venue, start, end, firstAidModule)))
-  // The venues the caller works tonight lead, so a two-venue night opens on their own building.
-  return { cards: [...cards].sort((a, b) => Number(b.dutyManagers !== null) - Number(a.dutyManagers !== null)) }
+  // The venues the caller works tonight lead, so a two-venue night opens on their own building;
+  // `viewerId` stamps whose numbers these are, for the copy the phone keeps (A-114).
+  return {
+    viewerId: account.id,
+    cards: cards.sort((a, b) => Number(b.dutyManagers !== null) - Number(a.dutyManagers !== null)),
+  }
 })
 
 async function cardTonight(event: H3Event, venue: VenueTonight, from: number, to: number, firstAidModule: string | null) {

@@ -3,10 +3,10 @@ import { saysWhenLong } from '#shared/utils/when'
 import { nightCacheKey } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
-import { saysFirstAiders } from '#shared/utils/venue-emergency'
+import { emergencyCardsFor, saysFirstAiders } from '#shared/utils/venue-emergency'
 import type { FirstAider } from '#shared/utils/venue-emergency'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/tonight/emergency' })
+definePageMeta({ layout: 'tonight', middleware: 'signed-in', docs: '/docs/tonight/emergency' })
 useSeoMeta({ title: 'Emergency card' })
 
 interface Card {
@@ -28,9 +28,10 @@ interface Card {
   dutyManagers: { name: string, phone: string }[] | null
 }
 
-interface Cards { cards: Card[] }
+interface Cards { viewerId: string, cards: Card[] }
 
 const request = useRequestFetch()
+const { account } = useAccount()
 
 // Rendered into the HTML, so a first-ever visit with no signal still carries the address to read
 // out (E-113 criterion 4). A failed read leaves `data` null: the empty state, not a 500.
@@ -44,8 +45,8 @@ const key = nightCacheKey({ screen: 'emergency-cards', night: currentShowNight()
 const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emergency'))
 
 // The served copy until the device has something of its own, then the device's: one is as old as
-// this request, the other as old as the last successful one, and the screen says which.
-const cards = computed(() => (cache.data.value ?? served.value)?.cards ?? null)
+// this request, the other as old as the last successful one. Its numbers are only its fetcher's.
+const cards = computed(() => emergencyCardsFor(cache.data.value ?? served.value, account.value.user?.id ?? null))
 const asOfAt = computed(() => cache.data.value ? cache.cachedAt.value : Date.now())
 
 function asOf(at: number): string {
