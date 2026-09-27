@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { TillLeftOpen } from './till'
 
 // The pre and post-show checklist's vocabulary (E-114). Nothing here reads a request or the
 // database; `server/utils/checklist.ts` is where an item is stamped, ticked and exempted.
@@ -22,6 +23,42 @@ export function saysSystemCheck(check: SystemCheck): string {
     case 'INCIDENTS_REVIEWED': return 'Tonight\'s incidents reviewed'
     default: return check satisfies never
   }
+}
+
+// One stamped item as `GET /api/tonight/checklist` and the night report carry it (E-114).
+export interface ChecklistEntry {
+  id: string
+  itemId: string
+  phase: Phase
+  label: string
+  required: boolean
+  systemCheck: SystemCheck | null
+  done: boolean
+  tickedByName: string | null
+  tickedAt: number | null
+  exempted: boolean
+  exemptReason: string | null
+  exemptedByName: string | null
+  exemptedAt: number | null
+}
+
+export interface ChecklistClose {
+  performanceId: string
+  // Null for a night that closed itself: nobody closed it (E-125 criterion 2).
+  closedByName: string | null
+  closedAt: number
+  automatic: boolean
+}
+
+// `GET /api/tonight/checklist`'s answer, which the route `satisfies`: every screen reads this one
+// declaration, so a field renamed on the server fails the type check wherever it is read.
+export interface TonightChecklist {
+  performanceId: string
+  night: string
+  venueId: string
+  items: ChecklistEntry[]
+  close: ChecklistClose | null
+  till: TillLeftOpen
 }
 
 // `systemClear` is null for a hand-ticked item. Any item, one that ticks itself included, is

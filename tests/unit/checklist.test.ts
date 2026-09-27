@@ -14,6 +14,8 @@ import {
 // E-114's pure vocabulary and validation. What the database holds is proved against the real
 // migrations in `tests/integration/checklist.test.ts`.
 
+const read = (path: string): Promise<string> => Bun.file(path).text()
+
 const base = { venueId: 'venue-1', phase: 'PRE' as const, label: 'Fire exits checked', sort: 1, required: true }
 
 describe('a checklist item names a venue, a phase, a label and an order (criterion 1)', () => {
@@ -104,5 +106,36 @@ describe('a blocked close says what is holding it and what to do (criterion 4)',
     const said = saysBlockedClose(['Till reconciled'])
     expect(said).not.toEndWith('.')
     expect(said).not.toStartWith('Cannot close')
+  })
+})
+
+// Every screen reads the one shape the route returns, so a field renamed on the server fails the
+// type check on each page that reads it, not at the moment one reads it (E-114).
+describe('the checklist answer is declared once, in shared (E-114)', () => {
+  const readers = [
+    'app/pages/tonight/index.vue',
+    'app/pages/tonight/checklist/index.vue',
+    'app/components/NightChecklistItems.vue',
+    'app/pages/tonight/report.vue',
+  ]
+
+  test('the route returns the shared answer, and the server keeps no copy of the entry', async () => {
+    expect(await read('server/api/tonight/checklist/index.get.ts')).toContain('satisfies TonightChecklist')
+    expect(await read('server/utils/checklist.ts')).not.toContain('export interface ChecklistEntry')
+    expect(await read('shared/utils/checklist.ts')).toContain('export interface TonightChecklist')
+  })
+
+  test.each(readers)('%s takes its entry from the shared type, not a copy of its own', async (path) => {
+    const source = await read(path)
+    expect(source).toMatch(/import type \{[^}]*\bChecklistEntry\b[^}]*\} from '#shared\/utils\/checklist'/)
+    expect(source).not.toMatch(/interface (Checklist)?Entry \{/)
+    expect(source).not.toMatch(/^\s+tickedByName: /m)
+  })
+
+  test('the hub and the checklist read the whole answer, till and close included, by its name', async () => {
+    const checklist = await read('app/pages/tonight/checklist/index.vue')
+    expect(checklist).toContain('request<TonightChecklist>')
+    expect(checklist).not.toContain('interface CloseInfo')
+    expect(await read('app/pages/tonight/index.vue')).toContain('request<TonightChecklist>')
   })
 })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { HUB_KPI_LABELS, checklistHint, curtainIsDown, hubKpis, hubTiles, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
 import { activePerformanceId } from '#shared/utils/tonight'
+import type { ChecklistEntry, TonightChecklist } from '#shared/utils/checklist'
 import type { HubHouse, HubTileId } from '#shared/utils/night-hub'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight' })
@@ -18,7 +19,6 @@ interface Performance {
   house: HubHouse
 }
 interface HouseTonight { night: string, venueId: string, performances: Performance[] }
-interface ChecklistEntry { phase: 'PRE' | 'POST', label: string, required: boolean, done: boolean }
 
 // Every 20 seconds while the screen is open, so house numbers move on their own (criterion 3).
 const POLL_MS = 20_000
@@ -45,7 +45,7 @@ const dutyManager = computed(() => authority.value.roles.includes('DUTY_MANAGER'
 async function loadChecklist(): Promise<void> {
   if (!dutyManager.value) return
   try {
-    checklist.value = (await request<{ items: ChecklistEntry[] }>('/api/tonight/checklist')).items
+    checklist.value = (await request<TonightChecklist>('/api/tonight/checklist')).items
   }
   catch {
     // The banner keeps what it last read.

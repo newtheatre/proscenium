@@ -1,19 +1,10 @@
 <script setup lang="ts">
 import { REVIEWED_AT_SIGN_OFF } from '#shared/utils/night-signoff'
-import type { SystemCheck } from '#shared/utils/checklist'
+import type { ChecklistEntry } from '#shared/utils/checklist'
 
 // The checklist's rows as the checklist and the night report both draw them (issue 1315): Tick
 // where a hand may tick, and a quiet "Can't do this?" line for an exception (E-114 criterion 5).
-interface Entry {
-  id: string
-  label: string
-  required: boolean
-  systemCheck: SystemCheck | null
-  done: boolean
-  tickedByName: string | null
-  exempted: boolean
-  exemptReason: string | null
-}
+type Entry = Pick<ChecklistEntry, 'id' | 'label' | 'required' | 'systemCheck' | 'done' | 'tickedByName' | 'exempted' | 'exemptReason'>
 
 const props = defineProps<{ items: Entry[], performanceId: string | null }>()
 const emit = defineEmits<{ changed: [] }>()

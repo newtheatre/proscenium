@@ -14,7 +14,7 @@ import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
-import type { ChecklistEntry } from '#server/utils/checklist'
+import type { ChecklistEntry } from '#shared/utils/checklist'
 import type { NightReport } from '#server/utils/night-report'
 import type { SQL } from 'drizzle-orm'
 
