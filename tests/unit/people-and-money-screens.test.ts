@@ -91,6 +91,11 @@ describe('a ledger entry says what it was and opens', () => {
     const source = await read(MONEY)
     for (const figure of ['kind: \'REFUND\'', 'tender: \'COMP\'', 'discounted: true']) expect(source).toContain(figure)
     expect(source).toContain('/money/reconciliation')
+    // A revenue row is card takings only, so its entries are too; the source is typed, not cast.
+    expect(source).toContain('entriesUrl({ source: row.original.source, tender: \'CARD\' })')
+    // An open variance is made of nights, so it opens the list of them, not tonight's page.
+    expect(source).toContain('to: \'#nights-needing-you\'')
+    expect(await read(NEEDS_YOU)).toContain('id="nights-needing-you"')
   })
 
   test('a money screen with nothing to search shows no search box', async () => {

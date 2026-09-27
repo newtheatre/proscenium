@@ -279,9 +279,9 @@ describe('an entry says what it was, and is found by it', () => {
     return { performanceId, reservationId: `r-${suffix}` }
   }
 
-  function placed(database: TestDatabase, entryId: string, kind: string, amountPence: number, refs: { performanceId?: string, reservationId?: string, qty?: number, discountPence?: number } = {}): void {
-    database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, performance_id, reservation_id, discount_pence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      `l-${++lineSeq}`, entryId, kind, amountPence, refs.qty ?? 1, refs.performanceId ?? null, refs.reservationId ?? null, refs.discountPence ?? 0]])
+  function placed(database: TestDatabase, entryId: string, kind: string, amountPence: number, refs: { performanceId?: string, reservationId?: string, qty?: number, discountPence?: number, discountPercent?: number } = {}): void {
+    database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, performance_id, reservation_id, discount_pence, discount_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      `l-${++lineSeq}`, entryId, kind, amountPence, refs.qty ?? 1, refs.performanceId ?? null, refs.reservationId ?? null, refs.discountPence ?? 0, refs.discountPercent ?? null]])
   }
 
   const found = (database: TestDatabase, raw: Record<string, string> = {}): string[] =>
@@ -362,6 +362,32 @@ describe('an entry says what it was, and is found by it', () => {
       const lines = read<Record<string, unknown>>(database, ledgerEntryLinesQuery(comp))
       expect(lines).toEqual([expect.objectContaining({ kind: 'REFUND', showTitle: 'A Test Show', reference: 'DETREF' })])
       expect(read(database, ledgerEntryDetailQuery('no-such-entry'))).toEqual([])
+    })
+  })
+
+  // The discount is snapshotted on the line, never the entry, so the panel reads it from there.
+  test('a line carries its own discount, in pence and as a percentage', async () => {
+    await withDatabase(async (database) => {
+      const bar = entry(database, 'TILL', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, bar, 'BAR_ITEM', 400, { discountPence: 100, discountPercent: 20 })
+      expect(read(database, ledgerEntryLinesQuery(bar))).toEqual([expect.objectContaining({ discountPence: 100, discountPercent: 20 })])
+    })
+  })
+
+  // rowid is the order the lines were rung up; the ids are random, so they would order nothing.
+  test('an entry\'s first show and reference, and its lines, follow the order they were written', async () => {
+    await withDatabase(async (database) => {
+      const first = booked(database, 'first', 'AAAREF')
+      const second = booked(database, 'second', 'ZZZREF')
+      const refund = entry(database, 'DESK', 'CARD', NOON_ON(DAY), DAY)
+      database.batch([
+        ['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, performance_id, reservation_id) VALUES (?, ?, ?, ?, ?, ?)', 'zz-line', refund, 'REFUND', -900, second.performanceId, second.reservationId],
+        ['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, performance_id, reservation_id) VALUES (?, ?, ?, ?, ?, ?)', 'aa-line', refund, 'REFUND', -900, first.performanceId, first.reservationId],
+      ])
+
+      const [row] = read<{ reference: string }>(database, ledgerEntriesQuery(ledgerEntriesClause(entriesQuery({ search: 'ZZZREF' })), 25, 0))
+      expect(row?.reference).toBe('ZZZREF')
+      expect(read<{ id: string }>(database, ledgerEntryLinesQuery(refund)).map(line => line.id)).toEqual(['zz-line', 'aa-line'])
     })
   })
 })

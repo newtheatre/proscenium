@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -211,6 +212,36 @@ describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105
     expect(await textOf(view, '[data-test="defined-terms"]')).toContain('Spring 2020: 2020-01-13 to 2020-03-27')
     view.close()
   }, 120_000)
+})
+
+// Issue 1361: one entry opened, with the people on it, to the finance readers alone (I-105 c5).
+// Dated outside the closed months above, since a closed period refuses the insert (I-107).
+describe.skipIf(skip !== null)('/money/entries: opening one entry', () => {
+  test('the Treasurer opens an entry and its lines; the committee cannot; an unknown one is a 404', async () => {
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('screens-e2', '2019-06-10', 'TILL', 'CARD', Math.floor(Date.UTC(2019, 5, 10, 20) / 1000), 400)
+      database.query('INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, discount_pence, discount_percent) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('screens-l2', 'screens-e2', 'BAR_ITEM', 400, 100, 20)
+    }
+    finally {
+      database.close()
+    }
+    // The Treasurer here holds no authenticator, and A-112 is not what this proves.
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
+    try {
+      const opened = await send('GET', '/api/admin/finance/season/entries/screens-e2', undefined, treasurer.cookie)
+      expect(opened.status).toBe(200)
+      expect(await opened.json()).toMatchObject({ id: 'screens-e2', lines: [{ kind: 'BAR_ITEM', discountPence: 100, discountPercent: 20 }] })
+
+      expect((await send('GET', '/api/admin/finance/season/entries/screens-e2', undefined, committee.cookie)).status).toBe(403)
+      expect((await send('GET', '/api/admin/finance/season/entries/screens-no-such-entry', undefined, treasurer.cookie)).status).toBe(404)
+    }
+    finally {
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
+    }
+  })
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
