@@ -245,6 +245,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/shows/[id]/publish.post.ts', actions: ['show.published', 'show.unpublished', 'pass-type.shows.updated'] },
   { route: 'server/api/admin/shows/[id]/index.delete.ts', actions: ['show.deleted'] },
   { route: 'server/api/admin/shows/[id]/performances.post.ts', actions: ['performance.created'] },
+  { route: 'server/api/admin/shows/[id]/runs.post.ts', actions: ['performance.created'] },
   { route: 'server/api/admin/performances/[id]/index.put.ts', actions: ['performance.updated'] },
   { route: 'server/api/admin/performances/[id]/sale.post.ts', actions: ['performance.on-sale', 'performance.off-sale'] },
   { route: 'server/api/admin/performances/[id]/cancel.post.ts', actions: ['performance.cancelled'] },

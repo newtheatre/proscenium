@@ -1,8 +1,9 @@
 import { z } from 'zod'
-import { formatLondon } from './london'
+import { formatLondon, fromLondonWallClock } from './london'
 import { holdExpiresAt } from './reservations'
 import { plural } from './text'
 import { POSTER_PREFIX, posterUrl } from './seo'
+import { SHOW_NIGHT_START_HOUR } from './show-night'
 import type { PublicContentWarning, WarningAssessment } from './content-warnings'
 
 // The publish flow and the booking window (D-121, D-112). A show is draft until somebody
@@ -119,20 +120,29 @@ const performanceFields = {
   notes: optionalText(2000),
 }
 
-export const performanceForm = z.object({
-  ...performanceFields,
-  // Integer seconds UTC, as the column stores it. The screen sends an instant, never a wall clock.
+// Integer seconds UTC, as the column stores it. The screen sends an instant, never a wall clock.
+const instants = z.object({
   startsAt: z.number().int().positive(),
   doorsAt: z.number().int().positive().nullish(),
-}).refine(input => input.doorsAt == null || input.doorsAt <= input.startsAt, {
-  message: 'Doors open before curtain, not after it',
-  path: ['doorsAt'],
 })
+
+const doorsFirst = (one: { startsAt: number, doorsAt?: number | null }): boolean => one.doorsAt == null || one.doorsAt <= one.startsAt
+const DOORS_FIRST = { message: 'Doors open before curtain, not after it', path: ['doorsAt'] }
+
+export const performanceForm = z.object({ ...performanceFields, ...instants.shape }).refine(doorsFirst, DOORS_FIRST)
 
 // Exported for other screens that hold a London day as a plain string before turning it into an
 // instant, such as a pass's validity window (D-123).
 export const CIVIL_DAY = /^\d{4}-\d{2}-\d{2}$/
 const CLOCK = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+
+// A curtain before the show night starts (0014) belongs to the evening before, so its doors may
+// read later on the clock; any other doors after the curtain is a typing slip, refused.
+const beforeNightStarts = (clock: string): boolean => Number(clock.slice(0, 2)) < SHOW_NIGHT_START_HOUR
+
+const doorsClockFirst = (form: { clock: string, doorsClock: string }): boolean =>
+  !form.doorsClock || form.doorsClock <= form.clock || beforeNightStarts(form.clock)
+const DOORS_CLOCK_FIRST = { message: 'Doors open before curtain, not after it', path: ['doorsClock'] }
 
 // What the screen holds: a London day and wall clocks, which it turns into instants before it
 // sends them. Validating the request shape against this state would fail on every field (0014).
@@ -141,11 +151,63 @@ export const performanceScreenForm = z.object({
   day: z.string().regex(CIVIL_DAY, 'A performance needs a day'),
   clock: z.string().regex(CLOCK, 'A curtain time reads HH:MM'),
   doorsClock: z.union([z.literal(''), z.string().regex(CLOCK, 'A doors time reads HH:MM')]),
-})
+}).refine(doorsClockFirst, DOORS_CLOCK_FIRST)
 
 export const performanceSaleForm = z.object({
   onSale: z.boolean(),
 })
+
+// A cap on one request, not a policy: a month of nights is longer than any run we stage.
+export const MAX_RUN_NIGHTS = 31
+
+// What a run shares, typed once; the overrides wait for Edit (D-132 criterion 10).
+const runFields = {
+  venueId: performanceFields.venueId,
+  durationMinutes: performanceFields.durationMinutes,
+  intervalCount: performanceFields.intervalCount,
+  intervalMinutes: performanceFields.intervalMinutes,
+}
+
+const runNight = instants.refine(doorsFirst, DOORS_FIRST)
+
+export const performanceRunForm = z.object({
+  ...runFields,
+  nights: z.array(runNight).min(1, 'A run needs a night').max(MAX_RUN_NIGHTS)
+    .refine(nights => new Set(nights.map(night => night.startsAt)).size === nights.length, 'Each night of a run is its own curtain'),
+})
+
+export type PerformanceRunInput = z.output<typeof performanceRunForm>
+
+export const runScreenForm = z.object({
+  ...runFields,
+  days: z.array(z.string().regex(CIVIL_DAY, 'Each night needs a day')).min(1, 'A run needs a night').max(MAX_RUN_NIGHTS)
+    .refine(days => new Set(days).size === days.length, 'Each day once'),
+  clock: z.string().regex(CLOCK, 'A curtain time reads HH:MM'),
+  doorsClock: z.union([z.literal(''), z.string().regex(CLOCK, 'A doors time reads HH:MM')]),
+}).refine(doorsClockFirst, DOORS_CLOCK_FIRST)
+
+function instantOf(day: string, clock: string): number {
+  const [year, month, date] = day.split('-').map(Number)
+  const [hour, minute] = clock.split(':').map(Number)
+  return Math.floor(fromLondonWallClock(year!, month!, date!, hour!, minute!).getTime() / 1000)
+}
+
+// Counted on the civil date, never by subtracting a day of seconds, which is wrong twice a year.
+function dayBefore(day: string): string {
+  const [year, month, date] = day.split('-').map(Number)
+  const at = new Date(Date.UTC(year!, month! - 1, date!))
+  at.setUTCDate(at.getUTCDate() - 1)
+  return at.toISOString().slice(0, 10)
+}
+
+// One night as the instants it names in London, read on the day the curtain falls (a 00:15
+// Saturday curtain is given as the Saturday, and is Friday's show night).
+export function nightInstants(day: string, clock: string, doorsClock: string): { startsAt: number, doorsAt: number | null } {
+  const startsAt = instantOf(day, clock)
+  if (!doorsClock) return { startsAt, doorsAt: null }
+  const sameDay = instantOf(day, doorsClock)
+  return { startsAt, doorsAt: sameDay > startsAt && beforeNightStarts(clock) ? instantOf(dayBefore(day), doorsClock) : sameDay }
+}
 
 export type ShowInput = z.output<typeof showForm>
 export type PerformanceInput = z.output<typeof performanceForm>
@@ -304,6 +366,8 @@ export interface AdminPerformance {
   notes: string | null
   soldTickets: number
   unpaidTickets: number
+  // Live shifts stamped for it, which the publish sheet reads back (D-132 criterion 7).
+  shiftCount: number
 }
 
 // The columns a visitor may see. Anything absent here is absent from every public payload, which
