@@ -21,6 +21,7 @@ import {
   reservationForm,
   reservationResendForm,
   sameNightReason,
+  sameTicketLines,
   saysExchangeNight,
   saysTotalDue,
   ticketEditDelta,
@@ -329,6 +330,16 @@ describe('a reference is told from a name by its alphabet, not just its length (
   test('the wrong length is never a reference, however plausible its letters', () => {
     expect(looksLikeReference('ABCDE')).toBe(false)
     expect(looksLikeReference('ABCDEFG')).toBe(false)
+  })
+})
+
+// A refused edit whose booking still reads as it did was refused for room, not because it moved.
+describe('D-110: two readings of a booking\'s tickets agree whatever their order (criterion 2)', () => {
+  test('the same counts per type agree, in any order; a count or a type apart does not', () => {
+    const read = [{ ticketTypeId: 'standard', quantity: 2 }, { ticketTypeId: 'concession', quantity: 1 }]
+    expect(sameTicketLines(read, [{ ticketTypeId: 'concession', quantity: 1 }, { ticketTypeId: 'standard', quantity: 2 }])).toBe(true)
+    expect(sameTicketLines(read, [{ ticketTypeId: 'standard', quantity: 1 }, { ticketTypeId: 'concession', quantity: 1 }])).toBe(false)
+    expect(sameTicketLines(read, [{ ticketTypeId: 'standard', quantity: 2 }])).toBe(false)
   })
 })
 

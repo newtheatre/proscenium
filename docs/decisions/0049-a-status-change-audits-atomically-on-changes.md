@@ -168,6 +168,13 @@ parameter.
   - The programme's name and address routes (content warnings, pass types, seasons, show
     categories, venues, shows and ticket types) moved onto it from a separate audit statement
     after their conditional write.
+- **Amended once more on 27 September 2026: the ticket edit's writes follow its audit row.** The
+  self-service ticket edit's guard now also holds that the booking holds exactly the lines the
+  request read (`ticketLinesStill()`), so a double submit changes nothing. Its first line would
+  change what that guard reads, so every line and the `updated_at` stamp are gated on
+  `entryLanded(entry)` rather than repeating the guard (`editTicketsStatements()` in
+  `server/utils/reservations.ts`). The 27 September note above, that every write shares the
+  guard, is superseded for this batch.
 
 ## Options considered
 
