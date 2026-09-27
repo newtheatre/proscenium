@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { claimShiftStatement } from '#server/utils/rota'
-import { boundStatement, createTestDatabase, rows, sql } from '#tests/helpers/database'
+import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -100,46 +100,33 @@ describe('contended invariants (K-105)', () => {
     }
   })
 
-  // Issue 1302's gap at the claim: the route checks training, then writes. Whichever lands first,
-  // the claim's outcome follows the record as it stands at the claim's own write (E-104 criterion 1).
-  test('a claim racing its own record\'s revocation lands only if it wrote first (#1302)', async () => {
+  // Issue 1302's gap at the claim: the route checks training, then writes. The two writes settle
+  // in the order they run, and the claim follows the record as it stands at its own write (E-104).
+  test.each([
+    ['claimed first, the claim stands and a later revocation leaves it', 'claim', 1, 'CONFIRMED'],
+    ['revoked first, the claim is refused and the shift stays open', 'revoke', 0, 'OPEN'],
+  ] as const)('a claim and its record\'s revocation, %s (#1302)', async (_, first, written, status) => {
     const database = await createTestDatabase()
     try {
       const tonight = tonightsPerformance(database)
       person(database, 'one')
       database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)',
         'shift-open', tonight.performanceId, 'DOOR', 'OPEN']])
+      const revoke = (): void => database.batch([['UPDATE training_records SET revoked_at = unixepoch() WHERE id = ?', 'tr-one']])
+      const claim = (): number => run(database, claimShiftStatement('shift-open', 'one', 'CONFIRMED', GATE)).length
 
-      const order: string[] = []
-      const [, claimed] = await race(2, async (index) => {
-        if (index === 0) {
-          run(database, sql`UPDATE training_records SET revoked_at = unixepoch() WHERE id = 'tr-one'`)
-          order.push('revoked')
-          return 0
-        }
-        const written = run(database, claimShiftStatement('shift-open', 'one', 'CONFIRMED', GATE)).length
-        order.push('claimed')
-        return written
-      })
+      let claimed: number
+      if (first === 'claim') {
+        claimed = claim()
+        revoke()
+      }
+      else {
+        revoke()
+        claimed = claim()
+      }
 
-      expect(claimed).toBe(order[0] === 'claimed' ? 1 : 0)
-    }
-    finally {
-      database.close()
-    }
-  })
-
-  test('a record revoked between the live check and the write refuses the claim (#1302)', async () => {
-    const database = await createTestDatabase()
-    try {
-      const tonight = tonightsPerformance(database)
-      person(database, 'one')
-      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)',
-        'shift-open', tonight.performanceId, 'DOOR', 'OPEN']])
-      database.batch([['UPDATE training_records SET revoked_at = unixepoch() WHERE id = ?', 'tr-one']])
-
-      expect(run(database, claimShiftStatement('shift-open', 'one', 'CONFIRMED', GATE))).toHaveLength(0)
-      expect(rows<{ status: string }>(database, 'SELECT status FROM shifts WHERE id = ?', 'shift-open')[0]!.status).toBe('OPEN')
+      expect(claimed).toBe(written)
+      expect(rows<{ status: string }>(database, 'SELECT status FROM shifts WHERE id = ?', 'shift-open')[0]!.status).toBe(status)
     }
     finally {
       database.close()
