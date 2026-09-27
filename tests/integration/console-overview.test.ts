@@ -60,9 +60,12 @@ function seedQueues(database: TestDatabase): void {
     ['INSERT INTO module_requests (id, user_id, module_id, status) VALUES (?, ?, ?, ?)', 'mr-2', 'u-2', 'mod-b', 'OPEN'],
     ['INSERT INTO module_requests (id, user_id, module_id, status) VALUES (?, ?, ?, ?)', 'mr-3', 'u-3', 'mod-a', 'WITHDRAWN'],
 
-    ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until) VALUES (?, ?, ?, ?, ?)', 'pt-1', 'season', 'Season pass', 1_000, 2_000],
+    ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until, status) VALUES (?, ?, ?, ?, ?, ?)', 'pt-1', 'season', 'Season pass', 1_000, 2_000, 'ON_SALE'],
     ['INSERT INTO pass_requests (id, pass_type_id, user_id, status) VALUES (?, ?, ?, ?)', 'pr-1', 'pt-1', 'u-1', 'PENDING'],
     ['INSERT INTO pass_requests (id, pass_type_id, user_id, status) VALUES (?, ?, ?, ?)', 'pr-2', 'pt-1', 'u-2', 'DECLINED'],
+    // The desk lists requests only for a pass on sale, so one on a closed pass cannot be fulfilled there.
+    ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until, status) VALUES (?, ?, ?, ?, ?, ?)', 'pt-2', 'autumn', 'Autumn pass', 1_000, 2_000, 'CLOSED'],
+    ['INSERT INTO pass_requests (id, pass_type_id, user_id, status) VALUES (?, ?, ?, ?)', 'pr-3', 'pt-2', 'u-3', 'PENDING'],
   ])
 }
 

@@ -55,7 +55,8 @@ describe('set-up still to do', () => {
     const lines = setUpLines({ eligibility: [UNSET_DOOR], anythingOnHand: false, anyStocktake: false, allergensUnknown: 1 })
     expect(lines.map(saysSetUp)).toEqual([
       'No module named yet, so nobody can claim a door shift.',
-      'Nothing is on hand at the bar: no delivery or opening count has been recorded.',
+      // Says the fact tested: a delivery since sold out also leaves nothing on hand.
+      'Nothing is on hand at the bar: record a delivery or an opening count.',
       'No stocktake has been applied yet, so on-hand is what deliveries and sales say, not a count.',
       '1 product has no allergen information recorded.',
     ])
@@ -77,12 +78,19 @@ describe('tonight, for whoever may open its screens', () => {
 describe('the overview screen', () => {
   test('it lists what is waiting, what is unfinished, tonight and the drill, and no placeholder', async () => {
     const source = await read(OVERVIEW)
-    for (const hook of ['waiting-for-you', 'waiting-failed', 'set-up-to-do', 'tonight-card', 'drill-overdue']) {
+    for (const hook of ['waiting-for-you', 'waiting-failed', 'set-up-to-do', 'tonight-card', 'drill-overdue', 'drill-failed']) {
       expect(source).toContain(`data-test="${hook}"`)
     }
     expect(source).toContain('NAV_QUEUES[')
     expect(source).toContain('/api/admin/overview')
     expect(source).not.toContain('The rest of this screen arrives')
+  })
+
+  // A viewer who decides no queue is not shown a failure about queues they do not have.
+  test('a failed count is said only to somebody who decides a queue', async () => {
+    const source = await read(OVERVIEW)
+    expect(source).toContain('queuesFor(')
+    expect(source).toMatch(/v-if="waiting\.length > 0 \|\| \(waitingFailed && decidesAny\)"/)
   })
 
   // A refused or failed read is not "nothing has failed" (issue 1358).
@@ -96,5 +104,14 @@ describe('the overview screen', () => {
 
   test('the sidebar and the overview read one count of each queue', async () => {
     expect(await read(NAV_COUNTS_COMPOSABLE)).toContain('/api/admin/waiting')
+  })
+
+  // A-130 criterion 11: deciding one moves the sidebar's count at once, not on the next screen.
+  test('each screen that works a counted queue refreshes the count after a decision', async () => {
+    for (const path of ['app/pages/rooms/manage/requests.vue', 'app/pages/training/manage/requests.vue', 'app/pages/box-office/desk-passes.vue']) {
+      const source = await read(path)
+      expect(source).toContain('useNavCounts()')
+      expect(source).toContain('nav.refresh()')
+    }
   })
 })
