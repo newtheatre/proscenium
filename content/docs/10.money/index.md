@@ -60,10 +60,11 @@ Box Office Manager gave it on the [seasons](/docs/box-office/seasons) screen.
    and Season appears only once at least one season exists.
    Changing any of these reads the ledger again at once; there is nothing else to press. Every
    figure is a query, so a sale made a moment ago is already in the next read.
-3. **Revenue by source**: what each surface took on a card, Desk, Till and so on. With
-   the Treasurer, each row has an **Entries** button that opens the
+3. **Revenue by source**: what each surface took on a card, Desk, Till and so on, ending in a
+   **Total** row: every card line in the range, summed by the ledger itself, so it always equals
+   the rows above it. With the Treasurer, each row has an **Entries** button that opens the
    [ledger entries](/docs/money/ledger-entries) list filtered to that source's card takings and
-   the dashboard's range.
+   the dashboard's range; the total's opens every card entry in the range.
 4. **Refunds**, **Forgone comps**, **Forgone discounts** and **Open variance**: the money
    handed back, the value given away rather than taken, and the sum of every night's reader
    reading that still disagrees with the ledger and has not been written off. With the

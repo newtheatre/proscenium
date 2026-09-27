@@ -100,6 +100,16 @@ export function revenueBySourceQuery(fromAt: number, toAt: number): SQL {
   `
 }
 
+// The same lines as the rows above, unsplit: the table's total is the ledger's sum, never the page
+// adding up what it was sent (0004).
+export function revenueTotalQuery(fromAt: number, toAt: number): SQL {
+  return sql`
+    SELECT coalesce(sum(ll.amount_pence), 0) AS totalPence
+    FROM ledger_lines ll JOIN ledger_entries le ON le.id = ll.entry_id
+    WHERE le.tender = 'CARD' AND le.happened_at >= ${fromAt} AND le.happened_at < ${toAt}
+  `
+}
+
 // Keyed off the line's own kind, matching revenue-by-show.ts and night-reconciliation.ts: a
 // live refund never sets `reverses_entry_id` (I-102), only the one-time historical import does.
 export function seasonRefundsQuery(fromAt: number, toAt: number): SQL {
@@ -125,8 +135,9 @@ export function openVarianceQuery(fromDay: string, toDay: string): SQL {
 
 export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary> {
   const bounds = await resolvePeriodBounds(period)
-  const [bySource, [refunds], [openVariance], theForegone, missing] = await Promise.all([
+  const [bySource, [revenueTotal], [refunds], [openVariance], theForegone, missing] = await Promise.all([
     db.all<RevenueBySource>(revenueBySourceQuery(bounds.fromAt, bounds.toAt)),
+    db.all<{ totalPence: number }>(revenueTotalQuery(bounds.fromAt, bounds.toAt)),
     db.all<{ refundsPence: number }>(seasonRefundsQuery(bounds.fromAt, bounds.toAt)),
     db.all<{ openVariancePence: number }>(openVarianceQuery(bounds.fromDay, bounds.toDay)),
     foregone({ scope: 'PERIOD', from: bounds.fromDay, to: bounds.toDay }),
@@ -136,6 +147,7 @@ export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary>
     fromDay: bounds.fromDay,
     toDay: bounds.toDay,
     revenueBySource: bySource,
+    revenueTotalPence: revenueTotal?.totalPence ?? 0,
     refundsPence: refunds?.refundsPence ?? 0,
     compsPence: theForegone.compsPence,
     discountsPence: theForegone.discountsPence,
