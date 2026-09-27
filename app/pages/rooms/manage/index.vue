@@ -286,7 +286,7 @@ const columns: TableColumn<Room>[] = [
           </p>
           <p
             v-if="row.original.description"
-            class="text-sm text-muted"
+            class="text-sm text-muted whitespace-normal"
           >
             {{ row.original.description }}
           </p>
