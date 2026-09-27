@@ -1312,8 +1312,9 @@ through I-107), reused as-is rather than a second resolver of when a year starts
 helper. `GET /api/admin/reports/incidents` groups `incidents` by category, severity and venue
 inside the range, with each dimension an optional filter; `GET /api/admin/reports/performances`
 reads one row per performance, `sold` from `heldSeatsSubquery` the same way `tonight.ts` does,
-`admitted` and `noShows` from `reservations.status`, `unfilledSlots` from any `shifts` row still
-`OPEN` or `DECLINED`, and `officerBypass`/`autoClosed` from `audit_log` and `night_reports.
+`admitted` and `noShows` from `admittedSeatsSubquery` and `noShowSeatsSubquery`, the night
+report's own seat counts (issue 1326), `unfilledSlots` from any `shifts` row still `OPEN`,
+`CLAIMED` or `DECLINED` (a claim waiting for an officer is nobody confirmed), and `officerBypass`/`autoClosed` from `audit_log` and `night_reports.
 signed_via` respectively. Both page in SQL (`shared/utils/pagination.ts`) and export to CSV
 through `toCsv()`, which already carries the formula-injection guard D-129 built.
 
