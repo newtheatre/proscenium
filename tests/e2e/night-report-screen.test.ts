@@ -4,6 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { registerMember } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { showNightBounds, showNightOf } from '#shared/utils/show-night'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
@@ -36,14 +37,32 @@ function write(statement: string, ...parameters: unknown[]): void {
   }
 }
 
-async function dutyManagerOn(suffix: string, curtains: number[]): Promise<{ id: string, password: string, email: string, performanceIds: string[] }> {
+function read<T>(statement: string, ...parameters: unknown[]): T[] {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query(statement).all(...parameters as never[]) as T[]
+  }
+  finally {
+    database.close()
+  }
+}
+
+// Half of tonight so far, with no running time: a curtain already down whenever the suite runs (0078).
+function curtainAlreadyDown(): number {
+  const now = new Date()
+  return (now.getTime() - showNightBounds(showNightOf(now)).from.getTime()) / 3_600_000 / 2
+}
+
+async function dutyManagerOn(suffix: string, curtains: (number | undefined)[]): Promise<{ id: string, password: string, email: string, venueId: string, performanceIds: string[] }> {
   const password = generatePassword()
   const member = await registerMember(app, `report-screen-${suffix}`, password)
   const database = new Database(app.databaseFile)
   const performanceIds: string[] = []
+  let venueId = ''
   try {
     const target = sqliteTarget(database)
     const venue = testVenue(target, { suffix: `report-screen-${suffix}` })
+    venueId = venue.id
     curtains.forEach((hours, index) => {
       const { performanceId } = tonightsPerformance(target, { suffix: `report-screen-${suffix}-${index}`, venueId: venue.id, curtainHoursAfterNightStart: hours })
       database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)')
@@ -54,7 +73,7 @@ async function dutyManagerOn(suffix: string, curtains: number[]): Promise<{ id: 
   finally {
     database.close()
   }
-  return { id: member.id, password, email: member.email, performanceIds }
+  return { id: member.id, password, email: member.email, venueId, performanceIds }
 }
 
 async function signedIn(email: string, password: string): Promise<Bun.WebView> {
@@ -68,30 +87,51 @@ async function signedIn(email: string, password: string): Promise<Bun.WebView> {
 }
 
 describe.skipIf(skip !== null)('signing off the night by hand (issue 1053)', () => {
-  test('the draft renders, the checklist gate refuses in words, and a closed night signs off', async () => {
-    const { id, email, password, performanceIds } = await dutyManagerOn('single', [15.5])
+  // Issue 1315: the draft reads all evening, and nothing final waits under the thumb before the curtain.
+  test('before the curtain the draft pins nothing and says when Sign off and close opens', async () => {
+    const { email, password } = await dutyManagerOn('ahead', [undefined])
     const view = await signedIn(email, password)
     try {
-      await visit(view, `${app.baseURL}/tonight`, '[data-test="tonight-hub"]')
-      await waitFor(view, `document.querySelector('[data-test="tile-report"]')`)
-
       await visit(view, `${app.baseURL}/tonight/report`)
       await waitFor(view, `document.querySelector('[data-test="report-draft"]')`)
       expect(await textOf(view, '[data-test="report-draft"]')).toContain('Walk-ups')
+      expect(await textOf(view, '[data-test="sign-off-opens"]')).toContain('Sign off and close opens at')
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="night-actions"]'))`)).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('after the curtain the hub leads with the report, an open item ticks in place, and one press closes the night', async () => {
+    const { id, email, password, venueId, performanceIds } = await dutyManagerOn('down', [curtainAlreadyDown()])
+    const performanceId = performanceIds[0]!
+    write('UPDATE performances SET duration_minutes = NULL WHERE id = ?', performanceId)
+    write(`INSERT INTO checklist_items (id, venue_id, phase, label, sort, required) VALUES (?, ?, 'POST', 'Bar shutters down', 1, 1)`, 'report-screen-down-item', venueId)
+    write(`INSERT INTO incidents (id, performance_id, reported_by, category, severity, body) VALUES (?, ?, ?, 'SAFETY', 'NOTE', 'A drink went over.')`, 'report-screen-down-incident', performanceId, id)
+    const view = await signedIn(email, password)
+    try {
+      await visit(view, `${app.baseURL}/tonight`, '[data-test="tonight-hub"]')
+      await waitFor(view, `document.querySelector('[data-test="tonight-hub"] > a:first-child')?.dataset.test === 'tile-report'`)
+
+      await visit(view, `${app.baseURL}/tonight/glance`)
+      await waitFor(view, `(document.querySelector('[data-test="night-actions"]')?.innerText ?? '').includes('Night report')`)
+
+      await visit(view, `${app.baseURL}/tonight/report`)
+      await waitFor(view, `document.querySelector('[data-test="report-open-items"]')`)
+      expect(await textOf(view, '[data-test="report-open-items"]')).toContain('Bar shutters down')
+      await click(view, '[data-test="report-open-items"] [data-test^="tick-"]')
+      await waitFor(view, `!document.querySelector('[data-test="report-open-items"]')`)
 
       await fill(view, NOTE, 'A quiet house, nothing to report.')
-      await click(view, '[data-test="sign-off"]')
-      await waitFor(view, `document.querySelector('[data-test="sign-off-failure"]')`)
-      expect(await textOf(view, '[data-test="sign-off-failure"]')).toContain('checklist has not been closed')
-      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="open-checklist"]'))`)).toBe(true)
-
-      write('INSERT INTO checklist_closes (id, performance_id, closed_by) VALUES (?, ?, ?)', 'report-screen-close', performanceIds[0], id)
       await click(view, '[data-test="sign-off"]')
       await waitFor(view, `document.querySelector('[data-test="report-signed"]')`)
       const signed = await textOf(view, '[data-test="report-signed"]')
       expect(signed).toContain('Signed off by')
       expect(signed).toContain('A quiet house, nothing to report.')
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="sign-off"]'))`)).toBe(false)
+      expect(read('SELECT id FROM checklist_closes WHERE performance_id = ?', performanceId)).toHaveLength(1)
+      expect(read(`SELECT id FROM audit_log WHERE action = 'incident.reviewed' AND target = ?`, 'incident:report-screen-down-incident')).toHaveLength(1)
     }
     finally {
       view.close()

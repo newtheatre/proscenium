@@ -3,6 +3,8 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { saysBlockedClose } from '#shared/utils/checklist'
+import { saysIncidentsMoved } from '#shared/utils/night-signoff'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -68,23 +70,54 @@ function shift(performanceId: string, role: string, userId: string, status = 'CO
     `${performanceId}-${role}`, performanceId, role, userId, status)
 }
 
-function closeChecklist(performanceId: string, closedBy: string, suffix: string): void {
-  write('INSERT INTO checklist_closes (id, performance_id, closed_by) VALUES (?, ?, ?)',
-    `close-${suffix}`, performanceId, closedBy)
+function said(body: { statusMessage?: string, message?: string }): string {
+  return body.statusMessage ?? body.message ?? ''
 }
 
-describe.skipIf(skip !== null)('the checklist gate (criterion 1)', () => {
-  test('sign-off refuses before the checklist closes, and succeeds once it has', async () => {
-    const dm = await registerMember(app, 'signoff-gate-dm', generatePassword())
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-gate' }))
+// Issue 1315: Sign off and close answers the checklist, the incidents and the freeze in one press.
+describe.skipIf(skip !== null)('one Sign off and close (criterion 1, E-114 criteria 3 and 4)', () => {
+  test('refuses naming a required item still open, then closes the checklist, reviews the incidents and freezes', async () => {
+    const dm = await registerMember(app, 'signoff-close-dm', generatePassword())
+    const { performanceId, venueId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-close' }))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
+    expect((await send('POST', '/api/admin/checklist/items', { venueId, phase: 'POST', label: 'Bar locked', sort: 1, required: true })).status).toBe(200)
+    expect((await send('POST', '/api/admin/checklist/items', { venueId, phase: 'POST', label: 'Incidents reviewed', sort: 2, required: true, systemCheck: 'INCIDENTS_REVIEWED' })).status).toBe(200)
+    const logged = await send('POST', '/api/tonight/incidents', { performanceId, category: 'SAFETY', severity: 'NOTE', body: 'A drink went over.' }, dm.cookie)
+    const { id: incidentId } = await logged.json() as { id: string }
 
-    const blocked = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'All fine' }, dm.cookie)
+    const blocked = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'All fine', incidentsSeen: 1 }, dm.cookie)
     expect(blocked.status).toBe(409)
+    expect(said(await blocked.json() as { statusMessage?: string })).toBe(saysBlockedClose(['Bar locked']))
+    expect(read('SELECT id FROM night_reports WHERE performance_id = ?', performanceId)).toHaveLength(0)
 
-    closeChecklist(performanceId, dm.id, 'gate')
-    const signed = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'All fine' }, dm.cookie)
+    const listed = await send('GET', `/api/tonight/checklist?performanceId=${performanceId}`, undefined, dm.cookie)
+    const { items } = await listed.json() as { items: { id: string, label: string }[] }
+    const barLocked = items.find(item => item.label === 'Bar locked')!
+    expect((await send('POST', `/api/tonight/checklist/${barLocked.id}/tick`, { performanceId }, dm.cookie)).status).toBe(200)
+
+    const signed = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'All fine', incidentsSeen: 1 }, dm.cookie)
     expect(signed.status).toBe(200)
+    expect(read<{ closed_by: string }>('SELECT closed_by FROM checklist_closes WHERE performance_id = ?', performanceId)).toEqual([{ closed_by: dm.id }])
+    expect(read(`SELECT id FROM audit_log WHERE action = 'incident.reviewed' AND target = ?`, `incident:${incidentId}`)).toHaveLength(1)
+
+    const frozen = await send('GET', `/api/tonight/report?performanceId=${performanceId}`, undefined, dm.cookie)
+    const { checklist } = await frozen.json() as { checklist: { label: string, done: boolean }[] }
+    expect(checklist.find(item => item.label === 'Incidents reviewed')?.done).toBe(true)
+  })
+
+  test('an incident logged after the report was read refuses, and nothing is closed or reviewed', async () => {
+    const dm = await registerMember(app, 'signoff-moved-dm', generatePassword())
+    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-moved' }))
+    shift(performanceId, 'DUTY_MANAGER', dm.id)
+    await send('POST', '/api/tonight/incidents', { performanceId, category: 'SAFETY', severity: 'NOTE', body: 'Logged at the last minute.' }, dm.cookie)
+
+    const refused = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'All fine', incidentsSeen: 0 }, dm.cookie)
+    expect(refused.status).toBe(409)
+    expect(said(await refused.json() as { statusMessage?: string })).toBe(saysIncidentsMoved(0, 1))
+    expect(read('SELECT id FROM night_reports WHERE performance_id = ?', performanceId)).toHaveLength(0)
+    expect(read('SELECT id FROM checklist_closes WHERE performance_id = ?', performanceId)).toHaveLength(0)
+    expect(read(`SELECT a.id FROM audit_log a JOIN incidents i ON a.target = 'incident:' || i.id
+      WHERE a.action = 'incident.reviewed' AND i.performance_id = ?`, performanceId)).toHaveLength(0)
   })
 })
 
@@ -93,15 +126,14 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
     const dm = await registerMember(app, 'signoff-once-dm', generatePassword())
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-once' }))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
-    closeChecklist(performanceId, dm.id, 'once')
 
-    const first = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Quiet night' }, dm.cookie)
+    const first = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Quiet night', incidentsSeen: 0 }, dm.cookie)
     expect(first.status).toBe(200)
     const body = await first.json() as { report: { signedByName: string, signedVia: string, closingNote: string } }
     expect(body.report.signedVia).toBe('SHIFT')
     expect(body.report.closingNote).toBe('Quiet night')
 
-    const second = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Trying again' }, dm.cookie)
+    const second = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Trying again', incidentsSeen: 0 }, dm.cookie)
     expect(second.status).toBe(409)
 
     const rows = read<{ id: string }>('SELECT id FROM night_reports WHERE performance_id = ?', performanceId)
@@ -112,11 +144,10 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
     const dm = await registerMember(app, 'signoff-race-dm', generatePassword())
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-race' }))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
-    closeChecklist(performanceId, dm.id, 'race')
 
     const [first, second] = await Promise.all([
-      send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Racer one' }, dm.cookie),
-      send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Racer two' }, dm.cookie),
+      send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Racer one', incidentsSeen: 0 }, dm.cookie),
+      send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Racer two', incidentsSeen: 0 }, dm.cookie),
     ])
     const statuses = [first.status, second.status].sort()
     expect(statuses).toEqual([200, 409])
@@ -127,9 +158,8 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
 
   test('an officer closing instead of the duty manager is flagged as such', async () => {
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-officer' }))
-    closeChecklist(performanceId, admin.id, 'officer')
 
-    const signed = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Covered by an officer' })
+    const signed = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Covered by an officer', incidentsSeen: 0 })
     expect(signed.status).toBe(200)
     const body = await signed.json() as { report: { signedVia: string } }
     expect(body.report.signedVia).toBe('OFFICER')
@@ -139,19 +169,17 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
     const door = await registerMember(app, 'signoff-door', generatePassword())
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-guard' }))
     shift(performanceId, 'DOOR', door.id)
-    closeChecklist(performanceId, door.id, 'guard')
 
-    expect((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Nope' }, door.cookie)).status).toBe(403)
-    expect([401, 403]).toContain((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Nope' }, '')).status)
+    expect((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Nope', incidentsSeen: 0 }, door.cookie)).status).toBe(403)
+    expect([401, 403]).toContain((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Nope', incidentsSeen: 0 }, '')).status)
   })
 
   test('records a delivery outcome for the standing recipients and the closer (criterion 4)', async () => {
     const dm = await registerMember(app, 'signoff-deliver-dm', generatePassword())
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-deliver' }))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
-    closeChecklist(performanceId, dm.id, 'deliver')
 
-    const signed = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Send it' }, dm.cookie)
+    const signed = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Send it', incidentsSeen: 0 }, dm.cookie)
     expect(signed.status).toBe(200)
 
     const deliveries = read<{ recipient: string, status: string }>(
@@ -167,13 +195,12 @@ describe.skipIf(skip !== null)('the report freezes (E-123 criterion 4, E-124 cri
     const dm = await registerMember(app, 'signoff-frozen-dm', generatePassword())
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-frozen' }))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
-    closeChecklist(performanceId, dm.id, 'frozen')
 
     const before = await send('GET', `/api/tonight/report?performanceId=${performanceId}`, undefined, dm.cookie)
     const beforeBody = await before.json() as { incidents: unknown[], signedOff: unknown }
     expect(beforeBody.signedOff).toBeNull()
 
-    expect((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Frozen now' }, dm.cookie)).status).toBe(200)
+    expect((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Frozen now', incidentsSeen: 0 }, dm.cookie)).status).toBe(200)
 
     write(`INSERT INTO incidents (id, performance_id, reported_by, category, severity, body) VALUES (?, ?, ?, 'OTHER', 'NOTE', 'After the freeze')`,
       'frozen-incident', performanceId, dm.id)
@@ -197,8 +224,7 @@ describe.skipIf(skip !== null)('addenda (criterion 5)', () => {
     const dm = await registerMember(app, 'addendum-dm', generatePassword())
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-ok' }))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
-    closeChecklist(performanceId, dm.id, 'addendum')
-    await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Original note' }, dm.cookie)
+    await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Original note', incidentsSeen: 0 }, dm.cookie)
 
     const added = await send('POST', '/api/admin/night-reports/addenda', { performanceId, note: 'The bar float was miscounted' })
     expect(added.status).toBe(200)
@@ -220,8 +246,7 @@ describe.skipIf(skip !== null)('addenda (criterion 5)', () => {
     const dm = await registerMember(app, 'addendum-guard-dm', generatePassword())
     const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-guard' }))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
-    closeChecklist(performanceId, dm.id, 'addendum-guard')
-    await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Note' }, dm.cookie)
+    await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Note', incidentsSeen: 0 }, dm.cookie)
 
     const refused = await send('POST', '/api/admin/night-reports/addenda', { performanceId, note: 'Not my call' }, stranger.cookie)
     expect(refused.status).toBe(403)

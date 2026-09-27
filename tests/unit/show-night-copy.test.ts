@@ -20,6 +20,7 @@ const SHOW_NIGHT_FILES = [
   'app/components/DoorVerdictCard.vue',
   'app/components/NightAction.vue',
   'app/components/NightBlock.vue',
+  'app/components/NightChecklistItems.vue',
   'app/components/NightKpi.vue',
   'app/components/NightCompQueue.vue',
   'app/components/NightPerformanceSwitcher.vue',

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { hubTiles, whoCanHelpTonight } from '#shared/utils/night-hub'
+import { curtainIsDown, hubTiles, whoCanHelpTonight } from '#shared/utils/night-hub'
 import { NIGHT_ROLES, claimedShiftRefusal, nightAuthorityRefusal, outsideWindowRefusal } from '#shared/utils/night-authority'
 import { hubRefusal, rolesThatReach, saysScreenIsFor } from '#shared/utils/refusals'
 import { viewAccounts, viewProgramme } from '#shared/utils/abilities'
@@ -39,6 +39,43 @@ describe('the hub shows the tiles the viewer\'s own authority opens (E-112 crite
 
   test('no role tonight leaves Emergency, always there', () => {
     expect(hubTiles([])).toEqual([{ id: 'emergency', gold: false }])
+  })
+})
+
+// Issue 1315: the end of the night is the report's, and nothing final leads before the curtain.
+describe('after the curtain the duty manager\'s hub leads with the night report', () => {
+  test('the report tile moves to the front, in gold, and the glance follows it', () => {
+    const tiles = hubTiles(['DUTY_MANAGER'], true)
+    expect(ids(tiles)).toEqual(['report', 'glance', 'checklist', 'age-checks', 'backstage', 'contacts', 'emergency'])
+    expect(tiles.filter(tile => tile.gold).map(tile => tile.id)).toEqual(['report'])
+  })
+
+  test('before the curtain the glance still leads', () => {
+    expect(hubTiles(['DUTY_MANAGER'], false)[0]).toEqual({ id: 'glance', gold: true })
+  })
+
+  test('the door and the bar keep their own job whatever the clock says', () => {
+    expect(hubTiles(['DOOR'], true)[0]).toEqual({ id: 'door', gold: true })
+    expect(hubTiles(['BAR'], true)[0]).toEqual({ id: 'till', gold: true })
+  })
+
+  test('roles not yet known still show every tile, none of them gold', () => {
+    expect(hubTiles(null, true).some(tile => tile.gold)).toBe(false)
+  })
+})
+
+describe('when the curtain is down (issue 1315, 0078)', () => {
+  const CURTAIN = 1_800_000_000
+
+  test('after the running time and every interval', () => {
+    const show = { startsAt: CURTAIN, durationMinutes: 120, intervalCount: 1, intervalMinutes: 20 }
+    expect(curtainIsDown(show, CURTAIN + 139 * 60)).toBe(false)
+    expect(curtainIsDown(show, CURTAIN + 140 * 60)).toBe(true)
+  })
+
+  test('with no running time recorded, from curtain up, the fallback 0078 already uses', () => {
+    expect(curtainIsDown({ startsAt: CURTAIN, durationMinutes: null }, CURTAIN - 1)).toBe(false)
+    expect(curtainIsDown({ startsAt: CURTAIN, durationMinutes: null }, CURTAIN)).toBe(true)
   })
 })
 

@@ -57,6 +57,13 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
 
 interface Item { id: string, label: string, phase: string, required: boolean, systemCheck: string | null }
 
+// Sign off and close sends back the report's own incident count, as the screen does (issue 1315).
+async function signOff(as: string, performanceId?: string): Promise<Response> {
+  const scoped = performanceId ? `?performanceId=${performanceId}` : ''
+  const report = await (await send('GET', `/api/tonight/report${scoped}`, undefined, as)).json() as { incidents: unknown[] }
+  return send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Closing out the fixture', incidentsSeen: report.incidents.length }, as)
+}
+
 describe.skipIf(skip !== null)('committee configuration (E-114 criterion 1)', () => {
   test('pre-show lists above post-show on the committee overview, whatever order they were added', async () => {
     const post = await send('POST', '/api/admin/checklist/items', { venueId: house.venueId, phase: 'POST', label: 'Ordering: post', sort: 1, required: true })
@@ -149,16 +156,17 @@ describe.skipIf(skip !== null)('tonight\'s checklist (E-114 criteria 2, 3)', () 
   })
 })
 
-describe.skipIf(skip !== null)('closing the night (E-114 criterion 4)', () => {
+describe.skipIf(skip !== null)('closing the night with Sign off and close (E-114 criterion 4, issue 1315)', () => {
   test('closing is blocked while a required item is unticked, and names it', async () => {
     const venue = await send('POST', '/api/admin/checklist/items', { venueId: house.venueId, phase: 'POST', label: 'Till reconciled', sort: 9, required: true })
     expect(venue.status).toBe(200)
 
-    const blocked = await send('POST', '/api/tonight/checklist/close', undefined, foh.cookie)
+    const blocked = await signOff(foh.cookie)
     expect(blocked.status).toBe(409)
     const body = await blocked.json() as { statusMessage?: string, message?: string }
     const said = body.statusMessage ?? body.message ?? ''
-    expect(said).toBe('The checklist cannot close while Till reconciled is still open: tick it or record an exception')
+    expect(said).toStartWith('The checklist cannot close while ')
+    expect(said).toContain('Till reconciled')
   })
 
   test('closing succeeds once every required item is ticked or exempted, a reload still knows it, and a second close refuses', async () => {
@@ -170,7 +178,7 @@ describe.skipIf(skip !== null)('closing the night (E-114 criterion 4)', () => {
       await send('POST', `/api/tonight/checklist/${entry.id}/exempt`, { reason: 'Closing out the fixture' }, foh.cookie)
     }
 
-    const closed = await send('POST', '/api/tonight/checklist/close', undefined, foh.cookie)
+    const closed = await signOff(foh.cookie)
     expect(closed.status).toBe(200)
 
     // A fresh read, not the close response: this is what a reloaded screen actually sees.
@@ -178,7 +186,7 @@ describe.skipIf(skip !== null)('closing the night (E-114 criterion 4)', () => {
     const { close } = await reread.json() as { close: { closedAt: number, closedByName: string } | null }
     expect(close?.closedByName).toBeTruthy()
 
-    const closedAgain = await send('POST', '/api/tonight/checklist/close', undefined, foh.cookie)
+    const closedAgain = await signOff(foh.cookie)
     expect(closedAgain.status).toBe(409)
   })
 })
@@ -199,7 +207,8 @@ describe.skipIf(skip !== null)('reviewing an incident (E-114 criterion 3)', () =
     expect((await send('POST', '/api/tonight/incidents/no-such-entry/review', undefined, foh.cookie)).status).toBe(404)
   })
 
-  test('a logged incident blocks the close until it is reviewed, and the log says which are', async () => {
+  // Issue 1315: the incident no longer holds the close; Sign off and close reviews it in the same batch.
+  test('a logged incident reads unreviewed until somebody reviews it, and Sign off and close reviews the rest', async () => {
     const performanceId = (() => {
       const database = new Database(app.databaseFile)
       try {
@@ -221,13 +230,10 @@ describe.skipIf(skip !== null)('reviewing an incident (E-114 criterion 3)', () =
     const { items: beforeItems } = await before.json() as { items: { id: string, itemId: string, done: boolean, required: boolean, systemCheck: string | null }[] }
     expect(beforeItems.find(entry => entry.itemId === itemId)?.done).toBe(false)
 
-    // Everything else settled first, so the close that follows is refused for the incident alone.
     for (const entry of beforeItems) {
       if (entry.systemCheck || entry.done) continue
-      await send('POST', `/api/tonight/checklist/${entry.id}/exempt`, { reason: 'Closing out the fixture' }, foh.cookie)
+      await send('POST', `/api/tonight/checklist/${entry.id}/exempt`, { performanceId, reason: 'Closing out the fixture' }, foh.cookie)
     }
-    const blocked = await send('POST', '/api/tonight/checklist/close', { performanceId }, foh.cookie)
-    expect(blocked.status).toBe(409)
 
     const unreviewed = await send('GET', '/api/tonight/incidents?pageSize=100', undefined, foh.cookie)
     const { items: logBefore } = await unreviewed.json() as { items: { id: string, reviewed: boolean }[] }
@@ -243,8 +249,12 @@ describe.skipIf(skip !== null)('reviewing an incident (E-114 criterion 3)', () =
     const { items: afterItems } = await after.json() as { items: { itemId: string, done: boolean }[] }
     expect(afterItems.find(entry => entry.itemId === itemId)?.done).toBe(true)
 
-    const closed = await send('POST', '/api/tonight/checklist/close', { performanceId }, foh.cookie)
+    const second = await send('POST', '/api/tonight/incidents', { performanceId, category: 'SAFETY', severity: 'NOTE', body: 'A coat left behind.' }, foh.cookie)
+    const { id: secondId } = await second.json() as { id: string }
+    const closed = await signOff(foh.cookie, performanceId)
     expect(closed.status).toBe(200)
+    const reviews = read<{ n: number }>(`SELECT count(*) AS n FROM audit_log WHERE action = 'incident.reviewed' AND target = ?`, `incident:${secondId}`)
+    expect(reviews?.n).toBe(1)
   })
 })
 
@@ -291,11 +301,11 @@ describe.skipIf(skip !== null)('the holds check and its exception (E-114 criteri
     const heldRead = await send('GET', `/api/tonight/checklist?performanceId=${heldId}`, undefined, foh.cookie)
     const { items: heldItems } = await heldRead.json() as { items: { id: string, done: boolean }[] }
     expect(heldItems[0]!.done).toBe(false)
-    expect((await send('POST', '/api/tonight/checklist/close', { performanceId: heldId }, foh.cookie)).status).toBe(409)
+    expect((await signOff(foh.cookie, heldId)).status).toBe(409)
 
     const exempted = await send('POST', `/api/tonight/checklist/${heldItems[0]!.id}/exempt`, { performanceId: heldId, reason: 'Director\'s hold, never collected' }, foh.cookie)
     expect(exempted.status).toBe(200)
-    const closed = await send('POST', '/api/tonight/checklist/close', { performanceId: heldId }, foh.cookie)
+    const closed = await signOff(foh.cookie, heldId)
     expect(closed.status).toBe(200)
   })
 })
@@ -337,7 +347,7 @@ describe.skipIf(skip !== null)('two performances, one venue, one day (E-128)', (
     const ticked = await send('POST', `/api/tonight/checklist/${matineeStamp.id}/tick`, { performanceId: matineeId }, dm.cookie)
     expect(ticked.status).toBe(200)
 
-    const closedMatinee = await send('POST', '/api/tonight/checklist/close', { performanceId: matineeId }, dm.cookie)
+    const closedMatinee = await signOff(dm.cookie, matineeId)
     expect(closedMatinee.status).toBe(200)
 
     const eveningStillOpen = await send('GET', `/api/tonight/checklist?performanceId=${eveningId}`, undefined, dm.cookie)
@@ -347,7 +357,7 @@ describe.skipIf(skip !== null)('two performances, one venue, one day (E-128)', (
 
     const eveningExempted = await send('POST', `/api/tonight/checklist/${eveningItems[0]!.id}/exempt`, { performanceId: eveningId, reason: 'Evening closes on its own record' }, dm.cookie)
     expect(eveningExempted.status).toBe(200)
-    const closedEvening = await send('POST', '/api/tonight/checklist/close', { performanceId: eveningId }, dm.cookie)
+    const closedEvening = await signOff(dm.cookie, eveningId)
     expect(closedEvening.status).toBe(200)
   })
 })
@@ -405,13 +415,12 @@ describe.skipIf(skip !== null)('the checklist screen on a matinee day (E-127, is
     }
   }, CASE_TIMEOUT_MS)
 
-  // The close still refuses on the server; this is the first line of defence, so the press never
-  // has to round-trip to learn what the screen already knows (E-114 criterion 4).
-  test('Close the night is disabled while a required item is outstanding, and says how many', async () => {
+  // Issue 1315: the night closes from the report, so the checklist pins nothing and counts what is left.
+  test('the checklist pins no close of its own, and says how many required items are open', async () => {
     const view = await signedInView()
     try {
       await visit(view, `${app.baseURL}/tonight/checklist?performanceId=${houses.eveningId}`, '[data-test="checklist-list"]')
-      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="close-night"]').disabled`)).toBe(true)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="night-actions"]'))`)).toBe(false)
       expect(await view.evaluate<string>('document.body.innerText')).toContain('1 required item still open')
     }
     finally {
