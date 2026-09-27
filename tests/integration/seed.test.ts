@@ -194,3 +194,26 @@ describe('the seed fills the screens', () => {
     expect(after).toEqual(before)
   }, 120_000)
 })
+
+// A developer re-seeds a database that was seeded on an earlier day, so a date-keyed row a re-run
+// skips has to be found by what it prices rather than by today's date (K-120).
+describe('the seed runs again on a later day (K-120)', () => {
+  test('a second day adopts the first day\'s prices rather than colliding with them', async () => {
+    const later = await createTestDatabase()
+    try {
+      const first = Math.floor(Date.UTC(2026, 8, 20, 12) / 1000)
+      const options = { hash, password: () => crypto.randomUUID(), token: () => crypto.randomUUID() }
+      await seed(later, { ...options, now: first })
+      const prices = (): number => rows<{ n: number }>(later, `
+        SELECT (SELECT count(*) FROM category_prices) + (SELECT count(*) FROM variant_prices) AS n
+      `)[0]!.n
+      const before = prices()
+
+      await seed(later, { ...options, now: first + 86_400 })
+      expect(prices()).toBe(before)
+    }
+    finally {
+      later.close()
+    }
+  }, 240_000)
+})

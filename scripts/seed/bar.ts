@@ -410,8 +410,8 @@ function categoryPriceOf(category: string, servingKind: string): number {
   return found?.pricePence ?? 0
 }
 
-// Prices are an append-only register keyed by the day they take effect, so a re-run asks before it
-// writes rather than stacking a second row on the same day (0010, F-116).
+// Prices are an append-only register, so a re-run on any later day adopts whatever price a category
+// or variant already has rather than restating it under the same id (0010, F-116).
 function seedPrices(
   target: SeedTarget,
   categories: Map<string, string>,
@@ -423,7 +423,7 @@ function seedPrices(
 
   for (const price of CATEGORY_PRICES) {
     const categoryId = categories.get(price.category)!
-    if (holds(target, 'category_prices', { category_id: categoryId, serving_kind: price.servingKind, effective_from: today })) continue
+    if (holds(target, 'category_prices', { category_id: categoryId, serving_kind: price.servingKind })) continue
     statements.push(insertOnly('category_prices', {
       id: seedId('categoryprice', price.category, price.servingKind),
       category_id: categoryId,
@@ -438,7 +438,7 @@ function seedPrices(
     for (const variant of product.variants) {
       if (variant.pricePence === undefined) continue
       const variantId = variants.get(`${product.slug}/${variant.slug}`)!.id
-      if (holds(target, 'variant_prices', { variant_id: variantId, effective_from: today })) continue
+      if (holds(target, 'variant_prices', { variant_id: variantId })) continue
       statements.push(insertOnly('variant_prices', {
         id: seedId('variantprice', product.slug, variant.slug),
         variant_id: variantId,
