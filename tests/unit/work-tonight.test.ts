@@ -212,8 +212,4 @@ describe('where a volunteer on shift looks (issue 1305)', () => {
   test('an explicit next of the home page still travels with the Google link', async () => {
     expect(await read('app/pages/sign-in.vue')).toContain('explicitNext.value === null ? \'/auth/google\'')
   })
-
-  test('a slot on a finished opening is not offered for release', async () => {
-    expect(await read('app/pages/rota/index.vue')).toContain('slot.endsAt >= nowSeconds')
-  })
 })

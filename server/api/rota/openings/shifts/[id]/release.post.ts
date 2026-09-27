@@ -18,11 +18,17 @@ export default defineEventHandler(async (event) => {
     detail: changes({ status: [held.status, 'OPEN'] }),
   })
 
+  // The cut-off rides the write, read from the opening's own night (E-107 criterion 1).
+  const at = Math.floor(Date.now() / 1000)
   const applied = await withOpeningConstraints(() =>
-    auditedWrite(db.all<{ id: string }>(releaseOpeningShiftStatement(id, account.id)), entry))
+    auditedWrite(db.all<{ id: string }>(releaseOpeningShiftStatement(id, account.id, at)), entry))
 
   if (!applied) {
     const now = await openingShiftDetail(id)
+    // Still the caller's to hold, so the write refused on the night having begun.
+    if (now && now.userId === account.id && (now.status === 'CLAIMED' || now.status === 'CONFIRMED')) {
+      throw createError({ statusCode: 409, statusMessage: 'That night has already begun, so the slot can no longer be released' })
+    }
     throw createError({ statusCode: 409, statusMessage: releaseRefusal(now?.status ?? held.status) })
   }
 

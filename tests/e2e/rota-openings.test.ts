@@ -434,6 +434,7 @@ describe.skipIf(skip !== null)('a queued claim is confirmed or declined (E-130 c
       await setAutoConfirm(true)
     }
   }, 120_000)
+})
 
 // E-107 criterion 1: a holder gives a slot back up to the start of its show night, and no later;
 // past that it is the night's business, as it is for a shift.

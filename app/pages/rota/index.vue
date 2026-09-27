@@ -403,7 +403,7 @@ useSeoMeta({ title: 'Rota' })
             </UButton>
           </div>
           <UButton
-            v-if="(slot.status === 'CLAIMED' || slot.status === 'CONFIRMED') && slot.endsAt >= nowSeconds"
+            v-if="(slot.status === 'CLAIMED' || slot.status === 'CONFIRMED') && releaseStillOpen(slot.startsAt, nowSeconds)"
             size="sm"
             color="neutral"
             variant="subtle"
