@@ -340,10 +340,11 @@ describe('every show-night route checks authority itself (E-111 criterion 5)', (
   // barAuthorityFor a till charge's answer and barOfficerFor its ended nights' half (F-102.5).
   const GUARDS = ['requireNightAuthority(', 'requireAnyNightAuthority(', 'closerFor(', 'barAuthorityFor(', 'barOfficerFor(']
 
-  // The one route that cannot resolve night authority, because it exists to answer the question
-  // the guard asks when it refuses: which venue. It returns venue names and nothing else (0077).
+  // Routes that refuse nobody on night authority: the till's venue picker answers the question the
+  // guard asks when it refuses (0077), and the emergency card is every signed-in account's (E-113).
   const WITHOUT_AUTHORITY: Record<string, string> = {
     'server/api/till/venues.get.ts': 'names the venues a caller may open a till at, which is what a request naming none is refused for',
+    'server/api/tonight/emergency.get.ts': 'serves every venue\'s card to anyone signed in; nightAuthorityIfAny only adds the duty manager numbers (A-114)',
   }
 
   test('no route under them resolves authority any other way', async () => {
@@ -371,5 +372,38 @@ describe('every show-night route checks authority itself (E-111 criterion 5)', (
   test('each is answerable in the audit coverage registry', () => {
     const covered = new Set(AUDIT_COVERAGE.map(entry => entry.route))
     expect(routes().filter(route => !covered.has(route))).toEqual([])
+  })
+})
+
+// A screen that answers anyone signed in and only adds what tonight's team may see asks whether
+// the caller has authority without paying for the refusal it would discard (issue 1310 review).
+describe('the non-throwing authority probe', () => {
+  const guard = (): Promise<string> => Bun.file('server/utils/night-authority.ts').text()
+  const body = (source: string, name: string): string => {
+    const start = source.indexOf(`export async function ${name}(`)
+    return source.slice(start, source.indexOf('\n}\n', start))
+  }
+
+  test('the probe and the guard try the same steps in the same order, through one function', async () => {
+    const source = await guard()
+    expect(body(source, 'requireAnyNightAuthority')).toContain('await firstAuthority(')
+    expect(body(source, 'nightAuthorityIfAny')).toContain('await firstAuthority(')
+  })
+
+  // A fault is not a refusal: thrown, so a phone keeps the numbers it last had rather than a 200
+  // without them overwriting its copy (A-114, E-113 criterion 2).
+  test('the probe answers null for a refusal, works out none, and throws a fault', async () => {
+    const probe = body(await guard(), 'nightAuthorityIfAny')
+    expect(probe).not.toContain('shiftRefusal(')
+    expect(probe).not.toContain('mostSpecificRefusal(')
+    expect(probe).toContain('>= 500')
+    expect(probe).toContain('return null')
+  })
+
+  test('the emergency card asks the probe rather than catching the guard\'s refusal', async () => {
+    const route = await Bun.file('server/api/tonight/emergency.get.ts').text()
+    expect(route).toContain('nightAuthorityIfAny(event, [\'DUTY_MANAGER\', \'DOOR\', \'BAR\'], { venueId })')
+    expect(route).not.toContain('requireAnyNightAuthority(')
+    expect(route).not.toContain('statusCode === 403')
   })
 })
