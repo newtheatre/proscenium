@@ -313,7 +313,10 @@ better than any gradient. Three rules:
    `PhotoHero` renders an empty `alt` and takes no `alt` prop: a caller that named the picture
    would have a screen reader read it before the words. `design-language.test.ts` refuses one.
 
-The house photographs live under `public/images/`, the logos under `public/images/logos/`, and
+The house photographs live under `public/images/`, the logos under `public/images/logos/`.
+`SiteWordmark` draws the white anniversary logo in the header, the footer and the way in, all of
+them stage black; it uses `anniversary-white-trimmed.webp`, cut from the 1920 canvas to the
+artwork, so the chrome never downloads a screen of transparent pixels (K-126 criterion 6).
 `PhotoHero` is the one component that draws a banner, so rules 1 and 3 are applied in one place. It takes
 `compact` where the picture is a band rather than the whole first screen, and its `title` and
 `description` slots take over from the props where the headline carries a word in its own colour,
