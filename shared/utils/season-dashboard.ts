@@ -9,6 +9,18 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date is YYYY-MM-DD')
 export const PERIOD_KINDS = ['DAY', 'WEEK', 'MONTH', 'TERM', 'SEASON', 'YEAR'] as const
 export type PeriodKind = (typeof PERIOD_KINDS)[number]
 
+const PERIOD_KIND_WORDS: Record<PeriodKind, string> = {
+  DAY: 'Day',
+  WEEK: 'Week',
+  MONTH: 'Month',
+  TERM: 'Term',
+  SEASON: 'Season',
+  YEAR: 'Year',
+}
+
+// What the period picker says, never the stored value (K-128, issue 1362).
+export const saysPeriodKind = (kind: PeriodKind): string => PERIOD_KIND_WORDS[kind]
+
 export const periodForm = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('DAY'), day: isoDate }),
   z.object({ kind: z.literal('WEEK'), day: isoDate }),

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
+import { saysEntrySource } from '#shared/utils/ledger'
+import { saysDay } from '#shared/utils/when'
+import type { EntrySource } from '#shared/utils/ledger'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
 import { entriesHref } from '#shared/utils/ledger-entries-list'
 import type { EntriesFilters } from '#shared/utils/ledger-entries-list'
@@ -41,7 +44,7 @@ function entriesUrl(filters: EntriesFilters = {}): string {
 const UButton = resolveComponent('UButton')
 
 const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
-  { id: 'source', header: 'Source', cell: ({ row }) => row.original.source },
+  { id: 'source', header: 'Source', cell: ({ row }) => saysEntrySource(row.original.source as EntrySource) },
   { id: 'amount', header: 'Amount', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.totalPence) },
   ...(mayDrillDown.value
     ? [{
@@ -93,7 +96,7 @@ const figures = computed(() => (data.value
 
     <template v-else-if="status !== 'pending' && data">
       <p class="text-sm text-muted">
-        {{ data.fromDay }} to {{ data.toDay }}
+        {{ saysDay(data.fromDay, { year: true }) }} to {{ saysDay(data.toDay, { year: true }) }}
       </p>
 
       <section

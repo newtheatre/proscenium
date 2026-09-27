@@ -79,7 +79,7 @@ const expectedRows = computed<ExpectedRow[]>(() => {
 const expectedColumns: TableColumn<ExpectedRow>[] = [
   {
     id: 'label',
-    header: 'Desk, by kind',
+    header: 'Where it was taken',
     cell: ({ row }) => h('span', { class: row.original.strong ? 'font-semibold' : undefined }, row.original.label),
   },
   {
@@ -307,7 +307,7 @@ function writeOff(): Promise<void> {
             {{ current ? 'Correct the reading' : 'Record this night\'s reading' }}
           </h2>
           <UFormField
-            label="Reader figure"
+            label="Reader total (Z)"
             description="As the reader shows it, in pounds and pence."
           >
             <div class="flex flex-wrap items-center gap-2">

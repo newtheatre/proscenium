@@ -2,6 +2,7 @@
 import { h } from 'vue'
 import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
+import { currentShowNight } from '#shared/utils/show-night'
 import { currentYear, yearChoices } from '#shared/utils/year'
 import type {
   BarReport,
@@ -30,8 +31,8 @@ const periodKindOptions = REPORT_PERIOD_KINDS.map(value => ({ label: saysReportP
 const request = useRequestFetch()
 
 const today = londonDay(new Date())
-const kind = ref<(typeof REPORT_PERIOD_KINDS)[number]>('CUSTOM')
-const night = ref(today)
+const kind = ref<(typeof REPORT_PERIOD_KINDS)[number]>('NIGHT')
+const night = ref(currentShowNight())
 const day = ref(today)
 const year = ref(currentYear())
 const years = yearChoices(year.value)
@@ -57,7 +58,7 @@ const query = computed(() => {
   return base
 })
 
-const { data, status, error, refresh } = await useAsyncData(
+const { data, status, error } = await useAsyncData(
   'bar-report',
   () => request<{ report: BarReport }>('/api/admin/bar/reports', { query: query.value }).then(response => response.report),
   { watch: [query] },
@@ -203,13 +204,6 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
             />
           </UFormField>
         </template>
-        <UButton
-          data-test="refresh-report"
-          variant="subtle"
-          @click="refresh()"
-        >
-          Refresh
-        </UButton>
       </template>
     </AdminToolbar>
 

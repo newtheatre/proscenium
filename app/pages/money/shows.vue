@@ -1,19 +1,25 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
-import { currentYear, yearChoices } from '#shared/utils/year'
 import type { PassUtilisationRow, RevenueByShowReport, ShowRevenueRow } from '#shared/utils/revenue-by-show'
+import type { FinanceSeason } from '#shared/utils/season-dashboard'
+import type { Period } from '#shared/utils/period-locks'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Revenue by show', middleware: 'console', docs: '/docs/money/revenue-by-show' })
 
 const request = useRequestFetch()
 
-const year = ref(currentYear())
-const years = yearChoices(year.value)
-
-// The year, always: a treasurer comparing shows reads them within one year at a time (0087).
-const query = computed(() => ({ kind: 'YEAR', year: String(year.value) }))
+// The money dashboard's own period controls, the season included (0087, issue 1362): it opens on
+// the year, and a treasurer comparing a season's shows picks the season.
+const periodForm = await usePeriodForm('revenue-by-show-period-choices', () => Promise.all([
+  request<{ periods: Period[] }>('/api/admin/finance/terms'),
+  request<{ seasons: FinanceSeason[] }>('/api/admin/finance/seasons'),
+]).then(([terms, seasons]) => ({
+  terms: terms.periods.map(({ id, label, fromDay, toDay }) => ({ id, label, fromDay, toDay })),
+  seasons: seasons.seasons,
+})))
+const query = periodForm.query
 
 const { data, status, error } = await useAsyncData(
   'revenue-by-show',
@@ -101,13 +107,7 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
       :searchable="false"
     >
       <template #actions>
-        <USelect
-          v-model="year"
-          aria-label="Year"
-          data-test="period-year"
-          :items="years"
-          value-key="value"
-        />
+        <PeriodFields :form="periodForm" />
       </template>
     </AdminToolbar>
 
@@ -131,7 +131,7 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
       >
         <template #empty>
           <p class="py-6 text-center text-sm text-muted">
-            Nothing was taken for a show in this year.
+            Nothing was taken for a show in this period.
           </p>
         </template>
       </UTable>
@@ -151,7 +151,7 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
         >
           <template #empty>
             <p class="py-6 text-center text-sm text-muted">
-              No pass has been used in this year.
+              No pass has been used in this period.
             </p>
           </template>
         </UTable>
