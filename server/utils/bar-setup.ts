@@ -106,7 +106,7 @@ export function planProductSetup(input: ProductSetupInput, context: SetupContext
     statements.push(sql`
       INSERT INTO bar_items (id, name, unit, container_ml, par_qty, category, age_restricted, allergen_state, allergen_notes, status)
       SELECT ${itemId}, ${newItem.name}, ${newItem.unit}, ${newItem.containerMl ?? null}, ${newItem.parQty ?? null},
-             ${newItem.category ?? null}, ${newItem.ageRestricted ? 1 : 0}, ${newItem.allergenState ?? null},
+             ${newItem.category ?? null}, ${newItem.ageRestricted ? 1 : 0}, ${newItem.allergenState},
              ${newItem.allergenNotes ?? null}, 'ACTIVE'
       WHERE ${itemFree} AND ${productFree} AND ${groupFree}
     `)

@@ -89,8 +89,8 @@ export const barProducts = sqliteTable('bar_products', {
   staffedOnly: integer('staffed_only', { mode: 'boolean' }).notNull().default(false),
   ageRestricted: integer('age_restricted', { mode: 'boolean' }).notNull().default(false),
   allergenState: text('allergen_state').notNull().default('UNKNOWN'),
-  // The note the till shows, which has to cover the product's ingredients (F-107 criterion 4).
-  // `bar_items.allergen_notes` is the per-item reference a manager writes it from.
+  // Only what the bar adds to what the product pours, such as a garnish; the till's answer is
+  // derived from the items' own answers with this after them (issue 1348, deriveAllergens).
   allergenNote: text('allergen_note'),
   sort: integer('sort').notNull().default(0),
   createdAt: integer('created_at').notNull().default(now),

@@ -206,8 +206,8 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
         categoryId: row.categoryId,
         // The tile's mark: any size, or any option offered, that asks (issue 1299, F-106.6).
         ageRestricted: sizes.some(size => size.ageRestricted || size.choice?.options.some(option => option.ageRestricted) === true),
-        allergenState: allergens.get(row.id)?.state ?? row.allergenState,
-        allergenNote: allergens.get(row.id)?.note ?? row.allergenNote,
+        allergenState: allergens.get(row.id)!.state,
+        allergenNote: allergens.get(row.id)!.note,
         variants: sizes,
       }
     })

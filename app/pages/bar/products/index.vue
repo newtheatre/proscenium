@@ -471,7 +471,7 @@ const columns: TableColumn<BarProduct>[] = [
             class="text-sm text-muted"
             data-test="product-allergens-derived"
           >
-            At the till: {{ says(editing.allergens.state) }}{{ editing.allergens.note ? `. ${editing.allergens.note}` : '' }}
+            At the till: {{ says(editing.allergens.state) }}.{{ editing.allergens.note ? ` ${editing.allergens.note.trim().replace(/\.*$/, '.')}` : '' }}
             It is read from the stock it pours, answered once on the Allergens screen.
           </p>
 

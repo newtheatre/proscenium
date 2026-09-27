@@ -35,19 +35,27 @@ export interface PouredAllergen {
 
 const sentence = (text: string): string => text.trim().replace(/\.+$/, '')
 
+const written = (note: string | null): note is string => Boolean(note?.trim())
+
+// An answer only when it is a clean one: confirmed none, or recorded with something written. A
+// recorded answer with no note, or a state no form writes, fails closed as no answer (F-107).
+const answered = (item: PouredAllergen): boolean =>
+  item.state === 'NONE' || (item.state === 'RECORDED' && written(item.note))
+
 // A product's answer from what it pours and what the bar adds (issue 1348, F-107 criteria 3 and 4):
-// unanswered while any item is, recorded while any item or the addition is, otherwise none.
+// unanswered while any item is, recorded while any item or the addition is, and no note is hidden.
 export function deriveAllergens(poured: readonly PouredAllergen[], addition: AllergenAnswer): AllergenAnswer {
-  if (poured.length === 0) return { state: addition.state, note: addition.note }
-  const unknown = [...new Set(poured.filter(item => item.state === 'UNKNOWN').map(item => item.itemName))]
-  const recorded = poured.filter(item => item.state === 'RECORDED' && item.note)
-  const added = addition.state === 'RECORDED' && addition.note ? addition.note : null
+  if (poured.length === 0) return addition
+  const unknown = [...new Set(poured.filter(item => !answered(item)).map(item => item.itemName))]
+  const noted = poured.filter(item => answered(item) && written(item.note))
+  const added = addition.state !== 'UNKNOWN' && written(addition.note) ? addition.note : null
   const parts = [
     ...(unknown.length > 0 ? [`No information recorded for ${unknown.join(', ')}`] : []),
-    ...recorded.map(item => `${item.itemName}: ${sentence(item.note!)}`),
+    ...noted.map(item => `${item.itemName}: ${sentence(item.note!)}`),
     ...(added ? [`Added at the bar: ${sentence(added)}`] : []),
   ]
-  const state: AllergenState = unknown.length > 0 ? 'UNKNOWN' : recorded.length > 0 || added ? 'RECORDED' : 'NONE'
+  const recorded = poured.some(item => item.state === 'RECORDED' && answered(item)) || (addition.state === 'RECORDED' && added !== null)
+  const state: AllergenState = unknown.length > 0 ? 'UNKNOWN' : recorded ? 'RECORDED' : 'NONE'
   return { state, note: parts.length > 0 ? `${parts.join('. ')}.` : null }
 }
 

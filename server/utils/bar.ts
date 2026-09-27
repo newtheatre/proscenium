@@ -333,13 +333,13 @@ interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 
   restrictedPours: string | null
 }
 
-const readProduct = (row: ProductRow, allergens: Map<string, AllergenAnswer>): BarProduct => ({
+const readProduct = (row: ProductRow, allergens: AllergenAnswer): BarProduct => ({
   ...row,
   staffedOnly: row.staffedOnly === 1,
   ageRestricted: row.ageRestricted === 1,
   everSold: row.everSold === 1,
   restrictedPours: readRestrictedPours(row.restrictedPours),
-  allergens: allergens.get(row.id) ?? { state: row.allergenState, note: row.allergenNote },
+  allergens,
 })
 
 export const PRODUCT_COLUMNS = sql`
@@ -392,7 +392,7 @@ export function productsQuery(clause: ListClause, limit: number, offset: number)
 export async function listProducts(clause: ListClause, limit: number, offset: number): Promise<BarProduct[]> {
   const rows = await db.all<ProductRow>(productsQuery(clause, limit, offset))
   const allergens = await derivedAllergens(sql`SELECT id FROM bar_products`, rows)
-  return rows.map(row => readProduct(row, allergens))
+  return rows.map(row => readProduct(row, allergens.get(row.id)!))
 }
 
 export async function countProducts(clause: ListClause): Promise<number> {
@@ -408,7 +408,7 @@ export async function productById(id: string): Promise<BarProduct | undefined> {
     FROM bar_products p JOIN bar_categories c ON c.id = p.category_id WHERE p.id = ${id}
   `)
   if (!row) return undefined
-  return readProduct(row, await derivedAllergens(sql`SELECT ${id}`, [row]))
+  return readProduct(row, (await derivedAllergens(sql`SELECT ${id}`, [row])).get(row.id)!)
 }
 
 interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements' | 'pouredBy' | 'pourSizes'> {
