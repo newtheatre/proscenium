@@ -1,5 +1,5 @@
 import { db, schema } from '@nuxthub/db'
-import { and, eq, lte, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
@@ -320,24 +320,28 @@ export async function declineAccessProfile(event: H3Event, userId: string, offic
   if (!applied) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000), version)
 }
 
+// A tombstone past its days, matched again on the DELETE itself: a profile declared again since
+// the sweep read it is no longer a tombstone, and survives (0003).
+export const overdueTombstone = (cutoff: number) => sql`status = 'WITHDRAWN' AND withdrawn_at <= ${cutoff}`
+
 // The 30-day tombstone from withdrawal, then gone outright (D-127 criterion 5). One batch per
 // row: each purge is independent and a failure on one must not block the rest.
 export async function sweepWithdrawnAccessProfiles(now: Date = new Date()): Promise<number> {
   const cutoff = Math.floor(now.getTime() / 1000) - WITHDRAWAL_TOMBSTONE_DAYS * 24 * 60 * 60
   const overdue = await db.select({ userId: schema.accessProfiles.userId })
     .from(schema.accessProfiles)
-    .where(and(eq(schema.accessProfiles.status, 'WITHDRAWN'), lte(schema.accessProfiles.withdrawnAt, cutoff)))
+    .where(overdueTombstone(cutoff))
 
+  let purged = 0
   for (const row of overdue) {
-    await db.batch([
-      db.delete(schema.accessProfiles).where(eq(schema.accessProfiles.userId, row.userId)),
-      db.insert(schema.auditLog).values(auditEntry({
-        actorId: null,
-        action: 'access-profile.tombstone.purged',
-        target: `user:${row.userId}`,
-      })),
-    ])
+    const gone = await auditedWrite(
+      db.delete(schema.accessProfiles)
+        .where(and(eq(schema.accessProfiles.userId, row.userId), overdueTombstone(cutoff)))
+        .returning({ userId: schema.accessProfiles.userId }),
+      auditEntry({ actorId: null, action: 'access-profile.tombstone.purged', target: `user:${row.userId}` }),
+    )
+    if (gone) purged += 1
   }
 
-  return overdue.length
+  return purged
 }
