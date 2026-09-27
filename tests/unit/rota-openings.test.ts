@@ -3,6 +3,7 @@ import {
   BAR_OPENING_STATUSES,
   barOpeningForm,
   openingClaimRefusal,
+  openingReleaseRefusal,
   openingSlotRemoveRefusal,
   openingUnconfirmRefusal,
   saysBarOpeningStatus,
@@ -78,5 +79,27 @@ describe('why removing a slot was refused (E-130 criterion 7)', () => {
   test('a cancelled opening, and a slot already gone, say so rather than anything else', () => {
     expect(openingSlotRemoveRefusal({ status: 'CANCELLED', openingStatus: 'CANCELLED' }, 2)).toContain('cancelled')
     expect(openingSlotRemoveRefusal(null, 2)).toContain('already been removed')
+  })
+})
+
+// Why a holder's own release did not apply, read only to explain it: the cut-off rides the write
+// (E-107 criterion 1), and an officer can reassign the slot between the read and the write.
+describe('a refused release says what happened to the slot', () => {
+  test('still held by the caller, so the night has begun', () => {
+    expect(openingReleaseRefusal({ userId: 'me', status: 'CONFIRMED' }, 'me', 'CONFIRMED'))
+      .toBe('That night has already begun, so the slot can no longer be released')
+  })
+
+  test('held by somebody else now, so an officer reassigned it', () => {
+    expect(openingReleaseRefusal({ userId: 'other', status: 'CONFIRMED' }, 'me', 'CLAIMED'))
+      .toBe('This slot has been reassigned since you opened this page')
+    expect(openingReleaseRefusal({ userId: 'other', status: 'CLAIMED' }, 'me', 'CLAIMED'))
+      .toBe('This slot has been reassigned since you opened this page')
+  })
+
+  test('otherwise the state of the slot, in the words a shift uses', () => {
+    expect(openingReleaseRefusal({ userId: null, status: 'OPEN' }, 'me', 'CONFIRMED')).toContain('nothing to release')
+    expect(openingReleaseRefusal({ userId: 'me', status: 'CANCELLED' }, 'me', 'CONFIRMED')).toBe('This shift has been cancelled')
+    expect(openingReleaseRefusal(null, 'me', 'CONFIRMED')).not.toContain('reassigned')
   })
 })

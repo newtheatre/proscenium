@@ -463,3 +463,38 @@ describe.skipIf(skip !== null)('a holder releases their own slot until its night
     expect(held.holderName).not.toBeNull()
   })
 })
+
+// E-107 criterion 2: a slot given back close to its night reaches the rota officers at once, as a
+// shift's does; one given back further out waits for their digest.
+describe.skipIf(skip !== null)('a release close to the night tells the rota officers at once (E-107 criterion 2)', () => {
+  function releaseNotices(userId: string): number {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const row = database.query(`SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type = 'shift.released'`).get(userId) as { n: number }
+      return row.n
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  async function claimedOn(label: string, on: string): Promise<Slot> {
+    expect((await plan(label, foh.cookie, on)).status).toBe(200)
+    const { items, slots } = await listing(foh.cookie)
+    const opening = items.find(one => one.label === label)!
+    const slot = slots.find(one => one.openingId === opening.openingId)!
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${slot.slotId}/claim`, {}, member.cookie)).status).toBe(200)
+    return slot
+  }
+
+  test('a slot for tomorrow released tonight notifies the Front of House Manager, one ten days out does not', async () => {
+    const before = releaseNotices(foh.id)
+    const soon = await claimedOn('A release tomorrow', daysAfter(currentShowNight(), 1))
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${soon.slotId}/release`, {}, member.cookie)).status).toBe(200)
+    expect(releaseNotices(foh.id)).toBe(before + 1)
+
+    const far = await claimedOn('A release far out', daysAfter(currentShowNight(), 10))
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${far.slotId}/release`, {}, member.cookie)).status).toBe(200)
+    expect(releaseNotices(foh.id)).toBe(before + 1)
+  })
+})
