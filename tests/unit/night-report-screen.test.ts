@@ -145,7 +145,7 @@ describe('the sign-off says what moved under it (issue 1315)', () => {
 
   test('before the curtain the screen says when the sign-off opens', () => {
     // 22:10 on Thursday 5 November 2026, in London.
-    expect(saysSignOffOpens(1793916600)).toBe('Sign off and close opens at 22:10, once the curtain is down.')
+    expect(saysSignOffOpens(1793916600)).toBe('Sign off and close opens at 22:10, once the curtain is down')
   })
 
   test('the form carries the count it was shown, and refuses without one', () => {

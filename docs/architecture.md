@@ -1848,7 +1848,9 @@ caller reads one shape either way.
 `/tonight/report` is the duty manager's screen over both routes (issue 1053), a tile on the hub
 carrying the house the hub is showing. Nothing that ends the night is pinned before
 `curtainDownAt`, on this screen or any other (issue 1315): until then the draft says when Sign off
-and close opens, and the hub and the glance keep their daytime shape, `curtainIsDown()` in
+and close opens, `POST /api/tonight/report/sign-off` refuses with a 409 in the same words
+(`signOffTooEarly`, over the same `performanceEnd()`) before it compiles or writes anything, and
+the hub and the glance keep their daytime shape, `curtainIsDown()` in
 `shared/utils/night-hub.ts` deciding for both. After it the hub leads the duty manager with the
 Night report tile in gold, the glance pins Night report, and this screen lists `openAtClose()`
 (every post-show item still open, and any required pre-show one) with Tick in place above the

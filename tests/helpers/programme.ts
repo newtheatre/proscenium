@@ -118,3 +118,16 @@ export function tonightsPerformance(into: AcceptsStatements, options: TonightsPe
 
   return { night, venueId, showId, performanceId, startsAt, venueCapacity, capacityOverride }
 }
+
+// Brings a performance's curtain down by now, only ever earlier and never before tonight's 04:00;
+// bring an earlier house at the venue down first or this one passes it (issue 1315).
+export function curtainDown(into: AcceptsStatements, performanceId: string, now: Date = new Date()): void {
+  const nightStart = Math.floor(showNightBounds(showNightOf(now)).from.getTime() / 1000)
+  const at = Math.max(nightStart, Math.floor(now.getTime() / 1000) - 60)
+  into.batch([[
+    `UPDATE performances SET duration_minutes = 0, interval_count = 0,
+       starts_at = min(starts_at, ?), doors_at = min(coalesce(doors_at, starts_at), ?)
+     WHERE id = ?`,
+    at, at, performanceId,
+  ]])
+}

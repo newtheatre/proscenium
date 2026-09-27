@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
-import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
+import { curtainDown, testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { NIGHT_TAP_TARGET_PX } from '#shared/utils/night-shell'
 import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
@@ -57,8 +57,16 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
 
 interface Item { id: string, label: string, phase: string, required: boolean, systemCheck: string | null }
 
-// Sign off and close sends back the report's own incident count, as the screen does (issue 1315).
+// Sign off and close sends back the report's own incident count, as the screen does, once the
+// curtain is down, which is when the route opens it (issue 1315).
 async function signOff(as: string, performanceId?: string): Promise<Response> {
+  const database = new Database(app.databaseFile)
+  try {
+    curtainDown(sqliteTarget(database), performanceId ?? house.performanceId)
+  }
+  finally {
+    database.close()
+  }
   const scoped = performanceId ? `?performanceId=${performanceId}` : ''
   const report = await (await send('GET', `/api/tonight/report${scoped}`, undefined, as)).json() as { incidents: unknown[] }
   return send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Closing out the fixture', incidentsSeen: report.incidents.length }, as)

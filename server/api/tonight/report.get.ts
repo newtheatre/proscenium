@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { performanceEnd } from '#shared/utils/rota-times'
 
 // The live draft (E-123 criterion 4) until sign-off freezes it, after which the frozen snapshot
 // and its addenda return instead (E-124 criterion 5). A venue running more than one today must name which one.
@@ -30,7 +29,6 @@ export default defineEventHandler(async (event) => {
   }
 
   // When the curtain comes down, the screen's cue to offer Sign off and close (issue 1315, 0078).
-  const [times, compiled] = await Promise.all([tonightPerformance(target), compileNightReport(target, resolved.venueId, resolved.night)])
-  const curtainDownAt = times ? performanceEnd(times) : null
-  return { ...compiled, curtainDownAt, signedOff: null, addenda: [] }
+  const [curtain, compiled] = await Promise.all([curtainDownAt(target), compileNightReport(target, resolved.venueId, resolved.night)])
+  return { ...compiled, curtainDownAt: curtain, signedOff: null, addenda: [] }
 })
