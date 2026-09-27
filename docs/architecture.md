@@ -1888,7 +1888,7 @@ could put somebody in a closed room calls it: availability, a booking, a request
 change to a pending request, approving a request (into its own room or another), a bump and a
 bump's alternatives, through `closedOver()`, which builds the one 422 ROOM_CLOSED refusal quoting
 the closure. Every write that places a booking also carries the closures on its own statement
-(`roomOpenTerms()`, the offsets bound once): the slot claim (`claimSlotStatement`: a booking, a
+(`roomOpenTerms()`, the offsets bound once): the slot claim (`claimRoomSlotStatement`: a booking, a
 request and relisting an SU request), the change to a pending request (`editPendingStatement`),
 the approval (`approveStatement`, into its own room or another), the bump and its held offer
 (`bumpStatements` in `server/utils/room-writes.ts`) and each week of a series

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { approveStatement } from '#server/utils/approvals'
-import { claimSlotStatement } from '#server/utils/bookings'
+import { claimRoomSlotStatement } from '#server/utils/bookings'
 import { bumpStatements, seriesClaimStatement } from '#server/utils/room-writes'
 import { showNightBounds, showNightOf } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -54,7 +54,7 @@ function input(span: { startsAt: number, endsAt: number }, roomId = 'r-house'): 
 
 // Written or not, read back by id: the statement's RETURNING is the route's signal, and this is its twin.
 function claim(database: TestDatabase, id: string, over: ClaimInput): boolean {
-  const [query, ...parameters] = boundStatement(database, claimSlotStatement(id, over))
+  const [query, ...parameters] = boundStatement(database, claimRoomSlotStatement(id, over))
   database.raw.prepare(query).all(...parameters as never[])
   return rows<{ n: number }>(database, 'SELECT count(*) n FROM room_bookings WHERE id = ?', id)[0]!.n === 1
 }
@@ -120,10 +120,10 @@ describe('a closure made after the check still stops the claim', () => {
 
   test('the statement binds the same parameters however many closures there are (0006)', async () => {
     await withDatabase((database) => {
-      const before = boundStatement(database, claimSlotStatement('b-count', input(EVENING))).length
+      const before = boundStatement(database, claimRoomSlotStatement('b-count', input(EVENING))).length
       closeRoom(database, 'r-house', AFTERNOON)
       closeRoom(database, null, AFTERNOON)
-      expect(boundStatement(database, claimSlotStatement('b-count', input(EVENING))).length).toBe(before)
+      expect(boundStatement(database, claimRoomSlotStatement('b-count', input(EVENING))).length).toBe(before)
     })
   })
 })

@@ -45,7 +45,7 @@ export type ClaimOutcome
 
 // The predicate rides the INSERT, so the check and the write are one statement and cannot be
 // interleaved: room live, nothing booked, nothing closed. Half-open, so back-to-back bookings fit.
-export function claimSlotStatement(id: string, input: ClaimInput): SQL {
+export function claimRoomSlotStatement(id: string, input: ClaimInput): SQL {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
   return sql`
     INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, reason)
@@ -70,7 +70,7 @@ export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
 
   // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
   // coming back is the same signal claimToken uses to know it won (0003).
-  const claimed = await db.all<{ id: string }>(claimSlotStatement(id, input))
+  const claimed = await db.all<{ id: string }>(claimRoomSlotStatement(id, input))
 
   if (claimed.length > 0) return { won: true, id }
 
