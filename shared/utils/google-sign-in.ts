@@ -1,4 +1,5 @@
 import { isWorkspaceEmail } from './auth'
+import { localPath } from './local-path'
 
 // What a Google sign-in resolves to, before anything is written. Kept pure so the order in
 // A-104 is provable without a database or a network.
@@ -68,4 +69,13 @@ export function resolveGoogleSignIn(identity: GoogleIdentity, lookups: GoogleLoo
   }
 
   return { action: 'create' }
+}
+
+export interface GoogleRoundTripStart { next: string | null, reauth: boolean }
+
+// What the first leg of the round trip asked for. Google's callback carries `code` or `error` and
+// nothing of the person's own, so it is null there: it reads what the first leg kept (A-128).
+export function googleRoundTripStart(query: Record<string, unknown>): GoogleRoundTripStart | null {
+  if (query.code !== undefined || query.error !== undefined) return null
+  return { next: localPath(query.next), reauth: query.reauth === '1' }
 }
