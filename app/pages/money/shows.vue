@@ -62,14 +62,14 @@ const showColumns: TableColumn<ShowRow>[] = [
     ]),
   },
   { id: 'gross', header: 'Gross', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.grossPence) },
-  { id: 'refunded', header: 'Refunded', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => saysMoney(row.original.refundedPence) },
+  { id: 'refunded', header: 'Refunded', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => saysMoney(row.original.refundedPence) },
   { id: 'net', header: 'Net', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.netPence) },
-  { id: 'walkUp', header: 'Walk-up', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.walkUpPence)) },
-  { id: 'preBooked', header: 'Pre-booked', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.preBookedPence)) },
+  { id: 'walkUp', header: 'Walk-up', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.walkUpPence)) },
+  { id: 'preBooked', header: 'Pre-booked', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => (row.original.unattributed ? '' : saysMoney(row.original.preBookedPence)) },
   {
     id: 'passAdmissions',
     header: 'Pass admissions',
-    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
+    meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
     cell: ({ row }) => (row.original.unattributed ? '' : String(row.original.passAdmissions)),
   },
 ]
@@ -87,8 +87,8 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
   },
   { id: 'passTypeName', header: 'Type', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => row.original.passTypeName },
   { id: 'pricePaid', header: 'Paid', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.pricePaid) },
-  { id: 'admittedShows', header: 'Shows admitted', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => String(row.original.admittedShows) },
-  { id: 'coveredShows', header: 'Shows covered', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } }, cell: ({ row }) => String(row.original.coveredShows) },
+  { id: 'admittedShows', header: 'Shows admitted', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => String(row.original.admittedShows) },
+  { id: 'coveredShows', header: 'Shows covered', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => String(row.original.coveredShows) },
 ]
 </script>
 

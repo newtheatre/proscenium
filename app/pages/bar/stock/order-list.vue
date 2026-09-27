@@ -44,21 +44,21 @@ const columns: TableColumn<OrderListRow>[] = [
   {
     id: 'onHand',
     header: 'On hand',
-    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
+    meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
     cell: ({ row }) => saysQuantity(row.original.onHand, row.original.unit),
   },
   {
     id: 'par',
     header: 'Par',
-    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
+    meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
     cell: ({ row }) => saysQuantity(row.original.parQty, row.original.unit),
   },
   {
     id: 'shortfall',
     header: 'Shortfall',
     // The one figure a supplier order actually needs, weighted against On hand and Par beside it.
-    meta: { class: { td: 'text-right whitespace-nowrap font-medium' } },
-    cell: ({ row }) => saysQuantity(row.original.shortfall, row.original.unit),
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => h('span', { class: 'font-medium' }, saysQuantity(row.original.shortfall, row.original.unit)),
   },
 ]
 </script>

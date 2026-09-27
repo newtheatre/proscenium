@@ -185,7 +185,7 @@ const columns: TableColumn<AdminVenue>[] = [
   {
     id: 'capacity',
     header: 'Capacity',
-    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-right whitespace-nowrap font-mono` } },
+    meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
     cell: ({ row }) => row.original.capacity ?? 'Uncapped',
   },
   {
