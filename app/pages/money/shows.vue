@@ -121,7 +121,7 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
 
     <template v-else-if="status !== 'pending' && data">
       <p class="text-sm text-muted">
-        {{ saysDay(data.fromDay) }} to {{ saysDay(data.toDay) }}
+        {{ saysDay(data.fromDay, { year: true }) }} to {{ saysDay(data.toDay, { year: true }) }}
       </p>
 
       <UTable
