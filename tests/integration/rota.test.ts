@@ -1411,8 +1411,9 @@ describe('the training gate rides the claim and the assignment (#1302, E-104 cri
       const tonight = tonightsPerformance(database)
       const untrained = person(database, 'untrained')
       const trainedOne = claimant(database, 'trained')
+      const officer = person(database, 'officer')
       const add = (id: string, userId?: string, slot = 1): unknown[] =>
-        run(database, addShiftStatement(id, { performanceId: tonight.performanceId, role: 'DOOR', slot, userId }, 'officer', OFFSETS, GATE))
+        run(database, addShiftStatement(id, { performanceId: tonight.performanceId, role: 'DOOR', slot, userId }, officer, OFFSETS, GATE))
 
       expect(add('shift-untrained', untrained)).toHaveLength(0)
       expect(add('shift-trained', trainedOne, 2)).toHaveLength(1)

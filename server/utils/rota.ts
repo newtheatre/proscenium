@@ -653,8 +653,10 @@ export function assignShiftStatement(shiftId: string, userId: string, actorId: s
 
 // An officer's ad hoc shift: a repeat entry collides on the same uniqueness a stamped one would
 // (E-107 criterion 5). The id is the caller's own, since this write is audited by `changes()`.
-export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId: string, defaults: ShiftOffsets): SQL {
+export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId: string, defaults: ShiftOffsets, gate: TrainingGate): SQL {
   const confirmed = input.userId !== undefined
+  // Somebody named is confirmed at once, as an assignment is, so the training gate rides the insert (#1302).
+  const trained = input.userId === undefined ? sql`` : sql` AND ${holdsGate(gate, input.userId)}`
   // The window comes from the performance and the template the same way a stamp's does: a shift
   // added by hand with no window would hold authority for the whole night (0078).
   return sql`
@@ -666,7 +668,8 @@ export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId
       ${windowStart(defaults)}, ${windowEnd(defaults)}
     FROM performances p
     LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = ${input.role} AND ${ourVenue('t')}
-    WHERE p.id = ${input.performanceId}
+    WHERE p.id = ${input.performanceId}${trained}
+    RETURNING id
   `
 }
 
