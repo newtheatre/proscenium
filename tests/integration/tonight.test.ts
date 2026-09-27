@@ -372,7 +372,7 @@ describe('the venues running tonight (issue 1310)', () => {
   })
 
   // An external venue keeps its own building's procedures until we staff a night there (issue 1318).
-  test('an external venue counts once somebody holds a shift on its performance tonight', async () => {
+  test('an external venue counts once its performance tonight carries a shift that is not cancelled', async () => {
     await withDatabase(async (database) => {
       const hired = testVenue(database, { suffix: 'hired', isExternal: true })
       const tonight = tonightsPerformance(database, { suffix: 'hired', venueId: hired.id })
@@ -470,8 +470,8 @@ describe('tonight\'s first aiders (issue 1310)', () => {
   })
 })
 
-// The answer a duty manager gives when they claim rides the claim's own batch, and lands only
-// if the claim took the shift (A-114, 0003, issue 1310).
+// The answer a duty manager gives when they claim rides the claim's own batch, behind the claim's
+// own audit row, so only a claim that took the shift writes it (A-114, 0003, issue 1310).
 describe('the duty manager\'s answer at the claim (issue 1310)', () => {
   function preference(database: TestDatabase, userId: string): number | undefined {
     return rows<{ visible: number }>(database, 'SELECT visible FROM shift_contact_preferences WHERE user_id = ?', userId)[0]?.visible
@@ -481,19 +481,28 @@ describe('the duty manager\'s answer at the claim (issue 1310)', () => {
     database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)', id, performanceId, 'DUTY_MANAGER', 'OPEN']])
   }
 
-  test('written when the claim took the shift, and a later answer replaces it', async () => {
+  // The claim, its conditional audit row and the answer, batched as the route batches them.
+  function claim(database: TestDatabase, shiftId: string, userId: string, visible: boolean): void {
+    const auditId = `audit-${crypto.randomUUID()}`
+    database.batch([
+      boundStatement(database, claimShiftStatement(shiftId, userId, 'CONFIRMED')),
+      [`INSERT INTO audit_log (id, actor_id, action, target, detail) SELECT ?, ?, 'shift.claimed', ?, '{}' WHERE changes() = 1`,
+        auditId, userId, `shift:${shiftId}`],
+      boundStatement(database, shareNumberStatement(auditId, userId, visible)),
+    ])
+  }
+
+  test('written when the claim took the shift, and replaced by the answer at a later claim', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       const who = person(database, 'dm-asked')
       open(database, 'dm-open', tonight.performanceId)
 
-      database.batch([
-        boundStatement(database, claimShiftStatement('dm-open', who, 'CONFIRMED')),
-        boundStatement(database, shareNumberStatement('dm-open', who, true)),
-      ])
+      claim(database, 'dm-open', who, true)
       expect(preference(database, who)).toBe(1)
 
-      database.batch([boundStatement(database, shareNumberStatement('dm-open', who, false))])
+      database.batch([['UPDATE shifts SET status = ?, user_id = NULL WHERE id = ?', 'OPEN', 'dm-open']])
+      claim(database, 'dm-open', who, false)
       expect(preference(database, who)).toBe(0)
     })
   })
@@ -505,12 +514,22 @@ describe('the duty manager\'s answer at the claim (issue 1310)', () => {
       const second = person(database, 'dm-second')
       open(database, 'dm-contested', tonight.performanceId)
 
-      database.batch([boundStatement(database, claimShiftStatement('dm-contested', first, 'CONFIRMED'))])
-      database.batch([
-        boundStatement(database, claimShiftStatement('dm-contested', second, 'CONFIRMED')),
-        boundStatement(database, shareNumberStatement('dm-contested', second, true)),
-      ])
+      claim(database, 'dm-contested', first, true)
+      claim(database, 'dm-contested', second, true)
       expect(preference(database, second)).toBeUndefined()
+    })
+  })
+
+  // A stale list on a second phone claims a shift already held: refused, so the first answer stands.
+  test('re-claiming your own held shift leaves the earlier answer in place', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'dm-twice')
+      open(database, 'dm-held', tonight.performanceId)
+
+      claim(database, 'dm-held', who, true)
+      claim(database, 'dm-held', who, false)
+      expect(preference(database, who)).toBe(1)
     })
   })
 })

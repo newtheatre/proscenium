@@ -174,8 +174,18 @@ describe.skipIf(skip !== null)('reading tonight\'s card (E-113 criteria 2, 4)', 
     expect(await page.text()).toContain('Cherry Tree Hill')
   })
 
-  test('somebody signed out is not given it', async () => {
+  test('somebody signed out is not given it, and the screen sends them to sign in', async () => {
     expect((await request(app, 'GET', '/api/tonight/emergency')).status).toBe(401)
+    const page = await request(app, 'GET', '/tonight/emergency')
+    expect(new URL(page.url).pathname).toBe('/sign-in')
+    expect(await page.text()).not.toContain('Cherry Tree Hill')
+  })
+
+  // A cached copy keeps its numbers only for the account it was fetched for (A-114).
+  test('the answer names the account it was fetched for', async () => {
+    const member = await registerMember(app, 'emergency-stamped', generatePassword())
+    const answered = await send('GET', '/api/tonight/emergency', undefined, member.cookie)
+    expect((await answered.json() as { viewerId: string }).viewerId).toBe(member.id)
   })
 })
 

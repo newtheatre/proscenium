@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { CONFIG_KEYS, hasDefault, isEnforced } from '#shared/utils/config'
 import { configHeading } from '#shared/utils/config-wording'
+import { clearNightCache, memoryNightCacheStore, nightCacheKey, writeNightCache } from '#shared/utils/night-cache'
 import { shiftClaimForm } from '#shared/utils/tonight'
-import { saysFirstAiders } from '#shared/utils/venue-emergency'
+import { emergencyCardsFor, saysFirstAiders } from '#shared/utils/venue-emergency'
 
 // Issue 1310: the card to anyone signed in, first aiders off the rota, and the duty manager asked at
 // the claim. Queries: `tests/integration/tonight.test.ts`; route: `tests/e2e/venue-emergency.test.ts`.
@@ -60,6 +61,48 @@ describe('the card is primed and read for anyone, under one key (E-113 criterion
     expect(screen).toContain('screen: \'emergency-cards\'')
     expect(layout).not.toContain('screen: \'emergency-card\'')
     expect(await source('server/api/tonight/emergency.get.ts')).toContain('requireAccount(event)')
+  })
+})
+
+// On a shared phone the cached card outlives the person who fetched it, so its numbers go with
+// them: a copy stamped for another account keeps its addresses and loses the numbers (A-114).
+describe('a cached card\'s numbers are the fetching account\'s alone', () => {
+  const answer = {
+    viewerId: 'rowan',
+    cards: [{ venueId: 'house', address: 'Cherry Tree Hill', dutyManagers: [{ name: 'Rowan Ellis', phone: '07700 900333' }] }],
+  }
+
+  test('the account that fetched it sees them', () => {
+    expect(emergencyCardsFor(answer, 'rowan')).toEqual(answer.cards)
+  })
+
+  test('another account, or nobody signed in, sees the card without them', () => {
+    for (const viewer of ['mel', null]) {
+      expect(emergencyCardsFor(answer, viewer)).toEqual([{ venueId: 'house', address: 'Cherry Tree Hill', dutyManagers: null }])
+    }
+  })
+
+  test('nothing cached is nothing to show', () => {
+    expect(emergencyCardsFor(null, 'rowan')).toBeNull()
+  })
+})
+
+describe('signing out takes the night off the phone', () => {
+  test('every night key goes, and nothing else on the device is touched', () => {
+    const store = memoryNightCacheStore()
+    const key = nightCacheKey({ screen: 'emergency-cards', night: '2026-10-17', wholeNight: true })
+    writeNightCache(store, key, { cards: [] })
+    store.setItem('nnt.theme', 'dark')
+
+    expect(clearNightCache(store)).toEqual([key])
+    expect(store.getItem(key)).toBeNull()
+    expect(store.getItem('nnt.theme')).toBe('dark')
+  })
+
+  test('sign-out clears it, and a signed-out visitor never reaches the screen', async () => {
+    const status = await source('app/components/AuthStatus.vue')
+    expect(status).toContain('clearNightCache(deviceNightCacheStore())')
+    expect(await source('app/pages/tonight/emergency.vue')).toContain('middleware: \'signed-in\'')
   })
 })
 
