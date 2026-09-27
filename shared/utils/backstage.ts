@@ -7,6 +7,10 @@ export const BOARD_CODE_DIGITS = 6
 // Criterion 4's own number, not a workshop configuration key: the story states it directly.
 export const MAX_FAILED_ATTEMPTS = 10
 
+// A device joins one show night's board, and the night ends at 04:00 (0014): whatever the phone
+// still holds after that, tonight's board takes tonight's code (E-120, issue 1312).
+export const LAST_NIGHTS_BOARD = 'This board was for last night: join tonight\'s with the new code'
+
 async function hmacSha256(key: string, message: string): Promise<Uint8Array> {
   const imported = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
