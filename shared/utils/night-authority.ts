@@ -11,8 +11,9 @@ import type { Permission, Role } from './roles'
 export const NIGHT_ROLES = ['DUTY_MANAGER', 'DOOR', 'BAR'] as const
 export type NightRole = (typeof NIGHT_ROLES)[number]
 
-// How the authority was reached. A refusal never returns, so there is no third state.
-export type NightAuthorityVia = 'SHIFT' | 'OFFICER'
+// How the authority was reached. A refusal never returns; COVER is tonight's confirmed duty
+// manager opening the door for their own performance (0095).
+export type NightAuthorityVia = 'SHIFT' | 'OFFICER' | 'COVER'
 
 export const OFFICER_BYPASS_ACTION = 'night.officer-bypass'
 
@@ -77,14 +78,16 @@ export function landingAfterSignIn(next: unknown, onShiftTonight: boolean): stri
 
 // Names both ways in, because a volunteer refused at 19:20 needs to know which one to go and get.
 // The administrator is not offered: "become an administrator" is not advice (0044).
-export function nightAuthorityRefusal(role: NightRole): { statusCode: 403, statusMessage: string } {
+export function nightAuthorityRefusal(role: NightRole, dutyManager: string | null = null): { statusCode: 403, statusMessage: string } {
   // The bar has a third way in, because an evening with no performance still opens a bar (0077).
   const tonight = role === 'BAR'
     ? `on one of tonight's performances or on tonight's bar opening`
     : `on one of tonight's performances`
+  // Tonight's confirmed duty manager covers the door, so a door refusal says who is there (0095).
+  const cover = role === 'DOOR' && dutyManager ? `. ${dutyManager}, tonight's duty manager, can open the door` : ''
   return {
     statusCode: 403,
-    statusMessage: `This needs ${NIGHT_ROLE_WORDS[role]} ${tonight}, or ${NIGHT_ROLE_OFFICER[role].words}`,
+    statusMessage: `This needs ${NIGHT_ROLE_WORDS[role]} ${tonight}, or ${NIGHT_ROLE_OFFICER[role].words}${cover}`,
   }
 }
 
@@ -150,6 +153,31 @@ export function mostSpecificRefusal<T extends { kind: NightRefusalKind }>(refusa
 // may run a matinee and an evening, so the venue is in the key and the performance is not (0044).
 export function officerBypassTarget(night: string, venueId: string, role: NightRole): string {
   return `night:${night}:${venueId}:${role}`
+}
+
+export const DOOR_COVER_ACTION = 'night.door-cover'
+
+// Once per duty manager, night and venue, the same key a bypass has without its role: cover is
+// only ever the door (0095).
+export function doorCoverTarget(night: string, venueId: string): string {
+  return `door-cover:${night}:${venueId}`
+}
+
+// Identifiers only, the venue's performances covered by the duty manager's shifts (0011).
+export function doorCoverEntry(actorId: string, night: string, venueId: string, performanceIds: string[]): AuditRow {
+  return auditEntry({
+    actorId,
+    action: DOOR_COVER_ACTION,
+    target: doorCoverTarget(night, venueId),
+    detail: { night, venueId, performanceIds },
+  })
+}
+
+// The night report's cover line: a shift being worked, never an officer standing in (0095).
+export function saysDoorCover(dutyManagerName: string | null): string {
+  return dutyManagerName
+    ? `Door: ${dutyManagerName} covered it from the duty manager's shift`
+    : 'Door: the duty manager covered it from their own shift'
 }
 
 // The detail carries the venue's whole night rather than the request's scope: the row is written

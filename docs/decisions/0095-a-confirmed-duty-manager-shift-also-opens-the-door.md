@@ -14,10 +14,11 @@ manager, refused at `/tonight/door` and in pass mode. The duty manager cannot ta
 short the only way in was phoning the Front of House Manager for their bypass. The person running
 the night could not do the one job every front of house volunteer can.
 
-A live door-eligibility check on the duty manager was considered and set aside:
-`SHIFT_ELIGIBILITY_DOOR_MODULE` ships unset until the committee names it (issue 1318), and an unset
-rule refuses everyone (E-103 criterion 4), so the check would refuse every duty manager on the very
-nights this exists for.
+Training is checked where a shift is claimed or assigned (E-104, E-107, issue 1302), never again at
+the door on the night: a confirmed door shift opens the door with no training read. A live
+door-eligibility check on the duty manager at the moment of cover would put a second training gate
+on the night that no other shift has, and would refuse a duty manager at 19:20 over a record the
+claim already weighed.
 
 ## Decision
 
@@ -32,9 +33,11 @@ performances, and a read records nothing (0098). The write is an insert whose "n
 written" predicate rides the statement, so two first acts at once write one row (0003). The night
 report's staffing section names who covered the door.
 
-**The catalogue carries the training, not a live check.** The duty manager module requires the door
-module in the catalogue, so whoever holds a current duty manager record has been trained on the
-door. That is committee configuration in the training console, not code.
+**The catalogue carries the training, not a live check.** The duty manager shift's module
+(`SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE`, Committee Operations and Governance) requires the door
+shift's module (`SHIFT_ELIGIBILITY_DOOR_MODULE`, Box Office and Ticketing) in the catalogue, so
+whoever claimed the duty manager shift was trained on the door. That is committee configuration in
+the training console, not code.
 
 **A door refusal names tonight's duty manager.** Somebody refused at the door is told, by first name,
 that tonight's confirmed duty manager can open it, where one is confirmed for the performance.
@@ -49,7 +52,7 @@ that tonight's confirmed duty manager can open it, where one is confirmed for th
   `OFFICER` and is unaffected.
 - The duty manager's name is read on a door refusal, one bounded query on a refusal path only.
 - The duty manager module's prerequisite is a Training Manager task before 12 October, recorded in
-  `docs/workshops.md`.
+  `docs/workshops.md`. Until it is set, a duty manager may cover the door without door training.
 
 ## Options considered
 
@@ -59,5 +62,5 @@ that tonight's confirmed duty manager can open it, where one is confirmed for th
   would show two jobs for one person.
 - **The duty manager assigns a present volunteer from the phone.** Deferred to V2 (E-206): it is the
   better fix when somebody is there to assign, and does not help when nobody is.
-- **A live door-eligibility check on cover.** Rejected while the key ships unset, since it would
-  refuse every duty manager.
+- **A live door-eligibility check on cover.** Rejected: training is checked at the claim for every
+  shift, and a second gate on the night would refuse a duty manager the claim already admitted.

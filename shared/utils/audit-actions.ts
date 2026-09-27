@@ -214,6 +214,8 @@ const CATALOGUE = {
   // Written once per officer per night, venue and role: an exception the night report shows, not
   // a standing grant (0044, E-111 criterion 4).
   'night.officer-bypass': { label: 'Show-night screen opened by an officer without a shift', module: 'show-night' },
+  // Once per duty manager per night and venue: tonight's duty manager covering the door (0095).
+  'night.door-cover': { label: 'Door covered by tonight\'s duty manager', module: 'show-night' },
 
   'shift-template.created': { label: 'Shift template set up', module: 'show-night' },
   'shift-template.updated': { label: 'Shift template changed', module: 'show-night' },

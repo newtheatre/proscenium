@@ -1,7 +1,7 @@
 import { DEFAULT_EYEBROW, bindNightEyebrow, bindNightFallbackSubject, bindNightSubject } from './useNightHeader'
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import type { NightHeaderState, NightSubject } from './useNightHeader'
-import type { NightRole } from '#shared/utils/night-authority'
+import type { NightAuthorityVia, NightRole } from '#shared/utils/night-authority'
 
 // The one show-night header lives in the layout, so every screen carries the same back arrow, the
 // same show title and the same on-shift badge; a screen says what goes in it through this state.
@@ -48,15 +48,16 @@ export function resolveNightAuthority(): void {
   // A role check is a read, so it records no officer bypass however often a screen makes it (0098).
   onMounted(async () => {
     const answers = await Promise.allSettled(NIGHT_ROLES.map(async (role) => {
-      const answered = await request<{ via: 'SHIFT' | 'OFFICER', performances: NightPerformance[] }>('/api/tonight/authority', { query: { role } })
+      const answered = await request<{ via: NightAuthorityVia, performances: NightPerformance[] }>('/api/tonight/authority', { query: { role } })
       return { role, via: answered.via, performances: answered.performances }
     }))
 
     const held = answers.flatMap(answer => answer.status === 'fulfilled' ? [answer.value] : [])
-    // A shift is the ordinary way in, so it wins the badge wherever the viewer holds both.
+    // A shift is the ordinary way in, so it wins the badge wherever the viewer holds both; a duty
+    // manager covering the door is on their own shift, so cover reads as a shift too (0095).
     resolved.value = {
       roles: held.map(one => one.role),
-      via: held.some(one => one.via === 'SHIFT') ? 'SHIFT' : (held.length > 0 ? 'OFFICER' : null),
+      via: held.some(one => one.via !== 'OFFICER') ? 'SHIFT' : (held.length > 0 ? 'OFFICER' : null),
       performances: held[0]?.performances ?? [],
     }
   })

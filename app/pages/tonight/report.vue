@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
 import { saysCategory, saysSeverity } from '#shared/utils/incidents'
-import { saysOfficerBypass } from '#shared/utils/night-authority'
+import { saysDoorCover, saysOfficerBypass } from '#shared/utils/night-authority'
 import { OFFICER_SIGN_OFF_NOTICE, saysSignedOff, tenderTotalPence } from '#shared/utils/night-signoff'
 import { saysShiftRole } from '#shared/utils/rota'
 import { saysTeamHolder } from '#shared/utils/tonight'
@@ -24,6 +24,7 @@ interface Report {
   milestones: { id: string, label: string, composedAt: number, supersededBy: string | null }[]
   staffing: { shiftId: string, role: ShiftRole, slot: number, status: ShiftStatus, name: string | null, officerBypass?: boolean }[]
   bypasses?: OfficerBypassLine[]
+  covers?: { officerName: string | null }[]
   bar: { revenuePence: number, itemsSold: number }
   access: { verified: number }
   checklist: { id: string, label: string, exempted: boolean, exemptReason: string | null }[]
@@ -285,6 +286,19 @@ const checklistLink = computed(() => performanceId.value ? `/tonight/checklist?p
         >
           An officer opened the duty manager's screens without the shift
         </UBadge>
+        <!-- Cover is a shift being worked, not an officer standing in, so it reads plainly (0095). -->
+        <ul
+          v-if="report.covers && report.covers.length > 0"
+          class="mb-2 space-y-1 text-sm text-muted"
+          data-test="staffing-door-cover"
+        >
+          <li
+            v-for="(cover, index) in report.covers"
+            :key="`cover-${index}`"
+          >
+            {{ saysDoorCover(cover.officerName) }}
+          </li>
+        </ul>
         <ul class="space-y-1 text-sm">
           <li
             v-for="row in report.staffing"
