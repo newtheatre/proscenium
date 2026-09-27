@@ -107,15 +107,15 @@ until the curtain comes down on the performance you are looking at, and **Night 
 reading **Sign off and close**, since that is where the night ends. The rest follow in the order
 they are pressed on a night: **Door**, **Till**, **Tonight at a glance**, **Checklist**, **Night
 report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, **Message tonight's
-audience** (the duty manager's), and **Emergency**, always there and always last. While a stocktake is open, a bar shift also sees **Stocktake** straight
-after **Till**, to count into it (see [Stocktakes](/docs/bar/stocktakes#counting-on-a-bar-shift)).
-Until the phone knows your roles, or with no signal, every tile shows, and
-each screen still checks for itself. The **Checklist** tile says what is left on it: **3 pre-show
-items left** before the house opens, **2 post-show items left** after, **All ticked** when nothing
-is outstanding. On a matinee day the **Tonight at a glance**, **Checklist**, **Night report** and
-**Contacts and incidents** tiles carry the house you chose on the switcher, so each opens on it. The
-line at the foot of the hub is the rule the whole night runs on: the door never sells tickets;
-unpaid and walk-up customers go to the bar.
+audience** (the duty manager's), and **Emergency**, always there and always last. While a stocktake
+is open, a bar shift also sees **Stocktake** straight after **Till**, to count into it (see
+[Stocktakes](/docs/bar/stocktakes#counting-on-a-bar-shift)). Until the phone knows your roles, or
+with no signal, every tile shows, and each screen still checks for itself. The **Checklist** tile
+says what is left on it: **3 pre-show items left** before the house opens, **2 post-show items
+left** after, **All ticked** when nothing is outstanding. On a matinee day the **Tonight at a
+glance**, **Checklist**, **Night report** and **Contacts and incidents** tiles carry the house you
+chose on the switcher, so each opens on it. The line at the foot of the hub is the rule the whole
+night runs on: the door never sells tickets; unpaid and walk-up customers go to the bar.
 
 The duty manager also sees **Waiting on you** above the tiles whenever a comp request is
 waiting, with its value, who asked and **Approve** or **Decline**, the same queue

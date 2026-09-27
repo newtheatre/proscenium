@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysAudienceCount } from '#shared/utils/announcements'
-import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS } from '#shared/utils/night-message'
+import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS, saysNightMessageSent } from '#shared/utils/night-message'
 import type { NightAudience } from '#shared/utils/night-message'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/message-tonight-s-audience' })
@@ -21,14 +21,16 @@ const refusal = ref<string | null>(null)
 // Tonight's houses as the duty manager's own authority covers them, so no other house can be
 // chosen here (0101, E-127); the hub hands over the one it was showing.
 const houses = ref<House[]>([])
-const performanceId = ref<string | null>(typeof route.query.performanceId === 'string' ? route.query.performanceId : null)
+const handedOver = typeof route.query.performanceId === 'string' ? route.query.performanceId : null
+// Set once authority answers, so the watch below asks for the count exactly once on mount.
+const performanceId = ref<string | null>(null)
 const choices = computed(() => houses.value.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt })))
 
 async function resolveAuthority(): Promise<void> {
   try {
     const answered = await request<{ performances: House[] }>('/api/tonight/authority', { query: { role: 'DUTY_MANAGER' } })
     houses.value = answered.performances
-    if (!performanceId.value) performanceId.value = (answered.performances.find(one => one.active) ?? answered.performances[0])?.id ?? null
+    performanceId.value = handedOver ?? (answered.performances.find(one => one.active) ?? answered.performances[0])?.id ?? null
     refusal.value = null
     syncedAt.value = new Date()
   }
@@ -44,24 +46,24 @@ async function resolveAuthority(): Promise<void> {
 const audience = ref<NightAudience | null>('TICKET_HOLDERS')
 const audienceOptions = NIGHT_AUDIENCES.map(value => ({ value, label: NIGHT_AUDIENCE_LABELS[value] }))
 const count = ref<number | null>(null)
+// Its own line, so a count that failed says so and clears on the next one; `failure` is authority's.
+const countFailure = ref<string | null>(null)
 
 // The count comes before the message (H-108 criterion 7), asked again whenever the house or the
 // audience changes, never cached.
 async function loadCount(): Promise<void> {
   count.value = null
+  countFailure.value = null
   if (!performanceId.value || !audience.value) return
   try {
     count.value = (await request<{ count: number }>('/api/tonight/message/audience', { query: { performanceId: performanceId.value, audience: audience.value } })).count
   }
   catch (refused) {
-    failure.value = refusalText(refused)
+    countFailure.value = refusalText(refused)
   }
 }
 
-onMounted(async () => {
-  await resolveAuthority()
-  await loadCount()
-})
+onMounted(resolveAuthority)
 watch([performanceId, audience], loadCount)
 
 const subject = ref('')
@@ -71,13 +73,19 @@ const previewing = ref(false)
 const sending = ref(false)
 const preview = ref<{ count: number, rendered: { subject: string, text: string } } | null>(null)
 const sent = ref<number | null>(null)
+// One draft, one copy a person: Send pressed again after a dropped connection reaches only those
+// not yet reached, and any change makes a new draft (0048).
+const draftKey = ref(crypto.randomUUID())
 
 const ready = computed(() => Boolean(performanceId.value && audience.value) && subject.value.trim().length > 0 && body.value.trim().length > 0)
-const message = computed(() => ({ performanceId: performanceId.value, audience: audience.value, subject: subject.value, body: body.value }))
+const message = computed(() => ({ performanceId: performanceId.value, audience: audience.value, subject: subject.value, body: body.value, draftKey: draftKey.value }))
 
-// A preview names this audience and these words or nothing: a stale one is worse than none.
+// A preview names this audience and these words or nothing: a stale one is worse than none, and a
+// sent notice above words that did not go is worse still.
 watch([performanceId, audience, subject, body], () => {
   preview.value = null
+  sent.value = null
+  draftKey.value = crypto.randomUUID()
 })
 
 async function runPreview(): Promise<void> {
@@ -103,10 +111,10 @@ async function send(): Promise<void> {
     const result = await $fetch<{ count: number }>('/api/tonight/message', { method: 'POST', body: message.value })
     sent.value = result.count
     preview.value = null
-    toast.add({ title: `Sent to ${plural(result.count, 'person', 'people')}`, icon: 'i-lucide-send', color: 'success' })
+    toast.add({ title: saysNightMessageSent(result.count), icon: 'i-lucide-send', color: 'success' })
   }
   catch (refused) {
-    failureToSend.value = writeFailureText(refused, 'Look in the send log before sending it again.')
+    failureToSend.value = writeFailureText(refused, 'Press Send again: nobody who already has it gets it twice.')
   }
   finally {
     sending.value = false
@@ -117,6 +125,7 @@ function startAnother(): void {
   subject.value = ''
   body.value = ''
   sent.value = null
+  draftKey.value = crypto.randomUUID()
 }
 </script>
 
@@ -157,7 +166,7 @@ function startAnother(): void {
         class="-mt-2 text-sm text-muted"
         data-test="night-message-count"
       >
-        {{ count === null ? 'Counting who that is' : saysAudienceCount(count) }}
+        {{ countFailure ?? (count === null ? 'Counting who that is' : saysAudienceCount(count)) }}
       </p>
 
       <UAlert
@@ -165,7 +174,7 @@ function startAnother(): void {
         color="success"
         variant="subtle"
         icon="i-lucide-send"
-        :title="`Sent to ${plural(sent, 'person', 'people')}`"
+        :title="saysNightMessageSent(sent)"
         description="What went out is below, as it was sent."
         data-test="night-message-sent"
       >

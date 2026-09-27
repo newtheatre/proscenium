@@ -23,7 +23,8 @@ behind it is guarded by `requireNightAuthority(event, 'DUTY_MANAGER', { performa
 
 - The authority is the shift, inside its window (0009, 0078), never a standing grant. The Front of
   House Manager reaches the screen through the existing officer bypass, recorded once per night,
-  venue and role when it sends (0044, 0098).
+  venue and role when it previews or sends, each a POST (0044, 0098); the count is a read and
+  records nothing.
 - The audience is fixed to one of tonight's performances that the caller's authority covers: its
   ticket holders, resolved by the announce composer's own resolver (0089), or its rota, the
   claimed and confirmed slots on that performance. No other audience is offered, so this is not a
@@ -33,7 +34,9 @@ behind it is guarded by `requireNightAuthority(event, 'DUTY_MANAGER', { performa
   A message about tonight that waits for the next digest has missed the night it was about, and a
   booker's Bookings preference was never meant to keep them from hearing that tonight has moved.
 - The screen shows the count before a word is written, a preview, and a send that names the
-  count. The send is recorded as `comms.announcement.sent`, the composer's own action, with the
+  count. Each draft carries a key the page makes, and each person's copy is claimed under it
+  before it sends (0048), so Send pressed again after a dropped connection reaches only those not
+  yet reached; any change to the draft makes a new key. The send is recorded as `comms.announcement.sent`, the composer's own action, with the
   performance, the audience, the count and whether a shift or an officer sent it; the subject and
   the message stay out of the audit trail (0011), in the send log where they already are.
 

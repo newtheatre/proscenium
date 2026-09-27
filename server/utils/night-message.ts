@@ -2,11 +2,12 @@ import { db, schema } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
-import { fanOut, performanceTicketHoldersQuery } from './announcements'
+import { performanceTicketHoldersQuery } from './announcements'
+import { claimNotification, notify } from './notify'
 import { render } from './templates'
 import { auditEntry } from '#shared/utils/audit'
 import { messageType } from '#shared/utils/notifications'
-import { nightMessageType } from '#shared/utils/night-message'
+import { nightMessageClaim, nightMessageType } from '#shared/utils/night-message'
 import { showNightOpensAt } from '#shared/utils/show-night'
 import type { Rendered } from './templates'
 import type { NightAuthorityVia } from '#shared/utils/night-authority'
@@ -46,11 +47,25 @@ export async function previewNightMessage(input: NightMessageInput, night: strin
   return { count: ids.length, rendered }
 }
 
+// Each copy is claimed under the draft before it sends, so a second press of the same draft reaches
+// only those not yet reached and counts them alone (0048). A claim never sent stays PENDING.
+async function sendOnce(event: H3Event, ids: string[], input: NightMessageInput): Promise<number> {
+  const type = nightMessageType(input.audience)
+  let reached = 0
+  for (const userId of ids) {
+    const claim = nightMessageClaim(input.draftKey, userId)
+    if (!await claimNotification({ userId, type, key: claim, recordId: input.performanceId })) continue
+    await notify(event, { type, userId, claim, context: { name: '', subject: input.subject, body: input.body } })
+    reached += 1
+  }
+  return reached
+}
+
 // The announce composer's audit action, so one reading of the audit trail answers both screens;
 // `via` says whether a shift or an officer's standing sent it (0044). Never the officer's prose (0011).
 export async function sendNightMessage(event: H3Event, actorId: string, via: NightAuthorityVia, input: NightMessageInput, night: string): Promise<{ count: number }> {
   const ids = await resolveNightAudience(input.audience, input.performanceId, night)
-  await fanOut(event, ids, nightMessageType(input.audience), input)
+  const reached = await sendOnce(event, ids, input)
 
   await db.insert(schema.auditLog).values(auditEntry({
     actorId,
@@ -58,11 +73,11 @@ export async function sendNightMessage(event: H3Event, actorId: string, via: Nig
     detail: {
       audienceKind: input.audience === 'TICKET_HOLDERS' ? 'PERFORMANCE_TICKET_HOLDERS' : 'PERFORMANCE_ROTA',
       performanceId: input.performanceId,
-      recipientCount: ids.length,
+      recipientCount: reached,
       safetyNotice: true,
       via,
     },
   }))
 
-  return { count: ids.length }
+  return { count: reached }
 }

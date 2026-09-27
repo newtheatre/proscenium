@@ -13,7 +13,6 @@ import { HOLDING_STATUSES } from '#shared/utils/capacity'
 import { messageType } from '#shared/utils/notifications'
 import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import type { AnnounceShowOption, AudienceDefinition, ComposeAnnouncementInput } from '#shared/utils/announcements'
-import type { MessageTypeName } from '#shared/utils/notifications'
 import type { Outcome } from './notify'
 import type { Rendered } from '#server/utils/templates'
 import type { SQL } from 'drizzle-orm'
@@ -229,18 +228,15 @@ export function heldForDigest(outcomes: AnnouncementOutcome[]): number {
 
 // One `notify()` call per recipient (criterion 2): every provider send carries one address, so no
 // recipient's header or body ever names another. Outcomes land in the send log by that call alone.
-export async function fanOut(event: H3Event, ids: string[], type: MessageTypeName, message: { subject: string, body: string }): Promise<AnnouncementOutcome[]> {
-  const outcomes: AnnouncementOutcome[] = []
-  for (const userId of ids) {
-    const status = await notify(event, { type, userId, context: { name: '', subject: message.subject, body: message.body } })
-    outcomes.push({ recipientId: userId, status })
-  }
-  return outcomes
-}
-
 export async function sendAnnouncement(event: H3Event, actorId: string, input: ComposeAnnouncementInput): Promise<{ count: number, outcomes: AnnouncementOutcome[] }> {
   const ids = await resolveAudience(event, input.audience)
-  const outcomes = await fanOut(event, ids, announcementType(input.audience, input.safetyNotice), input)
+  const type = announcementType(input.audience, input.safetyNotice)
+
+  const outcomes: AnnouncementOutcome[] = []
+  for (const userId of ids) {
+    const status = await notify(event, { type, userId, context: { name: '', subject: input.subject, body: input.body } })
+    outcomes.push({ recipientId: userId, status })
+  }
 
   // No subject and no body here, both the officer's own prose (0011): `notification_log.subject`
   // is where "what did this actually say" is answered from, one row per recipient.

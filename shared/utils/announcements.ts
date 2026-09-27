@@ -88,7 +88,8 @@ export type SendTiming = 'NOW' | 'WITH_DIGEST'
 // When a message goes, said before it goes (issue 1327): now is the transactional type, and the
 // digest window is the plain type's own, read live rather than written into the sentence (0012).
 export function sendTimingOptions(ticketHolders: boolean, digestMinutes: number | null): { value: SendTiming, label: string, description: string }[] {
-  const within = digestMinutes === null ? 'in the next digest' : `within ${plural(digestMinutes, 'minute')}`
+  // The digest waits from the person's first held message and runs every ten minutes, so "about".
+  const within = digestMinutes === null ? 'in the next digest' : `in the next digest, about ${plural(digestMinutes, 'minute')} from now`
   return ticketHolders
     ? [
         { value: 'NOW', label: 'Send now to everyone holding a ticket', description: 'Reaches every ticket holder at once, whatever their bookings preference.' },
@@ -104,6 +105,12 @@ export function sendTimingOptions(ticketHolders: boolean, digestMinutes: number 
 export function sendsNowByDefault(performanceStartsAt: number | null, at: Date): boolean {
   if (performanceStartsAt === null) return false
   return showNightOf(new Date(performanceStartsAt * 1000)) === showNightOf(at)
+}
+
+// Read afresh on every change, both ways: Send now ignores preferences, so it never outlives the
+// selection that chose it.
+export function defaultSendTiming(performanceStartsAt: number | null, at: Date): SendTiming {
+  return sendsNowByDefault(performanceStartsAt, at) ? 'NOW' : 'WITH_DIGEST'
 }
 
 export const composeAnnouncementForm = z.object({

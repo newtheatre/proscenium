@@ -169,8 +169,9 @@ Stories: 15 total (9 MVP, 5 V2, 1 Later).
      it), and to nobody else. The count comes first and a preview before the send, and every such
      message goes at once, as the transactional type, whatever the recipient's preferences. The
      composer at `/comms/announce` says when a message goes before it goes: now, or with the
-     recipient's other messages within the topic's digest window, starting on now for a
-     performance on tonight's show night.
+     recipient's other messages in the topic's next digest, starting on now while the performance
+     chosen is on tonight's show night and back on the digest for any other choice. Pressing send
+     again for the same draft after a dropped connection reaches only those not yet reached (0048).
 - Source: Prompt Book H-1; audit RM-1 (all admins emailed each request, subject to preferences), PR-10 (night reports emailed to configured recipients). Criterion 7 comes from the console review of 21 September 2026 (issue 1151 item 10). Criteria 8 and 9 come from feedback issue 1213 (a safety notice has to reach the audience, not only the membership), accepted as drafted by the IT Manager on 23 September 2026.
 
 ## H-109: Templates and Europe/London formatting

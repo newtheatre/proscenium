@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AUDIENCE_KINDS, AUDIENCE_LABELS, isTicketHolderAudience, saysAnnouncementSent, saysAudienceCount, sendTimingOptions, sendsNowByDefault } from '#shared/utils/announcements'
+import { AUDIENCE_KINDS, AUDIENCE_LABELS, isTicketHolderAudience, saysAnnouncementSent, saysAudienceCount, sendTimingOptions, defaultSendTiming } from '#shared/utils/announcements'
 import { ROLES, saysRole } from '#shared/utils/roles'
 import { saysClock, saysDay } from '#shared/utils/when'
 import type { AnnounceShowOption, AudienceKind, SendTiming } from '#shared/utils/announcements'
@@ -47,10 +47,15 @@ const performanceItems = computed(() => (show.value?.performances ?? []).map(per
   value: performance.id,
 })))
 
-// A message about tonight's performance is news now, so choosing one starts on Send now.
-watch(performanceId, (chosen) => {
-  const startsAt = show.value?.performances.find(performance => performance.id === chosen)?.startsAt ?? null
-  if (sendsNowByDefault(startsAt, new Date())) timing.value = 'NOW'
+// Send now for tonight's performance, the digest for anything else, read afresh on every change:
+// a choice of kind clears the performance, so Send now never outlives what chose it.
+function defaultTiming(): SendTiming {
+  const startsAt = show.value?.performances.find(performance => performance.id === performanceId.value)?.startsAt ?? null
+  return defaultSendTiming(startsAt, new Date())
+}
+
+watch(performanceId, () => {
+  timing.value = defaultTiming()
 })
 
 // A different show is a different run, so a performance picked from the last one is dropped.
@@ -69,14 +74,16 @@ watch(kind, () => {
 
 const request = useRequestFetch()
 
+interface AudienceCount { count: number, digestMinutes: number }
+
 // Answered from the audience alone, so the count is on screen before a word is written
 // (criterion 7). Never cached: an audience is resolved from live data every time it is asked.
 const { data: counted, status: countStatus } = await useAsyncData(
   () => `announce-audience-${JSON.stringify(audience.value)}`,
   () => (audienceReady.value
-    ? request<{ count: number, digestMinutes: number }>('/api/admin/comms/announcements/audience', { query: audience.value })
+    ? request<AudienceCount>('/api/admin/comms/announcements/audience', { query: audience.value })
     : Promise.resolve(null)),
-  { watch: [audience], default: (): { count: number, digestMinutes: number } | null => null, getCachedData: () => undefined },
+  { watch: [audience], default: (): AudienceCount | null => null, getCachedData: () => undefined },
 )
 
 const timingItems = computed(() => sendTimingOptions(ticketHolders.value, counted.value?.digestMinutes ?? null))
@@ -114,7 +121,7 @@ async function runPreview(): Promise<void> {
 function startAnother(): void {
   subject.value = ''
   body.value = ''
-  timing.value = 'WITH_DIGEST'
+  timing.value = defaultTiming()
   sent.value = null
   preview.value = null
 }
@@ -266,7 +273,7 @@ async function send(): Promise<void> {
 
     <UFormField
       label="When it goes"
-      data-test="announce-safety"
+      data-test="announce-timing"
     >
       <URadioGroup
         v-model="timing"
