@@ -547,6 +547,22 @@ describe('a product reads its allergens from the stock it pours (issue 1348)', (
     })
   })
 
+  // Every screen reads the answer as the till does: recorded with nothing written, or a state no
+  // form writes, is no answer (a direct load can store either, since the column has no CHECK).
+  test('an item recorded with no note, or in a state no form writes, reads as unanswered', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      database.batch([
+        [`UPDATE bar_items SET allergen_state = 'RECORDED', allergen_notes = NULL WHERE id = 'item-gin'`],
+        [`UPDATE bar_items SET allergen_state = 'bogus', allergen_notes = 'Contains quinine' WHERE id = 'item-tonic'`],
+      ])
+      expect(poured(database).filter(row => row.productId === 'prod-gin').map(row => [row.itemName, row.state])).toEqual([
+        ['Gin', 'UNKNOWN'],
+        ['Tonic', 'UNKNOWN'],
+      ])
+    })
+  })
+
   test('a retired size pours nothing, and the read binds no parameter', async () => {
     await withDatabase((database) => {
       bar(database)

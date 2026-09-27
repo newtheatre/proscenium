@@ -144,11 +144,14 @@ describe('the bar\'s set-up still to do (issue 1358)', () => {
         ['INSERT INTO bar_items (id, name, unit, allergen_state) VALUES (?, ?, ?, ?)', 'i-2', 'Crisps', 'ITEM', 'NONE'],
         ['INSERT INTO bar_items (id, name, unit, allergen_notes) VALUES (?, ?, ?, ?)', 'i-3', 'Ale', 'ITEM', 'Contains barley (gluten)'],
         ['INSERT INTO bar_items (id, name, unit, status) VALUES (?, ?, ?, ?)', 'i-4', 'Old cider', 'ITEM', 'RETIRED'],
+        // Recorded with nothing written, or a state no form writes: no answer, as at the till.
+        ['INSERT INTO bar_items (id, name, unit, allergen_state) VALUES (?, ?, ?, ?)', 'i-5', 'Guest ale', 'ITEM', 'RECORDED'],
+        ['INSERT INTO bar_items (id, name, unit, allergen_state) VALUES (?, ?, ?, ?)', 'i-6', 'Perry', 'ITEM', 'bogus'],
         ['INSERT INTO bar_categories (id, name) VALUES (?, ?)', 'cat-1', 'Beer'],
         ['INSERT INTO bar_products (id, category_id, name) VALUES (?, ?, ?)', 'p-1', 'cat-1', 'Unanswered on the product'],
         ['INSERT INTO bar_products (id, category_id, name) VALUES (?, ?, ?)', 'p-2', 'cat-1', 'Also unanswered on the product'],
       ])
-      expect(read<BarSetUp>(database, barSetUpQuery())[0]?.allergensUnknown).toBe(1)
+      expect(read<BarSetUp>(database, barSetUpQuery())[0]?.allergensUnknown).toBe(3)
     })
   })
 })

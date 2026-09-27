@@ -12,6 +12,7 @@ import {
   componentsForm,
   deliveryCost,
   deriveAllergens,
+  saysAtTheTill,
   deliveryCostBasis,
   effectivePriceRow,
   movementEntryForm,
@@ -479,6 +480,13 @@ describe('a product takes its allergen answer from what it pours', () => {
     ], noAddition)).toEqual({ state: 'UNKNOWN', note: 'No information recorded for Guest ale, Cider, Perry.' })
   })
 
+  // The bar's addition fails closed too; its own "No information recorded" still means nothing added.
+  test('an addition recorded with nothing written is unanswered, poured or not', () => {
+    expect(deriveAllergens([{ itemName: 'Gin', state: 'NONE', note: null }], { state: 'RECORDED', note: ' ' }))
+      .toEqual({ state: 'UNKNOWN', note: 'No information recorded for what the bar adds.' })
+    expect(deriveAllergens([], { state: 'RECORDED', note: '' })).toEqual({ state: 'UNKNOWN', note: null })
+  })
+
   // A note is never hidden: a caution written on an item answered clear reaches the till with it.
   test('a note on an item or an addition answered clear is read out, and leaves it clear', () => {
     expect(deriveAllergens([
@@ -488,6 +496,14 @@ describe('a product takes its allergen answer from what it pours', () => {
       state: 'NONE',
       note: 'Gin: May contain traces of milk. Added at the bar: Served with a lime wedge.',
     })
+  })
+})
+
+describe('what the product editor says the till will say', () => {
+  test('the answer ends its sentence, and a note follows as one of its own', () => {
+    expect(saysAtTheTill({ state: 'NONE', note: null })).toBe('Confirmed no allergens.')
+    expect(saysAtTheTill({ state: 'RECORDED', note: 'Contains nuts' })).toBe('Allergens recorded. Contains nuts.')
+    expect(saysAtTheTill({ state: 'RECORDED', note: 'Gin: Contains sulphites.' })).toBe('Allergens recorded. Gin: Contains sulphites.')
   })
 })
 
