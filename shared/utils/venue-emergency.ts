@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { SHIFT_ROLES, saysShiftRole } from './rota'
+import type { ShiftRole } from './rota'
 
 // The venue emergency card's vocabulary (E-113). Nothing here reads a request or the database;
 // `server/utils/venue-emergency.ts` is where a version is actually written and read.
@@ -40,4 +42,21 @@ export function emergencyCardComplete(card: EmergencyCardCompleteness | null | u
 // a card that has none, so the two can differ from the first save on (issue 1352).
 export function cardAddressDraft(cardAddress: string | null, venueAddress: string | null): string {
   return cardAddress ?? venueAddress ?? ''
+}
+
+// A first name and the jobs they hold tonight: the card is read by anyone signed in (issue 1310).
+export interface FirstAider { firstName: string, roles: ShiftRole[] }
+
+const NOBODY_TRAINED = 'No trained first aider is on tonight\'s rota'
+
+// Null tonight means no first-aid module is named, so the committee's own line is all there is
+// (E-113 criterion 1 as amended).
+export function saysFirstAiders(tonight: readonly FirstAider[] | null, filed: string | null): string[] {
+  if (tonight === null) return filed ? [`First aiders tonight: ${filed}`] : []
+  if (tonight.length === 0) return filed ? [NOBODY_TRAINED, filed] : [NOBODY_TRAINED]
+  const named = tonight.map((one) => {
+    const jobs = SHIFT_ROLES.filter(role => one.roles.includes(role)).map(role => saysShiftRole(role).toLowerCase())
+    return `${one.firstName} (${jobs.join(', ')})`
+  })
+  return [`First aiders tonight: ${named.join(', ')}`]
 }

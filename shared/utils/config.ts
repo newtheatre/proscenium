@@ -707,6 +707,13 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Training module a member must hold to claim a bar shift.',
   },
+  // No default on purpose: the catalogue has no first-aid module yet. Unset, the emergency card
+  // reads the committee's own first aiders line instead of tonight's rota (E-113, issue 1310).
+  FIRST_AID_MODULE: {
+    schema: z.string().regex(MODULE_ID),
+    workshop: 'spaces-and-training',
+    describes: 'Training module whose current record names a member of tonight\'s confirmed team as a first aider on the emergency card. It gates nothing.',
+  },
   // Module E open question 1: proposed rather than confirmed in session (docs/workshops.md).
   SHIFT_CLAIM_AUTO_CONFIRM: {
     schema: z.boolean(),

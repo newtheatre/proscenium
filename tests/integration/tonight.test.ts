@@ -336,7 +336,7 @@ function nightSeconds(night: string): [number, number] {
   return [Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)]
 }
 
-function opening(database: TestDatabase, id: string, venueId: string, night: string, status = 'OPEN'): void {
+function opening(database: TestDatabase, id: string, venueId: string, night: string, status = 'PLANNED'): void {
   const [from] = nightSeconds(night)
   database.batch([['INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
     id, venueId, night, 'Society social', from + 14 * 3600, from + 19 * 3600, status]])
@@ -368,6 +368,19 @@ describe('the venues running tonight (issue 1310)', () => {
       tonightsPerformance(database, { suffix: 'e', night: daysAfter(tonight.night, 1) })
 
       expect(read(database, venuesTonightQuery(...nightSeconds(tonight.night)))).toEqual([])
+    })
+  })
+
+  // An external venue keeps its own building's procedures until we staff a night there (issue 1318).
+  test('an external venue counts once somebody holds a shift on its performance tonight', async () => {
+    await withDatabase(async (database) => {
+      const hired = testVenue(database, { suffix: 'hired', isExternal: true })
+      const tonight = tonightsPerformance(database, { suffix: 'hired', venueId: hired.id })
+      const night = nightSeconds(tonight.night)
+      expect(read(database, venuesTonightQuery(...night))).toEqual([])
+
+      rostered(database, 'hired-door', tonight.performanceId, 'DOOR', person(database, 'hired-door'), 'CLAIMED')
+      expect(read(database, venuesTonightQuery(...night))).toEqual([{ venueId: hired.id, venueName: 'The Test House hired' }])
     })
   })
 })

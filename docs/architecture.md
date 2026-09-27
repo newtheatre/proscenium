@@ -1573,8 +1573,19 @@ new primary key as something to copy rather than to invent. Corrected to `lower(
 per migrated row; the append-only triggers are hand-added after generation, as this whole family
 of tables requires (0010).
 
-`GET /api/tonight/emergency` reads the current card for whichever venue
-`requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'])` resolves; `PUT
+`GET /api/tonight/emergency` answers `{ cards }` to any signed-in account (`requireAccount`, issue
+1310): one card for every venue `venuesTonightQuery` finds running tonight, a venue with a
+non-cancelled performance or bar opening in the night, where an external venue counts only once a
+shift is held on its performance or its card has been filed. A venue with no card yet is still
+listed, its fields null, so nobody is shown another building's address. Each card carries two
+derived fields. `dutyManagers` is `dutyManagersOnCall` over the venue's team, but only where
+`requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'], { venueId })` answers, and it
+is null otherwise (a 403 is caught; anything else is thrown), so a number stays with tonight's
+team and its holder's consent (A-114); those venues lead the list. `firstAidersTonight` is
+`firstAidersTonightQuery` over the venue's confirmed shifts and confirmed bar-opening slots,
+grouped a person and read against a current record of `FIRST_AID_MODULE` (read with
+`configValueIfSet`), and is null while that key is unset, which is the screen's cue to show the
+committee's own `firstAiders` line (`saysFirstAiders`). A GET records no bypass (0098). `PUT
 /api/admin/venues/[id]/emergency` writes a new version, gated by a new standing permission pair,
 `emergency-card.read`/`write`, granted to `FOH_MANAGER` alongside `checklist.*` and `rota.*`.
 `GET /api/admin/venues/emergency`, the committee's overview, filters by venue name and by
@@ -1583,12 +1594,19 @@ also carries paging, though a venue with no card yet still lists.
 
 **Closes K-103 criterion 3's own gap, cited from that section**: `app/layouts/tonight.vue`
 (platform's, `onMounted`) fetches `/api/tonight/emergency` once and calls `primeNightCache()`
-with a whole-night key, so any show-night screen, not only `/tonight/emergency` itself, leaves
-the card cached from the first screen a shift holder opens. `/tonight/emergency` then reads
-that same key through `useNightCache`, which is what makes the card open with no round trip
-after a device restart, exactly the old estate's gap the criterion names. Whole-night rather
-than venue-scoped: a shift holder resolves exactly one venue a night (0044), so nothing here
-has to learn which before it can prime or read.
+with a whole-night key (screen `emergency-cards`), so any show-night screen, not only
+`/tonight/emergency` itself, leaves every venue's card cached from the first screen anybody
+signed in opens. `/tonight/emergency` then reads that same key through `useNightCache`, which is
+what makes the card open with no round trip after a device restart, exactly the old estate's gap
+the criterion names. Whole-night rather than venue-scoped, since the answer already holds every
+venue running tonight.
+
+`POST /api/rota/shifts/[id]/claim` takes an optional `{ shareNumber }` (`shiftClaimForm`). My
+rota asks it of a duty manager shift before the claim goes, with neither answer selected, and the
+answer is the profile's own shift-contact consent: `shareNumberStatement` upserts
+`shift_contact_preferences` in the claim's own batch, after the claim and its audit row, behind
+an `EXISTS` on the shift now being this account's, so a claim that lost changes nobody's consent
+(0003). The claim's audit detail records `sharesNumber`, never the number.
 
 ### The backstage board's join (E-120)
 

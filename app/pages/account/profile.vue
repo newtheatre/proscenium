@@ -137,7 +137,7 @@ useSeoMeta({ title: 'Profile' })
         <UFormField
           label="Share my phone with tonight's team"
           name="shiftContactVisible"
-          description="Only while you hold a confirmed shift, and only to the duty manager running that performance."
+          description="Only while you hold a confirmed shift, and only to tonight's team at that venue: on the team list, and on the emergency card when you are the duty manager."
         >
           <USwitch
             v-model="state.shiftContactVisible"

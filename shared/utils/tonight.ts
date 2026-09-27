@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { showNightStartOf } from './show-night'
 import { saysClock } from './when'
 import type { NightRole } from './night-authority'
@@ -81,3 +82,7 @@ export function tonightToolFor(role: NightRole): { label: string, to: string } {
 export function releaseStillOpen(startsAt: number, at: number): boolean {
   return at < showNightStartOf(startsAt)
 }
+
+// A claim's body. A duty manager is asked whether tonight's team may ring them; the answer is the
+// profile's own shift-contact consent, and an absent answer leaves it as it was (A-114).
+export const shiftClaimForm = z.object({ shareNumber: z.boolean().optional() }).optional()

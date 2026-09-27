@@ -67,7 +67,8 @@ which is how the committee sees a rota that is not being kept; looking at a scre
 | The door | Door, or the duty manager's own shift on that performance | Front of house manager |
 | Checklist, Night report, Backstage, and the glance's comp requests, rota and backstage code | Duty manager | Front of house manager |
 | The till | Bar | Bar manager |
-| Tonight at a glance and the hub's house numbers (access wording for the door and duty manager only), Contacts and incidents, Challenge 25, Emergency | Any of the three | Either |
+| Tonight at a glance and the hub's house numbers (access wording for the door and duty manager only), Contacts and incidents, Challenge 25 | Any of the three | Either |
+| Emergency (the duty manager's number only for tonight's team at that venue) | None: anyone signed in | None |
 
 A door shift does not open the till, and the Front of house manager's role does not either; the
 roles are not interchangeable. The one crossing is the duty manager covering the door: their

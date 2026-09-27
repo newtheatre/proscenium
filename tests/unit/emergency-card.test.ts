@@ -4,9 +4,8 @@ import { configHeading } from '#shared/utils/config-wording'
 import { shiftClaimForm } from '#shared/utils/tonight'
 import { saysFirstAiders } from '#shared/utils/venue-emergency'
 
-// Issue 1310: the emergency card to anyone signed in, tonight's first aiders read off the rota,
-// and a duty manager asked at the claim whether their number goes on it. Queries are pinned in
-// `tests/integration/tonight.test.ts`, the route in `tests/e2e/venue-emergency.test.ts`.
+// Issue 1310: the card to anyone signed in, first aiders off the rota, and the duty manager asked at
+// the claim. Queries: `tests/integration/tonight.test.ts`; route: `tests/e2e/venue-emergency.test.ts`.
 
 const source = (path: string): Promise<string> => Bun.file(path).text()
 
@@ -69,6 +68,7 @@ describe('the duty manager is asked at the claim, with no answer chosen for them
     const page = await source('app/pages/rota/index.vue')
     expect(page).toContain('name="claim-duty-manager"')
     expect(page).toContain('const shareNumber = ref<\'yes\' | \'no\' | undefined>(undefined)')
-    expect(page).toContain('body: { shareNumber: shareNumber.value === \'yes\' }')
+    expect(page).toContain('claim(shift, { shareNumber: shareNumber.value === \'yes\' })')
+    expect(page).toContain(':disabled="shareNumber === undefined"')
   })
 })
