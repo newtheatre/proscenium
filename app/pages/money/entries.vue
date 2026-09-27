@@ -3,7 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { describeKind, saysEntrySource, saysTender } from '#shared/utils/ledger'
 import { saysWhen, saysWhenLong } from '#shared/utils/when'
-import { ledgerEntriesList, saysEntryWhat } from '#shared/utils/ledger-entries-list'
+import { ledgerEntriesList, saysEntryWhat, saysNoEntries } from '#shared/utils/ledger-entries-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { LedgerEntryLine, LedgerEntryOpened, LedgerEntryRow } from '#shared/utils/ledger-entries-list'
 import type { Page } from '#shared/utils/pagination'
@@ -21,7 +21,7 @@ if (typeof route.query.happenedAt !== 'string') {
   await navigateTo({ path: route.path, query: { ...route.query, happenedAt: today } }, { replace: true })
 }
 
-const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(ledgerEntriesList)
+const { search, conditions, sort, page, query, active, set, setSort, clear } = useListQuery(ledgerEntriesList)
 
 const empty = (): Page<LedgerEntryRow> => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 })
 
@@ -189,7 +189,7 @@ const lineColumns: TableColumn<LedgerEntryLine>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ filtered ? 'No entry matches that.' : 'Nothing posted to the ledger on this day.' }}
+          {{ saysNoEntries(conditions, active.some(chip => chip.key === 'search')) }}
         </p>
       </template>
     </UTable>

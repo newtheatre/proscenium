@@ -1,7 +1,8 @@
 import { ENTRY_SOURCES, LINE_KINDS, TENDERS, describeKind, saysEntrySource, saysTender } from './ledger'
 import { plural } from './text'
+import { saysDay } from './when'
 import type { EntrySource, LineKind, Tender } from './ledger'
-import type { ListSpec } from './list-filters'
+import type { FilterCondition, ListSpec } from './list-filters'
 
 // The ledger entries list's declaration (K-129, I-105 criterion 3): a treasurer drills down from
 // the money dashboard by day, source, tender or what was sold, never by editing a query string.
@@ -123,4 +124,16 @@ export function entriesHref(range: { fromDay: string, toDay: string }, filters: 
   if (filters.kind) params.set('kind', filters.kind)
   if (filters.discounted !== undefined) params.set('discounted', String(filters.discounted))
   return `/money/entries?${params.toString()}`
+}
+
+// The list always carries a day (I-105 criterion 3), so the range alone is a quiet day; only a
+// search or a filter beyond the range can be what matched nothing.
+export function saysNoEntries(conditions: readonly FilterCondition[], searched: boolean): string {
+  if (searched || conditions.some(one => one.key !== 'happenedAt')) return 'No entry matches that.'
+  const range = conditions.find(one => one.key === 'happenedAt')
+  if (!range) return 'Nothing has been posted to the ledger yet.'
+  const [from, to] = range.values.map(day => saysDay(day))
+  if (range.operator === 'between') return `Nothing was posted to the ledger between ${from} and ${to}.`
+  if (range.operator === 'before' || range.operator === 'after') return `Nothing was posted to the ledger ${range.operator} ${from}.`
+  return `Nothing was posted to the ledger on ${from}.`
 }
