@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
-import { isPerformanceClosure, performanceClosure } from '#shared/utils/performance-closures'
+import { performanceClosure } from '#shared/utils/performance-closures'
 
 // Issue 1347: a performance closes its venue's room over the performance's shift window (0043,
 // 0078), derived at read time rather than retyped as a closure.
@@ -32,11 +32,16 @@ describe('the closure a performance implies', () => {
     expect(saysClosed(closure)).toBe('The room is closed then: Review Show is on')
   })
 
-  test('is told apart from a closure an officer set, and keyed to its performance', () => {
+  // A show nobody has published is nowhere public (D-121), so its closure names no title.
+  test('an unpublished show reads as a performance, and nothing more', () => {
+    const closure = performanceClosure({ ...onStage, showTitle: null }, OFFSETS)
+    expect(saysClosed(closure)).toBe('The room is closed then: A performance is on')
+  })
+
+  test('is keyed to its performance, on an id no closure an officer set can carry', () => {
     const closure = performanceClosure(onStage, OFFSETS)
+    expect(closure.id).toBe('performance:p-1')
     expect(closure.performanceId).toBe('p-1')
-    expect(isPerformanceClosure(closure)).toBe(true)
-    expect(isPerformanceClosure({ id: 'b-1', roomId: 'auditorium', reason: 'Get-in', startsAt: 0, endsAt: 1 })).toBe(false)
   })
 
   test('with no doors time or running time recorded, the curtain is the fallback at both ends', () => {

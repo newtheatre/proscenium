@@ -18,6 +18,7 @@ const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 let officer = ''
+let officerId = ''
 let member: TestMember
 
 beforeAll(async () => {
@@ -25,6 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   const admin = await adminSession(app)
   officer = admin.cookie
+  officerId = admin.id
   member = await registerMember(app, 'show-week', generatePassword())
   write(
     `INSERT INTO memberships (id, user_id, starts_on, expires_on, source)
@@ -61,11 +63,16 @@ async function makeRoom(): Promise<string> {
 
 // A 19:30 curtain on a night three weeks out, well clear of every notice window, with doors at
 // 19:00 and two hours' running time, at a venue attached to `roomId`.
-function performanceIn(roomId: string | null, suffix: string, status: 'ON_SALE' | 'CANCELLED' | 'DRAFT' = 'ON_SALE'): string {
+function performanceIn(
+  roomId: string | null,
+  suffix: string,
+  status: 'ON_SALE' | 'CANCELLED' | 'DRAFT' = 'ON_SALE',
+  showStatus: 'DRAFT' | 'PUBLISHED' = 'PUBLISHED',
+): string {
   const database = new Database(app.databaseFile)
   try {
     const night = daysAfter(showNightOf(new Date()), 21)
-    tonightsPerformance(sqliteTarget(database), { night, suffix, roomId, status, curtainHoursAfterNightStart: 15.5 })
+    tonightsPerformance(sqliteTarget(database), { night, suffix, roomId, status, showStatus, curtainHoursAfterNightStart: 15.5 })
     return night
   }
   finally {
@@ -137,8 +144,98 @@ describe.skipIf(skip !== null)('a performance closes its venue\'s room over its 
   })
 })
 
+describe.skipIf(skip !== null)('a show nobody has published is nowhere public (D-121)', () => {
+  test('its closure reads as a performance, on the calendar and in a refusal', async () => {
+    const room = await makeRoom()
+    const night = performanceIn(room, 'unpublished', 'DRAFT', 'DRAFT')
+
+    const calendar = await (await send('GET', `/api/rooms/availability?from=${night}&to=${night}&roomId=${room}`, null, member.cookie))
+      .json() as { rooms: { closed: { reason: string }[] }[] }
+    expect(calendar.rooms[0]!.closed.map(one => one.reason)).toEqual(['A performance is on'])
+
+    const refused = await book(room, at(night, 18), at(night, 20))
+    const body = await refused.text()
+    expect(body).toContain('A performance is on')
+    expect(body).not.toContain('A Test Show')
+  })
+})
+
+// Every write that could put somebody in a closed room checks closures, not only a member's own.
+describe.skipIf(skip !== null)('an officer cannot put anybody in a room a performance has closed', () => {
+  function pending(roomId: string, night: string): string {
+    const id = crypto.randomUUID().replaceAll('-', '')
+    write(
+      `INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at, tier, purpose, status, reason)
+       VALUES (?, ?, ?, 'Rehearsal', ?, ?, 'GENERAL', 'REHEARSAL', 'PENDING_APPROVAL', 'Asked before the show was set')`,
+      id, roomId, member.id,
+      Math.floor(new Date(at(night, 18)).getTime() / 1000), Math.floor(new Date(at(night, 20)).getTime() / 1000),
+    )
+    return id
+  }
+
+  function statusOf(id: string): string {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      return (database.query('SELECT status FROM room_bookings WHERE id = ?').get(id) as { status: string }).status
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  interface Decided { ok: boolean, outcomes: { ok: boolean, says?: string }[] }
+
+  test('approving a request over a performance is refused, saying so', async () => {
+    const room = await makeRoom()
+    const night = performanceIn(room, 'approve-over')
+    const id = pending(room, night)
+
+    const answered = await send('POST', '/api/admin/rooms/requests/decide', { ids: [id], action: 'APPROVE' }, officer)
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as Decided
+    expect(body.ok).toBe(false)
+    expect(body.outcomes[0]?.says).toBe('The room is closed then: A Test Show is on')
+    expect(statusOf(id)).toBe('PENDING_APPROVAL')
+  })
+
+  test('moving a request into a room a performance has closed is refused too', async () => {
+    const asked = await makeRoom()
+    const closed = await makeRoom()
+    const night = performanceIn(closed, 'move-into')
+    const id = pending(asked, night)
+
+    const body = await (await send('POST', '/api/admin/rooms/requests/decide', { ids: [id], action: 'APPROVE', roomId: closed }, officer))
+      .json() as Decided
+    expect(body.outcomes[0]).toMatchObject({ ok: false, says: 'The room is closed then: A Test Show is on' })
+    expect(statusOf(id)).toBe('PENDING_APPROVAL')
+  })
+
+  test('bumping a booking under a performance hands nobody the slot', async () => {
+    const room = await makeRoom()
+    const night = daysAfter(showNightOf(new Date()), 21)
+    const booked = await book(room, at(night, 18), at(night, 20))
+    expect(booked.status).toBe(200)
+    const { id } = await booked.json() as { id: string }
+
+    const database = new Database(app.databaseFile)
+    try {
+      tonightsPerformance(sqliteTarget(database), { night, suffix: 'bump-under', roomId: room, curtainHoursAfterNightStart: 15.5 })
+    }
+    finally {
+      database.close()
+    }
+
+    const answered = await send('POST', `/api/admin/rooms/bookings/${id}/bump`, {
+      userId: officerId, title: 'Dress run', purpose: 'REHEARSAL', tier: 'PRODUCTION', reason: 'Show week',
+    }, officer)
+    expect(answered.status).toBe(422)
+    expect((await answered.json() as Refusal).data.failures).toEqual([{ reason: 'ROOM_CLOSED', says: 'The room is closed then: A Test Show is on' }])
+    expect(statusOf(id)).toBe('CONFIRMED')
+  })
+})
+
 describe.skipIf(skip !== null)('the Theatre Manager sees each performance closure, and what it overlaps', () => {
-  interface Listed { items: { performanceId: string, roomId: string, reason: string, overlapping: { title: string }[] }[] }
+  interface Listed { items: { performanceId: string, roomId: string, reason: string, show: string, overlapping: { title: string }[] }[] }
 
   test('listed read-only, with a booking made before the performance was scheduled, which is left standing', async () => {
     const room = await makeRoom()
@@ -158,7 +255,7 @@ describe.skipIf(skip !== null)('the Theatre Manager sees each performance closur
     const answered = await send('GET', '/api/admin/rooms/blackouts/performances', null, officer)
     expect(answered.status).toBe(200)
     const listed = (await answered.json() as Listed).items.find(item => item.performanceId === 'performance-overlapping')
-    expect(listed).toMatchObject({ roomId: room, reason: 'A Test Show is on' })
+    expect(listed).toMatchObject({ roomId: room, reason: 'A Test Show is on', show: 'A Test Show' })
     expect(listed?.overlapping.map(one => one.title)).toEqual(['Rehearsal'])
 
     const statusOf = new Database(app.databaseFile, { readonly: true })
