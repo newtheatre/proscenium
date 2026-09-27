@@ -1,12 +1,62 @@
-// The current card for tonight's venue, cached on the device the moment any show-night screen
-// reads it, so it opens fully offline afterwards (E-113 criteria 2, 4).
-export default defineEventHandler(async (event) => {
-  const resolved = await requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'])
-  const card = await currentCard(resolved.venueId)
-  if (!card) throw createError({ statusCode: 404, statusMessage: 'This venue has no emergency card yet' })
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import type { H3Error, H3Event } from 'h3'
+import type { FirstAider } from '#shared/utils/venue-emergency'
+import type { OnCall, VenueTonight } from '#server/utils/tonight'
 
-  // Derived from tonight's confirmed shifts, never a standing list (0009), and a number appears
-  // only where its holder's own shift-contact consent is set (A-114).
-  const teams = await Promise.all(resolved.performanceIds.map(performanceId => tonightTeam(performanceId)))
-  return { ...card, dutyManagers: dutyManagersOnCall(teams.flat()) }
+// Every venue running tonight, to anyone signed in, cached on the device by any show-night screen
+// (E-113 criteria 2, 4 as amended by issue 1310). The building's card is whoever holds the phone's.
+export default defineEventHandler(async (event) => {
+  const account = await requireAccount(event)
+  const { from, to } = showNightBounds(currentShowNight())
+  const [start, end] = [Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)]
+  const firstAidModule = await configValueIfSet(event, 'FIRST_AID_MODULE')
+
+  const venues = await venuesTonight(start, end)
+  const cards = await Promise.all(venues.map(venue => cardTonight(event, venue, start, end, firstAidModule)))
+  // The venues the caller works tonight lead, so a two-venue night opens on their own building;
+  // `viewerId` stamps whose numbers these are, for the copy the phone keeps (A-114).
+  return {
+    viewerId: account.id,
+    cards: cards.sort((a, b) => Number(b.dutyManagers !== null) - Number(a.dutyManagers !== null)),
+  }
 })
+
+async function cardTonight(event: H3Event, venue: VenueTonight, from: number, to: number, firstAidModule: string | null) {
+  const [card, dutyManagers, derived] = await Promise.all([
+    currentCard(venue.venueId),
+    onCallFor(event, venue.venueId),
+    firstAidModule === null ? null : firstAidersTonight(venue.venueId, from, to, firstAidModule, londonToday()),
+  ])
+  return {
+    venueId: venue.venueId,
+    venueName: venue.venueName,
+    address: card?.address ?? null,
+    assemblyPoint: card?.assemblyPoint ?? null,
+    exits: card?.exits ?? null,
+    isolationPoints: card?.isolationPoints ?? null,
+    firstAidKit: card?.firstAidKit ?? null,
+    defibrillator: card?.defibrillator ?? null,
+    firstAiders: card?.firstAiders ?? null,
+    firePanel: card?.firePanel ?? null,
+    what3words: card?.what3words ?? null,
+    notes: card?.notes ?? null,
+    updatedAt: card?.updatedAt ?? null,
+    firstAidersTonight: derived satisfies FirstAider[] | null,
+    dutyManagers,
+  }
+}
+
+// The duty manager's number stays with tonight's own team at the venue and their consent (A-114,
+// 0009); null tells the screen the caller is not on it, which is not the same as nobody sharing.
+async function onCallFor(event: H3Event, venueId: string): Promise<OnCall[] | null> {
+  let performanceIds: string[]
+  try {
+    performanceIds = (await requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'], { venueId })).performanceIds
+  }
+  catch (error) {
+    if ((error as H3Error).statusCode === 403) return null
+    throw error
+  }
+  const teams = await Promise.all(performanceIds.map(performanceId => tonightTeam(performanceId)))
+  return dutyManagersOnCall(teams.flat())
+}

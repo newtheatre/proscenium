@@ -184,6 +184,34 @@ describe.skipIf(skip !== null)('claiming (E-104)', () => {
   })
 })
 
+// Issue 1310: a duty manager is asked at the claim whether tonight's team may ring them, and the
+// answer is the same consent the profile holds (A-114).
+describe.skipIf(skip !== null)('a duty manager\'s answer about their number', () => {
+  const shared = (userId: string): number | undefined =>
+    read<{ visible: number }>('SELECT visible FROM shift_contact_preferences WHERE user_id = ?', userId)?.visible
+
+  test('a claim carrying the answer records it, and a lost claim records nothing', async () => {
+    expect((await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE', { value: moduleId })).status).toBe(200)
+    await setAutoConfirm(true)
+    const house = programme('claim-share')
+    const shiftId = openShift(house.performanceId, 'DUTY_MANAGER', 1)
+
+    expect((await send('POST', `/api/rota/shifts/${shiftId}/claim`, { shareNumber: true }, member.cookie)).status).toBe(200)
+    expect(shared(member.id)).toBe(1)
+
+    const lost = await send('POST', `/api/rota/shifts/${shiftId}/claim`, { shareNumber: true }, other.cookie)
+    expect(lost.status).toBe(409)
+    expect(shared(other.id)).toBeUndefined()
+  })
+
+  test('an answer that is not a yes or a no refuses the claim', async () => {
+    const house = programme('claim-share-bad')
+    const shiftId = openShift(house.performanceId, 'DUTY_MANAGER', 1)
+    expect((await send('POST', `/api/rota/shifts/${shiftId}/claim`, { shareNumber: 'please' }, other.cookie)).status).toBe(400)
+    expect(read<{ status: string }>('SELECT status FROM shifts WHERE id = ?', shiftId)?.status).toBe('OPEN')
+  })
+})
+
 describe.skipIf(skip !== null)('the queue (E-105)', () => {
   test('queue mode claims as CLAIMED, not CONFIRMED', async () => {
     await setAutoConfirm(false)

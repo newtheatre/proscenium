@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { can } from '#shared/utils/abilities'
+import { clearNightCache } from '#shared/utils/night-cache'
 import { saysDay } from '#shared/utils/when'
 import { ACCOUNT_NAV, SHELL_NAV } from '#shared/utils/site-nav'
 import type { NavEntry } from '#shared/utils/site-nav'
@@ -17,6 +18,8 @@ const shells = computed(() => SHELL_NAV.filter(entry => can(viewer.value, entry.
 async function signOut(): Promise<void> {
   // @ts-expect-error an options-carrying call has no working generic form yet (0053).
   await $fetch<unknown>('/api/auth/sign-out', { method: 'POST' })
+  // The next person on this phone must not be shown the last one's night (A-114).
+  clearNightCache(deviceNightCacheStore())
   await refresh()
   await navigateTo('/')
 }

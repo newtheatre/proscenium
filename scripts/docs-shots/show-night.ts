@@ -171,7 +171,8 @@ export const showNight: Shot[] = [
     name: 'show-night/emergency',
     persona: foh,
     url: '/tonight/emergency',
-    marker: '[data-test="emergency-999"]',
+    // The card renders for anyone before the header learns whose night it is; the badge is last.
+    marker: '[data-test="night-shift-badge"]',
     width: PHONE_WIDTH,
     height: 1700,
     annotations: [

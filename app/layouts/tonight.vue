@@ -31,14 +31,14 @@ setNightFallbackSubject(() => {
 
 const subject = computed(() => header.value.subject ?? header.value.fallback ?? DEFAULT_SUBJECT)
 
-// Opening any show-night screen caches the emergency card, whole-night rather than venue-scoped
-// since a shift holder resolves only one (0044). Best effort: no shift, nothing to prime.
+// Opening any show-night screen caches every venue's emergency card, for anyone signed in, shift
+// or none (E-113 criterion 2, issue 1310). Best effort: no signal, nothing to prime.
 onMounted(async () => {
   try {
     // Both generics load-bearing: the second, widened to string, keeps this under tsc's depth
     // limit once enough routes exist (0053 amendment).
-    const card = await $fetch<unknown, string>('/api/tonight/emergency')
-    await primeNightCache(nightCacheKey({ screen: 'emergency-card', night: currentShowNight(), wholeNight: true }), () => card)
+    const cards = await $fetch<unknown, string>('/api/tonight/emergency')
+    await primeNightCache(nightCacheKey({ screen: 'emergency-cards', night: currentShowNight(), wholeNight: true }), () => cards)
   }
   catch { /* nothing to prime */ }
 })

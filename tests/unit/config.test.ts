@@ -10,6 +10,7 @@ import type { Permission } from '#shared/utils/roles'
 // The keys the workshop register proposes no value for (0019). They ship unset, and the
 // features needing them wait rather than guessing. Typed, so a typo here is a build error.
 const UNSET: ConfigKey[] = [
+  'FIRST_AID_MODULE',
   'MEMBERSHIP_PURCHASE_URL',
   'NIGHT_REPORT_ROLES',
   'RETENTION_FINAL_WARNING_DAYS',

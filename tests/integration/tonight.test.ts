@@ -2,11 +2,16 @@ import { describe, expect, test } from 'bun:test'
 import {
   claimedShiftTonightQuery,
   dutyManagersOnCall,
+  firstAidersTonightQuery,
+  readFirstAiders,
   readTeamRow,
+  shareNumberStatement,
   tonightHouseQuery,
   tonightPerformanceQuery,
   tonightTeamQuery,
+  venuesTonightQuery,
 } from '#server/utils/tonight'
+import { claimShiftStatement } from '#server/utils/rota'
 import { ticketInsertQueries } from '#server/utils/capacity'
 import { daysAfter } from '#shared/utils/membership'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
@@ -322,6 +327,209 @@ describe('a claim waiting tonight, for the refusal that names it', () => {
       expect(claimed(database, who, 'DOOR', night)).toBe(false)
       expect(claimed(database, who, 'BAR', night, { venueId: venue.id })).toBe(true)
       expect(claimed(database, who, 'BAR', night, { venueId: 'venue-elsewhere' })).toBe(false)
+    })
+  })
+})
+
+function nightSeconds(night: string): [number, number] {
+  const { from, to } = showNightBounds(night)
+  return [Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)]
+}
+
+function opening(database: TestDatabase, id: string, venueId: string, night: string, status = 'PLANNED'): void {
+  const [from] = nightSeconds(night)
+  database.batch([['INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    id, venueId, night, 'Society social', from + 14 * 3600, from + 19 * 3600, status]])
+}
+
+// Anyone signed in reads the card of every venue running tonight, a bar opening's included
+// (E-113 criterion 2 as amended, 0077, issue 1310).
+describe('the venues running tonight (issue 1310)', () => {
+  test('a venue with a performance or a bar opening tonight, once each, in name order', async () => {
+    await withDatabase(async (database) => {
+      const house = tonightsPerformance(database, { suffix: 'b' })
+      tonightsPerformance(database, { suffix: 'b2', venueId: house.venueId })
+      const studio = testVenue(database, { suffix: 'a' })
+      opening(database, 'opening-studio', studio.id, house.night)
+
+      expect(read(database, venuesTonightQuery(...nightSeconds(house.night)))).toEqual([
+        { venueId: studio.id, venueName: 'The Test House a' },
+        { venueId: house.venueId, venueName: 'The Test House b' },
+      ])
+    })
+  })
+
+  test('a cancelled performance, a cancelled opening and tomorrow\'s performance are not tonight', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database, { suffix: 'c' })
+      database.batch([['UPDATE performances SET status = ? WHERE id = ?', 'CANCELLED', tonight.performanceId]])
+      const studio = testVenue(database, { suffix: 'd' })
+      opening(database, 'opening-cancelled', studio.id, tonight.night, 'CANCELLED')
+      tonightsPerformance(database, { suffix: 'e', night: daysAfter(tonight.night, 1) })
+
+      expect(read(database, venuesTonightQuery(...nightSeconds(tonight.night)))).toEqual([])
+    })
+  })
+
+  // An external venue keeps its own building's procedures until we staff a night there (issue 1318).
+  test('an external venue counts once its performance tonight carries a shift that is not cancelled', async () => {
+    await withDatabase(async (database) => {
+      const hired = testVenue(database, { suffix: 'hired', isExternal: true })
+      const tonight = tonightsPerformance(database, { suffix: 'hired', venueId: hired.id })
+      const night = nightSeconds(tonight.night)
+      expect(read(database, venuesTonightQuery(...night))).toEqual([])
+
+      rostered(database, 'hired-door', tonight.performanceId, 'DOOR', person(database, 'hired-door'), 'CLAIMED')
+      expect(read(database, venuesTonightQuery(...night))).toEqual([{ venueId: hired.id, venueName: 'The Test House hired' }])
+    })
+  })
+})
+
+// Tonight's first aiders come off tonight's own confirmed rota and a current record of the
+// module the committee names, never a standing list (E-113 criterion 1 as amended, 0009).
+describe('tonight\'s first aiders (issue 1310)', () => {
+  const FIRST_AID = 'SAFE-101'
+  const TODAY = '2026-10-12'
+
+  function named(database: TestDatabase, id: string, name: string): string {
+    database.batch([['INSERT OR IGNORE INTO users (id, name, email, verified) VALUES (?, ?, ?, 1)',
+      id, name, `${id}@e2e.newtheatre.org.uk`]])
+    return id
+  }
+
+  function certified(database: TestDatabase, userId: string, options: { module?: string, expiresOn?: string | null, revoked?: boolean } = {}): void {
+    const module = options.module ?? FIRST_AID
+    database.batch([
+      ['INSERT OR IGNORE INTO departments (code, name) VALUES (?, ?)', 'SAFE', 'Safety'],
+      ['INSERT OR IGNORE INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', module, 'SAFE', 'MODULE', `Module ${module}`],
+      [`INSERT INTO training_records (id, user_id, module_id, awarded_on, expires_on, source, revoked_at)
+        VALUES (?, ?, ?, '2025-09-01', ?, 'SIGNOFF', ?)`,
+      `tr-${userId}-${module}`, userId, module, options.expiresOn ?? null, options.revoked ? 1_700_000_000 : null],
+    ])
+  }
+
+  function firstAiders(database: TestDatabase, venueId: string, night: string): ReturnType<typeof readFirstAiders> {
+    return readFirstAiders(read(database, firstAidersTonightQuery(venueId, ...nightSeconds(night), FIRST_AID, TODAY)))
+  }
+
+  test('a confirmed volunteer holding a current record, once, by first name with every job tonight', async () => {
+    await withDatabase(async (database) => {
+      const matinee = tonightsPerformance(database, { suffix: 'matinee' })
+      const evening = tonightsPerformance(database, { suffix: 'evening', venueId: matinee.venueId })
+      const sam = named(database, 'sam', 'Sam Okafor')
+      certified(database, sam, { expiresOn: '2026-10-20' })
+      rostered(database, 'sam-matinee', matinee.performanceId, 'BAR', sam)
+      rostered(database, 'sam-evening', evening.performanceId, 'DUTY_MANAGER', sam)
+
+      expect(firstAiders(database, matinee.venueId, matinee.night)).toEqual([{ firstName: 'Sam', roles: ['DUTY_MANAGER', 'BAR'] }])
+    })
+  })
+
+  test('a claim, a lapsed or revoked record, another module and another venue are not tonight\'s first aiders', async () => {
+    await withDatabase(async (database) => {
+      const house = tonightsPerformance(database, { suffix: 'house' })
+      const late = tonightsPerformance(database, { suffix: 'late', venueId: house.venueId })
+      const studio = tonightsPerformance(database, { suffix: 'studio' })
+      const claimant = named(database, 'claimant', 'Clara Claimant')
+      const lapsed = named(database, 'lapsed', 'Lee Lapsed')
+      const revoked = named(database, 'revoked', 'Rae Revoked')
+      const other = named(database, 'other', 'Otto Other')
+      const elsewhere = named(database, 'elsewhere', 'Ella Elsewhere')
+      certified(database, claimant)
+      certified(database, lapsed, { expiresOn: TODAY })
+      certified(database, revoked, { revoked: true })
+      certified(database, other, { module: 'SAFE-102' })
+      certified(database, elsewhere)
+      rostered(database, 'claimed-door', house.performanceId, 'DOOR', claimant, 'CLAIMED')
+      rostered(database, 'lapsed-bar', house.performanceId, 'BAR', lapsed)
+      rostered(database, 'revoked-dm', house.performanceId, 'DUTY_MANAGER', revoked)
+      rostered(database, 'other-door', late.performanceId, 'DOOR', other)
+      rostered(database, 'elsewhere-door', studio.performanceId, 'DOOR', elsewhere)
+
+      expect(firstAiders(database, house.venueId, house.night)).toEqual([])
+      expect(firstAiders(database, studio.venueId, studio.night)).toEqual([{ firstName: 'Ella', roles: ['DOOR'] }])
+    })
+  })
+
+  test('a confirmed slot on tonight\'s bar opening at the venue counts (0077)', async () => {
+    await withDatabase(async (database) => {
+      const venue = testVenue(database, { suffix: 'social' })
+      const night = currentShowNight()
+      opening(database, 'opening-social', venue.id, night)
+      const barkeep = named(database, 'barkeep', 'Bea Barkeep')
+      const waiting = named(database, 'waiting', 'Wes Waiting')
+      certified(database, barkeep)
+      certified(database, waiting)
+      database.batch([
+        ['INSERT INTO bar_opening_shifts (id, opening_id, slot, user_id, status) VALUES (?, ?, 1, ?, ?)', 'social-1', 'opening-social', barkeep, 'CONFIRMED'],
+        ['INSERT INTO bar_opening_shifts (id, opening_id, slot, user_id, status) VALUES (?, ?, 2, ?, ?)', 'social-2', 'opening-social', waiting, 'CLAIMED'],
+      ])
+
+      expect(firstAiders(database, venue.id, night)).toEqual([{ firstName: 'Bea', roles: ['BAR'] }])
+    })
+  })
+})
+
+// The answer a duty manager gives when they claim rides the claim's own batch, behind the claim's
+// own audit row, so only a claim that took the shift writes it (A-114, 0003, issue 1310).
+describe('the duty manager\'s answer at the claim (issue 1310)', () => {
+  function preference(database: TestDatabase, userId: string): number | undefined {
+    return rows<{ visible: number }>(database, 'SELECT visible FROM shift_contact_preferences WHERE user_id = ?', userId)[0]?.visible
+  }
+
+  function open(database: TestDatabase, id: string, performanceId: string): void {
+    database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)', id, performanceId, 'DUTY_MANAGER', 'OPEN']])
+  }
+
+  // The claim, its conditional audit row and the answer, batched as the route batches them.
+  function claim(database: TestDatabase, shiftId: string, userId: string, visible: boolean): void {
+    const auditId = `audit-${crypto.randomUUID()}`
+    database.batch([
+      boundStatement(database, claimShiftStatement(shiftId, userId, 'CONFIRMED')),
+      [`INSERT INTO audit_log (id, actor_id, action, target, detail) SELECT ?, ?, 'shift.claimed', ?, '{}' WHERE changes() = 1`,
+        auditId, userId, `shift:${shiftId}`],
+      boundStatement(database, shareNumberStatement(auditId, userId, visible)),
+    ])
+  }
+
+  test('written when the claim took the shift, and replaced by the answer at a later claim', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'dm-asked')
+      open(database, 'dm-open', tonight.performanceId)
+
+      claim(database, 'dm-open', who, true)
+      expect(preference(database, who)).toBe(1)
+
+      database.batch([['UPDATE shifts SET status = ?, user_id = NULL WHERE id = ?', 'OPEN', 'dm-open']])
+      claim(database, 'dm-open', who, false)
+      expect(preference(database, who)).toBe(0)
+    })
+  })
+
+  test('a claim that lost leaves the answer unwritten', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const first = person(database, 'dm-first')
+      const second = person(database, 'dm-second')
+      open(database, 'dm-contested', tonight.performanceId)
+
+      claim(database, 'dm-contested', first, true)
+      claim(database, 'dm-contested', second, true)
+      expect(preference(database, second)).toBeUndefined()
+    })
+  })
+
+  // A stale list on a second phone claims a shift already held: refused, so the first answer stands.
+  test('re-claiming your own held shift leaves the earlier answer in place', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'dm-twice')
+      open(database, 'dm-held', tonight.performanceId)
+
+      claim(database, 'dm-held', who, true)
+      claim(database, 'dm-held', who, false)
+      expect(preference(database, who)).toBe(1)
     })
   })
 })

@@ -228,10 +228,42 @@ async function claimOpening(slot: OpenOpeningShift): Promise<void> {
   }
 }
 
-async function claim(shift: OpenShift): Promise<void> {
+// A duty manager is asked before the claim goes whether tonight's team may ring them, with neither
+// answer chosen for them; the answer is the profile's own phone consent (A-114, issue 1310).
+const askingFor = ref<OpenShift | null>(null)
+const shareNumber = ref<'yes' | 'no' | undefined>(undefined)
+const claimFailure = ref<string | null>(null)
+const askOpen = computed({
+  get: () => askingFor.value !== null,
+  set: (open: boolean) => { if (!open) askingFor.value = null },
+})
+const SHARE_CHOICES = [
+  { label: 'Share my number', value: 'yes' },
+  { label: 'Keep it to myself', value: 'no' },
+]
+
+function startClaim(shift: OpenShift): void {
+  if (shift.role !== 'DUTY_MANAGER') {
+    void claim(shift)
+    return
+  }
+  shareNumber.value = undefined
+  claimFailure.value = null
+  askingFor.value = shift
+}
+
+async function claimAsked(): Promise<void> {
+  const shift = askingFor.value
+  if (!shift || shareNumber.value === undefined) return
+  await claim(shift, { shareNumber: shareNumber.value === 'yes' })
+}
+
+async function claim(shift: OpenShift, body?: { shareNumber: boolean }): Promise<void> {
   claiming.value = shift.shiftId
+  claimFailure.value = null
   try {
-    const answer = await $fetch<{ status: 'CLAIMED' | 'CONFIRMED' }>(`/api/rota/shifts/${shift.shiftId}/claim`, { method: 'POST' })
+    const answer = await $fetch<{ status: 'CLAIMED' | 'CONFIRMED' }>(`/api/rota/shifts/${shift.shiftId}/claim`, { method: 'POST', body })
+    askingFor.value = null
     toast.add({
       title: answer.status === 'CONFIRMED' ? 'Shift confirmed' : 'Claim sent for approval',
       description: answer.status === 'CONFIRMED'
@@ -243,7 +275,9 @@ async function claim(shift: OpenShift): Promise<void> {
     await Promise.all([refresh(), refreshMine()])
   }
   catch (error) {
-    toast.add({ title: 'Could not claim that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
+    // Inside the dialogue that asked, where one did: a toast would sit behind it (0032).
+    if (askingFor.value) claimFailure.value = refusalText(error)
+    else toast.add({ title: 'Could not claim that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
   }
   finally {
     claiming.value = null
@@ -513,7 +547,7 @@ useSeoMeta({ title: 'Rota' })
                 class="min-h-12"
                 :loading="claiming === shift.shiftId"
                 :data-test="`claim-${shift.shiftId}`"
-                @click="claim(shift)"
+                @click="startClaim(shift)"
               >
                 Claim
               </UButton>
@@ -632,5 +666,27 @@ useSeoMeta({ title: 'Rota' })
       :failure="releaseFailure"
       @confirm="release"
     />
+
+    <ConfirmModal
+      v-model:open="askOpen"
+      name="claim-duty-manager"
+      title="Claim the duty manager shift"
+      verb="Claim"
+      color="primary"
+      consequence="Tonight's team at that venue see a shared number on the team list, and the duty manager's on the emergency card, to ring after 999. Your answer also sets the phone switch on your profile, where you can change it."
+      :loading="claiming !== null"
+      :disabled="shareNumber === undefined"
+      :failure="claimFailure"
+      @confirm="claimAsked"
+    >
+      <template #body>
+        <URadioGroup
+          v-model="shareNumber"
+          legend="Share the phone number on your profile with tonight's team?"
+          :items="SHARE_CHOICES"
+          data-test="claim-share-number"
+        />
+      </template>
+    </ConfirmModal>
   </UContainer>
 </template>

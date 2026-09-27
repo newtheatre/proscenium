@@ -17,7 +17,7 @@ const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 let admin: TestMember
 let foh: TestMember
-let house: { venueId: string }
+let house: { venueId: string, performanceId: string }
 
 beforeAll(async () => {
   if (skip) return
@@ -29,7 +29,7 @@ beforeAll(async () => {
   const database = new Database(app.databaseFile)
   try {
     const made = tonightsPerformance(sqliteTarget(database), { suffix: 'emergency-house' })
-    house = { venueId: made.venueId }
+    house = { venueId: made.venueId, performanceId: made.performanceId }
   }
   finally {
     database.close()
@@ -42,6 +42,34 @@ afterAll(async () => {
 
 const send = (method: string, path: string, body?: unknown, as = admin.cookie): Promise<Response> =>
   request(app, method, path, body, as)
+
+interface TonightCard {
+  venueId: string
+  venueName: string
+  address: string | null
+  assemblyPoint: string | null
+  firePanel: string | null
+  firstAiders: string | null
+  firstAidersTonight: { firstName: string, roles: string[] }[] | null
+  dutyManagers: { name: string, phone: string }[] | null
+}
+
+async function cardAt(as: string, venueId: string): Promise<TonightCard | undefined> {
+  const answered = await send('GET', '/api/tonight/emergency', undefined, as)
+  expect(answered.status).toBe(200)
+  const { cards } = await answered.json() as { cards: TonightCard[] }
+  return cards.find(card => card.venueId === venueId)
+}
+
+function write(statement: string, ...parameters: unknown[]): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(statement).run(...parameters as never[])
+  }
+  finally {
+    database.close()
+  }
+}
 
 describe.skipIf(skip !== null)('committee configuration (E-113 criterion 1)', () => {
   test('an officer can file a version and read it back', async () => {
@@ -112,13 +140,12 @@ describe.skipIf(skip !== null)('reading tonight\'s card (E-113 criteria 2, 4)', 
       firePanel: 'Foyer, left of the main doors',
     })
 
-    const answered = await send('GET', '/api/tonight/emergency', undefined, foh.cookie)
-    expect(answered.status).toBe(200)
-    const body = await answered.json() as { address: string | null, assemblyPoint: string | null, firePanel: string | null, venueName: string }
-    expect(body.assemblyPoint).toBe('Reading test')
-    expect(body.address).toContain('NG7 2RD')
-    expect(body.firePanel).toBe('Foyer, left of the main doors')
-    expect(body.venueName.length).toBeGreaterThan(0)
+    const card = await cardAt(foh.cookie, house.venueId)
+    expect(card?.assemblyPoint).toBe('Reading test')
+    expect(card?.address).toContain('NG7 2RD')
+    expect(card?.firePanel).toBe('Foyer, left of the main doors')
+    expect(card?.venueName.length).toBeGreaterThan(0)
+    expect(card?.dutyManagers).toEqual([])
   })
 
   // Issue 903: the first-ever visit with no connectivity has to carry the address, so the server
@@ -131,8 +158,68 @@ describe.skipIf(skip !== null)('reading tonight\'s card (E-113 criteria 2, 4)', 
     expect(await page.text()).toContain('Cherry Tree Hill')
   })
 
-  test('an ordinary member cannot', async () => {
+  // Issue 1310: the building's card is for whoever is holding the phone; only the duty manager's
+  // number stays with tonight's team (A-114).
+  test('anyone signed in reads every venue running tonight, with no duty manager\'s number', async () => {
     const member = await registerMember(app, 'emergency-reader', generatePassword())
-    expect((await send('GET', '/api/tonight/emergency', undefined, member.cookie)).status).toBe(403)
+    const card = await cardAt(member.cookie, house.venueId)
+    expect(card?.address).toContain('NG7 2RD')
+    expect(card?.dutyManagers).toBeNull()
+  })
+
+  test('the served HTML carries the address to a member with no shift too', async () => {
+    const member = await registerMember(app, 'emergency-served', generatePassword())
+    const page = await send('GET', '/tonight/emergency', undefined, member.cookie)
+    expect(page.status).toBe(200)
+    expect(await page.text()).toContain('Cherry Tree Hill')
+  })
+
+  test('somebody signed out is not given it, and the screen sends them to sign in', async () => {
+    expect((await request(app, 'GET', '/api/tonight/emergency')).status).toBe(401)
+    const page = await request(app, 'GET', '/tonight/emergency')
+    expect(new URL(page.url).pathname).toBe('/sign-in')
+    expect(await page.text()).not.toContain('Cherry Tree Hill')
+  })
+
+  // A cached copy keeps its numbers only for the account it was fetched for (A-114).
+  test('the answer names the account it was fetched for', async () => {
+    const member = await registerMember(app, 'emergency-stamped', generatePassword())
+    const answered = await send('GET', '/api/tonight/emergency', undefined, member.cookie)
+    expect((await answered.json() as { viewerId: string }).viewerId).toBe(member.id)
+  })
+})
+
+// E-113 criterion 1 as amended by issue 1310: tonight's first aiders come off tonight's own rota,
+// read against the module the committee names, and the committee's line stands in until then.
+describe.skipIf(skip !== null)('tonight\'s first aiders on the card (issue 1310)', () => {
+  test('unnamed, the card carries the committee\'s own line and derives nobody', async () => {
+    await send('PUT', `/api/admin/venues/${house.venueId}/emergency`, {
+      address: 'The Nottingham New Theatre, Cherry Tree Hill, University Park, Nottingham NG7 2RD',
+      assemblyPoint: 'First aid test',
+      firstAiders: 'Ask the duty manager',
+    })
+    const card = await cardAt(foh.cookie, house.venueId)
+    expect(card?.firstAiders).toBe('Ask the duty manager')
+    expect(card?.firstAidersTonight).toBeNull()
+  })
+
+  test('named, a confirmed volunteer with a current record is on it by first name', async () => {
+    const department = `SAF${crypto.randomUUID().slice(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, 'X')}`
+    expect((await send('POST', '/api/admin/training/departments', { code: department, name: 'First aid' })).status).toBe(200)
+    const moduleId = `${department}-101`
+    expect((await send('POST', '/api/admin/training/modules', {
+      id: moduleId, department, kind: 'MODULE', name: 'Emergency first aid at work', status: 'ACTIVE',
+    })).status).toBe(200)
+    expect((await send('PUT', '/api/admin/config/FIRST_AID_MODULE', { value: moduleId })).status).toBe(200)
+
+    const aider = await registerMember(app, 'emergency-aider', generatePassword())
+    write('INSERT INTO training_records (id, user_id, module_id, awarded_on, source) VALUES (?, ?, ?, ?, \'SIGNOFF\')',
+      `tr-${aider.id}`, aider.id, moduleId, '2026-01-10')
+    write('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, \'BAR\', 1, ?, \'CONFIRMED\')',
+      `${house.performanceId}-aider`, house.performanceId, aider.id)
+
+    const member = await registerMember(app, 'emergency-looker', generatePassword())
+    const card = await cardAt(member.cookie, house.venueId)
+    expect(card?.firstAidersTonight).toEqual([{ firstName: aider.name.split(' ')[0]!, roles: ['BAR'] }])
   })
 })
