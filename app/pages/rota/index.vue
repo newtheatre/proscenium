@@ -419,7 +419,7 @@ useSeoMeta({ title: 'Rota' })
           :key="group.night"
           :data-test="`night-${group.night}`"
         >
-          <h3 class="text-sm font-semibold text-muted">
+          <h3 class="text-base font-semibold">
             {{ saysDay(group.night) }}
           </h3>
           <ul class="mt-2 divide-y divide-default">

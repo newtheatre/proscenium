@@ -46,7 +46,7 @@ export function saysTrainingAction(action: TrainingAction): string {
     case 'SIGN_UP': return 'Sign up'
     case 'JOIN_WAITING_LIST': return 'Join the waiting list'
     case 'ASKED': return 'Asked for'
-    case 'ASK': return 'Ask for it'
+    case 'ASK': return 'Ask for this module'
     default: return action satisfies never
   }
 }

@@ -474,7 +474,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   2. A signed-in member sees which modules they hold and can act on one from its card. Amended
      26 September 2026 (issue 1335): the card carries the one derived action, Sign up, Join the
      waiting list, "You have a place" or the module request path when no session is open, the
-     same action the module page (on a phone as well), My training and My rota offer.
+     same action the module page (on a phone as well), Training and Rota offer.
   3. `/training/catalogue` still resolves to the public catalogue.
   4. `app/pages/training/manage/index.vue` is split into components (catalogue table, module
      editor, department filter) with no behaviour change: the existing tests pass untouched.

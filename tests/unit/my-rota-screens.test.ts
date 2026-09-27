@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-// Issue 1335, read as source: My rota lists what a member can take and a card per locked role,
+// Issue 1335, read as source: the rota page lists what a member can take and a card per locked role,
 // and every place a module meets a member offers the one derived action, on a phone as well.
 
 const read = (path: string): Promise<string> => Bun.file(path).text()
@@ -12,7 +12,7 @@ const CARD = 'app/components/training/ModuleCard.vue'
 const ASK = 'app/components/training/RequestModule.vue'
 const ACTION = 'app/components/training/ModuleAction.vue'
 
-describe('My rota (E-103 criterion 2 as trimmed)', () => {
+describe('the rota page (E-103 criterion 2 as trimmed)', () => {
   test('lists the shifts you can take, and a card for each role you could take', async () => {
     const source = await read(ROTA)
     expect(source).toContain('data-test="shifts-you-can-take"')
@@ -37,7 +37,7 @@ describe('My rota (E-103 criterion 2 as trimmed)', () => {
 })
 
 describe('one derived action wherever a module meets a member (G-102 c6, G-129 c2)', () => {
-  test('My training, the catalogue card and the module page all render it', async () => {
+  test('the training page, the catalogue card and the module page all render it', async () => {
     for (const path of [MY_TRAINING, CARD, MODULE]) {
       expect(await read(path)).toContain('<TrainingModuleAction')
     }
@@ -51,7 +51,7 @@ describe('one derived action wherever a module meets a member (G-102 c6, G-129 c
     expect(await read(MODULE)).toMatch(/lg:hidden[\s\S]{0,600}Sign in to take it/)
   })
 
-  test('an action taken on My training refreshes the records read, so an alert does not offer it again', async () => {
+  test('an action taken on the training page refreshes the records read, so an alert does not offer it again', async () => {
     expect(await read(MY_TRAINING)).toMatch(/async function changedAction[\s\S]{0,200}refreshRecords\(\)/)
   })
 

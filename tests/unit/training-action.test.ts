@@ -57,7 +57,7 @@ describe('what each action says', () => {
     expect(saysTrainingAction({ kind: 'JOIN_WAITING_LIST', session: session() })).toBe('Join the waiting list')
     expect(saysTrainingAction({ kind: 'PLACED', session: session() })).toBe('You have a place')
     expect(saysTrainingAction({ kind: 'WAITING', session: session(), position: 2 })).toBe('On the waiting list, number 2')
-    expect(saysTrainingAction({ kind: 'ASK' })).toBe('Ask for it')
+    expect(saysTrainingAction({ kind: 'ASK' })).toBe('Ask for this module')
     expect(saysTrainingAction({ kind: 'ASKED' })).toBe('Asked for')
   })
 })

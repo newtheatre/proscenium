@@ -58,7 +58,7 @@ async function submit(): Promise<void> {
     data-test="request-module"
     @click.stop.prevent="open = true"
   >
-    Ask for it
+    Ask for this module
   </UButton>
 
   <UModal

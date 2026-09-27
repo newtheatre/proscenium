@@ -2,7 +2,7 @@ import { fromLondonWallClock, londonWeekday } from './london'
 import { daysAfter } from './membership'
 import { showNightBounds, showNightOf } from './show-night'
 
-// My rota's week chips and night grouping (issue 1335). A week is Monday's night to Sunday's, and
+// The rota page's week chips and night grouping (issue 1335). A week is Monday's night to Sunday's, and
 // a night runs 04:00 to 04:00, so a matinee and the evening share one and 00:30 is the night before (0014).
 
 export const ROTA_WEEKS = ['ALL', 'THIS_WEEK', 'NEXT_WEEK', 'LATER'] as const
