@@ -47,6 +47,8 @@ describe('the role vocabulary', () => {
     // Every role should be reachable by import, save four the old estate never had: no card
     // reader (0044), no access profiles (D-127), no safety officer (E-116), no treasurer (I-103).
     expect([...ROLES].filter(role => !targets.has(role))).toEqual(['BAR_MANAGER', 'ACCESSIBILITY_OFFICER', 'SAFETY_OFFICER', 'TREASURER'])
+    // The old estate's front of house marker is decided by hand or skipped, never suggested (A-134 criterion 4).
+    expect(map['proscenium:FRONT_OF_HOUSE']).toBeUndefined()
   })
 
   // Questions 7 and 8, answered 2 September. Pinned because a role widening is a governance
@@ -110,10 +112,6 @@ describe('permissions come from live grants only', () => {
     expect(permissionsFor([], now).size).toBe(0)
   })
 
-  test('an operational role carries no standing permission at all (0009)', () => {
-    expect(permissionsFor([{ role: 'FRONT_OF_HOUSE', expiresAt: null }], now).size).toBe(0)
-  })
-
   // The season dashboard's aggregates and the cross-season report, nothing else standing
   // (I-105 criterion 5, E-126).
   test('the committee holds the season summary, the cross-season report, and no entry-level drill-down', () => {
@@ -170,6 +168,13 @@ describe('permissions come from live grants only', () => {
   test('the box office is no longer a role of its own, so nothing can grant it (A-133 criterion 2)', () => {
     expect(isRole('BOX_OFFICE')).toBe(false)
     expect(permissionsFor([{ role: 'BOX_OFFICE' as Role, expiresAt: null }], now).size).toBe(0)
+  })
+
+  // A role that granted nothing and that nothing read is gone, so the register counts ten (A-134).
+  test('front of house is no longer a role, and a stored grant naming it grants nothing (A-134 criterion 1)', () => {
+    expect(isRole('FRONT_OF_HOUSE')).toBe(false)
+    expect(ROLES).toHaveLength(10)
+    expect(permissionsFor([{ role: 'FRONT_OF_HOUSE' as Role, expiresAt: null }], now).size).toBe(0)
   })
 
   // The whole point of the role: a named accessibility officer, never general box office

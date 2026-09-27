@@ -24,7 +24,7 @@ beforeAll(async () => {
   treasurer = await registerMember(app, 'export-treasurer', generatePassword())
   front = await registerMember(app, 'export-front', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: front.id, role: 'FRONT_OF_HOUSE' }, admin.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: front.id, role: 'COMMITTEE' }, admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -65,7 +65,7 @@ describe.skipIf(skip !== null)('who may configure a mapping (finance.write) and 
     expect((await send('GET', '/api/admin/finance/export?fromDay=2026-09-01&toDay=2026-09-30', undefined, treasurer.cookie)).status).toBe(200)
   })
 
-  test('front of house holds none of finance\'s permissions', async () => {
+  test('the committee role holds none of finance\'s working permissions', async () => {
     expect((await send('GET', '/api/admin/finance/nominal-mappings', undefined, front.cookie)).status).toBe(403)
     expect((await send('POST', '/api/admin/finance/nominal-mappings', { kind: 'WALK_UP', source: 'DESK', nominalCode: '9999' }, front.cookie)).status).toBe(403)
     expect((await send('GET', '/api/admin/finance/export?fromDay=2026-09-01&toDay=2026-09-30', undefined, front.cookie)).status).toBe(403)

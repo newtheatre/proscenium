@@ -155,7 +155,7 @@ describe.skipIf(skip !== null)('a holder is warned before a grant lapses (criter
 
   test('moving the expiry re-arms the warning', async () => {
     const userId = await holder()
-    const id = grant(userId, 'FRONT_OF_HOUSE', now() + 10 * DAY)
+    const id = grant(userId, 'COMMITTEE', now() + 10 * DAY)
 
     await runSweep()
     expect(claimsFor(userId).filter(row => row.type === 'role.expiring')).toHaveLength(1)

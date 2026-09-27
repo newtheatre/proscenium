@@ -63,8 +63,12 @@ describe('the night roles are the three the rota staffs (E-111 criterion 1)', ()
     expect(bypass('BAR_MANAGER')).toEqual(['night.till'])
   })
 
-  test('an ordinary front of house member holds no bypass at all (0009)', () => {
-    expect(PERMISSION_MAP.FRONT_OF_HOUSE).toEqual([])
+  // A volunteer's night comes from a shift, never a role, so only the officers hold a bypass (0009, A-134).
+  test('no role but the two officers and the IT Manager holds a bypass', () => {
+    const holders = Object.entries(PERMISSION_MAP)
+      .filter(([, held]) => held.some(permission => OPERATIONAL_PERMISSIONS.includes(permission)))
+      .map(([role]) => role)
+    expect(holders.sort()).toEqual(['ADMIN', 'BAR_MANAGER', 'FOH_MANAGER'])
   })
 })
 
