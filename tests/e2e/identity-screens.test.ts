@@ -4,7 +4,7 @@ import { WORKSPACE_DOMAIN } from '#shared/utils/auth'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -100,6 +100,35 @@ const SIGN_IN_FORM = 'form input[type="email"]'
 const PASSWORD_FIELD = 'form input[type="password"]'
 const SUBMIT = 'form button[type="submit"]'
 const CHALLENGE = '[data-test="mfa-challenge"] input'
+const EMAIL_ME_A_LINK = '[data-test="email-me-a-link"]'
+const SIGNED_IN = 'document.querySelector(\'[data-test="account-menu"]\')'
+
+// The link a message carried, read back from the mail sink as a person reads their inbox, and
+// opened on this app whatever base the message was addressed from.
+async function linkSentTo(email: string, path: string): Promise<string> {
+  const pattern = new RegExp(`https?://\\S*${path}\\?token=\\S+`)
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    const found = (await letters(app))
+      .filter(letter => letter.startsWith(`To: ${email}`))
+      .map(letter => letter.match(pattern)?.[0])
+      .find(Boolean)
+    if (found) {
+      const url = new URL(found)
+      return `${url.pathname}${url.search}`
+    }
+    await Bun.sleep(200)
+  }
+  throw new Error(`no ${path} link reached ${email}`)
+}
+
+// A row the box office made for a ticket guest: a name, an address and no way to sign in.
+function guest(email: string): void {
+  withDatabase((database) => {
+    database.query('INSERT INTO users (id, email, name) VALUES (?, ?, ?)')
+      .run(crypto.randomUUID().replaceAll('-', ''), email, syntheticPerson(Math.floor(Math.random() * 1_000_000)).name)
+  }, false)
+}
 
 describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A-102)', () => {
   test('registering asks the visitor to check their email, and creates no session', async () => {
@@ -135,8 +164,52 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
     }
   }, CASE_TIMEOUT_MS)
 
+  // Registering seals the address into this browser, so the link opened here is a sign-in; the
+  // email carries where the visitor set out from (0103).
+  test('the confirmation link signs in the browser that registered, and returns to next', async () => {
+    const view = await open('/register?next=%2Faccount%2Fprofile')
+    try {
+      const email = address('here')
+      await fill(view, 'form input[type="text"]', syntheticPerson(2).name)
+      await fill(view, SIGN_IN_FORM, email)
+      await fill(view, PASSWORD_FIELD, password)
+      await click(view, SUBMIT)
+      await waitFor(view, 'document.querySelector(\'[data-test="check-your-email"]\')')
+
+      const link = await linkSentTo(email, '/verify')
+      expect(link).toContain('next=%2Faccount%2Fprofile')
+      await view.navigate(`${app.baseURL}${link}`)
+      await waitFor(view, `location.pathname === '/account/profile' && ${SIGNED_IN}`, 30_000)
+      expect(verifiedFlag(email)).toBe(1)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('opened in a browser that did not register, the confirmation link confirms without signing in', async () => {
+    const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+    const email = address('elsewhere')
+    await send('POST', '/api/auth/register', { email, name: person.name, password, next: '/account/profile' })
+    const link = await linkSentTo(email, '/verify')
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await view.navigate(`${app.baseURL}${link}`)
+      await waitFor(view, 'document.querySelector(\'[data-test="verified"]\')', 30_000)
+      expect(verifiedFlag(email)).toBe(1)
+      expect(await view.evaluate<boolean>(`Boolean(${SIGNED_IN})`)).toBe(false)
+      expect(await view.evaluate<string>('document.querySelector(\'[data-test="verified"] a\')?.getAttribute("href") ?? ""'))
+        .toContain('next=%2Faccount%2Fprofile')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   // A dead end is the failure this page exists to prevent (A-102 criterion 3).
-  test('an expired verification link offers a fresh send rather than a dead end', async () => {
+  // A sign-in link confirms the address as it signs in, so it is the fresh send (0103).
+  test('an expired verification link offers a sign-in link rather than a dead end', async () => {
     const email = await registerFresh('stale', false)
     const token = newToken()
     await plantToken(email, 'EMAIL_VERIFY', token, -1)
@@ -144,8 +217,12 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
     const view = await open(`/verify?token=${token}`)
     try {
       await waitFor(view, 'document.querySelector(\'[data-test="token-expired"]\')')
-      expect(await textOf(view)).toMatch(/send|again/i)
       expect(verifiedFlag(email)).toBe(0)
+
+      await fill(view, SIGN_IN_FORM, email)
+      await click(view, SUBMIT)
+      await waitFor(view, 'document.querySelector(\'[data-test="check-your-email"]\')')
+      expect(await linkSentTo(email, '/magic')).toContain('/magic?token=')
     }
     finally {
       view.close()
@@ -154,23 +231,23 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
 })
 
 describe.skipIf(skip !== null)('signing in in a browser (A-103, A-111)', () => {
-  // The refusal an unverified account gets is deliberately generic, so the way back has to be
-  // standing on the screen rather than in the message (0026).
-  test('the sign-in screen offers the confirmation email again', async () => {
-    const email = await registerFresh('resend', false)
+  // The refusal an unverified account gets is deliberately generic, so it points to the emailed
+  // link, which confirms the address as it signs in (0026, 0103).
+  test('a refused password points to the emailed link, and the link gets an unconfirmed address in', async () => {
+    const email = await registerFresh('refused', false)
     const view = await open('/sign-in')
     try {
       await fill(view, SIGN_IN_FORM, email)
       await fill(view, PASSWORD_FIELD, password)
       await click(view, SUBMIT)
-      await waitFor(view, 'document.querySelector(\'[data-test="resend-verification"]\')')
+      await waitFor(view, 'document.body.innerText.includes("do not match")')
+      expect(await textOf(view, '[data-test="sign-in-refused"]')).toContain('Email me a sign-in link')
 
-      await click(view, '[data-test="resend-verification"]')
-      await fill(view, SIGN_IN_FORM, email)
-      await click(view, SUBMIT)
-
+      await click(view, EMAIL_ME_A_LINK)
       await waitFor(view, 'document.querySelector(\'[data-test="check-your-email"]\')')
-      expect(verifiedFlag(email)).toBe(0)
+      await view.navigate(`${app.baseURL}${await linkSentTo(email, '/magic')}`)
+      await waitFor(view, SIGNED_IN, 30_000)
+      expect(verifiedFlag(email)).toBe(1)
     }
     finally {
       view.close()
@@ -208,16 +285,18 @@ describe.skipIf(skip !== null)('signing in in a browser (A-103, A-111)', () => {
     }
   }, CASE_TIMEOUT_MS)
 
-  // The one deliberate enumeration exception, and the screen has to say something useful
-  // (A-103 criterion 2).
-  test('a Workspace address is sent to Google rather than refused as a wrong password', async () => {
+  // No password field is ever drawn for a theatre address, so none can be typed there (0008,
+  // 0103). Without Google credentials the route comes straight back refused, which also counts.
+  test('a Workspace address is offered Google alone, and continuing goes to Google', async () => {
     const view = await open('/sign-in')
     try {
       await fill(view, SIGN_IN_FORM, `someone@${WORKSPACE_DOMAIN}`)
-      await fill(view, PASSWORD_FIELD, password)
-      await click(view, SUBMIT)
+      await waitFor(view, 'document.querySelector(\'[data-test="google-sign-in"]\')')
+      expect(await view.evaluate<number>(`document.querySelectorAll('input[type="password"]').length`)).toBe(0)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('${EMAIL_ME_A_LINK}'))`)).toBe(false)
 
-      await waitFor(view, 'document.body.innerText.includes("Google")')
+      await click(view, '[data-test="google-sign-in"]')
+      await waitFor(view, `location.host !== ${JSON.stringify(new URL(app.baseURL).host)} || location.search.includes('refused=google')`, 30_000)
     }
     finally {
       view.close()
@@ -272,17 +351,18 @@ describe.skipIf(skip !== null)('signing in in a browser (A-103, A-111)', () => {
 })
 
 describe.skipIf(skip !== null)('the links that arrive by email (A-107, A-108)', () => {
-  test('the reset link sets a new password, and the old one stops working', async () => {
+  // Choosing the password is the sign-in: nobody types it a second time straight after (0103).
+  test('the reset link sets a new password, signs in where the person set out for, and the old one stops working', async () => {
     const email = await registerFresh('reset')
     const token = newToken()
     await plantToken(email, 'PASSWORD_RESET', token, 60)
     const replacement = generatePassword()
 
-    const view = await open(`/reset?token=${token}`)
+    const view = await open(`/reset?token=${token}&next=%2Faccount%2Fprofile`)
     try {
       await fill(view, PASSWORD_FIELD, replacement)
       await click(view, SUBMIT)
-      await waitFor(view, 'document.querySelector(\'[data-test="reset-done"]\')')
+      await waitFor(view, `location.pathname === '/account/profile' && ${SIGNED_IN}`, 30_000)
     }
     finally {
       view.close()
@@ -333,6 +413,130 @@ describe.skipIf(skip !== null)('the links that arrive by email (A-107, A-108)', 
     try {
       await waitFor(view, 'document.querySelector(\'[data-test="token-expired"]\')')
       expect(await textOf(view)).not.toContain('Sign out')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('the sign-in screen asks for the address first (0103)', () => {
+  test('before an address it offers the address field alone, and no standing resend step', async () => {
+    const view = await open('/sign-in')
+    try {
+      await waitFor(view, 'document.querySelector(\'[data-test="continue"]\')')
+      expect(await view.evaluate<number>(`document.querySelectorAll('input[type="password"]').length`)).toBe(0)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="resend-verification"]'))`)).toBe(false)
+      expect(await textOf(view)).not.toContain('I did not get my confirmation email')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('any other address is offered the emailed link first, with the password beside it', async () => {
+    const view = await open('/sign-in')
+    try {
+      await fill(view, SIGN_IN_FORM, address('offers'))
+      await waitFor(view, `document.querySelector('${EMAIL_ME_A_LINK}') && document.querySelector('${PASSWORD_FIELD}')`)
+      const order = await view.evaluate<string>(`JSON.stringify({
+        linkFirst: Boolean(document.querySelector('${EMAIL_ME_A_LINK}').compareDocumentPosition(document.querySelector('${PASSWORD_FIELD}')) & Node.DOCUMENT_POSITION_FOLLOWING),
+        linkSubmits: document.querySelector('${EMAIL_ME_A_LINK}').type === 'submit',
+        submits: document.querySelectorAll('${SUBMIT}').length,
+      })`)
+      expect(JSON.parse(order)).toEqual({ linkFirst: true, linkSubmits: false, submits: 1 })
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('every control on the screen is at least 44 pixels tall on a phone', async () => {
+    const view = await openSignedOutView(app.baseURL, { width: 500, height: 900 })
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, SIGN_IN_FORM, address('thumbs'))
+      await waitFor(view, `document.querySelector('${PASSWORD_FIELD}')`)
+      const small = await view.evaluate<string>(`JSON.stringify(
+        [...document.querySelectorAll('[data-test="sign-in"] :is(input, button, a)')]
+          .filter(control => control.getClientRects().length > 0)
+          .map(control => ({ control: control.innerText || control.getAttribute('type'), height: control.getBoundingClientRect().height }))
+          .filter(found => found.height < 44))`)
+      expect(JSON.parse(small)).toEqual([])
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('every emailed link carries next (0103)', () => {
+  test('the sign-in link returns to where the person set out from', async () => {
+    const email = await registerFresh('link-next')
+    const view = await open('/sign-in?next=%2Faccount%2Fprofile')
+    try {
+      await fill(view, SIGN_IN_FORM, email)
+      await click(view, EMAIL_ME_A_LINK)
+      await waitFor(view, 'document.querySelector(\'[data-test="check-your-email"]\')')
+
+      const link = await linkSentTo(email, '/magic')
+      expect(link).toContain('next=%2Faccount%2Fprofile')
+      await view.navigate(`${app.baseURL}${link}`)
+      await waitFor(view, `location.pathname === '/account/profile' && ${SIGNED_IN}`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the forgotten-password step sends a reset link that carries next', async () => {
+    const email = await registerFresh('reset-next')
+    const view = await open('/sign-in?method=reset&next=%2Faccount%2Fprofile')
+    try {
+      await fill(view, SIGN_IN_FORM, email)
+      await click(view, SUBMIT)
+      await waitFor(view, 'document.querySelector(\'[data-test="check-your-email"]\')')
+      expect(await linkSentTo(email, '/reset')).toContain('next=%2Faccount%2Fprofile')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // Registering, then choosing, then signing in was three passwords for one guest (issue 1339).
+  test('a guest claiming their bookings chooses a password once and is signed in', async () => {
+    const email = address('claim')
+    guest(email)
+    const token = newToken()
+    await plantToken(email, 'SET_PASSWORD', token, 60)
+
+    const view = await open(`/reset?token=${token}&kind=set&next=%2Fmy`)
+    try {
+      await fill(view, PASSWORD_FIELD, generatePassword())
+      await click(view, SUBMIT)
+      await waitFor(view, `location.pathname === '/my' && ${SIGNED_IN}`, 30_000)
+      expect(verifiedFlag(email)).toBe(1)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a reset on an account with a factor is challenged before it signs in', async () => {
+    const email = await registerFresh('reset-mfa')
+    const secret = await withFactor(email)
+    const token = newToken()
+    await plantToken(email, 'PASSWORD_RESET', token, 60)
+
+    const view = await open(`/reset?token=${token}`)
+    try {
+      await fill(view, PASSWORD_FIELD, generatePassword())
+      await click(view, SUBMIT)
+      await waitFor(view, `document.querySelectorAll('${CHALLENGE}').length >= 6`)
+      expect(await textOf(view)).not.toContain('Sign out')
+
+      await fillPin(view, CHALLENGE, await nextCode(secret))
+      await waitFor(view, SIGNED_IN)
     }
     finally {
       view.close()

@@ -64,7 +64,7 @@ Open questions for the committee:
 - Story: As a returning member, I want to sign in with my email and password so that I can reach my account without ceremony.
 - Depends on: A-101
 - Acceptance criteria:
-  1. Every failure (unknown address, wrong password, password-less account, disabled account, unverified address) returns an identical 401, and a dummy password verification always runs so response timing is not an oracle. Amended 29 August 2026: an unverified address joined the list rather than gaining a message of its own, and the way back is a standing resend step on the sign-in screen (0026).
+  1. Every failure (unknown address, wrong password, password-less account, disabled account, unverified address) returns an identical 401, and a dummy password verification always runs so response timing is not an oracle. Amended 29 August 2026: an unverified address joined the list rather than gaining a message of its own, and the way back is a standing resend step on the sign-in screen (0026). Amended 27 September 2026: the standing resend step goes. The screen asks for the address first and offers the emailed sign-in link before the password; the refusal points to that link, which confirms the address as it signs in (0103).
   2. A @newtheatre.org.uk address returns 403 directing the user to Google sign-in: the one deliberate enumeration exception.
   3. If the account has any confirmed second factor, no session is created; the response carries an MFA attempt with a 5-minute lifetime instead (A-111).
   4. Rate limits of 20 attempts per 15 minutes per IP and 10 per 15 minutes per account are enforced.

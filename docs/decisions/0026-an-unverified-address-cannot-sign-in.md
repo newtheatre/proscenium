@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-08-29
+- Superseded in part by 0103: the standing resend step on the sign-in screen goes, and the emailed
+  sign-in link is the way back for an unconfirmed address
 
 ## Context
 
