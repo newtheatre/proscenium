@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { unclosedCandidatesQuery } from '#server/utils/night-auto-close'
+import { autoCloseFrom, unclosedCandidatesQuery } from '#server/utils/night-auto-close'
 import { signOffStatement } from '#server/utils/night-signoff'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -28,8 +28,8 @@ function run(database: TestDatabase, statement: SQL): Record<string, unknown>[] 
 
 const NIGHT = '2026-09-01'
 const NIGHT_END = showNightBounds(NIGHT).to
-// The first night the new system ran for real: everything above sits on or after it.
-const FROM = Math.floor(showNightBounds(NIGHT).from.getTime() / 1000)
+// The first night the new system ran for real: NIGHT's own 04:00 start.
+const FROM = autoCloseFrom(NIGHT)!
 
 const REPORT: NightReport = {
   performanceId: 'placeholder',

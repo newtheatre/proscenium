@@ -47,9 +47,16 @@ export function autoCloseDeadline(startsAt: number): { night: string, deadline: 
 
 export async function performancesDueAutoClose(at: Date = new Date()): Promise<DuePerformance[]> {
   const now = Math.floor(at.getTime() / 1000)
-  // Unset, the read warns in the operator log on every run, which is the nudge to set it.
-  const from = autoCloseFrom(await configValue(undefined, 'AUTO_CLOSE_FROM_NIGHT').catch(() => null))
-  if (from === null) return []
+  // Unset closes nothing and warns, the nudge to set it; only the unset refusal (503) is caught,
+  // so a failed read throws rather than looking like a quiet night.
+  const from = autoCloseFrom(await configValue(undefined, 'AUTO_CLOSE_FROM_NIGHT').catch((error: unknown) => {
+    if ((error as { statusCode?: number }).statusCode === 503) return null
+    throw error
+  }))
+  if (from === null) {
+    console.warn('configuration: AUTO_CLOSE_FROM_NIGHT is unset; nights:close closes nothing')
+    return []
+  }
   const candidates = await db.all<UnclosedCandidateRow>(unclosedCandidatesQuery(now, from))
 
   const due: DuePerformance[] = []
