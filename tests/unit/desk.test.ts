@@ -416,3 +416,43 @@ describe('a comp the desk cannot collect says why', () => {
     expect(new Set(said).size).toBe(said.length)
   })
 })
+
+// One results column as the screen writes it, from its id to the next column's.
+async function resultColumn(id: string): Promise<string> {
+  const source = await Bun.file('app/pages/box-office/desk.vue').text()
+  const block = source.slice(source.indexOf('const resultColumns'))
+  const columns = block.slice(0, block.indexOf('\n]\n'))
+  const start = columns.indexOf(`id: '${id}'`)
+  expect(start).toBeGreaterThan(-1)
+  const next = columns.indexOf('id: \'', start + 1)
+  return columns.slice(start, next === -1 ? undefined : next)
+}
+
+// K-123 criterion 10: beside the Tonight card the results scrolled sideways and put a row's Open
+// out of view, at whatever window width the resizable sidebar left the card.
+describe('every result row keeps Open in view beside the Tonight card (K-123 criterion 10)', () => {
+  test('the results table is sized by its own width, not the window\'s', async () => {
+    const source = await Bun.file('app/pages/box-office/desk.vue').text()
+    const table = /<UTable\b[^>]*data-test="desk-results"[^>]*>/.exec(source)?.[0] ?? ''
+    expect(table).toContain('@container')
+  })
+
+  test('Booked by drops while the table is narrow, and the name moves under the reference', async () => {
+    expect(await resultColumn('booker')).toContain('HIDE_BELOW_TABLE_2XL')
+    const reference = await resultColumn('reference')
+    expect(reference).toContain('SHOW_BELOW_TABLE_2XL')
+    expect(reference).toContain('bookerName')
+    expect(reference).toContain('whitespace-normal')
+  })
+
+  test('a long state wraps inside its column rather than pushing Open along', async () => {
+    const status = await resultColumn('status')
+    expect(status).toContain('whitespace-normal')
+    expect(status.match(/\.\.\.WRAPPING_BADGE/g) ?? []).toHaveLength(2)
+  })
+
+  test('the total and Open each keep to one line', async () => {
+    expect(await resultColumn('total')).toContain('meta: RIGHT_ALIGNED,')
+    expect(await resultColumn('act')).toContain('meta: ACTIONS_COLUMN,')
+  })
+})
