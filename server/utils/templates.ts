@@ -657,7 +657,8 @@ The Nottingham New Theatre`,
     subject: `Night report signed off: ${context.venueName}, ${context.night}`,
     html: layout(`<p>Tonight's report at ${context.venueName} was signed off by ${context.signedByName}
 ${context.officerBypass ? '(an officer, standing in for the duty manager)' : ''}.</p>
-<p>Closing note: ${context.closingNote}</p>`),
+<p>Closing note:</p>
+${paragraphs(String(context.closingNote))}`),
     text: `Tonight's report at ${context.venueName} was signed off by ${context.signedByName}${context.officerBypass ? ' (an officer, standing in for the duty manager)' : ''}.
 
 Closing note: ${context.closingNote}
@@ -668,7 +669,7 @@ The Nottingham New Theatre`,
   'night-report-addendum': (context: TemplateContext): Rendered => ({
     subject: `Correction to the ${context.night} report: ${context.venueName}`,
     html: layout(`<p>A correction was added to the signed-off report at ${context.venueName}, ${context.night}, by ${context.addedByName}.</p>
-<p>${context.note}</p>`),
+${paragraphs(String(context.note))}`),
     text: `A correction was added to the signed-off report at ${context.venueName}, ${context.night}, by ${context.addedByName}.
 
 ${context.note}
@@ -682,7 +683,7 @@ The Nottingham New Theatre`,
     subject: `Nobody signed off the night report: ${context.venueName}, ${context.night}`,
     html: layout(`<p>Tonight's report at ${context.venueName} closed itself, twenty-four hours after the show
 night ended with nobody signing it off.</p>
-<p>${context.closingNote}</p>`),
+${paragraphs(String(context.closingNote))}`),
     text: `Tonight's report at ${context.venueName} closed itself, twenty-four hours after the show night
 ended with nobody signing it off.
 

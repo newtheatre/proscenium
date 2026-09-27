@@ -566,6 +566,18 @@ describe('every typed value is escaped in the HTML part, and only there (issue 1
     expect(rendered.text).toContain('One <b>\n\nTwo & three')
   })
 
+  // A closing note or a correction is typed prose: its paragraphs and line breaks reach the
+  // letter as they were written (E-124 criteria 3 and 5, E-125 criterion 3).
+  for (const [template, field] of [['night-report-signed', 'closingNote'], ['night-report-addendum', 'note'], ['night-report-auto-closed', 'closingNote']] as const) {
+    test(`${template} keeps the note's paragraphs, escaped once`, () => {
+      const note = 'Full house <b>\n\nBar ran out & closed early\nLate finish'
+      const rendered = render(template, { ...EVERYTHING, [field]: note })
+      expect(rendered.html).toContain('<p>Full house &lt;b&gt;</p>')
+      expect(rendered.html).toContain('<p>Bar ran out &amp; closed early<br>Late finish</p>')
+      expect(rendered.text).toContain(note)
+    })
+  }
+
   test('a link keeps its address, escaped for the attribute it sits in', () => {
     const rendered = render('membership-expiring', { ...EVERYTHING, purchaseUrl: 'https://su.example.invalid/buy?a=1&b=2' })
     expect(rendered.html).toContain('href="https://su.example.invalid/buy?a=1&amp;b=2"')
