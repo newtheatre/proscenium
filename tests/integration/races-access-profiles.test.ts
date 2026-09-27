@@ -138,8 +138,7 @@ describe('a member\'s save lands only on the declaration it read (0003)', () => 
   })
 })
 
-// A tombstone past its days, then the member declares again after the sweep read it: the DELETE
-// as sweepWithdrawnAccessProfiles runs it, then its purge entry, which lands only if it applied.
+// The DELETE as sweepWithdrawnAccessProfiles runs it, then its purge entry, which lands only if it applied.
 function purge(database: TestDatabase, userId: string, cutoff: number): unknown[] {
   const gone = run(database, sql`
     DELETE FROM access_profiles WHERE user_id = ${userId} AND ${overdueTombstone(cutoff)}
@@ -158,7 +157,7 @@ describe('the sweep purges only a profile still withdrawn when it deletes (D-127
       'WITHDRAWN', CUTOFF - 3600, userId]])
   }
 
-  const purged = (database: TestDatabase, userId: string): unknown[] =>
+  const purgeEntries = (database: TestDatabase, userId: string): unknown[] =>
     rows(database, `SELECT id FROM audit_log WHERE action = 'access-profile.tombstone.purged' AND target = ?`, `user:${userId}`)
 
   test('a profile declared again after the sweep read it survives, and no purge is recorded', async () => {
@@ -172,7 +171,7 @@ describe('the sweep purges only a profile still withdrawn when it deletes (D-127
 
       expect(purge(database, 'u-back', CUTOFF)).toEqual([])
       expect(rows<{ status: string }>(database, 'SELECT status FROM access_profiles WHERE user_id = ?', 'u-back')).toEqual([{ status: 'PENDING' }])
-      expect(purged(database, 'u-back')).toEqual([])
+      expect(purgeEntries(database, 'u-back')).toEqual([])
     }
     finally {
       database.close()
@@ -185,7 +184,7 @@ describe('the sweep purges only a profile still withdrawn when it deletes (D-127
       withdrawn(database, 'u-gone')
       expect(purge(database, 'u-gone', CUTOFF)).toHaveLength(1)
       expect(rows(database, 'SELECT user_id FROM access_profiles WHERE user_id = ?', 'u-gone')).toEqual([])
-      expect(purged(database, 'u-gone')).toHaveLength(1)
+      expect(purgeEntries(database, 'u-gone')).toHaveLength(1)
     }
     finally {
       database.close()
@@ -197,7 +196,7 @@ describe('the sweep purges only a profile still withdrawn when it deletes (D-127
     try {
       withdrawn(database, 'u-recent')
       expect(purge(database, 'u-recent', CUTOFF - 7200)).toEqual([])
-      expect(purged(database, 'u-recent')).toEqual([])
+      expect(purgeEntries(database, 'u-recent')).toEqual([])
     }
     finally {
       database.close()
