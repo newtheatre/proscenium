@@ -205,6 +205,13 @@ describe.skipIf(skip !== null)('the emergency card names who to ring after 999 (
     return read<{ venue_id: string }>('SELECT venue_id FROM performances WHERE id = ?', performanceId)!.venue_id
   }
 
+  interface OnCall { name: string, phone: string }
+
+  async function onCall(response: Response, venueId: string): Promise<OnCall[] | null | undefined> {
+    const { cards } = await response.json() as { cards: { venueId: string, dutyManagers: OnCall[] | null }[] }
+    return cards.find(card => card.venueId === venueId)?.dutyManagers
+  }
+
   test('a consenting duty manager on tonight\'s rota is on the card the door opens', async () => {
     const door = await registerMember(app, 'door-emergency', generatePassword())
     const dutyManager = await registerMember(app, 'dm-emergency', generatePassword())
@@ -218,8 +225,13 @@ describe.skipIf(skip !== null)('the emergency card names who to ring after 999 (
 
     const answered = await send('GET', '/api/tonight/emergency', undefined, door.cookie)
     expect(answered.status).toBe(200)
-    const body = await answered.json() as { dutyManagers: { name: string, phone: string }[] }
-    expect(body.dutyManagers).toEqual([{ name: dutyManager.name, phone: '07700 900333' }])
+    expect(await onCall(answered, venueOf(house.performanceId))).toEqual([{ name: dutyManager.name, phone: '07700 900333' }])
+
+    // The card is anyone's, the number only tonight's team's (issue 1310, A-114).
+    const member = await registerMember(app, 'member-emergency', generatePassword())
+    const toMember = await send('GET', '/api/tonight/emergency', undefined, member.cookie)
+    expect(toMember.status).toBe(200)
+    expect(await onCall(toMember, venueOf(house.performanceId))).toBeNull()
   })
 
   test('a duty manager who has not shared a number leaves the card with none (A-114)', async () => {
@@ -230,8 +242,6 @@ describe.skipIf(skip !== null)('the emergency card names who to ring after 999 (
     shift(house.performanceId, 'DUTY_MANAGER', dutyManager.id)
     card(venueOf(house.performanceId), 'vei-emergency-quiet')
 
-    const body = await (await send('GET', '/api/tonight/emergency', undefined, door.cookie)).json() as
-      { dutyManagers: { name: string, phone: string }[] }
-    expect(body.dutyManagers).toEqual([])
+    expect(await onCall(await send('GET', '/api/tonight/emergency', undefined, door.cookie), venueOf(house.performanceId))).toEqual([])
   })
 })
