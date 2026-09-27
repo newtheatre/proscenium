@@ -115,12 +115,13 @@ export const declineAccessProfileForm = z.strictObject({
 
 export type DeclineAccessProfileInput = z.output<typeof declineAccessProfileForm>
 
-// The declaration the officer decided on: its payload's IV, fresh on every save of it and untouched
-// by a consent switch. Null for a row never encrypted (issue 1383, 0003).
+// The declaration a decision or a save was made over: its payload's IV, fresh on every save and
+// every decision, untouched by a consent switch; null for none read or none encrypted (0003).
 const decidedOn = { version: z.string().nullable() }
 
 export const verifyAccessProfileRequest = verifyAccessProfileForm.extend(decidedOn)
 export const declineAccessProfileRequest = declineAccessProfileForm.extend(decidedOn)
+export const declareAccessProfileRequest = declareAccessProfileForm.extend(decidedOn)
 
 // The declaration and where it stands: every flag, both notes and the card number.
 export interface AccessProfileDeclaration {
@@ -138,6 +139,8 @@ export interface AccessProfileDeclaration {
 // What the owner sees of their own declaration: the lot, and a decline's reason (D-127 criterion 8).
 export interface OwnAccessProfile extends AccessProfileDeclaration {
   declineReason: string | null
+  // What the page sends back with a save, so a decision since it loaded refuses it (0003).
+  version: string | null
 }
 
 // What a staff surface may ever see: the agreed wording, once every gate holds, and nothing that

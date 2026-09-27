@@ -44,7 +44,10 @@ async function load(): Promise<void> {
 async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<void> {
   saving.value = true
   try {
-    const { repended } = await $fetch<{ repended: boolean }>('/api/account/access-profile', { method: 'PUT', body: event.data })
+    const { repended } = await $fetch<{ repended: boolean }>('/api/account/access-profile', {
+      method: 'PUT',
+      body: { ...event.data, version: profile.value?.version ?? null },
+    })
     toast.add({
       title: repended ? 'Access profile saved' : 'Nothing has changed',
       description: repended
@@ -58,9 +61,14 @@ async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<
     await load()
   }
   catch (error) {
-    toast.add({ title: refusalText(error), color: 'error' })
-    // Decided while this was being saved: show what stands now, so the member saves over that.
-    if (refusalStatus(error) === 409) await load()
+    const raced = refusalStatus(error) === 409
+    toast.add({
+      title: refusalText(error),
+      description: raced ? 'What you typed was not saved. The form now shows your requirements as they stand.' : undefined,
+      color: 'error',
+    })
+    // Decided since the page loaded: show what stands now, so the member saves over that.
+    if (raced) await load()
   }
   finally {
     saving.value = false
