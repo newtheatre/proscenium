@@ -57,6 +57,14 @@ describe('the personas cover the states that are easy to forget', () => {
     expect(new Set(PERSONAS.map(persona => persona.shape))).toEqual(new Set(['full', 'guest', 'tombstone']))
   })
 
+  // The room forms refuse before they are filled in without one (issue 1338), so their pictures
+  // need somebody who holds one; the ordinary member deliberately holds none.
+  test('one persona holds a current membership, and the ordinary member does not', () => {
+    expect(PERSONAS.filter(persona => persona.membership === 'CURRENT').map(persona => persona.email))
+      .toEqual(['dev-booker@e2e.newtheatre.org.uk'])
+    expect(PERSONAS.find(persona => persona.email === 'dev-member@e2e.newtheatre.org.uk')?.membership).toBeUndefined()
+  })
+
   test('every persona says what it is for, and none shares an address', () => {
     for (const persona of PERSONAS) expect(persona.describes.length).toBeGreaterThan(20)
     expect(new Set(PERSONAS.map(persona => persona.email)).size).toBe(PERSONAS.length)
