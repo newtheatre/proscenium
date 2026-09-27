@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
-import { MAX_BASKET_LINE_QTY, lineNeedsCheckId } from '#shared/utils/sale'
+import { MAX_BASKET_LINE_QTY, lineNeedsCheckId, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
 import { refusalText, writeFailureText } from '../utils/refusal'
 import type { ComputedRef, Ref } from 'vue'
 import type { InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
@@ -83,7 +83,7 @@ export function useTillBasket(deps: TillBasketDeps) {
       })
       lastAdded.value = { lineId: id, said }
     }
-    askIfRestricted(productName, { variantId: variant.id, choiceItemId })
+    askIfRestricted(saysPouredLine({ productName, choiceItemName }), { variantId: variant.id, choiceItemId })
   }
 
   function undoLastAdded(): void {
@@ -94,10 +94,10 @@ export function useTillBasket(deps: TillBasketDeps) {
 
   // Before the drink is poured, not at the charge (F-106 criterion 6). A sale that already
   // passed does not ask again; a refusal is not a pass, so a later restricted tap asks afresh.
-  function askIfRestricted(productName: string, line: RestrictableLine): void {
+  function askIfRestricted(poured: string, line: RestrictableLine): void {
     if (!isLineRestricted(line) || passedAgeCheck.value) return
     refusalRecordFailure.value = null
-    askingAgeCheckFor.value = productName
+    askingAgeCheckFor.value = poured
   }
 
   const choosing = ref<{ productName: string, variant: SaleVariant, choice: SaleChoice } | null>(null)
@@ -249,7 +249,7 @@ export function useTillBasket(deps: TillBasketDeps) {
   // that may never be made: a basket left with nothing in it still owes the licence a record.
   async function refuseAgeCheck(outcome: InlineAgeCheckInput): Promise<void> {
     const removed = basket.value.filter(isLineRestricted)
-    const names = [...new Set(removed.map(line => line.productName))].join(', ')
+    const names = saysPouredLines(removed)
     basket.value = basket.value.filter(line => !isLineRestricted(line))
     askingAgeCheckFor.value = null
     refusedLinesNote.value = names ? `ID refused. Not sold: ${names}` : null

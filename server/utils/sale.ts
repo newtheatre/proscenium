@@ -6,7 +6,7 @@ import { createError } from 'h3'
 import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, onHandOfItems, resolvedPriceColumns } from '#server/utils/bar'
 import { stockCounted, tillServings } from '#server/utils/bar-linkage'
 import { chunked } from '#shared/utils/approvals'
-import { NOT_ENOUGH_STOCK, checkIdFor, choiceWithStock, stockShortOf, variantStock } from '#shared/utils/sale'
+import { NOT_ENOUGH_STOCK, checkIdFor, choiceWithStock, saysPouredLine, saysPouredLines, stockShortOf, variantStock } from '#shared/utils/sale'
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { discountedPence } from '#shared/utils/discounts'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
@@ -566,7 +566,7 @@ async function prepareSale(
 
   // No route sells a restricted line without an outcome on record first (F-106 criteria 1, 5).
   if (restricted.length > 0 && !ageCheck) {
-    const names = [...new Set(restricted.map(index => priced[index]!.productName))]
+    const names = [...new Set(restricted.map(index => saysPouredLine(priced[index]!)))]
     throw createError({
       statusCode: 409,
       statusMessage: `${names.join(' and ')} ${names.length === 1 ? 'needs' : 'need'} a Challenge 25 outcome before this can be charged`,
@@ -869,7 +869,7 @@ function ageCheckStatements(
     idType: ageCheck.idType,
     reason: ageCheck.reason,
     description: ageCheck.description,
-    product: [...new Set(restricted.map(index => priced[index]!.productName))].join(', '),
+    product: saysPouredLines(restricted.map(index => priced[index]!)),
     notes: ageCheck.notes,
   }, id)
   const audit = db.insert(schema.auditLog).values(auditEntry({ actorId, action: 'age-check.logged', target: `age-check:${id}`, detail: { outcome: ageCheck.outcome } }))
@@ -916,7 +916,7 @@ export async function commitCompSale(
   const { restricted, sold } = saleableAfterAgeCheck(resolved, priced, ageCheck)
 
   if (restricted.length > 0 && !ageCheck) {
-    const names = [...new Set(restricted.map(index => priced[index]!.productName))]
+    const names = [...new Set(restricted.map(index => saysPouredLine(priced[index]!)))]
     throw createError({
       statusCode: 409,
       statusMessage: `${names.join(' and ')} ${names.length === 1 ? 'needs' : 'need'} a Challenge 25 outcome before this can be given`,
