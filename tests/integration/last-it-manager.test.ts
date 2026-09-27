@@ -79,6 +79,21 @@ describe('the statement\'s predicate is the rule the code reads', () => {
     })
   })
 
+  // A-120 criterion 6: grants only on unusable accounts leave nobody to strand, so anyone may go.
+  test('with no usable IT Manager at all, the statement and the code both let every account go', async () => {
+    await withDatabase((database) => {
+      itManager(database, 'dis', null, { disabled: true })
+      itManager(database, 'pen', null, { waiting: true })
+      itManager(database, 'old', NOW - 60)
+      account(database, 'cal')
+      expect(holders(database)).toEqual([])
+      for (const userId of ['dis', 'pen', 'old', 'cal']) {
+        expect(`${userId}: ${holds(database, keepsAnItManagerWhere(userId, NOW))}`).toBe(`${userId}: true`)
+        expect(`${userId}: ${strandingBy(holders(database), userId)}`).toBe(`${userId}: null`)
+      }
+    })
+  })
+
   test('with every grant dated, no holder may go, and a non-holder always may', async () => {
     await withDatabase((database) => {
       itManager(database, 'ada', LATER)

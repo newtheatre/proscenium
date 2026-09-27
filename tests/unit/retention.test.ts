@@ -88,3 +88,12 @@ describe('days until the threshold (criteria 1, 2)', () => {
     expect(daysUntilRetentionThreshold(lastActive, 3, now)).toBeGreaterThan(0)
   })
 })
+
+// A-120 criterion 6: a refused erasure is counted and the run carries on, as the unverified sweep does.
+describe('the sweep carries on past a refused erasure', () => {
+  test('each erasure is caught and counted, never thrown out of the run', async () => {
+    const source = await Bun.file('server/utils/retention.ts').text()
+    expect(source).toMatch(/try \{\s*const outcome = await eraseAccount\(row\.id, null\)/)
+    expect(source).toContain('run.refused++')
+  })
+})

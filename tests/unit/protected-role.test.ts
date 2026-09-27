@@ -33,6 +33,11 @@ describe('removing an IT Manager is refused when it would leave none that cannot
     expect(strandingBy([permanent('ada')], 'cal')).toBeNull()
   })
 
+  // A-120 criterion 6: with nobody usable at all, taking a non-holder away strands nothing more.
+  test('with no usable IT Manager at all, an account holding none is still never refused', () => {
+    expect(strandingBy([], 'cal')).toBeNull()
+  })
+
   test('each refusal says what to do first', () => {
     expect(strandingRefusal('last', 'revoking')).toBe('That is the last IT Manager: grant another before revoking this one')
     expect(strandingRefusal('last', 'merging')).toBe('That is the last IT Manager: grant another before merging this one away')
