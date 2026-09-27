@@ -4,6 +4,8 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { daysAfter } from '#shared/utils/membership'
+import { currentShowNight } from '#shared/utils/show-night'
 import { click, fill, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -356,5 +358,32 @@ describe.skipIf(skip !== null)('a joined phone and the ends of the board (issue 
     const houseOpen = types.find(type => type.label === 'House open')!
     const refused = await request(app, 'POST', '/api/board/messages', { milestoneTypeId: houseOpen.id, composedAt: Math.floor(Date.now() / 1000) }, deviceCookie)
     expect(refused.status).toBe(400)
+  })
+})
+
+// Issue 1312: a phone joined before 04:00 belongs to that night, so once 04:00 passes it is
+// refused and told to join tonight's board. Last, because it moves the venue's night row.
+describe.skipIf(skip !== null)('a device from last night (issue 1312)', () => {
+  test('works on its own night, and is refused with the reason once that night is over', async () => {
+    const { deviceCookie } = await joinAs('Fly floor')
+    expect((await request(app, 'GET', '/api/board/config', undefined, deviceCookie)).status).toBe(200)
+
+    // What 04:00 does to a device: the night it joined becomes last night.
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('UPDATE backstage_nights SET night = ? WHERE id = (SELECT night_id FROM backstage_devices WHERE label = ?)')
+        .run(daysAfter(currentShowNight(), -1), 'Fly floor')
+    }
+    finally {
+      database.close()
+    }
+
+    for (const path of ['/api/board/config', '/api/board/messages']) {
+      const refused = await request(app, 'GET', path, undefined, deviceCookie)
+      expect(refused.status).toBe(401)
+      expect((await refused.json() as { statusMessage: string }).statusMessage).toBe('This board was for last night: join tonight\'s with the new code')
+    }
+    const posted = await request(app, 'POST', '/api/board/messages', { body: 'Still here?', composedAt: Math.floor(Date.now() / 1000) }, deviceCookie)
+    expect(posted.status).toBe(401)
   })
 })
