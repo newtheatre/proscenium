@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
-import { tonightsPerformance } from '#tests/helpers/programme'
+import { curtainDown, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { saysBlockedClose } from '#shared/utils/checklist'
-import { saysIncidentsMoved } from '#shared/utils/night-signoff'
+import { saysIncidentsMoved, saysSignOffOpens } from '#shared/utils/night-signoff'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -70,15 +70,39 @@ function shift(performanceId: string, role: string, userId: string, status = 'CO
     `${performanceId}-${role}`, performanceId, role, userId, status)
 }
 
+// Sign off and close opens once the curtain is down, on the server too (issue 1315).
+function afterCurtain<T extends { performanceId: string }>(made: T): T {
+  withBatch(runner => curtainDown(runner, made.performanceId))
+  return made
+}
+
 function said(body: { statusMessage?: string, message?: string }): string {
   return body.statusMessage ?? body.message ?? ''
 }
+
+// Issue 1315 hid the button until the curtain is down; hiding it is never the enforcement.
+describe.skipIf(skip !== null)('the sign-off opens once the curtain is down (issue 1315)', () => {
+  test('before the curtain it is refused naming when it opens, and nothing is frozen', async () => {
+    const dm = await registerMember(app, 'signoff-early-dm', generatePassword())
+    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-early' }))
+    shift(performanceId, 'DUTY_MANAGER', dm.id)
+
+    const { curtainDownAt } = await (await send('GET', `/api/tonight/report?performanceId=${performanceId}`, undefined, dm.cookie)).json() as { curtainDownAt: number }
+    const early = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Too soon', incidentsSeen: 0 }, dm.cookie)
+    expect(early.status).toBe(409)
+    expect(said(await early.json() as { statusMessage?: string })).toBe(saysSignOffOpens(curtainDownAt))
+    expect(read('SELECT id FROM night_reports WHERE performance_id = ?', performanceId)).toEqual([])
+
+    afterCurtain({ performanceId })
+    expect((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Now', incidentsSeen: 0 }, dm.cookie)).status).toBe(200)
+  })
+})
 
 // Issue 1315: Sign off and close answers the checklist, the incidents and the freeze in one press.
 describe.skipIf(skip !== null)('one Sign off and close (criterion 1, E-114 criteria 3 and 4)', () => {
   test('refuses naming a required item still open, then closes the checklist, reviews the incidents and freezes', async () => {
     const dm = await registerMember(app, 'signoff-close-dm', generatePassword())
-    const { performanceId, venueId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-close' }))
+    const { performanceId, venueId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-close' })))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
     expect((await send('POST', '/api/admin/checklist/items', { venueId, phase: 'POST', label: 'Bar locked', sort: 1, required: true })).status).toBe(200)
     expect((await send('POST', '/api/admin/checklist/items', { venueId, phase: 'POST', label: 'Incidents reviewed', sort: 2, required: true, systemCheck: 'INCIDENTS_REVIEWED' })).status).toBe(200)
@@ -107,7 +131,7 @@ describe.skipIf(skip !== null)('one Sign off and close (criterion 1, E-114 crite
 
   test('an incident logged after the report was read refuses, and nothing is closed or reviewed', async () => {
     const dm = await registerMember(app, 'signoff-moved-dm', generatePassword())
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-moved' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-moved' })))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
     await send('POST', '/api/tonight/incidents', { performanceId, category: 'SAFETY', severity: 'NOTE', body: 'Logged at the last minute.' }, dm.cookie)
 
@@ -124,7 +148,7 @@ describe.skipIf(skip !== null)('one Sign off and close (criterion 1, E-114 crite
 describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
   test('freezes a report exactly once for the performance, and a second attempt refuses', async () => {
     const dm = await registerMember(app, 'signoff-once-dm', generatePassword())
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-once' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-once' })))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
 
     const first = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Quiet night', incidentsSeen: 0 }, dm.cookie)
@@ -142,7 +166,7 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
 
   test('two concurrent sign-offs for the same performance produce exactly one row', async () => {
     const dm = await registerMember(app, 'signoff-race-dm', generatePassword())
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-race' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-race' })))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
 
     const [first, second] = await Promise.all([
@@ -157,7 +181,7 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
   })
 
   test('an officer closing instead of the duty manager is flagged as such', async () => {
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-officer' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-officer' })))
 
     const signed = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Covered by an officer', incidentsSeen: 0 })
     expect(signed.status).toBe(200)
@@ -167,7 +191,7 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
 
   test('a door shift holder cannot sign off, and a signed-out caller is refused', async () => {
     const door = await registerMember(app, 'signoff-door', generatePassword())
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-guard' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-guard' })))
     shift(performanceId, 'DOOR', door.id)
 
     expect((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Nope', incidentsSeen: 0 }, door.cookie)).status).toBe(403)
@@ -176,7 +200,7 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
 
   test('records a delivery outcome for the standing recipients and the closer (criterion 4)', async () => {
     const dm = await registerMember(app, 'signoff-deliver-dm', generatePassword())
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-deliver' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-deliver' })))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
 
     const signed = await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Send it', incidentsSeen: 0 }, dm.cookie)
@@ -193,7 +217,7 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
 describe.skipIf(skip !== null)('the report freezes (E-123 criterion 4, E-124 criterion 5)', () => {
   test('a signed report stops recomputing: a later incident does not change it', async () => {
     const dm = await registerMember(app, 'signoff-frozen-dm', generatePassword())
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-frozen' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-frozen' })))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
 
     const before = await send('GET', `/api/tonight/report?performanceId=${performanceId}`, undefined, dm.cookie)
@@ -215,14 +239,14 @@ describe.skipIf(skip !== null)('the report freezes (E-123 criterion 4, E-124 cri
 
 describe.skipIf(skip !== null)('addenda (criterion 5)', () => {
   test('refuses a correction to a performance nobody has signed off yet', async () => {
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-unsigned' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-unsigned' })))
     const refused = await send('POST', '/api/admin/night-reports/addenda', { performanceId, note: 'Too soon' })
     expect(refused.status).toBe(404)
   })
 
   test('adds a correction without editing the frozen report, and it appears on a fresh read', async () => {
     const dm = await registerMember(app, 'addendum-dm', generatePassword())
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-ok' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-ok' })))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
     await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Original note', incidentsSeen: 0 }, dm.cookie)
 
@@ -244,7 +268,7 @@ describe.skipIf(skip !== null)('addenda (criterion 5)', () => {
   test('a member with no standing authority cannot add a correction', async () => {
     const stranger = await registerMember(app, 'addendum-stranger', generatePassword())
     const dm = await registerMember(app, 'addendum-guard-dm', generatePassword())
-    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-guard' }))
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-guard' })))
     shift(performanceId, 'DUTY_MANAGER', dm.id)
     await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Note', incidentsSeen: 0 }, dm.cookie)
 
