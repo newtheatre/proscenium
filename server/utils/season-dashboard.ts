@@ -100,14 +100,10 @@ export function revenueBySourceQuery(fromAt: number, toAt: number): SQL {
   `
 }
 
-// The same lines as the rows above, unsplit: the table's total is the ledger's sum, never the page
-// adding up what it was sent (0004).
+// The rows' own query, summed: the table's total can never drift from the rows it heads, and is
+// never the page adding up what it was sent (0004).
 export function revenueTotalQuery(fromAt: number, toAt: number): SQL {
-  return sql`
-    SELECT coalesce(sum(ll.amount_pence), 0) AS totalPence
-    FROM ledger_lines ll JOIN ledger_entries le ON le.id = ll.entry_id
-    WHERE le.tender = 'CARD' AND le.happened_at >= ${fromAt} AND le.happened_at < ${toAt}
-  `
+  return sql`SELECT coalesce(sum(totalPence), 0) AS totalPence FROM (${revenueBySourceQuery(fromAt, toAt)})`
 }
 
 // Keyed off the line's own kind, matching revenue-by-show.ts and night-reconciliation.ts: a
@@ -135,9 +131,12 @@ export function openVarianceQuery(fromDay: string, toDay: string): SQL {
 
 export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary> {
   const bounds = await resolvePeriodBounds(period)
-  const [bySource, [revenueTotal], [refunds], [openVariance], theForegone, missing] = await Promise.all([
-    db.all<RevenueBySource>(revenueBySourceQuery(bounds.fromAt, bounds.toAt)),
-    db.all<{ totalPence: number }>(revenueTotalQuery(bounds.fromAt, bounds.toAt)),
+  const [[bySource, [revenueTotal]], [refunds], [openVariance], theForegone, missing] = await Promise.all([
+    // One batch, so a sale cannot land between the rows and the total they must equal (0001).
+    db.batch([
+      db.all<RevenueBySource>(revenueBySourceQuery(bounds.fromAt, bounds.toAt)),
+      db.all<{ totalPence: number }>(revenueTotalQuery(bounds.fromAt, bounds.toAt)),
+    ]),
     db.all<{ refundsPence: number }>(seasonRefundsQuery(bounds.fromAt, bounds.toAt)),
     db.all<{ openVariancePence: number }>(openVarianceQuery(bounds.fromDay, bounds.toDay)),
     foregone({ scope: 'PERIOD', from: bounds.fromDay, to: bounds.toDay }),
