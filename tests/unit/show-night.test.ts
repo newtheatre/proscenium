@@ -209,7 +209,7 @@ describe('one definition, no second implementation (E-110 criterion 1, 0014)', (
       }
     }
     expect([...owners.values()].flat().every(path => path === 'shared/utils/show-night.ts')).toBe(true)
-    expect([...owners.keys()].sort()).toEqual(['SHOW_NIGHT_START_HOUR', 'currentShowNight', 'isShowNight', 'showNightBounds', 'showNightOf'])
+    expect([...owners.keys()].sort()).toEqual(['SHOW_NIGHT_START_HOUR', 'currentShowNight', 'isShowNight', 'showNightBounds', 'showNightOf', 'showNightStartOf'])
   })
 
   // The likelier defect is not a second export but a boundary written inline in a door route.
