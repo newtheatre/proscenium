@@ -3,7 +3,8 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { configValue } from './configuration'
 import { longestTerm } from './membership-claims'
-import { roomOpenTerms } from './performance-closures'
+import { closedNow, roomOpenTerms } from './performance-closures'
+import { lostWriteCause } from '#shared/utils/blackouts'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING), since D-113 reaches `hasCurrentMembership`.
@@ -73,7 +74,7 @@ export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
 
   if (claimed.length > 0) return { won: true, id }
 
-  // Zero rows written, disambiguated rather than guessed: gone versus beaten (0003).
+  // Zero rows written, disambiguated rather than guessed: gone, closed or beaten (0003).
   return await whyItFailed(input)
 }
 
@@ -143,7 +144,7 @@ export async function editPending(input: EditInput): Promise<EditOutcome> {
   const booking = await bookingFor(input.id)
   if (!booking || booking.userId !== input.userId) return { won: false, why: 'missing' }
   if (booking.status !== 'PENDING_APPROVAL') return { won: false, why: 'settled' }
-  return await whyItFailed({ roomId: input.roomId, startsAt: input.startsAt, endsAt: input.endsAt, exceptId: input.id })
+  return await whyItFailed({ roomId: input.roomId, startsAt: input.startsAt, endsAt: input.endsAt, exceptId: input.id, offsets: input.offsets })
 }
 
 // The morning sweep's writes, guarded on the age it read: an edit that restarted the clock since
@@ -166,16 +167,18 @@ export function chaseStatement(id: string, createdAt: number, now: number): SQL 
   `
 }
 
-async function whyItFailed(input: Parameters<typeof conflictsWith>[0]): Promise<Exclude<ClaimOutcome, { won: true }>> {
+async function whyItFailed(input: Parameters<typeof conflictsWith>[0] & { offsets: ShiftOffsets }): Promise<Exclude<ClaimOutcome, { won: true }>> {
   const [room] = await db.select({ id: schema.rooms.id })
     .from(schema.rooms)
     .where(and(eq(schema.rooms.id, input.roomId), eq(schema.rooms.isActive, true)))
     .limit(1)
 
-  if (!room) return { won: false, why: 'gone' }
-  // Nothing booked in the way leaves the one other predicate the INSERT carries: a closure.
-  const conflicts = await conflictsWith(input)
-  return conflicts.length > 0 ? { won: false, why: 'conflict', conflicts } : { won: false, why: 'closed' }
+  const cause = lostWriteCause({
+    roomLive: Boolean(room),
+    closed: Boolean(room) && await closedNow(input.roomId, input.startsAt, input.endsAt, input.offsets),
+  })
+  if (cause === 'gone' || cause === 'closed') return { won: false, why: cause }
+  return { won: false, why: 'conflict', conflicts: await conflictsWith(input) }
 }
 
 // What is in the way, for the refusal to quote. Masked by the caller, never here: this returns the

@@ -2,8 +2,9 @@ import { db, schema } from '@nuxthub/db'
 import { eq, inArray, sql } from 'drizzle-orm'
 // Named rather than auto-imported, because `tests/` typechecks this file under Bun (0055).
 import { conflictsWith } from './bookings'
-import { roomOpenTerms } from './performance-closures'
+import { closedNow, roomOpenTerms } from './performance-closures'
 import { chunked, refusalToDecide } from '#shared/utils/approvals'
+import { lostWriteCause } from '#shared/utils/blackouts'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 import type { Conflict } from '#shared/utils/bookings'
 import type { ShiftOffsets } from '#shared/utils/rota-times'
@@ -71,7 +72,7 @@ export async function approveOne(id: string, actorId: string, intoRoom: string |
 
   // The alias is not usable in RETURNING, which is why the column is bare (SQLite).
   if (confirmed.length > 0) return { id, ok: true, status: 'CONFIRMED' }
-  return whyItFailed(id, intoRoom)
+  return whyItFailed(id, intoRoom, offsets)
 }
 
 // Built apart from its run so a test can race it against a member's edit on a real schema.
@@ -117,8 +118,9 @@ export async function rejectOne(id: string, actorId: string, reason: string, now
   return whyItFailed(id, null)
 }
 
-// Nothing written, disambiguated rather than guessed: gone, already answered, or beaten to it.
-async function whyItFailed(id: string, intoRoom: string | null): Promise<DecisionOutcome> {
+// Nothing written, disambiguated rather than guessed: gone, already answered, closed or beaten to it.
+// A rejection carries no closure predicate, so it reads none.
+async function whyItFailed(id: string, intoRoom: string | null, offsets?: ShiftOffsets): Promise<DecisionOutcome> {
   const [row] = await selectPending(eq(schema.roomBookings.id, id))
   if (!row) return { id, ok: false, why: 'missing', says: 'That request is no longer there' }
 
@@ -137,8 +139,10 @@ async function whyItFailed(id: string, intoRoom: string | null): Promise<Decisio
     return { id, ok: false, why: 'gone', says: 'That room is no longer bookable' }
   }
 
-  // Nothing booked in the way leaves the one other predicate the approval carries: a closure.
+  const closed = offsets !== undefined && await closedNow(roomId, row.startsAt, row.endsAt, offsets)
+  if (lostWriteCause({ roomLive: true, closed }) === 'closed') {
+    return { id, ok: false, why: 'closed', says: 'The room is closed for that span' }
+  }
   const conflicts = await conflictsWith({ roomId, startsAt: row.startsAt, endsAt: row.endsAt, exceptId: id })
-  if (conflicts.length === 0) return { id, ok: false, why: 'closed', says: 'The room was closed for that span while this was waiting' }
   return { id, ok: false, why: 'conflict', says: 'Somebody took that slot while this was waiting', conflicts }
 }

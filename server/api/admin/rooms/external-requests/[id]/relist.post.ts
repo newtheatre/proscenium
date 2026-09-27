@@ -55,7 +55,10 @@ export default defineEventHandler(async (event) => {
     offsets: await shiftOffsetDefaults(event),
   })
 
-  if (!claim.won && claim.why === 'closed') throw await closedRefusal(event, room.id, request.startsAt, request.endsAt)
+  if (!claim.won && claim.why === 'closed') {
+    throw (await closedOver(event, room.id, request.startsAt, request.endsAt))
+      ?? createError({ statusCode: 409, statusMessage: `Somebody already holds ${room.name} for that span` })
+  }
   if (!claim.won) {
     throw createError({
       statusCode: claim.why === 'gone' ? 410 : 409,

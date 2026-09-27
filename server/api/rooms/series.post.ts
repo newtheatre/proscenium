@@ -3,7 +3,16 @@ import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { bookingTier, maskConflicts } from '#shared/utils/bookings'
 import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { formatLondon } from '#shared/utils/london'
+import type { Blackout } from '#shared/utils/blackouts'
+import type { Occurrence } from '#shared/utils/series'
 import type { OccurrenceRefusal } from '#server/utils/series'
+
+const seconds = (at: Date): number => Math.floor(at.getTime() / 1000)
+
+// The closure over one week of the term, if any, from closures read once for the whole term.
+function closedWeek(shut: Blackout[], roomId: string, one: Occurrence): Blackout | undefined {
+  return blackoutOver(shut, roomId, { startsAt: seconds(one.startsAt), endsAt: seconds(one.endsAt) })
+}
 
 // Book a term of rehearsals as one series.
 export default defineEventHandler(async (event) => {
@@ -43,12 +52,9 @@ export default defineEventHandler(async (event) => {
   const clashes = await conflictsAcross(room.id, occurrences)
   // Read once for the whole term. A blacked-out occurrence is a refusal like any other, so the
   // member skips it explicitly rather than having it dropped for them (criterion 2).
-  const shut = await closuresAcross(
-    event,
-    Math.floor(occurrences[0]!.startsAt.getTime() / 1000),
-    Math.floor(occurrences.at(-1)!.endsAt.getTime() / 1000),
-    room.id,
-  )
+  const termFrom = seconds(occurrences[0]!.startsAt)
+  const termTo = seconds(occurrences.at(-1)!.endsAt)
+  const shut = await closuresAcross(event, termFrom, termTo, room.id)
 
   // Judged before any row is written, each counting against the cap as it goes: a series counts
   // each occurrence, which is what the setting says (criterion 2).
@@ -65,10 +71,7 @@ export default defineEventHandler(async (event) => {
     })
 
     const conflicts = clashes.get(one.occurrence) ?? []
-    const closed = blackoutOver(shut, room.id, {
-      startsAt: Math.floor(one.startsAt.getTime() / 1000),
-      endsAt: Math.floor(one.endsAt.getTime() / 1000),
-    })
+    const closed = closedWeek(shut, room.id, one)
     needsApproval ||= verdict.needsApproval
 
     if (verdict.refusedOutright || conflicts.length > 0 || closed) {
@@ -128,17 +131,9 @@ export default defineEventHandler(async (event) => {
   catch {
     // The completeness assertion raised and nothing was written (0035): a closure made since the
     // check refuses as the check would have, and anything else is a slot taken in between.
-    const closedSince = await closuresAcross(
-      event,
-      Math.floor(occurrences[0]!.startsAt.getTime() / 1000),
-      Math.floor(occurrences.at(-1)!.endsAt.getTime() / 1000),
-      room.id,
-    )
+    const closedSince = await closuresAcross(event, termFrom, termTo, room.id)
     const closedWeeks = occurrences.flatMap((one) => {
-      const closed = blackoutOver(closedSince, room.id, {
-        startsAt: Math.floor(one.startsAt.getTime() / 1000),
-        endsAt: Math.floor(one.endsAt.getTime() / 1000),
-      })
+      const closed = closedWeek(closedSince, room.id, one)
       return closed
         ? [{ occurrence: one.occurrence, day: one.day, failures: [{ reason: 'ROOM_CLOSED' as const, says: saysClosed(closed) }], conflicts: [] }]
         : []

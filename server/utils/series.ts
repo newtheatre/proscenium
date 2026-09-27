@@ -81,7 +81,7 @@ export async function writeSeries(write: SeriesWrite): Promise<{ ids: string[] }
 
   const claims = write.occurrences.map((one, at) => seriesClaimStatement(ids[at]!, write, one))
 
-  // Reached only when an occurrence was beaten to its slot between the check and the write.
+  // Reached only when an occurrence was beaten to its slot, or closed, between the check and the write.
   const assertion = sql`
     INSERT INTO room_series (id, user_id, room_id, title, frequency, starts_on, clock_from, clock_to, occurrences)
     SELECT ${write.seriesId}, ${write.userId}, ${write.roomId}, ${write.title}, ${write.recurrence.frequency},

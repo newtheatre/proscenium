@@ -68,6 +68,12 @@ export function bumpStatements(write: BumpWrite, claimId: string, offerId: strin
         AND ${clearOf(write.offer.roomId, write.offer.startsAt, write.offer.endsAt)}
         AND ${roomOpenTerms(write.offer.roomId, write.offer.startsAt, write.offer.endsAt, write.offsets)}
     `)
+    // An offer taken or closed since it was found is not written, and nothing may point at it.
+    statements.push(sql`
+      UPDATE room_bookings SET bumped_to_booking_id = NULL
+      WHERE id = ${displaced.id} AND bumped_to_booking_id = ${offerId}
+        AND NOT EXISTS (SELECT 1 FROM room_bookings WHERE id = ${offerId})
+    `)
   }
   return statements
 }

@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm'
 import { decisionForm } from '#shared/utils/approvals'
-import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { formatLondon } from '#shared/utils/london'
 import type { DecisionOutcome, PendingRow } from '#server/utils/approvals'
 import type { H3Event } from 'h3'
@@ -106,8 +105,8 @@ async function tellRequesters(
 async function closedFor(event: H3Event, row: PendingRow | undefined, intoRoom: string | null): Promise<string | null> {
   if (!row) return null
   const roomId = intoRoom ?? row.roomId
-  const shut = blackoutOver(await closuresAcross(event, row.startsAt, row.endsAt, roomId), roomId, row)
-  return shut ? saysClosed(shut) : null
+  const shut = await closedOver(event, roomId, row.startsAt, row.endsAt)
+  return shut ? shut.message : null
 }
 
 async function roomName(id: string): Promise<string | null> {

@@ -1886,14 +1886,19 @@ reads "A performance is on"; only the officers' list names it. `closuresAcross()
 `server/utils/blackouts.ts` joins them to an officer's closures, and every write or read that
 could put somebody in a closed room calls it: availability, a booking, a request, a series, a
 change to a pending request, approving a request (into its own room or another), a bump and a
-bump's alternatives. That read is what the refusal quotes. Every write that places a booking also
-carries the closures on its own statement (`roomOpenTerms()`, the offsets bound once): the slot
-claim (`claimSlotStatement`), the change to a pending request (`editPendingStatement`), the
-approval (`approveStatement`, into its own room or another), the bump and its held offer
+bump's alternatives, through `closedOver()`, which builds the one 422 ROOM_CLOSED refusal quoting
+the closure. Every write that places a booking also carries the closures on its own statement
+(`roomOpenTerms()`, the offsets bound once): the slot claim (`claimSlotStatement`: a booking, a
+request and relisting an SU request), the change to a pending request (`editPendingStatement`),
+the approval (`approveStatement`, into its own room or another), the bump and its held offer
 (`bumpStatements` in `server/utils/room-writes.ts`) and each week of a series
 (`seriesClaimStatement`). A closure made between the route's check and its write therefore still
-stops it (0003), and the write is refused as the check would have refused it: 422 ROOM_CLOSED
-(`closedRefusal()`), or a `closed` outcome naming the closure for an approval in a batch. A booking made before the room was attached or the performance scheduled is not cancelled;
+stops it (0003). A write that wrote nothing names a closure only when a re-read finds one
+(`closedNow()`, the same predicate; `lostWriteCause()` decides), and is then refused as the check
+would have refused it, or for an approval in a batch gets a `closed` outcome naming the closure;
+otherwise it is the clash it has always been. A bump's offer lost that way is not linked or
+announced: the batch clears the link and the route offers only an offer that was written. A booking
+made before the room was attached or the performance scheduled is not cancelled;
 `GET /api/admin/rooms/blackouts/performances` (`rooms.read`) lists each closure to the booking
 horizon with the bookings it overlaps, and the Closures screen shows them read-only. Cancelling the
 performance, or detaching the room, is what reopens it.

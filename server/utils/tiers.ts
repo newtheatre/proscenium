@@ -130,15 +130,17 @@ export async function performBump(input: BumpWrite & { displaced: Displaced }): 
 
   if (after?.status !== 'BUMPED') return { won: false, replacementId: null, offeredId: null }
 
-  const landed = await db.select({ id: schema.roomBookings.id })
+  const written = async (id: string | null): Promise<boolean> => id !== null && (await db.select({ id: schema.roomBookings.id })
     .from(schema.roomBookings)
-    .where(eq(schema.roomBookings.id, claimId))
-    .limit(1)
+    .where(eq(schema.roomBookings.id, id))
+    .limit(1)).length > 0
+  const landed = await written(claimId)
 
+  // Offered only if the offer was written: a closure or a booking may have taken its slot since.
   return {
-    won: landed.length > 0,
-    replacementId: landed.length > 0 ? claimId : null,
-    offeredId: offerId,
+    won: landed,
+    replacementId: landed ? claimId : null,
+    offeredId: await written(offerId) ? offerId : null,
   }
 }
 
