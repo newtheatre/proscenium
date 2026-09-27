@@ -926,8 +926,9 @@ principle 0010 states for the ledger. `GET /api/qr/current` follows the pointer 
 and night the old QR now reads Exchanged for; presenting the old QR itself still verifies (the
 signature is over the id alone) but no longer names a live booking, and the `/qr` page's cookie
 moves to the new reservation's token so the booker is looking at the booking that is now real.
-Releasing the vacated seat to the waiting list is D-113's `offerWaitingList()`, not yet wired in
-because D-113 had not merged when this was written (`docs/known-issues.md`).
+The vacated seats go to that night's waiting list through D-113's `offerWaitingList()` as soon as
+the exchange commits, ahead of the new confirmation, so a send that fails never leaves them
+unoffered until the next sweep (issue 1328).
 
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances
