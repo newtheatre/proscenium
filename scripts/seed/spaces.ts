@@ -1,6 +1,7 @@
 // Our own rooms and the SU's: a week of bookings in every status, a repeating series, a recorded
 // no-show, blackouts, and external requests at each step of the SU's own process.
 
+import { bookingTier } from '../../shared/utils/bookings'
 import { fromLondonWallClock, londonParts } from '../../shared/utils/london'
 import { ensure, holds, insert, insertOnly, seedId } from './statements'
 import { personIn } from './people'
@@ -51,7 +52,6 @@ interface SeedBooking {
   hours: number
   status: 'CONFIRMED' | 'PENDING_APPROVAL' | 'REJECTED' | 'CANCELLED' | 'BUMPED'
   purpose?: string
-  tier?: string
   reason?: string
   rejectionReason?: string
   bumpedReason?: string
@@ -245,7 +245,8 @@ function seedRoomBookings(target: SeedTarget, people: People, rooms: Map<string,
       attendees: booking.attendees ?? null,
       starts_at: from,
       ends_at: from + booking.hours * 3600,
-      tier: booking.tier ?? 'REHEARSAL',
+      // The tier a member's booking is given, from its purpose, as the booking write derives it.
+      tier: bookingTier(booking.purpose ?? 'REHEARSAL', undefined, false),
       purpose: booking.purpose ?? 'REHEARSAL',
       status: booking.status,
       reason: booking.reason ?? null,

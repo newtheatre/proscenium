@@ -146,6 +146,14 @@ describe('the seed fills the screens', () => {
     expect(current('dev-member@e2e.newtheatre.org.uk')).toBe(0)
   })
 
+  // A member's booking takes its tier from its purpose, as the booking write derives it (C-115,
+  // issue 1337), so the seed shows no meeting or get-in holding a rehearsal's priority.
+  test('a seeded booking at a member\'s tier carries the tier its purpose gives it', () => {
+    expect(counts(`room_bookings WHERE tier IN ('REHEARSAL', 'GENERAL')
+      AND tier <> CASE WHEN purpose = 'REHEARSAL' THEN 'REHEARSAL' ELSE 'GENERAL' END`)).toBe(0)
+    expect(counts(`room_bookings WHERE tier = 'GENERAL'`)).toBeGreaterThan(0)
+  })
+
   test('the awkward account states exist', () => {
     expect(counts('users WHERE password IS NULL AND anonymised_at IS NULL')).toBeGreaterThan(0)
     expect(counts('users WHERE anonymised_at IS NOT NULL')).toBeGreaterThan(0)
