@@ -26,7 +26,7 @@ export const PERSONAS: Persona[] = [
   { email: 'dev-theatre@e2e.newtheatre.org.uk', name: 'Tam Theatre (dev)', role: 'THEATRE_MANAGER', shape: 'full', describes: 'Reads the roll and the register; records neither.' },
   { email: 'dev-member@e2e.newtheatre.org.uk', name: 'Mel Member (dev)', role: null, shape: 'full', describes: 'An ordinary account: no roles, nothing in the admin screens.' },
   { email: 'dev-guest@e2e.newtheatre.org.uk', name: 'Gus Guest (dev)', role: null, shape: 'guest', describes: 'No password and no way in, the way guest checkout leaves one (A-116).' },
-  { email: 'dev-erased@e2e.newtheatre.org.uk', name: 'Term Tombstone (dev)', role: null, shape: 'tombstone', describes: 'Anonymised, so every screen has to keep working around it (0011).' },
+  { email: 'dev-erased@e2e.newtheatre.org.uk', name: 'Term Tombstone (dev)', role: null, shape: 'tombstone', membership: 'CURRENT', describes: 'Anonymised, so every screen has to keep working around it (0011). Its current term is kept for the statistics and left off the register, which says so.' },
 
   // Module C: spaces
 

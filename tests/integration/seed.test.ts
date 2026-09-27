@@ -138,6 +138,13 @@ describe('the seed fills the screens', () => {
     expect(counts('users WHERE id NOT IN (SELECT user_id FROM memberships)')).toBeGreaterThan(0)
   })
 
+  // Issue 1364: the register leaves an erased account's membership out and says so, which a
+  // picture can show only while some erased account holds one.
+  test('an erased account keeps a scrubbed current membership for the register to leave out', () => {
+    expect(counts(`memberships m JOIN users u ON u.id = m.user_id
+      WHERE u.anonymised_at IS NOT NULL AND m.expires_on > date('now')`)).toBeGreaterThanOrEqual(1)
+  })
+
   // Issue 1338: the room forms' pictures are taken as the one persona holding a current term.
   test('the booker persona holds a current membership, and the ordinary member none', () => {
     const current = (email: string): number => counts(`memberships m JOIN users u ON u.id = m.user_id

@@ -36,6 +36,19 @@ export const people: Shot[] = [
     ],
   },
   {
+    // Every erased account reads the same, and the seed always holds one (issue 1364).
+    name: 'people/account-erased',
+    persona,
+    url: '/people/accounts?anonymised=true',
+    marker: '[data-test="directory-table"]',
+    width: CONSOLE_WIDTH,
+    after: openFirstAccount,
+    annotations: [
+      { selector: '[data-test="account-name"]', label: 'Deleted user' },
+      { selector: '[data-test="erased-line"]', label: 'When it was erased' },
+    ],
+  },
+  {
     name: 'people/account-security',
     persona,
     url: '/people/accounts',
@@ -56,12 +69,15 @@ export const people: Shot[] = [
     url: '/people/members',
     marker: '[data-test="members-table"]',
     width: CONSOLE_WIDTH,
+    height: 1400,
     annotations: [
       { selector: '[data-test="toolbar-search"]', label: 'Search' },
       { selector: '[data-test="toolbar-filters"]', label: 'Filters' },
       { selector: '[data-test="record-membership"]', label: 'Record one' },
       { selector: '[data-test="members-export"]', label: 'Export' },
       { selector: '[data-test="members-table"]', label: 'The table' },
+      // The seeded erased persona holds a current term, so the line is always there to show.
+      { selector: '[data-test="members-erased-hidden"]', label: 'The erased accounts left out' },
     ],
   },
   {
