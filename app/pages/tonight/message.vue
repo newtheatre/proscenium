@@ -3,7 +3,7 @@ import { saysAudienceCount } from '#shared/utils/announcements'
 import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS } from '#shared/utils/night-message'
 import type { NightAudience } from '#shared/utils/night-message'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/tonight/message-tonights-audience' })
+definePageMeta({ layout: 'tonight', docs: '/docs/tonight/message-tonight-s-audience' })
 useSeoMeta({ title: 'Message tonight\'s audience' })
 
 interface House { id: string, showTitle: string, startsAt: number, active: boolean }

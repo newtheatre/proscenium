@@ -143,7 +143,7 @@ required pre-show checklist item that is still not done.
   ::card{icon="i-lucide-list-checks" title="Checklist" to="/docs/tonight/checklist"}
   The pre-show and post-show checklist, exceptions, and closing the night.
   ::
-  ::card{icon="i-lucide-megaphone" title="Message tonight's audience" to="/docs/tonight/message-tonights-audience"}
+  ::card{icon="i-lucide-megaphone" title="Message tonight's audience" to="/docs/tonight/message-tonight-s-audience"}
   Telling tonight's ticket holders or rota something, at once.
   ::
   ::card{icon="i-lucide-file-signature" title="Night report" to="/docs/tonight/night-report"}
