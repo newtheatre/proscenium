@@ -116,7 +116,7 @@ function admitPass(pass: DoorPassCard): void {
       <dl class="space-y-1 text-sm">
         <div class="flex justify-between gap-3">
           <dt class="text-muted">
-            Covers
+            Covered shows
           </dt>
           <dd class="text-right">
             {{ pass.covers }}
