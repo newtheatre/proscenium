@@ -241,7 +241,7 @@ const columns: TableColumn<Booking>[] = [
   {
     id: 'action',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => {
       const action = writes.value ? rowActionFor(row.original, Math.floor(Date.now() / 1000)) : null
       if (!action) return null

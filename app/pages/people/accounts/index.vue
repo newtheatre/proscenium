@@ -135,7 +135,7 @@ const columns: TableColumn<Account>[] = [
   {
     id: 'open',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => h(UButton, {
       'to': `/people/accounts/${row.original.id}`,
       'variant': 'ghost',

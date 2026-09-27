@@ -400,7 +400,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
     ? [{
       id: 'decide',
       header: ACTIONS_HEADER,
-      meta: { class: { td: 'text-right whitespace-nowrap' } },
+      meta: ACTIONS_COLUMN,
       // No action appears on a row it would refuse: the verbs differ by kind and by status,
       // and an officer clicking one that cannot apply learns nothing (C-122 criterion 5).
       cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, row.original.kind === 'unlisted'

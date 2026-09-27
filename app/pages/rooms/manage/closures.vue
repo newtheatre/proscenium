@@ -217,7 +217,7 @@ const columns: TableColumn<Closure>[] = [
   {
     id: 'remove',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => (writes.value === false
       ? null
       : h(UButton, {

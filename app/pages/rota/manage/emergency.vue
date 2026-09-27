@@ -151,7 +151,7 @@ const columns: TableColumn<VenueCard>[] = [
   {
     id: 'act',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right whitespace-nowrap' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => (writes.value === false
       ? null
       : h(UButton, {

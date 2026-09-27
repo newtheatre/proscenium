@@ -209,7 +209,7 @@ const typeColumns = computed<TableColumn<MilestoneType>[]>(() => [
     ? [{
         id: 'act',
         header: ACTIONS_HEADER,
-        meta: { class: { td: 'text-right whitespace-nowrap' } },
+        meta: ACTIONS_COLUMN,
         cell: ({ row }: { row: { original: MilestoneType } }) => h('div', { class: 'flex justify-end gap-1' }, [
           h(UButton, {
             'size': 'xs',
@@ -244,7 +244,7 @@ const presetColumns = computed<TableColumn<Preset>[]>(() => [
     ? [{
         id: 'act',
         header: ACTIONS_HEADER,
-        meta: { class: { td: 'text-right whitespace-nowrap' } },
+        meta: ACTIONS_COLUMN,
         cell: ({ row }: { row: { original: Preset } }) => h('div', { class: 'flex justify-end gap-1' }, [
           h(UButton, {
             'size': 'xs',

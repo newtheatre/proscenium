@@ -171,7 +171,7 @@ const columns: TableColumn<Holder>[] = [
   {
     id: 'act',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
       h(UButton, {
         'to': `/people/accounts/${row.original.userId}`,

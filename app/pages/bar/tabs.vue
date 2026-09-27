@@ -113,7 +113,7 @@ const columns: TableColumn<HolderRow>[] = [
   {
     id: 'act',
     header: ACTIONS_HEADER,
-    meta: { class: { td: 'text-right whitespace-nowrap' } },
+    meta: ACTIONS_COLUMN,
     cell: ({ row }) => h(UButton, {
       'size': 'sm',
       'color': 'neutral',
