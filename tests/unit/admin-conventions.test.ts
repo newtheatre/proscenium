@@ -537,13 +537,13 @@ describe('every console list is a UTable the shell knows about (K-123 criteria 9
 
   test('a table of more than three columns says which of them a phone drops', async () => {
     const wide = (await tables()).filter(file => columnEntries(file.source)
-      .some(entries => entries.length > 3 && !entries.some(entry => /HIDE_BELOW_SM|HIDE_BELOW_TABLE_2XL/.test(entry))))
+      .some(entries => entries.length > 3 && !entries.some(entry => /HIDE_BELOW_SM|HIDE_BELOW_TABLE_/.test(entry))))
     expect(wide.map(file => file.path).filter(path => !TABLES_AWAITING_A_NARROW_VIEW.includes(path))).toEqual([])
   })
 
   // Without a container above it, a column hidden by its table's width is hidden at every width.
   test('a column hidden by its table\'s width sits in a table that measures itself', async () => {
-    const offenders = (await tables()).filter(file => file.source.includes('HIDE_BELOW_TABLE_2XL')
+    const offenders = (await tables()).filter(file => file.source.includes('HIDE_BELOW_TABLE_')
       && !/<UTable\b[^>]*class="[^"]*@container/.test(file.source))
     expect(offenders.map(file => file.path)).toEqual([])
   })
@@ -572,7 +572,7 @@ const RIGHT_HEADER = /th:\s*[`'][^`']*text-right/
 describe('a figure column lines its header up with its figures', () => {
   test('the shared figure shapes right-align the header, and the action shape is not monospace', async () => {
     const shapes = await Bun.file('app/utils/responsive-table.ts').text()
-    for (const name of ['RIGHT_ALIGNED', 'RIGHT_ALIGNED_HIDE_BELOW_SM', 'ACTIONS_COLUMN']) {
+    for (const name of ['RIGHT_ALIGNED', 'RIGHT_ALIGNED_HIDE_BELOW_SM', 'RIGHT_ALIGNED_HIDE_BELOW_TABLE_MD', 'ACTIONS_COLUMN']) {
       expect(shapes).toMatch(new RegExp(`export const ${name} = \\{ class: \\{ th: [\`'][^\`']*text-right`))
     }
     expect(shapes).not.toMatch(/export const ACTIONS_COLUMN = [^\n]*font-mono/)
@@ -603,11 +603,13 @@ describe('a figure column lines its header up with its figures', () => {
 describe('a table narrows by its own width, and its cells wrap by one shape', () => {
   test('a column hidden by its table\'s width and the line that carries it turn at the same width', async () => {
     const shapes = await Bun.file('app/utils/responsive-table.ts').text()
-    const hides = /export const HIDE_BELOW_TABLE_(\w+) = 'hidden @(\w+):table-cell'/.exec(shapes)
-    const shows = /export const SHOW_BELOW_TABLE_(\w+) = '@(\w+):hidden'/.exec(shapes)
-    expect(hides).not.toBeNull()
-    expect(hides![1]!.toLowerCase()).toBe(hides![2]!)
-    expect(shows?.slice(1)).toEqual(hides!.slice(1))
+    const hides = [...shapes.matchAll(/export const HIDE_BELOW_TABLE_(\w+) = 'hidden @(\w+):table-cell'/g)]
+      .map(([, name, width]) => [name!, width!])
+    const shows = [...shapes.matchAll(/export const SHOW_BELOW_TABLE_(\w+) = '@(\w+):hidden'/g)]
+      .map(([, name, width]) => [name!, width!])
+    expect(hides.length).toBeGreaterThan(0)
+    for (const [name, width] of hides) expect(name.toLowerCase()).toBe(width)
+    expect(shows).toEqual(hides)
   })
 
   test('a badge that wraps inside its cell takes the one wrapping shape', async () => {
