@@ -3,12 +3,12 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
-import { approveSlotStatement, claimSlotStatement, declineSlotStatement, ourVenue } from './rota'
+import { approveSlotStatement, claimSlotStatement, declineSlotStatement, holdsGate, ourVenue } from './rota'
 import { predicate, whereFrom } from './list-filters'
 import { barOpeningConstraintRefusal } from '#shared/utils/rota-openings'
 import { showNightOf, showNightStartOf } from '#shared/utils/show-night'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
-import type { ApprovalGate, ClaimScope } from './rota'
+import type { TrainingGate, ClaimScope } from './rota'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { AuditRow } from '#shared/utils/audit'
@@ -154,11 +154,11 @@ export async function activeOpeningShifts(openingId: string): Promise<OpeningSlo
   `)
 }
 
-export function claimOpeningShiftStatement(slotId: string, userId: string, status: ShiftStatus): SQL {
-  return claimSlotStatement(OPENING_CLAIM_SCOPE, slotId, userId, status)
+export function claimOpeningShiftStatement(slotId: string, userId: string, status: ShiftStatus, gate: TrainingGate): SQL {
+  return claimSlotStatement(OPENING_CLAIM_SCOPE, slotId, userId, status, gate)
 }
 
-export function approveOpeningShiftStatement(slotId: string, gate: ApprovalGate): SQL {
+export function approveOpeningShiftStatement(slotId: string, gate: TrainingGate): SQL {
   return approveSlotStatement(OPENING_CLAIM_SCOPE, slotId, gate)
 }
 
@@ -166,9 +166,9 @@ export function declineOpeningShiftStatement(slotId: string, reason: string): SQ
   return declineSlotStatement(OPENING_CLAIM_SCOPE, slotId, reason)
 }
 
-// An officer putting somebody on a slot, or taking them off it: one UPDATE on the row that
-// already exists, never a delete and an insert (E-107 criteria 3 and 4).
-export function assignOpeningShiftStatement(slotId: string, userId: string, actorId: string): SQL {
+// An officer putting somebody on a slot, or taking them off it: one UPDATE on the row that already
+// exists, the bar gate on it, never a delete and an insert (E-107 criteria 3 and 4, #1302).
+export function assignOpeningShiftStatement(slotId: string, userId: string, actorId: string, gate: TrainingGate): SQL {
   return sql`
     UPDATE bar_opening_shifts AS target
     SET user_id = ${userId}, status = 'CONFIRMED', assigned_by = ${actorId},
@@ -182,6 +182,7 @@ export function assignOpeningShiftStatement(slotId: string, userId: string, acto
           AND other.user_id = ${userId}
           AND other.status IN ('CLAIMED', 'CONFIRMED')
       )
+      AND ${holdsGate(gate, userId)}
     RETURNING id
   `
 }

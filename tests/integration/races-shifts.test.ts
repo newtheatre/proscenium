@@ -17,9 +17,16 @@ function run(database: TestDatabase, statement: SQL): unknown[] {
   return database.raw.prepare(query).all(...parameters as never[]) as unknown[]
 }
 
+// Every claimant here holds the gating module, so the race is only ever over the slot itself.
+const GATE = { moduleId: 'SFTY-001', today: '2026-10-12' }
+
 function person(database: TestDatabase, id: string): void {
-  database.batch([['INSERT OR IGNORE INTO users (id, name, email, verified) VALUES (?, ?, ?, 1)',
-    id, `Someone ${id}`, `${id}@e2e.newtheatre.org.uk`]])
+  database.batch([
+    ['INSERT OR IGNORE INTO users (id, name, email, verified) VALUES (?, ?, ?, 1)', id, `Someone ${id}`, `${id}@e2e.newtheatre.org.uk`],
+    ['INSERT OR IGNORE INTO departments (code, name) VALUES (?, ?)', 'SFTY', 'Safety'],
+    ['INSERT OR IGNORE INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'SFTY-001', 'SFTY', 'MODULE', 'Front of house'],
+    [`INSERT INTO training_records (id, user_id, module_id, awarded_on, source) VALUES (?, ?, 'SFTY-001', '2025-08-21', 'SIGNOFF')`, `tr-${id}`, id],
+  ])
 }
 
 describe('contended invariants (K-105)', () => {
@@ -36,7 +43,7 @@ describe('contended invariants (K-105)', () => {
 
       const answers = await race(2, async (index) => {
         const claimant = index === 0 ? 'one' : 'two'
-        const claimed = run(database, claimShiftStatement('shift-open', claimant, 'CONFIRMED'))
+        const claimed = run(database, claimShiftStatement('shift-open', claimant, 'CONFIRMED', GATE))
         return { status: claimed.length === 1 ? 200 : 409 }
       })
 
@@ -71,7 +78,7 @@ describe('contended invariants (K-105)', () => {
       const answers = await race(2, async (index) => {
         const [shiftId, claimant] = attempts[index]!
         try {
-          const claimed = run(database, claimShiftStatement(shiftId, claimant, 'CONFIRMED'))
+          const claimed = run(database, claimShiftStatement(shiftId, claimant, 'CONFIRMED', GATE))
           return { status: claimed.length === 1 ? 200 : 409 }
         }
         catch {
@@ -87,6 +94,39 @@ describe('contended invariants (K-105)', () => {
         `SELECT id FROM shifts WHERE performance_id = ? AND role = 'DUTY_MANAGER' AND status = 'CONFIRMED'`,
         tonight.performanceId)
       expect(confirmed).toHaveLength(1)
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  // Issue 1302's gap at the claim: the route checks training, then writes. The two writes settle
+  // in the order they run, and the claim follows the record as it stands at its own write (E-104).
+  test.each([
+    ['claimed first, the claim stands and a later revocation leaves it', 'claim', 1, 'CONFIRMED'],
+    ['revoked first, the claim is refused and the shift stays open', 'revoke', 0, 'OPEN'],
+  ] as const)('a claim and its record\'s revocation, %s (#1302)', async (_, first, written, status) => {
+    const database = await createTestDatabase()
+    try {
+      const tonight = tonightsPerformance(database)
+      person(database, 'one')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)',
+        'shift-open', tonight.performanceId, 'DOOR', 'OPEN']])
+      const revoke = (): void => database.batch([['UPDATE training_records SET revoked_at = unixepoch() WHERE id = ?', 'tr-one']])
+      const claim = (): number => run(database, claimShiftStatement('shift-open', 'one', 'CONFIRMED', GATE)).length
+
+      let claimed: number
+      if (first === 'claim') {
+        claimed = claim()
+        revoke()
+      }
+      else {
+        revoke()
+        claimed = claim()
+      }
+
+      expect(claimed).toBe(written)
+      expect(rows<{ status: string }>(database, 'SELECT status FROM shifts WHERE id = ?', 'shift-open')[0]!.status).toBe(status)
     }
     finally {
       database.close()
