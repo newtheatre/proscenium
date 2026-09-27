@@ -24,7 +24,7 @@ export interface ReportAttendance {
 }
 
 // Seats admitted on a pass, and the Fellowship's among them, correlated or bound as the capacity
-// counts are. Their aliases are their own, so a caller's r, t, a or p can never capture them.
+// counts are. Their aliases are their own, so a caller's r, t, a, p or pt can never capture them.
 export function passAdmittedSeatsSubquery(performanceId: SQL): SQL {
   return sql`(SELECT count(*) FROM reservations passadm_r
     JOIN tickets passadm_t ON passadm_t.reservation_id = passadm_r.id
