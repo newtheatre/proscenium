@@ -67,6 +67,37 @@ describe('nights needing a reading are listed where the Treasurer looks', () => 
   })
 })
 
+const ENTRIES = 'app/pages/money/entries.vue'
+const PERIODS = 'app/pages/money/periods.vue'
+const EXPORTS = 'app/pages/money/exports.vue'
+
+// Issue 1361 (I-101, I-105 criterion 3): an entry says what it was and opens on its detail, every
+// figure on the dashboard drills down, and no money screen offers a search that searches nothing.
+describe('a ledger entry says what it was and opens', () => {
+  test('the list carries a What column and a search box it answers', async () => {
+    const source = await read(ENTRIES)
+    expect(source).toContain('saysEntryWhat(')
+    expect(source).toContain('v-model:search="search"')
+  })
+
+  test('each row opens its detail in a drawer, named for the entry it opens', async () => {
+    const source = await read(ENTRIES)
+    expect(source).toContain('<USlideover')
+    expect(source).toContain('/api/admin/finance/season/entries/${')
+    expect(source).toMatch(/'aria-label': `Open the entry/)
+  })
+
+  test('every figure on the dashboard drills down', async () => {
+    const source = await read(MONEY)
+    for (const figure of ['kind: \'REFUND\'', 'tender: \'COMP\'', 'discounted: true']) expect(source).toContain(figure)
+    expect(source).toContain('/money/reconciliation')
+  })
+
+  test('a money screen with nothing to search shows no search box', async () => {
+    for (const path of [PERIODS, EXPORTS]) expect(await read(path)).toContain(':searchable="false"')
+  })
+})
+
 describe('an account says where it was reached from (A-121 criterion 6)', () => {
   test('the page carries the way back to the directory', async () => {
     const source = await read(ACCOUNT)
