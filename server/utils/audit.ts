@@ -32,8 +32,10 @@ export function auditIfRow(entry: AuditRow, table: string, id: string): SQL {
   return auditWhere(entry, sql`EXISTS (SELECT 1 FROM ${sql.raw(table)} WHERE id = ${id})`)
 }
 
-// `then` is what the write cascades to, batched after the insert that reads `changes()`.
-export async function auditedWrite(write: BatchItem<'sqlite'>, entry: AuditRow, ...then: BatchItem<'sqlite'>[]): Promise<boolean> {
-  const [rows] = await db.batch([write, db.run(auditIfChanged(entry)), ...then])
+// `then` is what the write cascades to, batched after the insert that reads `changes()`. Several
+// entries chain, each landing only if the one before it did; none runs the write alone.
+export async function auditedWrite(write: BatchItem<'sqlite'>, entry: AuditRow | AuditRow[], ...then: BatchItem<'sqlite'>[]): Promise<boolean> {
+  const entries = Array.isArray(entry) ? entry : [entry]
+  const [rows] = await db.batch([write, ...entries.map(one => db.run(auditIfChanged(one))), ...then])
   return Array.isArray(rows) && rows.length > 0
 }

@@ -9,8 +9,8 @@ export default defineEventHandler(async (event) => {
   const id = newId()
 
   // The predicate rides the INSERT, so two officers adding the same warning at once produce one
-  // entry and a refusal rather than a constraint error (0003, 0006).
-  const created = await db.all<{ id: string }>(sql`
+  // entry and a refusal rather than a constraint error (0003, 0006); its audit row rides with it (0049).
+  const created = await auditedWrite(db.all<{ id: string }>(sql`
     INSERT INTO content_warnings (id, slug, title, kind, category, description, icon, sort, archived)
     SELECT ${id}, ${input.slug}, ${input.title}, ${input.kind}, ${input.category ?? null},
            ${input.description ?? null}, ${input.icon ?? null}, ${input.sort}, ${input.archived ? 1 : 0}
@@ -18,19 +18,17 @@ export default defineEventHandler(async (event) => {
       SELECT 1 FROM content_warnings WHERE slug = ${input.slug} OR title = ${input.title} COLLATE NOCASE
     )
     RETURNING id
-  `)
-
-  if (created.length === 0) {
-    const taken = await contentWarningNamed(input.slug, input.title)
-    throw createError({ statusCode: 409, statusMessage: `The vocabulary already holds ${taken?.title ?? input.title}` })
-  }
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  `), auditEntry({
     actorId: resolved.account.id,
     action: 'content-warning.created',
     target: `content-warning:${id}`,
     detail: { slug: input.slug, title: input.title, kind: input.kind },
   }))
+
+  if (!created) {
+    const taken = await contentWarningNamed(input.slug, input.title)
+    throw createError({ statusCode: 409, statusMessage: `The vocabulary already holds ${taken?.title ?? input.title}` })
+  }
 
   return { ok: true, id }
 })

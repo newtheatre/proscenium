@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
 
   // The predicate rides the INSERT, so two officers claiming one address at the same moment
   // produce one show and a refusal rather than a constraint error (0003, 0006).
-  const created = await db.all<{ id: string }>(sql`
+  const created = await auditedWrite(db.all<{ id: string }>(sql`
     INSERT INTO shows (
       id, slug, title, subtitle, description, long_description, age_guidance, latecomer_policy,
       category_id, season_id, booking_closes_hours_before, status
@@ -20,18 +20,16 @@ export default defineEventHandler(async (event) => {
            ${input.categoryId ?? null}, ${input.seasonId ?? null}, ${input.bookingClosesHoursBefore ?? null}, 'DRAFT'
     WHERE NOT EXISTS (SELECT 1 FROM shows WHERE slug = ${input.slug})
     RETURNING id
-  `)
-
-  if (created.length === 0) {
-    throw createError({ statusCode: 409, statusMessage: `A show already has the address /shows/${input.slug}` })
-  }
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  `), auditEntry({
     actorId: resolved.account.id,
     action: 'show.created',
     target: `show:${id}`,
     detail: { slug: input.slug, bookingClosesHoursBefore: input.bookingClosesHoursBefore ?? null },
   }))
+
+  if (!created) {
+    throw createError({ statusCode: 409, statusMessage: `A show already has the address /shows/${input.slug}` })
+  }
 
   return { ok: true, id }
 })

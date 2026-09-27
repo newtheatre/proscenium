@@ -14,21 +14,13 @@ export default defineEventHandler(async (event) => {
 
   // The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
   // moment refuses rather than reaching the unique index (0003, 0006).
-  const updated = await db.all<{ id: string }>(sql`
+  const updated = await auditedWrite(db.all<{ id: string }>(sql`
     UPDATE seasons
     SET name = ${input.name}, starts_on = ${input.startsOn}, ends_on = ${input.endsOn}
     WHERE id = ${id}
       AND NOT EXISTS (SELECT 1 FROM seasons WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
     RETURNING id
-  `)
-
-  if (updated.length === 0) {
-    const taken = await seasonNamed(input.name, id)
-    if (!taken) throw noSuch('season')
-    throw createError({ statusCode: 409, statusMessage: `A season is already called ${taken.name}` })
-  }
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  `), auditEntry({
     actorId: resolved.account.id,
     action: 'season.updated',
     target: `season:${id}`,
@@ -38,6 +30,12 @@ export default defineEventHandler(async (event) => {
       endsOn: [held.endsOn, input.endsOn],
     }),
   }))
+
+  if (!updated) {
+    const taken = await seasonNamed(input.name, id)
+    if (!taken) throw noSuch('season')
+    throw createError({ statusCode: 409, statusMessage: `A season is already called ${taken.name}` })
+  }
 
   return { ok: true, overlaps: await seasonOverlaps(input.startsOn, input.endsOn, id) }
 })
