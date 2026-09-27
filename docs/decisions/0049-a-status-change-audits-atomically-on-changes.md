@@ -162,8 +162,8 @@ parameter.
     (`content-warnings/[id]/index.put.ts`, `ticket-types/[id]/index.put.ts`).
   - A statement in `then` that must follow only an applied write is gated on `entryLanded(entry)`,
     `EXISTS (SELECT 1 FROM audit_log WHERE id = <the entry's id>)`, since `then` runs after the
-    entries. A new pass type's price points and shows, and an edited one's replaced prices, are
-    gated this way (`newPassTypeChildren()` and `replacePricesStatements()` in
+    entries. A new pass type's price points and shows, and an edited one's price points, are
+    gated this way (`newPassTypeChildren()` and `priceUpsertStatements()` in
     `server/utils/pass-types.ts`).
   - The programme's name and address routes (content warnings, pass types, seasons, show
     categories, venues, shows and ticket types) moved onto it from a separate audit statement
