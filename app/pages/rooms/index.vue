@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { formatLondon, fromLondonWallClock, londonWeekday } from '#shared/utils/london'
-import { closedOn } from '#shared/utils/rooms'
+import { closedOn, dateStrip } from '#shared/utils/rooms'
+import { addDays } from '#shared/utils/series'
+import { SU_ROOM_ASK } from '#shared/utils/external-requests'
+import { londonDate } from '#shared/utils/working-days'
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import type { GridColumn, GridRoom } from '~/components/RoomGrid.vue'
 
@@ -45,19 +48,13 @@ const roomId = ref(EVERY_ROOM)
 const everyRoom = computed(() => roomId.value === EVERY_ROOM)
 
 function todayInLondon(): string {
-  return formatLondon(new Date(), { year: 'numeric', month: '2-digit', day: '2-digit' })
-    .split('/').reverse().join('-')
+  return londonDate(new Date())
 }
 
 // Midday, so which London day a date names cannot be moved by a clock change.
 function noonOn(day: string): Date {
   const [year, month, date] = day.split('-').map(Number)
   return fromLondonWallClock(year!, month!, date!, 12)
-}
-
-function addDays(day: string, count: number): string {
-  const [year, month, date] = day.split('-').map(Number)
-  return new Date(Date.UTC(year!, month! - 1, date! + count)).toISOString().slice(0, 10)
 }
 
 // Monday to Sunday, which is how a rehearsal week reads.
@@ -132,6 +129,18 @@ function move(by: number): void {
   anchor.value = addDays(anchor.value, shown.value === 'day' ? by : by * 7)
 }
 
+// A day on a phone is one tap: the coming fortnight as a strip, and a picker for anything further
+// (issue 1346, C-102). The strip always starts today, so it never scrolls away from it.
+const strip = dateStrip(todayInLondon())
+
+// Anything past the fortnight, from the picker, which always shows the day on screen.
+const picked = computed<string | undefined>({
+  get: () => anchor.value,
+  set: (day) => {
+    if (day) anchor.value = day
+  },
+})
+
 function book(column: GridColumn, from: string, until: string): void {
   navigateTo({ path: '/rooms/book', query: { room: column.room.id, day: column.day, at: from, until } })
 }
@@ -164,12 +173,14 @@ useSeoMeta({ title: 'Rooms' })
           color="neutral"
           variant="outline"
           aria-label="Earlier"
+          class="min-h-11 min-w-11 justify-center"
           data-test="calendar-back"
           @click="move(-1)"
         />
         <UButton
           color="neutral"
           variant="outline"
+          class="min-h-11"
           data-test="calendar-today"
           @click="anchor = todayInLondon()"
         >
@@ -180,6 +191,7 @@ useSeoMeta({ title: 'Rooms' })
           color="neutral"
           variant="outline"
           aria-label="Later"
+          class="min-h-11 min-w-11 justify-center"
           data-test="calendar-forward"
           @click="move(1)"
         />
@@ -236,8 +248,43 @@ useSeoMeta({ title: 'Rooms' })
         to="/rooms/external"
         data-test="book-unlisted"
       >
-        Book a room not listed here
+        {{ SU_ROOM_ASK }}
       </UButton>
+    </div>
+
+    <div
+      v-if="shown === 'day'"
+      class="mt-3 space-y-2"
+    >
+      <div
+        class="flex gap-1 overflow-x-auto pb-1"
+        role="group"
+        aria-label="The coming fortnight"
+        data-test="date-strip"
+      >
+        <UButton
+          v-for="one in strip"
+          :key="one.day"
+          :color="one.day === anchor ? 'primary' : 'neutral'"
+          :variant="one.day === anchor ? 'solid' : 'outline'"
+          :aria-pressed="one.day === anchor"
+          :aria-label="labelFor(one.day)"
+          class="min-h-11 min-w-11 shrink-0 flex-col gap-0 px-2 py-1 text-xs leading-tight"
+          :data-test="`strip-${one.day}`"
+          @click="anchor = one.day"
+        >
+          <span>{{ one.weekday }}</span>
+          <span class="text-sm font-semibold">{{ one.date }}</span>
+        </UButton>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-muted">Or another day</span>
+        <DateField
+          v-model="picked"
+          aria-label="Another day"
+          data-test="calendar-pick-day"
+        />
+      </div>
     </div>
 
     <p

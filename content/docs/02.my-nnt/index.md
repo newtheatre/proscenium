@@ -66,7 +66,7 @@ hold, request and record; they never charge.
   ::card{icon="i-lucide-calendar-check" title="My room bookings" to="/docs/my-nnt/my-room-bookings"}
   What you hold, what became of it, cancelling and a calendar feed.
   ::
-  ::card{icon="i-lucide-map-pin" title="Book a room not listed here" to="/docs/my-nnt/book-a-room-not-listed-here"}
+  ::card{icon="i-lucide-map-pin" title="Ask for a Students' Union room" to="/docs/my-nnt/ask-for-a-students-union-room"}
   Asking for a room the theatre does not manage.
   ::
 ::

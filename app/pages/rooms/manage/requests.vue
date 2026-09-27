@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { BULK_LIMIT, REJECTION_REASON_LIMIT } from '#shared/utils/approvals'
 import { describePurpose, saysBookingState } from '#shared/utils/bookings'
-import { EXTERNAL_REASON_LIMIT, saysExternalState, saysExternalStatus } from '#shared/utils/external-requests'
+import { EXTERNAL_REASON_LIMIT, SU_ROOM_ASK, saysExternalState, saysExternalStatus } from '#shared/utils/external-requests'
 import { saysVerdict } from '#shared/utils/external-spaces'
 import { saysClock, saysWhen } from '#shared/utils/when'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
@@ -352,7 +352,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
       h('div', { class: 'flex items-center gap-2' }, [
         h('span', {}, row.original.requester),
         row.original.kind === 'unlisted'
-          ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Not ours')
+          ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Students\' Union')
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, `${row.original.title} (${describePurpose(row.original.purpose)})`),
@@ -886,7 +886,7 @@ onMounted(loadRooms)
 
     <UModal
       :open="unlisting !== null"
-      title="Ask for a room not listed here instead"
+      :title="`${SU_ROOM_ASK} instead`"
       description="The slot this is holding is freed straight away, and nothing is held until whoever manages the new room answers."
       @update:open="unlisting = null"
     >

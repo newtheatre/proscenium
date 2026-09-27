@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { can, memberOrGrace } from '#shared/utils/abilities'
 import { nameOrPurpose } from '#shared/utils/bookings'
-import { EXTERNAL_NO_MEMBERSHIP } from '#shared/utils/external-requests'
+import { EXTERNAL_NO_MEMBERSHIP, SU_ROOM_ASK } from '#shared/utils/external-requests'
 import { fromLondonWallClock } from '#shared/utils/london'
 import { saysDayLong } from '#shared/utils/when'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { z } from 'zod'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/book-a-room-not-listed-here' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/ask-for-a-students-union-room' })
 
 interface Failure { reason: string, says: string }
 
@@ -114,13 +114,13 @@ async function ask(event: FormSubmitEvent<ExternalForm>): Promise<void> {
   }
 }
 
-useSeoMeta({ title: 'Book a room not listed here' })
+useSeoMeta({ title: SU_ROOM_ASK })
 </script>
 
 <template>
   <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
-      title="Book a room not listed here"
+      :title="SU_ROOM_ASK"
       description="For when nothing of ours suits. The Theatre Manager decides which room we get, and this is a request rather than a booking."
       :ui="MEMBER_PAGE_HEADER"
     />

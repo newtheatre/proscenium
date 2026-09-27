@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
 
   return calendarFor([...rows, ...unlisted.map(one => ({
     ...one,
-    room: one.room ?? 'A room not listed here, not yet assigned',
+    room: one.room ?? 'A Students\' Union room, not yet assigned',
     // Their vocabulary against a calendar's: only a room we were actually given is confirmed.
     status: one.status === 'CONFIRMED' ? 'CONFIRMED' : one.status === 'AWAITING_EXTERNAL' || one.status === 'REQUESTED' ? 'PENDING_APPROVAL' : 'CANCELLED',
   }))], {

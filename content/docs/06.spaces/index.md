@@ -1,9 +1,9 @@
 ---
 title: Spaces
-description: The rooms we control, the request queue, every booking, closures, the rooms we do not manage and the utilisation report.
+description: The rooms we control, the request queue, every booking, closures, the Students' Union rooms and the utilisation report.
 module: Spaces
 audience: committee
-updatedOn: 2026-09-26
+updatedOn: 2026-09-27
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -32,7 +32,7 @@ without the buttons, and the request queue is not in their navigation at all.
   ::card{icon="i-lucide-construction" title="Closures" to="/docs/spaces/closures"}
   Shutting a room, or every room, for a stated reason, and what that does to bookings.
   ::
-  ::card{icon="i-lucide-map-pin" title="Other rooms" to="/docs/spaces/other-rooms"}
+  ::card{icon="i-lucide-map-pin" title="Students' Union rooms" to="/docs/spaces/students-union-rooms"}
   The catalogue of rooms the Students' Union manages, and what we have learned about each one.
   ::
   ::card{icon="i-lucide-chart-column" title="Utilisation" to="/docs/spaces/utilisation"}
@@ -53,5 +53,5 @@ decides which room we get.
 
 - [Book a room](/docs/my-nnt/book-a-room)
 - [My room bookings](/docs/my-nnt/my-room-bookings)
-- [Book a room not listed here](/docs/my-nnt/book-a-room-not-listed-here), the member's side of the catalogue
+- [Ask for a Students' Union room](/docs/my-nnt/ask-for-a-students-union-room), the member's side of the catalogue
 - [Roles and permissions](/docs/getting-started/roles-and-permissions)

@@ -22,7 +22,7 @@ function coverage(setting: { key: string, value: unknown, default: unknown }): {
 
   const horizon = new Date(Date.now() + HORIZON_WEEKS * 7 * 86_400_000)
   const reach = lastCovered(dates)
-  if (!reach) return { says: 'No dates recorded, so every request for a room not listed here is refused.', short: true }
+  if (!reach) return { says: 'No dates recorded, so every request for a Students\' Union room is refused.', short: true }
 
   return coversThrough(dates, horizon)
     ? { says: `Covers to ${reach}.`, short: false }

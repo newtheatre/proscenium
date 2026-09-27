@@ -6,7 +6,8 @@ import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { describePurpose } from '#shared/utils/bookings'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Other rooms', middleware: 'console', docs: '/docs/spaces/other-rooms' })
+// A literal, because the sidebar test reads the title from this source (0082); it is the name SU_ROOMS holds.
+definePageMeta({ layout: 'console', title: 'Students\' Union rooms', middleware: 'console', docs: '/docs/spaces/students-union-rooms' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

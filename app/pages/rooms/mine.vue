@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { formatLondon, fromLondonWallClock, londonClock } from '#shared/utils/london'
 import { SERIES_EDIT_REFUSAL, nameOrPurpose, saysBookingState } from '#shared/utils/bookings'
-import { saysExternalState } from '#shared/utils/external-requests'
+import { SU_ROOMS, saysExternalState } from '#shared/utils/external-requests'
 import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { z } from 'zod'
@@ -472,7 +472,7 @@ useSeoMeta({ title: 'My bookings' })
       data-test="unlisted-list"
     >
       <h2 class="text-lg font-semibold">
-        Rooms we do not manage
+        {{ SU_ROOMS }}
       </h2>
       <p class="mt-1 text-sm text-muted">
         The Theatre Manager decides which room we get, and none of these is held until they answer.
@@ -487,7 +487,7 @@ useSeoMeta({ title: 'My bookings' })
         >
           <div class="min-w-0 flex-1">
             <p class="flex flex-wrap items-center gap-2 font-medium">
-              {{ one.assigned ?? one.preferred ?? 'A room not listed here' }}
+              {{ one.assigned ?? one.preferred ?? 'A Students\' Union room' }}
               <UBadge
                 :color="one.status === 'CONFIRMED' ? 'success' : one.status === 'AWAITING_EXTERNAL' ? 'info' : 'neutral'"
                 variant="subtle"

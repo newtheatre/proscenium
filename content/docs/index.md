@@ -3,7 +3,7 @@ title: Documentation
 description: How each part of the theatre is run, kept by the people who run it.
 module: Governance
 audience: member
-updatedOn: 2026-09-26
+updatedOn: 2026-09-27
 updatedBy: Matt Adcock
 ---
 
@@ -47,7 +47,7 @@ the screens are for.
   Stock, movements, stocktakes, the order list, tabs and reports, then the products, categories and discounts behind them.
   ::
   ::card{icon="i-lucide-door-open" title="Spaces" to="/docs/spaces"}
-  The rooms, room requests, closures, other rooms and utilisation.
+  The rooms, room requests, closures, Students' Union rooms and utilisation.
   ::
   ::card{icon="i-lucide-clipboard-list" title="Rota" to="/docs/rota"}
   Shift templates, the rota board and the claims waiting on it, checklists, emergency cards, safety, the Challenge 25 register and the backstage board.
