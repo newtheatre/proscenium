@@ -4,9 +4,11 @@ import { accessBookingsQuery } from '#server/utils/tonight-glance'
 import { tillBookingByIdQuery } from '#server/utils/till-bookings'
 import {
   admittedSeatsSubquery,
+  admittedWalkUpSeatsSubquery,
   heldAccessSeatsSubquery,
   heldSeatsOfKindSubquery,
   heldSeatsSubquery,
+  noShowSeatsSubquery,
   ticketInsertQueries,
   unpaidSeatsSubquery,
   walkUpSeatsSubquery,
@@ -97,6 +99,8 @@ describe('the house counts ignore a caller\'s own aliases (#1295)', () => {
     ['walk-up', walkUpSeatsSubquery],
     ['held of a kind', performanceId => heldSeatsOfKindSubquery(performanceId, 'SINGLE')],
     ['held for access', heldAccessSeatsSubquery],
+    ['admitted walk-up', admittedWalkUpSeatsSubquery],
+    ['no-show', noShowSeatsSubquery],
   ]
 
   // A second house with seats of every sort, so a count that escapes its correlation reads them.
@@ -104,6 +108,7 @@ describe('the house counts ignore a caller\'s own aliases (#1295)', () => {
     const { performanceId } = tonightsPerformance(database, { suffix: 'other' })
     booking(database, 'rother', performanceId, 'Otto Other', 4, 'PENDING')
     booking(database, 'rdoor', performanceId, 'Dora Door', 1, 'DOOR')
+    booking(database, 'rcoll', performanceId, 'Colin Collected', 1, 'COLLECTED')
     database.batch([['UPDATE reservations SET source = ? WHERE id = ?', 'DOOR', 'rdoor']])
   }
 
