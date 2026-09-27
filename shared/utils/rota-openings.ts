@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { constraintRefusal } from './constraint-refusal'
 import { londonDayField } from './membership'
 import { showNightOf } from './show-night'
+import { releaseRefusal } from './rota'
 import type { ShiftStatus } from './rota'
 
 // What a bar opening is, and what a slot on one is (E-130, 0077). A bar opening names no
@@ -53,6 +54,17 @@ export function openingClaimRefusal(status: ShiftStatus): string {
 export function openingReassignRefusal(status: ShiftStatus): string {
   if (status === 'CANCELLED') return 'This slot has been cancelled'
   return 'That member already holds a slot on this opening'
+}
+
+// Why a holder's own release did not apply, read only to explain it: the cut-off rides the write
+// (E-107 criterion 1), and an officer may reassign the slot between the read and the write.
+export function openingReleaseRefusal(now: { userId: string | null, status: ShiftStatus } | null, callerId: string, heldStatus: ShiftStatus): string {
+  if (now && (now.status === 'CLAIMED' || now.status === 'CONFIRMED')) {
+    return now.userId === callerId
+      ? 'That night has already begun, so the slot can no longer be released'
+      : 'This slot has been reassigned since you opened this page'
+  }
+  return releaseRefusal(now?.status ?? heldStatus)
 }
 
 // Standing a slot down accepts anything with a name on it, a declined claim included, so only

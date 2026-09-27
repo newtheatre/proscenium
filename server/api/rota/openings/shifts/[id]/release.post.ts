@@ -1,5 +1,6 @@
 import { changes } from '#shared/utils/audit'
-import { releaseRefusal } from '#shared/utils/rota'
+import { formatLondon } from '#shared/utils/london'
+import { openingReleaseRefusal } from '#shared/utils/rota-openings'
 
 // The holder's own release, the same self-service a shift has (E-107 criterion 1): the slot goes
 // back on the open list naming nobody, and the officer is not in the way of it.
@@ -25,11 +26,20 @@ export default defineEventHandler(async (event) => {
 
   if (!applied) {
     const now = await openingShiftDetail(id)
-    // Still the caller's to hold, so the write refused on the night having begun.
-    if (now && now.userId === account.id && (now.status === 'CLAIMED' || now.status === 'CONFIRMED')) {
-      throw createError({ statusCode: 409, statusMessage: 'That night has already begun, so the slot can no longer be released' })
-    }
-    throw createError({ statusCode: 409, statusMessage: releaseRefusal(now?.status ?? held.status) })
+    throw createError({ statusCode: 409, statusMessage: openingReleaseRefusal(now, account.id, held.status) })
+  }
+
+  // Close to the night it reaches the rota officers now, as a shift's release does; further out
+  // it waits for their digest (E-107 criterion 2). An opening has no duty manager slot to chase.
+  const noticeHours = await configValue(event, 'SHIFT_RELEASE_NOTICE_HOURS')
+  if ((held.startsAt - at) / 3600 <= noticeHours) {
+    const officers = await rotaOfficers()
+    const when = formatLondon(new Date(held.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
+    await Promise.all(officers.map(officer => notify(event, {
+      userId: officer.id,
+      type: 'shift.released',
+      context: { name: '', show: held.label, venue: held.venueName, when, role: 'bar' },
+    })))
   }
 
   return { ok: true, status: 'OPEN' }
