@@ -14,8 +14,9 @@ export default defineEventHandler(async (event) => {
 
   const offsets = await shiftOffsetDefaults(event)
   const nights = input.nights.map(night => ({ ...night, id: newId() }))
+  const earliest = Math.min(...nights.map(night => night.startsAt))
 
-  await db.batch(nights.flatMap(night => [
+  const created = nights.flatMap(night => [
     db.insert(schema.performances).values({
       id: night.id,
       showId,
@@ -35,7 +36,12 @@ export default defineEventHandler(async (event) => {
       // The night, not the day: a matinee and an evening are two records (E-127 criterion 1).
       detail: { showId, venueId: input.venueId, night: performanceNight(night.startsAt), bookingClosesHoursBefore: null },
     })),
-  ]) as unknown as Parameters<typeof db.batch>[0])
+  ])
+  // Once, from the run's earliest night: a show with no season takes it (D-131 criterion 2).
+  const filled = fillSeasonStatements({ showId, startsAt: earliest, actorId: resolved.account.id, auditId: newId() })
+    .map(statement => db.run(statement))
+
+  await db.batch([...created, ...filled] as unknown as Parameters<typeof db.batch>[0])
 
   return { ok: true, ids: nights.map(night => night.id) }
 })

@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { can, manageEmergencyCard } from '#shared/utils/abilities'
 import { saysWhen } from '#shared/utils/when'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
+import { cardAddressDraft } from '#shared/utils/venue-emergency'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Emergency cards', middleware: 'console', docs: '/docs/rota/emergency-cards' })
@@ -25,6 +26,7 @@ interface VenueCard {
   notes: string | null
   updatedByName: string | null
   updatedAt: number | null
+  venueAddress: string | null
 }
 
 interface Listing {
@@ -75,7 +77,7 @@ const state = reactive<FormState>({
 function edit(venue: VenueCard): void {
   editing.value = venue
   Object.assign(state, {
-    address: venue.address ?? '',
+    address: cardAddressDraft(venue.address, venue.venueAddress),
     assemblyPoint: venue.assemblyPoint ?? '',
     exits: venue.exits ?? '',
     isolationPoints: venue.isolationPoints ?? '',
@@ -131,7 +133,7 @@ const columns: TableColumn<VenueCard>[] = [
   },
   {
     id: 'address',
-    header: 'Address',
+    header: 'Address to read to 999',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => row.original.address ?? 'Not filed',
   },
@@ -241,8 +243,8 @@ const columns: TableColumn<VenueCard>[] = [
           />
 
           <UFormField
-            label="Postal address"
-            description="Written to be read aloud to a 999 call handler, including the postcode."
+            label="Address to read to 999"
+            description="Read aloud to a 999 call handler, the postcode included. A new card starts from the venue's address for audiences."
           >
             <UTextarea
               v-model="state.address"

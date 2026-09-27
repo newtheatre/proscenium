@@ -45,6 +45,8 @@ export default defineEventHandler(async (event) => {
         bookingClosesHoursBefore: input.bookingClosesHoursBefore ?? null,
       },
     })),
+    ...fillSeasonStatements({ showId, startsAt: input.startsAt, actorId: resolved.account.id, auditId: newId() })
+      .map(statement => db.run(statement)),
   ])
 
   return { ok: true, id }

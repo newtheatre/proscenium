@@ -77,11 +77,13 @@ export async function currentCard(venueId: string): Promise<EmergencyCard | unde
   return row
 }
 
-// A venue with no card at all yet: every column the outer join could not fill.
+// A venue with no card at all yet: every column the outer join could not fill. The venue's own
+// address for audiences rides along, to prefill a card that has none (issue 1352).
 export type VenueCardRow = Omit<EmergencyCard, 'id' | 'updatedByName' | 'updatedAt'> & {
   id: string | null
   updatedByName: string | null
   updatedAt: number | null
+  venueAddress: string | null
 }
 
 // A card with no address is not one anybody can read to a 999 handler, so "filed" means the
@@ -113,7 +115,7 @@ export function emergencyCardsClause(query: ListQuery): ListClause {
 // the same join-and-pick-latest shape `listVenueChecklists()` uses for its own per-venue rows.
 export function currentCardsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
-    SELECT ${CARD_COLUMNS}
+    SELECT ${CARD_COLUMNS}, v.address AS venueAddress
     FROM venues v
     LEFT JOIN venue_emergency_info e ON e.id = (
       SELECT id FROM venue_emergency_info WHERE venue_id = v.id ORDER BY updated_at DESC LIMIT 1

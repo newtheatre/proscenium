@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
-import { tonightsPerformance } from '#tests/helpers/programme'
+import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -76,6 +76,23 @@ describe.skipIf(skip !== null)('committee configuration (E-113 criterion 1)', ()
 
   test('editing a missing venue 404s', async () => {
     expect((await send('PUT', '/api/admin/venues/no-such-venue/emergency', { address: 'x', assemblyPoint: 'x' })).status).toBe(404)
+  })
+
+  // Issue 1352: a venue with no card yet offers its address for audiences to prefill the card.
+  test('the overview carries each venue\'s address for audiences beside its card\'s own', async () => {
+    const database = new Database(app.databaseFile)
+    const bare = 'venue-emergency-bare'
+    try {
+      testVenue(sqliteTarget(database), { suffix: 'emergency-bare' })
+      database.run('UPDATE venues SET address = ? WHERE id = ?', ['University Park, Nottingham NG7 2RD', bare])
+    }
+    finally {
+      database.close()
+    }
+
+    const listed = await send('GET', '/api/admin/venues/emergency')
+    const { venues } = await listed.json() as { venues: { venueId: string, address: string | null, venueAddress: string | null }[] }
+    expect(venues.find(venue => venue.venueId === bare)).toMatchObject({ address: null, venueAddress: 'University Park, Nottingham NG7 2RD' })
   })
 
   // Issue 902: the address is the one line a volunteer reads aloud, so a card cannot be filed

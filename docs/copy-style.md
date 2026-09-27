@@ -106,7 +106,7 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Close | Retire, for a period or a night | A period or a night stops taking entries. |
 | Remove | Delete, retire, for something with no history | A template, a lead, a note, a poster: nothing to keep. |
 | Revoke | Remove, for a grant | A grant is taken away. |
-| Web address | Address, for a slug | The last part of a public page's address, lowercase words joined by hyphens. A postal address is a "postal address" and an email is an "email address". |
+| Web address | Address, for a slug | The last part of a public page's address, lowercase words joined by hyphens. A postal address is named for its reader (section 8): a venue's is the "Address for audiences", an emergency card's the "Address to read to 999". An email is an "email address". |
 
 ## 4a. The public shell's settled words
 
@@ -223,6 +223,12 @@ the next to follow.
 
 One marquee CTA per public view (`docs/design-language.md`): `app/pages/index.vue` already keeps
 to it, and its comment above `<template #links>` names the budget explicitly.
+
+Two fields never share a question. Where two forms each ask for something of the same kind that
+can differ, each label names who reads the answer, so nobody copies one into the other believing
+it is the same field. The venue form asks for the "Address for audiences" and the emergency card
+for the "Address to read to 999": for the theatre itself the two differ, the card's is prefilled
+once from the venue's, and after that each keeps its own (issue 1352).
 
 ## 9. Numbers, money, dates and times
 

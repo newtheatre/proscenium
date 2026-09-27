@@ -3,7 +3,7 @@ title: Box office
 description: The desk, passes, the programme and its reference data, and access profile verification.
 module: Ticketing
 audience: committee
-updatedOn: 2026-09-26
+updatedOn: 2026-09-27
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -51,7 +51,7 @@ no shift approves one.
   Where a performance happens: capacity, an optional room it closes, external venues.
   ::
   ::card{icon="i-lucide-calendar-range" title="Seasons" to="/docs/box-office/seasons"}
-  The committee years a show belongs to.
+  The theatre's seasons (Autumn, Spring, StuFF and the Fringe) a show belongs to, in date order.
   ::
   ::card{icon="i-lucide-layout-grid" title="Show categories" to="/docs/box-office/show-categories"}
   The headings the public listing groups shows under.

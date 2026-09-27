@@ -321,7 +321,9 @@ them are `server/utils/performances.ts` (`architecture.md`).
 `room_id` → rooms set null · `archived` bool · `created_at`. General admission only; no seat-map
 tables exist and nothing may assume them (constraint 4). A venue is its own row, never a flagged
 room: `room_id` says which rehearsal room the venue occupies, and its only effect is that the
-venue's performances apply blackouts to that room (0043).
+venue's performances apply blackouts to that room (0043). `address` is the address for audiences;
+the address read to a 999 call handler is the emergency card's own (`venue_emergency_info`), which
+the card form prefills from this one only while the card has none (D-131 criterion 1).
 
 **Administration (D-131).** `/box-office/venues`, over these routes, `ticketing.read` for the
 listing and `ticketing.write` for the rest:
@@ -365,7 +367,9 @@ Wave 0 contract does not list them.
 `updated_by` → users restrict · `updated_at`. Every column is nullable, `address` included,
 because the versions filed before migration 0100 predate it and an append-only table cannot be
 rewritten to fill them in; the form requires it instead, and a venue only counts as filed once
-its latest version carries one (issue 902). `first_aiders` is free text until the training
+its latest version carries one (issue 902). The committee overview (`currentCardsQuery()`) also
+carries the venue's own address as `venueAddress`, which starts a card with no address yet and is
+never read to 999 in its place. `first_aiders` is free text until the training
 catalogue carries a first-aid module to derive tonight's from. Versioned, not a single row per venue (E-113
 criterion 1): an edit is a new row, and the latest per venue by `updated_at` is the current
 card. Rebuilt from a single-row-per-venue shape in migration 0071, which also hand-corrects a
@@ -374,7 +378,9 @@ table never had) and adds the append-only triggers by hand, as every table in th
 
 ### seasons
 `id` PK · `name` UNIQUE, case-insensitive UNIQUE too (`seasons_name_nocase`) · `starts_on` ·
-`ends_on` · `sort` · `archived` bool. CHECK `ends_on` > `starts_on`.
+`ends_on` · `sort` · `archived` bool. CHECK `ends_on` > `starts_on`. `sort` is no longer read
+or written: seasons list by `starts_on` (D-131 criterion 2), and the column stays because a
+migration here only adds nullable columns.
 
 **A season is one of the theatre's seasons, never the committee year (0087).** Autumn, Spring,
 StuFF or the Fringe of an academic year, named and dated by the Box Office Manager; the whole
@@ -383,7 +389,15 @@ StuFF or the Fringe of an academic year, named and dated by the Box Office Manag
 `resolvePeriodBounds()` (`server/utils/season-dashboard.ts`) looks the row up by id and 404s an
 unknown one, and `GET /api/admin/finance/seasons` lists every row, retired ones too, for
 `finance.read` or `finance.summary`. Seasons should not overlap, since a day in two seasons counts
-in both; that is guidance on the Seasons page, not a constraint. The public What's on heading
+in both; that is guidance, not a constraint: an add or an edit answers `overlaps`, the names of
+the unretired seasons sharing a day with it (`seasonOverlapsQuery()`), and the Seasons page
+names them. A show with no season takes the season a performance's night falls in when that
+performance is added, unless the show already has an earlier live performance; once it has a
+season, no performance changes it, even one on an earlier night. `fillSeasonStatements()`
+(`server/utils/seasons.ts`), in the same batch as the performance, sets `shows.season_id` to the
+unretired season holding that night (0014), the later starting one if two do, and then writes a
+`show.updated` audit row with `filledFrom`, the night, only if that update changed the show (0049).
+The public What's on heading
 names a season too (`headlineSeasonQuery()`, `server/utils/whats-on.ts`, carried as `season` on
 `GET /api/whats-on`): the unretired row tonight's show night (0014) falls in, else the next to
 begin, else `null` and no season word at all; a finished season is never named.
@@ -393,9 +407,9 @@ listing and `ticketing.write` for the rest:
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/admin/reference-data/seasons` | The paged envelope, retired seasons included by default, each row carrying whether a show belongs to it. |
-| `POST /api/admin/reference-data/seasons` | Adds one. The name is refused if already held, without regard to capitals. |
-| `PUT /api/admin/reference-data/seasons/[id]` | Changes everything except `archived`, which is its own action. |
+| `GET /api/admin/reference-data/seasons` | The paged envelope in date order, retired seasons included by default, each row carrying whether a show belongs to it. |
+| `POST /api/admin/reference-data/seasons` | Adds one, answering `overlaps`. The name is refused if already held, without regard to capitals. |
+| `PUT /api/admin/reference-data/seasons/[id]` | Changes the name and the days, answering `overlaps`; `archived` is its own action. |
 | `POST /api/admin/reference-data/seasons/[id]/archive` | Retires a season, or brings one back. A retired season cannot be chosen for a new show and still names every show that already carries it. |
 | `DELETE /api/admin/reference-data/seasons/[id]` | Deletes a season no show belongs to. One with shows is a 409 naming retirement as the way. |
 
@@ -512,8 +526,8 @@ for the two that read and `ticketing.write` for the rest:
 | `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. |
 | `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. `cascadePerformances` takes DRAFT performances on sale in the same batch; CANCELLED ones are skipped by predicate. `coverPassTypeIds` adds the show to each named pass in the same batch, with a `pass-type.shows.updated` audit row wherever the row went in (0049); a pass not among `coveringPasses` is a 409 naming it and nothing is published, and one already covering is left alone (D-123 criterion 4, issue 1323). |
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
-| `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6). |
-| `POST /api/admin/shows/[id]/runs` | Adds a run: `venueId`, the running time and intervals once, and `nights` (each a curtain and optional doors, one to 31, each curtain once). Every night is written DRAFT and stamped from its venue's template in one batch, each with its own `performance.created` row, or none is: a missing running time at a venue we run, a retired venue or a night with doors after its curtain refuses the whole run (D-132 criterion 10). |
+| `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6). A show with no season and no earlier live performance takes the unretired season this night falls in, in the same batch, audited as `show.updated` with `filledFrom` (D-131 criterion 2). |
+| `POST /api/admin/shows/[id]/runs` | Adds a run: `venueId`, the running time and intervals once, and `nights` (each a curtain and optional doors, one to 31, each curtain once). Every night is written DRAFT and stamped from its venue's template in one batch, each with its own `performance.created` row, or none is: a missing running time at a venue we run, a retired venue or a night with doors after its curtain refuses the whole run (D-132 criterion 10). A show with no season and no earlier live performance takes the unretired season the run's earliest night falls in, in the same batch, audited once as `show.updated` (D-131 criterion 2). |
 | `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). |
 | `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |
 | `POST /api/admin/performances/[id]/cancel` | Cancels one, and answers with how many tickets are owed a refund. |

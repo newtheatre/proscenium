@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { seasonsList } from '#shared/utils/seasons-list'
-import { SEASON_REFERENCES, seasonInUseQuery, seasonsClause, seasonsQuery } from '#server/utils/seasons'
+import { SEASON_REFERENCES, fillSeasonStatements, seasonInUseQuery, seasonOptionsQuery, seasonOverlapsQuery, seasonsClause, seasonsQuery } from '#server/utils/seasons'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
+import type { SQL } from 'drizzle-orm'
 
 // K-129: the declaration is what turns a raw query into a clause, the same route it takes live.
 const seasonsSchema = filterQuerySchema(seasonsList)
@@ -104,6 +105,189 @@ describe('the listing is searched and paged in SQL', () => {
 
       const [query, ...parameters] = boundStatement(database, seasonsQuery(parsedSeasons({ archived: 'false' }), 1, 1))
       expect(rows<{ id: string }>(database, query, ...parameters).map(row => row.id)).toEqual(['se-2'])
+    })
+  })
+})
+
+function ask<T>(database: TestDatabase, statement: SQL): T[] {
+  const [query, ...parameters] = boundStatement(database, statement)
+  return rows<T>(database, query, ...parameters)
+}
+
+// Criterion 2, trimmed by issue 1352: the dates are the order, in the list and in every picker.
+describe('seasons list in date order', () => {
+  function threeSeasons(database: TestDatabase): void {
+    season(database, { id: 'spring', name: 'Spring 2027', starts_on: '2027-01-20', ends_on: '2027-04-10' })
+    season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10' })
+    season(database, { id: 'stuff', name: 'StuFF 2027', starts_on: '2027-05-01', ends_on: '2027-06-20', archived: 1 })
+  }
+
+  test('the console list opens earliest first, whatever the names say', async () => {
+    await withDatabase((database) => {
+      threeSeasons(database)
+      expect(ask<{ id: string }>(database, seasonsQuery(parsedSeasons({}), 25, 0)).map(row => row.id)).toEqual(['autumn', 'spring', 'stuff'])
+    })
+  })
+
+  test('a show\'s picker lists them the same way, a retired one included', async () => {
+    await withDatabase((database) => {
+      threeSeasons(database)
+      expect(ask<{ id: string }>(database, seasonOptionsQuery()).map(row => row.id)).toEqual(['autumn', 'spring', 'stuff'])
+    })
+  })
+})
+
+// Guidance, not a constraint (0087): the save goes through and names what it overlaps.
+describe('a save names the seasons it overlaps (issue 1352)', () => {
+  function overlaps(database: TestDatabase, startsOn: string, endsOn: string, exceptId: string | null = null): string[] {
+    return ask<{ name: string }>(database, seasonOverlapsQuery(startsOn, endsOn, exceptId)).map(row => row.name)
+  }
+
+  test('sharing even one day with a current season names it; the day after does not', async () => {
+    await withDatabase((database) => {
+      season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10' })
+      expect(overlaps(database, '2026-12-01', '2027-01-05')).toEqual(['Autumn 2026'])
+      expect(overlaps(database, '2026-12-10', '2026-12-20')).toEqual(['Autumn 2026'])
+      expect(overlaps(database, '2026-09-01', '2026-09-20')).toEqual(['Autumn 2026'])
+      expect(overlaps(database, '2026-12-11', '2027-01-19')).toEqual([])
+    })
+  })
+
+  test('a season never overlaps itself, and a retired one is not named', async () => {
+    await withDatabase((database) => {
+      season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10' })
+      season(database, { id: 'old', name: 'Autumn 2025', starts_on: '2025-09-20', ends_on: '2026-12-31', archived: 1 })
+      expect(overlaps(database, '2026-09-20', '2026-12-10', 'autumn')).toEqual([])
+    })
+  })
+
+  test('two overlapped seasons are named in date order', async () => {
+    await withDatabase((database) => {
+      season(database, { id: 'spring', name: 'Spring 2027', starts_on: '2027-01-20', ends_on: '2027-04-10' })
+      season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10' })
+      expect(overlaps(database, '2026-12-01', '2027-02-01')).toEqual(['Autumn 2026', 'Spring 2027'])
+    })
+  })
+})
+
+// Criterion 2: a show with no season takes the one its first performance's night falls in.
+describe('a show\'s season fills from its first performance (issue 1352)', () => {
+  const at = (iso: string): number => Date.parse(iso) / 1000
+
+  function show(database: TestDatabase, seasonId: string | null = null): string {
+    insert(database, 'shows', { id: 'show-1', slug: 'the-seagull', title: 'The Seagull', season_id: seasonId })
+    insert(database, 'venues', { id: 'venue-1', name: 'The Test House' })
+    insert(database, 'users', { id: 'officer', name: 'Someone', email: 'officer@e2e.newtheatre.org.uk', verified: 1 })
+    return 'show-1'
+  }
+
+  function performance(database: TestDatabase, id: string, startsAt: number, status = 'DRAFT'): void {
+    insert(database, 'performances', { id, show_id: 'show-1', venue_id: 'venue-1', starts_at: startsAt, status })
+  }
+
+  function fill(database: TestDatabase, startsAt: number, auditId = 'audit-fill'): void {
+    database.batch(fillSeasonStatements({ showId: 'show-1', startsAt, actorId: 'officer', auditId }).map(statement => boundStatement(database, statement)))
+  }
+
+  const seasonOf = (database: TestDatabase): string | null =>
+    rows<{ seasonId: string | null }>(database, 'SELECT season_id AS seasonId FROM shows WHERE id = ?', 'show-1')[0]!.seasonId
+
+  const trail = (database: TestDatabase) =>
+    rows<{ action: string, target: string, detail: string }>(database, 'SELECT action, target, detail FROM audit_log WHERE id = ?', 'audit-fill')
+
+  test('the first performance fills it with the season its night falls in, and the trail says so', async () => {
+    await withDatabase((database) => {
+      season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10' })
+      show(database)
+      const curtain = at('2026-10-14T18:30:00Z')
+      performance(database, 'p-1', curtain)
+      fill(database, curtain)
+
+      expect(seasonOf(database)).toBe('autumn')
+      const [entry] = trail(database)
+      expect(entry).toMatchObject({ action: 'show.updated', target: 'show:show-1' })
+      expect(JSON.parse(entry!.detail)).toMatchObject({ changes: { seasonId: { from: null, to: 'autumn' } }, filledFrom: '2026-10-14' })
+    })
+  })
+
+  test('a curtain after midnight is the night before, so the season\'s last night still counts (0014)', async () => {
+    await withDatabase((database) => {
+      season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10' })
+      show(database)
+      const curtain = at('2026-12-11T00:30:00Z')
+      performance(database, 'p-1', curtain)
+      fill(database, curtain)
+      expect(seasonOf(database)).toBe('autumn')
+    })
+  })
+
+  test('a season chosen by hand is never replaced, and nothing is written to the trail', async () => {
+    await withDatabase((database) => {
+      season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10' })
+      season(database, { id: 'fringe', name: 'Fringe 2026', starts_on: '2026-08-01', ends_on: '2026-08-31' })
+      show(database, 'fringe')
+      const curtain = at('2026-10-14T18:30:00Z')
+      performance(database, 'p-1', curtain)
+      fill(database, curtain)
+      expect(seasonOf(database)).toBe('fringe')
+      expect(trail(database)).toEqual([])
+    })
+  })
+
+  test('only the first performance fills it: a later one leaves a show with an earlier live night alone', async () => {
+    await withDatabase((database) => {
+      season(database, { id: 'spring', name: 'Spring 2027', starts_on: '2027-01-20', ends_on: '2027-04-10' })
+      show(database)
+      performance(database, 'p-1', at('2027-01-10T19:30:00Z'))
+      const later = at('2027-02-10T19:30:00Z')
+      performance(database, 'p-2', later)
+      fill(database, later)
+      expect(seasonOf(database)).toBeNull()
+    })
+  })
+
+  test('an earlier cancelled night is not the first performance', async () => {
+    await withDatabase((database) => {
+      season(database, { id: 'spring', name: 'Spring 2027', starts_on: '2027-01-20', ends_on: '2027-04-10' })
+      show(database)
+      performance(database, 'p-1', at('2027-01-10T19:30:00Z'), 'CANCELLED')
+      const later = at('2027-02-10T19:30:00Z')
+      performance(database, 'p-2', later)
+      fill(database, later)
+      expect(seasonOf(database)).toBe('spring')
+    })
+  })
+
+  // Once a show has a season nothing here moves it, whichever night is added first; the trail
+  // records the one fill that happened.
+  for (const order of [['october', 'august'], ['august', 'october']] as const) {
+    test(`two nights added ${order.join(' then ')}: the first added sets the season, once`, async () => {
+      await withDatabase((database) => {
+        season(database, { id: 'fringe', name: 'Fringe 2026', starts_on: '2026-08-01', ends_on: '2026-08-31' })
+        season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10' })
+        show(database)
+        const nights = { october: at('2026-10-14T18:30:00Z'), august: at('2026-08-15T18:30:00Z') }
+        order.forEach((which, index) => {
+          performance(database, `p-${which}`, nights[which])
+          fill(database, nights[which], `audit-${index + 1}`)
+        })
+
+        expect(seasonOf(database)).toBe(order[0] === 'october' ? 'autumn' : 'fringe')
+        const written = rows<{ id: string }>(database, `SELECT id FROM audit_log WHERE action = 'show.updated' AND target = 'show:show-1'`)
+        expect(written).toEqual([{ id: 'audit-1' }])
+      })
+    })
+  }
+
+  test('a retired season is never taken, and a night in no season leaves the show without one', async () => {
+    await withDatabase((database) => {
+      season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10', archived: 1 })
+      show(database)
+      const curtain = at('2026-10-14T18:30:00Z')
+      performance(database, 'p-1', curtain)
+      fill(database, curtain)
+      expect(seasonOf(database)).toBeNull()
+      expect(trail(database)).toEqual([])
     })
   })
 })

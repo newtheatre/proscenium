@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   // moment refuses rather than reaching the unique index (0003, 0006).
   const updated = await db.all<{ id: string }>(sql`
     UPDATE seasons
-    SET name = ${input.name}, starts_on = ${input.startsOn}, ends_on = ${input.endsOn}, sort = ${input.sort}
+    SET name = ${input.name}, starts_on = ${input.startsOn}, ends_on = ${input.endsOn}
     WHERE id = ${id}
       AND NOT EXISTS (SELECT 1 FROM seasons WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
     RETURNING id
@@ -36,9 +36,8 @@ export default defineEventHandler(async (event) => {
       name: [held.name, input.name],
       startsOn: [held.startsOn, input.startsOn],
       endsOn: [held.endsOn, input.endsOn],
-      sort: [held.sort, input.sort],
     }),
   }))
 
-  return { ok: true }
+  return { ok: true, overlaps: await seasonOverlaps(input.startsOn, input.endsOn, id) }
 })

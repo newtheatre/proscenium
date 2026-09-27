@@ -827,11 +827,15 @@ Open questions:
   1. Venues can be created, edited and retired, with the columns the data model gives them. A
      venue may point at a room and need not; the only effect of the attachment is that the
      venue's performances apply blackouts to that room, and nothing else about a room is
-     inferred from a venue or the reverse (0043).
-  2. Seasons can be created, edited and retired, and carry the order they are presented in. A
-     show belongs to at most one season. A season is one of the theatre's seasons (Autumn,
-     Spring, StuFF or the Fringe of an academic year), never the committee year, and seasons are
-     dated so they do not overlap; that is guidance on the page, not a constraint (0087).
+     inferred from a venue or the reverse (0043). Trimmed 27 September 2026 (issue 1352): the
+     venue's address is the "Address for audiences"; the address read to a 999 call handler is
+     the emergency card's own, prefilled once from it.
+  2. Seasons can be created, edited and retired, and are listed in date order. A show belongs to
+     at most one season, and a show with none takes the season its first performance falls in.
+     A season is one of the theatre's seasons (Autumn, Spring, StuFF or the Fringe of an academic
+     year), never the committee year, and seasons are dated so they do not overlap; that is
+     guidance on the page, which names any season a save overlaps, not a constraint (0087).
+     Trimmed 27 September 2026 (issue 1352): the order field is gone.
   3. Show categories can be created, edited and retired.
   4. Nothing here is ever destroyed while it is in use: a venue with performances, a season with
      shows or a category with shows refuses deletion and offers retirement instead, and a

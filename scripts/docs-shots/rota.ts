@@ -124,7 +124,7 @@ export const rota: Shot[] = [
     width: CONSOLE_WIDTH,
     after: openFirst('[data-test^="edit-emergency-"]'),
     annotations: [
-      { selector: '[data-test="field-address"]', label: 'Address' },
+      { selector: '[data-test="field-address"]', label: 'Address to read to 999' },
       { selector: '[data-test="field-assembly"]', label: 'Assembly point' },
       { selector: '[data-test="field-exits"]', label: 'Exits' },
       { selector: '[data-test="field-isolation"]', label: 'Isolation points' },
