@@ -63,7 +63,7 @@ export default defineEventHandler(async (event) => {
 
   // Never masked, unlike a booking. A closed room explains itself to everybody, which is the one
   // deliberate exception to C-103's masking (C-114 criterion 4).
-  const shut = await blackoutsAcross(fromAt, toAt)
+  const shut = await closuresAcross(event, fromAt, toAt)
 
   return {
     from: input.from,

@@ -29,7 +29,7 @@ export interface PendingRow {
 
 export type DecisionOutcome
   = | { id: string, ok: true, status: 'CONFIRMED' | 'REJECTED' }
-    | { id: string, ok: false, why: 'missing' | 'settled' | 'gone' | 'conflict', says: string, conflicts?: Conflict[] }
+    | { id: string, ok: false, why: 'missing' | 'settled' | 'gone' | 'conflict' | 'closed', says: string, conflicts?: Conflict[] }
 
 // Read back the rows a batch names, split so no statement's parameter count grows with the batch
 // (0003). Ids come from the body rather than a result set, and the cap is the same either way.

@@ -4,6 +4,7 @@ import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import { BLACKOUT_REASON_LIMIT, saysSpan } from '#shared/utils/blackouts'
 import { blackoutsList } from '#shared/utils/blackouts-list'
 import { fromLondonWallClock } from '#shared/utils/london'
+import type { ListedPerformanceClosure } from '#shared/utils/performance-closures'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Closures', middleware: 'console', docs: '/docs/spaces/closures' })
@@ -62,6 +63,17 @@ const { data: listing, status, refresh, error } = await useAsyncData(
 watch(error, (raised) => {
   if (raised) failure.value = listFailureFrom(raised, 'The closures could not be read.')
 })
+
+// Derived from the programme rather than set here, so it is listed and never reopened (issue 1347).
+const { data: performed, error: performedError, refresh: refreshPerformed } = await useAsyncData(
+  'rooms-performance-closures',
+  () => request<{ items: ListedPerformanceClosure[] }>('/api/admin/rooms/blackouts/performances'),
+  { default: () => ({ items: [] as ListedPerformanceClosure[] }) },
+)
+const performedFailure = useListFailure(performedError, 'The closures performances make could not be read.')
+
+const spanOf = (span: { startsAt: number, endsAt: number }): string =>
+  saysSpan(new Date(span.startsAt * 1000), new Date(span.endsAt * 1000))
 
 async function loadRooms(): Promise<void> {
   rooms.value = (await $fetch<{ items: typeof rooms.value }>('/api/admin/rooms')).items
@@ -244,6 +256,71 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
     >
       {{ plural(listing.total, 'closure') }}
     </p>
+
+    <UPageCard
+      title="Closed for performances"
+      description="A venue's performances close the room it is attached to, from before doors until after the curtain comes down. They are not reopened here: cancel the performance, or detach the room from the venue. A booking already in the room is left standing for you to settle with whoever made it."
+      data-test="performance-closures"
+    >
+      <ReadFailure
+        v-if="performedFailure"
+        :failure="performedFailure"
+        @retry="refreshPerformed()"
+      />
+      <p
+        v-else-if="performed.items.length === 0"
+        class="text-sm text-muted"
+      >
+        No performance closes a room as far ahead as bookings open.
+      </p>
+      <ul
+        v-else
+        class="divide-y divide-default"
+      >
+        <li
+          v-for="item in performed.items"
+          :key="item.id"
+          class="py-3"
+          :data-test="`performance-closure-${item.performanceId}`"
+        >
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <span class="font-medium">
+              {{ item.room }}: {{ item.show }} is on
+              <UBadge
+                v-if="!item.published"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              >Not yet published</UBadge>
+            </span>
+            <span class="text-sm text-muted">{{ spanOf(item) }}</span>
+          </div>
+          <p class="text-xs text-muted">
+            At {{ item.venue }}
+          </p>
+          <div
+            v-if="item.overlapping.length"
+            class="mt-2"
+          >
+            <UBadge
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-triangle-alert"
+            >
+              {{ plural(item.overlapping.length, 'booking') }} to settle
+            </UBadge>
+            <ul class="mt-1 space-y-0.5 text-sm">
+              <li
+                v-for="booking in item.overlapping"
+                :key="booking.id"
+              >
+                {{ booking.title }}, {{ booking.bookedBy ?? 'unnamed' }}, {{ spanOf(booking) }}
+              </li>
+            </ul>
+          </div>
+        </li>
+      </ul>
+    </UPageCard>
 
     <UModal
       v-model:open="closing"

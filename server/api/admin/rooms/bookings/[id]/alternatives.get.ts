@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const displaced = await displacedBooking(id)
   if (!displaced) throw noSuch('booking')
 
-  const candidates = await alternativesFor(displaced)
+  const candidates = await alternativesFor(displaced, event)
   const best = nearestTo(displaced, candidates)
 
   return { nearest: best ?? null, total: candidates.length }

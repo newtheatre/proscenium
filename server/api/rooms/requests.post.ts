@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
 
   // Nothing an approver could agree to either: the room is shut, and closing it was their doing.
   const shut = blackoutOver(
-    await blackoutsAcross(Math.floor(startsAt.getTime() / 1000), Math.floor(endsAt.getTime() / 1000), room.id),
+    await closuresAcross(event, Math.floor(startsAt.getTime() / 1000), Math.floor(endsAt.getTime() / 1000), room.id),
     room.id,
     { startsAt: Math.floor(startsAt.getTime() / 1000), endsAt: Math.floor(endsAt.getTime() / 1000) },
   )

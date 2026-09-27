@@ -254,6 +254,7 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   3. Creating a blackout over existing bookings cancels each with a notification naming the reason; for a recurring series, only the overlapping occurrences are cancelled.
   4. Blackouts render on the calendar for everyone with their stated reason; they are never masked as "Booked".
   5. Blackout creation, edit and removal are audited; removal restores nothing automatically (cancelled bookings stay cancelled and must be rebooked).
+  6. Added 26 September 2026 (issue 1347): a performance that is not cancelled closes its venue's room (0043) over the performance's shift window (0078), derived when availability or a booking is read rather than stored, so nobody types a show week in as a closure. It refuses a booking, a request, an officer's approval and a bump like any closure, with the show named (or "A performance" while the show is unpublished, D-121), and is listed read-only on the Closures screen with the bookings it overlaps, which are left standing for the Theatre Manager to settle rather than cancelled.
 - Source: Prompt Book C-2; audit RM-6 (no blackout mechanism existed).
 
 ## C-115: Priority tiers and bumping

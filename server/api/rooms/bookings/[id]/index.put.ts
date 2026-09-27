@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
   const startsAt = Math.floor(new Date(input.startsAt).getTime() / 1000)
   const endsAt = Math.floor(new Date(input.endsAt).getTime() / 1000)
 
-  const shut = blackoutOver(await blackoutsAcross(startsAt, endsAt, room.id), room.id, { startsAt, endsAt })
+  const shut = blackoutOver(await closuresAcross(event, startsAt, endsAt, room.id), room.id, { startsAt, endsAt })
   if (shut) {
     throw createError({
       statusCode: 422,

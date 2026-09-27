@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, ne, sql } from 'drizzle-orm'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 import { nearest } from '#shared/utils/tiers'
-import { blackoutsAcross } from './blackouts'
+import { closuresAcross } from './blackouts'
 import { blackoutOver } from '#shared/utils/blackouts'
 import type { Alternative } from '#shared/utils/tiers'
 import type { H3Event } from 'h3'
@@ -52,7 +52,7 @@ export async function displacedBooking(id: string): Promise<Displaced | undefine
 
 // Free slots of the same length, in the same room or one that holds at least as many, within a
 // window either side. Bounded by that window rather than by a count, so the search is one read.
-export async function alternativesFor(displaced: Displaced, withinDays = 14): Promise<Alternative[]> {
+export async function alternativesFor(displaced: Displaced, event?: H3Event, withinDays = 14): Promise<Alternative[]> {
   const length = displaced.endsAt - displaced.startsAt
   const from = displaced.startsAt - withinDays * 86_400
   const to = displaced.endsAt + withinDays * 86_400
@@ -86,7 +86,7 @@ export async function alternativesFor(displaced: Displaced, withinDays = 14): Pr
     ))
     .orderBy(asc(schema.roomBookings.startsAt))
 
-  const shut = await blackoutsAcross(from, to)
+  const shut = await closuresAcross(event, from, to)
 
   // The same clock time on nearby days, which is what "equivalent" means to somebody rearranging
   // a rehearsal: an hour earlier on the right day beats the same hour three weeks later.

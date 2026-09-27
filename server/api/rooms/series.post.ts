@@ -43,7 +43,8 @@ export default defineEventHandler(async (event) => {
   const clashes = await conflictsAcross(room.id, occurrences)
   // Read once for the whole term. A blacked-out occurrence is a refusal like any other, so the
   // member skips it explicitly rather than having it dropped for them (criterion 2).
-  const shut = await blackoutsAcross(
+  const shut = await closuresAcross(
+    event,
     Math.floor(occurrences[0]!.startsAt.getTime() / 1000),
     Math.floor(occurrences.at(-1)!.endsAt.getTime() / 1000),
     room.id,

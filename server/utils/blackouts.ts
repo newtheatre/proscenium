@@ -4,6 +4,7 @@ import { formatLondon } from '#shared/utils/london'
 import { blackoutsList } from '#shared/utils/blackouts-list'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { tableColumns, whereFrom, yesNo } from './list-filters'
+import { performanceClosuresAcross } from './performance-closures'
 import type { Blackout } from '#shared/utils/blackouts'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
@@ -30,6 +31,16 @@ export async function blackoutsAcross(from: number, to: number, roomId?: string)
       roomId ? or(eq(schema.roomBlackouts.roomId, roomId), sql`${schema.roomBlackouts.roomId} IS NULL`) : undefined,
     ))
     .orderBy(asc(schema.roomBlackouts.startsAt))
+}
+
+// Every closure over a span: those an officer set, and those a performance implies at the venue
+// its room is attached to (issue 1347). Anything that refuses a booking reads this, not the table.
+export async function closuresAcross(event: H3Event | undefined, from: number, to: number, roomId?: string): Promise<Blackout[]> {
+  const [set, performed] = await Promise.all([
+    blackoutsAcross(from, to, roomId),
+    performanceClosuresAcross(event, from, to, roomId),
+  ])
+  return [...set, ...performed].sort((one, other) => one.startsAt - other.startsAt)
 }
 
 export interface Stranded {
