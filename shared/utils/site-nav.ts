@@ -268,7 +268,7 @@ export const CONSOLE_NAV: NavGroup[] = [
 export const MY_NAV: NavEntry[] = [
   // Module K: platform
 
-  { label: 'My NNT', icon: 'i-lucide-house', to: '/my', ability: signedIn, exact: true },
+  { label: 'My NNT', icon: 'i-lucide-house', to: '/my', ability: signedIn },
 
   // Module E: show night
 
@@ -296,6 +296,12 @@ export const MY_NAV: NavEntry[] = [
   { label: 'Membership', icon: 'i-lucide-badge-check', to: '/account/membership', ability: signedIn },
 ]
 
+// Whether a member entry is lit on this path. The pages beneath one (My bookings, Training sessions,
+// Notifications) are the router's siblings of it, not children, so the router never lights it.
+export function memberNavActive(entry: NavEntry, path: string): boolean {
+  return path === entry.to || (!entry.exact && path.startsWith(`${entry.to}/`))
+}
+
 // The account settings pages: how somebody is known to the system, not what they are doing
 // tonight (K-127 criterion 3). `AccountSettings.vue` renders these as the settings side list.
 export const ACCOUNT_NAV: NavEntry[] = [
@@ -304,7 +310,8 @@ export const ACCOUNT_NAV: NavEntry[] = [
   { label: 'Access requirements', icon: 'i-lucide-accessibility', to: '/account/access', ability: signedIn },
   // Shortened from "Sign-in and security": truncated in the settings aside at 1280 (issue 921).
   { label: 'Security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
-  { label: 'Notifications', icon: 'i-lucide-bell', to: '/account/notifications', ability: signedIn },
+  // In-app always arrives, so this page only chooses what is emailed; the inbox is /my/notifications.
+  { label: 'Email settings', icon: 'i-lucide-mail', to: '/account/notifications', ability: signedIn },
 ]
 
 // The account menu is the only place all four shells are reachable from each other, because it is

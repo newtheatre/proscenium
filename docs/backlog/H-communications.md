@@ -48,12 +48,12 @@ Stories: 15 total (9 MVP, 5 V2, 1 Later).
 - Story: As a member, I want notification preferences per topic rather than per module so that I choose what I hear about, not which app happens to send it.
 - Depends on: H-101
 - Acceptance criteria:
-  1. The topics are exactly: bookings, shifts, training, room bookings, committee announcements; the preference screen is one page showing a topic-by-channel matrix with the current value of every cell.
-  2. Preferences are stored per topic per channel; defaults for a new account are agreed in Phase 0 configuration and are visible on the screen as defaults.
+  1. The topics are exactly: bookings, shifts, training, room bookings, committee announcements; the preference screen is one page with a switch per topic showing its current value. Trimmed 27 September 2026 (issue 1345): a switch per channel is offered only where something delivers (H-104 criterion 7), which today is email alone.
+  2. Preferences are stored per topic per channel; defaults for a new account are agreed in Phase 0 configuration. Trimmed 27 September 2026 (issue 1345): a default is not labelled on the screen, since the switch shows the value in force.
   3. A message whose topic is switched off for a channel is recorded in the send log as suppressed-by-preference for that channel, and is not handed to the provider.
   4. A preference change takes effect for the next send; no queued digest already cut is recalled.
-  5. Suppression never applies to types flagged transactional (H-103); the preference screen states this next to each topic.
-  6. In-app inbox entries are always written regardless of email preference, so switching email off never makes a message unfindable.
+  5. Suppression never applies to types flagged transactional (H-103); the preference screen states this once, above its switches. Trimmed 27 September 2026 (issue 1345) from "next to each topic".
+  6. In-app inbox entries are always written regardless of email preference, so switching email off never makes a message unfindable. The inbox is its own page under My NNT (`/my/notifications`), newest first, linking the email settings (issue 1345).
 - Source: Prompt Book H-1 (preferences per topic, not per module); audit RM-1/RM-6 (rooms admins can switch email off entirely, leaving a log line as backstop).
 
 ## H-103: Transactional messages always deliver

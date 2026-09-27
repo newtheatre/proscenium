@@ -19,6 +19,7 @@ not be a refusal at a desk (0031).
 | Route | Ability | Membership requirement | Sent to |
 | --- | --- | --- | --- |
 | `/my` | `signedIn` | None: a lapsed member sees every tile, including "Membership" reading lapsed (A-129 criterion 2). | n/a |
+| `/my/notifications` | `signedIn` | None: the inbox is your own notifications, whatever membership state the account is in. | n/a |
 
 ## Account
 

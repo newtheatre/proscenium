@@ -168,9 +168,9 @@ describe.skipIf(skip !== null)('a switched-off topic is suppressed, not sent (cr
   test('the message is still findable in the inbox', async () => {
     expect(inboxCount(member.id, 'room.booking.reminder')).toBe(1)
 
-    const answered = await send('GET', '/api/account/notifications', null, member.cookie)
-    const { inbox } = await answered.json() as { inbox: { type: string, title: string }[] }
-    expect(inbox.some(item => item.type === 'room.booking.reminder')).toBe(true)
+    const answered = await send('GET', '/api/account/inbox', null, member.cookie)
+    const { items } = await answered.json() as { items: { type: string, title: string }[] }
+    expect(items.some(item => item.type === 'room.booking.reminder')).toBe(true)
   })
 
   test('switching it back on delivers the next one', async () => {
@@ -198,32 +198,61 @@ describe.skipIf(skip !== null)('a transactional message ignores all of it (crite
   }, CASE_TIMEOUT_MS)
 })
 
-describe.skipIf(skip !== null)('the screen', () => {
-  test('one page shows every topic, its default and what a preference cannot silence', async () => {
-    const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/sign-in`)
-    await fill(view, 'form input[type="email"]', member.email)
-    await fill(view, 'form input[type="password"]', memberPassword)
-    await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+async function signedInView(): Promise<Bun.WebView> {
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', member.email)
+  await fill(view, 'form input[type="password"]', memberPassword)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+  return view
+}
 
-    await visit(view, `${app.baseURL}/account/notifications`, '[data-test="preference-matrix"]')
-    await waitFor(view, `document.querySelector('[data-test="topic-ANNOUNCEMENTS"]')`)
+describe.skipIf(skip !== null)('the screens (criteria 1, 5 and 6, issue 1345)', () => {
+  test('the email settings are five switches under one sentence, with no default labels', async () => {
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/account/notifications`, '[data-test="preference-matrix"]')
+      await waitFor(view, `document.querySelector('[data-test="email-ANNOUNCEMENTS"]')`)
 
-    const text = await textOf(view, '[data-test="preference-matrix"]')
-    for (const label of ['Bookings', 'Shifts', 'Training', 'Room bookings', 'Committee announcements']) {
-      expect(text).toContain(label)
+      expect(await view.evaluate<number>(`document.querySelectorAll('[data-test="preference-matrix"] [role="switch"]').length`)).toBe(5)
+      const text = await textOf(view, '[data-test="preference-matrix"]')
+      for (const label of ['Bookings', 'Shifts', 'Training', 'Room bookings', 'Committee announcements']) {
+        expect(text).toContain(label)
+      }
+      for (const gone of ['Using the default', 'On by default', 'Off by default', 'always on']) {
+        expect(text).not.toContain(gone)
+      }
+      // Said once, above the switches, rather than beside each (criterion 5).
+      expect(await textOf(view, 'main')).toContain('always arrive')
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="inbox-item"], [data-test="inbox-empty"]') === null`)).toBe(true)
     }
-    // The default is visible on the screen as a default (criterion 2).
-    expect(text).toContain('On by default')
-    expect(text).toContain('Off by default')
-    // The inbox is never silenced, and the page says so (criterion 6).
-    expect(text).toContain('always on')
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
 
-    const header = await textOf(view, 'main')
-    expect(header).toContain('always arrive')
+  test('the inbox is its own page under My NNT, newest first, and links the email settings', async () => {
+    const entry = 'INSERT INTO inbox_items (id, user_id, type, title, created_at) VALUES (?, ?, ?, ?, ?)'
+    write('DELETE FROM inbox_items WHERE user_id = ?', member.id)
+    write(entry, 'inbox-older', member.id, 'room.booking.reminder', 'The older one', 1000)
+    write(entry, 'inbox-newer', member.id, 'room.booking.reminder', 'The newer one', 2000)
 
-    view.close()
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/my`, '[data-test="my-page"]')
+      await waitFor(view, `document.querySelector('a[href="/my/notifications"]')`)
+
+      await visit(view, `${app.baseURL}/my/notifications`, '[data-test="inbox"]')
+      await waitFor(view, `document.querySelectorAll('[data-test="inbox-item"]').length === 2`)
+      const titles = await view.evaluate<string[]>(`[...document.querySelectorAll('[data-test="inbox-item"]')].map(item => item.innerText)`)
+      expect(titles[0]).toContain('The newer one')
+      expect(titles[1]).toContain('The older one')
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('a[href="/account/notifications"]'))`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })
 
