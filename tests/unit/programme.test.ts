@@ -19,8 +19,10 @@ import {
   saleRefusal,
   saysBookingWindow,
   saysClosingTime,
+  saysSeasonMoved,
   saysVenueOption,
   showForm,
+  showUpdateForm,
   toSlug,
   venueFilters,
   venueForFilter,
@@ -471,5 +473,22 @@ describe('a run of nights becomes one instant per night (D-132 criterion 10)', (
     expect(screen([]).success).toBe(false)
     expect(screen(['2026-10-24', '2026-10-24']).success).toBe(false)
     expect(screen(['24/10/2026']).success).toBe(false)
+  })
+})
+
+// A Details save states the season its form loaded, so the write can refuse one set since
+// rather than undo it (D-131 criterion 2, 0003).
+describe('a Details save carries the season it loaded', () => {
+  test('the loaded season is required, and may be none', () => {
+    const copy = { title: 'The Seagull', slug: 'the-seagull', seasonId: 'autumn' }
+    expect(showUpdateForm.safeParse({ ...copy, loadedSeasonId: null }).success).toBe(true)
+    expect(showUpdateForm.safeParse({ ...copy, loadedSeasonId: 'autumn' }).success).toBe(true)
+    expect(showUpdateForm.safeParse(copy).success).toBe(false)
+    expect(showForm.safeParse(copy).success).toBe(true)
+  })
+
+  test('a refused save names the season the show has now, or says it has none', () => {
+    expect(saysSeasonMoved('The Seagull', 'Autumn 2026')).toBe('The season of The Seagull changed to Autumn 2026 while you were editing it. Reload to see it, then choose again.')
+    expect(saysSeasonMoved('The Seagull', null)).toBe('The season of The Seagull was cleared while you were editing it. Reload to see it, then choose again.')
   })
 })

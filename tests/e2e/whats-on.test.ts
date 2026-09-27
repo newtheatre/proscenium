@@ -461,6 +461,7 @@ describe.skipIf(skip !== null)('the show page carries the practical details (D-1
       slug: created.slug,
       ageGuidance: '12 and over',
       latecomerPolicy: 'AT_INTERVAL',
+      loadedSeasonId: null,
     })).status).toBe(200)
     await addPerformance(created.id)
     await publish(created.id)

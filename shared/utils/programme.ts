@@ -91,6 +91,17 @@ export const showForm = z.object({
   bookingClosesHoursBefore: hoursBefore.nullish(),
 })
 
+// A Details save states the season its form loaded (none is null, never absent), so the write can
+// refuse one set since rather than undo it (D-131 criterion 2, 0003).
+export const showUpdateForm = showForm.extend({
+  loadedSeasonId: z.string().trim().min(1).nullable(),
+})
+
+export function saysSeasonMoved(title: string, seasonName: string | null): string {
+  const moved = seasonName === null ? 'was cleared' : `changed to ${seasonName}`
+  return `The season of ${title} ${moved} while you were editing it. Reload to see it, then choose again.`
+}
+
 // Publishing is its own action, so saving the copy can never change the status by accident.
 // A cap on the request, not a policy: a season has a handful of passes on sale at once.
 export const MAX_COVER_PASSES = 20
@@ -210,6 +221,7 @@ export function nightInstants(day: string, clock: string, doorsClock: string): {
 }
 
 export type ShowInput = z.output<typeof showForm>
+export type ShowUpdateInput = z.output<typeof showUpdateForm>
 export type PerformanceInput = z.output<typeof performanceForm>
 
 // What the console reads. `soldTickets` is counted from the tables that reference the performance

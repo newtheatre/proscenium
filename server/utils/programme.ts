@@ -12,7 +12,7 @@ import { showsList } from '#shared/utils/shows-list'
 import { posterUrl } from '#shared/utils/seo'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { AdminPerformance, AdminShow, ShowStatus, ShowVenue, ShowsStandingCounts } from '#shared/utils/programme'
+import type { AdminPerformance, AdminShow, ShowStatus, ShowUpdateInput, ShowVenue, ShowsStandingCounts } from '#shared/utils/programme'
 import type { SQL } from 'drizzle-orm'
 
 // Reading and counting the programme for its administration (D-121, D-112). "Has sold tickets" is
@@ -299,6 +299,39 @@ export async function showById(id: string): Promise<AdminShow | undefined> {
     FROM shows s WHERE s.id = ${id}
   `)
   return row ? readShow(row) : undefined
+}
+
+// A season is written only where the form changed it, over the one it loaded; a retired season or
+// category is never newly chosen, and the address is held once (D-131 criteria 2 and 5, 0003).
+export function updateShowStatement(id: string, input: ShowUpdateInput): SQL {
+  const seasonId = input.seasonId ?? null
+  const categoryId = input.categoryId ?? null
+  const chose = seasonId !== input.loadedSeasonId
+  const setSeason = chose ? sql`season_id = ${seasonId},` : sql``
+  const seasonHeld = chose ? sql` AND season_id IS ${input.loadedSeasonId}` : sql``
+  const seasonCurrent = chose && seasonId !== null
+    ? sql` AND EXISTS (SELECT 1 FROM seasons WHERE id = ${seasonId} AND archived = 0)`
+    : sql``
+  const categoryCurrent = categoryId !== null
+    ? sql` AND (category_id IS ${categoryId} OR EXISTS (SELECT 1 FROM show_categories WHERE id = ${categoryId} AND archived = 0))`
+    : sql``
+  return sql`
+    UPDATE shows
+    SET slug = ${input.slug},
+        title = ${input.title},
+        subtitle = ${input.subtitle ?? null},
+        description = ${input.description ?? null},
+        long_description = ${input.longDescription ?? null},
+        age_guidance = ${input.ageGuidance ?? null},
+        latecomer_policy = ${input.latecomerPolicy ?? null},
+        category_id = ${categoryId},
+        ${setSeason}
+        booking_closes_hours_before = ${input.bookingClosesHoursBefore ?? null},
+        updated_at = unixepoch()
+    WHERE id = ${id}
+      AND NOT EXISTS (SELECT 1 FROM shows WHERE slug = ${input.slug} AND id <> ${id})${seasonHeld}${seasonCurrent}${categoryCurrent}
+    RETURNING id
+  `
 }
 
 // The blob key, which no payload carries: the poster routes need the key itself to replace or

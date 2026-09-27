@@ -1,6 +1,6 @@
-import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
-import { showForm } from '#shared/utils/programme'
+import { saysNoSuch } from '#shared/utils/no-such'
+import { saysSeasonMoved, showUpdateForm } from '#shared/utils/programme'
 
 // Edit a show's copy, its address and the booking window its performances inherit. It does not
 // take the status: publishing is its own action (D-121 criterion 1, D-112 criterion 1).
@@ -11,39 +11,17 @@ export default defineEventHandler(async (event) => {
   const held = await showById(id)
   if (!held) throw noSuch('show')
 
-  const input = await readValidatedBodyOrThrow(event, showForm)
-  const window = input.bookingClosesHoursBefore ?? null
-
-  // The address predicate rides the UPDATE, so moving onto an address somebody is taking at the
-  // same moment refuses rather than reaching the unique index (0003, 0006).
-  const updated = await db.all<{ id: string }>(sql`
-    UPDATE shows
-    SET slug = ${input.slug},
-        title = ${input.title},
-        subtitle = ${input.subtitle ?? null},
-        description = ${input.description ?? null},
-        long_description = ${input.longDescription ?? null},
-        age_guidance = ${input.ageGuidance ?? null},
-        latecomer_policy = ${input.latecomerPolicy ?? null},
-        category_id = ${input.categoryId ?? null},
-        season_id = ${input.seasonId ?? null},
-        booking_closes_hours_before = ${window},
-        updated_at = unixepoch()
-    WHERE id = ${id}
-      AND NOT EXISTS (SELECT 1 FROM shows WHERE slug = ${input.slug} AND id <> ${id})
-    RETURNING id
-  `)
-
-  if (updated.length === 0) {
-    throw createError({ statusCode: 409, statusMessage: `A show already has the address /shows/${input.slug}` })
-  }
+  const input = await readValidatedBodyOrThrow(event, showUpdateForm)
+  const chosen = input.seasonId ?? null
+  const chose = chosen !== input.loadedSeasonId
 
   // The copy is prose, so the trail records that it moved and never what it says (0011).
   const copyChanged = input.description !== held.description
     || input.longDescription !== held.longDescription
     || input.subtitle !== held.subtitle
 
-  await db.insert(schema.auditLog).values(auditEntry({
+  // The season pair is recorded only where the form chose one, which the predicate makes exact.
+  const entry = auditEntry({
     actorId: resolved.account.id,
     action: 'show.updated',
     target: `show:${id}`,
@@ -53,13 +31,31 @@ export default defineEventHandler(async (event) => {
         title: [held.title, input.title],
         ageGuidance: [held.ageGuidance, input.ageGuidance ?? null],
         latecomerPolicy: [held.latecomerPolicy, input.latecomerPolicy ?? null],
-        bookingClosesHoursBefore: [held.bookingClosesHoursBefore, window],
+        bookingClosesHoursBefore: [held.bookingClosesHoursBefore, input.bookingClosesHoursBefore ?? null],
         categoryId: [held.categoryId, input.categoryId ?? null],
-        seasonId: [held.seasonId, input.seasonId ?? null],
+        ...(chose ? { seasonId: [input.loadedSeasonId, chosen] as [unknown, unknown] } : {}),
       }),
       copyChanged,
     },
-  }))
+  })
 
-  return { ok: true }
+  // Every refusal rides the UPDATE, and the audit rides its batch on changes() (0003, 0049).
+  const applied = await auditedWrite(db.all<{ id: string }>(updateShowStatement(id, input)), entry)
+  if (applied) return { ok: true }
+
+  const now = await showById(id)
+  if (!now) throw noSuch('show')
+  if (chose && now.seasonId !== input.loadedSeasonId) {
+    throw createError({ statusCode: 409, statusMessage: saysSeasonMoved(now.title, now.seasonName) })
+  }
+  if (chose && chosen !== null) chosenOrThrow('season', await seasonById(chosen))
+  const category = input.categoryId ?? null
+  if (category !== null && category !== now.categoryId) chosenOrThrow('show category', await showCategoryById(category))
+  throw createError({ statusCode: 409, statusMessage: `A show already has the address /shows/${input.slug}` })
 })
+
+// Why a season or a category could not be chosen: read only to explain the refused write.
+function chosenOrThrow(noun: string, found: { name: string, archived: boolean } | undefined): void {
+  if (!found) throw createError({ statusCode: 400, statusMessage: saysNoSuch(noun) })
+  if (found.archived) throw createError({ statusCode: 409, statusMessage: `${found.name} is retired and cannot be chosen for a show` })
+}
