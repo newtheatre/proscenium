@@ -43,6 +43,18 @@ export async function closuresAcross(event: H3Event | undefined, from: number, t
   return [...set, ...performed].sort((one, other) => one.startsAt - other.startsAt)
 }
 
+// A claim that lost to a closure made after the route's own check refuses as the check would have,
+// quoting the closure; if it has gone again by now, it says only that the room was closed.
+export async function closedRefusal(event: H3Event | undefined, roomId: string, startsAt: number, endsAt: number): Promise<Error> {
+  const shut = blackoutOver(await closuresAcross(event, startsAt, endsAt, roomId), roomId, { startsAt, endsAt })
+  const says = shut ? saysClosed(shut) : 'The room was closed for that span while this was being booked'
+  return createError({
+    statusCode: 422,
+    statusMessage: says,
+    data: { failures: [{ reason: 'ROOM_CLOSED', says }], canRequest: false, blackout: shut ?? null },
+  })
+}
+
 export interface Stranded {
   id: string
   userId: string

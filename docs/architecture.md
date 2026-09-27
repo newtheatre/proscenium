@@ -1886,8 +1886,12 @@ reads "A performance is on"; only the officers' list names it. `closuresAcross()
 `server/utils/blackouts.ts` joins them to an officer's closures, and every write or read that
 could put somebody in a closed room calls it: availability, a booking, a request, a series, a
 change to a pending request, approving a request (into its own room or another), a bump and a
-bump's alternatives. Each check is a read before the write, not a predicate on it. A booking made
-before the room was attached or the performance scheduled is not cancelled;
+bump's alternatives. That read is what the refusal quotes; the slot claim (`claimSlotStatement`)
+and the change to a pending request (`editPendingStatement`) also carry the closures on their own
+statement (`roomOpenTerms()`), with the offsets bound once, so a closure made between the route's
+check and its write still stops it (0003). A claim that loses that way is refused as the check
+would have refused it (`closedRefusal()`). The approval, the bump and a series still rely on the
+read. A booking made before the room was attached or the performance scheduled is not cancelled;
 `GET /api/admin/rooms/blackouts/performances` (`rooms.read`) lists each closure to the booking
 horizon with the bookings it overlaps, and the Closures screen shows them read-only. Cancelling the
 performance, or detaching the room, is what reopens it.

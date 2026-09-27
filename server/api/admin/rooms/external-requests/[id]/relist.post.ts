@@ -52,8 +52,10 @@ export default defineEventHandler(async (event) => {
     purpose: request.purpose,
     status: verdict.needsApproval ? 'PENDING_APPROVAL' : 'CONFIRMED',
     notes: request.notes,
+    offsets: await shiftOffsetDefaults(event),
   })
 
+  if (!claim.won && claim.why === 'closed') throw await closedRefusal(event, room.id, request.startsAt, request.endsAt)
   if (!claim.won) {
     throw createError({
       statusCode: claim.why === 'gone' ? 410 : 409,

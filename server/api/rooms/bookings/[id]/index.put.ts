@@ -79,7 +79,7 @@ export default defineEventHandler(async (event) => {
   const restartClock = restartsTheClock(booking, after)
 
   // Stays a request whatever the verdict: the approvers were asked, and an edit does not answer.
-  const edited = await editPending({ ...after, id, userId: account.id, restartClock, now: nowSeconds })
+  const edited = await editPending({ ...after, id, userId: account.id, restartClock, now: nowSeconds, offsets: await shiftOffsetDefaults(event) })
 
   if (!edited.won) {
     switch (edited.why) {
@@ -89,6 +89,8 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 409, statusMessage: 'That booking has already been decided' })
       case 'gone':
         throw createError({ statusCode: 410, statusMessage: 'That room is no longer bookable' })
+      case 'closed':
+        throw await closedRefusal(event, after.roomId, after.startsAt, after.endsAt)
       case 'conflict':
         throw createError({
           statusCode: 409,

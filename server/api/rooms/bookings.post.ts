@@ -78,8 +78,10 @@ export default defineEventHandler(async (event) => {
     purpose,
     status: 'CONFIRMED',
     notes: input.notes,
+    offsets: await shiftOffsetDefaults(event),
   })
 
+  if (!claimed.won && claimed.why === 'closed') throw await closedRefusal(event, room.id, Math.floor(startsAt.getTime() / 1000), Math.floor(endsAt.getTime() / 1000))
   if (!claimed.won && claimed.why === 'gone') {
     throw createError({ statusCode: 410, statusMessage: 'That room is no longer bookable' })
   }

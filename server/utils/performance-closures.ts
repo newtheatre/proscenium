@@ -38,6 +38,23 @@ export function performancesOnRoomsQuery(from: number, to: number, offsets: Shif
   `
 }
 
+// The room open over a span: no officer's closure of it or of every room, and no performance at
+// the venue it belongs to over its window. Half-open, as the clash rule is (C-114, issue 1347).
+export function roomOpenTerms(roomId: string, startsAt: number, endsAt: number, offsets: ShiftOffsets): SQL {
+  return sql`NOT EXISTS (
+      SELECT 1 FROM room_blackouts b
+      WHERE (b.room_id = ${roomId} OR b.room_id IS NULL) AND b.starts_at < ${endsAt} AND b.ends_at > ${startsAt}
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM performances p
+      JOIN venues v ON v.id = p.venue_id
+      WHERE v.room_id = ${roomId} AND p.status <> 'CANCELLED'
+        AND coalesce(p.doors_at, p.starts_at) - ${offsets.startBeforeDoorsMinutes} * 60 < ${endsAt}
+        AND p.starts_at + (coalesce(p.duration_minutes, 0) + p.interval_count * coalesce(p.interval_minutes, 0)) * 60
+          + ${offsets.endAfterEndMinutes} * 60 > ${startsAt}
+    )`
+}
+
 async function onRooms(event: H3Event | undefined, from: number, to: number, roomId?: string): Promise<{ rows: PerformanceOnRoom[], offsets: ShiftOffsets }> {
   const offsets = await shiftOffsetDefaults(event)
   return { rows: await db.all<PerformanceOnRoom>(performancesOnRoomsQuery(from, to, offsets, roomId)), offsets }

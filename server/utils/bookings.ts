@@ -3,11 +3,13 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { configValue } from './configuration'
 import { longestTerm } from './membership-claims'
+import { roomOpenTerms } from './performance-closures'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING), since D-113 reaches `hasCurrentMembership`.
 import { isCurrent, londonDay } from '#shared/utils/membership'
 import type { BookingStatus, Conflict } from '#shared/utils/bookings'
+import type { ShiftOffsets } from '#shared/utils/rota-times'
 import type { H3Event } from 'h3'
 import type { SQL } from 'drizzle-orm'
 
@@ -27,6 +29,8 @@ export interface ClaimInput {
   notes: string | null
   // Why an exception is being asked for. Null on an ordinary booking, required on a request.
   reason?: string | null
+  // The house's shift offsets, which set a performance's closure (0078, issue 1347).
+  offsets: ShiftOffsets
 }
 
 export type ClaimOutcome
@@ -35,16 +39,14 @@ export type ClaimOutcome
     | { won: false, why: 'gone' }
   // Somebody took it. 409, with what is in the way.
     | { won: false, why: 'conflict', conflicts: Conflict[] }
+  // Closed after the route checked, by an officer or a performance. 422, as the check refuses.
+    | { won: false, why: 'closed' }
 
 // The predicate rides the INSERT, so the check and the write are one statement and cannot be
-// interleaved. Half-open, so back-to-back bookings both succeed (criterion 5).
-export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
-  const id = newId()
+// interleaved: room live, nothing booked, nothing closed. Half-open, so back-to-back bookings fit.
+export function claimSlotStatement(id: string, input: ClaimInput): SQL {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
-
-  // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
-  // coming back is the same signal claimToken uses to know it won (0003).
-  const claimed = await db.all<{ id: string }>(sql`
+  return sql`
     INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, reason)
     SELECT ${id}, ${input.roomId}, ${input.userId}, ${input.title}, ${input.attendees},
            ${input.startsAt}, ${input.endsAt}, ${input.tier}, ${input.purpose}, ${input.status}, ${input.notes},
@@ -57,8 +59,17 @@ export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
           AND starts_at < ${input.endsAt}
           AND ends_at > ${input.startsAt}
       )
+      AND ${roomOpenTerms(input.roomId, input.startsAt, input.endsAt, input.offsets)}
     RETURNING id
-  `)
+  `
+}
+
+export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
+  const id = newId()
+
+  // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
+  // coming back is the same signal claimToken uses to know it won (0003).
+  const claimed = await db.all<{ id: string }>(claimSlotStatement(id, input))
 
   if (claimed.length > 0) return { won: true, id }
 
@@ -81,11 +92,12 @@ export interface EditInput {
   // Set by the route from restartsTheClock; the sweep measures both ages from created_at.
   restartClock: boolean
   now: number
+  offsets: ShiftOffsets
 }
 
 export type EditOutcome
   = | { won: true }
-    | { won: false, why: 'missing' | 'settled' | 'gone' }
+    | { won: false, why: 'missing' | 'settled' | 'gone' | 'closed' }
     | { won: false, why: 'conflict', conflicts: Conflict[] }
 
 // The claim's guarded twin for a request already held: owner, status and the clash rule all ride
@@ -118,6 +130,7 @@ export function editPendingStatement(input: EditInput): SQL {
           AND other.starts_at < ${input.endsAt}
           AND other.ends_at > ${input.startsAt}
       )
+      AND ${roomOpenTerms(input.roomId, input.startsAt, input.endsAt, input.offsets)}
     RETURNING id
   `
 }
@@ -160,7 +173,9 @@ async function whyItFailed(input: Parameters<typeof conflictsWith>[0]): Promise<
     .limit(1)
 
   if (!room) return { won: false, why: 'gone' }
-  return { won: false, why: 'conflict', conflicts: await conflictsWith(input) }
+  // Nothing booked in the way leaves the one other predicate the INSERT carries: a closure.
+  const conflicts = await conflictsWith(input)
+  return conflicts.length > 0 ? { won: false, why: 'conflict', conflicts } : { won: false, why: 'closed' }
 }
 
 // What is in the way, for the refusal to quote. Masked by the caller, never here: this returns the
