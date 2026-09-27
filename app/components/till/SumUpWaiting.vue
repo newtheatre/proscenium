@@ -22,6 +22,10 @@ const emit = defineEmits<{
 
 const smpTxCodeTyped = defineModel<string>('smpTxCodeTyped', { required: true })
 const abandonNote = defineModel<string>('abandonNote', { required: true })
+
+// Each listed mismatch keeps its own words on the money, so one row's note never answers another's.
+const listedNotes = ref<Record<string, string>>({})
+const listedNote = (id: string): string | null => listedNotes.value[id]?.trim() || null
 </script>
 
 <template>
@@ -124,6 +128,14 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
       >
         {{ attempt.error }}
       </p>
+      <UTextarea
+        v-if="attempt.status === 'MISMATCH'"
+        v-model="listedNotes[attempt.id]"
+        placeholder="If you are abandoning this: what happened to the money the reader took?"
+        class="mt-2 w-full"
+        :aria-label="`What happened to the ${saysMoney(attempt.expectedTotalPence)} charge at ${timeOf(attempt.createdAt)}`"
+        :data-test="`sumup-open-note-${attempt.id}`"
+      />
       <div class="mt-2 flex flex-wrap gap-2">
         <UButton
           size="sm"
@@ -154,7 +166,7 @@ const abandonNote = defineModel<string>('abandonNote', { required: true })
           class="min-h-12"
           :loading="resolving"
           :data-test="`sumup-open-abandoned-${attempt.id}`"
-          @click="emit('resolve', attempt.id, 'abandoned', attempt.status === 'MISMATCH' ? (abandonNote.trim() || null) : null)"
+          @click="emit('resolve', attempt.id, 'abandoned', attempt.status === 'MISMATCH' ? listedNote(attempt.id) : null)"
         >
           Payment did not
         </UButton>
