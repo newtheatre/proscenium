@@ -584,8 +584,31 @@ describe('a figure column lines its header up with its figures', () => {
 
   test('no column right-aligns its figures under a header left behind', async () => {
     const offenders = (await tables()).flatMap(file => columnMetas(file.source)
-      .filter(({ header, meta }) => RIGHT_CELLS.test(meta) && !RIGHT_HEADER.test(meta) && !header.includes('ACTIONS_HEADER'))
+      .filter(({ meta }) => RIGHT_CELLS.test(meta) && !RIGHT_HEADER.test(meta))
       .map(({ header }) => `${file.path}: ${header}`))
+    expect(offenders).toEqual([])
+  })
+
+  // The figure columns that once took no shape at all, so their headers and figures sat left.
+  test('a price or a quantity column takes a figure shape', async () => {
+    const figures: [string, string][] = [
+      ['app/pages/bar/categories.vue', `'Price'`],
+      ['app/pages/bar/products/[id].vue', `'Price'`],
+      ['app/pages/bar/stock/index.vue', `'On hand'`],
+      ['app/pages/bar/stock/index.vue', `'Par level'`],
+      ['app/pages/bar/stock/movements.vue', `'Quantity'`],
+    ]
+    for (const [path, header] of figures) {
+      const metas = columnMetas(await Bun.file(path).text()).filter(one => one.header === header).map(one => one.meta)
+      expect({ path, header, metas }).toEqual({ path, header, metas: [expect.stringMatching(/^RIGHT_ALIGNED/)] })
+    }
+  })
+
+  // Rule 6 for actions too: a column of row actions takes the one shape, never a copy of it.
+  test('a column of row actions takes ACTIONS_COLUMN rather than writing its own', async () => {
+    const offenders = (await tables()).flatMap(file => columnMetas(file.source)
+      .filter(({ header, meta }) => header.includes('ACTIONS_HEADER') && RIGHT_CELLS.test(meta))
+      .map(() => file.path))
     expect(offenders).toEqual([])
   })
 
