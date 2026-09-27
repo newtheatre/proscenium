@@ -268,7 +268,7 @@ export const CONSOLE_NAV: NavGroup[] = [
 export const MY_NAV: NavEntry[] = [
   // Module K: platform
 
-  { label: 'My NNT', icon: 'i-lucide-house', to: '/my', ability: signedIn, exact: true },
+  { label: 'My NNT', icon: 'i-lucide-house', to: '/my', ability: signedIn },
 
   // Module E: show night
 
@@ -295,6 +295,12 @@ export const MY_NAV: NavEntry[] = [
   // right now" rather than a setting, and sits in this list rather than ACCOUNT_NAV.
   { label: 'Membership', icon: 'i-lucide-badge-check', to: '/account/membership', ability: signedIn },
 ]
+
+// Whether a member entry is lit on this path. The pages beneath one (My bookings, Training sessions,
+// Notifications) are the router's siblings of it, not children, so the router never lights it.
+export function memberNavActive(entry: NavEntry, path: string): boolean {
+  return path === entry.to || (!entry.exact && path.startsWith(`${entry.to}/`))
+}
 
 // The account settings pages: how somebody is known to the system, not what they are doing
 // tonight (K-127 criterion 3). `AccountSettings.vue` renders these as the settings side list.

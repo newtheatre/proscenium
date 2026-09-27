@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { can } from '#shared/utils/abilities'
-import { MY_NAV } from '#shared/utils/site-nav'
+import { MY_NAV, memberNavActive } from '#shared/utils/site-nav'
 
 // Your own things: calm intensity and no sidebar, because a member checking a booking on a phone
 // is not doing desk work (docs/design-language.md). Tonight and the bar tab are there for some.
 const viewer = useViewer()
+const route = useRoute()
 const links = computed(() => MY_NAV
   .filter(entry => can(viewer.value, entry.ability))
-  .map(entry => ({ label: entry.label, icon: entry.icon, to: entry.to, exact: entry.exact })))
+  .map(entry => ({ label: entry.label, icon: entry.icon, to: entry.to, active: memberNavActive(entry, route.path) })))
 </script>
 
 <template>
