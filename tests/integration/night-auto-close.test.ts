@@ -28,6 +28,8 @@ function run(database: TestDatabase, statement: SQL): Record<string, unknown>[] 
 
 const NIGHT = '2026-09-01'
 const NIGHT_END = showNightBounds(NIGHT).to
+// The first night the new system ran for real: everything above sits on or after it.
+const FROM = Math.floor(showNightBounds(NIGHT).from.getTime() / 1000)
 
 const REPORT: NightReport = {
   performanceId: 'placeholder',
@@ -53,7 +55,7 @@ describe('unclosedCandidatesQuery (criterion 1)', () => {
       const { performanceId } = tonightsPerformance(database, { night: NIGHT, suffix: 'candidate-open' })
       const now = Math.floor(NIGHT_END.getTime() / 1000) + 24 * 60 * 60
 
-      const candidates = run(database, unclosedCandidatesQuery(now)).map(row => row.performanceId)
+      const candidates = run(database, unclosedCandidatesQuery(now, FROM)).map(row => row.performanceId)
       expect(candidates).toContain(performanceId)
     })
   })
@@ -67,7 +69,7 @@ describe('unclosedCandidatesQuery (criterion 1)', () => {
       }))
       const now = Math.floor(NIGHT_END.getTime() / 1000) + 24 * 60 * 60
 
-      const candidates = run(database, unclosedCandidatesQuery(now)).map(row => row.performanceId)
+      const candidates = run(database, unclosedCandidatesQuery(now, FROM)).map(row => row.performanceId)
       expect(candidates).not.toContain(performanceId)
     })
   })
@@ -77,8 +79,21 @@ describe('unclosedCandidatesQuery (criterion 1)', () => {
       const { performanceId } = tonightsPerformance(database, { night: NIGHT, suffix: 'candidate-cancelled', status: 'CANCELLED' })
       const now = Math.floor(NIGHT_END.getTime() / 1000) + 24 * 60 * 60
 
-      const candidates = run(database, unclosedCandidatesQuery(now)).map(row => row.performanceId)
+      const candidates = run(database, unclosedCandidatesQuery(now, FROM)).map(row => row.performanceId)
       expect(candidates).not.toContain(performanceId)
+    })
+  })
+
+  // Imported history has no report and never will: the sweep must not freeze and mail it (E-125).
+  test('excludes a performance before the first night the system ran, and keeps one on it', async () => {
+    await withDatabase((database) => {
+      const imported = tonightsPerformance(database, { night: '2026-08-31', suffix: 'candidate-imported' })
+      const first = tonightsPerformance(database, { night: NIGHT, suffix: 'candidate-first', curtainHoursAfterNightStart: 0 })
+      const now = Math.floor(NIGHT_END.getTime() / 1000) + 24 * 60 * 60
+
+      const candidates = run(database, unclosedCandidatesQuery(now, FROM)).map(row => row.performanceId)
+      expect(candidates).not.toContain(imported.performanceId)
+      expect(candidates).toContain(first.performanceId)
     })
   })
 
@@ -87,7 +102,7 @@ describe('unclosedCandidatesQuery (criterion 1)', () => {
       const { performanceId } = tonightsPerformance(database, { night: '2099-01-01', suffix: 'candidate-future' })
       const now = Math.floor(NIGHT_END.getTime() / 1000) + 24 * 60 * 60
 
-      const candidates = run(database, unclosedCandidatesQuery(now)).map(row => row.performanceId)
+      const candidates = run(database, unclosedCandidatesQuery(now, FROM)).map(row => row.performanceId)
       expect(candidates).not.toContain(performanceId)
     })
   })
