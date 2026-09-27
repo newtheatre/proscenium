@@ -6,7 +6,7 @@ import { createError } from 'h3'
 import { approveSlotStatement, claimSlotStatement, declineSlotStatement, ourVenue } from './rota'
 import { predicate, whereFrom } from './list-filters'
 import { barOpeningConstraintRefusal } from '#shared/utils/rota-openings'
-import { showNightStartOf } from '#shared/utils/show-night'
+import { showNightOf, showNightStartOf } from '#shared/utils/show-night'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
 import type { ApprovalGate, ClaimScope } from './rota'
 import type { ListClause } from './list-filters'
@@ -186,13 +186,15 @@ export function assignOpeningShiftStatement(slotId: string, userId: string, acto
   `
 }
 
-// The holder's own release: the slot returns to OPEN naming nobody, the same shape a fresh stamp
-// leaves, exactly as a shift's own release does (E-107 criterion 1).
-export function releaseOpeningShiftStatement(slotId: string, userId: string): SQL {
+// The holder's own release, back to OPEN naming nobody, only until the opening's own show night
+// begins (E-107 criterion 1, 0014): past that it is the night's business, as a shift's is.
+export function releaseOpeningShiftStatement(slotId: string, userId: string, now: number): SQL {
+  const tonight = showNightOf(new Date(now * 1000))
   return sql`
     UPDATE bar_opening_shifts
     SET status = 'OPEN', user_id = NULL, claimed_at = NULL, confirmed_at = NULL
     WHERE id = ${slotId} AND user_id = ${userId} AND status IN ('CLAIMED', 'CONFIRMED')
+      AND EXISTS (SELECT 1 FROM bar_openings o WHERE o.id = bar_opening_shifts.opening_id AND o.night > ${tonight})
     RETURNING id
   `
 }

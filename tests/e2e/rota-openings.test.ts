@@ -86,14 +86,17 @@ afterAll(async () => {
   await app?.stop()
 }, 30_000)
 
-const plan = (label: string, as: string): Promise<Response> =>
-  request(app, 'POST', '/api/rota/openings', {
+// 18:00 to 23:00 on the night asked for, a week out unless a test says otherwise.
+function plan(label: string, as: string, on = night): Promise<Response> {
+  const from = Math.floor(showNightBounds(on).from.getTime() / 1000)
+  return request(app, 'POST', '/api/rota/openings', {
     venueId,
-    night,
+    night: on,
     label,
-    startsAt: nightStart + 14 * 3600,
-    endsAt: nightStart + 19 * 3600,
+    startsAt: from + 14 * 3600,
+    endsAt: from + 19 * 3600,
   }, as)
+}
 
 async function listing(as: string): Promise<{ items: Opening[], slots: Slot[] }> {
   const response = await request(app, 'GET', '/api/rota/openings', undefined, as)
@@ -293,7 +296,7 @@ describe.skipIf(skip !== null)('cancelling one cancels its slots (E-130 criterio
     const { items, slots } = await listing(foh.cookie)
     const opening = items.find(one => one.label === 'A get-in')!
     const slot = slots.find(one => one.openingId === opening.openingId)!
-    await request(app, 'POST', `/api/rota/openings/shifts/${slot.slotId}/claim`, {}, member.cookie)
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${slot.slotId}/claim`, {}, member.cookie)).status).toBe(200)
 
     const cancelled = await request(app, 'POST', `/api/rota/openings/${opening.openingId}/cancel`, {}, foh.cookie)
     expect(cancelled.status).toBe(200)
@@ -434,4 +437,29 @@ describe.skipIf(skip !== null)('a queued claim is confirmed or declined (E-130 c
       await setAutoConfirm(true)
     }
   }, 120_000)
+})
+
+// E-107 criterion 1: a holder gives a slot back up to the start of its show night, and no later;
+// past that it is the night's business, as it is for a shift.
+describe.skipIf(skip !== null)('a holder releases their own slot until its night begins (E-107 criterion 1)', () => {
+  test('a slot a week out is released, and one tonight is refused, naming why', async () => {
+    const claimed = async (label: string, on: string): Promise<Slot> => {
+      expect((await plan(label, foh.cookie, on)).status).toBe(200)
+      const { items, slots } = await listing(foh.cookie)
+      const opening = items.find(one => one.label === label)!
+      const slot = slots.find(one => one.openingId === opening.openingId)!
+      expect((await request(app, 'POST', `/api/rota/openings/shifts/${slot.slotId}/claim`, {}, member.cookie)).status).toBe(200)
+      return slot
+    }
+
+    const later = await claimed('A release next week', night)
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${later.slotId}/release`, {}, member.cookie)).status).toBe(200)
+
+    const tonightSlot = await claimed('A release tonight', currentShowNight())
+    const refused = await request(app, 'POST', `/api/rota/openings/shifts/${tonightSlot.slotId}/release`, {}, member.cookie)
+    expect(refused.status).toBe(409)
+    expect(await message(refused)).toContain('already begun')
+    const held = (await listing(foh.cookie)).slots.find(one => one.slotId === tonightSlot.slotId)!
+    expect(held.holderName).not.toBeNull()
+  })
 })

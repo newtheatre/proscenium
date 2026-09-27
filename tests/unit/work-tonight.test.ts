@@ -135,6 +135,13 @@ describe('a release is offered only until the shift\'s show night begins (E-107 
     expect(releaseStillOpen(curtain, Math.floor(Date.UTC(2026, 9, 17, 3, 0) / 1000))).toBe(false)
     expect(releaseStillOpen(curtain, curtain + 3600)).toBe(false)
   })
+
+  // A slot on a bar opening has the same cut-off as a shift, not the opening's closing time.
+  test('a slot on a bar opening is offered for release on the same rule', async () => {
+    const source = await Bun.file('app/pages/rota/index.vue').text()
+    expect(source).toContain('v-if="releasable(slot)"')
+    expect(source).not.toContain('slot.endsAt >= nowSeconds')
+  })
 })
 
 describe('the duty manager to tell, from tonight\'s own team (E-112 criterion 2, A-114)', () => {
@@ -204,9 +211,5 @@ describe('where a volunteer on shift looks (issue 1305)', () => {
 
   test('an explicit next of the home page still travels with the Google link', async () => {
     expect(await read('app/pages/sign-in.vue')).toContain('explicitNext.value === null ? \'/auth/google\'')
-  })
-
-  test('a slot on a finished opening is not offered for release', async () => {
-    expect(await read('app/pages/rota/index.vue')).toContain('slot.endsAt >= nowSeconds')
   })
 })
