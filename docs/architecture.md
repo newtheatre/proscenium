@@ -1584,6 +1584,11 @@ reviews every incident on the performance in one set-based write (`reviewInciden
 an `INSERT ... SELECT` over `incidents` skipping any already reviewed, 0006), so the
 incidents-reviewed item never holds the close.
 
+A night that closed itself is closed too: `closeForQuery()` answers with a person's close where
+one exists and otherwise with the `SYSTEM` report, naming nobody (`automatic`), and the checklist
+says `saysNightClosed()`. The automatic close writes no close row and reviews no incident, since
+`closed_by` names a person and E-125 criterion 2 has the report list what was left.
+
 There is no close route of its own since issue 1315: the close is `closeStatement()`, written
 only inside Sign off and close's batch and only beside the report that batch froze (below, E-124).
 The gate is `holdsTheClose()` (`shared/utils/night-signoff.ts`): every required item across both
