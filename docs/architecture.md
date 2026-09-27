@@ -1363,12 +1363,12 @@ rebuilt here, and closed separately once E-128's own migration rebuilt both by h
 more than one performance is running, so the "every scan, admit and register entry lands against
 the performance selected" half of criterion 2 is answered wherever a screen resolves its own
 performance: `/tonight/incidents` and `/tonight/age-checks` already carry a picker when
-`performanceIds.length > 1` (E-115, E-118, predating this story). `POST /api/till/sale` accepts and
-correctly narrows on `performanceId` too, but `/tonight/till` never sends one yet, so a bar sale on
-a day with more than one performance currently lands unattributed to either report's bar summary,
-even though the shared till session itself is correct by design (criterion 5, `till_sessions` keyed
-to `venue_id` and `night` exactly as the criterion asks). Recorded in `docs/known-issues.md` for
-bar's own stream, since the fix is a picker on a page this stream does not own.
+`performanceIds.length > 1` (E-115, E-118, predating this story). The till asks nobody: a bar
+sale on a day with more than one performance names its house from the instant it was made
+against tonight's bar windows at the venue (F-126, 0078, `performanceForSale()` in
+`server/utils/sale.ts`), so each report's bar summary reads its own house, while the shared till
+session stays correct by design (criterion 5, `till_sessions` keyed to `venue_id` and `night`
+exactly as the criterion asks).
 
 Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) waited on D-126
 building `/tonight/door` at all, corrected onto this story's own dependency line, which omitted
