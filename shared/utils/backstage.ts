@@ -41,6 +41,10 @@ export const boardJoinForm = z.object({
   label: z.string().trim().min(1, 'Give it a label').max(LABEL_LIMIT),
 })
 
+// Who a wings phone is, picked rather than typed in the dark (issue 1313). Still only a display
+// label: nothing checks it, and something else may be typed instead (E-120 criterion 1).
+export const BOARD_LABELS = ['Stage manager', 'Deputy stage manager', 'Lighting', 'Sound', 'Crew'] as const
+
 export type BoardJoinInput = z.output<typeof boardJoinForm>
 
 // Milestones, presets and free text (E-121). One row per message, but which of the three a
@@ -48,6 +52,8 @@ export type BoardJoinInput = z.output<typeof boardJoinForm>
 
 export const FREE_TEXT_LIMIT = 500
 
+// Either end sends the same three shapes; front of house's own milestones (House open, Ready to
+// restart) feed the night report's timeline beside the wings' (issue 1313, E-121 criterion 7).
 export const postMessageForm = z.object({
   milestoneTypeId: z.string().min(1, 'Say which milestone you mean').nullable().default(null),
   presetId: z.string().min(1, 'Say which preset you mean').nullable().default(null),
@@ -64,22 +70,20 @@ export const postMessageForm = z.object({
 
 export type PostMessageInput = z.output<typeof postMessageForm>
 
-// Front of house sends a preset or free text, never a milestone: the night report's timeline
-// stays crew-authored, and a call from the foyer is not an event the show passed through.
-export const fohMessageForm = z.object({
-  presetId: z.string().min(1, 'Say which preset you mean').nullable().default(null),
-  body: z.string().trim().min(1, 'Say what the message is').max(FREE_TEXT_LIMIT).nullable().default(null),
-  composedAt: z.number().int().positive(),
-}).refine(
-  data => [data.presetId, data.body].filter(value => value !== null).length === 1,
-  'Send exactly one of a preset or free text',
-)
+// Which end of the board a message came from, and which end makes a call: the wings are offered
+// only their own milestones and presets, front of house only its own (criterion 7, issue 1313).
+export const BOARD_SIDES = ['FOH', 'BACKSTAGE'] as const
+export type BoardSide = (typeof BOARD_SIDES)[number]
 
-export type FohMessageInput = z.output<typeof fohMessageForm>
+// A call the committee has not placed on an end: a milestone reads as the wings', where every
+// milestone sat before calls had an end, and a preset as the foyer's, as the seeded ones read.
+export const MILESTONE_DEFAULT_SIDE: BoardSide = 'BACKSTAGE'
+export const PRESET_DEFAULT_SIDE: BoardSide = 'FOH'
 
-// Which end of the board a message came from, which is the whole of how the FOH screen colours
-// its history: FOH's own calls one way, the wings' the other (criterion 7).
-export type BoardSide = 'FOH' | 'BACKSTAGE'
+// The refusal for a call that belongs to the other end of the board (issue 1313).
+export function saysOtherEndsCall(side: BoardSide): string {
+  return side === 'FOH' ? 'That call is front of house\'s to make' : 'That call is the wings\' to make'
+}
 
 export function saysBoardSide(side: BoardSide): string {
   return side === 'FOH' ? 'FOH' : 'Backstage'
@@ -92,13 +96,17 @@ export function liveBoardMessages<T extends { id: string, supersedesId: string |
   return messages.filter(message => !superseded.has(message.id))
 }
 
+// The latest by the device's own clock; the first wins a tie.
+const latestOf = <T extends { composedAt: number }>(messages: T[]): T | null =>
+  messages.reduce<T | null>((latest, message) => latest === null || message.composedAt > latest.composedAt ? message : latest, null)
+
 // The two lines the FOH screen leads with: each side's own last call. A night nobody has called
 // yet has neither, which is a state the screen says out loud rather than drawing empty.
 export function currentBoardState<T extends { side: BoardSide, composedAt: number }>(messages: T[]): { foh: T | null, backstage: T | null } {
-  const latestOf = (side: BoardSide): T | null => messages
-    .filter(message => message.side === side)
-    .reduce<T | null>((latest, message) => latest === null || message.composedAt > latest.composedAt ? message : latest, null)
-  return { foh: latestOf('FOH'), backstage: latestOf('BACKSTAGE') }
+  return {
+    foh: latestOf(messages.filter(message => message.side === 'FOH')),
+    backstage: latestOf(messages.filter(message => message.side === 'BACKSTAGE')),
+  }
 }
 
 // What either screen needs of a message to draw it: both ends carry more, neither needs it here.
@@ -121,15 +129,35 @@ export function boardStateFrom<T>(side: BoardSide, state: { foh: T | null, backs
   return side === 'FOH' ? { own: state.foh, other: state.backstage } : { own: state.backstage, other: state.foh }
 }
 
-// A send the queue refused, in the words it was typed in (E-121 criterion 6). The preset it
-// names may have been retired between the tap and the drain, which is why the fallback exists.
+// A send the queue refused, in the words it was typed in (E-121 criterion 6). The milestone or
+// preset it names may have been retired between the tap and the drain, hence the fallback.
 export function saysQueuedSend(
-  presets: readonly { id: string, label: string }[],
-  payload: { presetId: string | null, body: string | null },
+  calls: readonly { id: string, label: string }[],
+  payload: { milestoneTypeId: string | null, presetId: string | null, body: string | null },
 ): string {
-  const preset = payload.presetId ? presets.find(one => one.id === payload.presetId) : undefined
-  const said = preset?.label ?? (payload.body ?? '').trim()
+  const callId = payload.milestoneTypeId ?? payload.presetId
+  const call = callId ? calls.find(one => one.id === callId) : undefined
+  const said = call?.label ?? (payload.body ?? '').trim()
   return said || 'A call to backstage'
+}
+
+interface MilestoneCall { id: string, milestoneTypeId: string | null, supersedesId: string | null, composedAt: number }
+
+// One tap for the call this end makes next: the one after its latest live milestone, in the
+// committee's order, or the first on a night nobody has called (issue 1313). None after the last.
+export function nextCall<T extends { id: string, sort: number }>(types: readonly T[], messages: MilestoneCall[]): T | null {
+  const ordered = [...types].sort((a, b) => a.sort - b.sort)
+  const ours = new Set(ordered.map(type => type.id))
+  const latest = latestOf(liveBoardMessages(messages).filter(message => message.milestoneTypeId !== null && ours.has(message.milestoneTypeId)))
+  if (!latest) return ordered[0] ?? null
+  return ordered[ordered.findIndex(type => type.id === latest.milestoneTypeId) + 1] ?? null
+}
+
+// A mis-tapped milestone is changed by its own end until anybody calls the next one: then the
+// earlier call is what the evening passed through (E-121 criterion 5, issue 1313).
+export function correctableMilestone<T extends MilestoneCall & { side: BoardSide }>(side: BoardSide, messages: T[]): T | null {
+  const latest = latestOf(liveBoardMessages(messages).filter(message => message.milestoneTypeId !== null))
+  return latest?.side === side ? latest : null
 }
 
 export interface BoardFeedRow<T> { message: T, seenAt: number | null }
@@ -157,6 +185,7 @@ const PRESET_BODY_LIMIT = 200
 export const milestoneTypeForm = z.object({
   label: z.string().trim().min(1, 'Give it a label').max(CONFIG_LABEL_LIMIT),
   sort: z.number().int(),
+  side: z.enum(BOARD_SIDES).default(MILESTONE_DEFAULT_SIDE),
 })
 
 export type MilestoneTypeInput = z.output<typeof milestoneTypeForm>
@@ -165,6 +194,7 @@ export const presetForm = z.object({
   label: z.string().trim().min(1, 'Give it a label').max(CONFIG_LABEL_LIMIT),
   body: z.string().trim().min(1, 'Say what the preset sends').max(PRESET_BODY_LIMIT),
   sort: z.number().int(),
+  side: z.enum(BOARD_SIDES).default(PRESET_DEFAULT_SIDE),
 })
 
 export type PresetInput = z.output<typeof presetForm>

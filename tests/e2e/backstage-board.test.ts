@@ -59,11 +59,12 @@ async function joinAs(label: string): Promise<{ deviceCookie: string, token: str
 }
 
 describe.skipIf(skip !== null)('milestone types and presets, committee configuration (E-121 criteria 1, 2)', () => {
-  test('the six named milestone types are already there', async () => {
+  // Issue 1313 adds front of house's Ready to restart beside the six the story named.
+  test('the named milestone types are already there', async () => {
     const listed = await send('GET', '/api/admin/backstage/milestone-types', undefined, foh.cookie)
     expect(listed.status).toBe(200)
     const { types } = await listed.json() as { types: { label: string }[] }
-    expect(types.map(type => type.label)).toEqual(['Clearance', 'House open', 'Curtain up', 'Interval', 'Restart', 'End'])
+    expect(types.map(type => type.label)).toEqual(['Clearance', 'House open', 'Curtain up', 'Interval', 'Ready to restart', 'Restart', 'End'])
   })
 
   test('the FOH officer can add, edit and retire a preset', async () => {
@@ -212,13 +213,17 @@ describe.skipIf(skip !== null)('front of house holds the other end of the board 
     expect(answered.presets.some(preset => preset.id === id)).toBe(true)
   })
 
-  test('front of house sends free text but never a milestone', async () => {
+  // Issue 1313: front of house calls its own milestones, and never the wings'.
+  test('front of house sends free text and its own milestones, never the wings\'', async () => {
     const composedAt = Math.floor(Date.now() / 1000)
     expect((await send('POST', '/api/tonight/board/messages', { body: 'Two minutes on the bar queue', composedAt }, foh.cookie)).status).toBe(200)
 
     const types = await send('GET', '/api/admin/backstage/milestone-types', undefined, foh.cookie)
-    const { types: milestones } = await types.json() as { types: { id: string }[] }
-    expect((await send('POST', '/api/tonight/board/messages', { milestoneTypeId: milestones[0]!.id, composedAt }, foh.cookie)).status).toBe(400)
+    const { types: milestones } = await types.json() as { types: { id: string, label: string, side: string }[] }
+    const wings = milestones.find(type => type.side === 'BACKSTAGE')!
+    const foyer = milestones.find(type => type.label === 'House open')!
+    expect((await send('POST', '/api/tonight/board/messages', { milestoneTypeId: wings.id, composedAt }, foh.cookie)).status).toBe(400)
+    expect((await send('POST', '/api/tonight/board/messages', { milestoneTypeId: foyer.id, composedAt }, foh.cookie)).status).toBe(200)
   })
 
   test('a crew tick marks an FOH call seen, and front of house ticks a call from the wings', async () => {
@@ -247,6 +252,28 @@ describe.skipIf(skip !== null)('front of house holds the other end of the board 
     const composedAt = Math.floor(Date.now() / 1000)
     expect((await send('POST', '/api/tonight/board/messages', { body: 'Nope', composedAt }, member.cookie)).status).toBe(403)
     expect((await send('POST', '/api/tonight/board/seen', { messageId: 'whatever' }, member.cookie)).status).toBe(403)
+  })
+
+  // Issue 1313: front of house changes its own milestone once, never the wings', and nobody else can.
+  test('front of house changes its own milestone once, never the wings\', under shift authority', async () => {
+    const composedAt = Math.floor(Date.now() / 1000)
+    const { types } = await (await send('GET', '/api/admin/backstage/milestone-types', undefined, foh.cookie)).json() as { types: { id: string, label: string }[] }
+    const byLabel = (label: string): string => types.find(type => type.label === label)!.id
+
+    const posted = await send('POST', '/api/tonight/board/messages', { milestoneTypeId: byLabel('House open'), composedAt }, foh.cookie)
+    const { id } = await posted.json() as { id: string }
+    const change = (entryId: string, label: string, as = foh.cookie): Promise<Response> =>
+      send('POST', `/api/tonight/board/messages/${entryId}/supersede`, { milestoneTypeId: byLabel(label), composedAt: composedAt + 10 }, as)
+
+    const member = await registerMember(app, 'board-change-outsider', generatePassword())
+    expect((await change(id, 'Ready to restart', member.cookie)).status).toBe(403)
+    expect((await change(id, 'Ready to restart')).status).toBe(200)
+    expect((await change(id, 'Ready to restart')).status).toBe(409)
+
+    const { deviceCookie } = await joinAs('Stage manager')
+    const wings = await request(app, 'POST', '/api/board/messages', { milestoneTypeId: byLabel('Clearance'), composedAt }, deviceCookie)
+    const { id: wingsId } = await wings.json() as { id: string }
+    expect((await change(wingsId, 'House open')).status).toBe(409)
   })
 })
 
@@ -309,4 +336,25 @@ describe.skipIf(skip !== null)('the wings read the board the way front of house 
       view.close()
     }
   }, 120_000)
+})
+
+// Issue 1313: a phone whose cookie still works reopens its board, and each end sends only its own.
+describe.skipIf(skip !== null)('a joined phone and the ends of the board (issue 1313)', () => {
+  test('the board a cookie opens names its venue, so a reload needs no second join', async () => {
+    const { deviceCookie } = await joinAs('Deputy stage manager')
+    const read = await request(app, 'GET', '/api/board/messages', undefined, deviceCookie)
+    expect(read.status).toBe(200)
+    expect((await read.json() as { venueName: string | null }).venueName).toBeTruthy()
+  })
+
+  test('the wings are offered none of the foyer\'s calls, and cannot send one', async () => {
+    const { deviceCookie } = await joinAs('Lighting')
+    const config = await (await request(app, 'GET', '/api/board/config', undefined, deviceCookie)).json() as { milestoneTypes: { label: string }[] }
+    expect(config.milestoneTypes.some(type => type.label === 'House open')).toBe(false)
+
+    const { types } = await (await send('GET', '/api/admin/backstage/milestone-types')).json() as { types: { id: string, label: string }[] }
+    const houseOpen = types.find(type => type.label === 'House open')!
+    const refused = await request(app, 'POST', '/api/board/messages', { milestoneTypeId: houseOpen.id, composedAt: Math.floor(Date.now() / 1000) }, deviceCookie)
+    expect(refused.status).toBe(400)
+  })
 })

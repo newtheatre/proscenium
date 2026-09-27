@@ -14,6 +14,7 @@ const SHOW_NIGHT_GLOBS = [
 const SHOW_NIGHT_FILES = [
   // Where the SumUp app returns: it wears the tonight layout, so it takes the tonight register.
   'app/pages/pay/return/[token].vue',
+  'app/components/BoardCallChange.vue',
   'app/components/BoardFeed.vue',
   'app/components/DoorResults.vue',
   'app/components/DoorVerdictCard.vue',

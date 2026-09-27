@@ -7,8 +7,8 @@ export default defineEventHandler(async (event) => {
   const device = await requireDevice(event)
   const input = await readValidatedBodyOrThrow(event, supersedeMessageForm)
 
-  const body = await milestoneLabel(input.milestoneTypeId)
-  if (!body) throw createError({ statusCode: 400, statusMessage: 'That milestone is not configured, or has been retired' })
+  const call = await resolveCall('BACKSTAGE', { milestoneTypeId: input.milestoneTypeId, presetId: null, body: null })
+  if ('refusal' in call) throw createError({ statusCode: 400, statusMessage: call.refusal })
 
   const id = newId()
   const entry = auditEntry({
@@ -19,10 +19,10 @@ export default defineEventHandler(async (event) => {
   })
 
   const applied = await auditedWrite(
-    db.all<{ id: string }>(supersedeMessageStatement(device.nightId, entryId, device.deviceId, input.milestoneTypeId, body, input.composedAt, id)),
+    db.all<{ id: string }>(supersedeMessageStatement(device.nightId, entryId, device.deviceId, input.milestoneTypeId, call.body, input.composedAt, id)),
     entry,
   )
-  if (!applied) throw createError({ statusCode: 409, statusMessage: 'That entry cannot be corrected: it may not be a milestone, or may already be corrected' })
+  if (!applied) throw createError({ statusCode: 409, statusMessage: 'That call cannot be changed: it may not be the wings\' milestone, or may already be changed' })
 
   return { id }
 })

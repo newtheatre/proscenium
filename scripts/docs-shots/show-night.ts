@@ -171,11 +171,12 @@ export const showNight: Shot[] = [
     marker: '[data-test="board-current"]',
     width: PHONE_WIDTH,
     annotations: [
+      // Reset sits under the history, below the fold at phone height, so the page names it in words.
       { selector: '[data-test="board-current"]', label: 'Current state' },
-      { selector: '[data-test="board-presets"]', label: 'Presets' },
+      { selector: '[data-test="board-next-call"]', label: 'Next call' },
+      { selector: '[data-test="board-milestones"]', label: 'Front of house\'s calls' },
+      { selector: '[data-test="board-code"]', label: 'Tonight\'s code and where to join' },
       { selector: '[data-test="board-free-text-input"]', label: 'Free text' },
-      { selector: '[data-test="board-code-reveal"]', label: 'Tonight\'s code' },
-      { selector: '[data-test="board-reset-open"]', label: 'Reset the board' },
     ],
   },
   {
@@ -186,7 +187,7 @@ export const showNight: Shot[] = [
     width: PHONE_WIDTH,
     annotations: [
       { selector: '[data-test="board-code-input"]', label: 'Code' },
-      { selector: '[data-test="board-label-input"]', label: 'Your name or role' },
+      { selector: '[data-test="board-label-chips"]', label: 'Who you are' },
       { selector: '[data-test="board-join-submit"]', label: 'Join' },
     ],
   },

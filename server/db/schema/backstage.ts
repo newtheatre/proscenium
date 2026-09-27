@@ -49,12 +49,15 @@ export const backstageDevices = sqliteTable('backstage_devices', {
   index('backstage_devices_night').on(table.nightId),
 ])
 
-// Committee configuration: the fixed structured milestones a night moves through, defaulting to
-// the six the story names, extensible without a migration (E-121 criterion 1).
+// Committee configuration: the structured milestones a night moves through, seeded by migration
+// and extensible without one (E-121 criterion 1).
 export const backstageMilestoneTypes = sqliteTable('backstage_milestone_types', {
   id: id(),
   label: text('label').notNull(),
   sort: integer('sort').notNull(),
+  // Which end makes the call; null is read as the wings' (issue 1313). No CHECK, which would
+  // rebuild a table messages reference (0063); the forms hold the two values.
+  side: text('side', { enum: ['BACKSTAGE', 'FOH'] }),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
   updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
   updatedAt: integer('updated_at').notNull().default(now),
@@ -68,6 +71,8 @@ export const backstagePresets = sqliteTable('backstage_presets', {
   label: text('label').notNull(),
   body: text('body').notNull(),
   sort: integer('sort').notNull(),
+  // Which end sends it; null is read as the foyer's (issue 1313), unchecked for the same reason.
+  side: text('side', { enum: ['BACKSTAGE', 'FOH'] }),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
   updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
   updatedAt: integer('updated_at').notNull().default(now),

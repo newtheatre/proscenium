@@ -10,12 +10,14 @@ interface Message {
   id: string
   side: BoardSide
   posterLabel: string
+  milestoneTypeId: string | null
   milestoneLabel: string | null
   body: string
   supersedesId: string | null
   composedAt: number
 }
 interface Preset { id: string, label: string, body: string }
+interface MilestoneType { id: string, label: string, sort: number }
 interface Seen { messageId: string, seenAt: number }
 
 const toast = useToast()
@@ -23,6 +25,7 @@ const toast = useToast()
 const messages = ref<Message[]>([])
 const seen = ref<Seen[]>([])
 const presets = ref<Preset[]>([])
+const milestoneTypes = ref<MilestoneType[]>([])
 const boardCode = ref<string | null>(null)
 const syncedAt = ref<Date | null>(null)
 const busy = ref(true)
@@ -32,10 +35,11 @@ const freeText = ref('')
 // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 async function load(): Promise<void> {
   try {
-    const answered = await useRequestFetch()<{ messages: Message[], seen: Seen[], presets: Preset[] }>('/api/tonight/board/messages')
+    const answered = await useRequestFetch()<{ messages: Message[], seen: Seen[], presets: Preset[], milestoneTypes: MilestoneType[] }>('/api/tonight/board/messages')
     messages.value = answered.messages
     seen.value = answered.seen
     presets.value = answered.presets
+    milestoneTypes.value = answered.milestoneTypes
     syncedAt.value = new Date()
     failure.value = null
   }
@@ -65,7 +69,7 @@ onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
 
-interface QueuedMessage { presetId: string | null, body: string | null }
+interface QueuedMessage { milestoneTypeId: string | null, presetId: string | null, body: string | null }
 
 // A connection hole costs nothing: a tap queues and drains on reconnect, carrying the moment it
 // was actually composed rather than the moment it finally sent (criterion 6, K-104).
@@ -89,22 +93,33 @@ const writeQueue = useWriteQueue<QueuedMessage>(async (action) => {
 })
 
 function sendPreset(id: string): void {
-  writeQueue.enqueue('preset', { presetId: id, body: null })
+  writeQueue.enqueue('preset', { milestoneTypeId: null, presetId: id, body: null })
+}
+
+function sendMilestone(id: string): void {
+  writeQueue.enqueue('milestone', { milestoneTypeId: id, presetId: null, body: null })
 }
 
 // The queue never revisits its own decision, so trying again is a fresh send carrying the same
 // words, and the refused row leaves the list either way (K-104).
 function sendAgain(id: string, payload: QueuedMessage): void {
   writeQueue.dismiss(id)
-  writeQueue.enqueue(payload.presetId ? 'preset' : 'free-text', payload)
+  writeQueue.enqueue(payload.milestoneTypeId ? 'milestone' : payload.presetId ? 'preset' : 'free-text', payload)
 }
+
+// A refused call reads as the milestone or preset it was, or the words typed (criterion 6).
+const calls = computed(() => [...milestoneTypes.value, ...presets.value])
 
 function sendFreeText(): void {
   const body = freeText.value.trim()
   if (!body) return
-  writeQueue.enqueue('free-text', { presetId: null, body })
+  writeQueue.enqueue('free-text', { milestoneTypeId: null, presetId: null, body })
   freeText.value = ''
 }
+
+// Where the crew join, said with the code so both are read out together (issue 1313).
+const requestUrl = useRequestURL()
+const joinAddress = computed(() => `${requestUrl.host}/board`)
 
 const seenFailure = ref<string | null>(null)
 
@@ -194,10 +209,38 @@ async function reset(): Promise<void> {
           </UButton>
         </template>
 
+        <BoardCallChange
+          side="FOH"
+          color="secondary"
+          :milestone-types="milestoneTypes"
+          :messages="messages"
+          :supersede-url="id => `/api/tonight/board/messages/${id}/supersede`"
+          @send="sendMilestone"
+          @changed="load"
+        />
+
         <section>
           <h2 class="mb-3 font-mono text-xs tracking-[0.2em] text-muted uppercase">
             Send to backstage
           </h2>
+          <div
+            v-if="milestoneTypes.length"
+            class="mb-3 grid grid-cols-2 gap-3"
+            data-test="board-milestones"
+          >
+            <UButton
+              v-for="type in milestoneTypes"
+              :key="type.id"
+              color="secondary"
+              variant="subtle"
+              size="lg"
+              class="min-h-14 justify-center text-base font-semibold"
+              :data-test="`board-milestone-${type.id}`"
+              @click="sendMilestone(type.id)"
+            >
+              {{ type.label }}
+            </UButton>
+          </div>
           <div
             v-if="presets.length"
             class="grid grid-cols-2 gap-3"
@@ -237,7 +280,7 @@ async function reset(): Promise<void> {
               :data-test="`board-rejected-${refused.id}`"
             >
               <p class="font-semibold">
-                {{ saysQueuedSend(presets, refused.payload) }}
+                {{ saysQueuedSend(calls, refused.payload) }}
               </p>
               <p class="text-sm">
                 Not sent. {{ refused.reason }}
@@ -264,45 +307,52 @@ async function reset(): Promise<void> {
             </li>
           </ul>
         </section>
+
+        <!-- Shown only on request, never polled or cached: a code sitting on screen is a code
+             somebody else can read off it (E-120 criteria 2, 5). -->
+        <NightBlock
+          title="Backstage code"
+          data-test="board-code"
+        >
+          <p
+            class="mb-2 text-sm"
+            data-test="board-join-address"
+          >
+            Crew join at <span class="font-mono">{{ joinAddress }}</span> with the code.
+          </p>
+          <template v-if="boardCode">
+            <p
+              class="font-mono text-3xl tracking-[0.2em]"
+              data-test="board-code-value"
+            >
+              {{ groupedBoardCode(boardCode) }}
+            </p>
+            <p class="mt-1 text-sm text-muted">
+              Read it out loud. It never travels by email or notification.
+            </p>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              class="mt-2 min-h-12"
+              data-test="board-code-hide"
+              @click="boardCode = null"
+            >
+              Hide the code
+            </UButton>
+          </template>
+          <UButton
+            v-else
+            color="neutral"
+            variant="subtle"
+            class="min-h-12"
+            data-test="board-code-reveal"
+            @click="loadCode"
+          >
+            Show the code
+          </UButton>
+        </NightBlock>
       </BoardFeed>
 
-      <!-- Shown only on request, never polled or cached: a code sitting on screen is a code
-           somebody else can read off it (E-120 criteria 2, 5). -->
-      <NightBlock
-        title="Backstage code"
-        data-test="board-code"
-      >
-        <template v-if="boardCode">
-          <p
-            class="font-mono text-3xl tracking-[0.2em]"
-            data-test="board-code-value"
-          >
-            {{ groupedBoardCode(boardCode) }}
-          </p>
-          <p class="mt-1 text-sm text-muted">
-            Read it out loud. It never travels by email or notification.
-          </p>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            class="mt-2 min-h-12"
-            data-test="board-code-hide"
-            @click="boardCode = null"
-          >
-            Hide the code
-          </UButton>
-        </template>
-        <UButton
-          v-else
-          color="neutral"
-          variant="subtle"
-          class="min-h-12"
-          data-test="board-code-reveal"
-          @click="loadCode"
-        >
-          Show the code
-        </UButton>
-      </NightBlock>
       <div class="flex justify-center pt-2">
         <UButton
           color="error"

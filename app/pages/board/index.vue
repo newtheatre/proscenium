@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { boardJoinForm } from '#shared/utils/backstage'
+import { BOARD_LABELS, boardJoinForm } from '#shared/utils/backstage'
 import type { BoardSide } from '#shared/utils/backstage'
 
 definePageMeta({ layout: 'backstage', docs: '/docs/tonight/backstage' })
@@ -11,6 +11,9 @@ const joining = ref(false)
 const failure = ref<string | null>(null)
 const joined = ref<{ venueName: string } | null>(null)
 const deviceToken = useCookie<string | null>('nnt-backstage-token', { maxAge: 60 * 60 * 24, sameSite: 'lax' })
+// A phone whose cookie still works reopens its board rather than joining again as a second
+// device (issue 1313); until that answer comes, neither the form nor the board is drawn.
+const resuming = ref(Boolean(deviceToken.value))
 
 // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 async function join(): Promise<void> {
@@ -36,7 +39,7 @@ useSeoMeta({ title: 'Backstage board' })
 
 // The board itself, once joined (E-121, E-122).
 
-interface MilestoneType { id: string, label: string }
+interface MilestoneType { id: string, label: string, sort: number }
 interface Preset { id: string, label: string, body: string }
 interface Message {
   id: string
@@ -50,6 +53,7 @@ interface Message {
 }
 interface Acknowledgement { messageId: string, deviceId: string }
 interface Seen { messageId: string, seenAt: number }
+interface BoardRead { messages: Message[], acknowledgements: Acknowledgement[], seen: Seen[], deviceId: string, venueName: string | null }
 
 const milestoneTypes = ref<MilestoneType[]>([])
 const presets = ref<Preset[]>([])
@@ -70,13 +74,18 @@ async function loadConfig(): Promise<void> {
   catch { /* the buttons below just stay empty; the feed still polls */ }
 }
 
+function take(answered: BoardRead): void {
+  messages.value = answered.messages
+  acknowledgements.value = answered.acknowledgements
+  seen.value = answered.seen
+  deviceId.value = answered.deviceId
+}
+
 async function loadMessages(): Promise<void> {
+  // A config that failed while the phone had no signal is fetched again with the next poll.
+  if (milestoneTypes.value.length === 0 && presets.value.length === 0) loadConfig()
   try {
-    const answered = await $fetch<{ messages: Message[], acknowledgements: Acknowledgement[], seen: Seen[], deviceId: string }>('/api/board/messages')
-    messages.value = answered.messages
-    acknowledgements.value = answered.acknowledgements
-    seen.value = answered.seen
-    deviceId.value = answered.deviceId
+    take(await $fetch<BoardRead>('/api/board/messages'))
     boardFailure.value = null
   }
   catch (error) {
@@ -84,14 +93,39 @@ async function loadMessages(): Promise<void> {
   }
 }
 
+// A refused cookie (401, revoked by a reset) goes and the form takes its place; a dropped
+// connection keeps the device and the board, and the poll tries again (criterion 6).
+async function resume(): Promise<void> {
+  try {
+    const answered = await $fetch<BoardRead>('/api/board/messages')
+    take(answered)
+    joined.value = { venueName: answered.venueName ?? 'Tonight\'s board' }
+  }
+  catch (error) {
+    if (refusalStatus(error) === 401) {
+      deviceToken.value = null
+    }
+    else {
+      joined.value = { venueName: 'Tonight\'s board' }
+      boardFailure.value = refusalText(error)
+    }
+  }
+  finally {
+    resuming.value = false
+  }
+}
+
+onMounted(() => {
+  if (resuming.value) resume()
+})
+
 // Within five seconds, the contract this story states directly, not a configuration key
 // (criterion 3).
 const POLL_MS = 5_000
 let timer: ReturnType<typeof setInterval> | undefined
 
 watch(joined, (value) => {
-  if (!value) return
-  loadConfig()
+  if (!value || timer) return
   loadMessages()
   timer = setInterval(loadMessages, POLL_MS)
 }, { immediate: true })
@@ -157,7 +191,15 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
 
 <template>
   <div class="mx-auto w-full max-w-md">
-    <UPageCard v-if="!joined">
+    <p
+      v-if="resuming"
+      class="text-center text-muted"
+      data-test="board-resuming"
+    >
+      Opening tonight's board…
+    </p>
+
+    <UPageCard v-else-if="!joined">
       <UForm
         :schema="boardJoinForm"
         :state="state"
@@ -193,13 +235,30 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
           />
         </UFormField>
 
+        <!-- Picked, not typed in the dark; still only a label the duty manager reads (issue 1313). -->
         <UFormField
-          label="Your name or role"
+          label="Who you are"
           name="label"
-          description="Shown to the duty manager, nothing else. Not validated against anything."
         >
+          <div
+            class="mb-2 flex flex-wrap gap-2"
+            data-test="board-label-chips"
+          >
+            <UButton
+              v-for="label in BOARD_LABELS"
+              :key="label"
+              :color="state.label === label ? 'primary' : 'neutral'"
+              :variant="state.label === label ? 'solid' : 'subtle'"
+              class="min-h-12"
+              :data-test="`board-label-${label}`"
+              @click="state.label = label"
+            >
+              {{ label }}
+            </UButton>
+          </div>
           <UInput
             v-model="state.label"
+            placeholder="Or type something else"
             class="w-full"
             data-test="board-label-input"
           />
@@ -262,6 +321,16 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
           <span v-else>· not seen yet</span>
         </template>
 
+        <BoardCallChange
+          side="BACKSTAGE"
+          color="primary"
+          :milestone-types="milestoneTypes"
+          :messages="messages"
+          :supersede-url="id => `/api/board/messages/${id}/supersede`"
+          @send="postMilestone"
+          @changed="loadMessages"
+        />
+
         <div
           v-if="milestoneTypes.length || presets.length"
           class="grid grid-cols-2 gap-2"
@@ -270,6 +339,7 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
             v-for="type in milestoneTypes"
             :key="type.id"
             color="primary"
+            variant="subtle"
             size="lg"
             class="min-h-12"
             :data-test="`milestone-${type.id}`"

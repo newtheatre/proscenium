@@ -503,6 +503,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   {
+    route: 'server/api/tonight/board/messages/[id]/supersede.post.ts',
+    actions: ['board.message-superseded', 'night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
     route: 'server/api/tonight/board/seen.post.ts',
     actions: ['night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
