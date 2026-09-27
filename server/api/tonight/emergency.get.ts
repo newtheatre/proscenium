@@ -1,5 +1,5 @@
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
-import type { H3Error, H3Event } from 'h3'
+import type { H3Event } from 'h3'
 import type { FirstAider } from '#shared/utils/venue-emergency'
 import type { OnCall, VenueTonight } from '#server/utils/tonight'
 
@@ -49,14 +49,8 @@ async function cardTonight(event: H3Event, venue: VenueTonight, from: number, to
 // The duty manager's number stays with tonight's own team at the venue and their consent (A-114,
 // 0009); null tells the screen the caller is not on it, which is not the same as nobody sharing.
 async function onCallFor(event: H3Event, venueId: string): Promise<OnCall[] | null> {
-  let performanceIds: string[]
-  try {
-    performanceIds = (await requireAnyNightAuthority(event, ['DUTY_MANAGER', 'DOOR', 'BAR'], { venueId })).performanceIds
-  }
-  catch (error) {
-    if ((error as H3Error).statusCode === 403) return null
-    throw error
-  }
-  const teams = await Promise.all(performanceIds.map(performanceId => tonightTeam(performanceId)))
+  const resolved = await nightAuthorityIfAny(event, ['DUTY_MANAGER', 'DOOR', 'BAR'], { venueId })
+  if (!resolved) return null
+  const teams = await Promise.all(resolved.performanceIds.map(performanceId => tonightTeam(performanceId)))
   return dutyManagersOnCall(teams.flat())
 }

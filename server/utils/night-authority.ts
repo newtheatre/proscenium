@@ -266,16 +266,18 @@ export async function requireNightAuthority(
   return throughBypass(event, caller, role, scope, options)
 }
 
-// For a screen more than one role reaches (E-118 criterion 4). Every role's shift is tried, then
-// door cover, then any bypass, so a shift that answers records neither (0095, 0098).
-export async function requireAnyNightAuthority(
+interface ShortOfAuthority { short: { role: NightRole, held: ShiftBranch }[], refusals: Refusal[] }
+
+// Every role's shift is tried, then door cover, then any bypass, so a shift that answers records
+// neither (0095, 0098). Short of authority, it hands back what the guard needs to say why.
+async function firstAuthority(
   event: H3Event,
+  caller: Caller,
   roles: NightRole[],
-  scope: NightScope = {},
-  options: NightAuthorityOptions = {},
-): Promise<NightAuthority> {
-  const caller = await callerTonight(event, scope)
-  const short: { role: NightRole, held: ShiftBranch }[] = []
+  scope: NightScope,
+  options: NightAuthorityOptions,
+): Promise<NightAuthority | ShortOfAuthority> {
+  const short: ShortOfAuthority['short'] = []
   const refusals: Refusal[] = []
   for (const role of roles) {
     try {
@@ -307,7 +309,37 @@ export async function requireAnyNightAuthority(
       refusals.push({ kind: 'ASKED', error })
     }
   }
+  return { short, refusals }
+}
+
+// For a screen more than one role reaches (E-118 criterion 4).
+export async function requireAnyNightAuthority(
+  event: H3Event,
+  roles: NightRole[],
+  scope: NightScope = {},
+  options: NightAuthorityOptions = {},
+): Promise<NightAuthority> {
+  const caller = await callerTonight(event, scope)
+  const found = await firstAuthority(event, caller, roles, scope, options)
+  if (isNightAuthority(found)) return found
   // The refusal about the caller's own position, never merely the last role asked (issue 1303).
-  for (const { role, held } of short) refusals.push(await shiftRefusal(caller, role, scope, held))
+  const refusals = [...found.refusals]
+  for (const { role, held } of found.short) refusals.push(await shiftRefusal(caller, role, scope, held))
   throw mostSpecificRefusal(refusals)?.error ?? createError(nightAuthorityRefusal('DUTY_MANAGER'))
+}
+
+// The same steps for a screen anyone signed in may read, which only adds what tonight's team may
+// see: null where the guard would refuse, without working out a refusal nobody reads.
+export async function nightAuthorityIfAny(
+  event: H3Event,
+  roles: NightRole[],
+  scope: NightScope = {},
+  options: NightAuthorityOptions = {},
+): Promise<NightAuthority | null> {
+  const found = await firstAuthority(event, await callerTonight(event, scope), roles, scope, options)
+  return isNightAuthority(found) ? found : null
+}
+
+function isNightAuthority(found: NightAuthority | ShortOfAuthority): found is NightAuthority {
+  return 'via' in found
 }
