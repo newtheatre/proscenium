@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import type { AccountRow } from '#server/utils/accounts'
 import type { Authority } from '#server/utils/authorise'
-import type { NightAuthorityVia, NightRefusalKind, NightRole, NightScope } from '#shared/utils/night-authority'
+import type { NightAuthorityVia, NightRefusalKind, NightRole, NightScope, RecordsRead } from '#shared/utils/night-authority'
 
 // Shift-scoped authority, the guard every show-night route calls (E-111). A confirmed shift is
 // tried first and the officer bypass falls through only when no shift covers the request (0044).
@@ -139,7 +139,7 @@ async function recordOfficerBypass(actorId: string, night: string, covered: Nigh
 
 // A read that decrypts access-profile wording (D-127) sets `recordsRead`, so an officer reading
 // it is recorded as an act would be (0098).
-export interface NightAuthorityOptions { recordsRead?: boolean }
+export interface NightAuthorityOptions { recordsRead?: RecordsRead }
 
 interface Caller { resolved: Authority, tonight: string }
 interface Refusal { kind: NightRefusalKind, error: unknown }
@@ -166,7 +166,7 @@ async function callerTonight(event: H3Event, scope: NightScope): Promise<Caller>
 async function throughCover(event: H3Event, { resolved, tonight }: Caller, scope: NightScope, options: NightAuthorityOptions): Promise<NightAuthority | ShiftBranch> {
   const held = await shiftHeldTonight(event, resolved.account.id, 'DUTY_MANAGER', tonight, scope)
   if (!held.coverage) return held
-  if (bypassIsRecorded(event.method, options.recordsRead)) {
+  if (bypassIsRecorded(event.method, recordsReadFor(options.recordsRead, 'DOOR'))) {
     // Written once a night and venue, so it names every house this duty manager runs there.
     const { from, to } = showNightBounds(tonight)
     const own = await confirmedShiftsTonight(
@@ -232,7 +232,7 @@ async function throughBypass(
   await requireSecondFactorIfPrivileged(event, resolved)
   const covered = await coverage(tonight, role, scope)
   // Recorded when the officer acts, never when a screen merely looks (0098).
-  if (bypassIsRecorded(event.method, options.recordsRead)) await recordOfficerBypass(resolved.account.id, tonight, covered, role)
+  if (bypassIsRecorded(event.method, recordsReadFor(options.recordsRead, role))) await recordOfficerBypass(resolved.account.id, tonight, covered, role)
   return {
     account: resolved.account,
     night: tonight,
