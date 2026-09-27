@@ -1,4 +1,5 @@
 import { changes } from '#shared/utils/audit'
+import { saysNoSuch } from '#shared/utils/no-such'
 import { saysSeasonMoved, showUpdateForm } from '#shared/utils/programme'
 
 // Edit a show's copy, its address and the booking window its performances inherit. It does not
@@ -11,28 +12,16 @@ export default defineEventHandler(async (event) => {
   if (!held) throw noSuch('show')
 
   const input = await readValidatedBodyOrThrow(event, showUpdateForm)
-  const window = input.bookingClosesHoursBefore ?? null
-
-  // Both predicates ride the UPDATE: the address is held once, and a season chosen over one set
-  // since the form loaded refuses rather than undo it (0003, 0006, D-131 criterion 2).
-  const [updated] = await db.all<{ id: string, seasonId: string | null }>(updateShowStatement(id, input))
-
-  if (!updated) {
-    const now = await showById(id)
-    if (!now) throw noSuch('show')
-    const chosen = input.seasonId ?? null
-    if (chosen !== input.loadedSeasonId && now.seasonId !== input.loadedSeasonId) {
-      throw createError({ statusCode: 409, statusMessage: saysSeasonMoved(now.title, now.seasonName) })
-    }
-    throw createError({ statusCode: 409, statusMessage: `A show already has the address /shows/${input.slug}` })
-  }
+  const chosen = input.seasonId ?? null
+  const chose = chosen !== input.loadedSeasonId
 
   // The copy is prose, so the trail records that it moved and never what it says (0011).
   const copyChanged = input.description !== held.description
     || input.longDescription !== held.longDescription
     || input.subtitle !== held.subtitle
 
-  await db.insert(schema.auditLog).values(auditEntry({
+  // The season pair is recorded only where the form chose one, which the predicate makes exact.
+  const entry = auditEntry({
     actorId: resolved.account.id,
     action: 'show.updated',
     target: `show:${id}`,
@@ -42,13 +31,31 @@ export default defineEventHandler(async (event) => {
         title: [held.title, input.title],
         ageGuidance: [held.ageGuidance, input.ageGuidance ?? null],
         latecomerPolicy: [held.latecomerPolicy, input.latecomerPolicy ?? null],
-        bookingClosesHoursBefore: [held.bookingClosesHoursBefore, window],
+        bookingClosesHoursBefore: [held.bookingClosesHoursBefore, input.bookingClosesHoursBefore ?? null],
         categoryId: [held.categoryId, input.categoryId ?? null],
-        seasonId: [held.seasonId, updated.seasonId],
+        ...(chose ? { seasonId: [input.loadedSeasonId, chosen] as [unknown, unknown] } : {}),
       }),
       copyChanged,
     },
-  }))
+  })
 
-  return { ok: true }
+  // Every refusal rides the UPDATE, and the audit rides its batch on changes() (0003, 0049).
+  const applied = await auditedWrite(db.all<{ id: string }>(updateShowStatement(id, input)), entry)
+  if (applied) return { ok: true }
+
+  const now = await showById(id)
+  if (!now) throw noSuch('show')
+  if (chose && now.seasonId !== input.loadedSeasonId) {
+    throw createError({ statusCode: 409, statusMessage: saysSeasonMoved(now.title, now.seasonName) })
+  }
+  if (chose && chosen !== null) chosenOrThrow('season', await seasonById(chosen))
+  const category = input.categoryId ?? null
+  if (category !== null && category !== now.categoryId) chosenOrThrow('show category', await showCategoryById(category))
+  throw createError({ statusCode: 409, statusMessage: `A show already has the address /shows/${input.slug}` })
 })
+
+// Why a season or a category could not be chosen: read only to explain the refused write.
+function chosenOrThrow(noun: string, found: { name: string, archived: boolean } | undefined): void {
+  if (!found) throw createError({ statusCode: 400, statusMessage: saysNoSuch(noun) })
+  if (found.archived) throw createError({ statusCode: 409, statusMessage: `${found.name} is retired and cannot be chosen for a show` })
+}

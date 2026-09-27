@@ -82,6 +82,19 @@ function trail<T>(action: string, target: string): T | undefined {
   }
 }
 
+// Every show.updated row for a show, oldest first, as the trail keeps them.
+function showUpdates(showId: string): { changes: Record<string, { from: unknown, to: unknown }> }[] {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    const found = database.query('SELECT detail FROM audit_log WHERE action = ? AND target = ? ORDER BY rowid')
+      .all('show.updated', `show:${showId}`) as { detail: string }[]
+    return found.map(row => JSON.parse(row.detail))
+  }
+  finally {
+    database.close()
+  }
+}
+
 interface ListedShow {
   id: string
   slug: string
@@ -206,10 +219,34 @@ describe.skipIf(skip !== null)('a show is a draft nobody outside can see until i
     expect((await send('PUT', `/api/admin/shows/${id}`, { title: `${title} again`, slug: slugged(title), seasonId: null, loadedSeasonId: null })).status).toBe(200)
     expect((await detail(id)).show).toMatchObject({ title: `${title} again`, seasonId: autumn.id })
 
+    const written = showUpdates(id).length
     const stale = await send('PUT', `/api/admin/shows/${id}`, { title, slug: slugged(title), seasonId: fringe.id, loadedSeasonId: null })
     expect(stale.status).toBe(409)
     expect(await stale.text()).toContain(autumn.name)
     expect((await detail(id)).show).toMatchObject({ title: `${title} again`, seasonId: autumn.id })
+    expect(showUpdates(id)).toHaveLength(written)
+  })
+
+  // D-131 criterion 5: retired vocabulary is not chosen for new work; the refusal names it.
+  test('a retired season or category is refused as a new choice, naming it', async () => {
+    const id = await newShow()
+    const title = (await detail(id)).show.title
+    const seasonName = named('Spring')
+    const season = await send('POST', '/api/admin/reference-data/seasons', { name: seasonName, startsOn: '2039-01-20', endsOn: '2039-04-10' })
+    const seasonId = (await season.json() as { id: string }).id
+    expect((await send('POST', `/api/admin/reference-data/seasons/${seasonId}/archive`, { archived: true })).status).toBe(200)
+    const categoryName = named('Mime')
+    const category = await send('POST', '/api/admin/reference-data/show-categories', { name: categoryName })
+    const categoryId = (await category.json() as { id: string }).id
+    expect((await send('POST', `/api/admin/reference-data/show-categories/${categoryId}/archive`, { archived: true })).status).toBe(200)
+
+    const toSeason = await send('PUT', `/api/admin/shows/${id}`, { title, slug: slugged(title), seasonId, loadedSeasonId: null })
+    expect(toSeason.status).toBe(409)
+    expect(await toSeason.text()).toContain(`${seasonName} is retired`)
+    const toCategory = await send('PUT', `/api/admin/shows/${id}`, { title, slug: slugged(title), categoryId, loadedSeasonId: null })
+    expect(toCategory.status).toBe(409)
+    expect(await toCategory.text()).toContain(`${categoryName} is retired`)
+    expect((await detail(id)).show).toMatchObject({ seasonId: null })
   })
 
   test('a save that does not say which season it loaded is refused', async () => {
@@ -219,7 +256,7 @@ describe.skipIf(skip !== null)('a show is a draft nobody outside can see until i
 
   test('a latecomer policy nobody defined is refused', async () => {
     const id = await newShow()
-    const answered = await send('PUT', `/api/admin/shows/${id}`, { title: 'X', slug: 'x-x', latecomerPolicy: 'MAYBE' })
+    const answered = await send('PUT', `/api/admin/shows/${id}`, { title: 'X', slug: 'x-x', latecomerPolicy: 'MAYBE', loadedSeasonId: null })
     expect(answered.status).toBe(400)
   })
 
@@ -625,6 +662,13 @@ describe.skipIf(skip !== null)('a show takes the season its first performance fa
 
     expect((await send('PUT', `/api/admin/shows/${id}`, { title, slug: slugged(title), ageGuidance: '12 and over', seasonId: null, loadedSeasonId: null })).status).toBe(200)
     expect((await detail(id)).show).toMatchObject({ ageGuidance: '12 and over', seasonId: season.id })
+
+    // The fill's own row, then the save's: the save left the season alone, so it records none.
+    const [filled, saved] = showUpdates(id)
+    expect(filled?.changes.seasonId).toEqual({ from: null, to: season.id })
+    expect(saved?.changes.ageGuidance).toEqual({ from: null, to: '12 and over' })
+    expect(saved?.changes.seasonId).toBeUndefined()
+    expect(showUpdates(id)).toHaveLength(2)
   })
 
   test('a run fills the season once, from its earliest night', async () => {

@@ -301,11 +301,20 @@ export async function showById(id: string): Promise<AdminShow | undefined> {
   return row ? readShow(row) : undefined
 }
 
-// The season is written only where the form changed it, and then only over the one it loaded, so
-// a save never undoes a season set since; the address is held once (D-131 criterion 2, 0003).
+// A season is written only where the form changed it, over the one it loaded; a retired season or
+// category is never newly chosen, and the address is held once (D-131 criteria 2 and 5, 0003).
 export function updateShowStatement(id: string, input: ShowUpdateInput): SQL {
   const seasonId = input.seasonId ?? null
-  const loaded = input.loadedSeasonId
+  const categoryId = input.categoryId ?? null
+  const chose = seasonId !== input.loadedSeasonId
+  const setSeason = chose ? sql`season_id = ${seasonId},` : sql``
+  const seasonHeld = chose ? sql` AND season_id IS ${input.loadedSeasonId}` : sql``
+  const seasonCurrent = chose && seasonId !== null
+    ? sql` AND EXISTS (SELECT 1 FROM seasons WHERE id = ${seasonId} AND archived = 0)`
+    : sql``
+  const categoryCurrent = categoryId !== null
+    ? sql` AND (category_id IS ${categoryId} OR EXISTS (SELECT 1 FROM show_categories WHERE id = ${categoryId} AND archived = 0))`
+    : sql``
   return sql`
     UPDATE shows
     SET slug = ${input.slug},
@@ -315,14 +324,13 @@ export function updateShowStatement(id: string, input: ShowUpdateInput): SQL {
         long_description = ${input.longDescription ?? null},
         age_guidance = ${input.ageGuidance ?? null},
         latecomer_policy = ${input.latecomerPolicy ?? null},
-        category_id = ${input.categoryId ?? null},
-        season_id = CASE WHEN ${seasonId} IS ${loaded} THEN season_id ELSE ${seasonId} END,
+        category_id = ${categoryId},
+        ${setSeason}
         booking_closes_hours_before = ${input.bookingClosesHoursBefore ?? null},
         updated_at = unixepoch()
     WHERE id = ${id}
-      AND NOT EXISTS (SELECT 1 FROM shows WHERE slug = ${input.slug} AND id <> ${id})
-      AND (${seasonId} IS ${loaded} OR season_id IS ${loaded})
-    RETURNING id, season_id AS seasonId
+      AND NOT EXISTS (SELECT 1 FROM shows WHERE slug = ${input.slug} AND id <> ${id})${seasonHeld}${seasonCurrent}${categoryCurrent}
+    RETURNING id
   `
 }
 
