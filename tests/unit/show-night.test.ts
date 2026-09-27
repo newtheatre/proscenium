@@ -6,6 +6,8 @@ import {
   isShowNight,
   showNightBounds,
   showNightOf,
+  showNightOpensAt,
+  showNightStartOf,
 } from '#shared/utils/show-night'
 
 // The show-night boundary (E-110), including the named clock-change regression cases (K-121).
@@ -138,6 +140,34 @@ describe('the clock-change nights (E-110 criterion 2)', () => {
   })
 })
 
+// The second a night opens is asked for by the rota, the board, announcements and the bookings
+// list, so it is answered once rather than worked out from the bounds at every site (0014).
+describe('the second a night opens', () => {
+  const seconds = (at: Date): number => at.getTime() / 1000
+
+  test('is 04:00 London on the night\'s own day, in epoch seconds', () => {
+    expect(showNightOpensAt('2026-10-17')).toBe(seconds(new Date('2026-10-17T03:00:00.000Z')))
+    expect(showNightOpensAt('2026-12-05')).toBe(seconds(new Date('2026-12-05T04:00:00.000Z')))
+  })
+
+  test('follows the clock change on the nights either side of it', () => {
+    expect(showNightOpensAt('2026-03-28')).toBe(seconds(new Date('2026-03-28T04:00:00.000Z')))
+    expect(showNightOpensAt('2026-03-29')).toBe(seconds(new Date('2026-03-29T03:00:00.000Z')))
+    expect(showNightOpensAt('2026-10-24')).toBe(seconds(new Date('2026-10-24T03:00:00.000Z')))
+    expect(showNightOpensAt('2026-10-25')).toBe(seconds(new Date('2026-10-25T04:00:00.000Z')))
+  })
+
+  test('is the night an instant falls in, opened, for any instant of that night', () => {
+    // 01:30Z on 25 October is the second 01:30 of the 25-hour night, still the 24th's.
+    expect(showNightStartOf(seconds(new Date('2026-10-25T01:30:00.000Z')))).toBe(showNightOpensAt('2026-10-24'))
+    expect(showNightStartOf(showNightOpensAt('2026-03-29'))).toBe(showNightOpensAt('2026-03-29'))
+  })
+
+  test('refuses a label that is not a real night', () => {
+    expect(() => showNightOpensAt('2026-02-30')).toThrow(/real date/)
+  })
+})
+
 describe('the arithmetic pins London and never reads server-local time (E-110 criterion 3)', () => {
   test('the answer is the same whatever zone the process runs in', () => {
     const was = process.env.TZ
@@ -209,7 +239,14 @@ describe('one definition, no second implementation (E-110 criterion 1, 0014)', (
       }
     }
     expect([...owners.values()].flat().every(path => path === 'shared/utils/show-night.ts')).toBe(true)
-    expect([...owners.keys()].sort()).toEqual(['SHOW_NIGHT_START_HOUR', 'currentShowNight', 'isShowNight', 'showNightBounds', 'showNightOf', 'showNightStartOf'])
+    expect([...owners.keys()].sort()).toEqual(['SHOW_NIGHT_START_HOUR', 'currentShowNight', 'isShowNight', 'showNightBounds', 'showNightOf', 'showNightOpensAt', 'showNightStartOf'])
+  })
+
+  test('nothing else works the opening second out from the bounds', async () => {
+    const inline = (await sources())
+      .filter(([path, source]) => path !== 'shared/utils/show-night.ts' && /showNightBounds\([^)]*\)\.from\.getTime\(\)/.test(source))
+      .map(([path]) => path)
+    expect(inline).toEqual([])
   })
 
   // The likelier defect is not a second export but a boundary written inline in a door route.
