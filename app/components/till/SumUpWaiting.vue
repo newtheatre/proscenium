@@ -71,7 +71,8 @@ const listedNote = (id: string): string | null => listedNotes.value[id]?.trim() 
       class="mt-2 w-full"
       data-test="sumup-abandon-note"
     />
-    <!-- Stacked at any window: the till's column is a phone's, and three across cut every label short. -->
+    <!-- Stacked at any window: the till's column is a phone's, too narrow for three answers across
+         without clipping their labels (issue 1520). -->
     <div class="mt-3 grid gap-2">
       <UButton
         color="primary"

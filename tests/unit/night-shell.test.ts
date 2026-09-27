@@ -16,52 +16,58 @@ const component = (name: string): Promise<string> => read(`app/components/${name
 // Anything that only exists under a pointer, or needs a second finger or a held press.
 const POINTER_ONLY = /\bhover:|group-hover:|@(mouseenter|mouseover|mouseleave|dblclick|contextmenu|touchstart|touchend)\b|v-on:(mouseenter|mouseover|contextmenu)/
 
-// A window-width variant, `sm:` to `2xl:` and their `max-` forms; `@md:` is a container's and passes.
-const VIEWPORT_VARIANT = /(?<![\w@-])(?:max-)?(?:sm|md|lg|xl|2xl):/
+// Anything keyed to the window's width: `sm:` to `2xl:`, arbitrary `min-[...]:` and `max-[...]:`,
+// and a width `@media` rule. A container's `@md:` or `@min-[...]:` passes, as does any other media query.
+const WINDOW_WIDTH = /(?<![\w@-])(?:max-)?(?:sm|md|lg|xl|2xl):|(?<![\w@-])(?:min|max)-\[[^\]]+\]:|@media[^{]*\bwidth\b/
 
-// NightScreen's `max-w-md`, and Tailwind's container sizes, both in rem.
-const NIGHT_COLUMN_REM = 28
+// Tailwind's container scale in rem, which both `max-w-*` and the `@*:` variants read.
 const CONTAINER_REM: Record<string, number> = {
   '3xs': 16, '2xs': 18, 'xs': 20, 'sm': 24, 'md': 28, 'lg': 32, 'xl': 36,
   '2xl': 42, '3xl': 48, '4xl': 56, '5xl': 64, '6xl': 72, '7xl': 80,
 }
+const capOf = (source: string): number | undefined => CONTAINER_REM[source.match(/\bmax-w-([\w-]+)/)?.[1] ?? '']
 
 const STOCKTAKE_COUNTS = 'app/components/stocktake/Counts.vue'
 // What the flexible first column keeps for the item's name once the fixed columns are paid for.
 const ROOM_FOR_A_NAME_REM = 10
 
-// Nuxt names a nested component by its folders then its file, dropping a repeated prefix.
-function componentFiles(): Map<string, string> {
+// Nuxt's own names for the application's components, from the declarations `nuxt prepare` writes
+// on install, so the walk below never has to reimplement Nuxt's naming.
+async function componentFiles(): Promise<Map<string, string>> {
+  const declared = await read('.nuxt/components.d.ts')
   const named = new Map<string, string>()
-  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/components', onlyFiles: true })) {
-    const parts = entry.replaceAll('\\', '/').replace(/\.vue$/, '').split('/')
-    const file = parts.pop()!
-    const prefix = parts.map(part => part.split('-').map(word => word[0]!.toUpperCase() + word.slice(1)).join('')).join('')
-    named.set(file.startsWith(prefix) ? file : `${prefix}${file}`, `app/components/${entry.replaceAll('\\', '/')}`)
+  for (const [, name, path] of declared.matchAll(/export const (\w+): typeof import\("\.\.\/(app\/components\/[^"]+\.vue)"\)/g)) {
+    named.set(name!, path!)
+    named.set(name!.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(), path!)
   }
   return named
 }
 
-// Every file drawn inside the tonight layout's column: the layout, each page on it, and every
-// component those reach by tag.
-async function tonightTree(): Promise<string[]> {
-  const named = componentFiles()
+// Every file drawn inside the tonight layout, with its source: the layout, each page on it, and
+// every component those reach by tag, in either case.
+async function tonightTree(): Promise<Map<string, string>> {
+  const named = await componentFiles()
+  const tag = new RegExp(`<(?:Lazy|lazy-)?(${[...named.keys()].join('|')})[\\s/>]`, 'g')
+  const sources = new Map<string, string>()
   const queue = [LAYOUT]
   for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/pages', onlyFiles: true })) {
     const path = `app/pages/${entry.replaceAll('\\', '/')}`
-    if (/layout:\s*'tonight'/.test(await read(path))) queue.push(path)
+    const source = await read(path)
+    if (/layout:\s*'tonight'/.test(source)) {
+      sources.set(path, source)
+      queue.push(path)
+    }
   }
   const seen = new Set<string>()
   while (queue.length > 0) {
     const file = queue.pop()!
     if (seen.has(file)) continue
     seen.add(file)
-    const source = await read(file)
-    for (const [name, path] of named) {
-      if (new RegExp(`<(?:Lazy)?${name}[\\s/>]`).test(source)) queue.push(path)
-    }
+    const source = sources.get(file) ?? await read(file)
+    sources.set(file, source)
+    for (const [, name] of source.matchAll(tag)) queue.push(named.get(name!)!)
   }
-  return [...seen].sort()
+  return new Map([...sources].sort(([a], [b]) => a.localeCompare(b)))
 }
 
 describe('the stale label (K-102, "last synced HH:MM")', () => {
@@ -156,16 +162,18 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     expect(await component('NightScreen')).toMatch(/\bmax-w-/)
   })
 
-  // Issue 1520: the column is capped at any window width, so `sm:` fired on a desk while the column
-  // was still a phone's, and a stocktake line's three columns crushed the item's name to nothing.
-  test('inside the capped column, a layout keys to its container and never to the window', async () => {
-    const files = await tonightTree()
-    expect(files).toContain(STOCKTAKE_COUNTS)
+  // Issue 1520: every page on the tonight layout is a capped column at any window width, so what
+  // changes shape inside it must key to its container; a window variant fires while it is still narrow.
+  test('every page on the tonight layout is a capped column, laid out by container and never by window', async () => {
+    const tree = await tonightTree()
+    expect([...tree.keys()]).toContain(STOCKTAKE_COUNTS)
     const offenders: string[] = []
-    for (const file of files) {
-      const source = await read(file)
+    for (const [file, source] of tree) {
+      if (file.startsWith('app/pages/') && !source.includes('<NightScreen') && capOf(source) === undefined) {
+        offenders.push(`${file}: neither a NightScreen nor a capped column`)
+      }
       source.split('\n').forEach((line, index) => {
-        if (VIEWPORT_VARIANT.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`)
+        if (WINDOW_WIDTH.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`)
       })
     }
     expect(offenders).toEqual([])
@@ -184,7 +192,9 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     const step = (utility: string): number => Number(line.match(new RegExp(`(?:^|\\s)${utility}-(\\d+)(?:\\s|$)`))?.[1] ?? 0) / 4
     const needed = fixedRem + gaps * step('gap') + 2 * step('p') + 2 / 16 + ROOM_FOR_A_NAME_REM
     expect(CONTAINER_REM[size!]).toBeGreaterThanOrEqual(needed)
-    expect(CONTAINER_REM[size!]).toBeGreaterThan(NIGHT_COLUMN_REM)
+    const column = capOf(await component('NightScreen'))
+    expect(column).toBeDefined()
+    expect(CONTAINER_REM[size!]).toBeGreaterThan(column!)
   })
 
   // The hub is the exception, and only the hub: it is the navigation rather than a screen with

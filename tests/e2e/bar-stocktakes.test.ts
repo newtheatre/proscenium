@@ -115,6 +115,24 @@ function movementsFor(itemId: string): { qty: number, kind: string, refTable: st
   }
 }
 
+// The Bar Manager signed in on a screen of the given size. A view that fails to sign in is closed
+// here, since the caller never receives it to close.
+async function signedIn(width = 375, height = 812): Promise<Bun.WebView> {
+  const screen = await openSignedOutView(app.baseURL, { width, height })
+  try {
+    await visit(screen, `${app.baseURL}/sign-in`)
+    await fill(screen, 'form input[type="email"]', barManager.email)
+    await fill(screen, 'form input[type="password"]', barPassword)
+    await click(screen, 'form button[type="submit"]')
+    await waitFor(screen, `document.querySelector('[data-test="account-menu"]')`)
+    return screen
+  }
+  catch (failure) {
+    screen.close()
+    throw failure
+  }
+}
+
 describe.skipIf(skip !== null)('opening a stocktake captures on-hand at that moment (F-115 criterion 1)', () => {
   test('a line is captured with the current on-hand, unaffected by a later delivery', async () => {
     const item = await anItem()
@@ -623,16 +641,6 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
 // Issue 1321 (F-115): the count asked for millilitres in 32 px fields, lost what was not saved,
 // showed the expected figure before counting and ordered the lines by name alone.
 describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (issue 1321)', () => {
-  async function signedIn(width = 375): Promise<Bun.WebView> {
-    const screen = await openSignedOutView(app.baseURL, { width, height: 812 })
-    await visit(screen, `${app.baseURL}/sign-in`)
-    await fill(screen, 'form input[type="email"]', barManager.email)
-    await fill(screen, 'form input[type="password"]', barPassword)
-    await click(screen, 'form button[type="submit"]')
-    await waitFor(screen, `document.querySelector('[data-test="account-menu"]')`)
-    return screen
-  }
-
   test('a bottle is counted as full ones plus the open one, and kept in millilitres', async () => {
     const item = await anItem({ containerMl: 750 })
     await deliver(item.id, 3000)
@@ -811,8 +819,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
   }, 120_000)
 })
 
-// Issue 1520: the show-night column is a phone's width at any window, but a line took its desk
-// layout from the window, and at a desk the item's name was crushed under its own count fields.
+// Issue 1520: a line lays out by the width its container gives it, so in the show-night column,
+// a phone's width at any window, its name, count fields and figures never sit on one another.
 describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is given (issue 1520)', () => {
   interface Box { left: number, right: number, top: number, bottom: number }
   interface LineLayout { name: Box, fields: Box, figures: Box, inputs: number[] }
@@ -837,25 +845,15 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
   const overlaps = (a: Box, b: Box): boolean =>
     a.right > a.left && b.right > b.left && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
 
-  async function signedIn(width: number, height: number): Promise<Bun.WebView> {
-    const screen = await openSignedOutView(app.baseURL, { width, height })
-    await visit(screen, `${app.baseURL}/sign-in`)
-    await fill(screen, 'form input[type="email"]', barManager.email)
-    await fill(screen, 'form input[type="password"]', barPassword)
-    await click(screen, 'form button[type="submit"]')
-    await waitFor(screen, `document.querySelector('[data-test="account-menu"]')`)
-    return screen
-  }
-
   test('on tonight\'s screen, at a desk and on a phone, no part of a line sits on another', async () => {
     const uncounted = await anItem({ containerMl: 750 })
     const counted = await anItem({ containerMl: 700 })
     await deliver(counted.id, 2100)
     const opened = await open()
-    expect((await count(opened.stocktake.id, [{ itemId: counted.id, counted: 1750 }])).status).toBe(200)
-
-    const screen = await signedIn(1280, 800)
+    let screen: Bun.WebView | undefined
     try {
+      expect((await count(opened.stocktake.id, [{ itemId: counted.id, counted: 1750 }])).status).toBe(200)
+      screen = await signedIn(1280, 800)
       for (const [width, height] of [[1280, 800], [360, 740]] as const) {
         await screen.resize(width, height)
         await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${uncounted.id}"]`)
@@ -872,9 +870,9 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
       }
     }
     finally {
-      screen.close()
+      screen?.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   // The console's column is wide at a desk, so there the line keeps its three columns side by side.
@@ -882,10 +880,10 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
     const item = await anItem({ containerMl: 700 })
     await deliver(item.id, 2100)
     const opened = await open()
-    expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 1750 }])).status).toBe(200)
-
-    const screen = await signedIn(1280, 800)
+    let screen: Bun.WebView | undefined
     try {
+      expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 1750 }])).status).toBe(200)
+      screen = await signedIn(1280, 800)
       await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
       await waitFor(screen, `document.querySelector('[data-test="variance-${item.id}"]')`)
       const line = await layoutOf(screen, item.id)
@@ -895,9 +893,9 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
       expect(line.figures.top).toBeLessThan(line.fields.bottom)
     }
     finally {
-      screen.close()
+      screen?.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 })
 
