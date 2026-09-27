@@ -83,7 +83,12 @@ describe.skipIf(skip !== null)('the report itself (E-123 criterion 1)', () => {
     shift(performanceId, 'DUTY_MANAGER', dm.id)
     write(`INSERT INTO incidents (id, performance_id, reported_by, category, severity, body) VALUES (?, ?, ?, 'SAFETY', 'SERIOUS', 'Something happened')`,
       'report-incident', performanceId, dm.id)
-    write('UPDATE incident_severity_config SET requires_follow_up = 1 WHERE severity = ?', 'SERIOUS')
+    // Written, not updated: the harness's reset empties the rows a migration seeded, so neither the
+    // severity nor the milestone type may be there to update (docs/known-issues.md).
+    write(`INSERT INTO incident_severity_config (severity, requires_follow_up) VALUES (?, 1)
+           ON CONFLICT (severity) DO UPDATE SET requires_follow_up = 1`, 'SERIOUS')
+    write(`INSERT INTO backstage_milestone_types (id, label, sort) VALUES (?, 'Clearance', 0)
+           ON CONFLICT (label) DO NOTHING`, 'report-clearance')
     write('INSERT INTO backstage_nights (id, venue_id, night) VALUES (?, ?, ?)', 'report-bn', venueId, night)
     write('INSERT INTO backstage_devices (id, night_id, label, token_hash, joined_epoch) VALUES (?, ?, ?, ?, 0)',
       'report-bd', 'report-bn', 'Stage left', 'b'.repeat(64))
