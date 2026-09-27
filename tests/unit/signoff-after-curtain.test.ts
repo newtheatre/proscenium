@@ -8,7 +8,7 @@ const CURTAIN_DOWN = 1793916600
 
 describe('the sign-off opens once the curtain is down (issue 1315, E-124)', () => {
   test('before the curtain it is refused, naming when it opens', () => {
-    expect(signOffTooEarly(CURTAIN_DOWN, CURTAIN_DOWN - 1)).toBe('Sign off and close opens at 22:10, once the curtain is down.')
+    expect(signOffTooEarly(CURTAIN_DOWN, CURTAIN_DOWN - 1)).toBe('Sign off and close opens at 22:10, once the curtain is down')
   })
 
   test('from the moment the curtain is down it is not', () => {
@@ -24,8 +24,8 @@ describe('the sign-off opens once the curtain is down (issue 1315, E-124)', () =
 describe('the route and the screen read the same curtain', () => {
   test('the sign-off route refuses before it compiles or writes anything', async () => {
     const route = await Bun.file('server/api/tonight/report/sign-off.post.ts').text()
-    expect(route).toContain('signOffTooEarly(times ? performanceEnd(times) : null, Math.floor(Date.now() / 1000))')
+    expect(route).toContain('signOffTooEarly(await curtainDownAt(target), Math.floor(Date.now() / 1000))')
     expect(route.indexOf('signOffTooEarly(')).toBeLessThan(route.indexOf('compileNightReport('))
-    expect(await Bun.file('server/api/tonight/report.get.ts').text()).toContain('performanceEnd(times)')
+    expect(await Bun.file('server/api/tonight/report.get.ts').text()).toContain('curtainDownAt(target)')
   })
 })

@@ -93,7 +93,7 @@ describe.skipIf(skip !== null)('the sign-off opens once the curtain is down (iss
     expect(said(await early.json() as { statusMessage?: string })).toBe(saysSignOffOpens(curtainDownAt))
     expect(read('SELECT id FROM night_reports WHERE performance_id = ?', performanceId)).toEqual([])
 
-    afterCurtain({ performanceId })
+    withBatch(runner => curtainDown(runner, performanceId))
     expect((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Now', incidentsSeen: 0 }, dm.cookie)).status).toBe(200)
   })
 })
@@ -191,7 +191,7 @@ describe.skipIf(skip !== null)('sign-off itself (criteria 1, 2, 3)', () => {
 
   test('a door shift holder cannot sign off, and a signed-out caller is refused', async () => {
     const door = await registerMember(app, 'signoff-door', generatePassword())
-    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-guard' })))
+    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'signoff-guard' }))
     shift(performanceId, 'DOOR', door.id)
 
     expect((await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'Nope', incidentsSeen: 0 }, door.cookie)).status).toBe(403)
@@ -239,7 +239,7 @@ describe.skipIf(skip !== null)('the report freezes (E-123 criterion 4, E-124 cri
 
 describe.skipIf(skip !== null)('addenda (criterion 5)', () => {
   test('refuses a correction to a performance nobody has signed off yet', async () => {
-    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-unsigned' })))
+    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { suffix: 'addendum-unsigned' }))
     const refused = await send('POST', '/api/admin/night-reports/addenda', { performanceId, note: 'Too soon' })
     expect(refused.status).toBe(404)
   })
