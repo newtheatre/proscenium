@@ -27,7 +27,10 @@ export const bar: Shot[] = [
     url: '/bar/products/new',
     marker: '[data-test="shape-cards"]',
     width: CONSOLE_WIDTH,
+    // The shapes follow the category, so one is chosen before capture (issue 1349).
+    after: `[...document.querySelectorAll('[data-test="setup-categories"] button')].find(chip => chip.innerText.trim() === 'Wine')?.click()`,
     annotations: [
+      { selector: '[data-test="setup-categories"]', label: 'The product category' },
       { selector: '[data-test="shape-simple"]', label: 'Sold as itself' },
       { selector: '[data-test="shape-measured"]', label: 'Sold by measure' },
       { selector: '[data-test="shape-recipe"]', label: 'Made from several things' },

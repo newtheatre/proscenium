@@ -3,10 +3,14 @@ import {
   MEASURE_PRESETS,
   SERVING_KINDS,
   categoryPriceForm,
+  defaultItemName,
   measurePreset,
+  openingQuantity,
   presetForCategory,
   productSetupForm,
   productShape,
+  saysSetupFinish,
+  suggestedShape,
 } from '#shared/utils/bar'
 
 // F-127's set-up vocabulary: shape read from the variants a product holds, presets over the
@@ -298,5 +302,36 @@ describe('one payload per shape, validated before anything is written (F-127 cri
   test('an opening delivery by measure is costed in whole pence, as the screen asked', () => {
     expect(aMeasured({ opening: { qty: 4500, costPence: 650 } }).success).toBe(true)
     expect(aMeasured({ opening: { qty: 4500, costPence: 6.5 } }).success).toBe(false)
+  })
+})
+
+// Issue 1349 (F-127): the set-up starts from the category, names the stocked item after the
+// product, asks opening stock in containers and says truthfully what it has made.
+describe('the set-up follows the category and says what it made (issue 1349)', () => {
+  test('a category suggests the shape its drinks are sold in, or none', () => {
+    expect(suggestedShape('Wine')).toBe('MEASURED')
+    expect(suggestedShape('Spirits')).toBe('MEASURED')
+    expect(suggestedShape('Soft drinks')).toBe('SIMPLE')
+    expect(suggestedShape('Cocktails')).toBe(null)
+  })
+
+  test('the stocked item is named after the product and what it comes in', () => {
+    expect(defaultItemName({ productName: 'House red', shape: 'MEASURED', containerMl: 750, servingKind: null })).toBe('House red 750ml')
+    expect(defaultItemName({ productName: 'Cider', shape: 'SIMPLE', containerMl: null, servingKind: 'can' })).toBe('Cider can')
+    expect(defaultItemName({ productName: 'Crisps', shape: 'SIMPLE', containerMl: null, servingKind: 'item' })).toBe('Crisps')
+    expect(defaultItemName({ productName: '  ', shape: 'MEASURED', containerMl: 750, servingKind: null })).toBe('')
+  })
+
+  test('opening stock is counted in containers and kept in the item\'s own unit', () => {
+    expect(openingQuantity(6, { unit: 'ML', containerMl: 750 })).toBe(4500)
+    expect(openingQuantity(24, { unit: 'ITEM', containerMl: null })).toBe(24)
+    expect(openingQuantity(20_000, { unit: 'ML', containerMl: null })).toBe(20_000)
+  })
+
+  test('the finish says whether it is on the till, and whether there is anything to pour', () => {
+    expect(saysSetupFinish({ status: 'ACTIVE', reason: null, inStock: true })).toBe('It is on the till.')
+    expect(saysSetupFinish({ status: 'ACTIVE', reason: null, inStock: false })).toBe('Set up, but out of stock until a delivery or count.')
+    expect(saysSetupFinish({ status: 'HIDDEN', reason: 'Hidden until it resolves: nothing prices Can.', inStock: false }))
+      .toBe('Hidden until it resolves: nothing prices Can.')
   })
 })

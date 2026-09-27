@@ -90,12 +90,13 @@ async function signedInBarManager(): Promise<Bun.WebView> {
 describe.skipIf(skip !== null)('a can is set up in one pass (F-127 criteria 1, 4 and 5)', () => {
   test('sold as itself: one screen, one submission, on the till', async () => {
     const categoryName = named('Cans and bottles')
-    await aCategory(categoryName)
+    const categoryId = await aCategory(categoryName)
     const productName = named('Cider')
 
     const view = await signedInBarManager()
     try {
       await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, `[data-test="category-${categoryId}"]`)
       await click(view, '[data-test="shape-simple"]')
       await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
 
@@ -118,12 +119,13 @@ describe.skipIf(skip !== null)('a can is set up in one pass (F-127 criteria 1, 4
 describe.skipIf(skip !== null)('a wine is set up by measure (F-127 criteria 2 and 3)', () => {
   test('sold by measure: the preset fills the sizes and one is unticked', async () => {
     const categoryName = named('Wine')
-    await aCategory(categoryName)
+    const categoryId = await aCategory(categoryName)
     const productName = named('House red')
 
     const view = await signedInBarManager()
     try {
       await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, `[data-test="category-${categoryId}"]`)
       await click(view, '[data-test="shape-measured"]')
       await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
 
@@ -154,7 +156,7 @@ describe.skipIf(skip !== null)('a wine is set up by measure (F-127 criteria 2 an
 describe.skipIf(skip !== null)('a cocktail is set up from its ingredients (F-127 criterion 4)', () => {
   test('made from several things: ingredients and a choice in one submission', async () => {
     const categoryName = named('Cocktails')
-    await aCategory(categoryName)
+    const categoryId = await aCategory(categoryName)
     const ginName = named('Gin')
     const vermouthName = named('Vermouth')
     const tonicName = named('Tonic')
@@ -166,6 +168,7 @@ describe.skipIf(skip !== null)('a cocktail is set up from its ingredients (F-127
     const view = await signedInBarManager()
     try {
       await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, `[data-test="category-${categoryId}"]`)
       await click(view, '[data-test="shape-recipe"]')
       await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
 
@@ -201,12 +204,13 @@ describe.skipIf(skip !== null)('a cocktail is set up from its ingredients (F-127
 describe.skipIf(skip !== null)('a size nothing prices hides the product rather than losing the form (F-127 criteria 3 and 5)', () => {
   test('the screen says so before the submission, and the product arrives hidden', async () => {
     const categoryName = named('Snacks')
-    await aCategory(categoryName)
+    const categoryId = await aCategory(categoryName)
     const productName = named('Crisps')
 
     const view = await signedInBarManager()
     try {
       await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, `[data-test="category-${categoryId}"]`)
       await click(view, '[data-test="shape-simple"]')
       await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
 
@@ -241,12 +245,13 @@ describe.skipIf(skip !== null)('the product\'s age flag follows what it pours (i
 
   test('a wine over a new stocked item asks for Check ID without anyone switching it on', async () => {
     const categoryName = named('Wine')
-    await aCategory(categoryName)
+    const categoryId = await aCategory(categoryName)
     const productName = named('Review Merlot')
 
     const view = await signedInBarManager()
     try {
       await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, `[data-test="category-${categoryId}"]`)
       await click(view, '[data-test="shape-measured"]')
       await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
 
@@ -268,12 +273,13 @@ describe.skipIf(skip !== null)('the product\'s age flag follows what it pours (i
 
   test('a can whose new stocked item is switched off sells without Check ID', async () => {
     const categoryName = named('Soft drinks')
-    await aCategory(categoryName)
+    const categoryId = await aCategory(categoryName)
     const productName = named('Cola')
 
     const view = await signedInBarManager()
     try {
       await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, `[data-test="category-${categoryId}"]`)
       await click(view, '[data-test="shape-simple"]')
       await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
 
@@ -293,7 +299,7 @@ describe.skipIf(skip !== null)('the product\'s age flag follows what it pours (i
 
   test('a product over a restricted item from the register follows it', async () => {
     const categoryName = named('Cans and bottles')
-    await aCategory(categoryName)
+    const categoryId = await aCategory(categoryName)
     const itemName = named('Lager 330ml bottle')
     await anItem(itemName, { unit: 'ITEM', containerMl: null })
     const productName = named('Lager')
@@ -301,6 +307,7 @@ describe.skipIf(skip !== null)('the product\'s age flag follows what it pours (i
     const view = await signedInBarManager()
     try {
       await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, `[data-test="category-${categoryId}"]`)
       await click(view, '[data-test="shape-simple"]')
       await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
 
@@ -328,13 +335,14 @@ describe.skipIf(skip !== null)('the product\'s age flag follows what it pours (i
 describe.skipIf(skip !== null)('an opening delivery by measure is costed by the container (0100)', () => {
   test('six bottles at £6.50 each are kept as £6.50 for 750 ml', async () => {
     const categoryName = named('Wine')
-    await aCategory(categoryName)
+    const categoryId = await aCategory(categoryName)
     const productName = named('House red')
     const itemName = named('House red 750ml')
 
     const view = await signedInBarManager()
     try {
       await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, `[data-test="category-${categoryId}"]`)
       await click(view, '[data-test="shape-measured"]')
       await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
 
@@ -348,7 +356,8 @@ describe.skipIf(skip !== null)('an opening delivery by measure is costed by the 
       await click(view, '[data-test="setup-opening"]')
       await waitFor(view, `document.querySelector('[data-test="setup-opening-cost"]')`)
       expect(await textOf(view, '[data-test="setup-form"]')).toContain('Cost of one container')
-      await fillNumber(view, '[data-test="setup-opening-qty"]', '4500')
+      // Six full bottles, asked in bottles and kept in millilitres (issue 1349).
+      await fillNumber(view, '[data-test="setup-opening-qty"]', '6')
       await fillNumber(view, '[data-test="setup-opening-cost"]', '6.5')
 
       await click(view, '[data-test="setup-submit"]')
@@ -362,4 +371,76 @@ describe.skipIf(skip !== null)('an opening delivery by measure is costed by the 
       view.close()
     }
   }, 120_000)
+})
+
+// Issue 1349 (F-127): set-up opened on a shape and a preset the category did not choose, left the
+// stocked item unnamed, and said "It is on the till" of a product with nothing in stock.
+describe.skipIf(skip !== null)('set-up starts from the category and says what it has made (issue 1349)', () => {
+  test('the category comes first, and the shape it suggests is marked', async () => {
+    const categoryName = named('Wine')
+    const categoryId = await aCategory(categoryName)
+
+    const view = await signedInBarManager()
+    try {
+      await visit(view, `${app.baseURL}/bar/products/new`, `[data-test="category-${categoryId}"]`)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="shape-cards"] [role="radio"]'))`)).toBe(false)
+      await click(view, `[data-test="category-${categoryId}"]`)
+      await waitFor(view, `document.querySelector('[data-test="shape-measured"]')?.getAttribute('data-suggested') === 'true'`)
+      await click(view, '[data-test="shape-measured"]')
+      await waitFor(view, `document.querySelector('[data-test="size-125ml"]')`)
+
+      await fill(view, '[data-test="setup-name"]', 'Review Merlot')
+      await waitFor(view, `document.querySelector('[data-test="setup-item-name"]')?.value === 'Review Merlot 750ml'`)
+
+      // A name typed by hand is kept whatever the product is renamed to afterwards.
+      await fill(view, '[data-test="setup-item-name"]', 'Cellar Merlot')
+      await fill(view, '[data-test="setup-name"]', 'Review Merlot reserve')
+      await Bun.sleep(300)
+      expect(await view.evaluate<string>(`document.querySelector('[data-test="setup-item-name"]').value`)).toBe('Cellar Merlot')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('a product set up with nothing in stock says so rather than that it is on the till', async () => {
+    const categoryName = named('Cans and bottles')
+    const categoryId = await aCategory(categoryName)
+    const productName = named('Empty cider')
+
+    const view = await signedInBarManager()
+    try {
+      await visit(view, `${app.baseURL}/bar/products/new`, `[data-test="category-${categoryId}"]`)
+      await click(view, `[data-test="category-${categoryId}"]`)
+      await click(view, '[data-test="shape-simple"]')
+      await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
+      await fill(view, '[data-test="setup-name"]', productName)
+      await fillNumber(view, '[data-test="setup-price"]', '3')
+      await click(view, '[data-test="setup-submit"]')
+      await waitFor(view, `document.body.innerText.includes('out of stock until a delivery or count')`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('the route says whether what it set up has anything to pour', async () => {
+    const categoryId = await aCategory(named('Snacks'))
+    const empty = await send('POST', '/api/admin/bar/products/setup', {
+      shape: 'SIMPLE',
+      product: { name: named('Empty crisps'), categoryId },
+      item: { mode: 'NEW', item: { name: named('Crisps bag'), unit: 'ITEM', ageRestricted: false } },
+      serving: { servingKind: 'item', label: 'Each', qty: 1, pricePence: 100 },
+    })
+    expect(await empty.json()).toMatchObject({ status: 'ACTIVE', inStock: false })
+
+    const stocked = await send('POST', '/api/admin/bar/products/setup', {
+      shape: 'SIMPLE',
+      product: { name: named('Stocked crisps'), categoryId },
+      item: { mode: 'NEW', item: { name: named('Crisps bag'), unit: 'ITEM', ageRestricted: false } },
+      serving: { servingKind: 'item', label: 'Each', qty: 1, pricePence: 100 },
+      opening: { qty: 12 },
+    })
+    expect(await stocked.json()).toMatchObject({ status: 'ACTIVE', inStock: true })
+  })
 })
