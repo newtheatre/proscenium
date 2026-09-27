@@ -11,7 +11,7 @@ import type { Permission } from '#shared/utils/roles'
 // features needing them wait rather than guessing. Typed, so a typo here is a build error.
 const UNSET: ConfigKey[] = [
   'MEMBERSHIP_PURCHASE_URL',
-  'NIGHT_REPORT_RECIPIENTS',
+  'NIGHT_REPORT_ROLES',
   'RETENTION_FINAL_WARNING_DAYS',
   'RETENTION_WARNING_DAYS',
 ]
@@ -214,7 +214,7 @@ describe('who may run up a tab', () => {
   // Which keys hold people or roles is said, never guessed from a key's name.
   test('the screen is told which keys hold people and which hold roles', () => {
     expect([...PEOPLE_KEYS]).toEqual(['BAR_AUTHORISED_TAB_HOLDERS'])
-    expect([...ROLE_KEYS]).toEqual(['BAR_AUTHORISED_TAB_ROLES', 'PRIVILEGED_ROLES'])
+    expect([...ROLE_KEYS]).toEqual(['BAR_AUTHORISED_TAB_ROLES', 'PRIVILEGED_ROLES', 'NIGHT_REPORT_ROLES'])
     expect(PEOPLE_KEYS.filter(key => !isSensitive(key))).toEqual([])
   })
 
@@ -222,5 +222,22 @@ describe('who may run up a tab', () => {
   test('the settings text says a role widens who is given credit', () => {
     expect(CONFIG_KEYS.BAR_AUTHORISED_TAB_ROLES.describes).toContain('credit')
     expect(CONFIG_KEYS.BAR_AUTHORISED_TAB_ROLES.describes).toContain('everybody')
+  })
+})
+
+// Issue 1356, E-124 criterion 3 as amended: the night report goes to roles, which lapse at the
+// committee year end on their own, never to a list of addresses somebody must remember to edit.
+describe('who the night report goes to', () => {
+  test('the standing list is roles, not addresses', () => {
+    expect(isConfigKey('NIGHT_REPORT_RECIPIENTS')).toBe(false)
+    const schema = CONFIG_KEYS.NIGHT_REPORT_ROLES.schema
+    expect(schema.safeParse(['FOH_MANAGER', 'SAFETY_OFFICER']).success).toBe(true)
+    expect(schema.safeParse(['duty@newtheatre.org.uk']).success).toBe(false)
+  })
+
+  test('the roles are chosen from the roles, read at the send, and audited with their values', () => {
+    expect(ROLE_KEYS as readonly string[]).toContain('NIGHT_REPORT_ROLES')
+    expect(isEnforced('NIGHT_REPORT_ROLES')).toBe(true)
+    expect(isSensitive('NIGHT_REPORT_ROLES')).toBe(false)
   })
 })

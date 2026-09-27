@@ -71,18 +71,18 @@ describe('what a settings change records (0011, 0024)', () => {
     expect(isRecordable(detail)).toBe(true)
   })
 
-  // A recipients list is addresses, and audit detail carries identifiers rather than people.
+  // A list of named people identifies them, and audit detail carries identifiers rather than people.
   test('a key holding personal data records a hash instead', async () => {
-    const detail = await configChangeDetail('NIGHT_REPORT_RECIPIENTS', [], ['duty@newtheatre.org.uk'])
-    expect(detail).toMatchObject({ key: 'NIGHT_REPORT_RECIPIENTS', redacted: true })
-    expect(JSON.stringify(detail)).not.toContain('duty@')
+    const detail = await configChangeDetail('BAR_AUTHORISED_TAB_HOLDERS', [], ['user-duty-manager'])
+    expect(detail).toMatchObject({ key: 'BAR_AUTHORISED_TAB_HOLDERS', redacted: true })
+    expect(JSON.stringify(detail)).not.toContain('user-duty-manager')
     expect(isRecordable(detail)).toBe(true)
   })
 
   test('the hash tells two values apart, and matches itself', async () => {
-    const first = await configChangeDetail('NIGHT_REPORT_RECIPIENTS', [], ['a@b.co.uk'])
-    const same = await configChangeDetail('NIGHT_REPORT_RECIPIENTS', [], ['a@b.co.uk'])
-    const other = await configChangeDetail('NIGHT_REPORT_RECIPIENTS', [], ['c@d.co.uk'])
+    const first = await configChangeDetail('BAR_AUTHORISED_TAB_HOLDERS', [], ['user-a'])
+    const same = await configChangeDetail('BAR_AUTHORISED_TAB_HOLDERS', [], ['user-a'])
+    const other = await configChangeDetail('BAR_AUTHORISED_TAB_HOLDERS', [], ['user-c'])
 
     expect(first.toHash).toBe(same.toHash as string)
     expect(first.toHash).not.toBe(other.toHash as string)
@@ -96,8 +96,9 @@ describe('what a settings change records (0011, 0024)', () => {
     }
   })
 
+  // The night report names roles since issue 1356, and a role identifies nobody (0024).
   test('the keys marked as holding personal data are exactly the ones naming specific people', () => {
-    expect(CONFIG_KEY_NAMES.filter(isSensitive).sort()).toEqual(['BAR_AUTHORISED_TAB_HOLDERS', 'NIGHT_REPORT_RECIPIENTS'])
+    expect(CONFIG_KEY_NAMES.filter(isSensitive).sort()).toEqual(['BAR_AUTHORISED_TAB_HOLDERS'])
   })
 })
 

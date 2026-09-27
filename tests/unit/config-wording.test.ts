@@ -59,7 +59,7 @@ describe('a value read rather than changed', () => {
     expect(saysConfigValue('PRIVILEGED_ROLES', ['TREASURER', 'ADMIN'])).toBe('Treasurer, IT Manager')
     expect(saysConfigValue('BAR_AUTHORISED_TAB_ROLES', [])).toBe('None')
     expect(saysConfigValue('ROOM_PRIORITY_TIERS', ['PRODUCTION', 'GENERAL'])).toBe('PRODUCTION, GENERAL')
-    expect(saysConfigValue('NIGHT_REPORT_RECIPIENTS', null)).toBe('Not set')
+    expect(saysConfigValue('NIGHT_REPORT_ROLES', null)).toBe('Not set')
     expect(saysConfigValue('SHIFT_ELIGIBILITY_BAR_MODULE', 'ADMN-102')).toBe('ADMN-102')
   })
 })
