@@ -12,7 +12,7 @@ import type { Permission } from '#shared/utils/roles'
 // amending 0040, issue 1305). The query behind `onShiftTonight` is pinned in tests/integration.
 
 const viewer = (onShiftTonight: boolean, permissions: Permission[] = []): Viewer =>
-  ({ id: 'someone', permissions, onShiftTonight, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' } })
+  ({ id: 'someone', permissions, onShiftTonight, leadsDepartment: false, isTrainer: false, keepsBarTab: false, membershipState: { kind: 'none' } })
 
 describe('a person can work tonight on a shift in its window, or by a night permission (0094)', () => {
   test('a confirmed shift in its window is enough, with no permission at all', () => {

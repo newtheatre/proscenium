@@ -272,7 +272,7 @@ export const MY_NAV: NavEntry[] = [
 
   // Module E: show night
 
-  { label: 'Tonight', icon: 'i-lucide-moon-star', to: '/tonight', ability: workTonight },
+  { label: 'Tonight', icon: 'i-lucide-moon-star', to: '/tonight', ability: canWorkTonight },
   { label: 'Rota', icon: 'i-lucide-clipboard-list', to: '/rota', ability: signedIn, exact: true },
 
   // Module C: spaces. Not exact, so My bookings and the booking form light it too.
