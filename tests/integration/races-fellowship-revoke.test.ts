@@ -29,7 +29,7 @@ function revoke(database: TestDatabase, actorId: string, reason: string, at: num
   const entry = auditEntry({ actorId, action: 'fellowship.revoked', target: 'fellowship:f-1' })
   const written = run(database, revokeFellowshipStatement('f-1', actorId, reason, at))
   run(database, auditIfChanged(entry))
-  run(database, cancelFellowshipPassStatement('u-1', entry.id))
+  run(database, cancelFellowshipPassStatement('u-1', entry))
   return written
 }
 

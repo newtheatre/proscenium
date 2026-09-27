@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { newId } from './accounts'
+import { entryLanded } from './audit'
 import { postEntry } from './ledger'
 import { auditEntry } from '#shared/utils/audit'
 import { generatePassReference } from '#shared/utils/passes'
@@ -103,11 +104,11 @@ export function revokeFellowshipStatement(id: string, actorId: string, reason: s
 
 // D-130 criterion 4: revocation stops future admissions and rewrites nothing already taken. Gated
 // on the revocation's own trail row, so a revocation that lost a race cancels nothing (0049).
-export function cancelFellowshipPassStatement(userId: string, auditId: string): SQL {
+export function cancelFellowshipPassStatement(userId: string, entry: AuditRow): SQL {
   return sql`
     UPDATE passes SET status = 'CANCELLED', updated_at = unixepoch()
     WHERE user_id = ${userId} AND status = 'ACTIVE'
       AND pass_type_id = (SELECT id FROM pass_types WHERE slug = 'fellowship')
-      AND EXISTS (SELECT 1 FROM audit_log WHERE id = ${auditId})
+      AND ${entryLanded(entry)}
   `
 }
