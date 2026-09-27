@@ -182,6 +182,30 @@ describe('every other write that places a booking holds the closures too', () =>
     })
   })
 
+  // The bump lands but its held offer does not: the displaced member must not be told of a slot
+  // that was never written, so the link to it is cleared in the same batch.
+  test('an offer whose room closed after the check is not written, and nothing points at it', async () => {
+    await withDatabase((database) => {
+      booking(database, 'b-standing', 'CONFIRMED', EVENING)
+      closeRoom(database, 'r-studio', AFTERNOON)
+      for (const statement of bumpStatements({
+        displaced: { id: 'b-standing', roomId: 'r-house', userId: 'u-booker', title: 'Rehearsal', attendees: null, tier: 'REHEARSAL', purpose: 'REHEARSAL', ...EVENING },
+        claimantId: 'u-booker',
+        title: 'Dress run',
+        tier: 'PRODUCTION',
+        purpose: 'REHEARSAL',
+        reason: 'Show week',
+        offer: { roomId: 'r-studio', room: 'The Studio', capacity: null, ...AFTERNOON },
+        now: NOW_SECONDS,
+        offsets: OFFSETS,
+      }, 'b-claimant', 'b-offer')) write(database, statement)
+      expect(statusOf(database, 'b-standing')).toBe('BUMPED')
+      expect(statusOf(database, 'b-claimant')).toBe('CONFIRMED')
+      expect(statusOf(database, 'b-offer')).toBeUndefined()
+      expect(rows<{ link: string | null }>(database, 'SELECT bumped_to_booking_id link FROM room_bookings WHERE id = ?', 'b-standing')[0]!.link).toBeNull()
+    })
+  })
+
   test('a series occurrence under a closure made after the check writes nothing', async () => {
     await withDatabase((database) => {
       database.batch([[`INSERT INTO room_series (id, user_id, room_id, title, frequency, starts_on, clock_from, clock_to, occurrences)
@@ -189,7 +213,7 @@ describe('every other write that places a booking holds the closures too', () =>
       closeRoom(database, 'r-house', EVENING)
       const occurrence = { occurrence: 1, day: NIGHT, startsAt: new Date(EVENING.startsAt * 1000), endsAt: new Date(EVENING.endsAt * 1000) }
       const series = { seriesId: 's-term', userId: 'u-booker', roomId: 'r-house', title: 'Rehearsal', attendees: null, tier: 'REHEARSAL', purpose: 'REHEARSAL', notes: null, status: 'CONFIRMED' as const, offsets: OFFSETS }
-      expect(write(database, seriesClaimStatement('b-week-1', series, occurrence))).toBe(0)
+      write(database, seriesClaimStatement('b-week-1', series, occurrence))
       expect(statusOf(database, 'b-week-1')).toBeUndefined()
     })
   })

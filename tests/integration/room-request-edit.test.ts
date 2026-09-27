@@ -24,6 +24,8 @@ async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>
   }
 }
 
+const OFFSETS = { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }
+
 function seed(database: TestDatabase, status = 'PENDING_APPROVAL'): void {
   database.batch([
     ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-asker', 'asker@example.invalid', 'An Asker'],
@@ -56,7 +58,7 @@ function edit(over: Partial<EditInput> = {}): EditInput {
     reason: 'The get-in is that day.',
     restartClock: false,
     now: NOW,
-    offsets: { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 },
+    offsets: OFFSETS,
     ...over,
   }
 }
@@ -157,7 +159,7 @@ describe('an edit racing an approval (C-109 criterion 3)', () => {
   test('approved first: the edit writes nothing and the booking stands as approved', async () => {
     await withDatabase((database) => {
       seed(database)
-      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW, { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }))).toBe(1)
+      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW, OFFSETS))).toBe(1)
       expect(run(database, editPendingStatement(edit({ startsAt: NOW + 20 * HOUR, endsAt: NOW + 22 * HOUR })))).toBe(0)
       expect(asked(database)).toMatchObject({ status: 'CONFIRMED', starts_at: NOW + 24 * HOUR })
     })
@@ -167,7 +169,7 @@ describe('an edit racing an approval (C-109 criterion 3)', () => {
     await withDatabase((database) => {
       seed(database)
       expect(run(database, editPendingStatement(edit({ startsAt: NOW + 20 * HOUR, endsAt: NOW + 22 * HOUR })))).toBe(1)
-      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW, { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }))).toBe(1)
+      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW, OFFSETS))).toBe(1)
       expect(asked(database)).toMatchObject({ status: 'CONFIRMED', starts_at: NOW + 20 * HOUR })
     })
   })
