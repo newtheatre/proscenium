@@ -160,9 +160,11 @@ parameter.
     together exactly when the write applied.
   - An empty list runs the write alone: a save that changed nothing writes no entry
     (`content-warnings/[id]/index.put.ts`, `ticket-types/[id]/index.put.ts`).
-  - A statement in `then` that must follow only an applied write conditions on
-    `EXISTS (SELECT 1 FROM audit_log WHERE id = <the entry's id>)`, as a pass type's replaced
-    price points do.
+  - A statement in `then` that must follow only an applied write is gated on `entryLanded(entry)`,
+    `EXISTS (SELECT 1 FROM audit_log WHERE id = <the entry's id>)`, since `then` runs after the
+    entries. A new pass type's price points and shows, and an edited one's replaced prices, are
+    gated this way (`newPassTypeChildren()` and `replacePricesStatements()` in
+    `server/utils/pass-types.ts`).
   - The programme's name and address routes (content warnings, pass types, seasons, show
     categories, venues, shows and ticket types) moved onto it from a separate audit statement
     after their conditional write.

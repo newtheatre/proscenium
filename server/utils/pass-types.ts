@@ -1,11 +1,14 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { newId } from './accounts'
+import { entryLanded } from './audit'
 import { aliasColumns, whereFrom } from './list-filters'
 import { passTypesList } from '#shared/utils/pass-types-list'
 import type { SQL } from 'drizzle-orm'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { CoveringPass, PassType, PassTypeStatus } from '#shared/utils/pass-types'
+import type { AuditRow } from '#shared/utils/audit'
 
 // "Ever issued" and "live coverage" (D-123 criteria 3 and 4) have no real answer until D-124
 // builds `passes`, so both read an empty registry until then (as ticket-types.ts did for D-119).
@@ -216,4 +219,30 @@ export async function passTypeBySlug(slug: string, exceptId?: string): Promise<P
 export function passCapAllows(passTypeId: string, maxIssued: number | null): SQL {
   if (maxIssued === null) return sql`1 = 1`
   return sql`(SELECT count(*) FROM passes WHERE pass_type_id = ${passTypeId} AND status != 'CANCELLED') < ${maxIssued}`
+}
+
+// A new pass type's price points and covered shows, each gated on the create's own entry, so a
+// create refused on its address leaves none of them (0049).
+export function newPassTypeChildren(passTypeId: string, prices: { label: string, price: number }[], showIds: string[], entry: AuditRow): SQL[] {
+  return [
+    ...prices.map(price => sql`
+      INSERT INTO pass_type_prices (id, pass_type_id, label, price)
+      SELECT ${newId()}, ${passTypeId}, ${price.label}, ${price.price} WHERE ${entryLanded(entry)}
+    `),
+    ...showIds.map(showId => sql`
+      INSERT INTO pass_type_shows (id, pass_type_id, show_id) SELECT ${newId()}, ${passTypeId}, ${showId} WHERE ${entryLanded(entry)}
+    `),
+  ]
+}
+
+// The whole set replaced, gated on the edit's own entry, so an edit refused on its address keeps
+// the old price points and adds none (0049).
+export function replacePricesStatements(passTypeId: string, prices: { label: string, price: number }[], entry: AuditRow): SQL[] {
+  return [
+    sql`DELETE FROM pass_type_prices WHERE pass_type_id = ${passTypeId} AND ${entryLanded(entry)}`,
+    ...prices.map(price => sql`
+      INSERT INTO pass_type_prices (id, pass_type_id, label, price)
+      SELECT ${newId()}, ${passTypeId}, ${price.label}, ${price.price} WHERE ${entryLanded(entry)}
+    `),
+  ]
 }

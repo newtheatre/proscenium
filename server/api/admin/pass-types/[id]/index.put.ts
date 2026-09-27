@@ -36,11 +36,9 @@ export default defineEventHandler(async (event) => {
       descriptionChanged: description !== held.description,
     },
   })
-  // The entry lands only if the update applied, so the price points move only with it.
-  const applied = sql`EXISTS (SELECT 1 FROM audit_log WHERE id = ${entry.id})`
 
   // The address predicate rides the UPDATE, so a clashing rename refuses (0003, 0006). The prices are
-  // replaced whole: a price point carries no history of its own until D-124 snapshots what was paid.
+  // replaced whole, which a pass's RESTRICT on its price point refuses once one is issued (D-124).
   const updated = await auditedWrite(db.all<{ id: string }>(sql`
     UPDATE pass_types
     SET slug = ${input.slug},
@@ -56,10 +54,7 @@ export default defineEventHandler(async (event) => {
     WHERE id = ${id}
       AND NOT EXISTS (SELECT 1 FROM pass_types WHERE slug = ${input.slug} AND id <> ${id})
     RETURNING id
-  `), entry, db.run(sql`DELETE FROM pass_type_prices WHERE pass_type_id = ${id} AND ${applied}`), ...input.prices.map(price => db.run(sql`
-    INSERT INTO pass_type_prices (id, pass_type_id, label, price)
-    SELECT ${newId()}, ${id}, ${price.label}, ${price.price} WHERE ${applied}
-  `)))
+  `), entry, ...replacePricesStatements(id, input.prices, entry).map(statement => db.run(statement)))
 
   if (!updated) {
     const taken = await passTypeBySlug(input.slug, id)
