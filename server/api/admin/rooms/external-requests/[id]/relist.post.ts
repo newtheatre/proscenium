@@ -62,9 +62,9 @@ export default defineEventHandler(async (event) => {
   // The predicate rides the INSERT, so two officers claiming one slot cannot both win (0003), and
   // the claim, the move and the audit land together or not at all (0049).
   const statements = relistStatements({ requestId: id, claimId, claim, now: Math.floor(Date.now() / 1000) }, entry)
-  const [claimed] = await db.batch(statements.map(statement => db.all(statement)) as unknown as Parameters<typeof db.batch>[0])
+  const [claimed] = await runBatch(statements)
 
-  if (!(claimed as unknown[]).length) {
+  if (!claimed!.length) {
     const current = await externalRequest(id)
     if (!current || refusalToRelist(current)) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
 

@@ -25,10 +25,10 @@ export default defineEventHandler(async (event) => {
     target: `external:${id}`,
     detail: { was: request.status },
   }))
-  const [out, , early] = await db.batch(statements.map(statement => db.all(statement)) as unknown as Parameters<typeof db.batch>[0])
-  const alreadyOut = (out as unknown[]).length > 0
+  const [out, , early] = await runBatch(statements)
+  const alreadyOut = out!.length > 0
 
-  if (!alreadyOut && !(early as unknown[]).length) {
+  if (!alreadyOut && !early!.length) {
     throw createError({ statusCode: 409, statusMessage: 'That request has already been decided' })
   }
 

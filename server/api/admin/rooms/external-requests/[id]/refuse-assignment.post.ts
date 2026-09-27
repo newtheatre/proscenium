@@ -57,8 +57,8 @@ export default defineEventHandler(async (event) => {
     recordedBy: account.id,
     recordedAt: now,
   }, refused, noted)
-  const [still] = await db.batch(statements.map(statement => db.all(statement)) as unknown as Parameters<typeof db.batch>[0])
-  if (!(still as unknown[]).length) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
+  const [still] = await runBatch(statements)
+  if (!still!.length) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
 
   await notify(event, {
     type: 'external.request.reassigning',

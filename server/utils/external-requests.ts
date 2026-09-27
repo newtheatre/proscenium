@@ -153,3 +153,9 @@ export function moveRequestStatement(
 ) {
   return db.all<{ id: string }>(moveRequestSql(id, from, set))
 }
+
+// Each statement's rows, in order, from one batch (0001).
+export async function runBatch(statements: SQL[]): Promise<unknown[][]> {
+  const results: unknown = await db.batch(statements.map(statement => db.all(statement)) as unknown as Parameters<typeof db.batch>[0])
+  return results as unknown[][]
+}

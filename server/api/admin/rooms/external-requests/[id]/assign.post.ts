@@ -53,9 +53,9 @@ export default defineEventHandler(async (event) => {
     // That a note existed and was overridden, never its wording (0011).
     detail: { space: space.id, overrode: blocksAssignment(note) },
   }))
-  const [moved] = await db.batch(statements.map(statement => db.all(statement)) as unknown as Parameters<typeof db.batch>[0])
+  const [moved] = await runBatch(statements)
 
-  if (!(moved as unknown[]).length) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
+  if (!moved!.length) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
 
   await notify(event, {
     type: 'external.request.assigned',

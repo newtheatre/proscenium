@@ -69,16 +69,10 @@ export function claimRoomSlotStatement(id: string, input: ClaimInput, onlyIf?: S
 }
 
 // The audit entry is built for the new id and batched with the claim, written only if it landed
-// (0049). Without one, the caller owns the claim's audit.
-export async function claimSlot(input: ClaimInput, audit?: (id: string) => AuditRow): Promise<ClaimOutcome> {
+// (0049). RETURNING rather than a changes count: a row coming back is the win (0003).
+export async function claimSlot(input: ClaimInput, audit: (id: string) => AuditRow): Promise<ClaimOutcome> {
   const id = newId()
-
-  // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
-  // coming back is the same signal claimToken uses to know it won (0003).
-  const write = db.all<{ id: string }>(claimRoomSlotStatement(id, input))
-  const claimed = audit ? await auditedWrite(write, audit(id)) : (await write).length > 0
-
-  if (claimed) return { won: true, id }
+  if (await auditedWrite(db.all<{ id: string }>(claimRoomSlotStatement(id, input)), audit(id))) return { won: true, id }
 
   // Zero rows written, disambiguated rather than guessed: gone, closed or beaten (0003).
   return await whyItFailed(input)
