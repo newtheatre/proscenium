@@ -1586,9 +1586,10 @@ categories and has no one sale category to inherit (F-203 is expected to normali
 into its own lookup table, for a supplier and a pack size to attach to; until then a typo splits a
 group silently) · `age_restricted` bool default true ·
 `allergen_state` NULL, the item's allergen answer (`UNKNOWN`, `NONE` or `RECORDED`), bare and
-nullable so the column rebuilds nothing, a NULL reading as `RECORDED` where `allergen_notes` holds
-text and `UNKNOWN` otherwise (`itemAllergenState`, issue 1348) · `allergen_notes`, the answer's
-note · `status` CHECK
+nullable so the column rebuilds nothing, read by `itemAllergenState` (issue 1348) as the till
+reads it: a NULL is `RECORDED` where `allergen_notes` holds text, and `RECORDED` with nothing
+written, or any state no form writes, is `UNKNOWN`, so every screen fails closed ·
+`allergen_notes`, the answer's note · `status` CHECK
 `ACTIVE|RETIRED` · `created_at`. Retired, never deleted once anything has moved: every movement
 restricts on the foreign key.
 
@@ -1625,8 +1626,9 @@ product list reads true: the guided set-up refuses before it writes, and an edit
 `allergen_state` CHECK
 `UNKNOWN|NONE|RECORDED` · `allergen_note`, required by `RECORDED` and refused by `UNKNOWN` (F-107);
 since issue 1348 both are only what the bar adds to what the product pours, and the answer the
-till gives is derived (`deriveAllergens`): an item recorded with no note, or in a state no form
-writes, counts as unanswered, and a note on an item answered clear is still read out ·
+till gives is derived (`deriveAllergens`): an item or an addition recorded with no note, or an
+item in a state no form writes, counts as unanswered, and a note on either answered clear is
+still read out ·
 `sort` · `created_at`.
 
 Nothing on the row says whether a product has ever sold, or whether it may go active. Both are

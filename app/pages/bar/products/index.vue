@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ALLERGEN_STATES, productForm, says, saysRestricted, poursRestrictedSwitchedOff } from '#shared/utils/bar'
+import { ALLERGEN_STATES, productForm, says, saysAtTheTill, saysRestricted, poursRestrictedSwitchedOff } from '#shared/utils/bar'
 import { barProductsList } from '#shared/utils/bar-products-list'
 import { encodeCondition } from '#shared/utils/list-filters'
 import type { FilterCondition, FilterOption } from '#shared/utils/list-filters'
@@ -471,7 +471,7 @@ const columns: TableColumn<BarProduct>[] = [
             class="text-sm text-muted"
             data-test="product-allergens-derived"
           >
-            At the till: {{ says(editing.allergens.state) }}.{{ editing.allergens.note ? ` ${editing.allergens.note.trim().replace(/\.*$/, '.')}` : '' }}
+            At the till: {{ saysAtTheTill(editing.allergens) }}
             It is read from the stock it pours, answered once on the Allergens screen.
           </p>
 

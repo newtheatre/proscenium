@@ -39,14 +39,18 @@ const written = (note: string | null): note is string => Boolean(note?.trim())
 
 // An answer only when it is a clean one: confirmed none, or recorded with something written. A
 // recorded answer with no note, or a state no form writes, fails closed as no answer (F-107).
-const answered = (item: PouredAllergen): boolean =>
-  item.state === 'NONE' || (item.state === 'RECORDED' && written(item.note))
+const answered = (answer: AllergenAnswer): boolean =>
+  answer.state === 'NONE' || (answer.state === 'RECORDED' && written(answer.note))
 
 // A product's answer from what it pours and what the bar adds (issue 1348, F-107 criteria 3 and 4):
-// unanswered while any item is, recorded while any item or the addition is, and no note is hidden.
+// unanswered while any part is, recorded while any is, and no note is hidden. UNKNOWN adds nothing.
 export function deriveAllergens(poured: readonly PouredAllergen[], addition: AllergenAnswer): AllergenAnswer {
-  if (poured.length === 0) return addition
-  const unknown = [...new Set(poured.filter(item => !answered(item)).map(item => item.itemName))]
+  const additionUnanswered = addition.state !== 'UNKNOWN' && !answered(addition)
+  if (poured.length === 0) return additionUnanswered ? { state: 'UNKNOWN', note: null } : addition
+  const unknown = [...new Set([
+    ...poured.filter(item => !answered(item)).map(item => item.itemName),
+    ...(additionUnanswered ? ['what the bar adds'] : []),
+  ])]
   const noted = poured.filter(item => answered(item) && written(item.note))
   const added = addition.state !== 'UNKNOWN' && written(addition.note) ? addition.note : null
   const parts = [
@@ -58,6 +62,10 @@ export function deriveAllergens(poured: readonly PouredAllergen[], addition: All
   const state: AllergenState = unknown.length > 0 ? 'UNKNOWN' : recorded ? 'RECORDED' : 'NONE'
   return { state, note: parts.length > 0 ? `${parts.join('. ')}.` : null }
 }
+
+// What the product editor says the till will say: the answer, then its note, each a sentence.
+export const saysAtTheTill = (answer: AllergenAnswer): string =>
+  `${says(answer.state)}.${written(answer.note) ? ` ${sentence(answer.note)}.` : ''}`
 
 // "Gin and Campari, which are age restricted": what every Check ID notice says a product pours.
 export function saysRestricted(names: readonly string[]): string {

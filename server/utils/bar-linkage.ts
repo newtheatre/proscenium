@@ -54,12 +54,14 @@ export function pourSizesColumn(alias: string): SQL {
   )`
 }
 
-// An item's allergen answer. A note written before the answer had its own column reads as a
-// recorded answer, so no row needs rewriting (issue 1348).
+// An item's answer, failing closed as deriveAllergens does: a note from before the column is
+// recorded, and recorded with nothing written, or a state no form writes, is unanswered (issue 1348).
 export function itemAllergenState(alias: string): SQL {
   const item = sql.raw(alias)
-  return sql`coalesce(${item}.allergen_state,
-    CASE WHEN coalesce(trim(${item}.allergen_notes), '') <> '' THEN 'RECORDED' ELSE 'UNKNOWN' END)`
+  return sql`CASE
+    WHEN ${item}.allergen_state = 'NONE' THEN 'NONE'
+    WHEN coalesce(${item}.allergen_state, 'RECORDED') = 'RECORDED' AND coalesce(trim(${item}.allergen_notes), '') <> '' THEN 'RECORDED'
+    ELSE 'UNKNOWN' END`
 }
 
 // Every item each product's live sizes pour, a choice's options included, with the item's own

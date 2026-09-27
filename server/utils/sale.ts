@@ -200,14 +200,15 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
             choice: choiceWithStock(variant.choice, servings.options.get(variant.id), counted),
             stock: variantStock(servings.sizes.get(variant.id) ?? null, counted),
           }))
+      const answer = allergens.get(row.id)!
       return {
         id: row.id,
         name: row.name,
         categoryId: row.categoryId,
         // The tile's mark: any size, or any option offered, that asks (issue 1299, F-106.6).
         ageRestricted: sizes.some(size => size.ageRestricted || size.choice?.options.some(option => option.ageRestricted) === true),
-        allergenState: allergens.get(row.id)!.state,
-        allergenNote: allergens.get(row.id)!.note,
+        allergenState: answer.state,
+        allergenNote: answer.note,
         variants: sizes,
       }
     })
