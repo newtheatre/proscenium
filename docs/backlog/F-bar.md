@@ -392,6 +392,10 @@ Open questions:
      movement, never an edit.
   6. Named regression case: a blank count never writes a zero adjustment, the exact damage the old
      estate recorded.
+  7. Added 26 September 2026 (issue 1322, decision 0099): while a stocktake is open, tonight's
+     confirmed bar shift may enter and change counts inside its window, each line recording who
+     entered it, so every line is reviewed before Apply. Opening, counting and applying are the
+     bar manager's and the Front of House Manager's, who takes the full count (`bar.stocktake`).
 - Source: Prompt Book F-2; audit PR-12 (stocktake blanks recorded as zero).
 
 ## F-116: Dated append-only prices with same-day correction

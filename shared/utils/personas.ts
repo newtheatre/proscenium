@@ -38,7 +38,7 @@ export const PERSONAS: Persona[] = [
 
   // Module E: show night
 
-  { email: 'dev-foh@e2e.newtheatre.org.uk', name: 'Fen Foh (dev)', role: 'FOH_MANAGER', shape: 'full', describes: 'Sets up the programme and its prices, works the desk, and opens the door and the duty manager screens with no shift, audited for it (0044, 0090).' },
+  { email: 'dev-foh@e2e.newtheatre.org.uk', name: 'Fen Foh (dev)', role: 'FOH_MANAGER', shape: 'full', describes: 'Sets up the programme and its prices, works the desk, takes the stocktake, and opens the door and the duty manager screens with no shift, audited for it (0044, 0090, 0099).' },
   { email: 'dev-bar@e2e.newtheatre.org.uk', name: 'Bex Bar (dev)', role: 'BAR_MANAGER', shape: 'full', describes: 'Opens the till with no bar shift. Opens nothing else: the roles are not interchangeable.' },
 
   // Module F: bar

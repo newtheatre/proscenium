@@ -36,7 +36,7 @@ async function attempt(id: string, actorId: string): Promise<boolean> {
 }
 
 export default defineEventHandler(async (event) => {
-  const resolved = await requirePermission(event, 'bar.write')
+  const resolved = await requirePermission(event, 'bar.stocktake')
 
   // A losing attempt reads the stocktake that beat it; if that one is applied first, the read
   // finds nothing and the slot is free, so retrying rather than refusing is the honest answer.

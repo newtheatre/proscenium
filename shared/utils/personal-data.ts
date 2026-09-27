@@ -595,6 +595,15 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     why: 'Who opened and applied a stocktake is what any on-hand figure audits to (F-115); the tombstone still answers for it.',
   },
   {
+    name: 'stocktake_lines',
+    column: 'counted_by',
+    section: null,
+    columns: null,
+    erasure: 'keep',
+    // Holds no free text: an item, two quantities and who entered the count.
+    why: 'Whoever applies a stocktake reviews who entered each count (0099); the tombstone still answers for it.',
+  },
+  {
     name: 'comp_requests',
     column: 'requested_by',
     section: null,

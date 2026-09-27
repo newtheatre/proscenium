@@ -98,6 +98,9 @@ export const verifyAccessProfiles = defineAbility((viewer: Viewer) => holds(view
 export const viewBarCatalogue = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
 export const viewBarStock = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read'))
 
+// The Front of House Manager takes the full count without reading the rest of the register (0099).
+export const takeStocktakes = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read') || holds(viewer, 'bar.stocktake'))
+
 // F-119 criterion 5 names the bar manager, the treasurer and administrators: the treasurer holds
 // no bar.read, so reports admit finance.read too, without opening the catalogue or stock (#906).
 export const viewBarReports = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read') || holds(viewer, 'finance.read'))
@@ -206,6 +209,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   exportTickets: 'ticketing.export',
   viewBarCatalogue: 'bar.read',
   viewBarStock: 'bar.read',
+  takeStocktakes: 'bar.stocktake',
   viewBarReports: 'bar.read',
   manageBarTabs: 'bar.write',
   viewFinanceReports: 'finance.read',

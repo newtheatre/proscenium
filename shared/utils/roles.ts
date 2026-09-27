@@ -71,6 +71,9 @@ export const PERMISSIONS = [
   // administrator do. Selling over the bar is operational and derives from tonight (0009, F-111).
   'bar.read',
   'bar.write',
+  // Opening, counting and applying a stocktake, without the catalogue or the rest of the register:
+  // the Front of House Manager takes the full count as well as the bar manager (0099).
+  'bar.stocktake',
   // The rota is planned days ahead at a desk, so administering it is a standing permission like
   // the programme's. Working tonight is not, and derives from a shift (0009, 0046).
   'rota.read',
@@ -141,13 +144,13 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // Owns the catalogue and appoints its stewards; `training.override` stays ADMIN because
   // never-expiring is the rarer break-glass (G-107, G-110, questions 7 and 8).
   TRAINING_MANAGER: ['accounts.read', 'members.read', 'rooms.read', 'training.by-address', 'training.leads', 'training.read', 'training.revoke', 'training.write'],
-  // One committee post: the programme, the rota and paid refunds on any day, and the door and duty
-  // manager screens without a shift tonight. The till is the bar manager's (0044, 0090, 0102).
-  FOH_MANAGER: ['ticketing.read', 'ticketing.write', 'ticketing.export', 'money.refund', 'night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read'],
+  // One committee post: the programme, the rota, paid refunds and the stocktake on any day, and the
+  // door and duty manager screens with no shift. The till is the bar manager's (0044, 0090, 0099, 0102).
+  FOH_MANAGER: ['ticketing.read', 'ticketing.write', 'ticketing.export', 'money.refund', 'bar.stocktake', 'night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read'],
   FRONT_OF_HOUSE: [],
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).
-  BAR_MANAGER: ['bar.read', 'bar.write', 'night.till'],
+  BAR_MANAGER: ['bar.read', 'bar.write', 'bar.stocktake', 'night.till'],
   // Verifies access profile declarations and nothing else: sighting evidence and agreeing the
   // door's wording is the whole of the job (D-127 criterion 2).
   ACCESSIBILITY_OFFICER: ['access.verify'],

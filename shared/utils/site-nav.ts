@@ -9,6 +9,7 @@ import {
   runTrainingSessions,
   sendAnnouncements,
   signedIn,
+  takeStocktakes,
   verifyAccessProfiles,
   viewAccounts,
   viewAuditTrail,
@@ -148,7 +149,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       // sidebar's default width (issue 921); the group heading says which stock (0082).
       { label: 'Stock', icon: 'i-lucide-package', to: '/bar/stock', ability: viewBarStock, exact: true, section: 'Every day' },
       { label: 'Movements', icon: 'i-lucide-arrow-left-right', to: '/bar/stock/movements', ability: viewBarStock, section: 'Every day' },
-      { label: 'Stocktakes', icon: 'i-lucide-clipboard-list', to: '/bar/stock/stocktakes', ability: viewBarStock, section: 'Every day' },
+      { label: 'Stocktakes', icon: 'i-lucide-clipboard-list', to: '/bar/stock/stocktakes', ability: takeStocktakes, section: 'Every day' },
       { label: 'Order list', icon: 'i-lucide-truck', to: '/bar/stock/order-list', ability: viewBarStock, section: 'Every day' },
       { label: 'Bar reports', icon: 'i-lucide-bar-chart-3', to: '/bar/reports', ability: viewBarReports, section: 'Every day' },
       { label: 'Products', icon: 'i-lucide-cup-soda', to: '/bar/products', ability: viewBarCatalogue, section: 'Set-up' },

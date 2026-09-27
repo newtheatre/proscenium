@@ -107,7 +107,9 @@ until the curtain comes down on the performance you are looking at, and **Night 
 reading **Sign off and close**, since that is where the night ends. The rest follow in the order
 they are pressed on a night: **Door**, **Till**, **Tonight at a glance**, **Checklist**, **Night
 report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, and **Emergency**, always
-there and always last. Until the phone knows your roles, or with no signal, every tile shows, and
+there and always last. While a stocktake is open, a bar shift also sees **Stocktake** straight
+after **Till**, to count into it (see [Stocktakes](/docs/bar/stocktakes#counting-on-a-bar-shift)).
+Until the phone knows your roles, or with no signal, every tile shows, and
 each screen still checks for itself. The **Checklist** tile says what is left on it: **3 pre-show
 items left** before the house opens, **2 post-show items left** after, **All ticked** when nothing
 is outstanding. On a matinee day the **Tonight at a glance**, **Checklist**, **Night report** and

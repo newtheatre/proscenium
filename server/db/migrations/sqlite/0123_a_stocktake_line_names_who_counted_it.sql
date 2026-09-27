@@ -1,0 +1,1 @@
+ALTER TABLE `stocktake_lines` ADD `counted_by` text;

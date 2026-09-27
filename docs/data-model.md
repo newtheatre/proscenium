@@ -1546,7 +1546,7 @@ erDiagram
 
 **The console lists (F-111, F-114, F-115, K-129).** `/bar/categories`, `/bar/products`,
 `/bar/stock`, `/bar/stock/movements` and `/bar/stock/stocktakes`, over these routes, `bar.read`
-for each listing:
+for each listing (the stocktakes list also to `bar.stocktake`, 0099):
 
 | Route | What it does |
 | --- | --- |
@@ -1838,8 +1838,19 @@ a venue or night.
 
 `stocktake_lines`: `id` PK · `stocktake_id` → stocktakes cascade · `item_id` → bar_items restrict ·
 `expected_qty`, the item's on-hand at the moment the stocktake opened · `counted_qty` NULL,
-distinct from an entered zero throughout (criterion 2); CHECK not negative. UNIQUE
+distinct from an entered zero throughout (criterion 2); CHECK not negative · `counted_by` NULL,
+the account that entered the count now standing and cleared with it, bare (a reference would
+rebuild the table) and registered as personal data kept on erasure (0099). UNIQUE
 (`stocktake_id`, `item_id`).
+
+Counts are entered by a holder of `bar.stocktake` on any day (the Bar Manager and the Front of
+House Manager), or by tonight's confirmed bar shift inside its window while the stocktake is open
+(`requireStocktakeCounter`, `server/utils/stocktake-authority.ts`, resolving the till's night
+authority, 0099); opening and applying stay with `bar.stocktake`. `GET
+/api/admin/bar/stocktakes/open` and `GET /api/admin/bar/stocktakes/[id]` read for a holder of
+`bar.read` or `bar.stocktake`, and for the bar shift only while the stocktake is open and blind: its lines
+carry no expected figure, variance or cost (`countedBlind`, issue 1321). A holder of `bar.stocktake` with no
+authenticator on tonight's bar shift counts through the shift, as the till lets them sell (0044).
 
 Opening captures one line per `ACTIVE` item in a single `INSERT ... SELECT`, so later sales cannot
 muddy the comparison (criterion 1). Applying is one `db.batch`: an `UPDATE` on `stocktakes` carries

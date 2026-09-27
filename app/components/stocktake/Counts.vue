@@ -124,7 +124,7 @@ const savingNow = computed(() => props.lines.some(line => state.value[line.itemI
 
 function variance(line: StocktakeLine): number | null {
   const qty = props.open ? drafts.value[line.itemId] : line.countedQty ?? undefined
-  return qty === undefined ? null : qty - line.expectedQty
+  return qty === undefined || line.expectedQty === null ? null : qty - line.expectedQty
 }
 
 // The cost is the register's, so it is shown only once the figure on screen is the one it holds.
@@ -256,6 +256,7 @@ const FIELD = {
                   {{ saysCount(drafts[line.itemId]!, line.unit, line.containerMl) }}
                 </p>
                 <p
+                  v-if="line.expectedQty !== null"
                   class="text-muted"
                   :data-test="`expected-${line.itemId}`"
                 >
@@ -273,6 +274,13 @@ const FIELD = {
                   >, {{ atCost(line) }}</span>
                 </p>
               </template>
+              <p
+                v-if="line.countedByName && !dirty(line)"
+                class="text-xs text-muted"
+                :data-test="`counted-by-${line.itemId}`"
+              >
+                Counted by {{ line.countedByName }}
+              </p>
               <p
                 v-if="open && state[line.itemId]"
                 class="text-xs"

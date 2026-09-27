@@ -30,11 +30,20 @@ export interface StocktakeLine {
   containerMl: number | null
   // The stock group the count walks the bar by, or null where none is set.
   category: string | null
-  expectedQty: number
+  // Null to somebody counting blind through tonight's bar shift (issue 1321, 0099).
+  expectedQty: number | null
   // Null is uncounted. Variance and its cost are null with it, since neither means anything yet.
   countedQty: number | null
   variance: number | null
   varianceCostPence: number | null
+  // Who entered the count, so whoever applies it reviews every line (0099).
+  countedByName: string | null
+}
+
+// What somebody counting blind is sent: the count and who took it, and nothing the expected
+// figure can be worked back from (issue 1321, 0099).
+export function countedBlind(line: StocktakeLine): StocktakeLine {
+  return { ...line, expectedQty: null, variance: null, varianceCostPence: null }
 }
 
 export const stocktakeCountForm = z.object({
