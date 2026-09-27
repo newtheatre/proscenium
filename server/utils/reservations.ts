@@ -488,7 +488,7 @@ export interface EditReservationTicketsResult {
 
 // One guard for every line and the audit written first under it, against the *desired total*:
 // no line moves it, so the audit row says whether the whole edit applied (D-110 criterion 2, 0049).
-export function editTicketsStatements(input: EditReservationTicketsInput, entry: AuditRow): SQL[] {
+export function editTicketsStatements(input: EditReservationTicketsInput, entry: AuditRow): [SQL, ...SQL[]] {
   const guard = sql`${capacityAllows(input.performanceId, input.capacity, input.desiredTotal, input.reservationId)} AND ${reservationIsPending(input.reservationId)}`
   return [
     auditWhere(entry, guard),
@@ -506,7 +506,7 @@ export async function editReservationTickets(input: EditReservationTicketsInput)
     detail: { desiredTotal: input.desiredTotal },
   })
   const [statement, ...rest] = editTicketsStatements(input, entry)
-  const [audited] = await db.batch([db.all<{ id: string }>(statement!), ...rest.map(one => db.run(one))])
+  const [audited] = await db.batch([db.all<{ id: string }>(statement), ...rest.map(one => db.run(one))])
   return { applied: audited.length > 0 }
 }
 

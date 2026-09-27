@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 // Remove the authenticator app, and the recovery codes that only existed for it.
 export default defineEventHandler(async (event) => {
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   await db.batch([
     db.delete(schema.totpSecrets).where(eq(schema.totpSecrets.userId, account.id)),
     // Logged only if a factor was removed: nothing set up, or a second press, logs nothing (0049).
-    db.run(auditWhere(entry, sql`changes() = 1`)),
+    db.run(auditIfChanged(entry)),
     // The codes existed only to recover the factor, so they go with it (A-110 criterion 4).
     db.delete(schema.recoveryCodes).where(eq(schema.recoveryCodes.userId, account.id)),
   ])

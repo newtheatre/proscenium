@@ -83,14 +83,14 @@ export default defineEventHandler(async (event) => {
   // Two conditional writes, the shape sign-up uses, each logged only if it took: the unique pair
   // refuses a second live row, the revival anything but a withdrawn one (0049).
   const at = Math.floor(Date.now() / 1000)
-  const added = () => auditEntry({
+  const entry = auditEntry({
     actorId: resolved.account.id,
     action: 'session.attendee.added',
     target: `session:${id}`,
     detail: { userId: input.userId, acknowledged: input.acknowledged.length },
   })
-  const took = await auditedWrite(db.all<{ id: string }>(walkInStatement(newId(), id, input.userId, at)), added())
-    || await auditedWrite(db.all<{ id: string }>(walkInRejoinStatement(id, input.userId, at)), added())
+  const took = await auditedWrite(db.all<{ id: string }>(walkInStatement(newId(), id, input.userId, at)), entry)
+    || await auditedWrite(db.all<{ id: string }>(walkInRejoinStatement(id, input.userId, at)), entry)
 
   // Already on the register is not a failure: they are on it, which is what was asked for.
   return { ok: true, added: took }

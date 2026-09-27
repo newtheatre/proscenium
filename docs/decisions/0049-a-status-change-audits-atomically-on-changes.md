@@ -147,6 +147,13 @@ parameter.
   which a two-statement helper cannot express. The five external-request routes named in
   `docs/known-issues.md` are a separate, larger change, because `assign.post.ts` also needs its
   `externalAssignments` insert folded into the same batch, not only its audit.
+- **Amended 27 September 2026: two more shapes.** `auditWhere(entry, condition)` writes the
+  audit row under a guard and returns it. First in a batch whose writes all share that guard, it
+  says whether the whole batch applied (the ticket edit, where no single `changes()` can).
+  `auditIfRow(entry, table, id)` writes only if a row the batch inserted exists (a bar opening, a
+  tab void's ledger entry). The response half still applies to both, except where the end state is
+  what was asked (removing an authenticator app that is not there). `docs/architecture.md`,
+  Concurrency on D1, lists all four shapes.
 
 ## Options considered
 

@@ -18,9 +18,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const status = onSale ? 'ON_SALE' : 'DRAFT'
-  if (status === held.status) {
-    throw createError({ statusCode: 409, statusMessage: onSale ? 'This performance is already on sale' : 'This performance is already off sale' })
-  }
+  const already = onSale ? 'This performance is already on sale' : 'This performance is already off sale'
+  if (status === held.status) throw createError({ statusCode: 409, statusMessage: already })
 
   // An externally ticketed performance sells nowhere internally, so putting it on sale would say
   // something untrue on every internal screen (D-122 criterion 1).
@@ -42,7 +41,7 @@ export default defineEventHandler(async (event) => {
   if (!applied) {
     const now = await performanceById(id)
     if (now?.status === 'CANCELLED') throw createError({ statusCode: 409, statusMessage: 'This performance has been cancelled' })
-    throw createError({ statusCode: 409, statusMessage: onSale ? 'This performance is already on sale' : 'This performance is already off sale' })
+    throw createError({ statusCode: 409, statusMessage: already })
   }
 
   return { ok: true, status }

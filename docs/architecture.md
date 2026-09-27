@@ -523,7 +523,8 @@ Reading the table:
   first in a batch, under a guard every write in it shares, it says whether the whole batch
   applied (the ticket edit). `auditIfRow(entry, table, id)` writes only if the row a batch just
   inserted is there (a bar opening, a tab void's ledger entry). A write that changed nothing
-  logs nothing, and the route says so rather than answering ok.
+  logs nothing, and the route refuses or says so (a walk-in answers `added: false`), except where
+  the end state is what was asked, such as removing an authenticator app that is not there.
 
 ## Console list filters (K-129, 0032)
 

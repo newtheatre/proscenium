@@ -3,6 +3,8 @@ import { COMMITTED_SHIFT_STATUSES, saysShiftRole } from '#shared/utils/rota'
 
 // Cancel a performance. This is the only way out for one that has sold seats, and the count it
 // returns is what the refund workflow (D-116) and the holder notification (D-107) will act on.
+const ALREADY_CANCELLED = 'This performance is already cancelled'
+
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const resolved = await requirePermission(event, 'ticketing.write')
@@ -10,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const held = await performanceById(id)
   if (!held) throw noSuch('performance')
   if (held.status === 'CANCELLED') {
-    throw createError({ statusCode: 409, statusMessage: 'This performance is already cancelled' })
+    throw createError({ statusCode: 409, statusMessage: ALREADY_CANCELLED })
   }
 
   // Read before the write, because the cancellation is what takes the status away.
@@ -41,7 +43,7 @@ export default defineEventHandler(async (event) => {
     // The rota goes with the performance, in the same batch (E-102 criterion 4).
     db.run(cancelShiftsStatement(id)),
   ])
-  if (cancelled.length === 0) throw createError({ statusCode: 409, statusMessage: 'This performance is already cancelled' })
+  if (cancelled.length === 0) throw createError({ statusCode: 409, statusMessage: ALREADY_CANCELLED })
 
   // The show is off, so a shift preference cannot silence this: somebody would otherwise turn up.
   const when = formatLondon(new Date(held.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })

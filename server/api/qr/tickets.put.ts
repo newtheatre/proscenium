@@ -61,7 +61,9 @@ export default defineEventHandler(async (event) => {
     })
 
     if (!result.applied) {
-      throw createError({ statusCode: 409, statusMessage: 'This performance no longer has room for that change' })
+      // Capacity is to blame only while the booking is still pending; collected or lapsed, it is closed.
+      const now = await reservationCurrentState(reservationId)
+      throw createError({ statusCode: 409, statusMessage: now?.status === 'PENDING' ? 'This performance no longer has room for that change' : 'This booking can no longer be changed here' })
     }
   }
   else if (delta.removals.length > 0) {

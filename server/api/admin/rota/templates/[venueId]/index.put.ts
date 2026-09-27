@@ -29,14 +29,15 @@ export default defineEventHandler(async (event) => {
   const { night, from } = stampWindow()
   const defaults = await shiftOffsetDefaults(event)
 
-  // In the same batch, after the template rows, so a first template never leaves the imported
-  // diary unstamped until somebody finds "Stamp the diary" (issue 1319).
   const entry = auditEntry({
     actorId: resolved.account.id,
     action: held.length === 0 ? 'shift-template.created' : 'shift-template.updated',
     target: `venue:${venueId}`,
     detail: { ...changes({ slots: [said(held), said(input.slots)] }), stampedFrom: night },
   })
+
+  // In the same batch, after the template rows, so a first template never leaves the imported
+  // diary unstamped until somebody finds "Stamp the diary" (issue 1319).
   const results = await withShiftConstraints(() => db.batch([
     db.run(cleared),
     ...written.map(statement => db.run(statement)),
@@ -46,7 +47,7 @@ export default defineEventHandler(async (event) => {
   ]))
   const logged = results.at(-2) as { id: string }[]
   const stamped = results.at(-1) as { id: string }[]
-  if (logged.length === 0) throw createError({ statusCode: 409, statusMessage: externalVenueTemplateRefusal({ ...venue, isExternal: true }) ?? 'That venue is now external' })
+  if (logged.length === 0) throw createError({ statusCode: 409, statusMessage: externalVenueTemplateRefusal({ ...venue, isExternal: true })! })
 
   return { ok: true, slots: orderedSlots(input.slots), stamped: stamped.length }
 })
