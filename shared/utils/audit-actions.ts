@@ -196,6 +196,7 @@ const CATALOGUE = {
   'pass.issued': { label: 'Pass issued at the desk', module: 'ticketing' },
   'pass.request.created': { label: 'Pass requested', module: 'ticketing', self: true },
   'pass.request.fulfilled': { label: 'Pass request fulfilled at issue', module: 'ticketing' },
+  'pass.request.withdrawn': { label: 'Pass request withdrawn', module: 'ticketing', self: true },
   'waiting-list.joined': { label: 'Joined a waiting list', module: 'ticketing', self: true },
   'waiting-list.offered': { label: 'Waiting-list offer made', module: 'ticketing' },
   'waiting-list.offer-lapsed': { label: 'Waiting-list offer lapsed unclaimed', module: 'ticketing' },

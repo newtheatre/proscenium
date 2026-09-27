@@ -7,6 +7,7 @@ import { passCapAllows } from './pass-types'
 import { auditEntry } from '#shared/utils/audit'
 import { generatePassReference } from '#shared/utils/passes'
 import type { BatchItem } from 'drizzle-orm/batch'
+import type { SQL } from 'drizzle-orm'
 
 // D-124: issuing a pass at the desk and requesting one online. Kept apart from
 // server/utils/passes.ts's reads, matching D-114's own collect/desk split.
@@ -97,22 +98,45 @@ export async function issuePass(input: IssuePassWriteInput, at = new Date()): Pr
   return { applied, passId: applied ? passId : undefined, reference: applied ? reference : undefined, entryId: applied ? posted.id : undefined }
 }
 
+// Issue 1331: a second open request is the partial unique index's to refuse, and a pass already
+// held is this statement's own predicate, so a second tap writes nothing rather than a duplicate.
+export function requestPassStatement(id: string, passTypeId: string, userId: string): SQL {
+  return sql`
+    INSERT INTO pass_requests (id, pass_type_id, user_id, status)
+    SELECT ${id}, ${passTypeId}, ${userId}, 'PENDING'
+    WHERE NOT EXISTS (SELECT 1 FROM passes WHERE user_id = ${userId} AND pass_type_id = ${passTypeId} AND status = 'ACTIVE')
+    ON CONFLICT (user_id, pass_type_id) WHERE status = 'PENDING' DO NOTHING
+    RETURNING id
+  `
+}
+
 // Criterion 3: reserves nothing, admits nobody. No capacity or cap check here at all; that is
 // entirely issue's job, at payment (criterion 4).
-export async function requestPass(passTypeId: string, userId: string): Promise<{ id: string }> {
+export async function requestPass(passTypeId: string, userId: string): Promise<{ id: string, requested: boolean }> {
   const id = newId()
   const entry = auditEntry({ actorId: userId, action: 'pass.request.created', target: `pass-type:${passTypeId}` })
 
-  await db.batch([
-    db.run(sql`INSERT INTO pass_requests (id, pass_type_id, user_id, status) VALUES (${id}, ${passTypeId}, ${userId}, 'PENDING')`),
+  const [inserted] = await db.batch([
+    db.all<{ id: string }>(requestPassStatement(id, passTypeId, userId)),
     db.run(sql`
       INSERT INTO audit_log (id, actor_id, action, target, detail)
       SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${entry.detail !== null ? JSON.stringify(entry.detail) : null}
-      WHERE changes() = 1
+      WHERE EXISTS (SELECT 1 FROM pass_requests WHERE id = ${id})
     `),
   ])
 
-  return { id }
+  return { id, requested: inserted.length > 0 }
+}
+
+// Only the member's own request, and only while it is still open: one the desk has fulfilled is a
+// pass now. Deleted, not marked, since the status CHECK has no such value to add without a rebuild.
+export function withdrawPassRequestStatement(id: string, userId: string): SQL {
+  return sql`DELETE FROM pass_requests WHERE id = ${id} AND user_id = ${userId} AND status = 'PENDING' RETURNING id`
+}
+
+export async function withdrawPassRequest(request: { id: string, passTypeId: string }, userId: string): Promise<boolean> {
+  const entry = auditEntry({ actorId: userId, action: 'pass.request.withdrawn', target: `pass-type:${request.passTypeId}` })
+  return auditedWrite(db.all<{ id: string }>(withdrawPassRequestStatement(request.id, userId)), entry)
 }
 
 export interface ExpirePassRequestsRun {
