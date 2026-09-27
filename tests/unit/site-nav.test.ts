@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { ABILITY_PERMISSIONS, canWorkTonight, keepBarTab, signedIn, viewReports } from '#shared/utils/abilities'
 import { contentPathOf } from '#shared/utils/docs-paths'
 import { PERMISSIONS } from '#shared/utils/roles'
-import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor, navCount } from '#shared/utils/site-nav'
+import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor, memberNavActive, navCount } from '#shared/utils/site-nav'
 
 // The navigation conventions are a test rather than a review habit (0040), the same way the admin
 // component conventions are (0032). What review still judges is whether a label reads well.
@@ -245,8 +245,20 @@ describe('the members area and the account settings never overlap (K-127 criteri
   })
 
   // A second page lights its entry: My bookings is Rooms' and Training sessions is Training's.
-  test('Rooms and Training stay lit on the pages beneath them', () => {
-    for (const to of ['/rooms', '/training']) expect(MY_NAV.find(entry => entry.to === to)?.exact).toBeUndefined()
+  // The pages are siblings, not nested routes, so the router alone never lights the parent entry.
+  test('an entry stays lit on the pages beneath it', () => {
+    const lit = (path: string): string[] => MY_NAV.filter(entry => memberNavActive(entry, path)).map(entry => entry.to)
+    expect(lit('/rooms/mine')).toEqual(['/rooms'])
+    expect(lit('/rooms/book')).toEqual(['/rooms'])
+    expect(lit('/training/sessions')).toEqual(['/training'])
+    expect(lit('/my/notifications')).toEqual(['/my'])
+    expect(lit('/my')).toEqual(['/my'])
+    expect(lit('/rota')).toEqual(['/rota'])
+  })
+
+  test('a prefix is a whole segment, and an exact entry lights only its own page', () => {
+    expect(memberNavActive({ ...MY_NAV[0]!, to: '/room' }, '/rooms')).toBe(false)
+    expect(memberNavActive({ ...MY_NAV[0]!, to: '/rota', exact: true }, '/rota/manage/shifts')).toBe(false)
   })
 
   // In-app always arrives, so the only thing the page sets is the email (issue 1345).
