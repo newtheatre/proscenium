@@ -106,7 +106,7 @@ describe('what is waiting, counted as each queue opens (issue 1358)', () => {
 interface BarSetUp { anythingOnHand: number, anyStocktake: number, allergensUnknown: number }
 
 describe('the bar\'s set-up still to do (issue 1358)', () => {
-  test('an empty bar has nothing on hand, no stocktake and no product waiting on allergens', async () => {
+  test('an empty bar has nothing on hand, no stocktake and no stocked item waiting on allergens', async () => {
     await withDatabase((database) => {
       const [facts] = read<BarSetUp>(database, barSetUpQuery())
       expect(facts).toEqual({ anythingOnHand: 0, anyStocktake: 0, allergensUnknown: 0 })
@@ -125,19 +125,30 @@ describe('the bar\'s set-up still to do (issue 1358)', () => {
     })
   })
 
-  test('only an applied stocktake counts, and a retired product is not waiting on allergens', async () => {
+  test('only an applied stocktake counts', async () => {
     await withDatabase((database) => {
       person(database, 'counter')
-      database.batch([
-        ['INSERT INTO stocktakes (id, status, opened_by) VALUES (?, \'OPEN\', ?)', 's-1', 'counter'],
-        ['INSERT INTO bar_categories (id, name) VALUES (?, ?)', 'cat-1', 'Beer'],
-        ['INSERT INTO bar_products (id, category_id, name) VALUES (?, ?, ?)', 'p-1', 'cat-1', 'Lager'],
-        ['INSERT INTO bar_products (id, category_id, name, status) VALUES (?, ?, ?, ?)', 'p-2', 'cat-1', 'Old cider', 'RETIRED'],
-        ['INSERT INTO bar_products (id, category_id, name, allergen_state) VALUES (?, ?, ?, ?)', 'p-3', 'cat-1', 'Crisps', 'NONE'],
-      ])
-      expect(read<BarSetUp>(database, barSetUpQuery())[0]).toMatchObject({ anyStocktake: 0, allergensUnknown: 1 })
+      database.batch([['INSERT INTO stocktakes (id, status, opened_by) VALUES (?, \'OPEN\', ?)', 's-1', 'counter']])
+      expect(read<BarSetUp>(database, barSetUpQuery())[0]?.anyStocktake).toBe(0)
       database.batch([['UPDATE stocktakes SET status = \'APPLIED\', applied_by = ?, applied_at = opened_at WHERE id = ?', 'counter', 's-1']])
       expect(read<BarSetUp>(database, barSetUpQuery())[0]?.anyStocktake).toBe(1)
+    })
+  })
+
+  // The answer is the stocked item's (issue 1348): a product's own state is only the bar's addition,
+  // so an item still to answer is what waits, and a legacy note reads as an answer.
+  test('an active stocked item with no allergen answer is waiting, and nothing else is', async () => {
+    await withDatabase((database) => {
+      database.batch([
+        ['INSERT INTO bar_items (id, name, unit) VALUES (?, ?, ?)', 'i-1', 'Lager', 'ITEM'],
+        ['INSERT INTO bar_items (id, name, unit, allergen_state) VALUES (?, ?, ?, ?)', 'i-2', 'Crisps', 'ITEM', 'NONE'],
+        ['INSERT INTO bar_items (id, name, unit, allergen_notes) VALUES (?, ?, ?, ?)', 'i-3', 'Ale', 'ITEM', 'Contains barley (gluten)'],
+        ['INSERT INTO bar_items (id, name, unit, status) VALUES (?, ?, ?, ?)', 'i-4', 'Old cider', 'ITEM', 'RETIRED'],
+        ['INSERT INTO bar_categories (id, name) VALUES (?, ?)', 'cat-1', 'Beer'],
+        ['INSERT INTO bar_products (id, category_id, name) VALUES (?, ?, ?)', 'p-1', 'cat-1', 'Unanswered on the product'],
+        ['INSERT INTO bar_products (id, category_id, name) VALUES (?, ?, ?)', 'p-2', 'cat-1', 'Also unanswered on the product'],
+      ])
+      expect(read<BarSetUp>(database, barSetUpQuery())[0]?.allergensUnknown).toBe(1)
     })
   })
 })

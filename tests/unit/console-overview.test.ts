@@ -46,7 +46,7 @@ describe('set-up still to do', () => {
       { kind: 'ELIGIBILITY', eligibility: UNSET_DOOR },
       { kind: 'NOTHING_ON_HAND' },
       { kind: 'NO_STOCKTAKE' },
-      { kind: 'ALLERGENS_UNKNOWN', products: 3 },
+      { kind: 'ALLERGENS_UNKNOWN', items: 3 },
     ])
     expect(setUpLines({ eligibility: [SET_BAR], anythingOnHand: true, anyStocktake: true, allergensUnknown: 0 })).toEqual([])
   })
@@ -58,10 +58,10 @@ describe('set-up still to do', () => {
       // Says the fact tested: a delivery since sold out also leaves nothing on hand.
       'Nothing is on hand at the bar: record a delivery or an opening count.',
       'No stocktake has been applied yet, so on-hand is what deliveries and sales say, not a count.',
-      '1 product has no allergen information recorded.',
+      '1 stocked item has no allergen answer.',
     ])
-    expect(lines.map(setUpHref)).toEqual(['/rota/manage/templates', '/bar/stock', '/bar/stock/stocktakes', '/bar/products'])
-    expect(saysSetUp({ kind: 'ALLERGENS_UNKNOWN', products: 4 })).toBe('4 products have no allergen information recorded.')
+    expect(lines.map(setUpHref)).toEqual(['/rota/manage/templates', '/bar/stock', '/bar/stock/stocktakes', '/bar/stock/allergens'])
+    expect(saysSetUp({ kind: 'ALLERGENS_UNKNOWN', items: 4 })).toBe('4 stocked items have no allergen answer.')
   })
 })
 
