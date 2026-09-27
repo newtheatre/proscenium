@@ -47,6 +47,12 @@ function reserve(database: TestDatabase, id: string, performanceId: string, stat
     id, id.toUpperCase().slice(0, 6), performanceId, status, source]])
 }
 
+// A seat on a booking: the report counts seats, as sold does, never bookings (issue 1326's rule).
+function seat(database: TestDatabase, id: string, reservationId: string, performanceId: string, refundedAt: number | null = null): void {
+  database.batch([['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source, refunded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    id, reservationId, performanceId, 'tt-standard', 900, 'BASE', refundedAt]])
+}
+
 function entry(database: TestDatabase, id: string, source: string, tender: string): void {
   database.batch([['INSERT INTO ledger_entries (id, london_day, source, tender, total_pence) VALUES (?, ?, ?, ?, 0)',
     id, '2026-09-10', source, tender]])
@@ -64,12 +70,34 @@ describe('attendance (criterion 1)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       reserve(database, 'r-admitted', tonight.performanceId, 'DOOR', 'WEB')
+      seat(database, 't-admitted', 'r-admitted', tonight.performanceId)
       reserve(database, 'r-no-show', tonight.performanceId, 'NO_SHOW', 'WEB')
+      seat(database, 't-no-show', 'r-no-show', tonight.performanceId)
       reserve(database, 'r-walk-up', tonight.performanceId, 'DOOR', 'DOOR')
+      seat(database, 't-walk-up', 'r-walk-up', tonight.performanceId)
 
       const [row] = read<{ sold: number, admitted: number, noShows: number, walkUps: number }>(
         database, reportAttendanceQuery(tonight.performanceId))
       expect(row).toMatchObject({ admitted: 2, noShows: 1, walkUps: 1 })
+    })
+  })
+
+  // Every figure counts seats, as sold does, so a party is its size on every line and "sold"
+  // less "admitted" is people, never people less bookings.
+  test('a party counts every seat it holds on every line, and a refunded seat on none', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      reserve(database, 'r-party', tonight.performanceId, 'DOOR', 'WEB')
+      for (const id of ['t-party-1', 't-party-2', 't-party-3']) seat(database, id, 'r-party', tonight.performanceId)
+      seat(database, 't-party-refunded', 'r-party', tonight.performanceId, 1_000)
+      reserve(database, 'r-walk-ups', tonight.performanceId, 'DOOR', 'DOOR')
+      for (const id of ['t-walk-up-1', 't-walk-up-2']) seat(database, id, 'r-walk-ups', tonight.performanceId)
+      reserve(database, 'r-absent', tonight.performanceId, 'COLLECTED', 'WEB')
+      for (const id of ['t-absent-1', 't-absent-2']) seat(database, id, 'r-absent', tonight.performanceId)
+
+      const [row] = read<{ sold: number, admitted: number, noShows: number, walkUps: number }>(
+        database, reportAttendanceQuery(tonight.performanceId))
+      expect(row).toMatchObject({ sold: 7, admitted: 5, noShows: 2, walkUps: 2 })
     })
   })
 
@@ -78,6 +106,7 @@ describe('attendance (criterion 1)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       reserve(database, 'r-admitted', tonight.performanceId, 'DOOR', 'WEB')
+      seat(database, 't-admitted', 'r-admitted', tonight.performanceId)
       reserve(database, 'r-paid-absent', tonight.performanceId, 'COLLECTED', 'WEB')
       reserve(database, 'r-refunded', tonight.performanceId, 'COLLECTED', 'WEB')
       reserve(database, 'r-unpaid', tonight.performanceId, 'PENDING', 'WEB')
@@ -99,6 +128,7 @@ describe('attendance (criterion 1)', () => {
       const tonight = tonightsPerformance(database)
       person(database, 'holder')
       reserve(database, 'r-paid', tonight.performanceId, 'DOOR', 'WEB')
+      seat(database, 't-paid', 'r-paid', tonight.performanceId)
       reserve(database, 'r-pass', tonight.performanceId, 'DOOR', 'WEB')
       database.batch([
         ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, 0, ?)',
