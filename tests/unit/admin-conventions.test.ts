@@ -542,9 +542,13 @@ describe('every console list is a UTable the shell knows about (K-123 criteria 9
   })
 
   // Without a container above it, a column hidden by its table's width is hidden at every width.
+  // Every table in such a file measures itself, so a second table cannot lend the first its container.
   test('a column hidden by its table\'s width sits in a table that measures itself', async () => {
-    const offenders = (await tables()).filter(file => file.source.includes('HIDE_BELOW_TABLE_')
-      && !/<UTable\b[^>]*class="[^"]*@container/.test(file.source))
+    const offenders = (await tables()).filter((file) => {
+      if (!/(?:HIDE|SHOW)_BELOW_TABLE_/.test(file.source)) return false
+      const tags = file.source.match(/<UTable\b[^>]*>/g) ?? []
+      return tags.length === 0 || tags.some(tag => !/\sclass="[^"]*@container\b/.test(tag))
+    })
     expect(offenders.map(file => file.path)).toEqual([])
   })
 
@@ -599,7 +603,7 @@ describe('a figure column lines its header up with its figures', () => {
 })
 
 // A table beside another card fits by its own width, since the sidebar resizes and no window
-// width says how much the card has (K-123 criterion 10, the desk results).
+// width says how much the card has (K-123 criterion 9, the desk results).
 describe('a table narrows by its own width, and its cells wrap by one shape', () => {
   test('a column hidden by its table\'s width and the line that carries it turn at the same width', async () => {
     const shapes = await Bun.file('app/utils/responsive-table.ts').text()
@@ -608,12 +612,15 @@ describe('a table narrows by its own width, and its cells wrap by one shape', ()
     const shows = [...shapes.matchAll(/export const SHOW_BELOW_TABLE_(\w+) = '@(\w+):hidden'/g)]
       .map(([, name, width]) => [name!, width!])
     expect(hides.length).toBeGreaterThan(0)
+    // A shape written any other way is not read above, so it is counted here and fails the rule.
+    expect(hides).toHaveLength([...shapes.matchAll(/export const HIDE_BELOW_TABLE_/g)].length)
+    expect(shows).toHaveLength([...shapes.matchAll(/export const SHOW_BELOW_TABLE_/g)].length)
     for (const [name, width] of hides) expect(name.toLowerCase()).toBe(width)
     expect(shows).toEqual(hides)
   })
 
   test('a badge that wraps inside its cell takes the one wrapping shape', async () => {
-    const offenders = (await tables()).filter(file => /label:\s*'whitespace-normal'/.test(file.source))
+    const offenders = (await tables()).filter(file => /label:\s*[`'][^`']*whitespace-normal/.test(file.source))
     expect(offenders.map(file => file.path)).toEqual([])
   })
 })

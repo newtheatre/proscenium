@@ -495,7 +495,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', { class: 'font-mono' }, row.original.reference),
       // While the table is narrow its lesser columns carry over into the cells before them, so Open
-      // stays in view beside the Tonight card and on a phone (K-123 criterion 10, issue 922).
+      // stays in view beside the Tonight card and on a phone (K-123 criterion 9, issue 922).
       h('div', { class: `${SHOW_BELOW_TABLE_2XL} text-xs text-muted` }, row.original.bookerName),
     ]),
   },

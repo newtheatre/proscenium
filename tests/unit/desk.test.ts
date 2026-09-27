@@ -428,9 +428,9 @@ async function resultColumn(id: string): Promise<string> {
   return columns.slice(start, next === -1 ? undefined : next)
 }
 
-// K-123 criterion 10: beside the Tonight card, and on a phone, the results scrolled sideways and
+// K-123 criterion 9: beside the Tonight card, and on a phone, the results scrolled sideways and
 // put a row's Open out of view; the resizable sidebar means no window width says how wide the card is.
-describe('every result row keeps Open in view, beside the Tonight card or on a phone (K-123 criterion 10)', () => {
+describe('every result row keeps Open in view, beside the Tonight card or on a phone (K-123 criterion 9)', () => {
   test('the results table is sized by its own width, not the window\'s', async () => {
     const source = await Bun.file('app/pages/box-office/desk.vue').text()
     const table = /<UTable\b[^>]*data-test="desk-results"[^>]*>/.exec(source)?.[0] ?? ''

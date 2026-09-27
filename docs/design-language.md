@@ -221,15 +221,21 @@ Eleven rules follow:
    state, no loading state and no column rules; a list of rows on the console is a `UTable` or it
    is a defect (K-123 criterion 9). A money or quantity column is right-aligned and mono, its
    header right-aligned over its figures, through `RIGHT_ALIGNED` (or
-   `RIGHT_ALIGNED_HIDE_BELOW_SM` where a phone drops it) and `saysMoney`; no screen writes that
-   shape out again. A column of row actions has a header, `ACTIONS_HEADER` hiding the word where
+   `RIGHT_ALIGNED_HIDE_BELOW_SM` where a phone drops it, `RIGHT_ALIGNED_HIDE_BELOW_TABLE_MD` where
+   a table sized by its own width drops it) and `saysMoney`; no screen writes that shape out again. A column of row actions has a header, `ACTIONS_HEADER` hiding the word where
    a visible one would read as noise, and an empty header is not a header; where it sits at the
    row's end it takes `ACTIONS_COLUMN`, never a figure shape, so its buttons keep the body face.
    A row offers at most three actions in line, the primary one visible and the rest in a
    `UDropdownMenu` (K-123 criterion 10). A secondary column carries `app/utils/responsive-table.ts`'s
    `HIDE_BELOW_SM` class on both its header and cell, and its content moves into the primary
    column's own cell as an `sm:hidden` line, so nothing a phone reads is lost, only where it sits;
-   the row's actions never move. A read-only history table with no primary column instead renders
+   the row's actions never move. A table that sits beside another card narrows by its own width
+   instead, since the console sidebar resizes and no window width says how wide the card is: its
+   `UTable` carries `class="@container"`, a secondary column takes `HIDE_BELOW_TABLE_2XL` or
+   `HIDE_BELOW_TABLE_MD`, and the cell before it carries the content on the matching
+   `SHOW_BELOW_TABLE_*` line (the desk results, K-123 criterion 9). A badge that can run to a
+   sentence takes `WRAPPING_BADGE` in a `whitespace-normal` cell rather than widening the table.
+   A read-only history table with no primary column instead renders
    as one card per row below `sm`, the table itself hidden there (issue 922). A true-or-false
    column ("In use", "Sold") is `StatusCell`, never a pair of sentences: a tick or a cross, with
    the words for each value as its label. The icon is hidden from a screen reader and the words
