@@ -27,9 +27,15 @@ const ALLOWED: Record<Verb, readonly ExternalStatus[]> = {
   'cancel': ['REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED'],
 }
 
+// One name for these rooms everywhere a member or an officer meets them (issue 1346).
+export const SU_ROOM_ASK = 'Ask for a Students\' Union room'
+export const SU_ROOMS = 'Students\' Union rooms'
+
+// Said as whose move it is: a member reading "Not yet requested" after asking thought nothing
+// had been sent (issue 1346).
 export function saysExternalStatus(status: string): string {
-  if (status === 'REQUESTED') return 'Not yet requested'
-  if (status === 'AWAITING_EXTERNAL') return 'Requested, awaiting a room'
+  if (status === 'REQUESTED') return 'Waiting on the Theatre Manager'
+  if (status === 'AWAITING_EXTERNAL') return 'Waiting on the Students\' Union'
   if (status === 'CONFIRMED') return 'Confirmed'
   if (status === 'REJECTED') return 'Turned down'
   if (status === 'CANCELLED') return 'Cancelled'
@@ -46,7 +52,7 @@ export function saysExternalState(request: { status: string, convertedToBookingI
 // than one we were lent, and it should not need a cancellation and a fresh ask to take it.
 export function refusalToRelist(request: { status: string }): string | null {
   if (!LIVE_EXTERNAL.includes(request.status as ExternalStatus)) {
-    return `That request is ${saysExternalStatus(request.status).toLowerCase()}, so there is nothing to move`
+    return `That request is ${midSentence(saysExternalStatus(request.status))}, so there is nothing to move`
   }
   return null
 }
@@ -57,7 +63,12 @@ export const LIVE_EXTERNAL: readonly ExternalStatus[] = ['REQUESTED', 'AWAITING_
 // One phrase or null, so a route and a screen refuse for the same reason in the same words.
 export function refusalToAct(request: { status: string }, verb: Verb): string | null {
   if (ALLOWED[verb].includes(request.status as ExternalStatus)) return null
-  return `That request is ${saysExternalStatus(request.status).toLowerCase()}, so it cannot be ${past(verb)}`
+  return `That request is ${midSentence(saysExternalStatus(request.status))}, so it cannot be ${past(verb)}`
+}
+
+// Only the first letter: the Theatre Manager and the Students' Union keep their capitals.
+function midSentence(words: string): string {
+  return words.charAt(0).toLowerCase() + words.slice(1)
 }
 
 function past(verb: Verb): string {

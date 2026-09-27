@@ -21,7 +21,7 @@ export const roomsQueueList = {
       options: [
         { value: 'all', label: 'All rooms' },
         { value: 'room', label: 'Our rooms' },
-        { value: 'unlisted', label: 'Rooms we do not manage' },
+        { value: 'unlisted', label: 'Students\' Union rooms' },
       ],
       operators: ['is'],
       icon: 'i-lucide-filter',

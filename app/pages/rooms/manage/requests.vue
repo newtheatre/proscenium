@@ -886,7 +886,7 @@ onMounted(loadRooms)
 
     <UModal
       :open="unlisting !== null"
-      title="Ask for a room not listed here instead"
+      title="Ask for a Students' Union room instead"
       description="The slot this is holding is freed straight away, and nothing is held until whoever manages the new room answers."
       @update:open="unlisting = null"
     >

@@ -182,7 +182,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // The ask is a fact about the estate; the member's words about it are theirs (0011).
     scrub: ['title', 'notes', 'rejection_reason'],
     scrubTo: { title: 'Erased request' },
-    why: 'Rooms we do not manage that this person asked for. What was asked survives; their words do not.',
+    why: 'Students\' Union rooms this person asked for. What was asked survives; their words do not.',
   },
   {
     name: 'external_requests',

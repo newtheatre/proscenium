@@ -103,6 +103,18 @@ export function hoursForMode(mode: HoursMode, opens: string, closes: string): Ro
   return days.map(weekday => ({ weekday, opens, closes }))
 }
 
+export interface StripDay { day: string, weekday: string, date: number }
+
+// The days a phone picks from with one tap (issue 1346). Calendar dates, not instants, so the
+// night the clocks change is one day like any other (0014).
+export function dateStrip(from: string, count = 14): StripDay[] {
+  const [year, month, date] = from.split('-').map(Number)
+  return Array.from({ length: count }, (_, offset) => {
+    const at = new Date(Date.UTC(year!, month! - 1, date! + offset))
+    return { day: at.toISOString().slice(0, 10), weekday: WEEKDAYS[at.getUTCDay()]!.short, date: at.getUTCDate() }
+  })
+}
+
 // No hours at all is a room with no restriction worth recording, which is most of them. Hours
 // once given are exhaustive: a weekday with no row is then a day the room is shut.
 export function unrestricted(hours: RoomHours[]): boolean {

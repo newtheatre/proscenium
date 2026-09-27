@@ -63,7 +63,7 @@ export const members: Shot[] = [
     annotations: [
       { selector: '[data-test="calendar-today"]', label: 'Today' },
       { selector: '[data-test="calendar-room"]', label: 'Every room, or one' },
-      { selector: '[data-test="book-unlisted"]', label: 'A room not listed here' },
+      { selector: '[data-test="book-unlisted"]', label: 'Ask for a Students\' Union room' },
       { selector: '[data-test^="slot-"]', label: 'A quarter hour to book' },
     ],
   },

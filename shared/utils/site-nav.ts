@@ -34,6 +34,7 @@ import {
   viewTicketTypes,
   viewTrainingCatalogue,
 } from './abilities'
+import { SU_ROOMS } from './external-requests'
 import type { Viewer } from './abilities'
 import type { BouncerAbility } from 'nuxt-authorization/utils'
 
@@ -171,7 +172,7 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Closures', icon: 'i-lucide-construction', to: '/rooms/manage/closures', ability: viewRooms, section: 'Every day' },
       { label: 'Utilisation', icon: 'i-lucide-chart-column', to: '/rooms/manage/utilisation', ability: viewRooms, section: 'Every day' },
       { label: 'Rooms', icon: 'i-lucide-house', to: '/rooms/manage', ability: viewRooms, exact: true, section: 'Set-up' },
-      { label: 'Other rooms', icon: 'i-lucide-map', to: '/rooms/manage/other', ability: viewRooms, section: 'Set-up' },
+      { label: SU_ROOMS, icon: 'i-lucide-map', to: '/rooms/manage/other', ability: viewRooms, section: 'Set-up' },
     ],
   },
 

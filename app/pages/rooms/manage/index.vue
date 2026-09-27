@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
+import { SU_ROOMS } from '#shared/utils/external-requests'
 import { HOURS_MODES, ROOM_OVERRIDE_FLOORS, WEEKDAYS, hoursForMode, hoursModeOf, minutesOpen, roomForm, saysHoursMode, saysOverrideFloor } from '#shared/utils/rooms'
 import { roomsList } from '#shared/utils/rooms-list'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -253,7 +254,7 @@ const columns: TableColumn<Room>[] = [
           icon="i-lucide-map-pin"
           data-test="to-other-rooms"
         >
-          Other rooms
+          {{ SU_ROOMS }}
         </UButton>
 
         <UButton

@@ -157,8 +157,8 @@ describe('the lifecycle', () => {
   })
 
   test('a refusal says the state in words a member would use', () => {
-    expect(saysExternalStatus('AWAITING_EXTERNAL')).toBe('Waiting on the Students' Union')
-    expect(refusalToAct({ status: 'AWAITING_EXTERNAL' }, 'submit')).toContain('waiting on the Students' Union')
+    expect(saysExternalStatus('AWAITING_EXTERNAL')).toBe('Waiting on the Students\' Union')
+    expect(refusalToAct({ status: 'AWAITING_EXTERNAL' }, 'submit')).toContain('waiting on the Students\' Union')
   })
 })
 

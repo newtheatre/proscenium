@@ -226,8 +226,10 @@ function labelOf(column: GridColumn, minutes: number): string {
       {{ tapping ? 'Now tap where it ends.' : 'Tap where the booking starts, then tap where it ends.' }}
     </p>
 
+    <!-- Its own scroll box, so the room names can stay pinned at its top down a long day (issue 1346). -->
     <div
-      class="overflow-x-auto"
+      class="max-h-[75vh] overflow-auto"
+      data-test="grid-scroll"
       @pointerup="dragging = null"
       @pointerleave="dragging = null"
     >
@@ -238,13 +240,13 @@ function labelOf(column: GridColumn, minutes: number): string {
           gridTemplateColumns: `4rem repeat(${columns.length}, minmax(4.5rem, 1fr))`,
         }"
       >
-        <div class="bg-default p-2 text-xs text-muted">
+        <div class="sticky top-0 z-10 bg-default p-2 text-xs text-muted">
           Time
         </div>
         <div
           v-for="column in columns"
           :key="column.key"
-          class="bg-default p-2 text-center text-xs font-medium"
+          class="sticky top-0 z-10 bg-default p-2 text-center text-xs font-medium"
         >
           {{ column.label }}
         </div>

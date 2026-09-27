@@ -4,9 +4,11 @@ import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import { SPACE_NOTE_REASON_LIMIT, VERDICTS, saysVerdict, spaceForm } from '#shared/utils/external-spaces'
 import { externalSpacesList } from '#shared/utils/external-spaces-list'
 import { describePurpose } from '#shared/utils/bookings'
+import { SU_ROOMS } from '#shared/utils/external-requests'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Other rooms', middleware: 'console', docs: '/docs/spaces/other-rooms' })
+// The title is the one SU_ROOMS says; definePageMeta is extracted at build time and takes no import.
+definePageMeta({ layout: 'console', title: 'Students\' Union rooms', middleware: 'console', docs: '/docs/spaces/other-rooms' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
@@ -253,7 +255,7 @@ watch(modalOpen, (nowOpen) => {
     />
 
     <p class="text-sm text-muted">
-      Rooms the Students' Union lends us, and what we know about each.
+      {{ SU_ROOMS }}: the rooms the Union lends us, and what we know about each.
     </p>
 
     <AdminToolbar
