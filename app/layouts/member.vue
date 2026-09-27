@@ -30,7 +30,7 @@ const links = computed(() => MY_NAV
           <UNavigationMenu
             :items="links"
             orientation="vertical"
-            aria-label="Primary"
+            aria-label="My NNT"
             highlight
           />
         </template>
@@ -41,12 +41,12 @@ const links = computed(() => MY_NAV
 
     <UMain class="grow">
       <!-- The strip is contained; the page is not, because every member screen already brings its
-           own container. Below sm the header's menu holds the same list (0104). -->
+           own container. Below sm the header's menu holds the same list, by the same name (0104, 0040). -->
       <UContainer class="hidden overflow-x-auto sm:block">
         <UNavigationMenu
           :items="links"
           highlight
-          aria-label="My theatre"
+          aria-label="My NNT"
           class="border-b border-default w-max min-w-full"
         />
       </UContainer>

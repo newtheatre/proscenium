@@ -372,7 +372,7 @@ describe('a member page is compact on a phone (0104, issue 1342)', () => {
 
   test('the strip of member links is not drawn below sm, where the menu holds the same list', async () => {
     const layout = templateOf(await Bun.file('app/layouts/member.vue').text())
-    const strip = /<UContainer\b[^>]*class="([^"]*)"[^>]*>\s*<UNavigationMenu\b[\s\S]*?aria-label="My theatre"/.exec(layout)
+    const strip = /<UContainer\b[^>]*class="([^"]*)"[^>]*>\s*<UNavigationMenu\b[\s\S]*?aria-label="My NNT"/.exec(layout)
     expect(strip?.[1]).toContain('hidden')
     expect(strip?.[1]).toContain('sm:block')
   })
@@ -395,6 +395,16 @@ describe('a member page is compact on a phone (0104, issue 1342)', () => {
       }
     }
     expect(unnamed).toEqual([])
+  })
+
+  // One list, so one name wherever a screen reader meets it: the strip, the phone menu's list and
+  // the dialogue holding it are all My NNT, the name the area has everywhere else (0040).
+  test('the member nav has one accessible name, the area\'s own', async () => {
+    const layout = templateOf(await Bun.file('app/layouts/member.vue').text())
+    const navNames = [...layout.matchAll(/<UNavigationMenu\b[^>]*?aria-label="([^"]*)"/g)].map(found => found[1])
+    const menuTitle = /:menu="\{\s*title:\s*'([^']*)'/.exec(layout)?.[1]
+    expect(navNames).toHaveLength(2)
+    expect([...new Set([...navNames, menuTitle])]).toEqual([MY_NAV[0]!.label])
   })
 })
 
