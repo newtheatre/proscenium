@@ -180,6 +180,7 @@ describe.skipIf(skip !== null)('a show is a draft nobody outside can see until i
       description: 'A comedy in four acts.',
       ageGuidance: '12 and over',
       latecomerPolicy: 'AT_INTERVAL',
+      loadedSeasonId: null,
     })).status).toBe(200)
 
     expect((await detail(id)).show).toMatchObject({
@@ -187,6 +188,33 @@ describe.skipIf(skip !== null)('a show is a draft nobody outside can see until i
       ageGuidance: '12 and over',
       latecomerPolicy: 'AT_INTERVAL',
     })
+  })
+
+  // D-131 criterion 2, 0003: a form states the season it loaded, and a save never undoes one
+  // set since, by another editor or by the first performance filling it.
+  test('a Details save from a form loaded before the season was set keeps it, or refuses naming it', async () => {
+    const id = await newShow()
+    const title = named('Stale form')
+    const seasons = await Promise.all(['Autumn', 'Fringe'].map(async (prefix, index) => {
+      const name = named(prefix)
+      const answered = await send('POST', '/api/admin/reference-data/seasons', { name, startsOn: `20${40 + index}-09-01`, endsOn: `20${40 + index}-12-01` })
+      return { id: (await answered.json() as { id: string }).id, name }
+    }))
+    const [autumn, fringe] = seasons as [{ id: string, name: string }, { id: string, name: string }]
+    expect((await send('PUT', `/api/admin/shows/${id}`, { title, slug: slugged(title), seasonId: autumn.id, loadedSeasonId: null })).status).toBe(200)
+
+    expect((await send('PUT', `/api/admin/shows/${id}`, { title: `${title} again`, slug: slugged(title), seasonId: null, loadedSeasonId: null })).status).toBe(200)
+    expect((await detail(id)).show).toMatchObject({ title: `${title} again`, seasonId: autumn.id })
+
+    const stale = await send('PUT', `/api/admin/shows/${id}`, { title, slug: slugged(title), seasonId: fringe.id, loadedSeasonId: null })
+    expect(stale.status).toBe(409)
+    expect(await stale.text()).toContain(autumn.name)
+    expect((await detail(id)).show).toMatchObject({ title: `${title} again`, seasonId: autumn.id })
+  })
+
+  test('a save that does not say which season it loaded is refused', async () => {
+    const id = await newShow()
+    expect((await send('PUT', `/api/admin/shows/${id}`, { title: 'Unsaid', slug: 'unsaid' })).status).toBe(400)
   })
 
   test('a latecomer policy nobody defined is refused', async () => {
@@ -365,6 +393,7 @@ describe.skipIf(skip !== null)('the booking window is per performance and inheri
       title,
       slug: slugged(title),
       bookingClosesHoursBefore: 6,
+      loadedSeasonId: null,
     })).status).toBe(200)
 
     const entry = trail<{ detail: { changes: { bookingClosesHoursBefore: { from: number, to: number } } } }>(
