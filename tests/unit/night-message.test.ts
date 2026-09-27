@@ -44,6 +44,10 @@ describe('the announce composer says when a message goes (issue 1327)', () => {
     ])
   })
 
+  test('before the window is known the choice still stands, naming the digest instead', () => {
+    expect(sendTimingOptions(true, null)[1]!.label).toBe('Send with their booking messages, in the next digest')
+  })
+
   test('a message about tonight\'s performance goes now unless the officer says otherwise', () => {
     const night = '2026-10-17'
     const curtain = Math.floor(showNightBounds(night).from.getTime() / 1000) + 15.5 * 3600

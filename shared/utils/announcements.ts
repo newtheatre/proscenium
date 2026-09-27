@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { ROLES } from './roles'
-import type { MessageTypeName } from './notifications'
+import { showNightOf } from './show-night'
 import { plural } from './text'
+import type { MessageTypeName } from './notifications'
 
 // Admin fan-out with blind copy (H-108): an audience is resolved from live data at send time,
 // never a pasted list, and a member cannot see who else the same message reached.
@@ -80,6 +81,29 @@ export function saysAudienceCount(count: number): string {
 // for rows that only appear with the next digest (0061).
 export function saysAnnouncementSent(count: number, held: number): string {
   return `${held > 0 ? 'Queued for' : 'Sent to'} ${plural(count, 'recipient')}`
+}
+
+export type SendTiming = 'NOW' | 'WITH_DIGEST'
+
+// When a message goes, said before it goes (issue 1327): now is the transactional type, and the
+// digest window is the plain type's own, read live rather than written into the sentence (0012).
+export function sendTimingOptions(ticketHolders: boolean, digestMinutes: number | null): { value: SendTiming, label: string, description: string }[] {
+  const within = digestMinutes === null ? 'in the next digest' : `within ${plural(digestMinutes, 'minute')}`
+  return ticketHolders
+    ? [
+        { value: 'NOW', label: 'Send now to everyone holding a ticket', description: 'Reaches every ticket holder at once, whatever their bookings preference.' },
+        { value: 'WITH_DIGEST', label: `Send with their booking messages, ${within}`, description: 'Honours each ticket holder\'s bookings preference.' },
+      ]
+    : [
+        { value: 'NOW', label: 'Send now to everyone in this audience', description: 'Reaches everyone at once, whatever their announcements preference.' },
+        { value: 'WITH_DIGEST', label: `Send with their committee announcements, ${within}`, description: 'Honours each member\'s announcements preference; the inbox entry is there at once.' },
+      ]
+}
+
+// A performance on tonight's show night is news now, so the composer starts on Send now for it.
+export function sendsNowByDefault(performanceStartsAt: number | null, at: Date): boolean {
+  if (performanceStartsAt === null) return false
+  return showNightOf(new Date(performanceStartsAt * 1000)) === showNightOf(at)
 }
 
 export const composeAnnouncementForm = z.object({

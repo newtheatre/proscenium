@@ -1439,6 +1439,21 @@ no clock to set, the case moves the two houses around the real now instead, the 
 hour off on whichever side of now the show night has room (0014), and waits out 04:00 if begun in
 the night's last two minutes.
 
+**Messaging tonight's audience (0101, H-108 criterion 10).** `/tonight/message` is the duty
+manager's composer, a hub tile of theirs. `GET /api/tonight/message/audience`,
+`POST /api/tonight/message/preview` and `POST /api/tonight/message` each call
+`requireNightAuthority(event, 'DUTY_MANAGER', { performanceId })`, so a confirmed shift inside its
+window opens them and the Front of House Manager's bypass is recorded on the send (0044, 0098).
+The audience is one of that performance's two (`server/utils/night-message.ts`): its ticket holders
+through `performanceTicketHoldersQuery()`, the announce composer's own resolver (0089), or its rota,
+`performanceRotaQuery()`, the claimed and confirmed slots on it. Every message goes at once as the
+transactional type (`nightMessageType()`), through the composer's own `fanOut()`, one `notify()` a
+recipient, and the send is `comms.announcement.sent` with the performance, the audience, the count
+and `via`, never the words (0011). The console composer at `/comms/announce` now offers **When it
+goes** in place of its safety tick: `sendTimingOptions()` names now or the digest window, read live
+from the plain type's topic key by the audience route, and `sendsNowByDefault()` starts on now for a
+performance on tonight's show night.
+
 ### The Challenge 25 register (E-118)
 
 `server/db/schema/show-night.ts` adds `age_checks`, append-only like `incidents` (0010): hand-

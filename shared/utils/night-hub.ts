@@ -147,7 +147,7 @@ export function seesAccessTonight(role: NightRole): boolean {
 
 // The hub's destinations and the roles whose authority opens each (E-112 criterion 1, issue 1304).
 // Emergency answers anyone, and a tile nobody's authority opens is not drawn at all.
-export type HubTileId = 'door' | 'till' | 'glance' | 'checklist' | 'report' | 'age-checks' | 'backstage' | 'contacts' | 'emergency'
+export type HubTileId = 'door' | 'till' | 'glance' | 'checklist' | 'report' | 'age-checks' | 'backstage' | 'contacts' | 'message' | 'emergency'
 
 const HUB_TILE_ROLES: Record<HubTileId, readonly NightRole[] | 'ANYONE'> = {
   'door': ['DOOR'],
@@ -158,6 +158,7 @@ const HUB_TILE_ROLES: Record<HubTileId, readonly NightRole[] | 'ANYONE'> = {
   'age-checks': ['DUTY_MANAGER', 'DOOR', 'BAR'],
   'backstage': ['DUTY_MANAGER'],
   'contacts': ['DUTY_MANAGER', 'DOOR', 'BAR'],
+  'message': ['DUTY_MANAGER'],
   'emergency': 'ANYONE',
 }
 

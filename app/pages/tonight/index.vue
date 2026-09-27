@@ -128,6 +128,7 @@ const HUB_TILES: Record<HubTileId | 'stocktake', { label: string, hint: string, 
   'age-checks': { label: 'Challenge 25', hint: 'Log a check · register', icon: 'i-lucide-id-card', to: '/tonight/age-checks', scoped: false },
   'backstage': { label: 'Backstage', hint: 'House open · clearance', icon: 'i-lucide-messages-square', to: '/tonight/board', scoped: false },
   'contacts': { label: 'Contacts and incidents', hint: 'Who\'s on · log', icon: 'i-lucide-phone', to: '/tonight/incidents', scoped: true },
+  'message': { label: 'Message tonight\'s audience', hint: 'Ticket holders · rota', icon: 'i-lucide-megaphone', to: '/tonight/message', scoped: true },
   'emergency': { label: 'Emergency', hint: 'Evac · first aid · 999', icon: 'i-lucide-siren', to: '/tonight/emergency', scoped: false },
 }
 

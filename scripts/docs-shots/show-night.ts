@@ -13,6 +13,7 @@ export const showNight: Shot[] = [
     url: '/tonight',
     marker: '[data-test="tonight-hub"]',
     width: PHONE_WIDTH,
+    height: 1400,
     annotations: [
       { selector: '[data-test="night-shift-badge"]', label: 'How you got in' },
       { selector: '[data-test="performance-switcher"]', label: 'Which performance' },
@@ -183,6 +184,20 @@ export const showNight: Shot[] = [
       { selector: '[data-test="log-category"]', label: 'About' },
       { selector: '[data-test="log-body"]', label: 'The sentence' },
       { selector: '[data-test="log-submit"]', label: 'Log it' },
+    ],
+  },
+  {
+    // The duty manager's own composer, fixed to one of tonight's performances (0101).
+    name: 'show-night/message',
+    persona: foh,
+    url: '/tonight/message',
+    marker: '[data-test="night-message-count"]',
+    width: PHONE_WIDTH,
+    annotations: [
+      { selector: '[data-test="night-message-audience"]', label: 'Who it goes to' },
+      { selector: '[data-test="night-message-subject"]', label: 'Subject' },
+      { selector: '[data-test="night-message-body"]', label: 'Message' },
+      { selector: '[data-test="night-actions"]', label: 'Preview' },
     ],
   },
   {

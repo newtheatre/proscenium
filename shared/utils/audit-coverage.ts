@@ -417,6 +417,21 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
   },
   {
+    route: 'server/api/tonight/message/index.post.ts',
+    actions: ['comms.announcement.sent', 'night.officer-bypass'],
+    via: ['server/utils/night-message.ts', 'server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
+    route: 'server/api/tonight/message/audience.get.ts',
+    actions: ['night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
+    route: 'server/api/tonight/message/preview.post.ts',
+    actions: ['night.officer-bypass'],
+    via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],
+  },
+  {
     route: 'server/api/tonight/incidents/index.get.ts',
     actions: ['night.officer-bypass'],
     via: ['server/utils/night-authority.ts', 'shared/utils/night-authority.ts'],

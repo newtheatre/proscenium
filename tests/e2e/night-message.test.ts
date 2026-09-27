@@ -7,9 +7,8 @@ import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
-// Decision 0101 through the real routes: tonight's confirmed duty manager messages one of
-// tonight's performances, its ticket holders or its rota, at once. The resolvers are pinned in
-// tests/integration/night-message.test.ts; this is the guard, the send and the record.
+// Decision 0101 through the real routes: the guard, the send and the record. The resolvers are
+// pinned in tests/integration/night-message.test.ts.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
