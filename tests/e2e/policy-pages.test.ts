@@ -93,16 +93,33 @@ describe.skipIf(skip !== null)('a policy page quotes the live setting (criteria 
 })
 
 describe.skipIf(skip !== null)('a rule nothing enforces says so (criterion 5)', () => {
-  test('the unpaid cancellation rule is quoted and marked as not enforced', async () => {
-    const html = await pageHtml('/policies/booking')
+  test('the membership fee, which nothing here charges, is quoted and marked as not enforced', async () => {
+    const html = await pageHtml('/policies/membership')
     expect(html).toContain('policy-unenforced')
     expect(html).toContain('applied by hand')
+    const { values } = await valuesFor('/policies/membership')
+    expect(values.MEMBERSHIP_FEE_PENCE?.enforced).toBe(false)
   })
 
-  test('an enforced rule on the same page carries no such mark', async () => {
+  test('an enforced rule carries no such mark', async () => {
     const { values } = await valuesFor('/policies/booking')
-    expect(values.REFUND_PAID_REQUIRES_MANAGER?.enforced).toBe(true)
-    expect(values.REFUND_UNPAID_CANCELLATION_FREE?.enforced).toBe(false)
+    expect(values.HOLD_RELEASE_MINUTES_BEFORE?.enforced).toBe(true)
+  })
+})
+
+// Issue 854: unpaid cancellation is free by construction, and who approves a paid refund is the
+// desk's business, so the booking page states both in words and quotes neither switch.
+describe.skipIf(skip !== null)('the booking page says how refunds work in words, never as a switch', () => {
+  test('neither refund switch is quoted, and every rule the page quotes is enforced', async () => {
+    const { values } = await valuesFor('/policies/booking')
+    expect(Object.keys(values)).not.toContain('REFUND_PAID_REQUIRES_MANAGER')
+    expect(Object.values(values).every(value => value.enforced)).toBe(true)
+
+    const html = await pageHtml('/policies/booking')
+    expect(html).not.toContain('policy-error')
+    expect(html).toContain('before the performance starts')
+    expect(html).toContain('cancelled at the box office')
+    expect(html).toContain('in person at the box office')
   })
 })
 

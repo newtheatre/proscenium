@@ -82,7 +82,7 @@ describe('formatted for what it measures (criterion 2)', () => {
 
   test('a rule that is on or off reads as words, not as true', () => {
     expect(formatPolicyValue('ROOM_MAX_BOOKING_ADMINS_EXEMPT', true)).toBe('yes')
-    expect(formatPolicyValue('REFUND_UNPAID_CANCELLATION_FREE', false)).toBe('no')
+    expect(formatPolicyValue('DISCOUNT_CODES_ENABLED', false)).toBe('no')
   })
 
   test('a list reads as a sentence, not as JSON', () => {
@@ -133,7 +133,7 @@ describe('which keys a public page may quote at all', () => {
 
   // Criterion 5: the rule is quoted and marked, rather than hidden, which is the honest state.
   test('a stated but unenforced rule resolves and says it is not enforced', () => {
-    expect(policyValueFor('REFUND_UNPAID_CANCELLATION_FREE', { ...state, enforced: false, value: true }))
+    expect(policyValueFor('DISCOUNT_CODES_ENABLED', { ...state, enforced: false, value: true }))
       .toEqual({ text: 'yes', enforced: false })
   })
 })
@@ -158,7 +158,7 @@ describe('what CI refuses in a page (criterion 3)', () => {
 describe('what a page renders (criteria 2, 4, 5)', () => {
   const values: PolicyValues = {
     ROOM_MAX_BOOKING_HOURS: { text: '4 hours', enforced: true },
-    REFUND_UNPAID_CANCELLATION_FREE: { text: 'yes', enforced: false },
+    DISCOUNT_CODES_ENABLED: { text: 'yes', enforced: false },
   }
 
   test('a resolved token becomes the live value in the prose', () => {
@@ -185,7 +185,7 @@ describe('what a page renders (criteria 2, 4, 5)', () => {
   })
 
   test('an unenforced rule renders marked, not silently like any other value', () => {
-    const resolved = resolvePolicyTree(tree(['p', {}, 'free: {{REFUND_UNPAID_CANCELLATION_FREE}}']), values)
+    const resolved = resolvePolicyTree(tree(['p', {}, 'discount codes: {{DISCOUNT_CODES_ENABLED}}']), values)
     const rendered = JSON.stringify(resolved)
     expect(rendered).toContain('policy-unenforced')
     expect(rendered).toContain('applied by hand')

@@ -78,6 +78,12 @@ describe('configuration surface (0012, 0019)', () => {
     }
   })
 
+  // Issue 854: cancelling an unpaid booking is free because no money has moved (D-110 criterion 4),
+  // so there is no switch for it.
+  test('free cancellation of an unpaid booking is not a setting', () => {
+    expect(isConfigKey('REFUND_UNPAID_CANCELLATION_FREE')).toBe(false)
+  })
+
   // A-112 (#900): the key's own description names three categories; a role holding one of these
   // entry-level permissions is in one of them, whatever the default list currently says.
   const MONEY_OR_SAFETY_PERMISSIONS: Permission[] = [

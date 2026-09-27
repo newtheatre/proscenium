@@ -127,7 +127,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect(JSON.parse(entry!.detail)).toMatchObject({ key: 'BAR_TAB_CAP_PENCE', changes: { value: { from: 2000, to: 2500 } } })
     }
     finally {
-      clearConfigOverride(app, 'REFUND_UNPAID_CANCELLATION_FREE')
+      clearConfigOverride(app, 'BAR_TAB_CAP_PENCE')
     }
   })
 
@@ -219,6 +219,7 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       await fillPin(view, '[data-test="mfa-challenge"] input', await unusedCode())
       await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
 
+      overrideConfig(app, 'BAR_TAB_CAP_PENCE', 2500)
       await visit(view, `${app.baseURL}/admin/settings`, '[data-test="config-search"]')
 
       // Fifty keys, found by searching for what the key decides rather than its name (0032).
@@ -239,7 +240,7 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       // text on the page, so it is read rather than searched for.
       const shown = await view.evaluate<string>(
         `document.querySelector('input[data-test="input-BAR_TAB_CAP_PENCE"]')?.value ?? ''`)
-      // 2500 pence is what this suite set it to, and £25.00 is what that should read as.
+      // 2500 pence, set above, reads as £25.00.
       expect(shown).toBe('£25.00')
 
       // A yearly boundary is picked from a calendar with no year in it, and reads as a day and a
@@ -278,15 +279,16 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="bank-holiday-sync-now"]\'))')).toBe(true)
       expect(await textOf(view)).toContain('gov.uk')
 
-      await fill(view, 'input[data-test="config-search"]', 'cancel an unpaid booking')
-      await waitFor(view, 'document.querySelector(\'[data-test="toggle-REFUND_UNPAID_CANCELLATION_FREE"]\')')
-      await click(view, '[data-test="toggle-REFUND_UNPAID_CANCELLATION_FREE"]')
+      await fill(view, 'input[data-test="config-search"]', 'book past the maximum')
+      await waitFor(view, 'document.querySelector(\'[data-test="toggle-ROOM_MAX_BOOKING_ADMINS_EXEMPT"]\')')
+      await click(view, '[data-test="toggle-ROOM_MAX_BOOKING_ADMINS_EXEMPT"]')
       await waitFor(view, 'document.body.innerText.includes("Changed by")')
 
-      expect((await settingFor('REFUND_UNPAID_CANCELLATION_FREE')).value).toBe(false)
+      expect((await settingFor('ROOM_MAX_BOOKING_ADMINS_EXEMPT')).value).toBe(false)
     }
     finally {
-      clearConfigOverride(app, 'REFUND_UNPAID_CANCELLATION_FREE')
+      clearConfigOverride(app, 'ROOM_MAX_BOOKING_ADMINS_EXEMPT')
+      clearConfigOverride(app, 'BAR_TAB_CAP_PENCE')
       clearConfigOverride(app, 'YEAR_START')
       view.close()
     }
