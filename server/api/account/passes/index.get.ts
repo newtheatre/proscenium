@@ -1,7 +1,7 @@
 import { showsPassQr } from '#shared/utils/passes'
 
-// A member's own held passes and their own pending requests (D-124 criterion 5), and what may
-// still be requested. A pass the door would admit carries its QR, to be shown there (issue 1332).
+// A member's own passes, each the door would admit with its QR (issue 1332), their pending requests
+// (D-124 criterion 5), and each type on sale, saying whether it is held or asked for (issue 1331).
 export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
   const [held, requests, sellable] = await Promise.all([
@@ -15,5 +15,13 @@ export default defineEventHandler(async (event) => {
     ...pass,
     qrSvg: showsPassQr(pass, now) ? qrSvgBase64(`${base}/passes/${await passQrTokenFor(pass.id)}`) : null,
   })))
-  return { passes, requests, sellable }
+  return {
+    passes,
+    requests,
+    sellable: sellable.map(type => ({
+      ...type,
+      held: passes.some(pass => pass.passTypeId === type.id && pass.status === 'ACTIVE'),
+      openRequestId: requests.find(request => request.passTypeId === type.id && request.status === 'PENDING')?.id ?? null,
+    })),
+  }
 })

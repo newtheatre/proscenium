@@ -212,6 +212,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['pass.request.created'],
     via: ['server/utils/pass-issue.ts'],
   },
+  {
+    route: 'server/api/account/passes/requests/[id].delete.ts',
+    actions: ['pass.request.withdrawn'],
+    via: ['server/utils/pass-issue.ts'],
+  },
   { route: 'server/api/passes/current.get.ts', exempt: 'reads the pass the cookie names; nothing is written' },
   { route: 'server/routes/passes/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
   { route: 'server/routes/passes/[token]/image.png.get.ts', exempt: 'renders the pass QR as a PNG for the email; nothing is written' },

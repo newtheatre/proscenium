@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { users } from './identity'
 import { performances, shows } from './programme'
 import { tickets } from './ticketing'
@@ -112,6 +112,8 @@ export const passRequests = sqliteTable('pass_requests', {
 }, table => [
   index('pass_requests_pass_type_status').on(table.passTypeId, table.status),
   index('pass_requests_user').on(table.userId),
+  // One open request per account and pass type: the index is the refusal, never a read (issue 1331).
+  uniqueIndex('pass_requests_one_open').on(table.userId, table.passTypeId).where(sql`status = 'PENDING'`),
   check('pass_requests_status_values', sql`${table.status} IN ('PENDING', 'FULFILLED', 'DECLINED', 'EXPIRED')`),
   // A pass is set exactly when fulfilment decided it, never on any other status (0033).
   check('pass_requests_pass_pairs_with_fulfilled', sql`(${table.status} = 'FULFILLED') = (${table.passId} IS NOT NULL)`),

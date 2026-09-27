@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -239,6 +239,155 @@ describe.skipIf(skip !== null)('requesting online, and fulfilling at the desk (c
 
     const row = query<{ status: string }>('SELECT status AS status FROM pass_requests WHERE user_id = ?', requester.id)
     expect(row?.status).toBe('EXPIRED')
+  }, CASE_TIMEOUT_MS)
+})
+
+// Issue 1331: one open request per pass type, none for a pass held, and a way to take one back.
+describe.skipIf(skip !== null)('a request is asked once, never for a pass held, and can be withdrawn (criterion 3)', () => {
+  test('a second request for the same pass is refused, saying it is already asked for', async () => {
+    const { id: passTypeId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+
+    expect((await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)).status).toBe(200)
+    const again = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    expect(again.status).toBe(409)
+    expect(await again.text()).toContain('already asked')
+
+    const open = query<{ total: number }>(
+      'SELECT count(*) AS total FROM pass_requests WHERE user_id = ? AND pass_type_id = ? AND status = ?', requester.id, passTypeId, 'PENDING',
+    )
+    expect(open?.total).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
+  test('a member holding the pass is not offered it again, and a request is refused', async () => {
+    const { id: passTypeId, priceId } = await onSalePassType()
+    const holder = await registerMember(app, 'holder', generatePassword())
+    expect((await send('POST', '/api/box-office/desk/passes', {
+      passTypeId, passTypePriceId: priceId, userId: holder.id, expectedTotalPence: 4500,
+    })).status).toBe(200)
+
+    const refused = await send('POST', '/api/account/passes/request', { passTypeId }, holder.cookie)
+    expect(refused.status).toBe(409)
+    expect(await refused.text()).toContain('already hold')
+
+    const listed = await send('GET', '/api/account/passes', undefined, holder.cookie)
+    const { sellable } = await listed.json() as { sellable: { id: string, held: boolean }[] }
+    expect(sellable.find(one => one.id === passTypeId)?.held).toBe(true)
+  }, CASE_TIMEOUT_MS)
+
+  test('withdrawing takes the request back, the desk no longer sees it, and asking again works', async () => {
+    const { id: passTypeId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+
+    const listed = await send('GET', '/api/account/passes', undefined, requester.cookie)
+    const { sellable } = await listed.json() as { sellable: { id: string, openRequestId: string | null }[] }
+    expect(sellable.find(one => one.id === passTypeId)?.openRequestId).toBe(requestId)
+
+    expect((await send('DELETE', `/api/account/passes/requests/${requestId}`, undefined, requester.cookie)).status).toBe(200)
+
+    const pending = await send('GET', `/api/box-office/desk/passes/${passTypeId}/requests`)
+    const { items } = await pending.json() as { items: { userId: string }[] }
+    expect(items.some(item => item.userId === requester.id)).toBe(false)
+
+    expect((await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)).status).toBe(200)
+  }, CASE_TIMEOUT_MS)
+
+  test('somebody else\'s request answers as though it does not exist', async () => {
+    const { id: passTypeId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+    const stranger = await registerMember(app, 'stranger', generatePassword())
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+
+    expect((await send('DELETE', `/api/account/passes/requests/${requestId}`, undefined, stranger.cookie)).status).toBe(404)
+    const row = query<{ status: string }>('SELECT status FROM pass_requests WHERE id = ?', requestId)
+    expect(row?.status).toBe('PENDING')
+  }, CASE_TIMEOUT_MS)
+
+  // Read again after the refusal, so the answer names what actually happened to the request.
+  test('withdrawing a request the desk has fulfilled, or one that lapsed, says which', async () => {
+    const { id: passTypeId, priceId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+    expect((await send('POST', '/api/box-office/desk/passes', {
+      passTypeId, passTypePriceId: priceId, userId: requester.id, expectedTotalPence: 4500, requestId,
+    })).status).toBe(200)
+
+    const settled = await send('DELETE', `/api/account/passes/requests/${requestId}`, undefined, requester.cookie)
+    expect(settled.status).toBe(409)
+    expect(await settled.text()).toContain('This request has already been settled at the box office desk')
+
+    const { id: otherTypeId } = await onSalePassType()
+    const lapsedId = crypto.randomUUID()
+    write('INSERT INTO pass_requests (id, pass_type_id, user_id, status) VALUES (?, ?, ?, ?)', lapsedId, otherTypeId, requester.id, 'EXPIRED')
+    const lapsed = await send('DELETE', `/api/account/passes/requests/${lapsedId}`, undefined, requester.cookie)
+    expect(lapsed.status).toBe(409)
+    expect(await lapsed.text()).toContain('This request has already lapsed')
+  }, CASE_TIMEOUT_MS)
+
+  // A desk sale that picks the buyer by name, not from the request list, still settles their request.
+  test('selling the pass to a member who asked for it fulfils their request, and the desk list drops them', async () => {
+    const { id: passTypeId, priceId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+
+    expect((await send('POST', '/api/box-office/desk/passes', {
+      passTypeId, passTypePriceId: priceId, userId: requester.id, expectedTotalPence: 4500,
+    })).status).toBe(200)
+
+    const row = query<{ status: string, passId: string | null }>('SELECT status, pass_id AS passId FROM pass_requests WHERE id = ?', requestId)
+    expect(row?.status).toBe('FULFILLED')
+    expect(row?.passId).not.toBeNull()
+
+    const pending = await send('GET', `/api/box-office/desk/passes/${passTypeId}/requests`)
+    const { items } = await pending.json() as { items: { userId: string }[] }
+    expect(items.some(item => item.userId === requester.id)).toBe(false)
+  }, CASE_TIMEOUT_MS)
+})
+
+async function signedInView(member: TestMember, password: string): Promise<Bun.WebView> {
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', member.email)
+  await fill(view, 'form input[type="password"]', password)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+  return view
+}
+
+// Withdrawing removes the request, so the member is asked first, as every member screen that
+// destroys something asks (K-123, 0032).
+describe.skipIf(skip !== null)('withdrawing on the passes page asks first (issue 1331)', () => {
+  test('Withdraw opens a named confirmation; backing out keeps the request, confirming takes it back', async () => {
+    const { id: passTypeId } = await onSalePassType()
+    const password = generatePassword()
+    const requester = await registerMember(app, 'requester', password)
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+    const stillThere = (): boolean => query<{ id: string }>('SELECT id FROM pass_requests WHERE id = ?', requestId) !== undefined
+
+    const view = await signedInView(requester, password)
+    try {
+      const withdraw = `[data-test="account-pass-withdraw-${passTypeId}"]`
+      await visit(view, `${app.baseURL}/account/passes`, withdraw)
+      await click(view, withdraw)
+      await waitFor(view, `document.querySelector('[data-test="confirm-withdraw-pass-request-verb"]')`)
+      await click(view, '[data-test="confirm-withdraw-pass-request-back"]')
+      expect(stillThere()).toBe(true)
+
+      await click(view, withdraw)
+      await waitFor(view, `document.querySelector('[data-test="confirm-withdraw-pass-request-verb"]')`)
+      await click(view, '[data-test="confirm-withdraw-pass-request-verb"]')
+      await waitFor(view, `document.querySelector('[data-test="account-pass-request-${passTypeId}"]')`)
+      expect(stillThere()).toBe(false)
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })
 

@@ -31,6 +31,10 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // A buyer picked by name may still have asked online: their request is settled by this sale too,
+  // under the same conditional fulfilment, so a withdrawal racing it simply finds nothing (issue 1331).
+  const requestId = input.requestId ?? await openPassRequestFor(input.userId, input.passTypeId)
+
   const result = await issuePass({
     passTypeId: input.passTypeId,
     passTypePriceId: input.passTypePriceId,
@@ -38,7 +42,7 @@ export default defineEventHandler(async (event) => {
     userId: input.userId,
     pricePaid: price.price,
     actorId: resolved.account.id,
-    requestId: input.requestId,
+    requestId,
   })
 
   if (!result.applied) {
