@@ -3,6 +3,7 @@ import {
   addOpeningShiftStatement,
   addedSlotAuditStatement,
   approveOpeningShiftStatement,
+  assignOpeningShiftStatement,
   barSlotCountQuery,
   cancelOpeningShiftsStatement,
   cancelOpeningStatement,
@@ -52,9 +53,16 @@ function run(database: TestDatabase, statement: SQL): unknown[] {
   return database.raw.prepare(query).all(...parameters as never[]) as unknown[]
 }
 
+// Every member here holds the bar module (`tr-bar-<id>`), so a claim is refused only over the slot
+// itself unless a test revokes that record (#1302: the gate rides the claim's write).
 function person(database: TestDatabase, id: string): string {
-  database.batch([['INSERT OR IGNORE INTO users (id, name, email, verified) VALUES (?, ?, ?, 1)',
-    id, `Someone ${id}`, `${id}@e2e.newtheatre.org.uk`]])
+  database.batch([
+    ['INSERT OR IGNORE INTO users (id, name, email, verified) VALUES (?, ?, ?, 1)', id, `Someone ${id}`, `${id}@e2e.newtheatre.org.uk`],
+    ['INSERT OR IGNORE INTO departments (code, name) VALUES (?, ?)', 'ADMN', 'Administration'],
+    ['INSERT OR IGNORE INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'ADMN-102', 'ADMN', 'MODULE', 'Bar induction'],
+    [`INSERT OR IGNORE INTO training_records (id, user_id, module_id, awarded_on, source)
+      VALUES (?, ?, 'ADMN-102', '2025-09-01', 'SIGNOFF')`, `tr-bar-${id}`, id],
+  ])
   return id
 }
 
@@ -227,7 +235,7 @@ describe('a slot is claimed through the rota\'s own race-safe write (E-130 crite
 
       const answers = await race(2, async (index) => {
         const claimant = index === 0 ? 'one' : 'two'
-        const claimed = run(database, claimOpeningShiftStatement(slot!.id, claimant, 'CONFIRMED'))
+        const claimed = run(database, claimOpeningShiftStatement(slot!.id, claimant, 'CONFIRMED', BAR_GATE))
         return { status: claimed.length === 1 ? 200 : 409 }
       })
 
@@ -245,8 +253,8 @@ describe('a slot is claimed through the rota\'s own race-safe write (E-130 crite
       person(database, 'one')
       const [first, second] = slotsOn(database, openingId)
 
-      expect(run(database, claimOpeningShiftStatement(first!.id, 'one', 'CONFIRMED'))).toHaveLength(1)
-      expect(run(database, claimOpeningShiftStatement(second!.id, 'one', 'CONFIRMED'))).toHaveLength(0)
+      expect(run(database, claimOpeningShiftStatement(first!.id, 'one', 'CONFIRMED', BAR_GATE))).toHaveLength(1)
+      expect(run(database, claimOpeningShiftStatement(second!.id, 'one', 'CONFIRMED', BAR_GATE))).toHaveLength(0)
 
       const held = slotsOn(database, openingId)
       expect(held.filter(slot => slot.user_id === 'one')).toHaveLength(1)
@@ -260,7 +268,7 @@ describe('a slot is claimed through the rota\'s own race-safe write (E-130 crite
       person(database, 'one')
       const [slot] = slotsOn(database, openingId)
 
-      expect(run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CLAIMED'))).toHaveLength(1)
+      expect(run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CLAIMED', BAR_GATE))).toHaveLength(1)
 
       const bounds = showNightBounds(NIGHT)
       const from = Math.floor(bounds.from.getTime() / 1000)
@@ -281,12 +289,27 @@ describe('a slot is claimed through the rota\'s own race-safe write (E-130 crite
       const { openingId } = opening(database)
       person(database, 'one')
       const [slot] = slotsOn(database, openingId)
-      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CLAIMED'))
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CLAIMED', BAR_GATE))
+      database.batch([['UPDATE training_records SET revoked_at = unixepoch() WHERE id = ?', 'tr-bar-one']])
       trained(database, 'one', '2026-10-01')
 
       expect(run(database, approveOpeningShiftStatement(slot!.id, BAR_GATE))).toHaveLength(0)
       expect(slotsOn(database, openingId)[0]).toMatchObject({ status: 'CLAIMED', user_id: 'one' })
       expect(run(database, approveOpeningShiftStatement(slot!.id, { moduleId: null, today: BAR_GATE.today }))).toHaveLength(0)
+    })
+  })
+
+  test('the bar gate rides the claim and the assignment too: a revoked record is refused at the write (#1302)', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      person(database, 'one')
+      person(database, 'officer')
+      database.batch([['UPDATE training_records SET revoked_at = unixepoch() WHERE id = ?', 'tr-bar-one']])
+      const [slot] = slotsOn(database, openingId)
+
+      expect(run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED', BAR_GATE))).toHaveLength(0)
+      expect(run(database, assignOpeningShiftStatement(slot!.id, 'one', 'officer', BAR_GATE))).toHaveLength(0)
+      expect(slotsOn(database, openingId)[0]).toMatchObject({ status: 'OPEN', user_id: null })
     })
   })
 
@@ -296,14 +319,14 @@ describe('a slot is claimed through the rota\'s own race-safe write (E-130 crite
       const { openingId } = opening(database)
       person(database, 'one')
       const [slot] = slotsOn(database, openingId)
-      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CLAIMED'))
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CLAIMED', BAR_GATE))
       run(database, declineOpeningShiftStatement(slot!.id, 'Not trained yet'))
 
       expect(run(database, unconfirmOpeningShiftStatement(slot!.id))).toHaveLength(1)
 
       const reopened = slotsOn(database, openingId)[0]!
       expect(reopened).toMatchObject({ status: 'OPEN', user_id: null })
-      expect(run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))).toHaveLength(1)
+      expect(run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED', BAR_GATE))).toHaveLength(1)
     })
   })
 
@@ -312,7 +335,7 @@ describe('a slot is claimed through the rota\'s own race-safe write (E-130 crite
       const { openingId, venueId } = opening(database)
       person(database, 'one')
       const [slot] = slotsOn(database, openingId)
-      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED', BAR_GATE))
 
       const bounds = showNightBounds(NIGHT)
       const from = Math.floor(bounds.from.getTime() / 1000)
@@ -333,7 +356,7 @@ describe('cancelling an opening cancels its shifts (E-130 criterion 5)', () => {
       const { openingId } = opening(database)
       person(database, 'one')
       const [first] = slotsOn(database, openingId)
-      run(database, claimOpeningShiftStatement(first!.id, 'one', 'CONFIRMED'))
+      run(database, claimOpeningShiftStatement(first!.id, 'one', 'CONFIRMED', BAR_GATE))
 
       run(database, cancelOpeningStatement(openingId))
       run(database, cancelOpeningShiftsStatement(openingId))
@@ -432,9 +455,9 @@ describe('a planned opening\'s staffing changes one-off after stamping (E-130 cr
       person(database, 'two')
       person(database, 'three')
       const [claimed, confirmed, declined] = slotsOn(database, openingId)
-      run(database, claimOpeningShiftStatement(claimed!.id, 'one', 'CLAIMED'))
-      run(database, claimOpeningShiftStatement(confirmed!.id, 'two', 'CONFIRMED'))
-      run(database, claimOpeningShiftStatement(declined!.id, 'three', 'CLAIMED'))
+      run(database, claimOpeningShiftStatement(claimed!.id, 'one', 'CLAIMED', BAR_GATE))
+      run(database, claimOpeningShiftStatement(confirmed!.id, 'two', 'CONFIRMED', BAR_GATE))
+      run(database, claimOpeningShiftStatement(declined!.id, 'three', 'CLAIMED', BAR_GATE))
       run(database, declineOpeningShiftStatement(declined!.id, 'Not trained yet'))
 
       for (const slot of [claimed!, confirmed!, declined!]) {
@@ -475,7 +498,7 @@ describe('a planned opening\'s staffing changes one-off after stamping (E-130 cr
       const answers = await race(2, async (index) => {
         const written = index === 0
           ? run(database, removeOpeningShiftStatement(slot!.id))
-          : run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))
+          : run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED', BAR_GATE))
         return { status: written.length === 1 ? 200 : 409 }
       })
 
@@ -512,7 +535,7 @@ describe('the open-slot list for somebody who already works the opening', () => 
       const { openingId } = opening(database)
       const [first] = slotsOn(database, openingId)
       person(database, 'me')
-      run(database, claimOpeningShiftStatement(first!.id, 'me', 'CONFIRMED'))
+      run(database, claimOpeningShiftStatement(first!.id, 'me', 'CONFIRMED', BAR_GATE))
 
       const now = OPENS_AT - 3600
       expect(run(database, openOpeningShiftsQuery({}, now, 50, 'me'))).toEqual([])
@@ -535,7 +558,7 @@ describe('the open-slot count on the bar card', () => {
 
       const [first] = slotsOn(database, openingId)
       person(database, 'me')
-      run(database, claimOpeningShiftStatement(first!.id, 'me', 'CONFIRMED'))
+      run(database, claimOpeningShiftStatement(first!.id, 'me', 'CONFIRMED', BAR_GATE))
       expect(counted(database, now)).toBe(1)
       expect(run(database, openOpeningShiftsQuery({}, now, 50))).toHaveLength(1)
     })
@@ -560,7 +583,7 @@ describe('a member\'s own opening slots stay on their rota through the night (E-
       const { openingId } = opening(database)
       person(database, 'one')
       const [slot] = slotsOn(database, openingId)
-      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED', BAR_GATE))
 
       const listed = (at: number): unknown[] => run(database, myOpeningShiftsQuery('one', at))
       expect(listed(CLOSES_AT + 3600)).toHaveLength(1)
@@ -577,7 +600,7 @@ describe('a holder releases their own slot until the night begins (E-107 criteri
       const { openingId } = opening(database)
       person(database, 'one')
       const [slot] = slotsOn(database, openingId)
-      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED', BAR_GATE))
 
       expect(run(database, releaseOpeningShiftStatement(slot!.id, 'one', NIGHT_START - 60))).toHaveLength(1)
       expect(slotsOn(database, openingId)[0]).toMatchObject({ user_id: null, status: 'OPEN' })
@@ -589,7 +612,7 @@ describe('a holder releases their own slot until the night begins (E-107 criteri
       const { openingId } = opening(database)
       person(database, 'one')
       const [slot] = slotsOn(database, openingId)
-      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED', BAR_GATE))
 
       expect(run(database, releaseOpeningShiftStatement(slot!.id, 'one', NIGHT_START))).toHaveLength(0)
       expect(run(database, releaseOpeningShiftStatement(slot!.id, 'one', CLOSES_AT + 3600))).toHaveLength(0)
