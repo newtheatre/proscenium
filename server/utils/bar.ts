@@ -229,6 +229,12 @@ export function resolvedPriceColumns(categoryId: SQL, variantAlias: string, on: 
   }
 }
 
+// How many products still sell with no allergen answer, for the console overview (issue 1358).
+// The bar's own count: an answer moving onto the stocked item moves it here, and nowhere else.
+export function allergensUnansweredCount(): SQL {
+  return sql`(SELECT count(*) FROM bar_products WHERE status <> 'RETIRED' AND allergen_state = 'UNKNOWN')`
+}
+
 // On-hand is the sum of an item's movements, computed where it is asked for and stored nowhere
 // (F-114 criterion 2).
 export function onHandColumn(alias: string): SQL {

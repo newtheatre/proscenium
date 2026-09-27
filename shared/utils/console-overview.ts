@@ -48,7 +48,7 @@ export function setUpLines(facts: SetUpFacts): SetUpLine[] {
 export function saysSetUp(line: SetUpLine): string {
   switch (line.kind) {
     case 'ELIGIBILITY': return saysEligibility(line.eligibility)
-    case 'NOTHING_ON_HAND': return 'Nothing is on hand at the bar: no delivery or opening count has been recorded.'
+    case 'NOTHING_ON_HAND': return 'Nothing is on hand at the bar: record a delivery or an opening count.'
     case 'NO_STOCKTAKE': return 'No stocktake has been applied yet, so on-hand is what deliveries and sales say, not a count.'
     case 'ALLERGENS_UNKNOWN': return `${plural(line.products, 'product')} ${line.products === 1 ? 'has' : 'have'} no allergen information recorded.`
     default: return line satisfies never
@@ -79,7 +79,7 @@ export function tonightLines(performances: readonly { id: string, showTitle: str
     .map(({ id, showTitle, venueName, startsAt }) => ({ performanceId: id, showTitle, venueName, startsAt }))
 }
 
-// Tonight is null for a reader who may not open tonight's screens, and a list, maybe empty, otherwise.
+// Tonight is null for a reader who holds no night permission, and a list, maybe empty, otherwise.
 export interface ConsoleOverview {
   setUp: SetUpLine[]
   tonight: TonightLine[] | null

@@ -8,7 +8,8 @@ import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { OPERATIONAL_PERMISSIONS } from '#shared/utils/roles'
 import { currentShowNight } from '#shared/utils/show-night'
 import { accessProfilesClause } from './access-profiles'
-import { onHandColumn } from './bar'
+import { allergensUnansweredCount, onHandColumn } from './bar'
+import { STOCK_COUNTED } from './bar-linkage'
 import { claimsClause } from './membership-claims'
 import { performancesOnNight } from './performances'
 import { roleEligibilities } from './rota-readiness'
@@ -37,7 +38,10 @@ const COUNTS: Record<NavCount, (leadOf: string | undefined) => SQL> = {
   'training-requests': leadOf => sql`(SELECT count(*) FROM module_requests r
     JOIN modules m ON m.id = r.module_id
     WHERE r.status = 'OPEN' AND ${demandScope(leadOf)})`,
-  'pass-requests': () => sql`(SELECT count(*) FROM pass_requests WHERE status = 'PENDING')`,
+  // The desk lists requests only for a pass on sale, so one on any other cannot be fulfilled there.
+  'pass-requests': () => sql`(SELECT count(*) FROM pass_requests r
+    JOIN pass_types t ON t.id = r.pass_type_id
+    WHERE r.status = 'PENDING' AND t.status = 'ON_SALE')`,
 }
 
 // One row, one column per queue asked for, named by its key. Never called with none.
@@ -45,11 +49,10 @@ export function waitingCountsQuery(queues: readonly NavCount[], leadOf: string |
   return sql`SELECT ${sql.join(queues.map(count => sql`${COUNTS[count](leadOf)} AS ${sql.identifier(count)}`), sql`, `)}`
 }
 
-// A lead who is not a training officer counts their own departments' requests only (G-110).
-export async function waitingCounts(permissions: ReadonlySet<Permission>, userId: string, leadsDepartment: boolean): Promise<Partial<Record<NavCount, number>>> {
+// `leadOf` is the demand board's own scope (scopeToLeadOf): undefined for a training officer.
+export async function waitingCounts(permissions: ReadonlySet<Permission>, leadOf: string | undefined, leadsDepartment: boolean): Promise<Partial<Record<NavCount, number>>> {
   const queues = queuesFor(permissions, leadsDepartment)
   if (queues.length === 0) return {}
-  const leadOf = permissions.has('training.read') ? undefined : userId
   const [row] = await db.all<Record<NavCount, number>>(waitingCountsQuery(queues, leadOf))
   return Object.fromEntries(queues.map(count => [count, Number(row?.[count] ?? 0)]))
 }
@@ -57,8 +60,8 @@ export async function waitingCounts(permissions: ReadonlySet<Permission>, userId
 export function barSetUpQuery(): SQL {
   return sql`SELECT
     EXISTS (SELECT 1 FROM bar_items i WHERE i.status = 'ACTIVE' AND ${onHandColumn('i')} > 0) AS anythingOnHand,
-    EXISTS (SELECT 1 FROM stocktakes WHERE status = 'APPLIED') AS anyStocktake,
-    (SELECT count(*) FROM bar_products WHERE status <> 'RETIRED' AND allergen_state = 'UNKNOWN') AS allergensUnknown`
+    ${STOCK_COUNTED} AS anyStocktake,
+    ${allergensUnansweredCount()} AS allergensUnknown`
 }
 
 interface BarSetUp { anythingOnHand: number, anyStocktake: number, allergensUnknown: number }

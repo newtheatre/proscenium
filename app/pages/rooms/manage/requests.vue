@@ -87,8 +87,11 @@ watch(error, (raised) => {
   if (raised) failure.value = refusalText(raised)
 })
 
+// The sidebar counts this queue, so every decision moves it too (A-130 criterion 11, issue 1358).
+const nav = useNavCounts()
+
 async function reload(): Promise<void> {
-  await refresh()
+  await Promise.all([refresh(), nav.refresh()])
   selected.value = selected.value.filter(id => listing.value.items.some(item => item.id === id))
 }
 

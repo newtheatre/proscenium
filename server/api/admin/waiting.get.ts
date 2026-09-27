@@ -3,6 +3,8 @@
 export default defineEventHandler(async (event) => {
   const resolved = await authority(event)
   await requireSecondFactorIfPrivileged(event, resolved)
-  const leads = !resolved.permissions.has('training.read') && (await liveLeads(resolved.account.id)).length > 0
-  return { counts: await waitingCounts(resolved.permissions, resolved.account.id, leads) }
+  // The demand board's own scope, so the count and the board it opens on agree (G-110).
+  const leadOf = scopeToLeadOf(resolved)
+  const leads = leadOf !== undefined && (await liveLeads(leadOf)).length > 0
+  return { counts: await waitingCounts(resolved.permissions, leadOf, leads) }
 })

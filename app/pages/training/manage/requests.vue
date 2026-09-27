@@ -26,6 +26,9 @@ const { data, status, error, refresh } = await useAsyncData(
   { default: () => ({ items: [] as Demand[] }) },
 )
 
+// The sidebar counts open requests, so answering one moves it too (A-130 criterion 11, issue 1358).
+const nav = useNavCounts()
+
 async function answer(): Promise<void> {
   if (!answering.value) return
   saving.value = true
@@ -43,7 +46,7 @@ async function answer(): Promise<void> {
     })
     answering.value = null
     reason.value = ''
-    await refresh()
+    await Promise.all([refresh(), nav.refresh()])
   }
   catch (caught) {
     failure.value = refusalText(caught)

@@ -581,7 +581,7 @@ export async function requireCatalogueReader(event: H3Event): Promise<CatalogueA
 }
 
 // Whose catalogue a reader may see: everybody's for an officer, their own for a lead.
-export function scopeToLeadOf(resolved: CatalogueAuthority): string | undefined {
+export function scopeToLeadOf(resolved: Authority): string | undefined {
   return resolved.permissions.has('training.read') ? undefined : resolved.account.id
 }
 

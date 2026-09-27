@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { can, viewAuditTrail, viewBackups, viewCommsOperations } from '#shared/utils/abilities'
-import { saysSetUp, setUpHref } from '#shared/utils/console-overview'
+import { queuesFor, saysSetUp, setUpHref } from '#shared/utils/console-overview'
 import { saysNotificationStatus } from '#shared/utils/notifications'
 import { currentShowNight } from '#shared/utils/show-night'
 import { NAV_COUNTS, NAV_QUEUES } from '#shared/utils/site-nav'
@@ -21,6 +21,8 @@ const { counts, failed: waitingFailed } = useNavCounts()
 const waiting = computed(() => NAV_COUNTS.flatMap(count => (counts.value[count] === undefined
   ? []
   : [{ count, ...NAV_QUEUES[count], total: counts.value[count] }])))
+// A failed read is news only to somebody who decides a queue; anybody else has no card to fail.
+const decidesAny = computed(() => queuesFor(new Set(viewer.value.permissions), viewer.value.leadsDepartment).length > 0)
 
 const { data: overview, error: overviewError } = await useAsyncData(
   'console-overview',
@@ -32,11 +34,12 @@ const overviewFailure = computed(() => (overviewError.value ? refusalText(overvi
 // A missed or failed drill stays in front of the committee until one passes (K-108 criterion 3).
 interface DrillStatus { lastDrillAt: string | null, lastDrillOutcome: 'PASS' | 'FAIL' | null, overdue: boolean }
 const seesDrill = computed(() => can(viewer.value, viewBackups))
-const { data: drill } = await useAsyncData(
+const { data: drill, error: drillError } = await useAsyncData(
   'drill-status',
   () => request<DrillStatus>('/api/admin/backups'),
   { default: (): DrillStatus | null => null, immediate: false },
 )
+const drillFailure = computed(() => (drillError.value ? refusalText(drillError.value, 'Whether a restore drill is due could not be read.') : null))
 const drillTitle = computed(() => {
   if (drill.value?.lastDrillOutcome === 'FAIL') return 'The last restore drill failed'
   return drill.value?.lastDrillAt ? 'A restore drill is overdue' : 'No restore drill has ever passed'
@@ -113,9 +116,16 @@ onMounted(() => {
       description="Restore a backup into a scratch copy and record the drill. This stays here until one passes."
       :actions="[{ label: 'Open backups', color: 'warning', variant: 'outline', to: '/admin/backups' }]"
     />
+    <UAlert
+      v-else-if="seesDrill && drillFailure"
+      data-test="drill-failed"
+      color="error"
+      variant="subtle"
+      :description="drillFailure"
+    />
 
     <UPageCard
-      v-if="waiting.length > 0 || waitingFailed"
+      v-if="waiting.length > 0 || (waitingFailed && decidesAny)"
       title="Waiting for you"
       description="Every queue you decide, with how many are in it now."
       data-test="waiting-for-you"
