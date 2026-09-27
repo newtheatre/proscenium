@@ -55,6 +55,37 @@ export function orderMyTiles(summary: MySummary): MyTileName[] {
   return [...timely, ...MY_TILES.filter(name => !soon.has(name))]
 }
 
+// A tile with nothing behind it. Membership always says where it stands, and a shift tile with no
+// shift still leads to tonight while the member is on shift at a bar opening.
+function tileIsEmpty(summary: MySummary, name: MyTileName): boolean {
+  if (name === 'shift') return !summary.shift && !summary.onShiftTonight
+  if (name === 'room') return !summary.room
+  if (name === 'training') return summary.training.held === 0 && summary.training.available === 0 && !summary.training.nextStep
+  if (name === 'passes') return summary.passes.active.length === 0 && !summary.passes.request
+  if (name === 'notifications') return summary.notifications.length === 0
+  if (name === 'show') return !summary.nextShow
+  return false
+}
+
+// The tiles with something behind them, soonest first, and the rest as one list in the standing
+// order (K-127 criterion 6, issue 1153 item 3).
+export function splitMyTiles(summary: MySummary): { tiles: MyTileName[], things: MyTileName[] } {
+  return {
+    tiles: orderMyTiles(summary).filter(name => !tileIsEmpty(summary, name)),
+    things: MY_TILES.filter(name => tileIsEmpty(summary, name)),
+  }
+}
+
+// A line on the list: what would be there, and the one action that fills it.
+export const MY_THINGS_TO_DO: Record<Exclude<MyTileName, 'membership'>, { says: string, label: string, to: string }> = {
+  shift: { says: 'You have no shift claimed.', label: 'See open shifts', to: '/rota' },
+  room: { says: 'You have no room booked.', label: 'Book a room', to: '/rooms' },
+  training: { says: 'You have no training recorded yet.', label: 'See what we teach', to: '/training/modules' },
+  passes: { says: 'You hold no pass.', label: 'See passes', to: '/account/passes' },
+  notifications: { says: 'Nothing new has come in.', label: 'Choose what we email you about', to: '/account/notifications' },
+  show: { says: 'Nothing is on sale yet.', label: 'See what\'s on', to: '/whats-on' },
+}
+
 // What the overview says about the reader's membership: a sentence, not a fragment hung off their
 // name (copy-style, K-127 criterion 6).
 export function saysMembershipSentence(membership: MySummary['membership']): string {

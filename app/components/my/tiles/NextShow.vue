@@ -11,11 +11,8 @@ const sayDay = (at: number): string => saysDay(at)
 <template>
   <MyTile
     title="Next show on sale"
-    :to="summary.nextShow ? `/shows/${summary.nextShow.slug}` : '/whats-on'"
-    label="What's on"
-    :empty="!summary.nextShow"
-    empty-title="Nothing on sale yet"
-    empty-label="What's on"
+    :to="`/shows/${summary.nextShow?.slug}`"
+    label="See the show"
     class="lg:col-span-2"
   >
     <p class="font-semibold">

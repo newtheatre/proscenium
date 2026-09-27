@@ -3,7 +3,7 @@ title: My NNT
 description: What a signed-in member can do for themselves, and what a visitor can do without signing in at all.
 module: Identity
 audience: member
-updatedOn: 2026-09-26
+updatedOn: 2026-09-27
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -21,15 +21,18 @@ show tonight and Bar tab if you keep one. On a phone the same list is in the hea
 bookings is reached from Rooms, and Training sessions from Training. Access requirements is one of
 your account settings. The help icon at the top right of each screen opens its page here.
 
-![My NNT on a phone, with the next shift tile (1), the membership tile (2) and the training tile (3)](/images/docs/members/my.png)
+![My NNT on a phone, with the membership tile (1), the training tile (2) and Things you can do (3)](/images/docs/members/my.png)
 
-1. **Next shift** shows the shift the member holds next, its role in words, and whether it is
-   **Confirmed**, **Declined** or **Claimed, waiting to be confirmed**, or a link to the open
-   shifts. While the member is on shift the tile links to Tonight, and says **On shift tonight**
-   when the shift it shows is tonight's; on shift at a bar opening with no performance shift, it
-   reads **On shift at the bar tonight**.
-2. **Membership** says whether the membership is current, in grace or lapsed.
-3. **Training** counts what the member holds and names what they could do next.
+1. **Membership** says whether the membership is current, in grace or lapsed.
+2. **Training** counts what the member holds and names what they could do next.
+3. **Things you can do** is one line for each tile with nothing behind it, each saying what would
+   be there, with the whole line a link to the one thing that fills it.
+
+The whole of each tile is its link. **Next shift**, once the member holds one, shows its role in
+words and whether it is **Confirmed**, **Declined** or **Claimed, waiting to be confirmed**.
+While the member is on shift the tile links to Tonight, and says **On shift tonight** when the
+shift it shows is tonight's; on shift at a bar opening with no performance shift, it reads **On
+shift at the bar tonight**.
 
 ::callout{icon="i-lucide-info" color="info"}
 Nothing on any of these screens takes money. A ticket is paid for at the box office desk on the

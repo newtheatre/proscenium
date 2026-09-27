@@ -10,9 +10,6 @@ defineProps<{ summary: MySummary }>()
     title="Next room booking"
     to="/rooms/mine"
     label="See my bookings"
-    :empty="!summary.room"
-    empty-title="No room booked"
-    empty-label="Book a room"
   >
     <p class="font-semibold">
       {{ summary.room?.roomName }}

@@ -30,8 +30,7 @@ const onThisShift = computed(() => props.summary.onShiftTonight && props.summary
     :label="summary.onShiftTonight ? 'Go to tonight' : 'See my rota'"
     :highlight="summary.onShiftTonight"
     :empty="!summary.shift"
-    :empty-title="summary.onShiftTonight ? 'On shift at the bar tonight' : 'No shift claimed'"
-    :empty-label="summary.onShiftTonight ? 'Go to tonight' : 'See open shifts'"
+    empty-title="On shift at the bar tonight"
     class="lg:col-span-2 sm:col-span-2"
   >
     <p
