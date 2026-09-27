@@ -34,16 +34,13 @@ function entriesUrl(filters: EntriesFilters = {}): string {
 
 const UButton = resolveComponent('UButton')
 
-// The total row is the summary's own figure, the ledger's sum over the same lines (0004). A footer
-// cell takes the header's class, so the figures' columns right-align both.
-const RIGHT_FOOTED = { class: { th: 'text-right', td: RIGHT_ALIGNED.class.td } }
-
 const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
   { id: 'source', header: 'Source', footer: 'Total', cell: ({ row }) => saysEntrySource(row.original.source) },
   {
     id: 'amount',
     header: 'Amount',
-    meta: RIGHT_FOOTED,
+    meta: RIGHT_ALIGNED,
+    // The total row is the summary's own figure, the ledger's sum over the same lines (0004).
     footer: () => h('span', { 'class': 'font-mono', 'data-test': 'revenue-total' }, saysMoney(data.value?.revenueTotalPence ?? 0)),
     cell: ({ row }) => saysMoney(row.original.totalPence),
   },
@@ -51,8 +48,7 @@ const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
     ? [{
         id: 'act',
         header: ACTIONS_HEADER,
-        // The footer's button sits in a th, so it takes the cells' face and alignment too.
-        meta: { class: { th: RIGHT_ALIGNED.class.td, td: RIGHT_ALIGNED.class.td } },
+        meta: ACTIONS_COLUMN,
         footer: () => h(UButton, { size: 'sm', variant: 'subtle', to: entriesUrl({ tender: 'CARD' }) }, () => 'Entries'),
         cell: ({ row }: { row: { original: RevenueBySource } }) => h(UButton, {
           size: 'sm',
