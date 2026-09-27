@@ -65,6 +65,7 @@ interface ListedVariant {
     choiceGroupId: string | null
     choiceGroupName: string | null
     includedInPrice: boolean
+    choiceOptional: boolean
   }[]
 }
 
@@ -524,6 +525,22 @@ describe.skipIf(skip !== null)('a variant attaches at most one choice group, wit
 
     const line = (await variants(productId)).find(variant => variant.id === id)?.components.find(component => component.choiceGroupId === groupId)
     expect(line?.includedInPrice).toBe(true)
+    expect(line?.choiceOptional).toBe(false)
+  })
+
+  // Issue 1314: a spirit may be served neat, so this size's mixer may be answered with none.
+  test('a choice attached as optional says so, and attaching it again without the flag clears it', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId, { servingKind: 'double', label: 'Double' })
+    const itemId = await anItem({ name: named('Tonic') })
+    const groupId = await addChoiceGroup([{ itemId, qty: 200 }])
+    const choiceOf = async () => (await variants(productId)).find(variant => variant.id === id)?.components.find(component => component.choiceGroupId === groupId)
+
+    expect((await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true, optional: true })).status).toBe(200)
+    expect((await choiceOf())?.choiceOptional).toBe(true)
+
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true })
+    expect((await choiceOf())?.choiceOptional).toBe(false)
   })
 
   test('attaching a second group replaces the first rather than adding to it', async () => {

@@ -355,6 +355,19 @@ describe('the same read carries each option of a choice (F-128 criterion 9)', ()
     })
   })
 
+  // Issue 1314: a size that may be served neat is held only to what it always pours, so an empty
+  // mixer shelf never takes the neat serve off the till.
+  test('an optional choice does not hold the size to its options', async () => {
+    await withDatabase((database) => {
+      withSoda(database)
+      database.batch([['UPDATE variant_components SET choice_optional = 1 WHERE id = ?', 'c-3']])
+      delivery(database, 'item-gin', 700)
+      const till = tillRead(database)
+      expect(till.sizes.get('var-double')).toBe(14)
+      expect(till.options.get('var-double')?.get('gi-1')).toBe(0)
+    })
+  })
+
   // 0006 from the second direction again: the options widen the read without binding anything.
   test('the read still binds no parameter, however many options there are', async () => {
     await withDatabase((database) => {

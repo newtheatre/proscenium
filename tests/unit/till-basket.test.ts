@@ -128,6 +128,44 @@ describe('tapping a variant twice merges into one line, up to the cap (F-103 cri
   })
 })
 
+// Issue 1314: a spirit served neat is rung up as poured, not with a mixer nobody poured.
+describe('an optional choice may be answered with none (F-112 criteria 2, 3)', () => {
+  const mixer = { id: 'choice-1', name: 'Mixer', options: [{ id: 'opt-1', itemName: 'Tonic' }] }
+
+  test('answering none on an optional choice adds the size with no choice, and closes the picker', () => {
+    const { basket, scope } = setup()
+    const neatable = aVariant({ choice: { ...mixer, optional: true } })
+    basket.tapVariant('Gin', neatable)
+    basket.chooseOption(null, null)
+    expect(basket.basket.value).toHaveLength(1)
+    expect(basket.basket.value[0]).toMatchObject({ choiceItemId: null, choiceItemName: null })
+    expect(basket.choosing.value).toBeNull()
+    scope.stop()
+  })
+
+  test('two neat pours merge, and stay apart from one with a mixer', () => {
+    const { basket, scope } = setup()
+    const neatable = aVariant({ choice: { ...mixer, optional: true } })
+    basket.tapVariant('Gin', neatable)
+    basket.chooseOption(null, null)
+    basket.tapVariant('Gin', neatable)
+    basket.chooseOption(null, null)
+    basket.tapVariant('Gin', neatable)
+    basket.chooseOption('opt-1', 'Tonic')
+    expect(basket.basket.value.map(line => [line.choiceItemName, line.qty])).toEqual([[null, 2], ['Tonic', 1]])
+    scope.stop()
+  })
+
+  test('a choice that is not optional takes no answer of none', () => {
+    const { basket, scope } = setup()
+    basket.tapVariant('Gin', aVariant({ choice: mixer }))
+    basket.chooseOption(null, null)
+    expect(basket.basket.value).toHaveLength(0)
+    expect(basket.choosing.value?.choice.name).toBe('Mixer')
+    scope.stop()
+  })
+})
+
 describe('what a tap on a tile does depends on the product\'s sizes (F-103 criterion 1, 0083)', () => {
   test('one size with no choice adds to the basket at once', () => {
     const { basket, scope } = setup()

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
+import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, saysNoChoice, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
 import type { SaleProduct } from '#shared/utils/sale'
 
 const aLine = { variantId: 'var-1', qty: 1 }
@@ -223,5 +223,13 @@ describe('a restricted line is named as poured (F-106 criteria 3, 6)', () => {
       { productName: 'Cola', choiceItemName: 'Rum' },
       { productName: 'Gin', choiceItemName: null },
     ])).toEqual(['Cola with Rum', 'Gin'])
+  })
+})
+
+// Issue 1314: the answer that pours no choice is named after the choice it declines.
+describe('an optional choice\'s answer of none (F-112 criterion 2)', () => {
+  test('it reads as no mixer, in the choice\'s own words', () => {
+    expect(saysNoChoice({ name: 'Mixer' })).toBe('No mixer')
+    expect(saysNoChoice({ name: 'Mixers' })).toBe('No mixers')
   })
 })
