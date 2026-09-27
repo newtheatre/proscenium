@@ -1094,9 +1094,9 @@ record of the role's gating module as of London's today, so two simultaneous cla
 exactly one winner, a double booking is refused the same way, and a record revoked or lapsing
 between the route's live eligibility check and the write admits nobody (criteria 1 to 3, issue
 1302). None of the predicates is a read followed by a write. The route still runs the live check
-first, for its wording and for what the write does not read (a gating module that is unset or
-unpublished); when the write matches nothing on a shift still `OPEN`, it runs that check again to
-say which refusal applies. The `status` written, `CLAIMED` or `CONFIRMED`, comes from
+first, so a member it refuses gets the qualify wording before any write; when the write matches
+nothing on a shift still `OPEN`, it runs that check again to say which refusal applies. The
+`status` written, `CLAIMED` or `CONFIRMED`, comes from
 `SHIFT_CLAIM_AUTO_CONFIRM` (E-105 criterion 1), read fresh on every claim, never cached.
 
 Winner or loser is read from the write's own `RETURNING`, never by comparing the caller against a

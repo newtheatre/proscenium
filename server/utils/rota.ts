@@ -539,11 +539,11 @@ export interface ClaimScope { table: string, event: string }
 export const SHIFT_CLAIM_SCOPE: ClaimScope = { table: 'shifts', event: 'performance_id' }
 
 // The role's gating module and London's today, as the live check read them (E-104 criterion 1).
-export interface ApprovalGate { moduleId: string | null, today: string }
+export interface TrainingGate { moduleId: string | null, today: string }
 
 // `heldNow` repeated, not imported: training.ts leans on ambient imports Bun cannot typecheck, so
 // change both together. An unset rule holds for nobody, as it lets nobody claim (E-103 criterion 4).
-export function holdsGate(gate: ApprovalGate, userId: SQL): SQL {
+export function holdsGate(gate: TrainingGate, userId: string | SQL): SQL {
   if (gate.moduleId === null) return sql`0`
   return sql`EXISTS (
     SELECT 1 FROM training_records gate_record
@@ -555,7 +555,7 @@ export function holdsGate(gate: ApprovalGate, userId: SQL): SQL {
 
 // Availability, one-slot-per-event and the training gate all ride the UPDATE, so two claims resolve
 // to one winner and a record lapsing after the live check admits nobody (E-104, #1302).
-export function claimSlotStatement(scope: ClaimScope, slotId: string, userId: string, status: ShiftStatus, gate: ApprovalGate): SQL {
+export function claimSlotStatement(scope: ClaimScope, slotId: string, userId: string, status: ShiftStatus, gate: TrainingGate): SQL {
   const table = sql.raw(scope.table)
   const event = sql.raw(scope.event)
   return sql`
@@ -570,25 +570,21 @@ export function claimSlotStatement(scope: ClaimScope, slotId: string, userId: st
           AND other.user_id = ${userId}
           AND other.status IN ('CLAIMED', 'CONFIRMED')
       )
-      AND ${holdsGate(gate, sql`${userId}`)}
+      AND ${holdsGate(gate, userId)}
     RETURNING id
   `
 }
 
-export function claimShiftStatement(shiftId: string, userId: string, status: ShiftStatus, gate: ApprovalGate): SQL {
+export function claimShiftStatement(shiftId: string, userId: string, status: ShiftStatus, gate: TrainingGate): SQL {
   return claimSlotStatement(SHIFT_CLAIM_SCOPE, shiftId, userId, status, gate)
-}
-
-function claimantHoldsGate(gate: ApprovalGate): SQL {
-  return holdsGate(gate, sql`target.user_id`)
 }
 
 // Answering a queued claim, under whichever table holds it. The status settles two officers at
 // once and the gate rides the same write, so a lapsed claimant is never confirmed (E-105, 0003).
-export function approveSlotStatement(scope: ClaimScope, slotId: string, gate: ApprovalGate): SQL {
+export function approveSlotStatement(scope: ClaimScope, slotId: string, gate: TrainingGate): SQL {
   return sql`
     UPDATE ${sql.raw(scope.table)} AS target SET status = 'CONFIRMED', confirmed_at = unixepoch()
-    WHERE target.id = ${slotId} AND target.status = 'CLAIMED' AND ${claimantHoldsGate(gate)}
+    WHERE target.id = ${slotId} AND target.status = 'CLAIMED' AND ${holdsGate(gate, sql`target.user_id`)}
     RETURNING id
   `
 }
@@ -604,7 +600,7 @@ export function declineSlotStatement(scope: ClaimScope, slotId: string, reason: 
 }
 
 // Answering a queued claim (E-105 criteria 2 and 3).
-export function approveShiftStatement(shiftId: string, gate: ApprovalGate): SQL {
+export function approveShiftStatement(shiftId: string, gate: TrainingGate): SQL {
   return approveSlotStatement(SHIFT_CLAIM_SCOPE, shiftId, gate)
 }
 
@@ -636,7 +632,7 @@ export function dismissShiftStatement(shiftId: string, userId: string): SQL {
 
 // An officer's assignment, onto an open shift or over an existing holder: confirmed by definition,
 // one UPDATE on the row that already exists, the member's training gate on it (criteria 3, 4, #1302).
-export function assignShiftStatement(shiftId: string, userId: string, actorId: string, gate: ApprovalGate): SQL {
+export function assignShiftStatement(shiftId: string, userId: string, actorId: string, gate: TrainingGate): SQL {
   return sql`
     UPDATE shifts AS target
     SET user_id = ${userId}, status = 'CONFIRMED', assigned_by = ${actorId},
@@ -650,7 +646,7 @@ export function assignShiftStatement(shiftId: string, userId: string, actorId: s
           AND other.user_id = ${userId}
           AND other.status IN ('CLAIMED', 'CONFIRMED')
       )
-      AND ${holdsGate(gate, sql`${userId}`)}
+      AND ${holdsGate(gate, userId)}
     RETURNING id
   `
 }
