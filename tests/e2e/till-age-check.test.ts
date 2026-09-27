@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, query, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
@@ -380,6 +380,13 @@ describe.skipIf(skip !== null)('Check ID follows what a line pours, whatever the
     const refused = await charge(venueId, [{ variantId, qty: 1, choiceItemId: optionFor(rum) }], 400, null)
     expect(refused.status).toBe(409)
     expect(await message(refused)).toContain('Challenge 25')
+
+    // The register names what was poured, so the rum is on the record, not the product alone.
+    const sold = await charge(venueId, [{ variantId, qty: 1, choiceItemId: optionFor(rum) }], 400, { outcome: 'ACCEPTED', idType: 'PASSPORT', description: 'Checked at the bar' })
+    expect(sold.status).toBe(200)
+    const { ageCheck } = await sold.json() as { ageCheck: { id: string } }
+    const logged = query<{ product: string }>(app, 'SELECT product FROM age_checks WHERE id = ?', ageCheck.id)
+    expect(logged?.product).toContain(`with ${rum.name}`)
   })
 
   test('an item switched to restricted after set-up asks from the next sale on', async () => {

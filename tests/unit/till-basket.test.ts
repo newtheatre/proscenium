@@ -527,8 +527,26 @@ describe('Check ID follows what the line pours, not the product switch alone (is
 
     basket.tapVariant('Cola', glass)
     basket.chooseOption('o-rum', 'Rum')
-    expect(basket.askingAgeCheckFor.value).toBe('Cola')
+    // Named as poured, so whoever asks for ID knows the rum is why (review of #1401).
+    expect(basket.askingAgeCheckFor.value).toBe('Cola with Rum')
     expect(basket.needsAgeCheck.value).toBe(true)
+    scope.stop()
+  })
+
+  test('a refusal names the line as poured, on the screen and in the register', async () => {
+    const glass = aVariant({
+      id: 'variant-glass',
+      label: 'Glass',
+      ageRestricted: false,
+      choice: { id: 'g-1', name: 'Mixer', options: [{ id: 'o-rum', itemName: 'Rum', ageRestricted: true }] },
+    })
+    const register = recorder()
+    const { basket, scope } = setup([aProduct({ id: 'p-cola', name: 'Cola', ageRestricted: true, variants: [glass] })], { recordAgeCheck: register.record })
+    basket.tapVariant('Cola', glass)
+    basket.chooseOption('o-rum', 'Rum')
+    await basket.refuseAgeCheck({ outcome: 'REFUSED', idType: null, reason: 'NO_ID_SHOWN', description: 'Declined to show ID', notes: null })
+    expect(basket.refusedLinesNote.value).toBe('ID refused. Not sold: Cola with Rum')
+    expect(register.recorded[0]?.product).toBe('Cola with Rum')
     scope.stop()
   })
 })
