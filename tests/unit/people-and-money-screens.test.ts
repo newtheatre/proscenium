@@ -12,6 +12,7 @@ const SHOWS = 'app/pages/money/shows.vue'
 const REPORTS = 'app/pages/money/reports.vue'
 const BAR_REPORTS = 'app/pages/bar/reports.vue'
 const TILL_CLOSE = 'app/components/till/CloseModal.vue'
+const FINANCE_PERIOD_FORM = 'app/composables/useFinancePeriodForm.ts'
 const RECONCILIATION = 'app/pages/money/reconciliation.vue'
 const PERIOD_FORM = 'app/composables/usePeriodForm.ts'
 const PERIOD_FIELDS = 'app/components/PeriodFields.vue'
@@ -26,13 +27,14 @@ describe('money screens read in words', () => {
     const source = await read(MONEY)
     expect(source).toContain('saysEntrySource(')
     expect(source).not.toMatch(/\{\{\s*data\.fromDay\s*\}\}/)
-    expect(source).not.toMatch(/=>\s*row\.original\.source\b(?!\s*as)/)
+    expect(source).not.toMatch(/=>\s*row\.original\.source\b/)
   })
 
   test('the reconciliation sheet is headed for what it holds, and the Z is called one on both screens', async () => {
     const source = await read(RECONCILIATION)
     expect(source).not.toContain('Desk, by kind')
     expect(source).toContain('label="Reader total (Z)"')
+    expect(source).not.toContain('reader figure')
     expect(await read(TILL_CLOSE)).toContain('label="Reader total (Z)"')
   })
 })
@@ -182,8 +184,11 @@ describe('the period controls ask the question themselves (I-105 criterion 6)', 
   test('revenue by show offers every period, the season included, through the shared controls', async () => {
     const source = await read(SHOWS)
     expect(source).toContain('<PeriodFields')
-    expect(source).toContain('/api/admin/finance/seasons')
+    expect(source).toContain('useFinancePeriodForm(')
     expect(source).not.toContain('yearChoices(')
+    // One loader for the finance screens' terms and seasons, so the two cannot drift apart.
+    expect(await read(MONEY)).toContain('useFinancePeriodForm(')
+    expect(await read(FINANCE_PERIOD_FORM)).toContain('/api/admin/finance/seasons')
   })
 
   // Issue 1362 (I-105 criterion 6, F-119): bar reports opens on tonight and asks the question itself.
@@ -192,6 +197,8 @@ describe('the period controls ask the question themselves (I-105 criterion 6)', 
     expect(source).not.toContain('Refresh')
     expect(source).toMatch(/ref<[^>]*>\('NIGHT'\)/)
     expect(source).toContain('currentShowNight()')
+    // Tonight keeps growing, so the report reads again whenever the screen is come back to.
+    expect(source).toContain('visibilitychange')
   })
 
   test('no money screen leaves a number spinner on a period control', async () => {
