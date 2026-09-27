@@ -1329,8 +1329,9 @@ column: every slot on a bar opening is a bar slot. Creating an opening stamps on
 of the venue template's `BAR` count in the same batch, and a venue with no bar row stamps
 nothing and is told so rather than given a slot the theatre never asked for. Claims run through
 `claimSlotStatement()`, the rota's own conditional write parameterised by table, so two
-simultaneous claims settle to one winner and one member holds one slot on an opening (E-104,
-0003). Cancelling an opening cancels its slots in the same batch, keeping whoever held one.
+simultaneous claims settle to one winner, one member holds one slot on an opening, and the bar's
+training gate rides the write (E-104, 0003, issue 1302); an officer's assignment onto a slot
+carries the same gate. Cancelling an opening cancels its slots in the same batch, keeping whoever held one.
 A holder's own release (`releaseOpeningShiftStatement()`) applies only while the opening's
 `night` is later than the current show night, the predicate riding the `UPDATE`, so a slot is
 given back up to 04:00 on its day and not after, as a shift is (E-107 criterion 1, 0014).

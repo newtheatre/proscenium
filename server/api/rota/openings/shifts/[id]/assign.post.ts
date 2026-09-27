@@ -22,10 +22,10 @@ export default defineEventHandler(async (event) => {
 
   // The same live gate self-claiming rides: an officer's assignment does not admit somebody a
   // training gap would otherwise refuse (E-107 criterion 3).
-  const eligibilities = await shiftEligibilities(event, userId, londonToday())
-  if (!eligibilities.BAR.eligible) {
-    throw createError({ statusCode: 403, statusMessage: 'That member does not currently qualify for a bar shift' })
-  }
+  const today = londonToday()
+  const refusedTraining = createError({ statusCode: 403, statusMessage: 'That member does not currently qualify for a bar shift' })
+  if (!(await shiftEligibilities(event, userId, today)).BAR.eligible) throw refusedTraining
+  const gate = { moduleId: (await shiftRoleRules(event)).BAR, today }
 
   const entry = auditEntry({
     actorId: resolved.account.id,
@@ -35,10 +35,12 @@ export default defineEventHandler(async (event) => {
   })
 
   const applied = await withOpeningConstraints(() =>
-    auditedWrite(db.all<{ id: string }>(assignOpeningShiftStatement(id, userId, resolved.account.id)), entry))
+    auditedWrite(db.all<{ id: string }>(assignOpeningShiftStatement(id, userId, resolved.account.id, gate)), entry))
 
   if (!applied) {
     const now = await openingShiftDetail(id)
+    // The gate on the write refused a record that lapsed after the check above (#1302).
+    if (now && now.status !== 'CANCELLED' && !(await shiftEligibilities(event, userId, today)).BAR.eligible) throw refusedTraining
     throw createError({ statusCode: 409, statusMessage: openingReassignRefusal(now?.status ?? held.status) })
   }
 

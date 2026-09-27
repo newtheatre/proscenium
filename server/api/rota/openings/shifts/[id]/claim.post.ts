@@ -13,10 +13,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'This opening has been cancelled' })
   }
 
-  const eligibilities = await shiftEligibilities(event, account.id, londonToday())
-  if (!eligibilities.BAR.eligible) {
-    throw createError({ statusCode: 403, statusMessage: 'You do not currently qualify for a bar shift' })
-  }
+  const today = londonToday()
+  const refusedTraining = createError({ statusCode: 403, statusMessage: 'You do not currently qualify for a bar shift' })
+  if (!(await shiftEligibilities(event, account.id, today)).BAR.eligible) throw refusedTraining
+  // The same gate rides the write, so a record lapsing after this check admits nobody (#1302).
+  const gate = { moduleId: (await shiftRoleRules(event)).BAR, today }
 
   const autoConfirm = await configValue(event, 'SHIFT_CLAIM_AUTO_CONFIRM')
   const status = autoConfirm ? 'CONFIRMED' : 'CLAIMED'
@@ -29,11 +30,12 @@ export default defineEventHandler(async (event) => {
   })
 
   const applied = await withOpeningConstraints(() =>
-    auditedWrite(db.all<{ id: string }>(claimOpeningShiftStatement(id, account.id, status)), entry))
+    auditedWrite(db.all<{ id: string }>(claimOpeningShiftStatement(id, account.id, status, gate)), entry))
 
   if (!applied) {
     const now = await openingShiftDetail(id)
     if (!now) throw noSuch('bar opening slot')
+    if (now.status === 'OPEN' && !(await shiftEligibilities(event, account.id, today)).BAR.eligible) throw refusedTraining
     throw createError({ statusCode: 409, statusMessage: openingClaimRefusal(now.status) })
   }
 

@@ -18,13 +18,14 @@ export default defineEventHandler(async (event) => {
 
   // The same live gate self-claiming rides: an officer's assignment does not admit somebody a
   // training gap would otherwise refuse (E-107 criterion 3).
-  const eligibilities = await shiftEligibilities(event, userId, londonToday())
-  if (!eligibilities[held.role].eligible) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: `That member does not currently qualify for a ${saysShiftRole(held.role).toLowerCase()} shift`,
-    })
-  }
+  const today = londonToday()
+  const refusedTraining = createError({
+    statusCode: 403,
+    statusMessage: `That member does not currently qualify for a ${saysShiftRole(held.role).toLowerCase()} shift`,
+  })
+  const eligibilities = await shiftEligibilities(event, userId, today)
+  if (!eligibilities[held.role].eligible) throw refusedTraining
+  const gate = { moduleId: (await shiftRoleRules(event))[held.role], today }
 
   const entry = auditEntry({
     actorId: resolved.account.id,
@@ -35,10 +36,12 @@ export default defineEventHandler(async (event) => {
 
   // One UPDATE on the row that already exists, so replacing a duty manager never puts a second
   // CONFIRMED row on the performance for the index to arbitrate (E-107 criterion 4).
-  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(assignShiftStatement(id, userId, resolved.account.id)), entry))
+  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(assignShiftStatement(id, userId, resolved.account.id, gate)), entry))
 
   if (!applied) {
     const now = await shiftDetail(id)
+    // The gate on the write refused a record that lapsed after the check above (#1302).
+    if (now && now.status !== 'CANCELLED' && !(await shiftEligibilities(event, userId, today))[held.role].eligible) throw refusedTraining
     throw createError({ statusCode: 409, statusMessage: reassignRefusal(now?.status ?? held.status) })
   }
 

@@ -497,11 +497,20 @@ describe('the duty manager\'s answer at the claim (issue 1310)', () => {
     database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, 1, ?)', id, performanceId, 'DUTY_MANAGER', 'OPEN']])
   }
 
+  // The duty manager's gate, held by every claimant here, so a claim is refused only over the shift.
+  const DM_GATE = { moduleId: 'ADMN-201', today: '2026-10-12' }
+
   // The claim, its conditional audit row and the answer, batched as the route batches them.
   function claim(database: TestDatabase, shiftId: string, userId: string, visible: boolean): void {
     const auditId = `audit-${crypto.randomUUID()}`
     database.batch([
-      boundStatement(database, claimShiftStatement(shiftId, userId, 'CONFIRMED')),
+      ['INSERT OR IGNORE INTO departments (code, name) VALUES (?, ?)', 'ADMN', 'Administration'],
+      ['INSERT OR IGNORE INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'ADMN-201', 'ADMN', 'MODULE', 'Committee operations'],
+      [`INSERT OR IGNORE INTO training_records (id, user_id, module_id, awarded_on, source) VALUES (?, ?, 'ADMN-201', '2025-09-01', 'SIGNOFF')`,
+        `tr-dm-${userId}`, userId],
+    ])
+    database.batch([
+      boundStatement(database, claimShiftStatement(shiftId, userId, 'CONFIRMED', DM_GATE)),
       [`INSERT INTO audit_log (id, actor_id, action, target, detail) SELECT ?, ?, 'shift.claimed', ?, '{}' WHERE changes() = 1`,
         auditId, userId, `shift:${shiftId}`],
       boundStatement(database, shareNumberStatement(auditId, userId, visible)),

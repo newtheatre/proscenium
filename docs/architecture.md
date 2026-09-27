@@ -1086,12 +1086,17 @@ nothing; the performances there are staffed through the ad hoc add (E-101 criter
 
 ### Claiming, confirming and declining (E-104, E-105)
 
-`claimShiftStatement(shiftId, userId, status)` is the whole of E-104's race safety: the UPDATE's
-own WHERE clause asserts both that the shift is still `OPEN` and, by a correlated `NOT EXISTS`
-against the shift's own `performance_id`, that this member holds no other claimed or confirmed
-shift on that performance, so two simultaneous claims settle to exactly one winner and a double
-booking is refused the same way (criteria 1 to 3). Neither predicate is a read followed by a
-write. The `status` written, `CLAIMED` or `CONFIRMED`, comes from
+`claimShiftStatement(shiftId, userId, status, gate)` is the whole of E-104's race safety: the
+UPDATE's own WHERE clause asserts that the shift is still `OPEN`, by a correlated `NOT EXISTS`
+against the shift's own `performance_id` that this member holds no other claimed or confirmed
+shift on that performance, and by `holdsGate` that the member holds an unrevoked, unexpired
+record of the role's gating module as of London's today, so two simultaneous claims settle to
+exactly one winner, a double booking is refused the same way, and a record revoked or lapsing
+between the route's live eligibility check and the write admits nobody (criteria 1 to 3, issue
+1302). None of the predicates is a read followed by a write. The route still runs the live check
+first, for its wording and for what the write does not read (a gating module that is unset or
+unpublished); when the write matches nothing on a shift still `OPEN`, it runs that check again to
+say which refusal applies. The `status` written, `CLAIMED` or `CONFIRMED`, comes from
 `SHIFT_CLAIM_AUTO_CONFIRM` (E-105 criterion 1), read fresh on every claim, never cached.
 
 Winner or loser is read from the write's own `RETURNING`, never by comparing the caller against a
@@ -1149,7 +1154,8 @@ atomic for free: the partial unique index that allows only one `CONFIRMED` `DUTY
 performance never sees a second row appear, because there was never a second row to begin with
 (E-107 criterion 4). The predicate is the same `NOT EXISTS` claiming uses, so a member cannot be
 assigned onto a second shift on a performance they already hold one on; the assignment re-checks
-the same live eligibility gate self-claiming does, and refuses the same way a self-claim would.
+the same live eligibility gate self-claiming does, carries the same `holdsGate` predicate on its
+own UPDATE (issue 1302), and refuses the same way a self-claim would.
 A disabled account is refused before either check runs: a training gap and a disabled account are
 different reasons, and the route names the one that actually applies (0009). Both the outgoing and
 the incoming holder are emailed (`shift.removed`, `shift.assigned`), and
