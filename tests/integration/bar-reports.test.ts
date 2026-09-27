@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { compsCountQuery, compsQuery, gpDepletionQuery, gpRevenueQuery, varianceCountQuery, varianceQuery, wastageQuery } from '#server/utils/bar-reports'
+import { compsCountQuery, compsReportQuery, gpDepletionQuery, gpRevenueQuery, varianceCountQuery, varianceQuery, wastageQuery } from '#server/utils/bar-reports'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -282,7 +282,7 @@ describe('the comps section belongs to the bar (F-119 criterion 1)', () => {
       const desk = entry(database, 'e-2', INSIDE, { source: 'DESK', tender: 'COMP', compReason: 'A press ticket' })
       line(database, 'l-2', desk, 0, 2000)
 
-      const comps = read<{ entryId: string, reason: string, foregonePence: number }>(database, compsQuery(FROM_AT, TO_AT, 25, 0))
+      const comps = read<{ entryId: string, reason: string, foregonePence: number }>(database, compsReportQuery(FROM_AT, TO_AT, 25, 0))
       expect(comps.map(row => row.entryId)).toEqual(['e-1'])
       expect(comps[0]?.reason).toBe('A round on the house')
       expect(comps[0]?.foregonePence).toBe(500)
@@ -314,8 +314,8 @@ describe('an unbounded section pages rather than truncating silently (F-119 crit
 
       const [counted] = read<{ total: number }>(database, compsCountQuery(FROM_AT, TO_AT))
       expect(counted?.total).toBe(3)
-      expect(ids(read(database, compsQuery(FROM_AT, TO_AT, 2, 0)))).toEqual(['e-1', 'e-2'])
-      expect(ids(read(database, compsQuery(FROM_AT, TO_AT, 2, 2)))).toEqual(['e-3'])
+      expect(ids(read(database, compsReportQuery(FROM_AT, TO_AT, 2, 0)))).toEqual(['e-1', 'e-2'])
+      expect(ids(read(database, compsReportQuery(FROM_AT, TO_AT, 2, 2)))).toEqual(['e-3'])
     })
   })
 
@@ -325,8 +325,8 @@ describe('an unbounded section pages rather than truncating silently (F-119 crit
         line(database, `l-${n}`, entry(database, `e-${n}`, INSIDE, { tender: 'COMP', compReason: `Round ${n}` }), 0, 100)
       }
 
-      const first = ids(read(database, compsQuery(FROM_AT, TO_AT, 2, 0)))
-      const second = ids(read(database, compsQuery(FROM_AT, TO_AT, 2, 2)))
+      const first = ids(read(database, compsReportQuery(FROM_AT, TO_AT, 2, 0)))
+      const second = ids(read(database, compsReportQuery(FROM_AT, TO_AT, 2, 2)))
       expect([...first, ...second].sort()).toEqual(['e-1', 'e-2', 'e-3'])
     })
   })
