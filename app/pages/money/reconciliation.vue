@@ -258,7 +258,7 @@ function writeOff(): Promise<void> {
             <p class="text-sm text-muted">
               {{ varianceNow === 0
                 ? `We now expect ${saysMoney(current.readerPence)}, which is what the reader showed. Checking again records the same figure and closes the variance.`
-                : 'Once the missing sale or refund is in the ledger, check again: the same reader figure is recorded against what we expect then, with nothing retyped.' }}
+                : 'Once the missing sale or refund is in the ledger, check again: the same reader total is recorded against what we expect then, with nothing retyped.' }}
             </p>
             <UButton
               color="neutral"

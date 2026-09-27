@@ -2,8 +2,6 @@
 import { h } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import type { PassUtilisationRow, RevenueByShowReport, ShowRevenueRow } from '#shared/utils/revenue-by-show'
-import type { FinanceSeason } from '#shared/utils/season-dashboard'
-import type { Period } from '#shared/utils/period-locks'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Revenue by show', middleware: 'console', docs: '/docs/money/revenue-by-show' })
@@ -12,13 +10,7 @@ const request = useRequestFetch()
 
 // The money dashboard's own period controls, the season included (0087, issue 1362): it opens on
 // the year, and a treasurer comparing a season's shows picks the season.
-const periodForm = await usePeriodForm('revenue-by-show-period-choices', () => Promise.all([
-  request<{ periods: Period[] }>('/api/admin/finance/terms'),
-  request<{ seasons: FinanceSeason[] }>('/api/admin/finance/seasons'),
-]).then(([terms, seasons]) => ({
-  terms: terms.periods.map(({ id, label, fromDay, toDay }) => ({ id, label, fromDay, toDay })),
-  seasons: seasons.seasons,
-})))
+const periodForm = await useFinancePeriodForm('revenue-by-show-period-choices')
 const query = periodForm.query
 
 const { data, status, error } = await useAsyncData(

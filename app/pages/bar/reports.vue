@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h } from 'vue'
+import { h, onBeforeUnmount, onMounted } from 'vue'
 import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
 import { currentShowNight } from '#shared/utils/show-night'
@@ -58,11 +58,29 @@ const query = computed(() => {
   return base
 })
 
-const { data, status, error } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   'bar-report',
   () => request<{ report: BarReport }>('/api/admin/bar/reports', { query: query.value }).then(response => response.report),
   { watch: [query] },
 )
+
+// Tonight keeps growing, so the report reads again whenever the screen is come back to, the way
+// the member's tab does, rather than offering a button to press (I-105 criterion 6).
+function onReturnToTab(): void {
+  if (document.visibilityState === 'visible') void refresh()
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', onReturnToTab)
+  window.addEventListener('focus', onReturnToTab)
+  window.addEventListener('pageshow', onReturnToTab)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onReturnToTab)
+  window.removeEventListener('focus', onReturnToTab)
+  window.removeEventListener('pageshow', onReturnToTab)
+})
 
 const reportFailure = useListFailure(error, 'The report could not be read.')
 const loading = computed(() => status.value === 'pending')
