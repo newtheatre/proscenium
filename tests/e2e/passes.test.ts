@@ -83,8 +83,8 @@ async function onSalePassType(over: Record<string, unknown> = {}): Promise<{ id:
   expect(created.status).toBe(200)
   const { id } = await created.json() as { id: string }
 
-  // PUT replaces the price rows wholesale (no price history until D-124 snapshots what a pass
-  // paid), so the price id is only real once fetched after publish, never before it.
+  // The price id is read back after the PUT that puts the pass on sale, which keeps price points
+  // by label, so it is the id an issue sells against.
   const published = await send('PUT', `/api/admin/pass-types/${id}`, {
     name, slug: slugged(name), validFrom: now, validUntil: now + 180 * 86_400,
     prices: [{ label: 'Standard', price: 4500 }], status: 'ON_SALE', ...createOver,
@@ -388,6 +388,32 @@ describe.skipIf(skip !== null)('withdrawing on the passes page asks first (issue
     finally {
       view.close()
     }
+  }, CASE_TIMEOUT_MS)
+})
+
+// An issued pass holds its price point (RESTRICT, D-124), so the product stays editable: a rename
+// or a new price applies, and only removing the held price point is refused, by name.
+describe.skipIf(skip !== null)('a pass type with passes issued can still be edited', () => {
+  test('a rename and a price change apply; removing the held price point is refused naming it', async () => {
+    const { id: passTypeId, priceId } = await onSalePassType()
+    const buyer = await registerMember(app, 'buyer', generatePassword())
+    expect((await send('POST', '/api/box-office/desk/passes', {
+      passTypeId, passTypePriceId: priceId, userId: buyer.id, expectedTotalPence: 4500,
+    })).status).toBe(200)
+
+    const detail = await send('GET', `/api/admin/pass-types/${passTypeId}`, undefined, officer.cookie)
+    const { passType } = await detail.json() as { passType: { name: string, slug: string } }
+    const body = { name: `${passType.name} renamed`, slug: passType.slug, validFrom: now, validUntil: now + 180 * 86_400, status: 'ON_SALE' }
+
+    const edited = await send('PUT', `/api/admin/pass-types/${passTypeId}`, { ...body, prices: [{ label: 'Standard', price: 5000 }] }, officer.cookie)
+    expect(edited.status).toBe(200)
+    expect(query<{ price: number }>('SELECT price FROM pass_type_prices WHERE id = ?', priceId)?.price).toBe(5000)
+    expect(query<{ paid: number }>('SELECT price_paid AS paid FROM passes WHERE user_id = ?', buyer.id)?.paid).toBe(4500)
+
+    const refused = await send('PUT', `/api/admin/pass-types/${passTypeId}`, { ...body, prices: [{ label: 'Premium', price: 6000 }] }, officer.cookie)
+    expect(refused.status).toBe(409)
+    expect(await refused.text()).toContain('Standard is held by an issued pass')
+    expect(query<{ n: number }>('SELECT count(*) AS n FROM pass_type_prices WHERE pass_type_id = ? AND label = ?', passTypeId, 'Premium')?.n).toBe(0)
   }, CASE_TIMEOUT_MS)
 })
 
