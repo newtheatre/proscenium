@@ -94,7 +94,7 @@ describe('the tree a viewer sees (criterion 8)', () => {
 
 describe('the chrome is told, and the layout filters by it', () => {
   test('the session answer says whether the viewer holds any live role', async () => {
-    expect(await Bun.file('server/api/auth/session.get.ts').text()).toMatch(/holdsRole:\s*grants\.length > 0/)
+    expect(await Bun.file('server/utils/viewer-facts.ts').text()).toMatch(/holdsRole:\s*grants\.length > 0/)
   })
 
   test('the docs layout filters its tree and its search', async () => {
