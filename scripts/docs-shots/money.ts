@@ -59,12 +59,26 @@ export const money: Shot[] = [
   {
     name: 'money/ledger-entries',
     persona,
-    url: '/money/entries',
+    url: '/money/entries?happenedAt=after:2026-08-31&kind=any:TICKET_COLLECTION,WALK_UP,REFUND',
     marker: '[data-test="entries-table"]',
     width: CONSOLE_WIDTH,
     annotations: [
+      { selector: '[data-test="toolbar-search"]', label: 'Search' },
       { selector: '[data-test="entries-table"]', label: 'Entries' },
+      { selector: '[data-test^="open-entry-"]', label: 'Open' },
       { selector: '[data-test="entries-total"]', label: 'Count' },
+    ],
+  },
+  {
+    name: 'money/ledger-entry',
+    persona,
+    url: '/money/entries?happenedAt=after:2026-08-31&kind=any:TICKET_COLLECTION,WALK_UP,REFUND',
+    marker: '[data-test="entries-table"]',
+    width: CONSOLE_WIDTH,
+    after: `document.querySelector('[data-test^="open-entry-"]').click()`,
+    annotations: [
+      { selector: '[data-test="entry-detail"] dl', label: 'Who and how' },
+      { selector: '[data-test="entry-lines"]', label: 'Lines' },
     ],
   },
   {

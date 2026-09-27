@@ -62,13 +62,16 @@ Box Office Manager gave it on the [seasons](/docs/box-office/seasons) screen.
    figure is a query, so a sale made a moment ago is already in the next read.
 3. **Revenue by source**: what each surface took on a card, Desk, Till and so on. With
    the Treasurer, each row has an **Entries** button that opens the
-   [ledger entries](/docs/money/ledger-entries) list filtered to that source and the
-   dashboard's range.
+   [ledger entries](/docs/money/ledger-entries) list filtered to that source's card takings and
+   the dashboard's range.
 4. **Refunds**, **Forgone comps**, **Forgone discounts** and **Open variance**: the money
    handed back, the value given away rather than taken, and the sum of every night's reader
-   reading that still disagrees with the ledger and has not been written off. A night with no
-   reading has no variance to add yet, so when the period holds any, a line beneath says how many
-   the open variance leaves out, and the Treasurer's copy links to reconciling them.
+   reading that still disagrees with the ledger and has not been written off. With the
+   Treasurer, each figure is a link: the first three open the ledger entries they are made of,
+   and an open variance other than £0.00 moves to the **Needs you** list, whose nights each open
+   their [daily reconciliation](/docs/money/daily-reconciliation). A night
+   with no reading has no variance to add yet, so when the period holds any, a line beneath says
+   how many the open variance leaves out, and the Treasurer's copy links to reconciling them.
 
 The range the figures cover is printed above them, from and to, as London dates.
 

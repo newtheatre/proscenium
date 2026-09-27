@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import {
   ledgerEntriesClause,
   ledgerEntriesQuery,
+  ledgerEntryDetailQuery,
+  ledgerEntryLinesQuery,
   financeSeasonsQuery,
   openVarianceQuery,
   periodBounds,
@@ -12,6 +14,7 @@ import {
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -260,6 +263,131 @@ describe('drill-down entries, filtered by declaration and paged in SQL (K-129, c
       const compOnly = read<{ id: string }>(database, ledgerEntriesQuery(ledgerEntriesClause(entriesQuery({ tender: 'is:COMP' })), 10, 0))
       expect(compOnly.map(row => row.id)).toEqual([comp])
       expect(card).not.toBe(comp)
+    })
+  })
+})
+
+// Issue 1361: an entry says what it was, is filtered and searched by it, and opens on its detail
+// (I-101, I-105 criterion 3, K-129). Every figure is a subquery on the entry, never an id list.
+describe('an entry says what it was, and is found by it', () => {
+  const DAY = '2026-09-15'
+
+  function booked(database: TestDatabase, suffix: string, reference: string): { performanceId: string, reservationId: string } {
+    const { performanceId } = tonightsPerformance(database, { suffix, night: DAY })
+    database.batch([['INSERT INTO reservations (id, reference, performance_id, status, source) VALUES (?, ?, ?, ?, ?)',
+      `r-${suffix}`, reference, performanceId, 'COLLECTED', 'DESK']])
+    return { performanceId, reservationId: `r-${suffix}` }
+  }
+
+  function placed(database: TestDatabase, entryId: string, kind: string, amountPence: number, refs: { performanceId?: string, reservationId?: string, qty?: number, discountPence?: number, discountPercent?: number } = {}): void {
+    database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, performance_id, reservation_id, discount_pence, discount_percent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      `l-${++lineSeq}`, entryId, kind, amountPence, refs.qty ?? 1, refs.performanceId ?? null, refs.reservationId ?? null, refs.discountPence ?? 0, refs.discountPercent ?? null]])
+  }
+
+  const found = (database: TestDatabase, raw: Record<string, string> = {}): string[] =>
+    read<{ id: string }>(database, ledgerEntriesQuery(ledgerEntriesClause(entriesQuery(raw)), 25, 0)).map(row => row.id).sort()
+
+  test('a row carries its kinds, how many items, its show and its booking reference', async () => {
+    await withDatabase(async (database) => {
+      const { performanceId, reservationId } = booked(database, 'what', 'NNTREF')
+      const refund = entry(database, 'DESK', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, refund, 'REFUND', -900, { performanceId, reservationId })
+      const bar = entry(database, 'TILL', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, bar, 'BAR_ITEM', 500, { qty: 2 })
+      placed(database, bar, 'BAR_ITEM', 300)
+
+      const rowsFound = read<{ id: string, kinds: string, items: number, showTitle: string | null, reference: string | null }>(
+        database, ledgerEntriesQuery(ledgerEntriesClause(entriesQuery()), 25, 0))
+      expect(rowsFound.find(row => row.id === refund)).toMatchObject({ kinds: 'REFUND', items: 1, showTitle: 'A Test Show', reference: 'NNTREF' })
+      expect(rowsFound.find(row => row.id === bar)).toMatchObject({ kinds: 'BAR_ITEM', items: 3, showTitle: null, reference: null })
+    })
+  })
+
+  test('kind filters on what the entry was: is, is not and any of', async () => {
+    await withDatabase(async (database) => {
+      const walkUp = entry(database, 'DESK', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, walkUp, 'WALK_UP', 900)
+      const bar = entry(database, 'TILL', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, bar, 'BAR_ITEM', 400)
+      const tab = entry(database, 'TILL', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, tab, 'TAB_SETTLEMENT', 1200)
+
+      expect(found(database, { kind: 'is:BAR_ITEM' })).toEqual([bar])
+      expect(found(database, { kind: 'not:BAR_ITEM' })).toEqual([tab, walkUp].sort())
+      expect(found(database, { kind: 'any:BAR_ITEM,TAB_SETTLEMENT' })).toEqual([bar, tab].sort())
+    })
+  })
+
+  test('discounted picks the entries a discount reduced, and no picks the rest', async () => {
+    await withDatabase(async (database) => {
+      const discounted = entry(database, 'TILL', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, discounted, 'BAR_ITEM', 400, { discountPence: 100 })
+      const full = entry(database, 'TILL', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, full, 'BAR_ITEM', 500)
+
+      expect(found(database, { discounted: 'true' })).toEqual([discounted])
+      expect(found(database, { discounted: 'false' })).toEqual([full])
+    })
+  })
+
+  test('the search box finds an entry by its booking reference or its show', async () => {
+    await withDatabase(async (database) => {
+      const { performanceId, reservationId } = booked(database, 'search', 'ZX9KQ2')
+      const booking = entry(database, 'DESK', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, booking, 'REFUND', -900, { performanceId, reservationId })
+      const bar = entry(database, 'TILL', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, bar, 'BAR_ITEM', 400)
+
+      expect(found(database, { search: 'zx9kq2' })).toEqual([booking])
+      expect(found(database, { search: 'Test Show' })).toEqual([booking])
+      expect(found(database, { search: 'nothing like it' })).toEqual([])
+    })
+  })
+
+  test('an entry opens on who took it, who approved it, whose tab it was and each line', async () => {
+    await withDatabase(async (database) => {
+      for (const id of ['taker', 'approver', 'debtor']) person(database, id)
+      const { performanceId, reservationId } = booked(database, 'detail', 'DETREF')
+      const comp = entry(database, 'DESK', 'COMP', NOON_ON(DAY), DAY)
+      database.batch([
+        ['INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence, actor_id, comp_reason, comp_approved_by, tab_debtor_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'e-detail', DAY, 'TILL', 'TAB', NOON_ON(DAY), 700, 'taker', 'Cast drinks', 'approver', 'debtor'],
+      ])
+      placed(database, 'e-detail', 'BAR_ITEM', 700)
+      placed(database, comp, 'REFUND', 0, { performanceId, reservationId })
+
+      const [detail] = read<Record<string, unknown>>(database, ledgerEntryDetailQuery('e-detail'))
+      expect(detail).toMatchObject({ id: 'e-detail', takenBy: 'Someone taker', compReason: 'Cast drinks', compApprovedBy: 'Someone approver', tabDebtor: 'Someone debtor' })
+
+      const lines = read<Record<string, unknown>>(database, ledgerEntryLinesQuery(comp))
+      expect(lines).toEqual([expect.objectContaining({ kind: 'REFUND', showTitle: 'A Test Show', reference: 'DETREF' })])
+      expect(read(database, ledgerEntryDetailQuery('no-such-entry'))).toEqual([])
+    })
+  })
+
+  // The discount is snapshotted on the line, never the entry, so the panel reads it from there.
+  test('a line carries its own discount, in pence and as a percentage', async () => {
+    await withDatabase(async (database) => {
+      const bar = entry(database, 'TILL', 'CARD', NOON_ON(DAY), DAY)
+      placed(database, bar, 'BAR_ITEM', 400, { discountPence: 100, discountPercent: 20 })
+      expect(read(database, ledgerEntryLinesQuery(bar))).toEqual([expect.objectContaining({ discountPence: 100, discountPercent: 20 })])
+    })
+  })
+
+  // rowid is the order the lines were rung up; the ids are random, so they would order nothing.
+  test('an entry\'s first show and reference, and its lines, follow the order they were written', async () => {
+    await withDatabase(async (database) => {
+      const first = booked(database, 'first', 'AAAREF')
+      const second = booked(database, 'second', 'ZZZREF')
+      const refund = entry(database, 'DESK', 'CARD', NOON_ON(DAY), DAY)
+      database.batch([
+        ['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, performance_id, reservation_id) VALUES (?, ?, ?, ?, ?, ?)', 'zz-line', refund, 'REFUND', -900, second.performanceId, second.reservationId],
+        ['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, performance_id, reservation_id) VALUES (?, ?, ?, ?, ?, ?)', 'aa-line', refund, 'REFUND', -900, first.performanceId, first.reservationId],
+      ])
+
+      const [row] = read<{ reference: string }>(database, ledgerEntriesQuery(ledgerEntriesClause(entriesQuery({ search: 'ZZZREF' })), 25, 0))
+      expect(row?.reference).toBe('ZZZREF')
+      expect(read<{ id: string }>(database, ledgerEntryLinesQuery(refund)).map(line => line.id)).toEqual(['zz-line', 'aa-line'])
     })
   })
 })

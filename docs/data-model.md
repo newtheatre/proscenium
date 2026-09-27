@@ -1095,8 +1095,10 @@ a pass; `(status = 'FULFILLED') = (pass_id IS NOT NULL)` is a CHECK, not a conve
 `DESK|TILL|SELF_SERVE|IMPORT|SYSTEM` · `tender` CHECK `CARD|COMP|TAB|NONE` · `actor_id` →
 users restrict NULL (system) · `total_pence` (0 on a COMP; negative on a reversal) ·
 `reverses_entry_id` NULL self-FK (a correction points at what it corrects) · `comp_reason`
-NULL, **no CHECK** until module D decides its values (0033) · `comp_approved_by` NULL · `discount_id` NULL · `discount_percent` /
-`discount_pence` snapshots · `tab_debtor_id` NULL → users restrict · `tab_settled_at` and
+NULL, **no CHECK** until module D decides its values (0033) · `comp_approved_by` NULL · `discount_id`,
+`discount_percent` and `discount_pence`, declared but **never written**: a discount is snapshotted
+on each `ledger_lines` row it reduced (F-117), which is where every report and the entry panel read
+it · `tab_debtor_id` NULL → users restrict · `tab_settled_at` and
 `tab_settlement_entry_id`, declared but **never written**: the append-only trigger refuses an
 UPDATE outright, and a charge cannot know at insert time whether it will later be settled, so
 `ledger_lines.settles_entry_id` on the settlement's own lines is what actually answers it

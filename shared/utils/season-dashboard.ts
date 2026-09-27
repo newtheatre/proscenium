@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { EntrySource } from './ledger'
 
 // The treasurer's money dashboard (I-105): every figure a query over the ledger, never stored.
 // TERM carries its own range (I-107); SEASON names a seasons row whose days the server reads (0087).
@@ -48,7 +49,7 @@ export function periodQuery(period: PeriodInput): Record<string, string> {
   }
 }
 
-export interface RevenueBySource { source: string, totalPence: number }
+export interface RevenueBySource { source: EntrySource, totalPence: number }
 
 // Every figure derived from ledger rows (criterion 2): comps and discounts are I-103's own
 // foregone-value figure over the same range, never a second account of it.
