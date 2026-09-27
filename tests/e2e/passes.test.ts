@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -346,6 +346,48 @@ describe.skipIf(skip !== null)('a request is asked once, never for a pass held, 
     const pending = await send('GET', `/api/box-office/desk/passes/${passTypeId}/requests`)
     const { items } = await pending.json() as { items: { userId: string }[] }
     expect(items.some(item => item.userId === requester.id)).toBe(false)
+  }, CASE_TIMEOUT_MS)
+})
+
+async function signedInView(member: TestMember, password: string): Promise<Bun.WebView> {
+  const view = await openSignedOutView(app.baseURL)
+  await visit(view, `${app.baseURL}/sign-in`)
+  await fill(view, 'form input[type="email"]', member.email)
+  await fill(view, 'form input[type="password"]', password)
+  await click(view, 'form button[type="submit"]')
+  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+  return view
+}
+
+// Withdrawing removes the request, so the member is asked first, as every member screen that
+// destroys something asks (K-123, 0032).
+describe.skipIf(skip !== null)('withdrawing on the passes page asks first (issue 1331)', () => {
+  test('Withdraw opens a named confirmation; backing out keeps the request, confirming takes it back', async () => {
+    const { id: passTypeId } = await onSalePassType()
+    const password = generatePassword()
+    const requester = await registerMember(app, 'requester', password)
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+    const stillThere = (): boolean => query<{ id: string }>('SELECT id FROM pass_requests WHERE id = ?', requestId) !== undefined
+
+    const view = await signedInView(requester, password)
+    try {
+      const withdraw = `[data-test="account-pass-withdraw-${passTypeId}"]`
+      await visit(view, `${app.baseURL}/account/passes`, withdraw)
+      await click(view, withdraw)
+      await waitFor(view, `document.querySelector('[data-test="confirm-withdraw-pass-request-verb"]')`)
+      await click(view, '[data-test="confirm-withdraw-pass-request-back"]')
+      expect(stillThere()).toBe(true)
+
+      await click(view, withdraw)
+      await waitFor(view, `document.querySelector('[data-test="confirm-withdraw-pass-request-verb"]')`)
+      await click(view, '[data-test="confirm-withdraw-pass-request-verb"]')
+      await waitFor(view, `document.querySelector('[data-test="account-pass-request-${passTypeId}"]')`)
+      expect(stillThere()).toBe(false)
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })
 
