@@ -507,15 +507,30 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     expect(body.attempts.map(attempt => attempt.id)).toContain(`earlier-${id}`)
 
     expect((await request(app, 'GET', '/api/till/earlier', undefined, foh.cookie)).status).toBe(403)
+    // No shift reaches back into an ended night, tonight's confirmed bar shift included.
+    const onShift = await registerMember(app, 'till-earlier-shift', generatePassword())
+    shiftFor(stale.performanceId, 'BAR', onShift.id)
+    expect((await request(app, 'GET', '/api/till/earlier', undefined, onShift.cookie)).status).toBe(403)
   })
 
-  test('the bar manager closes last night\'s till from tonight\'s', async () => {
+  // A closed night's charge is not offered as recorded: the sale needs that night's till open, and
+  // how a late card charge lands in the ledger waits on a decision (question 15).
+  test('the bar manager closes last night\'s till from tonight\'s, then answers its charge the Treasurer now records', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-earlier', screenPassword)
     await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
     const tonight = programme('till-screen-earlier')
     await openTill(tonight.venueId, screenBar.cookie)
     const id = insertStaleSession(tonight.venueId, '2020-01-03', screenBar.id)
+    const charge = `earlier-mismatch-${id}`
+    const database = new Database(app.databaseFile)
+    try {
+      database.query(`INSERT INTO sumup_attempts (id, till_session_id, venue_id, night, created_by, basket, expected_total_pence, status, kind, error)
+        VALUES (?, ?, ?, '2020-01-03', ?, '{}', 250, 'MISMATCH', 'TYPED', 'Recording the sale was interrupted')`).run(charge, id, tonight.venueId, screenBar.id)
+    }
+    finally {
+      database.close()
+    }
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -527,6 +542,8 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     await visit(view, `${app.baseURL}/tonight/till?venueId=${tonight.venueId}`, `[data-test="till-open"]`)
     await waitFor(view, `document.querySelector('[data-test="earlier-close-${id}"]')`)
     expect(await textOf(view, '[data-test="till-earlier"]')).toContain('still open')
+    // That night's till is still open, so recording the sale is still on offer.
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="earlier-succeeded-${charge}"]')`)).toBe(true)
 
     await click(view, `[data-test="earlier-close-${id}"]`)
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
@@ -535,6 +552,14 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     await waitFor(view, `!document.querySelector('[data-test="earlier-close-${id}"]')`)
     // Tonight's session is untouched by closing last night's.
     expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="till-open"]')`)).toBe(true)
+
+    await waitFor(view, `document.querySelector('[data-test="earlier-treasurer-${charge}"]')`)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="earlier-succeeded-${charge}"]')`)).toBe(false)
+    expect(await textOf(view, `[data-test="earlier-treasurer-${charge}"]`)).toContain('the Treasurer records it')
+
+    await fill(view, `[data-test="earlier-note-${charge}"]`, 'Reader took £2.50; told the Treasurer')
+    await click(view, `[data-test="earlier-abandoned-${charge}"]`)
+    await waitFor(view, `!document.querySelector('[data-test="earlier-attempt-${charge}"]')`)
     view.close()
   }, 120_000)
 })
@@ -562,6 +587,36 @@ describe.skipIf(skip !== null)('a till refusal held to a missing second factor',
       await visit(view, `${app.baseURL}/tonight/till?venueId=${enrolling.venueId}`, 'body')
       await waitFor(view, `document.querySelector('[data-test="till-failure"]')`)
       const shown = await textOf(view, '[data-test="till-failure"]')
+      expect(shown).toMatch(/authenticator/i)
+      expect(shown).toContain('Set up an authenticator app')
+      view.close()
+    }
+    finally {
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
+    }
+  }, 120_000)
+
+  // Tonight's shift opens the till with no second factor; the earlier nights' list is the role's
+  // alone, so its refusal shows rather than an empty screen (issue 1316).
+  test('a Bar Manager on tonight\'s shift without an authenticator is told why earlier nights are not listed', async () => {
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['BAR_MANAGER'])
+    try {
+      const working = programme('till-enrol-shift')
+      const password = generatePassword()
+      const noFactor = await registerMember(app, 'till-enrol-shift-bar', password)
+      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'BAR_MANAGER' }, admin.cookie)
+      shiftFor(working.performanceId, 'BAR', noFactor.id)
+
+      const view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', noFactor.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      await visit(view, `${app.baseURL}/tonight/till?venueId=${working.venueId}`, '[data-test="till-closed"]')
+      await waitFor(view, `document.querySelector('[data-test="till-earlier-failure"]')`)
+      const shown = await textOf(view, '[data-test="till-earlier-failure"]')
       expect(shown).toMatch(/authenticator/i)
       expect(shown).toContain('Set up an authenticator app')
       view.close()

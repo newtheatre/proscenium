@@ -63,14 +63,14 @@ export function earlierOpenSessionsQuery(tonight: string): SQL {
   `
 }
 
-// One venue's bar for the close-night checklist: tonight's till still open, and what earlier
-// nights left there (E-114 criterion 3, issue 1316).
+// For the close-night checklist: this venue's till tonight, and what earlier nights left at any
+// bar, since a house not running tonight has no checklist of its own (E-114.3, F-102.5).
 export function tillLeftOpenQuery(venueId: string, tonight: string): SQL {
   return sql`
     SELECT
       (SELECT count(*) FROM till_sessions WHERE venue_id = ${venueId} AND night = ${tonight} AND closed_at IS NULL) AS tonight,
-      (SELECT count(*) FROM till_sessions WHERE venue_id = ${venueId} AND night < ${tonight} AND closed_at IS NULL) AS earlier,
-      (SELECT count(*) FROM sumup_attempts a WHERE a.venue_id = ${venueId} AND ${unresolvedBefore(tonight)}) AS unanswered
+      (SELECT count(*) FROM till_sessions WHERE night < ${tonight} AND closed_at IS NULL) AS earlier,
+      (SELECT count(*) FROM sumup_attempts a WHERE ${unresolvedBefore(tonight)}) AS unanswered
   `
 }
 

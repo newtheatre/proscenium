@@ -346,4 +346,28 @@ describe('what an earlier night left unanswered', () => {
       expect(found.sort()).toEqual(['att-mismatch', 'att-waiting'])
     })
   })
+
+  // Recording the sale needs that night's till open at that bar, so the till offers it only then
+  // (issue 1316; how a late charge lands once the till is closed waits on a decision).
+  test('each charge says whether its night\'s till is still open at its bar', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const { venueId } = tonightsPerformance(database, { suffix: 'earlier-open' })
+      insert(database, 'till_sessions', { id: 't-open', venue_id: venueId, night: '2026-09-12', opened_by: opener, opened_at: 1000 })
+      insert(database, 'till_sessions', {
+        id: 't-closed', venue_id: venueId, night: '2026-09-11', opened_by: opener, opened_at: 1000, closed_by: opener, closed_at: 2000,
+      })
+      const at = (id: string, sessionId: string, night: string): void => insert(database, 'sumup_attempts', {
+        id, till_session_id: sessionId, venue_id: venueId, night, created_by: opener, basket: '{}', expected_total_pence: 250, status: 'MISMATCH',
+      })
+      at('att-open', 't-open', '2026-09-12')
+      at('att-closed', 't-closed', '2026-09-11')
+
+      const found = read<{ id: string, sessionOpen: number }>(database, earlierUnresolvedAttemptsQuery('2026-09-14'))
+      expect(found.map(({ id, sessionOpen }) => ({ id, sessionOpen: Boolean(sessionOpen) }))).toEqual([
+        { id: 'att-closed', sessionOpen: false },
+        { id: 'att-open', sessionOpen: true },
+      ])
+    })
+  })
 })

@@ -164,6 +164,9 @@ export interface SumupAttemptView {
   resolution: SumupResolution | null
 }
 
+// A typed charge still waiting is answered as the reader answered it (0096).
+export const typedAndWaiting = (attempt: Pick<SumupAttemptView, 'kind' | 'status'>): boolean => attempt.kind === 'TYPED' && attempt.status === 'STARTED'
+
 export function saysAttemptStatus(status: SumupAttemptStatus, kind: SumupAttemptKind = 'SUMUP'): string {
   switch (status) {
     case 'STARTED': return kind === 'TYPED' ? 'Keyed into the reader, waiting for an answer' : 'Waiting for the SumUp app'

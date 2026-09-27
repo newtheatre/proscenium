@@ -8,10 +8,10 @@ import { auditedWrite } from './audit'
 import { commitSale } from './sale'
 import { openSessionFor, requireOpenSession } from './till'
 import { qrTokenFor, verifyQrToken } from './qr-tokens'
-import { ATTEMPT_COLUMNS, earlierUnresolvedAttemptsQuery, openAttemptsOn, recordPostedSaleStatement, stuckAttemptsQuery } from './sumup-queries'
+import { ATTEMPT_COLUMNS, UNRESOLVED, earlierUnresolvedAttemptsQuery, openAttemptsOn, recordPostedSaleStatement, stuckAttemptsQuery } from './sumup-queries'
 import { auditEntry } from '#shared/utils/audit'
 import { londonDayOf } from '#shared/utils/ledger'
-import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, UNRESOLVED_ATTEMPT_STATUSES, attemptMayMove, isTerminalAttempt, sumupLaunchUrl } from '#shared/utils/sumup'
+import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, attemptMayMove, isTerminalAttempt, sumupLaunchUrl } from '#shared/utils/sumup'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { SaleInput, SaleReceipt } from '#shared/utils/sale'
@@ -83,8 +83,7 @@ export function attemptByIdQuery(id: string): SQL {
 export function unresolvedAttemptsQuery(night: string): SQL {
   return sql`
     SELECT ${ATTEMPT_COLUMNS} FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by
-    WHERE a.night = ${night}
-      AND a.status IN (${sql.join(UNRESOLVED_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})
+    WHERE a.night = ${night} AND ${UNRESOLVED}
     ORDER BY a.created_at DESC
   `
 }
@@ -116,8 +115,8 @@ export async function unresolvedAttempts(night: string): Promise<SumupAttemptVie
 }
 
 export async function earlierUnresolvedAttempts(tonight: string): Promise<EarlierTillLeftOpen['attempts']> {
-  const rows = await db.all<AttemptRow & { venueName: string }>(earlierUnresolvedAttemptsQuery(tonight))
-  return rows.map(row => ({ ...view(row), night: row.night, venueName: row.venueName }))
+  const rows = await db.all<AttemptRow & { venueName: string, sessionOpen: number }>(earlierUnresolvedAttemptsQuery(tonight))
+  return rows.map(row => ({ ...view(row), night: row.night, venueName: row.venueName, sessionOpen: Boolean(row.sessionOpen) }))
 }
 
 export function basketOf(row: AttemptRow): AttemptBasket {

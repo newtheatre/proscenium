@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
-import { saysAttemptStatus } from '#shared/utils/sumup'
+import { saysAttemptStatus, typedAndWaiting } from '#shared/utils/sumup'
 import type { ResolveOutcome, SumupAttemptView } from '#shared/utils/sumup'
 
 // F-124 criteria 5 and 6: the hand-off this screen started, waiting for an answer, and any other
@@ -19,10 +19,6 @@ const emit = defineEmits<{
   checkAgain: []
   resolve: [id: string, outcome: ResolveOutcome, note: string | null]
 }>()
-
-// A typed charge still waiting is answered as the reader answered it; anything else is asked
-// whether the payment went through (0096).
-const typedAndWaiting = (attempt: SumupAttemptView): boolean => attempt.kind === 'TYPED' && attempt.status === 'STARTED'
 
 const smpTxCodeTyped = defineModel<string>('smpTxCodeTyped', { required: true })
 const abandonNote = defineModel<string>('abandonNote', { required: true })

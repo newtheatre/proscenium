@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
-import { saysAttemptStatus } from '#shared/utils/sumup'
+import { saysAttemptStatus, typedAndWaiting } from '#shared/utils/sumup'
 import { saysClock, saysDay } from '#shared/utils/when'
 import type { ResolveOutcome } from '#shared/utils/sumup'
 import type { EarlierTillLeftOpen } from '#shared/utils/till'
+import type { ListFailure } from '~/composables/useListFailure'
 
 // What ended nights left open, above tonight's till for the Bar Manager (F-102 criterion 5, issue
 // 1316): each till closes on its own night's figures, and each charge takes the answers tonight's do.
 
 defineProps<{
   left: EarlierTillLeftOpen
-  failure: string | null
+  failure: ListFailure | null
   answering: string | null
 }>()
 
@@ -20,14 +21,12 @@ const emit = defineEmits<{
 }>()
 
 const notes = defineModel<Record<string, string>>('notes', { required: true })
-
-type Attempt = EarlierTillLeftOpen['attempts'][number]
-const typedAndWaiting = (attempt: Attempt): boolean => attempt.kind === 'TYPED' && attempt.status === 'STARTED'
 </script>
 
 <template>
+  <!-- A refused read shows too: a Bar Manager with no authenticator otherwise sees nothing at all. -->
   <NightBlock
-    v-if="left.sessions.length || left.attempts.length"
+    v-if="failure || left.sessions.length || left.attempts.length"
     title="Left open from an earlier night"
     data-test="till-earlier"
   >
@@ -36,7 +35,8 @@ const typedAndWaiting = (attempt: Attempt): boolean => attempt.kind === 'TYPED' 
       class="mb-2"
       color="error"
       variant="subtle"
-      :description="failure"
+      :description="failure.message"
+      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
       data-test="till-earlier-failure"
     />
     <div
@@ -78,14 +78,25 @@ const typedAndWaiting = (attempt: Attempt): boolean => attempt.kind === 'TYPED' 
         {{ attempt.error }}
       </p>
       <UTextarea
-        v-if="attempt.status === 'MISMATCH'"
+        v-if="attempt.status === 'MISMATCH' || !attempt.sessionOpen"
         v-model="notes[attempt.id]"
         placeholder="If you are abandoning this: what happened to the money the reader took?"
         class="mt-2 w-full"
         :data-test="`earlier-note-${attempt.id}`"
       />
+      <!-- Recording the sale needs that night's till open, and how a late card charge lands in the
+           ledger is still to be decided, so a closed night's is the Treasurer's (issue 1316). -->
+      <p
+        v-if="!attempt.sessionOpen"
+        class="mt-2 text-xs text-muted"
+        :data-test="`earlier-treasurer-${attempt.id}`"
+      >
+        That night's till is closed, so the sale cannot be recorded here. If the reader took the money,
+        the Treasurer records it: say so in the note.
+      </p>
       <div class="mt-2 flex flex-wrap gap-2">
         <UButton
+          v-if="attempt.sessionOpen"
           size="sm"
           class="min-h-12"
           :loading="answering === attempt.id"

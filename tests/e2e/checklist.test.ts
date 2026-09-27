@@ -438,7 +438,7 @@ describe.skipIf(skip !== null)('the checklist screen on a matinee day (E-127, is
 // Issue 1316: the checklist says whether the bar's till is closed, tonight's or one an earlier night
 // left, and ticks itself once it is; only the bar can close a till, so it never holds the close.
 describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterion 3)', () => {
-  test('the checklist reads tonight\'s till and an earlier night\'s at its venue, and names who closes them', async () => {
+  test('the checklist reads tonight\'s till at its venue and an earlier night\'s at any bar, and names who closes them', async () => {
     const dmPassword = generatePassword()
     const dm = await registerMember(app, 'checklist-till-dm', dmPassword)
     const barManager = await registerMember(app, 'checklist-till-bar', generatePassword())

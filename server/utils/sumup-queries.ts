@@ -23,14 +23,18 @@ export const openAttemptsOn = (night: string): SQL =>
 // rather than from the hand-off, which may have been keyed in an hour before (F-124 criterion 5).
 const SINCE_THE_ANSWER = sql`coalesce(a.callback_at, a.created_at)`
 
+// Waiting for an answer, or taken on the reader and not recorded, on the `a` alias.
+export const UNRESOLVED = sql`a.status IN (${sql.join(UNRESOLVED_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})`
+
 // A charge an ended night left waiting, or taken and not recorded: no shift reaches it now, so it
 // is the Bar Manager's to answer from the till (F-102 criterion 5, issue 1316).
-export const unresolvedBefore = (tonight: string): SQL =>
-  sql`a.night < ${tonight} AND a.status IN (${sql.join(UNRESOLVED_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})`
+export const unresolvedBefore = (tonight: string): SQL => sql`a.night < ${tonight} AND ${UNRESOLVED}`
 
+// `sessionOpen` because recording the sale needs that night's till still open at that bar.
 export function earlierUnresolvedAttemptsQuery(tonight: string): SQL {
   return sql`
-    SELECT ${ATTEMPT_COLUMNS}, v.name AS venueName
+    SELECT ${ATTEMPT_COLUMNS}, v.name AS venueName,
+      EXISTS (SELECT 1 FROM till_sessions s WHERE s.venue_id = a.venue_id AND s.night = a.night AND s.closed_at IS NULL) AS sessionOpen
     FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by JOIN venues v ON v.id = a.venue_id
     WHERE ${unresolvedBefore(tonight)}
     ORDER BY a.night, a.created_at
