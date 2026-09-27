@@ -506,7 +506,7 @@ describe.skipIf(skip !== null)('the screens (C-120)', () => {
       await click(view, '[data-test="external-submit"]')
 
       await waitFor(view, `document.querySelector('[data-test="unlisted-list"]')`, 30_000)
-      expect(await textOf(view, 'body')).toContain('Not yet requested')
+      expect(await textOf(view, 'body')).toContain('Waiting on the Theatre Manager')
 
       expect(read<{ status: string }>(
         `SELECT status FROM external_requests WHERE title = 'Asked from a browser'`)?.status).toBe('REQUESTED')
