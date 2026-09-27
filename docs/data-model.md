@@ -1103,7 +1103,8 @@ cancels it through the ordinary self-service path (D-110) like any other unpaid-
 `note` scrub, `decided_by` restrict, `pass_id` restrict, NULL until fulfilled). A request is not
 a pass; `(status = 'FULFILLED') = (pass_id IS NOT NULL)` is a CHECK, not a convention. Partial
 UNIQUE `pass_requests_one_open` (`user_id`, `pass_type_id`) WHERE `status = 'PENDING'`: one open
-request per account and pass type (issue 1331).
+request per account and pass type (issue 1331). Migration 0124 builds it after deleting all but
+each account's oldest open request per type.
 
 ## The ledger (module I)
 
