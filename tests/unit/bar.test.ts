@@ -31,6 +31,7 @@ import {
   variantForm,
   writeOffSizes,
 } from '#shared/utils/bar'
+import type { AllergenState } from '#shared/utils/bar'
 
 // F-111 and F-114's write-path rules, which the database CHECKs mirror rather than replace: a
 // refusal has to say what is wrong before a constraint error would.
@@ -465,6 +466,28 @@ describe('a product takes its allergen answer from what it pours', () => {
   test('a product that pours nothing keeps the answer it was given', () => {
     expect(deriveAllergens([], { state: 'RECORDED', note: 'Contains nuts' })).toEqual({ state: 'RECORDED', note: 'Contains nuts' })
     expect(deriveAllergens([], noAddition)).toEqual({ state: 'UNKNOWN', note: null })
+  })
+
+  // A food-safety answer fails closed: a recorded answer with nothing written, or a state no form
+  // writes, is no answer at all, never a clean one (a direct load can write either).
+  test('a recorded item with no note, or a state outside the three, is unanswered', () => {
+    expect(deriveAllergens([
+      { itemName: 'Guest ale', state: 'RECORDED', note: null },
+      { itemName: 'Cider', state: 'RECORDED', note: '  ' },
+      { itemName: 'Perry', state: 'bogus' as AllergenState, note: null },
+      { itemName: 'Lemonade', state: 'NONE', note: null },
+    ], noAddition)).toEqual({ state: 'UNKNOWN', note: 'No information recorded for Guest ale, Cider, Perry.' })
+  })
+
+  // A note is never hidden: a caution written on an item answered clear reaches the till with it.
+  test('a note on an item or an addition answered clear is read out, and leaves it clear', () => {
+    expect(deriveAllergens([
+      { itemName: 'Gin', state: 'NONE', note: 'May contain traces of milk' },
+      { itemName: 'Tonic water', state: 'NONE', note: null },
+    ], { state: 'NONE', note: 'Served with a lime wedge' })).toEqual({
+      state: 'NONE',
+      note: 'Gin: May contain traces of milk. Added at the bar: Served with a lime wedge.',
+    })
   })
 })
 
