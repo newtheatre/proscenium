@@ -219,6 +219,7 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       await fillPin(view, '[data-test="mfa-challenge"] input', await unusedCode())
       await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
 
+      overrideConfig(app, 'BAR_TAB_CAP_PENCE', 2500)
       await visit(view, `${app.baseURL}/admin/settings`, '[data-test="config-search"]')
 
       // Fifty keys, found by searching for what the key decides rather than its name (0032).
@@ -239,7 +240,7 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       // text on the page, so it is read rather than searched for.
       const shown = await view.evaluate<string>(
         `document.querySelector('input[data-test="input-BAR_TAB_CAP_PENCE"]')?.value ?? ''`)
-      // 2500 pence is what this suite set it to, and £25.00 is what that should read as.
+      // 2500 pence, set above, reads as £25.00.
       expect(shown).toBe('£25.00')
 
       // A yearly boundary is picked from a calendar with no year in it, and reads as a day and a
@@ -287,6 +288,7 @@ describe.skipIf(skip !== null)('the settings screen', () => {
     }
     finally {
       clearConfigOverride(app, 'ROOM_MAX_BOOKING_ADMINS_EXEMPT')
+      clearConfigOverride(app, 'BAR_TAB_CAP_PENCE')
       clearConfigOverride(app, 'YEAR_START')
       view.close()
     }

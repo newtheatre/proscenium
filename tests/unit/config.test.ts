@@ -78,8 +78,8 @@ describe('configuration surface (0012, 0019)', () => {
     }
   })
 
-  // Issue 854: nothing read it, and cancelling an unpaid booking is free because no money has
-  // moved (D-110 criterion 4), not because a switch says so.
+  // Issue 854: cancelling an unpaid booking is free because no money has moved (D-110 criterion 4),
+  // so there is no switch for it.
   test('free cancellation of an unpaid booking is not a setting', () => {
     expect(isConfigKey('REFUND_UNPAID_CANCELLATION_FREE')).toBe(false)
   })

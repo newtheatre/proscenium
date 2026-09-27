@@ -107,16 +107,18 @@ describe.skipIf(skip !== null)('a rule nothing enforces says so (criterion 5)', 
   })
 })
 
-// Issue 854: the booking page printed "yes (applied by hand)" for two switches. Cancelling unpaid
-// is free by construction, and who approves a paid refund is the desk's business, not the page's.
+// Issue 854: unpaid cancellation is free by construction, and who approves a paid refund is the
+// desk's business, so the booking page states both in words and quotes neither switch.
 describe.skipIf(skip !== null)('the booking page says how refunds work in words, never as a switch', () => {
   test('neither refund switch is quoted, and every rule the page quotes is enforced', async () => {
     const { values } = await valuesFor('/policies/booking')
     expect(Object.keys(values)).not.toContain('REFUND_PAID_REQUIRES_MANAGER')
-    expect(Object.keys(values)).not.toContain('REFUND_UNPAID_CANCELLATION_FREE')
     expect(Object.values(values).every(value => value.enforced)).toBe(true)
 
     const html = await pageHtml('/policies/booking')
+    expect(html).not.toContain('policy-error')
+    expect(html).toContain('before the performance starts')
+    expect(html).toContain('cancelled at the box office')
     expect(html).toContain('in person at the box office')
   })
 })
