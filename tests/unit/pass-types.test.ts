@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   MAX_PASS_PRICE_PENCE,
   coverPresetOn,
+  heldPricePointRefusal,
   newPassTypeForm,
   passTypeForm,
   passTypeShowsForm,
@@ -151,5 +152,17 @@ describe('the publish sheet presets the cover for an in-house show (issue 1323)'
     expect(publishShowForm.parse({ published: true }).coverPassTypeIds).toEqual([])
     expect(publishShowForm.parse({ published: true, coverPassTypeIds: ['pt-1'] }).coverPassTypeIds).toEqual(['pt-1'])
     expect(publishShowForm.safeParse({ published: true, coverPassTypeIds: [''] }).success).toBe(false)
+  })
+})
+
+// A pass holds the price point it was issued at, so a refusal names the ones an edit would remove.
+describe('removing a price point an issued pass holds is refused by name', () => {
+  test('one price point', () => {
+    expect(heldPricePointRefusal(['Standard'])).toBe('Standard is held by an issued pass, so it cannot be removed: change its price instead')
+  })
+
+  test('several, in the words of a list', () => {
+    expect(heldPricePointRefusal(['Concession', 'Standard', 'Student']))
+      .toBe('Concession, Standard and Student are held by issued passes, so they cannot be removed: change their prices instead')
   })
 })

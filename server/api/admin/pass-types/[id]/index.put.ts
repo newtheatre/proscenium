@@ -1,6 +1,5 @@
-import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
-import { passTypeForm } from '#shared/utils/pass-types'
+import { heldPricePointRefusal, passTypeForm } from '#shared/utils/pass-types'
 
 // Edit a pass product: name, description, windows, price points and status. Covered shows move
 // through their own endpoint, sometimes manager-gated (D-123 criterion 4).
@@ -37,29 +36,27 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // The address predicate rides the UPDATE, so a clashing rename refuses (0003, 0006). The prices are
-  // replaced whole, which a pass's RESTRICT on its price point refuses once one is issued (D-124).
-  const updated = await auditedWrite(db.all<{ id: string }>(sql`
-    UPDATE pass_types
-    SET slug = ${input.slug},
-        name = ${input.name},
-        description = ${description},
-        status = ${input.status},
-        valid_from = ${input.validFrom},
-        valid_until = ${input.validUntil},
-        sales_open_at = ${salesOpenAt},
-        sales_close_at = ${salesCloseAt},
-        max_issued = ${maxIssued},
-        updated_at = unixepoch()
-    WHERE id = ${id}
-      AND NOT EXISTS (SELECT 1 FROM pass_types WHERE slug = ${input.slug} AND id <> ${id})
-    RETURNING id
-  `), entry, ...replacePricesStatements(id, input.prices, entry).map(statement => db.run(statement)))
+  // The address and the price points an issued pass holds are both the write's own predicates
+  // (0003); the price points follow behind its entry, kept by label and changed in place (0049).
+  const updated = await auditedWrite(db.all<{ id: string }>(updatePassTypeStatement(id, {
+    slug: input.slug,
+    name: input.name,
+    description,
+    status: input.status,
+    validFrom: input.validFrom,
+    validUntil: input.validUntil,
+    salesOpenAt,
+    salesCloseAt,
+    maxIssued,
+    prices: input.prices,
+  })), entry, ...priceUpsertStatements(id, input.prices, entry).map(statement => db.run(statement)))
 
   if (!updated) {
     const taken = await passTypeBySlug(input.slug, id)
-    if (!taken) throw noSuch('pass')
-    throw createError({ statusCode: 409, statusMessage: `A pass already has the address ${taken.slug}` })
+    if (taken) throw createError({ statusCode: 409, statusMessage: `A pass already has the address ${taken.slug}` })
+    const kept = await heldPricePointsRemoved(id, input.prices.map(price => price.label))
+    if (kept.length > 0) throw createError({ statusCode: 409, statusMessage: heldPricePointRefusal(kept) })
+    throw noSuch('pass')
   }
 
   return { ok: true }

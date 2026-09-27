@@ -1016,7 +1016,7 @@ two that read and `ticketing.write` for the rest:
 | `GET /api/admin/pass-types` | The paged envelope, every status included, each row carrying whether it has ever been issued and the shows it covers. |
 | `POST /api/admin/pass-types` | Adds one, always DRAFT, with its price points and covered shows in one batch. |
 | `GET /api/admin/pass-types/[id]` | One pass product and every show it may be extended to cover. |
-| `PUT /api/admin/pass-types/[id]` | Changes name, address, description, windows, price points (whole-set replace) and status. It does not take covered shows. |
+| `PUT /api/admin/pass-types/[id]` | Changes name, address, description, windows, price points and status. It does not take covered shows. Price points are kept by label and a changed price is updated in place, since an issued pass holds its price point by id (`pass_type_price_id` RESTRICT, D-124) and keeps its own `price_paid`. A price point the edit leaves out is removed, and the whole edit is refused with a 409 naming it if an issued pass holds it: the predicate rides the `UPDATE` (`updatePassTypeStatement()`), and the price points follow behind its audit row (`priceUpsertStatements()`). |
 | `PUT /api/admin/pass-types/[id]/shows` | Replaces the covered set. Reachable by `ticketing.write` or `ticketing.manage`, since MANAGER carries the second and not the first (0009); dropping a show with a live pass against it needs `ticketing.manage` specifically, whichever door was used to reach the route. |
 | `DELETE /api/admin/pass-types/[id]` | Deletes one nothing has ever been issued under. An issued one is a 409 naming closing as the way. |
 

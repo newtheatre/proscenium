@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
 
   // The read above only words the refusal; the write's own predicate decides a race (0003). The pass
   // cancel follows behind the revocation's own trail row, so a lost race cancels nothing (0049).
-  const revoked = await auditedWrite(db.all<{ id: string }>(revoke), entry, db.run(cancelFellowshipPassStatement(held.userId, entry.id)))
+  const revoked = await auditedWrite(db.all<{ id: string }>(revoke), entry, db.run(cancelFellowshipPassStatement(held.userId, entry)))
 
   if (!revoked) throw createError({ statusCode: 409, statusMessage: 'That fellowship is already revoked' })
 

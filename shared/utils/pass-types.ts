@@ -133,3 +133,13 @@ export function coverPresetOn(performances: { status: string, isExternal: boolea
   const playing = performances.filter(one => one.status !== 'CANCELLED')
   return playing.length > 0 && playing.every(one => !one.isExternal)
 }
+
+// An issued pass holds the price point it was sold at (D-124), so an edit may change a held one's
+// price but never remove it; the refusal names each one it would have removed.
+export function heldPricePointRefusal(labels: string[]): string {
+  const one = labels.length === 1
+  const named = one ? labels[0] : `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`
+  return one
+    ? `${named} is held by an issued pass, so it cannot be removed: change its price instead`
+    : `${named} are held by issued passes, so they cannot be removed: change their prices instead`
+}

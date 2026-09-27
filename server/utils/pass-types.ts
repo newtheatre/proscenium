@@ -235,14 +235,71 @@ export function newPassTypeChildren(passTypeId: string, prices: { label: string,
   ]
 }
 
-// The whole set replaced, gated on the edit's own entry, so an edit refused on its address keeps
-// the old price points and adds none (0049).
-export function replacePricesStatements(passTypeId: string, prices: { label: string, price: number }[], entry: AuditRow): SQL[] {
+export interface PassTypeUpdate {
+  slug: string
+  name: string
+  description: string | null
+  status: PassTypeStatus
+  validFrom: number
+  validUntil: number
+  salesOpenAt: number | null
+  salesCloseAt: number | null
+  maxIssued: number | null
+  prices: { label: string, price: number }[]
+}
+
+// The labels an edit keeps, as one JSON parameter however many there are (0006).
+const keptLabels = (prices: { label: string }[]): SQL => sql`(SELECT value FROM json_each(${JSON.stringify(prices.map(price => price.label))}))`
+
+// The edit refuses a clashing address, and refuses removing a price point an issued pass holds
+// (its RESTRICT, D-124), both on the write itself (0003), so nothing after it runs either way.
+export function updatePassTypeStatement(id: string, input: PassTypeUpdate): SQL {
+  return sql`
+    UPDATE pass_types
+    SET slug = ${input.slug},
+        name = ${input.name},
+        description = ${input.description},
+        status = ${input.status},
+        valid_from = ${input.validFrom},
+        valid_until = ${input.validUntil},
+        sales_open_at = ${input.salesOpenAt},
+        sales_close_at = ${input.salesCloseAt},
+        max_issued = ${input.maxIssued},
+        updated_at = unixepoch()
+    WHERE id = ${id}
+      AND NOT EXISTS (SELECT 1 FROM pass_types WHERE slug = ${input.slug} AND id <> ${id})
+      AND NOT EXISTS (
+        SELECT 1 FROM pass_type_prices pr
+        WHERE pr.pass_type_id = ${id} AND pr.label NOT IN ${keptLabels(input.prices)}
+          AND EXISTS (SELECT 1 FROM passes p WHERE p.pass_type_price_id = pr.id)
+      )
+    RETURNING id
+  `
+}
+
+// What a refused edit would have removed from under an issued pass, named in the refusal.
+export function heldPricePointsRemovedQuery(passTypeId: string, labels: string[]): SQL {
+  return sql`
+    SELECT pr.label AS label FROM pass_type_prices pr
+    WHERE pr.pass_type_id = ${passTypeId} AND pr.label NOT IN (SELECT value FROM json_each(${JSON.stringify(labels)}))
+      AND EXISTS (SELECT 1 FROM passes p WHERE p.pass_type_price_id = pr.id)
+    ORDER BY pr.label
+  `
+}
+
+export async function heldPricePointsRemoved(passTypeId: string, labels: string[]): Promise<string[]> {
+  return (await db.all<{ label: string }>(heldPricePointsRemovedQuery(passTypeId, labels))).map(row => row.label)
+}
+
+// Price points kept by label and changed in place, since an issued pass holds its own by id; the
+// ones the edit drops go, and all of it only once the edit's entry has landed (0049).
+export function priceUpsertStatements(passTypeId: string, prices: { label: string, price: number }[], entry: AuditRow): SQL[] {
   return [
-    sql`DELETE FROM pass_type_prices WHERE pass_type_id = ${passTypeId} AND ${entryLanded(entry)}`,
+    sql`DELETE FROM pass_type_prices WHERE pass_type_id = ${passTypeId} AND label NOT IN ${keptLabels(prices)} AND ${entryLanded(entry)}`,
     ...prices.map(price => sql`
       INSERT INTO pass_type_prices (id, pass_type_id, label, price)
       SELECT ${newId()}, ${passTypeId}, ${price.label}, ${price.price} WHERE ${entryLanded(entry)}
+      ON CONFLICT (pass_type_id, label) DO UPDATE SET price = excluded.price
     `),
   ]
 }
