@@ -17,7 +17,7 @@ import { claimCompRequestForSale, compRequestById, compRequestLines, releaseComp
 import { priceRef, saysMoney } from '#shared/utils/bar'
 import { deskTicketsQuery } from '#server/utils/desk'
 import { tillBookingById } from '#server/utils/till-bookings'
-import { bookableTicketTypes, guestAccount, writeReservation } from '#server/utils/reservations'
+import { bookableTicketTypes, guestAccount, holdReleaseMinutesFor, writeReservation } from '#server/utils/reservations'
 import { performanceById } from '#server/utils/programme'
 import { effectiveCapacity } from '#server/utils/performances'
 import { qrTokenFor } from '#server/utils/qr-tokens'
@@ -27,7 +27,7 @@ import { recordPostedSaleStatement } from '#server/utils/sumup-queries'
 import { barWindowsTonight, shiftOffsetDefaults } from '#server/utils/rota'
 import { houseForSale } from '#shared/utils/rota-times'
 import { saleRefusal } from '#shared/utils/programme'
-import { holdExpiresAt, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
+import { holdExpiresAt } from '#shared/utils/reservations'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { Discount } from '#shared/utils/discounts'
 import type { DeskTicketLine } from '#server/utils/desk'
@@ -408,7 +408,7 @@ async function resolveWalkUps(walkUps: WalkUpLineInput[], performanceIds: string
       return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source }
     })
 
-    const releaseMinutes = resolveHoldReleaseMinutes(performance.holdReleaseMinutesBefore, await configValue(undefined, 'HOLD_RELEASE_MINUTES_BEFORE'))
+    const releaseMinutes = await holdReleaseMinutesFor(undefined, performance)
     resolved.push({
       performanceId,
       showTitle: performance.showTitle,

@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
+import { registrableAddress } from '#tests/helpers/seed'
 import { click, fill, fillNumber, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -353,5 +354,52 @@ describe.skipIf(skip !== null)('an offer stands until online booking closes, and
     expect(says).toContain('Online booking closed at')
     expect(says).toContain('on the door')
     expect(entriesFor(performanceId)).toHaveLength(1)
+  }, CASE_TIMEOUT_MS)
+})
+
+// Two nights of one show in the one-seat house, so a single booking fills the first night.
+async function twoNightShow(): Promise<{ first: string, second: string, ticketTypeId: string }> {
+  const title = named('The Cherry Orchard')
+  const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
+  const showId = (await show.json() as { id: string }).id
+  const night = async (startsAt: number): Promise<string> => {
+    const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120 })
+    return (await performance.json() as { id: string }).id
+  }
+  const first = await night(nextWeek())
+  const second = await night(nextWeek() + 86_400)
+  const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
+  const ticketTypeId = (await type.json() as { id: string }).id
+  expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
+  return { first, second, ticketTypeId }
+}
+
+// An exchange frees the seats it leaves, the same as a cancel, so the list for that night is
+// offered them; the offers run before the exchange's own confirmation is sent (issue 1328).
+describe.skipIf(skip !== null)('an exchange offers the seats it frees to the waiting list (criterion 2)', () => {
+  test('moving a booking to another night offers its old seat to that night\'s list', async () => {
+    const { first, second, ticketTypeId } = await twoNightShow()
+    const mover = registrableAddress('mover')
+    const booked = await send('POST', '/api/reservations', {
+      performanceId: first, lines: [{ ticketTypeId, quantity: 1 }], guest: { name: 'Ada Mover', email: mover },
+    }, '')
+    expect(booked.status).toBe(200)
+    const { reference, qrToken } = await booked.json() as { reference: string, qrToken: string }
+
+    const waiter = `waiter-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    expect((await send('POST', `/api/performances/${first}/waiting-list`, {
+      performanceId: first, partySize: 1, guest: { name: 'Ada Waiter', email: waiter },
+    }, '')).status).toBe(200)
+    expect(entriesFor(first)[0]?.status).toBe('WAITING')
+
+    const opened = await fetch(`${app.baseURL}/qr/${qrToken}`, { redirect: 'manual' })
+    const cookie = (opened.headers.get('set-cookie') ?? '').split(';')[0]!
+    const exchanged = await send('POST', '/api/qr/exchange', { performanceId: second, reference }, cookie)
+    expect(exchanged.status).toBe(200)
+
+    expect(entriesFor(first)[0]?.status).toBe('OFFERED')
+    const sent = await letters(app)
+    expect(sent.some(text => text.includes(waiter) && text.includes('first refusal'))).toBe(true)
+    expect(sent.some(text => text.includes(mover) && text.includes('/qr/'))).toBe(true)
   }, CASE_TIMEOUT_MS)
 })
