@@ -31,8 +31,8 @@ describe('every site audits through the write, never beside it', () => {
   // A new account and a session started are unconditional writes, so they keep their own rows.
   test('6. a Google claim logs only through its own write, and a lost one is settled by the account', async () => {
     const route = await source('server/routes/auth/google.get.ts')
-    expect(route).toContain('const claimed = await auditedWrite(')
-    expect(route).toContain('afterLostGoogleClaim(current.googleSub, identity.sub)')
+    expect(route).toContain('lostClaim = !await auditedWrite(')
+    expect(route).toContain('afterLostGoogleClaim(account.googleSub, identity.sub)')
     expect(route.match(/action: outcome\.action === 'claim-pending'/g)).toHaveLength(1)
   })
 

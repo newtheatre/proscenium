@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test'
+import { auditIfChanged, auditWhere } from '#server/utils/audit'
+import { auditEntry } from '#shared/utils/audit'
 import { erasureStatements } from '#shared/utils/erasure'
 import { googleClaimStatement } from '#shared/utils/google-sign-in'
-import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { boundStatement, createTestDatabase, rows, sql } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -30,14 +32,16 @@ function person(database: TestDatabase, id: string): string {
   return id
 }
 
-// The erasure's own audit row, written after its statements as `eraseAccount` writes it.
-function erase(database: TestDatabase, userId: string, id: string, at: number): void {
-  database.batch([
-    ...erasureStatements(userId, at).map(statement => boundStatement(database, statement)),
-    ['INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (?, ?, ?, ?, ?)',
-      id, userId, 'account.erased', `user:${userId}`, JSON.stringify({ tables: 42 })],
+// As `eraseAccount` batches it: the audit row directly after the tombstone, on its `changes()`.
+function erase(database: TestDatabase, userId: string, at: number): unknown[][] {
+  return batch(database, [
+    ...erasureStatements(userId, at),
+    auditWhere(auditEntry({ actorId: userId, action: 'account.erased', target: `user:${userId}`, detail: { tables: 42 } }), sql`changes() = 1`),
   ])
 }
+
+const erasuresLogged = (database: TestDatabase): (string | null)[] =>
+  rows<{ detail: string | null }>(database, 'SELECT detail FROM audit_log WHERE action = ?', 'account.erased').map(row => row.detail)
 
 const detailOf = (database: TestDatabase, id: string): string | null =>
   rows<{ detail: string | null }>(database, 'SELECT detail FROM audit_log WHERE id = ?', id)[0]?.detail ?? null
@@ -48,10 +52,10 @@ describe('a second erasure racing the first', () => {
   test('leaves the first erasure\'s own audit row as it was written', async () => {
     await withDatabase((database) => {
       const who = person(database, 'u-raced')
-      erase(database, who, 'e-winner', 1_780_000_000)
-      erase(database, who, 'e-loser', 1_780_000_060)
+      erase(database, who, 1_780_000_000)
+      erase(database, who, 1_780_000_060)
 
-      expect(detailOf(database, 'e-winner')).toBe(JSON.stringify({ tables: 42 }))
+      expect(erasuresLogged(database)).toEqual([JSON.stringify({ tables: 42 })])
     })
   })
 
@@ -60,7 +64,7 @@ describe('a second erasure racing the first', () => {
       const who = person(database, 'u-before')
       database.batch([['INSERT INTO audit_log (id, actor_id, action, target, detail) VALUES (?, ?, ?, ?, ?)',
         'e-earlier', 'officer', 'account.profile.updated', `user:${who}`, JSON.stringify({ fields: ['name'] })]])
-      erase(database, who, 'e-winner', 1_780_000_000)
+      erase(database, who, 1_780_000_000)
 
       expect(detailOf(database, 'e-earlier')).toBe(JSON.stringify({ redacted: true }))
     })
@@ -70,8 +74,14 @@ describe('a second erasure racing the first', () => {
 // A Google sign-in read the account as claimable, and an erasure or a disable landed before its
 // claim wrote: the claim must not hand a Google identity back to that account (A-104, 0003).
 describe('a Google claim racing an erasure or a disable', () => {
-  const claim = (database: TestDatabase, userId: string): unknown[] =>
-    batch(database, [googleClaimStatement(userId, 'google-sub-1', 1_780_000_100)])[0]!
+  // As `auditedWrite` batches it: the claim, then its audit row on the claim's `changes()`.
+  const claim = (database: TestDatabase, userId: string): unknown[] => batch(database, [
+    googleClaimStatement(userId, 'google-sub-1', 1_780_000_100),
+    auditIfChanged(auditEntry({ actorId: userId, action: 'account.google.claimed', target: `user:${userId}` })),
+  ])[0]!
+
+  const claimsLogged = (database: TestDatabase): number =>
+    rows<{ n: number }>(database, 'SELECT count(*) AS n FROM audit_log WHERE action = ?', 'account.google.claimed')[0]!.n
 
   const subOf = (database: TestDatabase, userId: string): string | null =>
     rows<{ sub: string | null }>(database, 'SELECT google_sub AS sub FROM users WHERE id = ?', userId)[0]!.sub
@@ -79,10 +89,11 @@ describe('a Google claim racing an erasure or a disable', () => {
   test('erased first: the claim writes nothing, and the tombstone answers to no Google identity', async () => {
     await withDatabase((database) => {
       const who = person(database, 'u-erased')
-      erase(database, who, 'e-winner', 1_780_000_000)
+      erase(database, who, 1_780_000_000)
 
       expect(claim(database, who)).toHaveLength(0)
       expect(subOf(database, who)).toBeNull()
+      expect(claimsLogged(database)).toBe(0)
     })
   })
 
@@ -93,6 +104,7 @@ describe('a Google claim racing an erasure or a disable', () => {
 
       expect(claim(database, who)).toHaveLength(0)
       expect(subOf(database, who)).toBeNull()
+      expect(claimsLogged(database)).toBe(0)
     })
   })
 
@@ -103,6 +115,7 @@ describe('a Google claim racing an erasure or a disable', () => {
       expect(claim(database, who)).toHaveLength(1)
       expect(subOf(database, who)).toBe('google-sub-1')
       expect(claim(database, who)).toHaveLength(0)
+      expect(claimsLogged(database)).toBe(1)
     })
   })
 
@@ -110,7 +123,7 @@ describe('a Google claim racing an erasure or a disable', () => {
     await withDatabase((database) => {
       const who = person(database, 'u-claimed')
       claim(database, who)
-      erase(database, who, 'e-winner', 1_780_000_200)
+      erase(database, who, 1_780_000_200)
 
       expect(subOf(database, who)).toBeNull()
     })
