@@ -548,6 +548,45 @@ describe('every console list is a UTable the shell knows about (K-123 criteria 9
   })
 })
 
+// Each column's own meta written out in place, with the header it sits under: the nearest header
+// before it, since a column is written id, header, meta, cell.
+function inlineColumnMetas(source: string): { header: string, meta: string }[] {
+  return [...source.matchAll(/meta:\s*(\{\s*class:\s*\{(?:\$\{[^}]*\}|[^}])*\}\s*\})/g)].map(match => ({
+    header: [...source.slice(0, match.index).matchAll(/header:\s*([^,\n]+)/g)].at(-1)?.[1] ?? '',
+    meta: match[1]!,
+  }))
+}
+
+const RIGHT_CELLS = /td:\s*[`'][^`']*text-right/
+const RIGHT_HEADER = /th:\s*[`'][^`']*text-right/
+
+// A figure's header sits over its figures, and a row's buttons are not set in the figures'
+// monospace (0032, K-101; the review of #1474).
+describe('a figure column lines its header up with its figures', () => {
+  test('the shared figure shapes right-align the header, and the action shape is not monospace', async () => {
+    const shapes = await Bun.file('app/utils/responsive-table.ts').text()
+    for (const name of ['RIGHT_ALIGNED', 'RIGHT_ALIGNED_HIDE_BELOW_SM']) {
+      expect(shapes).toMatch(new RegExp(`export const ${name} = \\{ class: \\{ th: [\`'][^\`']*text-right`))
+    }
+    const actions = shapes.match(/export const ACTIONS_COLUMN = (\{[^\n]*\})/)?.[1] ?? ''
+    expect(actions).toContain('text-right')
+    expect(actions).not.toContain('font-mono')
+  })
+
+  test('no column right-aligns its figures under a header left behind', async () => {
+    const offenders = (await tables()).flatMap(file => inlineColumnMetas(file.source)
+      .filter(({ header, meta }) => RIGHT_CELLS.test(meta) && !RIGHT_HEADER.test(meta) && !header.includes('ACTIONS_HEADER'))
+      .map(({ header }) => `${file.path}: ${header}`))
+    expect(offenders).toEqual([])
+  })
+
+  test('a column of row actions never takes a figure shape', async () => {
+    const offenders = (await tables()).filter(file => /header:\s*ACTIONS_HEADER,\s*meta:\s*RIGHT_ALIGNED/.test(file.source)
+      || inlineColumnMetas(file.source).some(({ header, meta }) => header.includes('ACTIONS_HEADER') && meta.includes('font-mono')))
+    expect(offenders.map(file => file.path)).toEqual([])
+  })
+})
+
 // A console screen says what it is for in one sentence and hands the rest to its documentation
 // page (K-123 criterion 11, J-109, issue 1151 item 2). Three shapes carry the rule.
 
