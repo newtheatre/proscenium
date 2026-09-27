@@ -1,8 +1,8 @@
 import { MAX_SEASON_NAME } from './seasons'
 import type { ListSpec } from './list-filters'
 
-// The seasons list's declaration (K-129). A season keeps its own manual order (D-131); name is
-// the tiebreak and the fallback for a reader who wants alphabetical instead.
+// The seasons list's declaration (K-129). Seasons list in date order (D-131 criterion 2); name
+// is the other way to read them.
 export const seasonsList = {
   key: 'seasons',
   search: { placeholder: 'A season', maxLength: MAX_SEASON_NAME },
@@ -11,9 +11,9 @@ export const seasonsList = {
   ],
   sort: {
     fields: [
-      { key: 'sort', label: 'Order', column: 'sort' },
+      { key: 'startsOn', label: 'Dates', column: 'starts_on' },
       { key: 'name', label: 'Name', column: 'name', collate: 'nocase' },
     ],
-    default: 'sort',
+    default: 'startsOn',
   },
 } as const satisfies ListSpec

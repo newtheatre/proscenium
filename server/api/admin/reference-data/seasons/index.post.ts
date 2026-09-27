@@ -1,15 +1,16 @@
 import { sql } from 'drizzle-orm'
 import { seasonForm } from '#shared/utils/seasons'
 
-// Add a season. The name is held once, whatever the capitals (D-131 criterion 2).
+// Add a season. The name is held once, whatever the capitals, and an overlap is named, never
+// refused (D-131 criterion 2).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
   const input = await readValidatedBodyOrThrow(event, seasonForm)
   const id = newId()
 
   const created = await db.all<{ id: string }>(sql`
-    INSERT INTO seasons (id, name, starts_on, ends_on, sort, archived)
-    SELECT ${id}, ${input.name}, ${input.startsOn}, ${input.endsOn}, ${input.sort}, 0
+    INSERT INTO seasons (id, name, starts_on, ends_on, archived)
+    SELECT ${id}, ${input.name}, ${input.startsOn}, ${input.endsOn}, 0
     WHERE NOT EXISTS (SELECT 1 FROM seasons WHERE name = ${input.name} COLLATE NOCASE)
     RETURNING id
   `)
@@ -26,5 +27,5 @@ export default defineEventHandler(async (event) => {
     detail: { name: input.name, startsOn: input.startsOn, endsOn: input.endsOn },
   }))
 
-  return { ok: true, id }
+  return { ok: true, id, overlaps: await seasonOverlaps(input.startsOn, input.endsOn, id) }
 })

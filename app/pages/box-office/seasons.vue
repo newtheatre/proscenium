@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { seasonForm } from '#shared/utils/seasons'
+import { saysOverlaps, seasonForm } from '#shared/utils/seasons'
 import { seasonsList } from '#shared/utils/seasons-list'
 import { saysDay } from '#shared/utils/when'
 import type { TableColumn } from '@nuxt/ui'
@@ -49,10 +49,12 @@ interface FormState {
   name: string
   startsOn: string
   endsOn: string
-  sort: number
 }
 
-const state = reactive<FormState>({ name: '', startsOn: '', endsOn: '', sort: 0 })
+const state = reactive<FormState>({ name: '', startsOn: '', endsOn: '' })
+
+// Named after a save, never refused (0087): stays until the next save so it can be acted on.
+const overlapping = ref<{ name: string, says: string } | null>(null)
 
 function edit(season: AdminSeason | null): void {
   editing.value = season
@@ -61,7 +63,6 @@ function edit(season: AdminSeason | null): void {
     name: season?.name ?? '',
     startsOn: season?.startsOn ?? '',
     endsOn: season?.endsOn ?? '',
-    sort: season?.sort ?? 0,
   })
   open.value = true
 }
@@ -69,14 +70,13 @@ function edit(season: AdminSeason | null): void {
 async function save(): Promise<void> {
   saving.value = true
   failure.value = null
-  const body = { name: state.name.trim(), startsOn: state.startsOn, endsOn: state.endsOn, sort: state.sort }
+  const body = { name: state.name.trim(), startsOn: state.startsOn, endsOn: state.endsOn }
   try {
-    if (editing.value) {
-      await $fetch(`/api/admin/reference-data/seasons/${editing.value.id}`, { method: 'PUT', body })
-    }
-    else {
-      await $fetch('/api/admin/reference-data/seasons', { method: 'POST', body })
-    }
+    const answer = editing.value
+      ? await $fetch<{ overlaps: string[] }>(`/api/admin/reference-data/seasons/${editing.value.id}`, { method: 'PUT', body })
+      : await $fetch<{ overlaps: string[] }>('/api/admin/reference-data/seasons', { method: 'POST', body })
+    const says = saysOverlaps(answer.overlaps)
+    overlapping.value = says ? { name: body.name, says } : null
     toast.add({ title: editing.value ? 'Season changed' : 'Season added', icon: 'i-lucide-check', color: 'success' })
     open.value = false
     await reload()
@@ -210,8 +210,19 @@ const columns: TableColumn<AdminSeason>[] = [
       :description="failure"
     />
 
+    <UAlert
+      v-if="overlapping"
+      data-test="season-overlaps"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-triangle-alert"
+      :title="`${overlapping.name} is saved`"
+      :description="overlapping.says"
+    />
+
     <p class="text-sm text-muted">
-      The committee years a show belongs to.
+      The theatre's seasons: Autumn, Spring, StuFF and the Fringe. A show takes the season its first
+      performance falls in, unless its Details tab names another.
     </p>
 
     <AdminToolbar
@@ -273,7 +284,7 @@ const columns: TableColumn<AdminSeason>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Edit ${editing.name}` : 'Add a season'"
-      description="The name is held once. Committee years run 1 August to 31 July, London."
+      description="The name is held once. Give its real first and last day, both included, London."
     >
       <template #body>
         <UForm
@@ -322,18 +333,6 @@ const columns: TableColumn<AdminSeason>[] = [
             <DateField
               v-model="state.endsOn"
               data-test="season-ends"
-            />
-          </UFormField>
-
-          <UFormField
-            label="Order"
-            name="sort"
-            description="Lower numbers show first."
-          >
-            <UInputNumber
-              v-model="state.sort"
-              class="w-full"
-              data-test="season-sort"
             />
           </UFormField>
         </UForm>

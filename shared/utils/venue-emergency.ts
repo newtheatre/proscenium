@@ -35,3 +35,9 @@ export interface EmergencyCardCompleteness {
 export function emergencyCardComplete(card: EmergencyCardCompleteness | null | undefined): boolean {
   return Boolean(card?.address && card.assemblyPoint)
 }
+
+// The card's own address is the one read to 999; the venue's address for audiences only starts
+// a card that has none, so the two can differ from the first save on (issue 1352).
+export function cardAddressDraft(cardAddress: string | null, venueAddress: string | null): string {
+  return cardAddress ?? venueAddress ?? ''
+}

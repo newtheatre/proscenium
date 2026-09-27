@@ -351,9 +351,10 @@ const columns: TableColumn<AdminVenue>[] = [
           </UFormField>
 
           <UFormField
-            label="Postal address"
+            label="Address for audiences"
             name="address"
             hint="Optional"
+            description="Where the audience comes to. The emergency card keeps its own address to read to 999."
           >
             <UInput
               v-model="state.address"
