@@ -7,17 +7,21 @@ export default defineTask({
   },
   async run() {
     const before = new Date()
-    await sweepExpiredLimits(before)
-    const attempts = await sweepExpiredAttempts(before)
-    const tokens = await sweepExpiredTokens(before)
-    const unverified = await expireUnverifiedAccounts(before)
-    const renewals = await remindExpiringMemberships(undefined, before)
-    const waitingClaims = await remindWaitingClaims(undefined, before)
-    const withdrawnAccessProfiles = await sweepWithdrawnAccessProfiles(before)
-    const backstage = await purgeStaleMessages(before)
-    const roleLapses = await sweepRoleLapses(undefined, before)
-    const sendLog = await pruneNotificationLog(undefined, before)
-    const digestEntries = await pruneOrphanedDigestEntries()
-    return { result: { attempts, tokens, unverified, renewals, waitingClaims, withdrawnAccessProfiles, backstage, roleLapses, sendLog, digestEntries } }
+    // Independent steps: one that fails is logged and the rest still run, then the task fails.
+    const result = await runEachStep('daily:sweeps', {
+      limits: () => sweepExpiredLimits(before),
+      attempts: () => sweepExpiredAttempts(before),
+      tokens: () => sweepExpiredTokens(before),
+      unverified: () => expireUnverifiedAccounts(before),
+      renewals: () => remindExpiringMemberships(undefined, before),
+      waitingClaims: () => remindWaitingClaims(undefined, before),
+      withdrawnAccessProfiles: () => sweepWithdrawnAccessProfiles(before),
+      backstage: () => purgeStaleMessages(before),
+      roleLapses: () => sweepRoleLapses(undefined, before),
+      sendLog: () => pruneNotificationLog(undefined, before),
+      digestEntries: () => pruneOrphanedDigestEntries(),
+    })
+    const { limits: _, ...counts } = result
+    return { result: counts }
   },
 })
