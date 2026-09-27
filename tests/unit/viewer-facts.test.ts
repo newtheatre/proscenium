@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { sessionFacts } from '#shared/utils/viewer-facts'
+import { NO_SESSION_FACTS, sessionFacts, viewerFromSession } from '#shared/utils/viewer-facts'
 import type { ViewerFacts } from '#shared/utils/viewer-facts'
 
 // The session and the ability resolver read one set of viewer facts, so a fact added to one can
@@ -42,6 +42,18 @@ describe('one set of viewer facts for the session and the ability resolver', () 
     const answered = sessionFacts(FACTS)
     expect(answered).toMatchObject(shared)
     expect(Object.keys(answered).sort()).toEqual([...Object.keys(shared), 'canWorkTonight'].sort())
+  })
+
+  // The client's snapshot is typed from the session answer, so its signed-out defaults name every
+  // fact, and the chrome's viewer is rebuilt from it with nothing lost or added.
+  test('the chrome rebuilds the resolver\'s viewer from the session answer, fact for fact', () => {
+    const { holdsRole: _, ...viewer } = FACTS
+    expect(viewerFromSession(FACTS.id, sessionFacts(FACTS))).toEqual(viewer)
+  })
+
+  test('signed out, the snapshot holds every fact the session answers, each at its empty value', () => {
+    expect(Object.keys(NO_SESSION_FACTS).sort()).toEqual(Object.keys(sessionFacts(FACTS)).sort())
+    expect(NO_SESSION_FACTS).toMatchObject({ permissions: [], holdsRole: false, canWorkTonight: false, membershipState: { kind: 'none' } })
   })
 
   test('what follows from the facts is worked out from them', () => {

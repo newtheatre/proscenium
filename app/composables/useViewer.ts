@@ -1,3 +1,4 @@
+import { viewerFromSession } from '#shared/utils/viewer-facts'
 import type { Viewer } from '#shared/utils/abilities'
 
 // The viewer an ability is checked against in the chrome. The same shape the server resolver
@@ -5,16 +6,8 @@ import type { Viewer } from '#shared/utils/abilities'
 export function useViewer(): ComputedRef<Viewer | null> {
   const { account } = useAccount()
   return computed(() => {
-    const user = account.value.user
-    if (!account.value.signedIn || !user) return null
-    return {
-      id: user.id,
-      permissions: account.value.permissions,
-      onShiftTonight: account.value.onShiftTonight,
-      leadsDepartment: account.value.leadsDepartment,
-      isTrainer: account.value.isTrainer,
-      keepsBarTab: account.value.keepsBarTab,
-      membershipState: account.value.membershipState,
-    }
+    const { signedIn, user, ...facts } = account.value
+    if (!signedIn || !user) return null
+    return viewerFromSession(user.id, facts)
   })
 }
