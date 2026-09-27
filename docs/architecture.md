@@ -1930,7 +1930,7 @@ stops it (0003). A write that wrote nothing names a closure only when a re-read 
 (`closedNow()`, the same predicate; `lostWriteCause()` decides), and is then refused as the check
 would have refused it, or for an approval in a batch gets a `closed` outcome naming the closure;
 otherwise it is the clash it has always been. A bump's offer lost that way is not linked or
-announced: the batch clears the link and the route offers only an offer that was written. A booking
+announced: the bump links only an offer that was written, and the route offers only that. A booking
 made before the room was attached or the performance scheduled is not cancelled;
 `GET /api/admin/rooms/blackouts/performances` (`rooms.read`) lists each closure to the booking
 horizon with the bookings it overlaps, and the Closures screen shows them read-only. Cancelling the

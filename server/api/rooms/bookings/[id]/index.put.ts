@@ -72,7 +72,12 @@ export default defineEventHandler(async (event) => {
   const restartClock = restartsTheClock(booking, after)
 
   // Stays a request whatever the verdict: the approvers were asked, and an edit does not answer.
-  const edited = await editPending({ ...after, id, userId: account.id, restartClock, now: nowSeconds, offsets: await shiftOffsetDefaults(event) })
+  const edited = await editPending({ ...after, id, userId: account.id, restartClock, now: nowSeconds, offsets: await shiftOffsetDefaults(event) }, auditEntry({
+    actorId: account.id,
+    action: 'room.request.edited',
+    target: `booking:${id}`,
+    detail: { room: room.id, ...editDiff(booking, after), restartedClock: restartClock },
+  }))
 
   if (!edited.won) {
     switch (edited.why) {
@@ -93,13 +98,6 @@ export default defineEventHandler(async (event) => {
         })
     }
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: account.id,
-    action: 'room.request.edited',
-    target: `booking:${id}`,
-    detail: { room: room.id, ...editDiff(booking, after), restartedClock: restartClock },
-  }))
 
   return {
     ok: true,

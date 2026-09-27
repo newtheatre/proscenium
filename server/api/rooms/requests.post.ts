@@ -56,7 +56,13 @@ export default defineEventHandler(async (event) => {
     notes: input.notes,
     reason: input.reason,
     offsets: await shiftOffsetDefaults(event),
-  })
+  }, id => auditEntry({
+    actorId: account.id,
+    action: 'room.requested',
+    target: `booking:${id}`,
+    // The rules it broke, never the reason: that is the member's own words (0011).
+    detail: { room: room.id, tier, failed: verdict.failures.map(failure => failure.reason) },
+  }))
 
   if (!claimed.won && claimed.why === 'closed') {
     throw (await closedOver(event, room.id, from, to)) ?? createError({ statusCode: 409, statusMessage: 'Somebody booked that slot first' })
@@ -71,14 +77,6 @@ export default defineEventHandler(async (event) => {
       data: { conflicts: maskConflicts(claimed.conflicts, permissions.has('rooms.read')) },
     })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: account.id,
-    action: 'room.requested',
-    target: `booking:${claimed.id}`,
-    // The rules it broke, never the reason: that is the member's own words (0011).
-    detail: { room: room.id, tier, failed: verdict.failures.map(failure => failure.reason) },
-  }))
 
   await notify(event, {
     type: 'room.request.received',

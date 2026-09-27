@@ -111,6 +111,12 @@ export default defineEventHandler(async (event) => {
   const status = needsApproval ? 'PENDING_APPROVAL' as const : 'CONFIRMED' as const
   const purpose = await requirePurpose(event, input.purpose)
   const tier = bookingTier(purpose, input.tier, isAdmin)
+  const entry = auditEntry({
+    actorId: account.id,
+    action: status === 'CONFIRMED' ? 'room.series.booked' : 'room.series.requested',
+    target: `series:${seriesId}`,
+    detail: { room: room.id, tier, occurrences: occurrences.length, frequency: input.frequency },
+  })
 
   try {
     await writeSeries({
@@ -126,7 +132,7 @@ export default defineEventHandler(async (event) => {
       recurrence,
       occurrences,
       offsets: await shiftOffsetDefaults(event),
-    })
+    }, entry)
   }
   catch {
     // The completeness assertion raised and nothing was written (0035): a closure made since the
@@ -150,13 +156,6 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Somebody booked one of those slots while this was being worked out',
     })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: account.id,
-    action: status === 'CONFIRMED' ? 'room.series.booked' : 'room.series.requested',
-    target: `series:${seriesId}`,
-    detail: { room: room.id, tier, occurrences: occurrences.length, frequency: input.frequency },
-  }))
 
   await notify(event, {
     type: status === 'CONFIRMED' ? 'room.series.confirmed' : 'room.series.requested',

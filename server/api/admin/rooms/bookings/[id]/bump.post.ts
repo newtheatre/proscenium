@@ -39,7 +39,13 @@ export default defineEventHandler(async (event) => {
     offer,
     now,
     offsets: await shiftOffsetDefaults(event),
-  })
+  }, auditEntry({
+    actorId: account.id,
+    action: 'room.booking.bumped',
+    target: `booking:${id}`,
+    // The batch adds the booking that replaced it and the offer it held (criterion 5).
+    detail: { room: displaced.roomId, tier: input.tier, was: displaced.tier },
+  }))
 
   // The bump carries the closures itself, so one made since the check above stops it (0003).
   if (!outcome.won) {
@@ -50,20 +56,6 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'That booking changed while this was being worked out',
     })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: account.id,
-    action: 'room.booking.bumped',
-    target: `booking:${id}`,
-    // The displaced booking, the one that replaced it, and the offer made (criterion 5).
-    detail: {
-      room: displaced.roomId,
-      replacedBy: outcome.replacementId,
-      offered: outcome.offeredId,
-      tier: input.tier,
-      was: displaced.tier,
-    },
-  }))
 
   // Immediately, with the reason and what they have instead: nobody should learn this by
   // finding somebody else in the room (criterion 3).

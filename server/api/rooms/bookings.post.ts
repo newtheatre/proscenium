@@ -70,7 +70,12 @@ export default defineEventHandler(async (event) => {
     status: 'CONFIRMED',
     notes: input.notes,
     offsets: await shiftOffsetDefaults(event),
-  })
+  }, id => auditEntry({
+    actorId: account.id,
+    action: 'room.booked',
+    target: `booking:${id}`,
+    detail: { room: room.id, tier },
+  }))
 
   if (!claimed.won && claimed.why === 'closed') {
     throw (await closedOver(event, room.id, from, to)) ?? createError({ statusCode: 409, statusMessage: 'Somebody booked that slot first' })
@@ -86,13 +91,6 @@ export default defineEventHandler(async (event) => {
       data: { conflicts: maskConflicts(claimed.conflicts, permissions.has('rooms.read')) },
     })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: account.id,
-    action: 'room.booked',
-    target: `booking:${claimed.id}`,
-    detail: { room: room.id, tier },
-  }))
 
   await notify(event, {
     type: 'room.booking.confirmed',

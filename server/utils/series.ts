@@ -4,8 +4,9 @@ import { LIVE_EXTERNAL } from '#shared/utils/external-requests'
 import type { Conflict } from '#shared/utils/bookings'
 import type { Occurrence, Recurrence } from '#shared/utils/series'
 import type { Failure } from '#shared/utils/booking-policy'
-import { seriesClaimStatement } from './room-writes'
+import { seriesAuditStatement, seriesClaimStatement } from './room-writes'
 import type { SeriesClaim } from './room-writes'
+import type { AuditRow } from '#shared/utils/audit'
 
 // Writing a whole series or none of it (C-110 criteria 2 and 3). D1 has no interactive
 // transaction, so the all-or-nothing shape is a batch and an assertion inside it (0035).
@@ -65,7 +66,7 @@ export async function conflictsAcross(roomId: string, occurrences: Occurrence[])
 
 // Every occurrence claimed under its own clash and closure predicates, then an assertion they all landed: a
 // short count re-inserts the series row onto its own primary key, failing the batch (0035).
-export async function writeSeries(write: SeriesWrite): Promise<{ ids: string[] }> {
+export async function writeSeries(write: SeriesWrite, entry: AuditRow): Promise<{ ids: string[] }> {
   const ids = write.occurrences.map(() => newId())
   const weekdays = write.recurrence.frequency === 'WEEKLY'
     ? [...write.recurrence.weekdays].sort((a, b) => a - b).join(',')
@@ -93,6 +94,7 @@ export async function writeSeries(write: SeriesWrite): Promise<{ ids: string[] }
     db.run(seriesRow),
     ...claims.map(claim => db.run(claim)),
     db.run(assertion),
+    db.run(seriesAuditStatement(write.seriesId, entry)),
   ] as unknown as Parameters<typeof db.batch>[0])
 
   return { ids }

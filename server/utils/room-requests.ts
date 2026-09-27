@@ -123,15 +123,17 @@ type Asked = { title: string, startsAt: number }
 async function expire(event: H3Event | undefined, request: Waiting, now: number): Promise<boolean> {
   // A decision or a clock-restarting edit landing since the read wins (0006); the title and time
   // come back from the write, because an edit may have changed them since.
-  const [lapsed] = await db.all<Asked>(lapseStatement(request.id, request.createdAt, now))
+  const [written] = await db.batch([
+    db.all<Asked>(lapseStatement(request.id, request.createdAt, now)),
+    db.run(auditIfChanged(auditEntry({
+      actorId: null,
+      action: 'room.request.expired',
+      target: `booking:${request.id}`,
+      detail: { room: request.room },
+    }))),
+  ])
+  const [lapsed] = written as Asked[]
   if (!lapsed) return false
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: null,
-    action: 'room.request.expired',
-    target: `booking:${request.id}`,
-    detail: { room: request.room },
-  }))
 
   await notify(event, {
     type: 'room.request.expired',

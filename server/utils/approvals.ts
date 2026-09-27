@@ -1,11 +1,13 @@
 import { db, schema } from '@nuxthub/db'
 import { eq, inArray, sql } from 'drizzle-orm'
 // Named rather than auto-imported, because `tests/` typechecks this file under Bun (0055).
+import { auditedWrite } from './audit'
 import { conflictsWith } from './bookings'
 import { closedNow, roomOpenTerms } from './performance-closures'
 import { chunked, refusalToDecide } from '#shared/utils/approvals'
 import { lostWriteCause } from '#shared/utils/blackouts'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
+import type { AuditRow } from '#shared/utils/audit'
 import type { Conflict } from '#shared/utils/bookings'
 import type { ShiftOffsets } from '#shared/utils/rota-times'
 import type { SQL } from 'drizzle-orm'
@@ -65,17 +67,17 @@ async function selectPending(where: ReturnType<typeof eq>): Promise<PendingRow[]
     .where(where)
 }
 
-// The whole predicate is on the statement: still waiting, room still bookable, and nothing
-// overlapping it in the room it is going into. A read then a write could be interleaved (0006).
-export async function approveOne(id: string, actorId: string, intoRoom: string | null, now: number, offsets: ShiftOffsets): Promise<DecisionOutcome> {
-  const confirmed = await db.all<{ id: string }>(approveStatement(id, actorId, intoRoom, now, offsets))
-
-  // The alias is not usable in RETURNING, which is why the column is bare (SQLite).
-  if (confirmed.length > 0) return { id, ok: true, status: 'CONFIRMED' }
+// The whole predicate is on the statement (0006), and each decision audits in its own batch, so a
+// bulk answer failing part-way leaves every decision before the failure with its trail (0049).
+export async function approveOne(id: string, actorId: string, intoRoom: string | null, now: number, offsets: ShiftOffsets, entry: AuditRow): Promise<DecisionOutcome> {
+  if (await auditedWrite(db.all<{ id: string }>(approveStatement(id, actorId, intoRoom, now, offsets)), entry)) {
+    return { id, ok: true, status: 'CONFIRMED' }
+  }
   return whyItFailed(id, intoRoom, offsets)
 }
 
-// Built apart from its run so a test can race it against a member's edit on a real schema.
+// Still waiting, room still bookable, nothing overlapping it in the room it goes into. The alias
+// is not usable in RETURNING, which is why the column is bare (SQLite).
 export function approveStatement(id: string, actorId: string, intoRoom: string | null, now: number, offsets: ShiftOffsets): SQL {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
 
@@ -102,8 +104,8 @@ export function approveStatement(id: string, actorId: string, intoRoom: string |
   `
 }
 
-export async function rejectOne(id: string, actorId: string, reason: string, now: number): Promise<DecisionOutcome> {
-  const rejected = await db.all<{ id: string }>(sql`
+export function rejectStatement(id: string, actorId: string, reason: string, now: number): SQL {
+  return sql`
     UPDATE room_bookings AS target
     SET status = 'REJECTED',
         rejection_reason = ${reason},
@@ -112,9 +114,13 @@ export async function rejectOne(id: string, actorId: string, reason: string, now
         updated_at = ${now}
     WHERE target.id = ${id} AND target.status = 'PENDING_APPROVAL'
     RETURNING id
-  `)
+  `
+}
 
-  if (rejected.length > 0) return { id, ok: true, status: 'REJECTED' }
+export async function rejectOne(id: string, actorId: string, reason: string, now: number, entry: AuditRow): Promise<DecisionOutcome> {
+  if (await auditedWrite(db.all<{ id: string }>(rejectStatement(id, actorId, reason, now)), entry)) {
+    return { id, ok: true, status: 'REJECTED' }
+  }
   return whyItFailed(id, null)
 }
 

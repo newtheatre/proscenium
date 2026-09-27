@@ -4,6 +4,7 @@ import { closuresAcross } from './blackouts'
 import { bumpStatements } from './room-writes'
 import { blackoutOver } from '#shared/utils/blackouts'
 import type { BumpWrite } from './room-writes'
+import type { AuditRow } from '#shared/utils/audit'
 import type { Alternative } from '#shared/utils/tiers'
 import type { H3Event } from 'h3'
 
@@ -115,21 +116,15 @@ export function nearestTo(displaced: Displaced, candidates: Alternative[]): Alte
 }
 
 // The bump itself: the displaced booking becomes BUMPED and the claimant's takes the slot, in one
-// batch guarded on the status that was read (criteria 2 and 4).
-export async function performBump(input: BumpWrite & { displaced: Displaced }): Promise<{ won: boolean, replacementId: string | null, offeredId: string | null }> {
+// batch guarded on the status that was read, with its audit (criteria 2 and 4, 0049).
+export async function performBump(input: BumpWrite & { displaced: Displaced }, entry: AuditRow): Promise<{ won: boolean, replacementId: string | null, offeredId: string | null }> {
   const claimId = newId()
   const offerId = input.offer ? newId() : null
-  const statements = bumpStatements(input, claimId, offerId).map(statement => db.run(statement))
+  const statements = bumpStatements(input, claimId, offerId, entry).map(statement => db.run(statement))
 
   await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
 
-  const [after] = await db.select({ status: schema.roomBookings.status })
-    .from(schema.roomBookings)
-    .where(eq(schema.roomBookings.id, input.displaced.id))
-    .limit(1)
-
-  if (after?.status !== 'BUMPED') return { won: false, replacementId: null, offeredId: null }
-
+  // The claimant's booking is written only with the bump, so its being there is the bump's answer.
   const written = async (id: string | null): Promise<boolean> => id !== null && (await db.select({ id: schema.roomBookings.id })
     .from(schema.roomBookings)
     .where(eq(schema.roomBookings.id, id))
