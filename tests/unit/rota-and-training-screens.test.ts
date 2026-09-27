@@ -11,6 +11,8 @@ const TEMPLATES = 'app/pages/rota/manage/templates.vue'
 const BOARD = 'app/pages/rota/manage/shifts.vue'
 const OPENINGS = 'app/pages/rota/manage/openings.vue'
 const APPROVALS = 'app/pages/rota/manage/approvals.vue'
+const CLAIM_ANSWER = 'app/composables/useClaimAnswer.ts'
+const DECLINE_MODAL = 'app/components/DeclineClaimModal.vue'
 const RECORDS = 'app/pages/training/manage/records.vue'
 const REQUESTS = 'app/pages/training/manage/requests.vue'
 const SESSIONS = 'app/pages/training/manage/sessions/index.vue'
@@ -47,16 +49,20 @@ describe('the claims waiting for confirmation are worked on the board (E-105 cri
   })
 
   test('a claim on the board can be declined with a reason, as well as confirmed', async () => {
-    const source = await read(BOARD)
-    expect(source).toContain(':data-test="`decline-${shift.shiftId}`"')
-    expect(source).toContain('/decline`')
+    expect(await read(BOARD)).toContain(':data-test="`decline-${shift.shiftId}`"')
+    expect(await read(CLAIM_ANSWER)).toContain('/decline`')
   })
 
+  // The board and the openings screen answer a claim through one composable and one dialogue.
   test('a refused Confirm opens Decline with the route\'s reason, and a plain Decline starts empty', async () => {
-    const source = await read(BOARD)
-    expect(source).toContain('refusalData<{ declineReason?: string }>(error)?.declineReason')
-    expect(source).toContain('openDecline(shift, offered)')
-    expect(source).toContain('@click="openDecline(shift)"')
+    const answer = await read(CLAIM_ANSWER)
+    expect(answer).toContain('refusalData<{ declineReason?: string }>(error)?.declineReason')
+    expect(answer).toContain('openDecline(claim, offered)')
+    expect(await read(DECLINE_MODAL)).toContain('if (isOpen) state.reason = props.offered')
+    const board = await read(BOARD)
+    expect(board).toContain('useClaimAnswer<RosterShift>(')
+    expect(board).toContain('@click="openDecline(shift)"')
+    expect(board).toContain(':offered="declineOffered"')
   })
 
   test('Confirm and Decline each work one at a time, so a double press never meets a 409', async () => {
@@ -111,16 +117,37 @@ describe('the board shows bar openings beside performances (E-130 criterion 8)',
 describe('a queued claim on a bar opening is confirmed or declined on the openings screen', () => {
   test('a claimed slot offers Confirm and Decline, through the opening\'s own routes', async () => {
     const source = await read(OPENINGS)
-    expect(source).toContain('`/api/rota/openings/shifts/${slot.slotId}/approve`')
-    expect(source).toContain('`/api/rota/openings/shifts/${slot.slotId}/decline`')
+    expect(source).toContain('useClaimAnswer<Slot>(')
+    expect(source).toContain('route: slot => `/api/rota/openings/shifts/${slot.slotId}`')
     expect(source).toContain('`confirm-${slot.slotId}`')
     expect(source).toContain('`decline-${slot.slotId}`')
+    const answer = await read(CLAIM_ANSWER)
+    expect(answer).toContain('`${options.route(claim)}/approve`')
+    expect(answer).toContain('`${options.route(claim)}/decline`')
   })
 
-  test('a decline asks for the reason the claimant is shown', async () => {
+  test('a decline asks for the reason the claimant is shown, in the dialogue the board uses', async () => {
+    expect(await read(OPENINGS)).toContain('<DeclineClaimModal')
+    const modal = await read(DECLINE_MODAL)
+    expect(modal).toContain(':schema="shiftDeclineForm"')
+    expect(modal).toContain('data-test="decline-reason"')
+  })
+
+  test('a refused Confirm opens Decline with the route\'s reason, and a plain Decline starts empty', async () => {
     const source = await read(OPENINGS)
-    expect(source).toContain(':schema="shiftDeclineForm"')
-    expect(source).toContain('data-test="decline-reason"')
+    expect(source).toContain(':offered="declineOffered"')
+    expect(source).toContain('\'onClick\': () => openDecline(slot)')
+  })
+
+  test('Confirm and Decline each work one at a time, so a double press never meets a 409', async () => {
+    const source = await read(OPENINGS)
+    expect(source).toContain('\'loading\': confirmingId.value === slot.slotId')
+    expect(source).toContain(':loading="declineWorking"')
+    expect(await read(CLAIM_ANSWER)).toContain('if (confirmingId.value) return')
+  })
+
+  test('a claimed slot is answered rather than stood down', async () => {
+    expect(await read(OPENINGS)).toContain('slot.status === \'CONFIRMED\' || slot.status === \'DECLINED\'')
   })
 })
 

@@ -9,10 +9,10 @@ import { can, manageRota } from '#shared/utils/abilities'
 import { BAR_OPENING_LABEL_LIMIT, saysBarOpeningStatus } from '#shared/utils/rota-openings'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
 import { showNightOf } from '#shared/utils/show-night'
-import { saysShiftStatus, shiftDeclineForm } from '#shared/utils/rota'
+import { saysShiftStatus } from '#shared/utils/rota'
 import type { BarOpeningStatus } from '#shared/utils/rota-openings'
 import type { ShiftStatus, TemplateSlot } from '#shared/utils/rota'
-import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
+import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Bar openings', middleware: 'console', docs: '/docs/rota/bar-openings' })
 
@@ -190,70 +190,16 @@ async function standDown(): Promise<void> {
   }
 }
 
-// A queued claim is worked here, where the opening is staffed (E-130 criterion 3). One at a time,
-// so a second press is ignored rather than meeting a 409.
-const confirmingId = ref<string | null>(null)
-
-async function confirmClaim(slot: Slot): Promise<void> {
-  if (confirmingId.value) return
-  confirmingId.value = slot.slotId
-  failure.value = null
-  try {
-    await $fetch(`/api/rota/openings/shifts/${slot.slotId}/approve`, { method: 'POST' })
-    toast.add({ title: `${slot.holderName ?? 'The claimant'} confirmed`, icon: 'i-lucide-check', color: 'success' })
-    await refresh()
-  }
-  catch (error) {
-    // A claimant who no longer qualifies is offered the decline with its reason written, as the
-    // board does (issue 1302), and the refusal is said inside that dialogue.
-    const offered = refusalData<{ declineReason?: string }>(error)?.declineReason
-    if (offered) {
-      openDecline(slot, offered)
-      declineFailure.value = refusalText(error)
-    }
-    else {
-      failure.value = refusalText(error)
-    }
-  }
-  finally {
-    confirmingId.value = null
-  }
-}
-
-// The reason is read by the claimant word for word (E-105 criterion 3).
-const declining = ref<Slot | null>(null)
-const declineFailure = ref<string | null>(null)
-const declineWorking = ref(false)
-const decline = reactive<{ reason?: string }>({})
-
-function openDecline(slot: Slot, reason?: string): void {
-  declineFailure.value = null
-  declining.value = slot
-  decline.reason = reason
-}
-
-async function submitDecline(event: FormSubmitEvent<{ reason: string }>): Promise<void> {
-  const slot = declining.value
-  if (!slot || declineWorking.value) return
-  declineWorking.value = true
-  declineFailure.value = null
-  try {
-    await $fetch(`/api/rota/openings/shifts/${slot.slotId}/decline`, { method: 'POST', body: event.data })
-    toast.add({
-      title: 'Declined',
-      description: `${slot.holderName ?? 'The claimant'} is told why. Stand the slot down to put it back on offer.`,
-      icon: 'i-lucide-x',
-    })
-    declining.value = null
-    await refresh()
-  }
-  catch (error) {
-    declineFailure.value = refusalText(error)
-  }
-  finally {
-    declineWorking.value = false
-  }
-}
+// A queued claim is worked here, where the opening is staffed (E-130 criterion 3), the same way
+// the board works a shift's.
+const { confirmingId, confirm, declining, declineOffered, declineFailure, declineWorking, openDecline, closeDecline, submitDecline } = useClaimAnswer<Slot>({
+  route: slot => `/api/rota/openings/shifts/${slot.slotId}`,
+  id: slot => slot.slotId,
+  confirmedTitle: slot => `${slot.holderName ?? 'The claimant'} confirmed`,
+  declinedDescription: slot => `${slot.holderName ?? 'The claimant'} is told why. The slot is back on offer once they dismiss it or you stand it down.`,
+  failure,
+  refresh,
+})
 
 const adding = ref<string | null>(null)
 
@@ -328,7 +274,7 @@ function slotLine(slot: Slot, opening: Opening): VNode {
             'loading': confirmingId.value === slot.slotId,
             'disabled': confirmingId.value !== null && confirmingId.value !== slot.slotId,
             'data-test': `confirm-${slot.slotId}`,
-            'onClick': () => confirmClaim(slot),
+            'onClick': () => confirm(slot),
           }, () => 'Confirm'),
           h(UButton, {
             'size': 'xs',
@@ -341,7 +287,7 @@ function slotLine(slot: Slot, opening: Opening): VNode {
           }, () => 'Decline'),
         ]
       : []),
-    // A declined slot is reopened by standing it down: an opening has no other way back (E-107).
+    // Standing down is the officer's way to reopen a declined slot; the member's is to dismiss it (E-114).
     ...(writes.value && (slot.status === 'CONFIRMED' || slot.status === 'DECLINED')
       ? [h(UButton, {
           'size': 'xs',
@@ -647,41 +593,15 @@ watch(modalOpen, (nowOpen) => {
       @confirm="removeSlot"
     />
 
-    <ConfirmModal
+    <DeclineClaimModal
       :open="declining !== null"
-      name="decline-claim"
       :title="declining ? `Decline ${declining.holderName ?? 'this claim'}` : ''"
-      verb="Decline the claim"
-      consequence="Say why: the claimant sees this word for word. The slot keeps their name until you stand it down."
-      form="decline-form"
+      consequence="Say why: the claimant sees this word for word. The slot keeps their name until they dismiss it or you stand it down."
+      :offered="declineOffered"
       :loading="declineWorking"
       :failure="declineFailure"
-      @update:open="value => { if (!value) { declining = null; declineFailure = null } }"
-    >
-      <template #body>
-        <UForm
-          id="decline-form"
-          :schema="shiftDeclineForm"
-          :state="decline"
-          class="space-y-4"
-          @submit="submitDecline"
-        >
-          <UFormField
-            name="reason"
-            label="Reason"
-            required
-          >
-            <UTextarea
-              v-model="decline.reason"
-              data-test="decline-reason"
-              :rows="3"
-              autoresize
-              :maxrows="6"
-              class="w-full"
-            />
-          </UFormField>
-        </UForm>
-      </template>
-    </ConfirmModal>
+      @close="closeDecline"
+      @decline="submitDecline"
+    />
   </div>
 </template>

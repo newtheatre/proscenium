@@ -22,6 +22,7 @@ let foh: TestMember
 let member: TestMember
 let other: TestMember
 let venueId: string
+let barModuleId = ''
 const fohPassword = generatePassword()
 
 // A week out rather than tonight: the open-slot list and a member's own rota both filter on the
@@ -54,7 +55,32 @@ beforeAll(async () => {
   finally {
     database.close()
   }
+
+  // The bar gate names a module every claimant here holds, so a claim is refused only where a
+  // test takes the training away (E-104, as rota-claim.test.ts sets its own gate).
+  const department = `OPN${crypto.randomUUID().slice(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, 'X')}`
+  expect((await request(app, 'POST', '/api/admin/training/departments', { code: department, name: 'Bar openings' }, admin.cookie)).status).toBe(200)
+  barModuleId = `${department}-101`
+  expect((await request(app, 'POST', '/api/admin/training/modules', {
+    id: barModuleId, department, kind: 'MODULE', name: `Module ${barModuleId}`, status: 'ACTIVE',
+  }, admin.cookie)).status).toBe(200)
+  expect((await request(app, 'PUT', '/api/admin/config/SHIFT_ELIGIBILITY_BAR_MODULE', { value: barModuleId }, admin.cookie)).status).toBe(200)
+  for (const claimant of [member, other]) award(claimant.id)
 }, BOOT_TIMEOUT_MS)
+
+// A current bar training record, awarded a month ago; the id lets a test revoke it.
+function award(userId: string): string {
+  const id = `tr-${crypto.randomUUID().slice(0, 8)}`
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(`INSERT INTO training_records (id, user_id, module_id, awarded_on, source) VALUES (?, ?, ?, ?, 'SIGNOFF')`)
+      .run(id, userId, barModuleId, daysAfter(currentShowNight(), -30))
+  }
+  finally {
+    database.close()
+  }
+  return id
+}
 
 afterAll(async () => {
   await app?.stop()
@@ -337,6 +363,40 @@ describe.skipIf(skip !== null)('a queued claim is confirmed or declined (E-130 c
       finally {
         database.close()
       }
+    }
+    finally {
+      await setAutoConfirm(true)
+    }
+  })
+
+  // Issue 1302 through the opening's own route: a claimant whose bar training lapsed since is not
+  // confirmed, and the refusal carries the decline reason the screen offers.
+  test('a claim whose bar training lapsed since is refused, offering its decline reason', async () => {
+    await setAutoConfirm(false)
+    try {
+      const lapsing = await registerMember(app, 'openings-lapsing', generatePassword())
+      const recordId = award(lapsing.id)
+      expect((await plan('A lapsed hire', foh.cookie)).status).toBe(200)
+      const { items, slots } = await listing(foh.cookie)
+      const opening = items.find(one => one.label === 'A lapsed hire')!
+      const slot = slots.find(one => one.openingId === opening.openingId)!
+      expect((await request(app, 'POST', `/api/rota/openings/shifts/${slot.slotId}/claim`, {}, lapsing.cookie)).status).toBe(200)
+
+      const database = new Database(app.databaseFile)
+      try {
+        database.query('UPDATE training_records SET revoked_at = unixepoch(), revoked_by = ?, revoke_reason = ? WHERE id = ?')
+          .run(admin.id, 'Certificate not renewed', recordId)
+      }
+      finally {
+        database.close()
+      }
+
+      const refused = await request(app, 'POST', `/api/rota/openings/shifts/${slot.slotId}/approve`, {}, foh.cookie)
+      expect(refused.status).toBe(409)
+      const body = await refused.json() as { statusMessage: string, data?: { declineReason?: string } }
+      expect(body.statusMessage).toStartWith('No longer qualifies:')
+      expect(body.data?.declineReason).toContain(`Module ${barModuleId}`)
+      expect(await statusOf(slot.slotId)).toBe('CLAIMED')
     }
     finally {
       await setAutoConfirm(true)
