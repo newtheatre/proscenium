@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { showNightOf } from './show-night'
 
 // The backstage board's join code (E-120). Derived, never stored: the same secret, night, venue
 // and epoch always produce the same code, and a rotated epoch produces a different one.
@@ -11,10 +10,6 @@ export const MAX_FAILED_ATTEMPTS = 10
 // A device joins one show night's board, and the night ends at 04:00 (0014): whatever the phone
 // still holds after that, tonight's board takes tonight's code (E-120, issue 1312).
 export const LAST_NIGHTS_BOARD = 'This board was for last night: join tonight\'s with the new code'
-
-export function boardIsTonight(deviceNight: string, at: Date = new Date()): boolean {
-  return deviceNight === showNightOf(at)
-}
 
 async function hmacSha256(key: string, message: string): Promise<Uint8Array> {
   const imported = await crypto.subtle.importKey(

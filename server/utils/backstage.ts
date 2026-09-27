@@ -5,8 +5,9 @@ import { createError, getCookie } from 'h3'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { newId } from './accounts'
 import { performancesOnNight } from './performances'
-import { LAST_NIGHTS_BOARD, MAX_FAILED_ATTEMPTS, MESSAGE_RETENTION_DAYS, MILESTONE_DEFAULT_SIDE, PRESET_DEFAULT_SIDE, boardIsTonight, deriveBoardCode, deriveFohCredential, saysOtherEndsCall } from '#shared/utils/backstage'
+import { LAST_NIGHTS_BOARD, MAX_FAILED_ATTEMPTS, MESSAGE_RETENTION_DAYS, MILESTONE_DEFAULT_SIDE, PRESET_DEFAULT_SIDE, deriveBoardCode, deriveFohCredential, saysOtherEndsCall } from '#shared/utils/backstage'
 import type { BoardSide } from '#shared/utils/backstage'
+import { currentShowNight } from '#shared/utils/show-night'
 import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
@@ -130,7 +131,7 @@ export async function requireDevice(event: H3Event): Promise<DeviceHolder> {
 
   const device = await deviceByToken(token)
   if (!device) throw createError({ statusCode: 401, statusMessage: 'That device is not recognised' })
-  if (!boardIsTonight(device.night)) throw createError({ statusCode: 401, statusMessage: LAST_NIGHTS_BOARD })
+  if (device.night !== currentShowNight()) throw createError({ statusCode: 401, statusMessage: LAST_NIGHTS_BOARD })
   if (device.revokedAt !== null) throw createError({ statusCode: 401, statusMessage: 'The board was reset: join again with the new code' })
 
   return device

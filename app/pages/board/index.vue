@@ -81,6 +81,21 @@ function take(answered: BoardRead): void {
   deviceId.value = answered.deviceId
 }
 
+// Within five seconds, the contract this story states directly, not a configuration key
+// (criterion 3).
+const POLL_MS = 5_000
+let timer: ReturnType<typeof setInterval> | undefined
+
+// A refused cookie (401: last night's, or revoked by a reset) goes, the poll stops, and the join
+// form takes the board's place saying why, whether the phone was reopened or left open (issue 1312).
+function dropDevice(error: unknown): void {
+  deviceToken.value = null
+  joined.value = null
+  failure.value = refusalText(error)
+  if (timer) clearInterval(timer)
+  timer = undefined
+}
+
 async function loadMessages(): Promise<void> {
   // A config that failed while the phone had no signal is fetched again with the next poll.
   if (milestoneTypes.value.length === 0 && presets.value.length === 0) loadConfig()
@@ -89,12 +104,12 @@ async function loadMessages(): Promise<void> {
     boardFailure.value = null
   }
   catch (error) {
-    boardFailure.value = refusalText(error)
+    if (refusalStatus(error) === 401) dropDevice(error)
+    else boardFailure.value = refusalText(error)
   }
 }
 
-// A refused cookie (401: last night's, or revoked by a reset) goes and the form takes its place,
-// saying why; a dropped connection keeps the device and the board, and the poll tries again.
+// A dropped connection keeps the device and the board, and the poll tries again (criterion 6).
 async function resume(): Promise<void> {
   try {
     const answered = await $fetch<BoardRead>('/api/board/messages')
@@ -103,8 +118,7 @@ async function resume(): Promise<void> {
   }
   catch (error) {
     if (refusalStatus(error) === 401) {
-      deviceToken.value = null
-      failure.value = refusalText(error)
+      dropDevice(error)
     }
     else {
       joined.value = { venueName: 'Tonight\'s board' }
@@ -119,11 +133,6 @@ async function resume(): Promise<void> {
 onMounted(() => {
   if (resuming.value) resume()
 })
-
-// Within five seconds, the contract this story states directly, not a configuration key
-// (criterion 3).
-const POLL_MS = 5_000
-let timer: ReturnType<typeof setInterval> | undefined
 
 watch(joined, (value) => {
   if (!value || timer) return
