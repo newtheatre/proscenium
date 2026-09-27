@@ -208,7 +208,7 @@ const columns: TableColumn<Room>[] = [
   { id: 'capacity', header: 'Capacity', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   { id: 'hours', header: 'Open', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   { id: 'state', header: 'State' },
-  { id: 'actions', header: ACTIONS_HEADER },
+  { id: 'actions', header: ACTIONS_HEADER, meta: ACTIONS_COLUMN },
 ]
 </script>
 
