@@ -75,6 +75,7 @@ export const spaces: Shot[] = [
       { selector: '[data-test="close-room"]', label: 'Close a room' },
       { selector: '[data-test="blackouts-table"]', label: 'The closures' },
       { selector: '[data-test^="reopen-"]:not([data-test="reopen-confirm"])', label: 'Reopen' },
+      { selector: '[data-test="performance-closures"]', label: 'Closed for performances' },
     ],
   },
   {
