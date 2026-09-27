@@ -9,7 +9,7 @@ import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { currentShowNight } from '#shared/utils/show-night'
 import { officerBypassTarget } from '#shared/utils/night-authority'
-import { NIGHT_TAP_TARGET_PX } from '#shared/utils/night-shell'
+import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX } from '#shared/utils/night-shell'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -663,6 +663,13 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await click(view, '[data-test="comp-keep-waiting"]')
     await waitFor(view, `document.querySelector('[data-test="till-comp-pending-chip"]')`)
 
+    // The basket the request named stays as sent: the sheet does not open over it, and no Undo
+    // is offered for the press that filled it (issue 1311).
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="basket-summary-open"]').disabled`)).toBe(true)
+    await view.evaluate(`document.querySelector('[data-test="basket-summary-open"]').click()`)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="basket-sheet"]')`)).toBe(false)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="basket-added-undo"]')`)).toBe(false)
+
     // Decided from elsewhere, exactly as an approving manager would on the glance screen, while
     // the till itself only polls the single request it asked for (Stream 6 A10).
     const listed = await request(app, 'GET', `/api/till/comp-requests?venueId=${comping.venueId}`, undefined, bar2.cookie)
@@ -760,7 +767,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
 describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)', () => {
   // `aSellableProduct` makes a category of its own each time, so a second one is what puts the
   // category chips on the grid at all.
-  async function atTheTill(secondCategory = false): Promise<{ view: Bun.WebView, productId: string }> {
+  async function atTheTill(secondCategory = false, size?: { width: number, height: number }): Promise<{ view: Bun.WebView, productId: string }> {
     const password = generatePassword()
     const staff = await registerMember(app, `till-layout-${crypto.randomUUID().slice(0, 6)}`, password)
     await request(app, 'POST', '/api/admin/roles', { userId: staff.id, role: 'BAR_MANAGER' }, admin.cookie)
@@ -769,7 +776,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
     const { productId } = await aSellableProduct(300)
     if (secondCategory) await aSellableProduct(250)
 
-    const view = await openSignedOutView(app.baseURL)
+    const view = await openSignedOutView(app.baseURL, size)
     await visit(view, `${app.baseURL}/sign-in`)
     await fill(view, 'form input[type="email"]', staff.email)
     await fill(view, 'form input[type="password"]', password)
@@ -902,17 +909,39 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
     await waitFor(view, `document.querySelector('[data-test="category-chips"] button')`)
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
+    // A second press brings Added back, so Undo is there to measure whatever the price took.
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket-added-undo"]')`)
 
-    const heights = `[
+    const sizes = `[
       ...document.querySelectorAll('[data-test="category-chips"] button'),
       document.querySelector('[data-test="allergen-${productId}"]'),
       document.querySelector('[data-test="till-comp-chip"]'),
       document.querySelector('[data-test="till-overflow-menu"]'),
+      document.querySelector('[data-test="basket-summary-open"]'),
+      document.querySelector('[data-test="basket-added-undo"]'),
       ...document.querySelectorAll('[role="tab"]'),
-    ].map(control => Math.round(control.getBoundingClientRect().height))`
-    const measured = await view.evaluate<number[]>(heights)
-    expect(measured.length).toBeGreaterThanOrEqual(6)
-    for (const height of measured) expect(height).toBeGreaterThanOrEqual(48)
+    ].map(control => control.getBoundingClientRect()).map(box => Math.round(Math.min(box.height, box.width)))`
+    const measured = await view.evaluate<number[]>(sizes)
+    expect(measured.length).toBeGreaterThanOrEqual(8)
+    for (const size of measured) expect(size).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+
+    await click(view, '[data-test="basket-summary-open"]')
+    await waitFor(view, `document.querySelector('[data-test="basket-sheet-close"]')`)
+    const back = await view.evaluate<number>(`Math.round(document.querySelector('[data-test="basket-sheet-close"]').getBoundingClientRect().height)`)
+    expect(back).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+    view.close()
+  }, 120_000)
+
+  // K-102 criterion 1: the bar's one row, the press named with its Undo beside the comp chip and the
+  // total, still fits the narrowest phone the show-night screens are built for.
+  test('the bar under the thumb fits a 360 pixel phone while a press is named', async () => {
+    const { view, productId } = await atTheTill(false, { width: NIGHT_VIEWPORT_PX, height: 780 })
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket-added"]') && document.querySelector('[data-test="till-comp-chip"]')`)
+    expect(await view.evaluate<boolean>(`document.documentElement.scrollWidth <= window.innerWidth`)).toBe(true)
     view.close()
   }, 120_000)
 })

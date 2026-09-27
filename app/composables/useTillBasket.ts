@@ -67,9 +67,8 @@ export function useTillBasket(deps: TillBasketDeps) {
     const existing = basket.value.find(line => line.variantId === variant.id && line.choiceItemId === choiceItemId)
     const said = [productName, variant.label, choiceItemName].filter(Boolean).join(', ')
     if (existing) {
-      const before = existing.qty
-      existing.qty = Math.min(existing.qty + 1, MAX_BASKET_LINE_QTY)
-      lastAdded.value = existing.qty > before ? { lineId: existing.id, said } : null
+      lastAdded.value = existing.qty < MAX_BASKET_LINE_QTY ? { lineId: existing.id, said } : null
+      incrementLine(existing)
     }
     else {
       const id = crypto.randomUUID()

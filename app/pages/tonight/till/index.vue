@@ -183,8 +183,6 @@ watch(lastAdded, (added) => {
   }, ADDED_SHOWN_MS)
 })
 onBeforeUnmount(() => clearTimeout(addedTimer))
-// A line a Challenge 25 refusal already took back out has nothing left to undo.
-const added = computed(() => (lastAdded.value && basket.value.some(line => line.id === lastAdded.value!.lineId) ? lastAdded.value : null))
 
 const route = useRoute()
 // Read once, as the claim is taken on mount; dropped from the address so a reload asks nothing.
@@ -285,6 +283,19 @@ const {
   pollRequest: id => $fetch<{ request: CompRequest }>(`/api/till/comp-requests/${id}`),
   giveComp: (id, body) => $fetch<SaleReceipt>(`/api/till/comp-requests/${id}/sale`, { method: 'POST', body }),
   refreshCatalogue: () => catalogue.refresh(),
+})
+
+// A basket a comp request or a waiting charge has named is frozen until it is answered, wherever
+// it is drawn: under the grid, in the sheet, or through Undo (F-110 criterion 4, 0096).
+const basketLocked = computed(() => compLocked.value || sumup.pending.value !== null)
+watch(basketLocked, (locked) => {
+  if (locked) basketSheetOpen.value = false
+})
+
+// Nothing to undo on a frozen basket, or on a line a Challenge 25 refusal already took back out.
+const added = computed(() => {
+  const last = lastAdded.value
+  return last && !basketLocked.value && basket.value.some(line => line.id === last.lineId) ? last : null
 })
 
 // The frozen total once a request exists, the same figure the server holds; the live basket
@@ -710,8 +721,8 @@ const basketBindings = computed(() => ({
 
         <template v-if="!charged">
           <div
-            :inert="compLocked || sumup.pending.value !== null"
-            :class="{ 'opacity-50': compLocked || sumup.pending.value !== null }"
+            :inert="basketLocked"
+            :class="{ 'opacity-50': basketLocked }"
             class="space-y-6"
           >
             <!-- The tabs are hand-rolled rather than UTabs, because the panes need ids that name
@@ -972,6 +983,7 @@ const basketBindings = computed(() => ({
               variant="subtle"
               class="min-h-12 shrink-0"
               trailing-icon="i-lucide-chevron-up"
+              :disabled="basketLocked"
               data-test="basket-summary-open"
               @click="basketSheetOpen = true"
             >
@@ -1048,7 +1060,10 @@ const basketBindings = computed(() => ({
       description="Change a line, add a discount, or close this to charge."
     >
       <template #body>
-        <div data-test="basket-sheet">
+        <div
+          data-test="basket-sheet"
+          :inert="basketLocked"
+        >
           <TillBasket
             v-if="!basketEmpty"
             v-model:selected-discount-id="selectedDiscountId"
