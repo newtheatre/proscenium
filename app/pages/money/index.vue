@@ -4,7 +4,6 @@ import { saysMoney } from '#shared/utils/bar'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
 import { entriesHref } from '#shared/utils/ledger-entries-list'
 import type { EntriesFilters } from '#shared/utils/ledger-entries-list'
-import type { EntrySource } from '#shared/utils/ledger'
 import type { FinanceSeason, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { Period } from '#shared/utils/period-locks'
 import type { TableColumn } from '@nuxt/ui'
@@ -52,7 +51,7 @@ const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
         cell: ({ row }: { row: { original: RevenueBySource } }) => h(UButton, {
           size: 'sm',
           variant: 'subtle',
-          to: entriesUrl({ source: row.original.source as EntrySource, tender: 'CARD' }),
+          to: entriesUrl({ source: row.original.source, tender: 'CARD' }),
         }, () => 'Entries'),
       }]
     : []),
@@ -65,8 +64,8 @@ const figures = computed(() => (data.value
       { label: 'Refunds', test: 'refunds-pence', pence: data.value.refundsPence, to: entriesUrl({ kind: 'REFUND', tender: 'CARD' }) },
       { label: 'Forgone comps', test: 'comps-pence', pence: data.value.compsPence, to: entriesUrl({ tender: 'COMP' }) },
       { label: 'Forgone discounts', test: 'discounts-pence', pence: data.value.discountsPence, to: entriesUrl({ discounted: true }) },
-      // A variance is a reading against the ledger, not an entry, so it opens the readings.
-      { label: 'Open variance', test: 'open-variance-pence', pence: data.value.openVariancePence, to: '/money/reconciliation' },
+      // An open variance is made of nights, each listed and linked in Needs you above; none is none.
+      { label: 'Open variance', test: 'open-variance-pence', pence: data.value.openVariancePence, to: data.value.openVariancePence === 0 ? null : '#nights-needing-you' },
     ]
   : []))
 </script>
@@ -135,7 +134,7 @@ const figures = computed(() => (data.value
               class="text-right font-mono whitespace-nowrap"
             >
               <ULink
-                v-if="mayDrillDown"
+                v-if="mayDrillDown && figure.to"
                 :to="figure.to"
                 class="underline underline-offset-4"
                 :data-test="`${figure.test}-link`"

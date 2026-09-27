@@ -94,7 +94,7 @@ describe('a ledger entry says what it was and opens', () => {
     // A revenue row is card takings only, so its entries are too; the source is typed, not cast.
     expect(source).toContain('entriesUrl({ source: row.original.source, tender: \'CARD\' })')
     // An open variance is made of nights, so it opens the list of them, not tonight's page.
-    expect(source).toContain('to: \'#nights-needing-you\'')
+    expect(source).toContain('\'#nights-needing-you\'')
     expect(await read(NEEDS_YOU)).toContain('id="nights-needing-you"')
   })
 

@@ -9,9 +9,8 @@ import { nightsMissingAReading } from './night-reconciliation'
 import { nightsWithin } from '#shared/utils/night-reconciliation'
 import { londonDayOf } from '#shared/utils/ledger'
 import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
-import { aliasColumns, whereFrom, yesNo } from './list-filters'
-import type { EntrySource, Tender } from '#shared/utils/ledger'
-import type { LedgerEntryRow } from '#shared/utils/ledger-entries-list'
+import { aliasColumns, predicate, whereFrom, yesNo } from './list-filters'
+import type { LedgerEntryDetail, LedgerEntryLine, LedgerEntryOpened, LedgerEntryRow } from '#shared/utils/ledger-entries-list'
 import type { ListQuery } from '#shared/utils/list-filters'
 import type { FinanceSeason, PeriodInput, RangedPeriod, RevenueBySource, SeasonSummary } from '#shared/utils/season-dashboard'
 import type { ListClause } from './list-filters'
@@ -152,12 +151,10 @@ const showsOf = sql`(SELECT group_concat(s.title) FROM ledger_lines ll
   JOIN performances p ON p.id = ll.performance_id JOIN shows s ON s.id = p.show_id WHERE ll.entry_id = le.id)`
 const referencesOf = sql`(SELECT group_concat(r.reference) FROM ledger_lines ll
   JOIN reservations r ON r.id = ll.reservation_id WHERE ll.entry_id = le.id)`
+const anyLine = (where: SQL): SQL => sql`EXISTS (SELECT 1 FROM ledger_lines ll WHERE ll.entry_id = le.id AND ${where})`
 
 // Any of the kinds, as one subquery: the list is capped at the kinds there are (0006).
-function hasKind(kinds: readonly string[]): SQL {
-  return sql`EXISTS (SELECT 1 FROM ledger_lines ll WHERE ll.entry_id = le.id
-    AND ll.kind IN (${sql.join(kinds.map(kind => sql`${kind}`), sql`, `)}))`
-}
+const hasKind = (kinds: readonly string[]): SQL => anyLine(sql`ll.kind IN (${sql.join(kinds.map(kind => sql`${kind}`), sql`, `)})`)
 
 // The drill-down list's own declaration (K-129, I-105 criterion 3): when, source, tender, what was
 // sold and whether it was discounted are filters a treasurer picks, never a query string by hand.
@@ -167,51 +164,32 @@ export function ledgerEntriesClause(query: ListQuery): ListClause {
     search: [referencesOf, showsOf],
     fields: {
       kind: condition => (condition.operator === 'not' ? sql`NOT ${hasKind(condition.values)}` : hasKind(condition.values)),
-      discounted: yesNo(sql`EXISTS (SELECT 1 FROM ledger_lines ll WHERE ll.entry_id = le.id AND ll.discount_pence > 0)`),
+      discounted: yesNo(anyLine(sql`ll.discount_pence > 0`)),
     },
   })
 }
 
-const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clause.where}` : sql``)
-
+// rowid is insertion order on this append-only table; id is a random UUID (0010).
 export function ledgerEntriesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
     SELECT le.id AS id, le.happened_at AS happenedAt, le.source AS source, le.tender AS tender, le.total_pence AS totalPence,
       ${linesOf(sql`group_concat(DISTINCT ll.kind)`)} AS kinds,
       ${linesOf(sql`coalesce(sum(ll.qty), 0)`)} AS items,
       (SELECT s.title FROM ledger_lines ll JOIN performances p ON p.id = ll.performance_id JOIN shows s ON s.id = p.show_id
-        WHERE ll.entry_id = le.id ORDER BY ll.id LIMIT 1) AS showTitle,
+        WHERE ll.entry_id = le.id ORDER BY ll.rowid LIMIT 1) AS showTitle,
       (SELECT r.reference FROM ledger_lines ll JOIN reservations r ON r.id = ll.reservation_id
-        WHERE ll.entry_id = le.id ORDER BY ll.id LIMIT 1) AS reference
+        WHERE ll.entry_id = le.id ORDER BY ll.rowid LIMIT 1) AS reference
     FROM ledger_entries le${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}
   `
 }
 
-export interface LedgerEntryDetail {
-  id: string
-  happenedAt: number
-  source: EntrySource
-  tender: Tender
-  totalPence: number
-  takenBy: string | null
-  compReason: string | null
-  compApprovedBy: string | null
-  discountPercent: number | null
-  discountPence: number | null
-  tabDebtor: string | null
-  voidReason: string | null
-  voidOfEntryId: string | null
-  reversesEntryId: string | null
-}
-
 // One entry with the people on it, named: finance.read alone reaches this (I-105 criterion 5).
 export function ledgerEntryDetailQuery(id: string): SQL {
   return sql`
     SELECT le.id AS id, le.happened_at AS happenedAt, le.source AS source, le.tender AS tender, le.total_pence AS totalPence,
-      taker.name AS takenBy, le.comp_reason AS compReason, approver.name AS compApprovedBy,
-      le.discount_percent AS discountPercent, le.discount_pence AS discountPence, debtor.name AS tabDebtor,
+      taker.name AS takenBy, le.comp_reason AS compReason, approver.name AS compApprovedBy, debtor.name AS tabDebtor,
       le.void_reason AS voidReason, le.void_of_entry_id AS voidOfEntryId, le.reverses_entry_id AS reversesEntryId
     FROM ledger_entries le
     LEFT JOIN users taker ON taker.id = le.actor_id
@@ -221,32 +199,22 @@ export function ledgerEntryDetailQuery(id: string): SQL {
   `
 }
 
-export interface LedgerEntryLine {
-  id: string
-  kind: string
-  qty: number
-  unitPricePence: number | null
-  amountPence: number
-  discountPence: number | null
-  showTitle: string | null
-  startsAt: number | null
-  reference: string | null
-}
-
+// rowid is insertion order on this append-only table; id is a random UUID (0010).
 export function ledgerEntryLinesQuery(id: string): SQL {
   return sql`
     SELECT ll.id AS id, ll.kind AS kind, ll.qty AS qty, ll.unit_price_pence AS unitPricePence, ll.amount_pence AS amountPence,
-      ll.discount_pence AS discountPence, s.title AS showTitle, p.starts_at AS startsAt, r.reference AS reference
+      ll.discount_pence AS discountPence, ll.discount_percent AS discountPercent, s.title AS showTitle,
+      p.starts_at AS startsAt, r.reference AS reference
     FROM ledger_lines ll
     LEFT JOIN performances p ON p.id = ll.performance_id
     LEFT JOIN shows s ON s.id = p.show_id
     LEFT JOIN reservations r ON r.id = ll.reservation_id
     WHERE ll.entry_id = ${id}
-    ORDER BY ll.id
+    ORDER BY ll.rowid
   `
 }
 
-export async function ledgerEntryDetail(id: string): Promise<(LedgerEntryDetail & { lines: LedgerEntryLine[] }) | null> {
+export async function ledgerEntryDetail(id: string): Promise<LedgerEntryOpened | null> {
   const [[entry], lines] = await Promise.all([
     db.all<LedgerEntryDetail>(ledgerEntryDetailQuery(id)),
     db.all<LedgerEntryLine>(ledgerEntryLinesQuery(id)),

@@ -60,6 +60,38 @@ export interface LedgerEntryRow {
   reference: string | null
 }
 
+// One entry as its panel opens it: the people on it, named, and every line (issue 1361).
+export interface LedgerEntryDetail {
+  id: string
+  happenedAt: number
+  source: EntrySource
+  tender: Tender
+  totalPence: number
+  takenBy: string | null
+  compReason: string | null
+  compApprovedBy: string | null
+  tabDebtor: string | null
+  voidReason: string | null
+  voidOfEntryId: string | null
+  reversesEntryId: string | null
+}
+
+// A discount is snapshotted on its line, never on the entry (F-117), so a line carries its own.
+export interface LedgerEntryLine {
+  id: string
+  kind: string
+  qty: number
+  unitPricePence: number | null
+  amountPence: number
+  discountPence: number | null
+  discountPercent: number | null
+  showTitle: string | null
+  startsAt: number | null
+  reference: string | null
+}
+
+export type LedgerEntryOpened = LedgerEntryDetail & { lines: LedgerEntryLine[] }
+
 const KIND_ORDER = LINE_KINDS.map(kind => kind.name as string)
 
 // "Ticket collection (2 items), Hamlet": what a treasurer would say the entry was.

@@ -24,6 +24,7 @@ const nights = computed(() => nightsNeedingYou(data.value))
 <template>
   <UPageCard
     v-if="nights.length"
+    id="nights-needing-you"
     title="Needs you: nights to reconcile"
     :description="`${plural(nights.length, 'night')} with takings and no Z reading, or a reading that still disagrees with what we expect.`"
     data-test="nights-needing-you"

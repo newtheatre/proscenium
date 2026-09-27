@@ -5,8 +5,7 @@ import { describeKind, saysEntrySource, saysTender } from '#shared/utils/ledger'
 import { saysWhen, saysWhenLong } from '#shared/utils/when'
 import { ledgerEntriesList, saysEntryWhat } from '#shared/utils/ledger-entries-list'
 import type { TableColumn } from '@nuxt/ui'
-import type { EntrySource, Tender } from '#shared/utils/ledger'
-import type { LedgerEntryRow } from '#shared/utils/ledger-entries-list'
+import type { LedgerEntryLine, LedgerEntryOpened, LedgerEntryRow } from '#shared/utils/ledger-entries-list'
 import type { Page } from '#shared/utils/pagination'
 
 definePageMeta({ layout: 'console', title: 'Ledger entries', middleware: 'console', docs: '/docs/money/ledger-entries' })
@@ -35,26 +34,7 @@ const { data, status: loading, error } = await useAsyncData(
 const entriesFailure = computed(() => (error.value ? refusalText(error.value, 'The entries could not be read.') : null))
 
 // One entry, opened in a drawer: who took it, who approved it, whose tab and every line (issue 1361).
-interface EntryLine { id: string, kind: string, qty: number, unitPricePence: number | null, amountPence: number, discountPence: number | null, showTitle: string | null, startsAt: number | null, reference: string | null }
-interface EntryDetail {
-  id: string
-  happenedAt: number
-  source: EntrySource
-  tender: Tender
-  totalPence: number
-  takenBy: string | null
-  compReason: string | null
-  compApprovedBy: string | null
-  discountPercent: number | null
-  discountPence: number | null
-  tabDebtor: string | null
-  voidReason: string | null
-  voidOfEntryId: string | null
-  reversesEntryId: string | null
-  lines: EntryLine[]
-}
-
-const opened = ref<EntryDetail | null>(null)
+const opened = ref<LedgerEntryOpened | null>(null)
 const openFailure = ref<string | null>(null)
 const opening = ref<string | null>(null)
 const drawerOpen = computed({
@@ -70,7 +50,7 @@ async function open(entry: LedgerEntryRow): Promise<void> {
   opening.value = entry.id
   openFailure.value = null
   try {
-    opened.value = await request<EntryDetail>(`/api/admin/finance/season/entries/${entry.id}`)
+    opened.value = await request<LedgerEntryOpened>(`/api/admin/finance/season/entries/${entry.id}`)
   }
   catch (openError) {
     openFailure.value = refusalText(openError, 'That entry could not be read.')
@@ -91,7 +71,6 @@ const facts = computed(() => {
     { label: 'Taken by', says: entry.takenBy },
     { label: 'Comp reason', says: entry.compReason },
     { label: 'Comp approved by', says: entry.compApprovedBy },
-    { label: 'Discount', says: entry.discountPence ? `${saysMoney(entry.discountPence)}${entry.discountPercent ? ` (${entry.discountPercent}%)` : ''}` : null },
     { label: 'On the tab of', says: entry.tabDebtor },
     { label: 'Why it was voided', says: entry.voidReason },
   ].filter((fact): fact is { label: string, says: string } => Boolean(fact.says))
@@ -152,7 +131,7 @@ const columns: TableColumn<LedgerEntryRow>[] = [
 
 // Two columns: the panel is narrow at every width, so what a line was carries its show, its
 // booking and its discount beneath it rather than beside it.
-const lineColumns: TableColumn<EntryLine>[] = [
+const lineColumns: TableColumn<LedgerEntryLine>[] = [
   {
     id: 'kind',
     header: 'Line',
@@ -161,7 +140,7 @@ const lineColumns: TableColumn<EntryLine>[] = [
       ...[
         [row.original.showTitle, row.original.startsAt ? saysWhen(row.original.startsAt) : null].filter(Boolean).join(', '),
         row.original.reference ? `Booking ${row.original.reference}` : '',
-        row.original.discountPence ? `${saysMoney(row.original.discountPence)} off` : '',
+        row.original.discountPence ? `${saysMoney(row.original.discountPence)} off${row.original.discountPercent ? ` (${row.original.discountPercent}%)` : ''}` : '',
       ].filter(Boolean).map(detail => h('div', { class: 'text-xs text-muted' }, detail)),
     ]),
   },
