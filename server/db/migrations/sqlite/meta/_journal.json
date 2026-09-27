@@ -890,6 +890,13 @@
       "when": 1790513377764,
       "tag": "0126_a_size_may_be_served_without_its_choice",
       "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "6",
+      "when": 1790514377316,
+      "tag": "0127_the_front_of_house_role_is_retired",
+      "breakpoints": true
     }
   ]
 }

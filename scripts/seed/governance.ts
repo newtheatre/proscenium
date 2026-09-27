@@ -74,7 +74,7 @@ function seedAudit(target: SeedTarget, people: People, now: number): number {
 
   const acts: { slug: string, actorId: string | null, action: string, target: string, detail: Record<string, unknown>, daysAgo: number }[] = [
     { slug: 'config', actorId: officer, action: 'config.changed', target: 'config:HOLD_RELEASE_MINUTES_BEFORE', detail: { changes: { value: { from: 15, to: 20 } } }, daysAgo: 45 },
-    { slug: 'role', actorId: officer, action: 'role.granted', target: `user:${personIn(people, 'priya').id}`, detail: { role: 'FRONT_OF_HOUSE' }, daysAgo: 40 },
+    { slug: 'role', actorId: officer, action: 'role.granted', target: `user:${personIn(people, 'priya').id}`, detail: { role: 'COMMITTEE' }, daysAgo: 40 },
     { slug: 'ticket-type', actorId: officer, action: 'ticket-type.created', target: 'ticket-type:standard', detail: { price: 700 }, daysAgo: 60 },
     { slug: 'bar-price', actorId: officer, action: 'bar.category.price.set', target: 'bar-category:spirits', detail: { servingKind: 'single', pricePence: 250 }, daysAgo: 30 },
     { slug: 'stocktake', actorId: personIn(people, 'devon').id, action: 'bar.stocktake.applied', target: 'stocktake:applied', detail: { lines: 5 }, daysAgo: 14 },

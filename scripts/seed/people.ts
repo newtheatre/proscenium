@@ -33,8 +33,8 @@ export interface SeedPerson {
 // a screen that only ever sees a current member is a screen nobody has tested.
 export const PEOPLE: SeedPerson[] = [
   { slug: 'rowan', name: 'Rowan Ellis (test)', pronouns: 'she/her', membership: 'CURRENT', roles: [{ role: 'COMMITTEE', when: 'CURRENT' }] },
-  { slug: 'priya', name: 'Priya Nair (test)', pronouns: 'she/her', membership: 'CURRENT', roles: [{ role: 'FRONT_OF_HOUSE', when: 'CURRENT' }] },
-  { slug: 'tomasz', name: 'Tomasz Zielinski (test)', pronouns: 'he/him', membership: 'CURRENT', roles: [{ role: 'FRONT_OF_HOUSE', when: 'EXPIRING' }] },
+  { slug: 'priya', name: 'Priya Nair (test)', pronouns: 'she/her', membership: 'CURRENT', roles: [{ role: 'COMMITTEE', when: 'CURRENT' }] },
+  { slug: 'tomasz', name: 'Tomasz Zielinski (test)', pronouns: 'he/him', membership: 'CURRENT', roles: [{ role: 'COMMITTEE', when: 'EXPIRING' }] },
   { slug: 'aoife', name: 'Aoife Brennan (test)', pronouns: 'she/her', membership: 'CURRENT', roles: [{ role: 'SAFETY_OFFICER', when: 'CURRENT' }] },
   { slug: 'sam', name: 'Sam Okonkwo (test)', pronouns: 'they/them', membership: 'CURRENT', roles: [{ role: 'THEATRE_MANAGER', when: 'LAPSED' }] },
   { slug: 'iris', name: 'Iris Fairweather (test)', membership: 'CURRENT', roles: [{ role: 'COMMITTEE', when: 'FOREVER' }] },
