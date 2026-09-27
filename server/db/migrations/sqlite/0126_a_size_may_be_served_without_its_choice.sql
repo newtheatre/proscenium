@@ -1,0 +1,1 @@
+ALTER TABLE `variant_components` ADD `choice_optional` integer;

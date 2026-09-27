@@ -883,6 +883,13 @@
       "when": 1790494935931,
       "tag": "0125_a_stocked_item_answers_its_own_allergens",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "6",
+      "when": 1790513377764,
+      "tag": "0126_a_size_may_be_served_without_its_choice",
+      "breakpoints": true
     }
   ]
 }

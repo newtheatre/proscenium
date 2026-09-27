@@ -225,6 +225,9 @@ export const variantComponents = sqliteTable('variant_components', {
   // single without costing twice as much (F-112 criterion 2).
   qty: integer('qty').notNull(),
   includedInPrice: integer('included_in_price', { mode: 'boolean' }).notNull().default(false),
+  // On a choice row only: the size may be served with none of it, a spirit neat (issue 1314).
+  // Nullable and read as false, since a NOT NULL add would rebuild the table.
+  choiceOptional: integer('choice_optional', { mode: 'boolean' }),
 }, table => [
   uniqueIndex('variant_components_item').on(table.variantId, table.itemId),
   // A variant holds at most one choice group; scoping on `variant_id` alone rather than the pair

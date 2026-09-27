@@ -268,6 +268,31 @@ describe.skipIf(skip !== null)('a matched sale depletes stock, one movement per 
     // 150 per double, times a basket quantity of 2: the chosen option alone, not the untouched one.
     expect(movements[0]).toMatchObject({ item_id: lemonade, qty: -300 })
   })
+
+  // Issue 1314: a spirit served neat depletes the spirit, and no mixer nobody poured.
+  test('an optional choice answered with none depletes the size\'s own recipe and nothing offered', async () => {
+    const { venueId } = programme('commit-neat')
+    const categoryId = await aCategory()
+    const productId = await aProductIn(categoryId)
+    const variantId = await addVariant(productId, { servingKind: 'double', label: 'Double' })
+    await priceVariant(variantId, 450)
+    const whisky = await anItem({ name: named('Whisky') })
+    const soda = await anItem({ name: named('Soda') })
+    await deliver(whisky, 700)
+    await deliver(soda, 1000)
+    await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId: whisky, qty: 50 }] })
+    const groupId = await created(await send('POST', '/api/admin/bar/choice-groups', { name: named('Mixers'), options: [{ itemId: soda, qty: 100 }] }))
+    await send('PUT', `/api/admin/bar/variants/${variantId}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true, optional: true })
+    await activate(productId)
+    await openTill(venueId)
+
+    const answered = await charge(venueId, [{ variantId, qty: 1 }], 450)
+    expect(answered.status).toBe(200)
+    const { entryId } = await answered.json() as { entryId: string }
+    const [line] = ledgerLinesFor(entryId)
+    expect(line!.choices).toBeNull()
+    expect(movementsFor(line!.id).map(movement => ({ item_id: movement.item_id, qty: movement.qty }))).toEqual([{ item_id: whisky, qty: -50 }])
+  })
 })
 
 describe.skipIf(skip !== null)('an oversized sale is refused, and nothing is written (F-105 criteria 2, 5)', () => {

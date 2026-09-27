@@ -214,10 +214,11 @@ function choiceGroupOf(variant: ProductVariant): ProductVariant['components'][nu
 const choosing = ref<ProductVariant | null>(null)
 // undefined, not null, while nothing is picked: USelect's own model type. Converted to the
 // nullable the route expects only where it is actually sent (0032).
-const choiceState = reactive<{ choiceGroupId: string | undefined, qty: number, includedInPrice: boolean }>({
+const choiceState = reactive<{ choiceGroupId: string | undefined, qty: number, includedInPrice: boolean, optional: boolean }>({
   choiceGroupId: undefined,
   qty: 1,
   includedInPrice: false,
+  optional: false,
 })
 
 function editChoice(variant: ProductVariant): void {
@@ -228,6 +229,7 @@ function editChoice(variant: ProductVariant): void {
     choiceGroupId: current?.choiceGroupId ?? choiceGroupOptions.value[0]?.value ?? undefined,
     qty: current?.qty ?? 1,
     includedInPrice: current?.includedInPrice ?? false,
+    optional: current?.choiceOptional ?? false,
   })
 }
 
@@ -240,7 +242,7 @@ async function saveChoice(): Promise<void> {
   try {
     await $fetch(`/api/admin/bar/variants/${variant.id}/choice`, {
       method: 'PUT',
-      body: { choiceGroupId: choiceState.choiceGroupId ?? null, qty: choiceState.qty, includedInPrice: choiceState.includedInPrice },
+      body: { choiceGroupId: choiceState.choiceGroupId ?? null, qty: choiceState.qty, includedInPrice: choiceState.includedInPrice, optional: choiceState.optional },
     })
     toast.add({
       title: 'Choice attached',
@@ -435,7 +437,7 @@ const depletion = (variant: ProductVariant): string =>
     : variant.components
         .map(component => (component.itemId
           ? `${component.itemName}, ${saysQuantity(component.qty, component.unit ?? 'ITEM')}`
-          : `${component.choiceGroupName}, ${component.qty}`))
+          : `${component.choiceGroupName}, ${component.qty}${component.choiceOptional ? ', or none' : ''}`))
         .join('; ')
 
 const columns: TableColumn<ProductVariant>[] = [
@@ -1001,6 +1003,17 @@ const priceColumns: TableColumn<VariantPrice>[] = [
             <USwitch
               v-model="choiceState.includedInPrice"
               data-test="choice-included"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Can be served without one"
+            name="optional"
+            description="Ticked for a spirit that may be served neat: the till offers no mixer as an answer, and pours nothing from the group."
+          >
+            <USwitch
+              v-model="choiceState.optional"
+              data-test="choice-optional"
             />
           </UFormField>
         </UForm>

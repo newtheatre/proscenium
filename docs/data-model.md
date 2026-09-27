@@ -1664,7 +1664,11 @@ one could never be added later); F-105 must add its `sale: true` entry there by 
 ### variant_components
 `id` PK · `variant_id` → product_variants cascade · `item_id` NULL → bar_items restrict ·
 `choice_group_id` NULL (CHECK: exactly one of the two) · `qty` in the item's own counting unit,
-CHECK positive · `included_in_price` bool (the free mixer, 0017). UNIQUE (`variant_id`, `item_id`);
+CHECK positive · `included_in_price` bool (the free mixer, 0017) · `choice_optional` NULL, on a
+choice row only: the size may be served with none of the group, a spirit neat, so the sale depletes
+its own recipe alone and the size's servings are not held to the options. The allergen answer still
+reads every option, so a neat serve never makes an unanswered mixer read as clean (issue 1314; nullable and
+read as false, since a NOT NULL add would rebuild the table). UNIQUE (`variant_id`, `item_id`);
 a partial UNIQUE on `variant_id` where `choice_group_id IS NOT NULL` holds a variant to at most
 one choice group (F-113 criterion 2). One level deep by construction: no column here can name
 another product (F-113 criterion 1).

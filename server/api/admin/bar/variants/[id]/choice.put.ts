@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const held = await variantById(id, londonDayOf(new Date()))
   if (!held) throw noSuch('serving size')
 
-  const { choiceGroupId, qty, includedInPrice } = await readValidatedBodyOrThrow(event, variantChoiceForm)
+  const { choiceGroupId, qty, includedInPrice, optional } = await readValidatedBodyOrThrow(event, variantChoiceForm)
 
   const group = choiceGroupId ? await choiceGroupById(choiceGroupId) : undefined
   if (choiceGroupId && !group) throw noSuch('choice group')
@@ -38,13 +38,14 @@ export default defineEventHandler(async (event) => {
           choiceGroupId: group.id,
           qty,
           includedInPrice,
+          choiceOptional: optional,
         })]
       : []),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'bar.variant.choice.changed',
       target: `bar-variant:${id}`,
-      detail: { choiceGroupId: group?.id ?? null, includedInPrice: group ? includedInPrice : false },
+      detail: { choiceGroupId: group?.id ?? null, includedInPrice: group ? includedInPrice : false, optional: group ? optional : false },
     })),
   ]
 

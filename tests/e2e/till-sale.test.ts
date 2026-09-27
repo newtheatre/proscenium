@@ -302,6 +302,37 @@ describe.skipIf(skip !== null)('the screen', () => {
     view.close()
   }, 120_000)
 
+  // Issue 1314: the mixer sheet has a way back, and a size that may be served neat offers no mixer.
+  test('the mixer sheet goes Back without adding anything, and an optional one sells neat', async () => {
+    const { venueId } = programme('sale-neat')
+    const { productId, variantId } = await aSellableProduct({ name: named('Screen whisky') })
+    const itemId = await anItem({ name: named('Screen soda') })
+    const groupId = await created(await send('POST', '/api/admin/bar/choice-groups', { name: named('Screen mixer'), options: [{ itemId, qty: 50 }] }))
+    await send('PUT', `/api/admin/bar/variants/${variantId}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true, optional: true })
+    await openTill(venueId)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
+    await click(view, '[data-test="choice-back"]')
+    await waitFor(view, `!document.querySelector('[data-test="choice-back"]')`)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="basket"]')`)).toBe(false)
+
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="choice-none"]')`)
+    expect(await textOf(view, '[data-test="choice-none"]')).toContain('No screen mixer')
+    await click(view, '[data-test="choice-none"]')
+    await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£2.50')`)
+    expect(await textOf(view, '[data-test="basket"]')).toContain('Screen whisky')
+    view.close()
+  }, 120_000)
+
   // 0083: the sizes are a sheet off the tile, so a wine at 360 pixels is two large taps rather
   // than four pills wrapped inside half a card.
   test('a product with several sizes opens the size sheet, and the size chosen there lands in the basket', async () => {

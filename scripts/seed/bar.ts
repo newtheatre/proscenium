@@ -57,6 +57,8 @@ interface SeedVariant {
   pricePence?: number
   recipe?: { item: string, qty: number }
   choice?: string
+  // A spirit may be served neat; a soft drink with no mixer is an empty glass (issue 1314).
+  choiceOptional?: boolean
   status?: 'RETIRED'
 }
 
@@ -101,8 +103,8 @@ const PRODUCTS: SeedProduct[] = [
     ageRestricted: true,
     allergenState: 'NONE',
     variants: [
-      { slug: 'single', servingKind: 'single', label: 'Single', recipe: { item: 'gin', qty: 25 }, choice: 'mixers' },
-      { slug: 'double', servingKind: 'double', label: 'Double', pricePence: 450, recipe: { item: 'gin', qty: 50 }, choice: 'mixers' },
+      { slug: 'single', servingKind: 'single', label: 'Single', recipe: { item: 'gin', qty: 25 }, choice: 'mixers', choiceOptional: true },
+      { slug: 'double', servingKind: 'double', label: 'Double', pricePence: 450, recipe: { item: 'gin', qty: 50 }, choice: 'mixers', choiceOptional: true },
     ],
   },
   {
@@ -113,8 +115,8 @@ const PRODUCTS: SeedProduct[] = [
     ageRestricted: true,
     allergenState: 'NONE',
     variants: [
-      { slug: 'single', servingKind: 'single', label: 'Single', recipe: { item: 'vodka', qty: 25 }, choice: 'mixers' },
-      { slug: 'double', servingKind: 'double', label: 'Double', recipe: { item: 'vodka', qty: 50 }, choice: 'mixers' },
+      { slug: 'single', servingKind: 'single', label: 'Single', recipe: { item: 'vodka', qty: 25 }, choice: 'mixers', choiceOptional: true },
+      { slug: 'double', servingKind: 'double', label: 'Double', recipe: { item: 'vodka', qty: 50 }, choice: 'mixers', choiceOptional: true },
     ],
   },
   {
@@ -125,8 +127,8 @@ const PRODUCTS: SeedProduct[] = [
     ageRestricted: true,
     allergenState: 'NONE',
     variants: [
-      { slug: 'single', servingKind: 'single', label: 'Single', recipe: { item: 'rum', qty: 25 }, choice: 'mixers' },
-      { slug: 'double', servingKind: 'double', label: 'Double', recipe: { item: 'rum', qty: 50 }, choice: 'mixers' },
+      { slug: 'single', servingKind: 'single', label: 'Single', recipe: { item: 'rum', qty: 25 }, choice: 'mixers', choiceOptional: true },
+      { slug: 'double', servingKind: 'double', label: 'Double', recipe: { item: 'rum', qty: 50 }, choice: 'mixers', choiceOptional: true },
     ],
   },
   {
@@ -367,6 +369,7 @@ export function seedBar(target: SeedTarget, people: People, programme: Programme
           choice_group_id: groups.get(variant.choice)!,
           qty: 1,
           included_in_price: 1,
+          choice_optional: variant.choiceOptional ? 1 : null,
         }))
       }
 
