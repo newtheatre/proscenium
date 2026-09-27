@@ -13,7 +13,7 @@ const FACTS: ViewerFacts = {
   leadsDepartment: false,
   isTrainer: true,
   keepsBarTab: false,
-  membershipState: 'current',
+  membershipState: { kind: 'current', until: '2027-07-31' },
 }
 
 describe('one set of viewer facts for the session and the ability resolver', () => {

@@ -1,6 +1,3 @@
-import { londonDay, membershipState } from '#shared/utils/membership'
-import type { Viewer } from '#shared/utils/abilities'
-
 // Resolves the viewer an ability is checked against. Sorted after 0.secrets-store, which must
 // still run first, and lazy on purpose: a public request must not pay for the queries below.
 export default defineNitroPlugin((nitroApp) => {
@@ -9,22 +6,7 @@ export default defineNitroPlugin((nitroApp) => {
       resolveServerUser: async <User extends Record<string, unknown>>(): Promise<User | null> => {
         const account = await currentAccount(event)
         if (!account) return null
-        const [term, graceDays, onShift, keepsTab] = await Promise.all([
-          longestTerm(account.id),
-          configValue(event, 'MEMBERSHIP_GRACE_DAYS'),
-          onShiftTonight(event, account.id),
-          keepsBarTab(event, account.id),
-        ])
-        const viewer: Viewer = {
-          id: account.id,
-          permissions: [...permissionsFor(await liveGrants(account.id), new Date())],
-          onShiftTonight: onShift,
-          leadsDepartment: (await liveLeads(account.id)).length > 0,
-          isTrainer: (await trainerStandingOf(account.id, londonToday())).trainer,
-          keepsBarTab: keepsTab,
-          membershipState: membershipState(term, londonDay(new Date()), graceDays),
-        }
-        return viewer as unknown as User
+        return await viewerFacts(event, account.id) as unknown as User
       },
     }
   })
