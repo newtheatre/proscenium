@@ -587,6 +587,25 @@ describe.skipIf(skip !== null)('a show takes the season its first performance fa
     expect(entry?.detail.filledFrom).toBe(nightOf(curtain))
   })
 
+  test('a run fills the season once, from its earliest night', async () => {
+    const curtain = nextWeek(90 * 24)
+    const season = await seasonAround(curtain)
+    const id = await newShow()
+    const run = [curtain + 2 * 86_400, curtain, curtain + 86_400].map(startsAt => ({ startsAt }))
+    expect((await send('POST', `/api/admin/shows/${id}/runs`, { venueId, durationMinutes: 120, nights: run })).status).toBe(200)
+
+    expect((await detail(id)).show.seasonId).toBe(season.id)
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const written = database.query('SELECT detail FROM audit_log WHERE action = ? AND target = ?').all('show.updated', `show:${id}`) as { detail: string }[]
+      expect(written).toHaveLength(1)
+      expect(JSON.parse(written[0]!.detail).filledFrom).toBe(nightOf(curtain))
+    }
+    finally {
+      database.close()
+    }
+  })
+
   test('a season that overlaps another is saved, and the answer names the one it overlaps', async () => {
     const curtain = nextWeek(60 * 24)
     const first = await seasonAround(curtain)
