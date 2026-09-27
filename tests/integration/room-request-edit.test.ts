@@ -157,7 +157,7 @@ describe('an edit racing an approval (C-109 criterion 3)', () => {
   test('approved first: the edit writes nothing and the booking stands as approved', async () => {
     await withDatabase((database) => {
       seed(database)
-      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW))).toBe(1)
+      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW, { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }))).toBe(1)
       expect(run(database, editPendingStatement(edit({ startsAt: NOW + 20 * HOUR, endsAt: NOW + 22 * HOUR })))).toBe(0)
       expect(asked(database)).toMatchObject({ status: 'CONFIRMED', starts_at: NOW + 24 * HOUR })
     })
@@ -167,7 +167,7 @@ describe('an edit racing an approval (C-109 criterion 3)', () => {
     await withDatabase((database) => {
       seed(database)
       expect(run(database, editPendingStatement(edit({ startsAt: NOW + 20 * HOUR, endsAt: NOW + 22 * HOUR })))).toBe(1)
-      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW))).toBe(1)
+      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW, { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }))).toBe(1)
       expect(asked(database)).toMatchObject({ status: 'CONFIRMED', starts_at: NOW + 20 * HOUR })
     })
   })

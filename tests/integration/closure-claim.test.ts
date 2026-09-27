@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'bun:test'
+import { approveStatement } from '#server/utils/approvals'
 import { claimSlotStatement } from '#server/utils/bookings'
+import { bumpStatements, seriesClaimStatement } from '#server/utils/room-writes'
 import { showNightBounds, showNightOf } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { race } from '#tests/helpers/race'
 import type { ClaimInput } from '#server/utils/bookings'
 import type { TestDatabase } from '#tests/helpers/database'
+import type { SQL } from 'drizzle-orm'
 
 // The closure race (0003): a closure made between a route's closure check and its claim must still
 // stop the claim, so the closures ride the INSERT with the clash rule rather than a read before it.
@@ -17,6 +20,7 @@ const OFFSETS = { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }
 const CURTAIN_HOURS = 15.5
 const EVENING = { startsAt: NIGHT_START + 14 * 3600, endsAt: NIGHT_START + 16 * 3600 }
 const AFTERNOON = { startsAt: NIGHT_START + 8 * 3600, endsAt: NIGHT_START + 10 * 3600 }
+const NOW_SECONDS = NIGHT_START - 7 * 86_400
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
@@ -120,6 +124,73 @@ describe('a closure made after the check still stops the claim', () => {
       closeRoom(database, 'r-house', AFTERNOON)
       closeRoom(database, null, AFTERNOON)
       expect(boundStatement(database, claimSlotStatement('b-count', input(EVENING))).length).toBe(before)
+    })
+  })
+})
+
+// The same race for every other write that places a booking (0003): the route read the room open,
+// an officer closed it, and the write that follows writes nothing.
+function write(database: TestDatabase, statement: SQL): number {
+  const [query, ...parameters] = boundStatement(database, statement)
+  return rows(database, query, ...parameters).length
+}
+
+function booking(database: TestDatabase, id: string, status: string, span: { startsAt: number, endsAt: number }, roomId = 'r-house'): void {
+  database.batch([[`INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at, tier, purpose, status)
+    VALUES (?, ?, 'u-booker', 'Rehearsal', ?, ?, 'REHEARSAL', 'REHEARSAL', ?)`, id, roomId, span.startsAt, span.endsAt, status]])
+}
+
+const statusOf = (database: TestDatabase, id: string): string | undefined =>
+  rows<{ status: string }>(database, 'SELECT status FROM room_bookings WHERE id = ?', id)[0]?.status
+
+describe('every other write that places a booking holds the closures too', () => {
+  test('approving a request into a room closed after the check writes nothing', async () => {
+    await withDatabase((database) => {
+      booking(database, 'b-asked', 'PENDING_APPROVAL', EVENING)
+      closeRoom(database, 'r-house', EVENING)
+      expect(write(database, approveStatement('b-asked', 'u-booker', null, NOW_SECONDS, OFFSETS))).toBe(0)
+      expect(statusOf(database, 'b-asked')).toBe('PENDING_APPROVAL')
+    })
+  })
+
+  test('moving a request into a room a performance closes writes nothing, and into an open one lands', async () => {
+    await withDatabase((database) => {
+      booking(database, 'b-moving', 'PENDING_APPROVAL', { startsAt: NIGHT_START + 16 * 3600, endsAt: NIGHT_START + 17 * 3600 }, 'r-studio')
+      tonightsPerformance(database, { night: NIGHT, suffix: 'house', roomId: 'r-house', curtainHoursAfterNightStart: CURTAIN_HOURS })
+      expect(write(database, approveStatement('b-moving', 'u-booker', 'r-house', NOW_SECONDS, OFFSETS))).toBe(0)
+      expect(write(database, approveStatement('b-moving', 'u-booker', null, NOW_SECONDS, OFFSETS))).toBe(1)
+    })
+  })
+
+  test('a bump over a closure made after the check bumps nobody and hands nobody the slot', async () => {
+    await withDatabase((database) => {
+      booking(database, 'b-standing', 'CONFIRMED', EVENING)
+      closeRoom(database, 'r-house', EVENING)
+      for (const statement of bumpStatements({
+        displaced: { id: 'b-standing', roomId: 'r-house', userId: 'u-booker', title: 'Rehearsal', attendees: null, tier: 'REHEARSAL', purpose: 'REHEARSAL', ...EVENING },
+        claimantId: 'u-booker',
+        title: 'Dress run',
+        tier: 'PRODUCTION',
+        purpose: 'REHEARSAL',
+        reason: 'Show week',
+        offer: undefined,
+        now: NOW_SECONDS,
+        offsets: OFFSETS,
+      }, 'b-claimant', null)) write(database, statement)
+      expect(statusOf(database, 'b-standing')).toBe('CONFIRMED')
+      expect(statusOf(database, 'b-claimant')).toBeUndefined()
+    })
+  })
+
+  test('a series occurrence under a closure made after the check writes nothing', async () => {
+    await withDatabase((database) => {
+      database.batch([[`INSERT INTO room_series (id, user_id, room_id, title, frequency, starts_on, clock_from, clock_to, occurrences)
+        VALUES ('s-term', 'u-booker', 'r-house', 'Rehearsal', 'WEEKLY', ?, '18:00', '20:00', 1)`, NIGHT]])
+      closeRoom(database, 'r-house', EVENING)
+      const occurrence = { occurrence: 1, day: NIGHT, startsAt: new Date(EVENING.startsAt * 1000), endsAt: new Date(EVENING.endsAt * 1000) }
+      const series = { seriesId: 's-term', userId: 'u-booker', roomId: 'r-house', title: 'Rehearsal', attendees: null, tier: 'REHEARSAL', purpose: 'REHEARSAL', notes: null, status: 'CONFIRMED' as const, offsets: OFFSETS }
+      expect(write(database, seriesClaimStatement('b-week-1', series, occurrence))).toBe(0)
+      expect(statusOf(database, 'b-week-1')).toBeUndefined()
     })
   })
 })
