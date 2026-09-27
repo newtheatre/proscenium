@@ -807,7 +807,11 @@ its own path.
 `CONFIG_KEYS` (`shared/utils/config.ts`) declares every operational number: a Zod schema, a
 default where the workshop register proposed one, and the workshop it belongs to.
 `configValue(event, key)` reads a `config` row if one exists, the default otherwise, and 503s a
-key with neither (J-104). `PUT /api/admin/config/[key]` and the read side, `GET
+key with neither (J-104). `configValueOrUnset(event, key)` reads through it and answers that 503
+alone as null, for an enforced key that may honestly stand unset (`AUTO_CLOSE_FROM_NIGHT`,
+`NIGHT_REPORT_ROLES`); any other failure is thrown on, so a broken read never looks like an unset
+key. `configValueIfSet`, for a key that gates nothing, answers null quietly and is not counted as
+an enforced read. `PUT /api/admin/config/[key]` and the read side, `GET
 /api/admin/config`, are the whole surface; `/admin/settings.vue` renders every key from the second
 and writes through the first. The screen heads each card with `configHeading()` and reads a
 number's unit from its key with `configUnit()` (`shared/utils/config-wording.ts`, whose heading

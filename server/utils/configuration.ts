@@ -55,6 +55,19 @@ export async function configValue<K extends ConfigKey>(event: H3Event | undefine
   return (CONFIG_KEYS[key] as { default: unknown }).default as ConfigValue<K>
 }
 
+// `configValue`'s own refusal for a key with neither an override nor a default, and nothing else:
+// any other failure, a database error included, is thrown on rather than read as unset.
+export function unsetAsNull(error: unknown): null {
+  if ((error as { statusCode?: number } | null)?.statusCode === 503) return null
+  throw error
+}
+
+// An enforced key that may stand unset, such as a sweep's arming night: unset is null and warns in
+// the operator log, and a failed read throws, so a broken database never looks like a quiet night.
+export async function configValueOrUnset<K extends ConfigKey>(event: H3Event | undefined, key: K): Promise<ConfigValue<K> | null> {
+  return configValue(event, key).catch(unsetAsNull)
+}
+
 // For a key whose absence has an honest meaning, such as a link nobody has named yet: unset reads
 // as null, quietly, and the caller leaves the thing out (A-202).
 export async function configValueIfSet<K extends ConfigKey>(event: H3Event | undefined, key: K): Promise<ConfigValue<K> | null> {

@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { auditIfChanged } from './audit'
 import { closeStatement, reviewIncidentsStatement } from './checklist'
-import { configValue } from './configuration'
+import { configValueOrUnset } from './configuration'
 import { sendRaw } from './notify'
 import { holdsLiveGrant } from './roles-register'
 import { REVIEWED_AT_SIGN_OFF } from '#shared/utils/night-signoff'
@@ -156,7 +156,7 @@ export function reportRoleHoldersQuery(roles: readonly string[], now: number): S
 // Ships unset until a workshop confirms it (0019): distribution to the standing roles is then
 // simply empty, rather than an unset key blocking the freeze itself.
 async function configuredRecipients(event: H3Event | undefined): Promise<string[]> {
-  const roles = await configValue(event, 'NIGHT_REPORT_ROLES').catch(() => [])
+  const roles = (await configValueOrUnset(event, 'NIGHT_REPORT_ROLES')) ?? []
   if (!roles.length) return []
   const holders = await db.all<{ email: string }>(reportRoleHoldersQuery(roles, Math.floor(Date.now() / 1000)))
   return holders.map(holder => holder.email)
