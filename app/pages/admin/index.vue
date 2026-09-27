@@ -189,14 +189,15 @@ onMounted(() => {
           <span class="ms-auto font-mono text-xs text-muted">{{ saysClock(performance.startsAt) }}</span>
         </li>
       </ul>
-      <UButton
-        to="/tonight"
-        variant="subtle"
-        icon="i-lucide-moon-star"
-        class="mt-3"
-      >
-        Open tonight's screens
-      </UButton>
+      <div class="mt-3">
+        <UButton
+          to="/tonight"
+          variant="subtle"
+          icon="i-lucide-moon-star"
+        >
+          Open tonight's screens
+        </UButton>
+      </div>
     </UPageCard>
 
     <UPageCard
@@ -279,15 +280,18 @@ onMounted(() => {
         </li>
       </ul>
 
-      <UButton
+      <div
         v-if="seesSendLog"
-        to="/comms/operations"
-        variant="subtle"
-        icon="i-lucide-list"
         class="mt-3"
       >
-        Open the send log
-      </UButton>
+        <UButton
+          to="/comms/operations"
+          variant="subtle"
+          icon="i-lucide-list"
+        >
+          Open the send log
+        </UButton>
+      </div>
     </UPageCard>
 
     <UPageCard
