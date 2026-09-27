@@ -54,3 +54,10 @@ export async function outstandingTabBalance(userId: string): Promise<number> {
   const [row] = await db.all<{ total: number }>(tabBalanceQuery(userId))
   return row?.total ?? 0
 }
+
+// Whether the member's own nav offers the tab: a named holder, or anybody still owing on one
+// after their authority lapsed (F-109, issue 1342).
+export async function keepsBarTab(event: H3Event | undefined, userId: string): Promise<boolean> {
+  const [holder, owing] = await Promise.all([authorisedTabHolder(event, userId), outstandingTabBalance(userId)])
+  return holder !== null || owing > 0
+}

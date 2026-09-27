@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { can, member, memberOrGrace, reachConsole, viewBarReports, viewReports, workTonight } from '#shared/utils/abilities'
+import { can, keepBarTab, member, memberOrGrace, reachConsole, viewBarReports, viewReports, workTonight } from '#shared/utils/abilities'
 import type { Viewer } from '#shared/utils/abilities'
 import type { MembershipState } from '#shared/utils/membership'
 
@@ -12,6 +12,7 @@ const viewerWith = (membershipState: MembershipState): Viewer => ({
   onShiftTonight: false,
   leadsDepartment: false,
   isTrainer: false,
+  keepsBarTab: false,
   membershipState,
 })
 
@@ -71,7 +72,7 @@ describe('a guest with no account never satisfies either ability', () => {
 // still open without granting the wider bar catalogue or stock screens.
 describe('viewBarReports admits the treasurer alongside the bar manager', () => {
   const withPermissions = (permissions: Viewer['permissions']): Viewer => ({
-    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' },
+    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, keepsBarTab: false, membershipState: { kind: 'none' },
   })
 
   test('bar.read and finance.read each satisfy it', () => {
@@ -88,7 +89,7 @@ describe('viewBarReports admits the treasurer alongside the bar manager', () => 
 // finance or bar read opens nothing here.
 describe('viewReports rests on reports.read alone', () => {
   const withPermissions = (permissions: Viewer['permissions']): Viewer => ({
-    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' },
+    id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, keepsBarTab: false, membershipState: { kind: 'none' },
   })
 
   test('reports.read satisfies it', () => {
@@ -104,7 +105,7 @@ describe('viewReports rests on reports.read alone', () => {
 // false while E-102 and E-104 were outstanding. Only a confirmed shift tonight sets it.
 describe('workTonight rests on the shift fact alone', () => {
   const onShift = (onShiftTonight: boolean): Viewer => ({
-    id: 'someone', permissions: [], onShiftTonight, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' },
+    id: 'someone', permissions: [], onShiftTonight, leadsDepartment: false, isTrainer: false, keepsBarTab: false, membershipState: { kind: 'none' },
   })
 
   test('a viewer on shift tonight holds it, with no permission at all', () => {
@@ -118,5 +119,24 @@ describe('workTonight rests on the shift fact alone', () => {
 
   test('a guest with no account is refused, not thrown at', () => {
     expect(can(null, workTonight)).toBe(false)
+  })
+})
+
+// Issue 1342, F-108, F-109: the member's nav offers the bar tab to an authorised holder or anybody
+// still owing, a fact resolved per request like the shift, never a grant (0009).
+describe('keepBarTab rests on the tab fact alone', () => {
+  const keeps = (keepsBarTab: boolean): Viewer => ({ ...viewerWith(NONE), keepsBarTab })
+
+  test('somebody who keeps a tab holds it, with no permission at all', () => {
+    expect(can(keeps(true), keepBarTab)).toBe(true)
+  })
+
+  test('somebody who does not is refused, bar manager or not', () => {
+    expect(can(keeps(false), keepBarTab)).toBe(false)
+    expect(can({ ...keeps(false), permissions: ['bar.write'] }, keepBarTab)).toBe(false)
+  })
+
+  test('a guest with no account is refused, not thrown at', () => {
+    expect(can(null, keepBarTab)).toBe(false)
   })
 })

@@ -176,6 +176,9 @@ const standings = computed(() => [
   ...(data.value.standing.trainer ? ['run training sessions'] : []),
   ...(data.value.standing.supervisor ? ['supervise'] : []),
 ])
+
+// Training is one nav entry, so the sessions on offer are reached from here (issue 1342).
+const SECOND_PAGE = [{ label: 'Training sessions', to: '/training/sessions', icon: 'i-lucide-calendar-days', color: 'neutral' as const, variant: 'outline' as const }]
 </script>
 
 <template>
@@ -184,8 +187,10 @@ const standings = computed(() => [
     data-test="training-page"
   >
     <UPageHeader
-      title="My training"
+      title="Training"
       description="What you hold, and how long each one is good for. Something expiring still counts until its date."
+      :links="SECOND_PAGE"
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <UAlert

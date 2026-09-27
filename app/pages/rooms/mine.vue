@@ -307,6 +307,7 @@ useSeoMeta({ title: 'My bookings' })
     <UPageHeader
       title="My bookings"
       description="What you hold, and what became of what you held. Cancelling frees the slot straight away."
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <UFieldGroup class="mt-6">

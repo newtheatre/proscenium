@@ -2,6 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-09-21
+- Amended by: 0104 (the header and the widths below the small breakpoint)
 
 ## Context
 
@@ -42,7 +43,7 @@ wears the `tonight` shell, where the kit is also at home.
 ### Two heading sizes
 
 The page title is the one the `member` layout's page draws through `UPageHeader`, or the one
-`AccountSettings` draws for the three account settings pages. A page that genuinely needs to
+`AccountSettings` draws for the account settings pages. A page that genuinely needs to
 draw its own writes one `h1` of `text-2xl font-semibold text-highlighted`; none does today.
 
 A section heading is `text-lg font-semibold`. A heading nested inside a section is
@@ -56,7 +57,7 @@ A page does not spell its own width. `app/utils/member-shell.ts` names them and 
 | Constant | Value | For |
 | --- | --- | --- |
 | `MEMBER_PAGE_READING` | `max-w-3xl py-16` | A page you read: your rota, your bookings, your training, your tab, your passes |
-| `MEMBER_PAGE_WORKING` | `max-w-xl py-16` | One form you fill in: booking a room, declaring access requirements, your membership |
+| `MEMBER_PAGE_WORKING` | `max-w-xl py-16` | One form you fill in: booking a room, your membership |
 | `MEMBER_PAGE_WIDE` | `max-w-5xl py-10` | A page whose content is a grid or a second column: the overview, account settings, the room calendar |
 
 The first two are the reading page and the working page the ruling asks for, and each is the

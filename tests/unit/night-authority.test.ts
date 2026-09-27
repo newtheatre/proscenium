@@ -29,7 +29,7 @@ const NIGHT = '2026-10-17'
 const VENUE = 'venue-a'
 
 const viewer = (permissions: Viewer['permissions']): Viewer =>
-  ({ id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, membershipState: { kind: 'none' } })
+  ({ id: 'someone', permissions, onShiftTonight: false, leadsDepartment: false, isTrainer: false, keepsBarTab: false, membershipState: { kind: 'none' } })
 
 describe('the night roles are the three the rota staffs (E-111 criterion 1)', () => {
   test('there are three, and nothing else is one', () => {

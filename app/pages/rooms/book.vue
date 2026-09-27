@@ -369,6 +369,7 @@ useSeoMeta({ title: 'Book a room' })
     <UPageHeader
       title="Book a room"
       description="A booking inside the rules is held straight away. One outside them is a request an officer decides on."
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <UPageCard class="mt-8">

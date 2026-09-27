@@ -142,6 +142,9 @@ function openDay(roomIdentity: string, day: string): void {
   view.value = 'day'
 }
 
+// Rooms is one nav entry, so what you hold is reached from here (issue 1342).
+const SECOND_PAGE = [{ label: 'My bookings', to: '/rooms/mine', icon: 'i-lucide-calendar-check', color: 'neutral' as const, variant: 'outline' as const }]
+
 useSeoMeta({ title: 'Rooms' })
 </script>
 
@@ -150,6 +153,8 @@ useSeoMeta({ title: 'Rooms' })
     <UPageHeader
       title="Rooms"
       description="What is free, and when. Choose a free slot to book an hour, or drag across several; on a touch screen, tap where it starts and then where it ends. A slot somebody else holds reads as booked and nothing more."
+      :links="SECOND_PAGE"
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <div class="mt-6 flex flex-wrap items-center gap-2">

@@ -221,7 +221,7 @@ function selectRole(one: ShiftRole | undefined): void {
   page.value = 1
 }
 
-useSeoMeta({ title: 'My rota' })
+useSeoMeta({ title: 'Rota' })
 </script>
 
 <template>
@@ -230,8 +230,9 @@ useSeoMeta({ title: 'My rota' })
     data-test="rota-page"
   >
     <UPageHeader
-      title="My rota"
+      title="Rota"
       description="Shifts you already hold, and open ones you currently qualify for. What is locked names what would unlock it."
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <ReadFailure

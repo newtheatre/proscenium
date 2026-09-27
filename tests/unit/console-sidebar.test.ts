@@ -22,6 +22,7 @@ const viewerHolding = (role: Role): Viewer => ({
   onShiftTonight: false,
   leadsDepartment: false,
   isTrainer: false,
+  keepsBarTab: false,
   membershipState: { kind: 'none' },
 })
 

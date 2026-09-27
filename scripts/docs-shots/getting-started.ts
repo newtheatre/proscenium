@@ -15,7 +15,7 @@ export const gettingStarted: Shot[] = [
     annotations: [
       { selector: '[data-test="account-menu"]', label: 'Your name' },
       { selector: '[data-test="docs-link"]', label: 'The help button' },
-      { selector: '[aria-label="My theatre"]', label: 'The strip' },
+      { selector: 'header [data-slot="toggle"]', label: 'The menu button' },
       { selector: '[data-test="my-page"] h1', label: 'The heading' },
     ],
   },

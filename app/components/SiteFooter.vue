@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can, signedIn } from '#shared/utils/abilities'
 import { withoutPlaceholders } from '#shared/utils/editorial'
 import { SITE_ADDRESS } from '#shared/utils/seo'
 import { ACCOUNT_NAV, MY_NAV, PUBLIC_GROUPS, PUBLIC_NAV } from '#shared/utils/site-nav'
@@ -7,6 +8,7 @@ import type { NavEntry } from '#shared/utils/site-nav'
 // Stage black in both colour modes, done by marking the subtree rather than overriding slot
 // classes (docs/design-language.md).
 const { account } = useAccount()
+const viewer = useViewer()
 
 // The footer keeps one shape for everybody: a signed-out visitor who followed a link still
 // arrives where they meant to, rather than finding the link was never there (0040).
@@ -15,6 +17,10 @@ function href(entry: NavEntry): string {
 }
 
 const unwritten = usePlaceholderPaths()
+
+// Tonight and the bar tab belong to some viewers only, so a visitor not yet signed in sees the six.
+const mine = computed(() => MY_NAV.filter(entry =>
+  account.value.signedIn ? can(viewer.value, entry.ability) : entry.ability === signedIn))
 
 // The public half groups by the heading each entry declares (0040), and a page the committee has
 // not written yet is left out of every column until it has copy (D-103 criterion 6).
@@ -26,7 +32,7 @@ const publicColumns = computed(() => PUBLIC_GROUPS.map(heading => ({
 
 const columns = computed(() => [
   // The same names the navigation uses: the member area is My NNT wherever it is named (0040).
-  { label: 'My NNT', links: MY_NAV, public: false },
+  { label: 'My NNT', links: mine.value, public: false },
   { label: 'Account', links: ACCOUNT_NAV, public: false },
   ...publicColumns.value,
 ].filter(column => column.links.length > 0))

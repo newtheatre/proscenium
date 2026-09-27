@@ -128,13 +128,11 @@ useSeoMeta({ title: 'Access requirements' })
 </script>
 
 <template>
-  <UContainer :class="MEMBER_PAGE_WORKING">
-    <UPageHeader
-      title="Access requirements"
-      description="Tell us what you need once, and choose exactly what the people on the door are shown. The Accessibility Officer verifies it in person before it reaches any other screen."
-    />
-
-    <UPageCard class="mt-8">
+  <AccountSettings
+    title="Access requirements"
+    description="Tell us what you need once, and choose exactly what the people on the door are shown. The Accessibility Officer verifies it in person before it reaches any other screen."
+  >
+    <UPageCard>
       <div
         v-if="loading"
         class="flex items-center gap-3 text-muted"
@@ -335,5 +333,5 @@ useSeoMeta({ title: 'Access requirements' })
       :failure="withdrawFailure"
       @confirm="withdraw"
     />
-  </UContainer>
+  </AccountSettings>
 </template>

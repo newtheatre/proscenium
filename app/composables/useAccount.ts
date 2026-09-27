@@ -12,6 +12,7 @@ export interface AccountSnapshot {
   onShiftTonight: boolean
   leadsDepartment: boolean
   isTrainer: boolean
+  keepsBarTab: boolean
   membershipState: MembershipState
 }
 
@@ -27,6 +28,7 @@ export function useAccount(): { account: Ref<AccountSnapshot>, refresh: () => Pr
     onShiftTonight: false,
     leadsDepartment: false,
     isTrainer: false,
+    keepsBarTab: false,
     membershipState: noMembership,
   }))
   // Plain $fetch sends none of the incoming request's headers while rendering, so every
@@ -41,6 +43,7 @@ export function useAccount(): { account: Ref<AccountSnapshot>, refresh: () => Pr
       onShiftTonight: false,
       leadsDepartment: false,
       isTrainer: false,
+      keepsBarTab: false,
       membershipState: noMembership,
       ...answer,
     }

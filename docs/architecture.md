@@ -81,7 +81,7 @@ A domain with both audiences puts the member's screens at the top and the consol
 (`/people/accounts`, `/bar/products` and `/bar/stock`). Every navigable destination is declared once
 in `shared/utils/site-nav.ts`, which the console sidebar renders and the console middleware guards
 from, so a deep link and the sidebar cannot disagree. `MY_NAV` is a member's own screens (`/my`
-first, K-127); `ACCOUNT_NAV` is the three settings pages the member menu and `AccountSettings.vue`
+first, K-127); `ACCOUNT_NAV` is the four settings pages the member menu and `AccountSettings.vue`
 render. Neither is guarded by `entryFor`, which scans console entries only.
 
 ### Route namespaces
@@ -244,7 +244,12 @@ becomes interactive.
   from `onShiftTonight` (`server/utils/rota.ts`): a `CONFIRMED` shift on a performance that is not
   cancelled, inside `showNightBounds(currentShowNight())` (0014). `CLAIMED` does not count, unlike
   My NNT's accent tile, because authority follows the confirmation rather than the claim (0009,
-  0044); it is what `workTonight` gates the account menu's Tonight entry on (0040).
+  0044); it is what `workTonight` gates the account menu's Tonight entry on (0040). It also carries
+  `keepsBarTab`, which both resolvers derive from `keepsBarTab()` (`server/utils/tab-holders.ts`):
+  an authorised tab holder (`BAR_AUTHORISED_TAB_HOLDERS`, or a live grant of a
+  `BAR_AUTHORISED_TAB_ROLES` role) or anybody with an outstanding tab balance, read live per
+  request (0009, F-108, F-109). `keepBarTab` gates `MY_NAV`'s Bar tab entry only;
+  `/account/bar-tab` still opens to anyone signed in.
 - MFA (TOTP + passkeys) is enforced at guard level for permission-bearing roles (0008).
 - A passkey is a complete sign-in and no challenge follows it: the authenticator verified the
   person before it would sign, so the credential step and the second step happened at once

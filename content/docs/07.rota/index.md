@@ -55,7 +55,7 @@ reaches these screens: a confirmed shift opens the night's tools, and a role ope
 
 1. A **venue** gets a shift template: one duty manager, so many door, so many bar.
 2. Adding a **performance** at that venue stamps one open shift per slot, the moment it exists.
-3. **Members** claim open shifts from My rota. A claim confirms itself, or waits for
+3. **Members** claim open shifts from **Rota**. A claim confirms itself, or waits for
    [Approvals](/docs/rota/approvals), depending on a setting.
 4. A **confirmed shift** is what opens the show-night screens that evening, and what the day-before
    reminder and the seven-day digest are counted against.

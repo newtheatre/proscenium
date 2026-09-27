@@ -82,6 +82,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
     <UPageHeader
       title="Passes"
       description="Passes you hold, and any request still with an officer."
+      :ui="MEMBER_PAGE_HEADER"
     />
 
     <ReadFailure
