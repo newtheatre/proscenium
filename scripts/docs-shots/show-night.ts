@@ -167,7 +167,22 @@ export const showNight: Shot[] = [
     annotations: [
       { selector: '[data-test="tonight-team"]', label: 'On tonight' },
       { selector: '[data-test="incidents-list"]', label: 'The log' },
-      { selector: '[data-test="night-actions"]', label: 'Log an incident and Report a near miss' },
+      { selector: '[data-test="night-actions"]', label: 'Log something' },
+    ],
+  },
+  {
+    // The one sheet for anything worth writing down, a near miss already chosen (issue 1317).
+    name: 'show-night/incidents-log',
+    persona: foh,
+    url: '/tonight/incidents',
+    marker: '[data-test="incidents-list"]',
+    width: PHONE_WIDTH,
+    after: 'document.querySelector(\'[data-test="open-log"]\').click()',
+    annotations: [
+      { selector: '[data-test="log-kind"]', label: 'What kind' },
+      { selector: '[data-test="log-category"]', label: 'About' },
+      { selector: '[data-test="log-body"]', label: 'The sentence' },
+      { selector: '[data-test="log-submit"]', label: 'Log it' },
     ],
   },
   {

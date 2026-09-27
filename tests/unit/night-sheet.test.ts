@@ -2,9 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { DEFAULT_LOG_KIND, LOG_KINDS, logRoute } from '#shared/utils/incidents'
 import { nightHintShows } from '#shared/utils/night-shell'
 
-// Issue 1317: the show-night screens stop borrowing the desk's habits. An overlay is a sheet from
-// the foot of the phone, a hint is for an empty or first-use screen, houses stack, and an incident
-// is one Log something sheet.
+// Issue 1317: an overlay is a sheet from the foot of the phone, a hint is for an empty or first-use
+// screen, houses stack, and an incident is one Log something sheet (docs/design-language.md 11).
 
 const read = (path: string): Promise<string> => Bun.file(path).text()
 

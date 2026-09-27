@@ -400,38 +400,25 @@ async function reset(): Promise<void> {
       </form>
     </template>
 
-    <UModal
+    <NightSheet
       v-model:open="confirmingReset"
       title="Reset the backstage board?"
-      description="Every joined device is disconnected immediately. The new code does not appear here: read it out loud."
+      primary="Reset the board"
+      primary-color="error"
+      primary-test-id="board-reset-confirm"
+      :loading="resetting"
+      @primary="reset"
     >
-      <template #body>
-        <UAlert
-          v-if="resetFailure"
-          data-test="board-reset-failure"
-          color="error"
-          variant="subtle"
-          :description="resetFailure"
-        />
-      </template>
-
-      <template #footer>
-        <UButton
-          color="error"
-          :loading="resetting"
-          data-test="board-reset-confirm"
-          @click="reset"
-        >
-          Reset the board
-        </UButton>
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="confirmingReset = false"
-        >
-          {{ CONFIRM_BACK_LABEL }}
-        </UButton>
-      </template>
-    </UModal>
+      <p class="text-sm">
+        Every joined device is disconnected at once. The new code does not appear here: read it out loud.
+      </p>
+      <UAlert
+        v-if="resetFailure"
+        data-test="board-reset-failure"
+        color="error"
+        variant="subtle"
+        :description="resetFailure"
+      />
+    </NightSheet>
   </NightScreen>
 </template>

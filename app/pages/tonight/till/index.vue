@@ -555,6 +555,7 @@ const basketBindings = computed(() => ({
       :hint="session
         ? (basketEmpty ? 'Tap an item to add it; one with several sizes asks which. Quantities and lines are editable before payment.' : undefined)
         : 'One till for the whole night. Everyone at this bar sells against it.'"
+      :empty="!session"
       :stale="session ? catalogue.cachedAt.value : syncedAt"
       :busy="busy || catalogue.pending.value"
       :refused="failure && !needsVenue && !failure.enrolPath && failureStatus === 403 ? failure.message : null"

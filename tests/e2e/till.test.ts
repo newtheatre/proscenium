@@ -817,9 +817,12 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
     view.close()
   }, 120_000)
 
-  // A hint is for the first sale of the night, not a line above every one of them.
-  test('the hint goes once there is something in the basket', async () => {
+  // A hint is for the first sale on this phone, not a line above every one of them (issue 1317).
+  test('the hint shows on a first visit, and goes once there is something in the basket', async () => {
     const { view, productId } = await atTheTill()
+    await view.evaluate(`localStorage.removeItem('nnt-night-hint:Till')`)
+    await visit(view, await view.evaluate<string>('location.href'), `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="night-hint"]')`)
     expect(await textOf(view, '[data-test="night-hint"]')).toContain('Tap an item to add it')
 
     await click(view, `[data-test="product-${productId}"]`)

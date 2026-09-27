@@ -30,3 +30,13 @@ export function staleAnnouncement(state: NightFreshness): string {
   if (state === 'FRESH') return 'These figures are current.'
   return 'Nothing has synced yet.'
 }
+
+// A standing sentence is read once and never again, so a screen's hint shows the first time it is
+// opened on this phone, or while there is nothing on it yet (issue 1317, K-101).
+export function nightHintShows(state: { empty: boolean, seenBefore: boolean }): boolean {
+  return state.empty || !state.seenBefore
+}
+
+export function nightHintSeenKey(title: string): string {
+  return `nnt-night-hint:${title}`
+}

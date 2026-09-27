@@ -144,52 +144,36 @@ async function submitExempt(): Promise<void> {
     </li>
   </ul>
 
-  <UModal
+  <NightSheet
     :open="exempting !== null"
     :title="exempting ? `Exception: ${exempting.label}` : ''"
-    description="Say why it cannot be done tonight. The reason stays on the list and prints in the night report."
+    primary="Make the exception"
+    primary-test-id="exempt-submit"
+    :loading="exemptSaving"
     @update:open="exempting = null"
+    @primary="submitExempt"
   >
-    <template #body>
-      <form
-        class="space-y-4"
-        data-test="exempt-form"
-        @submit.prevent="submitExempt"
-      >
-        <UAlert
-          v-if="exemptFailure"
-          data-test="exempt-failure"
-          color="error"
-          variant="subtle"
-          :description="exemptFailure"
+    <form
+      class="space-y-4"
+      data-test="exempt-form"
+      @submit.prevent="submitExempt"
+    >
+      <UAlert
+        v-if="exemptFailure"
+        data-test="exempt-failure"
+        color="error"
+        variant="subtle"
+        :description="exemptFailure"
+      />
+
+      <UFormField label="Why it cannot be done tonight">
+        <UTextarea
+          v-model="exemptReason"
+          :rows="3"
+          class="w-full"
+          data-test="exempt-reason"
         />
-
-        <UFormField label="Why">
-          <UTextarea
-            v-model="exemptReason"
-            :rows="3"
-            class="w-full"
-            data-test="exempt-reason"
-          />
-        </UFormField>
-
-        <div class="flex flex-wrap gap-2">
-          <UButton
-            type="submit"
-            :loading="exemptSaving"
-            data-test="exempt-submit"
-          >
-            Make the exception
-          </UButton>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            @click="exempting = null"
-          >
-            {{ CONFIRM_BACK_LABEL }}
-          </UButton>
-        </div>
-      </form>
-    </template>
-  </UModal>
+      </UFormField>
+    </form>
+  </NightSheet>
 </template>

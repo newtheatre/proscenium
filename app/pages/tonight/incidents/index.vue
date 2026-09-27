@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NightRole } from '#shared/utils/night-authority'
-import { CATEGORIES, SEVERITIES, saysCategory, saysSeverity } from '#shared/utils/incidents'
+import { CATEGORIES, DEFAULT_LOG_KIND, LOG_KINDS, logRoute, saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysClock } from '#shared/utils/when'
 import { saysShiftRole } from '#shared/utils/rota'
 import { contactRoster, saysPerformanceChoice, saysTeamHolder, telHref } from '#shared/utils/tonight'
@@ -101,76 +101,55 @@ const performanceOptions = computed(() => performanceIds.value.map((id) => {
   return { label: named ? saysPerformanceChoice(named) : id, value: id }
 }))
 
-interface FormState {
-  performanceId: string
-  category: Category
-  severity: Severity
+const kindOptions = LOG_KINDS.map(value => ({ label: saysSeverity(value), value }))
+const categoryOptions = CATEGORIES.map(value => ({ label: saysCategory(value), value }))
+
+// One sheet for anything worth writing down (issue 1317): the kind is chosen already, a near miss,
+// so the routine report is open, a category and a sentence (E-117 criterion 1 as trimmed).
+interface LogState {
+  performanceId: string | null
+  kind: Severity | null
+  category: Category | null
   body: string
 }
 
-const blankForm = (): FormState => ({
-  performanceId: performanceIds.value[0] ?? '',
-  category: 'OTHER',
-  severity: 'NOTE',
+const blankLog = (): LogState => ({
+  performanceId: performanceIds.value[0] ?? null,
+  kind: DEFAULT_LOG_KIND,
+  category: null,
   body: '',
 })
 
-const categoryOptions = CATEGORIES.map(value => ({ label: saysCategory(value), value }))
-const severityOptions = SEVERITIES.map(value => ({ label: saysSeverity(value), value }))
-
 const logging = ref(false)
-const logForm = reactive<FormState>(blankForm())
+const logForm = reactive<LogState>(blankLog())
 const logFailure = ref<string | null>(null)
 const saving = ref(false)
+const logReady = computed(() => Boolean(logForm.performanceId && logForm.kind && logForm.category && logForm.body.trim()))
 
 function openLog(): void {
-  Object.assign(logForm, blankForm())
+  Object.assign(logForm, blankLog())
   logFailure.value = null
   logging.value = true
 }
 
+// A near miss keeps its own route, filed as it happens with no severity; anything else is the
+// log's, timed now (E-115 criterion 1, E-117 criterion 2).
 async function submitLog(): Promise<void> {
+  if (!logReady.value || !logForm.kind) return
   saving.value = true
   logFailure.value = null
+  const nearMiss = logForm.kind === 'NEAR_MISS'
+  const body = nearMiss
+    ? { performanceId: logForm.performanceId, category: logForm.category, body: logForm.body }
+    : { performanceId: logForm.performanceId, category: logForm.category, severity: logForm.kind, body: logForm.body, happenedAt: null }
   try {
-    await $fetch('/api/tonight/incidents', { method: 'POST', body: { ...logForm, happenedAt: null } })
-    toast.add({ title: 'Incident logged', icon: 'i-lucide-check', color: 'success' })
+    await $fetch(logRoute(logForm.kind), { method: 'POST', body })
+    toast.add({ title: nearMiss ? 'Near miss logged' : 'Logged', icon: 'i-lucide-check', color: 'success' })
     logging.value = false
     await load()
   }
   catch (refused) {
     logFailure.value = refusalText(refused)
-  }
-  finally {
-    saving.value = false
-  }
-}
-
-// One tap to open, one to pick a category, one sentence: no severity and no timestamp field at
-// all, since a near miss is always filed as it happens (E-117 criteria 1, 2).
-const reportingNearMiss = ref(false)
-const nearMiss = reactive({ performanceId: '', category: 'SAFETY' as Category, body: '' })
-const nearMissFailure = ref<string | null>(null)
-
-function openNearMiss(): void {
-  nearMiss.performanceId = performanceIds.value[0] ?? ''
-  nearMiss.category = 'SAFETY'
-  nearMiss.body = ''
-  nearMissFailure.value = null
-  reportingNearMiss.value = true
-}
-
-async function submitNearMiss(): Promise<void> {
-  saving.value = true
-  nearMissFailure.value = null
-  try {
-    await $fetch('/api/tonight/incidents/near-miss', { method: 'POST', body: nearMiss })
-    toast.add({ title: 'Near miss reported', description: 'Thank you for flagging it.', icon: 'i-lucide-check', color: 'success' })
-    reportingNearMiss.value = false
-    await load()
-  }
-  catch (refused) {
-    nearMissFailure.value = refusalText(refused)
   }
   finally {
     saving.value = false
@@ -195,8 +174,9 @@ async function markReviewed(entry: Entry): Promise<void> {
 }
 
 const correcting = ref<Entry | null>(null)
-const correctForm = reactive<Omit<FormState, 'performanceId'>>({ category: 'OTHER', severity: 'NOTE', body: '' })
+const correctForm = reactive<{ category: Category | null, severity: Severity | null, body: string }>({ category: 'OTHER', severity: 'NOTE', body: '' })
 const correctFailure = ref<string | null>(null)
+const correctReady = computed(() => Boolean(correctForm.category && correctForm.severity && correctForm.body.trim()))
 
 function openCorrect(entry: Entry): void {
   correcting.value = entry
@@ -228,6 +208,8 @@ async function submitCorrect(): Promise<void> {
     <NightScreen
       title="Contacts and incidents"
       :refused="refusal"
+      hint="Every entry is timed, named and printed in the night report. A mistake is corrected with a new entry, never an edit."
+      :empty="items.length === 0"
       :stale="syncedAt"
       :busy="busy"
     >
@@ -358,254 +340,127 @@ async function submitCorrect(): Promise<void> {
               </div>
             </div>
           </div>
-
-          <p class="mt-3 text-center text-sm text-muted">
-            Every entry is timed and named, and lands in the end-of-night report in full. A mistake
-            is corrected with a new entry, never an edit, and the duty manager marks each one
-            reviewed before the night closes.
-          </p>
         </section>
       </div>
 
       <template #actions>
-        <!-- The incident is what this screen is for, so it is the one under the thumb; the near
-             miss stays one tap on from it, which is what E-112 criterion 4 asks for. -->
+        <!-- One action for anything worth writing down, a near miss already chosen (issue 1317). -->
         <NightAction
-          label="Log an incident"
+          label="Log something"
           icon="i-lucide-clipboard-pen"
           color="primary"
           :disabled="performanceIds.length === 0"
-          data-test="open-log-incident"
+          data-test="open-log"
           @press="openLog"
-        />
-        <NightAction
-          label="Report a near miss"
-          icon="i-lucide-triangle-alert"
-          color="neutral"
-          variant="outline"
-          :disabled="performanceIds.length === 0"
-          data-test="open-near-miss"
-          @press="openNearMiss"
         />
       </template>
     </NightScreen>
 
-    <UModal
+    <NightSheet
       v-model:open="logging"
-      title="Log an incident"
-      description="The time, a category, a severity and what happened. Your name goes on it."
+      title="Log something"
+      primary="Log it"
+      primary-test-id="log-submit"
+      :primary-disabled="!logReady"
+      :loading="saving"
+      @primary="submitLog"
     >
-      <template #body>
-        <form
-          class="space-y-4"
-          data-test="log-incident-form"
-          @submit.prevent="submitLog"
+      <form
+        class="space-y-4"
+        data-test="log-form"
+        @submit.prevent="submitLog"
+      >
+        <UAlert
+          v-if="logFailure"
+          data-test="log-failure"
+          color="error"
+          variant="subtle"
+          :description="logFailure"
+        />
+
+        <NightChoices
+          v-model="logForm.kind"
+          label="What kind"
+          :options="kindOptions"
+          test-id="log-kind"
+        />
+
+        <NightChoices
+          v-model="logForm.category"
+          label="About"
+          :options="categoryOptions"
+          test-id="log-category"
+        />
+
+        <NightChoices
+          v-if="performanceOptions.length > 1"
+          v-model="logForm.performanceId"
+          label="Performance"
+          :options="performanceOptions"
+          :columns="1"
+          test-id="log-performance"
+        />
+
+        <UFormField
+          :label="logForm.kind === 'NEAR_MISS' ? 'What nearly happened' : 'What happened'"
+          description="People by role, never by name."
         >
-          <UAlert
-            v-if="logFailure"
-            data-test="log-incident-failure"
-            color="error"
-            variant="subtle"
-            :description="logFailure"
+          <UTextarea
+            v-model="logForm.body"
+            :rows="logForm.kind === 'NEAR_MISS' ? 2 : 4"
+            class="w-full"
+            data-test="log-body"
           />
+        </UFormField>
+      </form>
+    </NightSheet>
 
-          <UFormField
-            v-if="performanceOptions.length > 1"
-            label="Performance"
-          >
-            <USelect
-              v-model="logForm.performanceId"
-              :items="performanceOptions"
-              class="w-full"
-              data-test="log-performance"
-            />
-          </UFormField>
-
-          <UFormField label="Category">
-            <USelect
-              v-model="logForm.category"
-              :items="categoryOptions"
-              class="w-full"
-              data-test="log-category"
-            />
-          </UFormField>
-
-          <UFormField label="Severity">
-            <USelect
-              v-model="logForm.severity"
-              :items="severityOptions"
-              class="w-full"
-              data-test="log-severity"
-            />
-          </UFormField>
-
-          <UFormField
-            label="What happened"
-            description="People by role, never by name."
-          >
-            <UTextarea
-              v-model="logForm.body"
-              :rows="4"
-              class="w-full"
-              data-test="log-body"
-            />
-          </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              class="min-h-12"
-              :loading="saving"
-              data-test="log-submit"
-            >
-              Log the incident
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="logging = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
-        </form>
-      </template>
-    </UModal>
-
-    <UModal
-      v-model:open="reportingNearMiss"
-      title="Report a near miss"
-      description="A category and a sentence. No severity to choose, and this never blocks anything else."
-    >
-      <template #body>
-        <form
-          class="space-y-4"
-          data-test="near-miss-form"
-          @submit.prevent="submitNearMiss"
-        >
-          <UAlert
-            v-if="nearMissFailure"
-            data-test="near-miss-failure"
-            color="error"
-            variant="subtle"
-            :description="nearMissFailure"
-          />
-
-          <UFormField
-            v-if="performanceOptions.length > 1"
-            label="Performance"
-          >
-            <USelect
-              v-model="nearMiss.performanceId"
-              :items="performanceOptions"
-              class="w-full"
-              data-test="near-miss-performance"
-            />
-          </UFormField>
-
-          <UFormField label="Category">
-            <USelect
-              v-model="nearMiss.category"
-              :items="categoryOptions"
-              class="w-full"
-              data-test="near-miss-category"
-            />
-          </UFormField>
-
-          <UFormField label="What nearly happened">
-            <UInput
-              v-model="nearMiss.body"
-              class="w-full"
-              data-test="near-miss-body"
-            />
-          </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              class="min-h-12"
-              :loading="saving"
-              data-test="near-miss-submit"
-            >
-              Report the near miss
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="reportingNearMiss = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
-        </form>
-      </template>
-    </UModal>
-
-    <UModal
+    <NightSheet
       :open="correcting !== null"
-      :title="correcting ? 'Correct this entry' : ''"
-      description="This files a new entry. The original stays visible."
+      title="Correct this entry"
+      primary="File the correction"
+      primary-test-id="correct-submit"
+      :primary-disabled="!correctReady"
+      :loading="saving"
       @update:open="correcting = null"
+      @primary="submitCorrect"
     >
-      <template #body>
-        <form
-          class="space-y-4"
-          data-test="correct-form"
-          @submit.prevent="submitCorrect"
-        >
-          <UAlert
-            v-if="correctFailure"
-            data-test="correct-failure"
-            color="error"
-            variant="subtle"
-            :description="correctFailure"
+      <form
+        class="space-y-4"
+        data-test="correct-form"
+        @submit.prevent="submitCorrect"
+      >
+        <UAlert
+          v-if="correctFailure"
+          data-test="correct-failure"
+          color="error"
+          variant="subtle"
+          :description="correctFailure"
+        />
+
+        <NightChoices
+          v-model="correctForm.severity"
+          label="What kind"
+          :options="kindOptions"
+          test-id="correct-severity"
+        />
+
+        <NightChoices
+          v-model="correctForm.category"
+          label="About"
+          :options="categoryOptions"
+          test-id="correct-category"
+        />
+
+        <UFormField label="Corrected account">
+          <UTextarea
+            v-model="correctForm.body"
+            :rows="4"
+            class="w-full"
+            data-test="correct-body"
           />
-
-          <UFormField label="Category">
-            <USelect
-              v-model="correctForm.category"
-              :items="categoryOptions"
-              class="w-full"
-              data-test="correct-category"
-            />
-          </UFormField>
-
-          <UFormField label="Severity">
-            <USelect
-              v-model="correctForm.severity"
-              :items="severityOptions"
-              class="w-full"
-              data-test="correct-severity"
-            />
-          </UFormField>
-
-          <UFormField label="Corrected account">
-            <UTextarea
-              v-model="correctForm.body"
-              :rows="4"
-              class="w-full"
-              data-test="correct-body"
-            />
-          </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              :loading="saving"
-              data-test="correct-submit"
-            >
-              File the correction
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              @click="correcting = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
-        </form>
-      </template>
-    </UModal>
+        </UFormField>
+      </form>
+    </NightSheet>
   </div>
 </template>

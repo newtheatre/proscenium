@@ -201,100 +201,67 @@ watch(() => props.performanceId, refresh)
       </ul>
     </NightBlock>
 
-    <UModal
+    <NightSheet
       :open="approving !== null"
       title="Approve this comp"
-      :description="approving?.line"
+      primary="Approve the comp"
+      primary-color="secondary"
+      primary-test-id="approve-comp-submit"
+      :loading="deciding !== null"
       @update:open="approving = null"
+      @primary="approveComp()"
     >
-      <template #body>
-        <div
-          class="space-y-4"
-          data-test="approve-comp-form"
-        >
-          <UAlert
-            v-if="approveFailure"
-            data-test="approve-comp-failure"
-            color="error"
-            variant="subtle"
-            :description="approveFailure"
-          />
+      <div
+        class="space-y-4"
+        data-test="approve-comp-form"
+      >
+        <p class="text-sm">
+          {{ approving?.line }}
+        </p>
+        <UAlert
+          v-if="approveFailure"
+          data-test="approve-comp-failure"
+          color="error"
+          variant="subtle"
+          :description="approveFailure"
+        />
+      </div>
+    </NightSheet>
 
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              color="secondary"
-              class="min-h-12"
-              :loading="deciding !== null"
-              data-test="approve-comp-submit"
-              @click="approveComp()"
-            >
-              Approve the comp
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              class="min-h-12"
-              @click="approving = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
-        </div>
-      </template>
-    </UModal>
-
-    <UModal
+    <NightSheet
       :open="declining !== null"
       title="Decline this comp"
-      description="The person who asked sees the reason you give."
+      primary="Decline the comp"
+      primary-test-id="decline-comp-submit"
+      :primary-disabled="!declineReason.trim()"
+      :loading="deciding !== null"
       @update:open="declining = null"
+      @primary="declineComp"
     >
-      <template #body>
-        <form
-          class="space-y-4"
-          data-test="decline-comp-form"
-          @submit.prevent="declineComp"
+      <form
+        class="space-y-4"
+        data-test="decline-comp-form"
+        @submit.prevent="declineComp"
+      >
+        <UAlert
+          v-if="declineFailure"
+          data-test="decline-comp-failure"
+          color="error"
+          variant="subtle"
+          :description="declineFailure"
+        />
+
+        <UFormField
+          label="Why (the person who asked sees it)"
+          required
         >
-          <UAlert
-            v-if="declineFailure"
-            data-test="decline-comp-failure"
-            color="error"
-            variant="subtle"
-            :description="declineFailure"
+          <UInput
+            v-model="declineReason"
+            class="w-full"
+            data-test="decline-comp-reason"
           />
-
-          <UFormField
-            label="Why"
-            required
-          >
-            <UInput
-              v-model="declineReason"
-              class="w-full"
-              data-test="decline-comp-reason"
-            />
-          </UFormField>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
-              class="min-h-12"
-              :loading="deciding !== null"
-              :disabled="!declineReason.trim()"
-              data-test="decline-comp-submit"
-            >
-              Decline the comp
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              class="min-h-12"
-              @click="declining = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
-            </UButton>
-          </div>
-        </form>
-      </template>
-    </UModal>
+        </UFormField>
+      </form>
+    </NightSheet>
   </div>
 </template>

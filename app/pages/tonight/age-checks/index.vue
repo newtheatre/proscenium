@@ -224,6 +224,7 @@ async function submitCorrect(): Promise<void> {
       title="Challenge 25 register"
       :refused="refusal"
       hint="Every entry stays visible once filed. A mistake is corrected with a new entry, never an edit."
+      :empty="items.length === 0"
       :stale="syncedAt"
       :busy="busy"
     >
@@ -302,308 +303,271 @@ async function submitCorrect(): Promise<void> {
       </template>
     </NightScreen>
 
-    <UModal
+    <NightSheet
       v-model:open="logging"
       title="Log a Challenge 25 check"
-      description="The time and your name go on it. Describe who you checked, never by name."
+      primary="Log the check"
+      primary-test-id="log-submit"
+      :primary-disabled="!logReady"
+      :loading="saving"
+      @primary="submitLog"
     >
-      <template #body>
-        <form
-          class="space-y-4"
-          data-test="log-check-form"
-          @submit.prevent="submitLog"
-        >
-          <UAlert
-            v-if="logFailure"
-            data-test="log-check-failure"
-            color="error"
-            variant="subtle"
-            :description="logFailure"
-          />
+      <form
+        class="space-y-4"
+        data-test="log-check-form"
+        @submit.prevent="submitLog"
+      >
+        <UAlert
+          v-if="logFailure"
+          data-test="log-check-failure"
+          color="error"
+          variant="subtle"
+          :description="logFailure"
+        />
 
-          <!-- The routine check is two taps and a sentence: the outcome, the ID, who you saw.
-               Everything the register does not need every time folds away (E-118 criterion 1). -->
-          <UFormField label="Outcome">
-            <div
-              class="grid grid-cols-3 gap-2"
-              data-test="log-outcome"
-            >
-              <UButton
-                v-for="option in outcomeOptions"
-                :key="option.value"
-                :color="logForm.outcome === option.value ? 'primary' : 'neutral'"
-                :variant="logForm.outcome === option.value ? 'solid' : 'subtle'"
-                size="lg"
-                class="min-h-12 justify-center font-semibold"
-                :data-test="`log-outcome-${option.value}`"
-                @click="chooseOutcome(logForm, option.value)"
-              >
-                {{ option.label }}
-              </UButton>
-            </div>
-          </UFormField>
-
-          <UFormField
-            v-if="logForm.outcome !== 'NOT_REQUIRED'"
-            :label="logForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'"
+        <!-- The routine check is two taps and a sentence: the outcome, the ID, who you saw.
+             Everything the register does not need every time folds away (E-118 criterion 1). -->
+        <UFormField label="Outcome">
+          <div
+            class="grid grid-cols-3 gap-2"
+            data-test="log-outcome"
           >
-            <div
-              v-if="logForm.outcome === 'ACCEPTED'"
-              class="grid grid-cols-2 gap-2"
-              data-test="log-id-type"
-            >
-              <UButton
-                v-for="option in idTypeOptions"
-                :key="option.value"
-                :color="logForm.idType === option.value ? 'primary' : 'neutral'"
-                :variant="logForm.idType === option.value ? 'solid' : 'subtle'"
-                class="min-h-12 justify-center"
-                :data-test="`log-id-type-${option.value}`"
-                @click="logForm.idType = option.value"
-              >
-                {{ option.label }}
-              </UButton>
-            </div>
-            <div
-              v-else
-              class="grid gap-2"
-              data-test="log-reason"
-            >
-              <UButton
-                v-for="option in reasonOptions"
-                :key="option.value"
-                :color="logForm.reason === option.value ? 'primary' : 'neutral'"
-                :variant="logForm.reason === option.value ? 'solid' : 'subtle'"
-                class="min-h-12 justify-center"
-                :data-test="`log-reason-${option.value}`"
-                @click="logForm.reason = option.value"
-              >
-                {{ option.label }}
-              </UButton>
-            </div>
-          </UFormField>
-
-          <UFormField
-            label="Who you checked"
-            description="Appearance, never a name: tall man, grey coat."
-            :hint="logForm.outcome === 'NOT_REQUIRED' ? 'Optional' : undefined"
-          >
-            <UInput
-              v-model="logForm.description"
-              size="xl"
-              class="w-full"
-              data-test="log-description"
-            />
-          </UFormField>
-
-          <UCollapsible data-test="log-more">
             <UButton
-              color="neutral"
-              variant="subtle"
-              trailing-icon="i-lucide-chevron-down"
-              block
-              class="min-h-12 justify-between"
-              data-test="log-more-open"
-            >
-              House, product, note
-            </UButton>
-
-            <template #content>
-              <div class="space-y-4 pt-4">
-                <UFormField
-                  v-if="performances.length > 0"
-                  label="Performance"
-                >
-                  <USelect
-                    v-model="logForm.performanceId"
-                    :items="performanceOptions"
-                    size="xl"
-                    class="w-full"
-                    data-test="log-performance"
-                  />
-                </UFormField>
-
-                <UFormField label="Product">
-                  <UInput
-                    v-model="logForm.product"
-                    size="xl"
-                    class="w-full"
-                    data-test="log-product"
-                  />
-                </UFormField>
-
-                <UFormField label="Notes">
-                  <UTextarea
-                    v-model="logForm.notes"
-                    :rows="2"
-                    class="w-full"
-                    data-test="log-notes"
-                  />
-                </UFormField>
-              </div>
-            </template>
-          </UCollapsible>
-
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              type="submit"
+              v-for="option in outcomeOptions"
+              :key="option.value"
+              :color="logForm.outcome === option.value ? 'primary' : 'neutral'"
+              :variant="logForm.outcome === option.value ? 'solid' : 'subtle'"
               size="lg"
-              class="min-h-12"
-              :loading="saving"
-              :disabled="!logReady"
-              data-test="log-submit"
+              class="min-h-12 justify-center font-semibold"
+              :data-test="`log-outcome-${option.value}`"
+              @click="chooseOutcome(logForm, option.value)"
             >
-              Log the check
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              class="min-h-12"
-              @click="logging = false"
-            >
-              {{ CONFIRM_BACK_LABEL }}
+              {{ option.label }}
             </UButton>
           </div>
-        </form>
-      </template>
-    </UModal>
+        </UFormField>
 
-    <UModal
-      :open="correcting !== null"
-      :title="correcting ? 'Correct this entry' : ''"
-      description="This files a new entry. The original stays visible."
-      @update:open="correcting = null"
-    >
-      <template #body>
-        <form
-          class="space-y-4"
-          data-test="correct-check-form"
-          @submit.prevent="submitCorrect"
+        <UFormField
+          v-if="logForm.outcome !== 'NOT_REQUIRED'"
+          :label="logForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'"
         >
-          <UAlert
-            v-if="correctFailure"
-            data-test="correct-check-failure"
-            color="error"
-            variant="subtle"
-            :description="correctFailure"
-          />
-
-          <UFormField label="Outcome">
-            <div
-              class="grid grid-cols-3 gap-2"
-              data-test="correct-outcome"
-            >
-              <UButton
-                v-for="option in outcomeOptions"
-                :key="option.value"
-                :color="correctForm.outcome === option.value ? 'primary' : 'neutral'"
-                :variant="correctForm.outcome === option.value ? 'solid' : 'subtle'"
-                size="lg"
-                class="min-h-12 justify-center font-semibold"
-                :data-test="`correct-outcome-${option.value}`"
-                @click="chooseOutcome(correctForm, option.value)"
-              >
-                {{ option.label }}
-              </UButton>
-            </div>
-          </UFormField>
-
-          <UFormField
-            v-if="correctForm.outcome !== 'NOT_REQUIRED'"
-            :label="correctForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'"
+          <div
+            v-if="logForm.outcome === 'ACCEPTED'"
+            class="grid grid-cols-2 gap-2"
+            data-test="log-id-type"
           >
-            <div
-              v-if="correctForm.outcome === 'ACCEPTED'"
-              class="grid grid-cols-2 gap-2"
-              data-test="correct-id-type"
-            >
-              <UButton
-                v-for="option in idTypeOptions"
-                :key="option.value"
-                :color="correctForm.idType === option.value ? 'primary' : 'neutral'"
-                :variant="correctForm.idType === option.value ? 'solid' : 'subtle'"
-                class="min-h-12 justify-center"
-                :data-test="`correct-id-type-${option.value}`"
-                @click="correctForm.idType = option.value"
-              >
-                {{ option.label }}
-              </UButton>
-            </div>
-            <div
-              v-else
-              class="grid gap-2"
-              data-test="correct-reason"
-            >
-              <UButton
-                v-for="option in reasonOptions"
-                :key="option.value"
-                :color="correctForm.reason === option.value ? 'primary' : 'neutral'"
-                :variant="correctForm.reason === option.value ? 'solid' : 'subtle'"
-                class="min-h-12 justify-center"
-                :data-test="`correct-reason-${option.value}`"
-                @click="correctForm.reason = option.value"
-              >
-                {{ option.label }}
-              </UButton>
-            </div>
-          </UFormField>
-
-          <UFormField
-            label="Who you checked"
-            description="Appearance, never a name."
-            :hint="correctForm.outcome === 'NOT_REQUIRED' ? 'Optional' : undefined"
-          >
-            <UInput
-              v-model="correctForm.description"
-              class="w-full"
-              data-test="correct-description"
-            />
-          </UFormField>
-
-          <UFormField
-            label="Product"
-            hint="Optional"
-          >
-            <UInput
-              v-model="correctForm.product"
-              class="w-full"
-              data-test="correct-product"
-            />
-          </UFormField>
-
-          <UFormField
-            label="Notes"
-            hint="Optional"
-          >
-            <UTextarea
-              v-model="correctForm.notes"
-              :rows="2"
-              class="w-full"
-              data-test="correct-notes"
-            />
-          </UFormField>
-
-          <div class="flex flex-wrap gap-2">
             <UButton
-              type="submit"
-              class="min-h-12"
-              :loading="saving"
-              :disabled="!correctReady"
-              data-test="correct-submit"
+              v-for="option in idTypeOptions"
+              :key="option.value"
+              :color="logForm.idType === option.value ? 'primary' : 'neutral'"
+              :variant="logForm.idType === option.value ? 'solid' : 'subtle'"
+              class="min-h-12 justify-center"
+              :data-test="`log-id-type-${option.value}`"
+              @click="logForm.idType = option.value"
             >
-              File the correction
-            </UButton>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              class="min-h-12"
-              @click="correcting = null"
-            >
-              {{ CONFIRM_BACK_LABEL }}
+              {{ option.label }}
             </UButton>
           </div>
-        </form>
-      </template>
-    </UModal>
+          <div
+            v-else
+            class="grid gap-2"
+            data-test="log-reason"
+          >
+            <UButton
+              v-for="option in reasonOptions"
+              :key="option.value"
+              :color="logForm.reason === option.value ? 'primary' : 'neutral'"
+              :variant="logForm.reason === option.value ? 'solid' : 'subtle'"
+              class="min-h-12 justify-center"
+              :data-test="`log-reason-${option.value}`"
+              @click="logForm.reason = option.value"
+            >
+              {{ option.label }}
+            </UButton>
+          </div>
+        </UFormField>
+
+        <UFormField
+          label="Who you checked"
+          description="Appearance, never a name: tall man, grey coat."
+          :hint="logForm.outcome === 'NOT_REQUIRED' ? 'Optional' : undefined"
+        >
+          <UInput
+            v-model="logForm.description"
+            size="xl"
+            class="w-full"
+            data-test="log-description"
+          />
+        </UFormField>
+
+        <UCollapsible data-test="log-more">
+          <UButton
+            color="neutral"
+            variant="subtle"
+            trailing-icon="i-lucide-chevron-down"
+            block
+            class="min-h-12 justify-between"
+            data-test="log-more-open"
+          >
+            House, product, note
+          </UButton>
+
+          <template #content>
+            <div class="space-y-4 pt-4">
+              <UFormField
+                v-if="performances.length > 0"
+                label="Performance"
+              >
+                <USelect
+                  v-model="logForm.performanceId"
+                  :items="performanceOptions"
+                  size="xl"
+                  class="w-full"
+                  data-test="log-performance"
+                />
+              </UFormField>
+
+              <UFormField label="Product">
+                <UInput
+                  v-model="logForm.product"
+                  size="xl"
+                  class="w-full"
+                  data-test="log-product"
+                />
+              </UFormField>
+
+              <UFormField label="Notes">
+                <UTextarea
+                  v-model="logForm.notes"
+                  :rows="2"
+                  class="w-full"
+                  data-test="log-notes"
+                />
+              </UFormField>
+            </div>
+          </template>
+        </UCollapsible>
+      </form>
+    </NightSheet>
+
+    <NightSheet
+      :open="correcting !== null"
+      title="Correct this entry"
+      primary="File the correction"
+      primary-test-id="correct-submit"
+      :primary-disabled="!correctReady"
+      :loading="saving"
+      @update:open="correcting = null"
+      @primary="submitCorrect"
+    >
+      <form
+        class="space-y-4"
+        data-test="correct-check-form"
+        @submit.prevent="submitCorrect"
+      >
+        <UAlert
+          v-if="correctFailure"
+          data-test="correct-check-failure"
+          color="error"
+          variant="subtle"
+          :description="correctFailure"
+        />
+
+        <UFormField label="Outcome">
+          <div
+            class="grid grid-cols-3 gap-2"
+            data-test="correct-outcome"
+          >
+            <UButton
+              v-for="option in outcomeOptions"
+              :key="option.value"
+              :color="correctForm.outcome === option.value ? 'primary' : 'neutral'"
+              :variant="correctForm.outcome === option.value ? 'solid' : 'subtle'"
+              size="lg"
+              class="min-h-12 justify-center font-semibold"
+              :data-test="`correct-outcome-${option.value}`"
+              @click="chooseOutcome(correctForm, option.value)"
+            >
+              {{ option.label }}
+            </UButton>
+          </div>
+        </UFormField>
+
+        <UFormField
+          v-if="correctForm.outcome !== 'NOT_REQUIRED'"
+          :label="correctForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'"
+        >
+          <div
+            v-if="correctForm.outcome === 'ACCEPTED'"
+            class="grid grid-cols-2 gap-2"
+            data-test="correct-id-type"
+          >
+            <UButton
+              v-for="option in idTypeOptions"
+              :key="option.value"
+              :color="correctForm.idType === option.value ? 'primary' : 'neutral'"
+              :variant="correctForm.idType === option.value ? 'solid' : 'subtle'"
+              class="min-h-12 justify-center"
+              :data-test="`correct-id-type-${option.value}`"
+              @click="correctForm.idType = option.value"
+            >
+              {{ option.label }}
+            </UButton>
+          </div>
+          <div
+            v-else
+            class="grid gap-2"
+            data-test="correct-reason"
+          >
+            <UButton
+              v-for="option in reasonOptions"
+              :key="option.value"
+              :color="correctForm.reason === option.value ? 'primary' : 'neutral'"
+              :variant="correctForm.reason === option.value ? 'solid' : 'subtle'"
+              class="min-h-12 justify-center"
+              :data-test="`correct-reason-${option.value}`"
+              @click="correctForm.reason = option.value"
+            >
+              {{ option.label }}
+            </UButton>
+          </div>
+        </UFormField>
+
+        <UFormField
+          label="Who you checked"
+          description="Appearance, never a name."
+          :hint="correctForm.outcome === 'NOT_REQUIRED' ? 'Optional' : undefined"
+        >
+          <UInput
+            v-model="correctForm.description"
+            class="w-full"
+            data-test="correct-description"
+          />
+        </UFormField>
+
+        <UFormField
+          label="Product"
+          hint="Optional"
+        >
+          <UInput
+            v-model="correctForm.product"
+            class="w-full"
+            data-test="correct-product"
+          />
+        </UFormField>
+
+        <UFormField
+          label="Notes"
+          hint="Optional"
+        >
+          <UTextarea
+            v-model="correctForm.notes"
+            :rows="2"
+            class="w-full"
+            data-test="correct-notes"
+          />
+        </UFormField>
+      </form>
+    </NightSheet>
   </div>
 </template>
