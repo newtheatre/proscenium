@@ -46,8 +46,8 @@ export type ClaimOutcome
     | { won: false, why: 'closed' }
 
 // The predicate rides the INSERT, so the check and the write are one statement and cannot be
-// interleaved: room live, nothing booked, nothing closed. Half-open, so back-to-back bookings fit.
-export function claimRoomSlotStatement(id: string, input: ClaimInput): SQL {
+// interleaved: room live, nothing booked, nothing closed, and `onlyIf`. Half-open, as ever.
+export function claimRoomSlotStatement(id: string, input: ClaimInput, onlyIf?: SQL): SQL {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
   return sql`
     INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, reason)
@@ -63,21 +63,16 @@ export function claimRoomSlotStatement(id: string, input: ClaimInput): SQL {
           AND ends_at > ${input.startsAt}
       )
       AND ${roomOpenTerms(input.roomId, input.startsAt, input.endsAt, input.offsets)}
+      ${onlyIf ? sql`AND ${onlyIf}` : sql``}
     RETURNING id
   `
 }
 
 // The audit entry is built for the new id and batched with the claim, written only if it landed
-// (0049). Without one, the caller owns the claim's audit.
-export async function claimSlot(input: ClaimInput, audit?: (id: string) => AuditRow): Promise<ClaimOutcome> {
+// (0049). RETURNING rather than a changes count: a row coming back is the win (0003).
+export async function claimSlot(input: ClaimInput, audit: (id: string) => AuditRow): Promise<ClaimOutcome> {
   const id = newId()
-
-  // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
-  // coming back is the same signal claimToken uses to know it won (0003).
-  const write = db.all<{ id: string }>(claimRoomSlotStatement(id, input))
-  const claimed = audit ? await auditedWrite(write, audit(id)) : (await write).length > 0
-
-  if (claimed) return { won: true, id }
+  if (await auditedWrite(db.all<{ id: string }>(claimRoomSlotStatement(id, input)), audit(id))) return { won: true, id }
 
   // Zero rows written, disambiguated rather than guessed: gone, closed or beaten (0003).
   return await whyItFailed(input)
@@ -282,4 +277,9 @@ export async function hasCurrentMembership(event: H3Event, userId: string, now: 
   const term = await longestTerm(userId)
   if (!term) return false
   return isCurrent(term, londonDay(now), await configValue(event, 'MEMBERSHIP_GRACE_DAYS'))
+}
+
+// A claim its caller batched with other writes, and lost, disambiguated as claimSlot's own is (0003).
+export async function whyClaimLost(input: ClaimInput): Promise<Exclude<ClaimOutcome, { won: true }>> {
+  return await whyItFailed(input)
 }

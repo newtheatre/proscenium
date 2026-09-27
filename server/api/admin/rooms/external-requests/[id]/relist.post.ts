@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { bookingTier } from '#shared/utils/bookings'
 import { refusalToRelist } from '#shared/utils/external-requests'
@@ -39,9 +38,7 @@ export default defineEventHandler(async (event) => {
 
   // The member asked, so the tier is theirs as any member booking's is (C-115 criterion 1).
   const tier = bookingTier(request.purpose, undefined, false)
-
-  // The predicate rides the INSERT, so two officers claiming one slot cannot both win (0003).
-  const claim = await claimSlot({
+  const claim = {
     roomId: room.id,
     userId: request.userId,
     title: request.title,
@@ -50,51 +47,38 @@ export default defineEventHandler(async (event) => {
     endsAt: request.endsAt,
     tier,
     purpose: request.purpose,
-    status: verdict.needsApproval ? 'PENDING_APPROVAL' : 'CONFIRMED',
+    status: verdict.needsApproval ? 'PENDING_APPROVAL' as const : 'CONFIRMED' as const,
     notes: request.notes,
     offsets: await shiftOffsetDefaults(event),
-  })
-
-  if (!claim.won && claim.why === 'closed') {
-    throw (await closedOver(event, room.id, request.startsAt, request.endsAt))
-      ?? createError({ statusCode: 409, statusMessage: `Somebody already holds ${room.name} for that span` })
   }
-  if (!claim.won) {
-    throw createError({
-      statusCode: claim.why === 'gone' ? 410 : 409,
-      statusMessage: claim.why === 'gone'
-        ? 'That room is no longer bookable'
-        : `Somebody already holds ${room.name} for that span`,
-      data: claim.why === 'conflict' ? { conflicts: claim.conflicts } : undefined,
-    })
-  }
-
-  const seconds = Math.floor(Date.now() / 1000)
-  const moved = await moveRequest(id, ['REQUESTED', 'AWAITING_EXTERNAL', 'CONFIRMED'], {
-    status: 'CANCELLED',
-    converted_to_booking_id: claim.id,
-    updated_at: seconds,
-  })
-
-  // The booking is already claimed, so a request that moved on under us leaves it to be undone
-  // rather than left holding a slot for something nobody asked for.
-  if (!moved) {
-    await db.update(schema.roomBookings)
-      .set({ status: 'CANCELLED', updatedAt: seconds })
-      .where(eq(schema.roomBookings.id, claim.id))
-    throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
-  }
-
-  await db.update(schema.roomBookings)
-    .set({ convertedFromRequestId: id })
-    .where(eq(schema.roomBookings.id, claim.id))
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  const claimId = newId()
+  const entry = auditEntry({
     actorId: account.id,
     action: 'external.request.relisted',
     target: `external:${id}`,
-    detail: { became: claim.id, room: room.id, tier, needsApproval: verdict.needsApproval },
-  }))
+    detail: { became: claimId, room: room.id, tier, needsApproval: verdict.needsApproval },
+  })
+
+  // The predicate rides the INSERT, so two officers claiming one slot cannot both win (0003), and
+  // the claim, the move and the audit land together or not at all (0049).
+  const statements = relistStatements({ requestId: id, claimId, claim, now: Math.floor(Date.now() / 1000) }, entry)
+  const [claimed] = await runBatch(statements)
+
+  if (!claimed!.length) {
+    const current = await externalRequest(id)
+    if (!current || refusalToRelist(current)) throw createError({ statusCode: 409, statusMessage: 'That request has already moved on' })
+
+    const lost = await whyClaimLost(claim)
+    if (lost.why === 'closed') {
+      throw (await closedOver(event, room.id, request.startsAt, request.endsAt))
+        ?? createError({ statusCode: 409, statusMessage: `Somebody already holds ${room.name} for that span` })
+    }
+    throw createError({
+      statusCode: lost.why === 'gone' ? 410 : 409,
+      statusMessage: lost.why === 'gone' ? 'That room is no longer bookable' : `Somebody already holds ${room.name} for that span`,
+      data: lost.why === 'conflict' ? { conflicts: lost.conflicts } : undefined,
+    })
+  }
 
   await notify(event, {
     type: 'external.request.relisted',
@@ -109,5 +93,5 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return { ok: true, id, became: claim.id, status: verdict.needsApproval ? 'PENDING_APPROVAL' : 'CONFIRMED' }
+  return { ok: true, id, became: claimId, status: claim.status }
 })

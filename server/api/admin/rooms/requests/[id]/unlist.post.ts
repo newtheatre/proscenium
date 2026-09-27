@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import { refusalToUnlist } from '#shared/utils/bookings'
 import { addWorkingDays, coversThrough, londonDate } from '#shared/utils/working-days'
 import { unlistForm } from '#shared/utils/approvals'
@@ -36,36 +35,17 @@ export default defineEventHandler(async (event) => {
 
   const requestId = newId()
   const now = Math.floor(Date.now() / 1000)
-
-  // The reason does not cross: it answers why a member is asking for something outside our
-  // policy, which is not a question the other side asks (C-123 criterion 6).
-  const insert = sql`
-    INSERT INTO external_requests (id, user_id, title, purpose, attendees, starts_at, ends_at, notes, status,
-                                   converted_from_booking_id, series_id, occurrence)
-    VALUES (${requestId}, ${booking.userId}, ${booking.title}, ${booking.purpose ?? UNRECORDED_PURPOSE},
-            ${booking.attendees}, ${booking.startsAt}, ${booking.endsAt}, ${booking.notes}, 'REQUESTED', ${id},
-            ${booking.seriesId}, ${booking.occurrence})
-  `
-
-  const move = sql`
-    UPDATE room_bookings SET status = 'CANCELLED', converted_to_request_id = ${requestId}, updated_at = ${now}
-    WHERE id = ${id} AND status = 'PENDING_APPROVAL'
-  `
-
-  // Reached only when somebody decided the request between the read and the write: the duplicate
-  // primary key fails the batch rather than leaving a request nothing points at (0035).
-  const assertion = sql`
-    INSERT INTO external_requests (id, user_id, title, purpose, starts_at, ends_at)
-    SELECT ${requestId}, ${booking.userId}, ${booking.title}, ${booking.purpose ?? UNRECORDED_PURPOSE},
-           ${booking.startsAt}, ${booking.endsAt}
-    WHERE NOT EXISTS (
-      SELECT 1 FROM room_bookings WHERE id = ${id} AND converted_to_request_id = ${requestId}
-    )
-  `
+  const entry = auditEntry({
+    actorId: account.id,
+    action: 'room.request.unlisted',
+    target: `booking:${id}`,
+    detail: { became: requestId, room: booking.roomId },
+  })
 
   // The head follows what is left, and it moves in the same batch: a series read between the two
   // would name a week that has already gone somewhere else (C-124 criterion 4).
-  const statements = [db.run(insert), db.run(move), db.run(assertion)]
+  const statements = unlistStatements({ ...booking, purpose: booking.purpose ?? UNRECORDED_PURPOSE }, requestId, now, entry)
+    .map(statement => db.run(statement))
   if (booking.seriesId) statements.push(promoteHead(booking.seriesId, now))
 
   try {
@@ -74,13 +54,6 @@ export default defineEventHandler(async (event) => {
   catch {
     throw createError({ statusCode: 409, statusMessage: 'That request has already been decided' })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: account.id,
-    action: 'room.request.unlisted',
-    target: `booking:${id}`,
-    detail: { became: requestId, room: booking.roomId },
-  }))
 
   await notify(event, {
     type: 'room.request.unlisted',
