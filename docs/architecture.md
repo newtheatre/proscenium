@@ -241,7 +241,10 @@ becomes interactive.
 - `nuxt-authorization` abilities (`shared/utils/abilities.ts`) are named views over the same
   permission map, used to decide what the chrome shows. Two resolvers hand an ability its viewer:
   `server/plugins/authorisation.ts` from the account row and its live grants,
-  `app/plugins/authorization.ts` from the account snapshot. Neither reads authority from the
+  `app/plugins/authorization.ts` from the account snapshot. The server resolver and
+  `GET /api/auth/session`, which fills that snapshot, both read one set of facts:
+  `viewerFacts(event, accountId)` in `server/utils/viewer-facts.ts`, once per request (held on
+  `event.context`), so a fact added for one reaches the other. Neither reads authority from the
   cookie, and neither replaces `requirePermission`, which also holds the MFA gate (0040). The
   `Viewer` also carries `membershipState` (`current`, `grace`, `lapsed` or `none`, never two
   booleans), and `member` and `memberOrGrace` read it; navigation is not filtered by either, so a
