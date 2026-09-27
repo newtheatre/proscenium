@@ -46,8 +46,8 @@ describe('the name reaches the trail, the settings and the personal-data notes',
     ]
     expect(readerFacing.filter(one => /rooms? we do not manage/i.test(one))).toEqual([])
     expect(AUDIT_ACTIONS['room.request.unlisted'].label).toBe('Request moved to a Students\' Union room')
-    expect(await read('shared/utils/personal-data.ts')).not.toMatch(/rooms? we do not manage/i)
-    expect(await read('app/pages/rooms/book.vue')).not.toMatch(/rooms? we do not manage/i)
+    expect(await Bun.file('shared/utils/personal-data.ts').text()).not.toMatch(/rooms? we do not manage/i)
+    expect(await Bun.file('app/pages/rooms/book.vue').text()).not.toMatch(/rooms? we do not manage/i)
   })
 })
 

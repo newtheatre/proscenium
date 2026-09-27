@@ -63,7 +63,7 @@ export function nameOrPurpose(title: string, purpose: string): string {
 // What a member reads for a booking's state. A cancellation carrying a conversion pointer was
 // moved rather than withdrawn, and reading it as "Cancelled" would say the opposite (C-123).
 export function saysBookingState(booking: { status: string, convertedToRequestId?: string | null }): string {
-  if (booking.status === 'CANCELLED' && booking.convertedToRequestId) return 'Moved to a room we do not manage'
+  if (booking.status === 'CANCELLED' && booking.convertedToRequestId) return 'Moved to a Students\' Union room'
   return BOOKING_STATE[booking.status] ?? booking.status
 }
 

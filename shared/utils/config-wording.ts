@@ -47,7 +47,7 @@ const HEADINGS: Record<ConfigKey, string> = {
   ROOM_REQUEST_EXPIRE_HOURS: 'Room request lapses after',
   ROOM_FEED_WEEKS: 'Calendar feed reaches ahead',
   ROOM_AVAILABILITY_ROW_BOUND: 'Bookings one availability check covers',
-  EXTERNAL_REQUEST_NOTICE_WORKING_DAYS: 'Notice for a room we do not manage',
+  EXTERNAL_REQUEST_NOTICE_WORKING_DAYS: 'Notice for a Students\' Union room',
   BANK_HOLIDAYS: 'Bank holidays',
   ROOM_PURPOSES: 'What a room is booked for',
   ROOM_PRIORITY_TIERS: 'Booking priority',

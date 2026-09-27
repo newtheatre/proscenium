@@ -193,7 +193,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     // The officer who handled somebody else's ask is cleared like every other officer column;
     // who did it stays in the audit trail, which erasure redacts on its own terms (0011).
     scrub: ['submitted_by', 'decided_by'],
-    why: 'Requests for rooms we do not manage that this person handled for somebody else. The request survives; the officer does not.',
+    why: 'Requests for Students\' Union rooms that this person handled for somebody else. The request survives; the officer does not.',
   },
   {
     name: 'room_bookings',
@@ -223,7 +223,7 @@ export const PERSONAL_TABLES: PersonalTable[] = [
     erasure: 'scrub',
     // What we learned about a room outlives whoever wrote it down; the audit trail keeps who.
     scrub: ['written_by'],
-    why: 'An officer noted what a room we do not manage is no good for. The knowledge survives; the officer does not.',
+    why: 'An officer noted what a Students\' Union room is no good for. The knowledge survives; the officer does not.',
   },
   {
     name: 'room_blackouts',
