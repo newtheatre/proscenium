@@ -22,7 +22,7 @@ const waiting = computed(() => NAV_COUNTS.flatMap(count => (counts.value[count] 
   ? []
   : [{ count, ...NAV_QUEUES[count], total: counts.value[count] }])))
 // A failed read is news only to somebody who decides a queue; anybody else has no card to fail.
-const decidesAny = computed(() => queuesFor(new Set(viewer.value.permissions), viewer.value.leadsDepartment).length > 0)
+const decidesAny = computed(() => viewer.value !== null && queuesFor(new Set(viewer.value.permissions), viewer.value.leadsDepartment).length > 0)
 
 const { data: overview, error: overviewError } = await useAsyncData(
   'console-overview',
