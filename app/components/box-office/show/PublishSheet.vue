@@ -15,13 +15,13 @@ const props = defineProps<{
 const cascade = defineModel<boolean>('cascade', { required: true })
 const cover = defineModel<string[]>('cover', { required: true })
 
-interface PriceLine { ticketTypeId: string, name: string, price: number, active: boolean, archived: boolean, kind: string, accessKind: string | null }
+interface PriceLine { ticketTypeId: string, name: string, price: number, active: boolean, archived: boolean, accessKind: string | null }
 
 const prices = ref<PriceLine[] | null>(null)
 
-// What a booker is offered: a pass admission or an access seat is never bought on its own.
+// An access seat is never bought on its own; the route already leaves out pass admission (0074).
 const offered = computed(() => (prices.value ?? [])
-  .filter(one => one.active && !one.archived && one.kind !== 'PASS_ADMISSION' && one.accessKind === null))
+  .filter(one => one.active && !one.archived && one.accessKind === null))
 
 onMounted(async () => {
   if (!props.detail) return

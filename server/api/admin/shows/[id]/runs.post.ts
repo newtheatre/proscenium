@@ -1,4 +1,4 @@
-import { performanceRunForm, runningTimeRefusal } from '#shared/utils/programme'
+import { performanceRunForm } from '#shared/utils/programme'
 
 // Add a run: every night of it or none, each born DRAFT and stamped from its venue's template in
 // the same batch as the others (D-132 criterion 10, D-121 criteria 2 and 3, E-102 criterion 1).
@@ -10,11 +10,7 @@ export default defineEventHandler(async (event) => {
   if (!show) throw noSuch('show')
 
   const input = await readValidatedBodyOrThrow(event, performanceRunForm)
-  const venue = (await listVenues()).find(one => one.id === input.venueId)
-  if (!venue) throw createError({ statusCode: 400, statusMessage: saysNoSuch('venue') })
-  if (venue.archived) throw createError({ statusCode: 409, statusMessage: `${venue.name} is retired and cannot be booked for a new performance` })
-  const untimed = runningTimeRefusal(venue, input.durationMinutes)
-  if (untimed) throw createError({ statusCode: 400, statusMessage: untimed })
+  await bookableVenueOrThrow(input.venueId, input.durationMinutes)
 
   const offsets = await shiftOffsetDefaults(event)
   const nights = input.nights.map(night => ({ ...night, id: newId() }))

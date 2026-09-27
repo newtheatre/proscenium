@@ -105,7 +105,8 @@ function addRun(from: AdminPerformance | null): void {
   failure.value = null
   Object.assign(form, {
     ...NO_OVERRIDES,
-    venueId: from?.venueId ?? preselectedVenueId(props.venues, props.show.lastVenueId),
+    // A retired venue is not offered for new work, so Duplicate from one starts where Add would.
+    venueId: from && !venueOf(from.venueId)?.archived ? from.venueId : preselectedVenueId(props.venues, props.show.lastVenueId),
     days: [''],
     clock: from ? clockOf(from.startsAt) : '19:30',
     doorsClock: from?.doorsAt ? clockOf(from.doorsAt) : '',
@@ -138,20 +139,6 @@ function editPerformance(one: AdminPerformance): void {
   performanceOpen.value = true
 }
 
-// Every night of a run in one request, so the run lands whole or not at all (D-132 criterion 10).
-function saveRun(): Promise<unknown> {
-  return $fetch(`/api/admin/shows/${props.show.id}/runs`, {
-    method: 'POST',
-    body: {
-      venueId: form.venueId,
-      durationMinutes: form.durationMinutes,
-      intervalCount: form.intervalCount,
-      intervalMinutes: form.intervalMinutes,
-      nights: form.days.map(day => nightInstants(day, form.clock, form.doorsClock)),
-    },
-  })
-}
-
 async function savePerformance(): Promise<void> {
   saving.value = true
   failure.value = null
@@ -176,7 +163,17 @@ async function savePerformance(): Promise<void> {
       })
     }
     else {
-      await saveRun()
+      // Every night of a run in one request, so the run lands whole or not at all (D-132 criterion 10).
+      await $fetch(`/api/admin/shows/${props.show.id}/runs`, {
+        method: 'POST',
+        body: {
+          venueId: form.venueId,
+          durationMinutes: form.durationMinutes,
+          intervalCount: form.intervalCount,
+          intervalMinutes: form.intervalMinutes,
+          nights: form.days.map(day => nightInstants(day, form.clock, form.doorsClock)),
+        },
+      })
     }
     toast.add({
       title: editing ? 'Performance changed' : `${plural(added, 'performance', 'performances')} added`,
@@ -533,10 +530,10 @@ const columns: TableColumn<AdminPerformance>[] = [
 
           <UFormField
             v-else
-            label="Nights"
+            label="Days"
             name="days"
             required
-            description="Each night is one performance at the curtain below."
+            description="Each day is one performance at the curtain below, on the day the curtain falls: a 00:15 Saturday curtain is the Saturday, and is Friday's show night."
           >
             <div class="space-y-2">
               <div
@@ -553,7 +550,7 @@ const columns: TableColumn<AdminPerformance>[] = [
                   color="neutral"
                   variant="ghost"
                   icon="i-lucide-x"
-                  :aria-label="`Remove night ${index + 1}`"
+                  :aria-label="`Remove day ${index + 1}`"
                   @click="form.days.splice(index, 1)"
                 />
               </div>
@@ -566,7 +563,7 @@ const columns: TableColumn<AdminPerformance>[] = [
                 data-test="run-add-night"
                 @click="form.days.push('')"
               >
-                Add another night
+                Add another day
               </UButton>
             </div>
           </UFormField>

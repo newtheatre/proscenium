@@ -1,10 +1,13 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { createError } from 'h3'
 // A function import only: `capacity.ts` imports `soldReferences` from this file, and importing a
 // constant back would be a circular value that is not there yet the first time either module runs.
 import { heldSeatsSubquery, showUnpaidSeatsColumn, unpaidSeatsColumn } from './capacity'
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
+import { saysNoSuch } from '#shared/utils/no-such'
 import { performancesList } from '#shared/utils/performances-list'
+import { runningTimeRefusal } from '#shared/utils/programme'
 import { showsList } from '#shared/utils/shows-list'
 import { posterUrl } from '#shared/utils/seo'
 import type { ListClause } from './list-filters'
@@ -444,6 +447,16 @@ export async function listVenues(): Promise<ShowVenue[]> {
     SELECT id, name, capacity, is_external AS isExternal, archived FROM venues ORDER BY name COLLATE NOCASE
   `)
   return rows.map(row => ({ ...row, isExternal: row.isExternal === 1, archived: row.archived === 1 }))
+}
+
+// The one set of refusals both ways of adding a performance make, in the same order (D-121, D-131).
+export async function bookableVenueOrThrow(venueId: string, durationMinutes: number | null | undefined): Promise<ShowVenue> {
+  const venue = (await listVenues()).find(one => one.id === venueId)
+  if (!venue) throw createError({ statusCode: 400, statusMessage: saysNoSuch('venue') })
+  if (venue.archived) throw createError({ statusCode: 409, statusMessage: `${venue.name} is retired and cannot be booked for a new performance` })
+  const untimed = runningTimeRefusal(venue, durationMinutes)
+  if (untimed) throw createError({ statusCode: 400, statusMessage: untimed })
+  return venue
 }
 
 export interface ShowOption {

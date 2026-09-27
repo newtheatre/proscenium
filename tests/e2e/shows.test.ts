@@ -769,6 +769,10 @@ describe.skipIf(skip !== null)('the screen', () => {
   test('publishing opens a sheet naming each night, its running time and shifts, and puts the show on sale', async () => {
     const id = await newShow({ title: named('Reviewed on screen') })
     const performance = await addPerformance(id, { durationMinutes: 135, intervalCount: 1, intervalMinutes: 15 })
+    const standard = named('Standard')
+    const access = named('Access')
+    expect((await send('POST', '/api/admin/ticket-types', { name: standard, price: 900 })).status).toBe(200)
+    expect((await send('POST', '/api/admin/ticket-types', { name: access, price: 900, accessKind: 'ACCESS' })).status).toBe(200)
 
     const view = await signedIn()
     await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="publish"]')
@@ -781,6 +785,12 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect(await textOf(view, '[data-test="publish-warnings"]')).toContain('Not yet assessed')
     expect(await textOf(view, '[data-test="publish-poster"]')).toContain('No poster')
     expect(await textOf(view, '[data-test="confirm-publish"]')).toContain('Put on sale')
+
+    // What a booker pays, never an access seat, which is not bought on its own.
+    await waitFor(view, `!document.querySelector('[data-test="publish-prices"]')?.textContent.includes('Reading the prices')`)
+    const prices = await textOf(view, '[data-test="publish-prices"]')
+    expect(prices).toContain(`${standard} £9.00`)
+    expect(prices).not.toContain(access)
 
     await click(view, '[data-test="confirm-publish"]')
     await waitFor(view, `document.querySelector('[data-test="show-status"]')?.textContent.includes('Published')`)

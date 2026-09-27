@@ -192,6 +192,12 @@ describe('the booking window inherits performance, then show, then curtain-up (D
     expect(performanceScreenForm.safeParse({ ...state, doorsClock: '24:00' }).success).toBe(false)
   })
 
+  test('the Edit form refuses doors typed after an evening curtain, and allows them for one after midnight', () => {
+    const state = { venueId: 'v1', day: '2026-11-07', clock: '19:30', doorsClock: '19:45', durationMinutes: 120 }
+    expect(performanceScreenForm.safeParse(state).success).toBe(false)
+    expect(performanceScreenForm.safeParse({ ...state, clock: '00:30', doorsClock: '23:45' }).success).toBe(true)
+  })
+
   test('doors open before curtain, never after it', () => {
     const base = { venueId: 'v1', startsAt: seconds(CURTAIN) }
     expect(performanceForm.safeParse({ ...base, doorsAt: seconds(CURTAIN) - 1800 }).success).toBe(true)
@@ -430,8 +436,26 @@ describe('a run of nights becomes one instant per night (D-132 criterion 10)', (
     expect(nightInstants('2026-11-07', '00:30', '23:45')).toEqual({ startsAt: at(2026, 11, 7, 0, 30), doorsAt: at(2026, 11, 6, 23, 45) })
   })
 
+  // The date is the day the curtain falls on: a 00:15 Saturday curtain is given as the Saturday.
+  test('a curtain after midnight is on the day it falls, which is the show night before', () => {
+    expect(nightInstants('2026-10-24', '00:15', '')).toEqual({ startsAt: at(2026, 10, 24, 0, 15), doorsAt: null })
+  })
+
   const run = (nights: { startsAt: number, doorsAt?: number | null }[], over: Record<string, unknown> = {}) =>
     performanceRunForm.safeParse({ venueId: 'venue-a', durationMinutes: 120, nights, ...over })
+
+  // A 19:45 doors against a 19:30 curtain is a slip: it stays on the same day, so the run refuses
+  // it rather than opening every night's doors and shifts the evening before.
+  test('doors typed after an evening curtain stay on its day and are refused, on the screen and in the request', () => {
+    const slipped = nightInstants('2026-11-07', '19:30', '19:45')
+    expect(slipped).toEqual({ startsAt: at(2026, 11, 7, 19, 30), doorsAt: at(2026, 11, 7, 19, 45) })
+    expect(run([slipped]).success).toBe(false)
+
+    const screen = { venueId: 'venue-a', days: ['2026-11-07'], clock: '19:30', durationMinutes: 120 }
+    expect(runScreenForm.safeParse({ ...screen, doorsClock: '19:45' }).success).toBe(false)
+    expect(runScreenForm.safeParse({ ...screen, doorsClock: '19:00' }).success).toBe(true)
+    expect(runScreenForm.safeParse({ ...screen, clock: '00:30', doorsClock: '23:45' }).success).toBe(true)
+  })
 
   test('a run takes one to the cap of nights, each curtain once, doors never after its curtain', () => {
     expect(run([{ startsAt: 2_000_000_000 }]).success).toBe(true)
