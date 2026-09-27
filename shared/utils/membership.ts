@@ -63,7 +63,9 @@ export function renewalTerm(boughtOn: string, years: MembershipTerm, heldUntil: 
 // The screen field for a civil date. The round trip refuses a day the calendar does not have
 // (2026-02-31 would roll into March), and guards the shape since every check runs after the regex.
 const DAY = /^\d{4}-\d{2}-\d{2}$/
-export const londonDayField = z.string()
+// A date left empty asks for one, on every form that shares this field (K-128 criterion 2).
+export const londonDayField = z.string('Choose a date')
+  .min(1, { message: 'Choose a date', abort: true })
   .regex(DAY, 'Give the date as YYYY-MM-DD')
   .refine(day => !DAY.test(day) || daysAfter(day, 0) === day, 'That is not a day on the calendar')
 
