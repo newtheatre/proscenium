@@ -337,7 +337,16 @@ chosen at the time (`<archive-name>` below; nothing is decided yet). In order:
    advance; say so plainly, because the obvious assumption, that the hardcoded id needs changing
    because it belonged to whichever database was live *before*, is the wrong way round.
 
-8. **Confirm the photographs transform on the host that serves them.** Open the home page on the
+8. **Set the first night that closes itself.** Under Settings, set `AUTO_CLOSE_FROM_NIGHT` to
+   the night after the old estate's last performance, so every night from it onwards ran on the
+   new system; not merely the first new-system night, since a show kept on the old system for its
+   whole run can perform after that (`docs/roadmap.md` Phase 3). It ships unset, and the
+   `nights:close` sweep closes nothing until it is set, warning in the operator log on every run;
+   set too early, it freezes and mails a report for every imported performance after it. When in
+   doubt, choose the later night: too late leaves a few new nights to sign off by hand; too early
+   mails imported ones.
+
+9. **Confirm the photographs transform on the host that serves them.** Open the home page on the
    deployed host and check the hero image's `src` starts `/cdn-cgi/image/` and loads. The image
    provider builds a relative URL, so this is the same check on the pre-cutover host and on the
    bare domain (K-126).

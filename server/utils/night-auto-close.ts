@@ -5,6 +5,7 @@ import { auditedWrite } from './audit'
 import { boardResetRecipients, venueName } from './backstage'
 import { compileNightReport } from './night-report'
 import { distributeReport, reportForPerformance, signOffStatement } from './night-signoff'
+import { configValue } from './configuration'
 import { claimNotification, notify } from './notify'
 import { performanceNight } from './performances'
 import { render } from './templates'
@@ -18,15 +19,21 @@ import type { SQL } from 'drizzle-orm'
 
 export interface UnclosedCandidateRow { performanceId: string, venueId: string, startsAt: number }
 
-// Bounded to performances that have already started; the 24-hour cut itself is computed per row
-// in `performancesDueAutoClose`, timezone-aware and not expressible here (0014).
-export function unclosedCandidatesQuery(now: number): SQL {
+// Bounded to performances that have started since the first night the system ran; the 24-hour
+// cut itself is computed per row in `performancesDueAutoClose`, timezone-aware (0014).
+export function unclosedCandidatesQuery(now: number, from: number): SQL {
   return sql`
     SELECT p.id AS performanceId, p.venue_id AS venueId, p.starts_at AS startsAt
     FROM performances p
     LEFT JOIN night_reports nr ON nr.performance_id = p.id
-    WHERE nr.id IS NULL AND p.status != 'CANCELLED' AND p.starts_at < ${now}
+    WHERE nr.id IS NULL AND p.status != 'CANCELLED' AND p.starts_at >= ${from} AND p.starts_at < ${now}
   `
+}
+
+// That night's 04:00 start, or null with no night named: an unset key closes nothing, never
+// everything the import brought in (0019).
+export function autoCloseFrom(fromNight: string | null): number | null {
+  return fromNight === null ? null : Math.floor(showNightBounds(fromNight).from.getTime() / 1000)
 }
 
 export interface DuePerformance { performanceId: string, venueId: string, night: string }
@@ -40,7 +47,17 @@ export function autoCloseDeadline(startsAt: number): { night: string, deadline: 
 
 export async function performancesDueAutoClose(at: Date = new Date()): Promise<DuePerformance[]> {
   const now = Math.floor(at.getTime() / 1000)
-  const candidates = await db.all<UnclosedCandidateRow>(unclosedCandidatesQuery(now))
+  // Unset closes nothing and warns, the nudge to set it; only the unset refusal (503) is caught,
+  // so a failed read throws rather than looking like a quiet night.
+  const from = autoCloseFrom(await configValue(undefined, 'AUTO_CLOSE_FROM_NIGHT').catch((error: unknown) => {
+    if ((error as { statusCode?: number }).statusCode === 503) return null
+    throw error
+  }))
+  if (from === null) {
+    console.warn('configuration: AUTO_CLOSE_FROM_NIGHT is unset; nights:close closes nothing')
+    return []
+  }
+  const candidates = await db.all<UnclosedCandidateRow>(unclosedCandidatesQuery(now, from))
 
   const due: DuePerformance[] = []
   for (const candidate of candidates) {

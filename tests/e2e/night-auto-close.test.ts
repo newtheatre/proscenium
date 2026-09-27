@@ -4,6 +4,7 @@ import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { letters, skipReason, startApp } from '#tests/helpers/webview'
+import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { showNightOf } from '#shared/utils/show-night'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -17,10 +18,14 @@ const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 let admin: TestMember
 
+// The sweep starts from a named night (E-125 as amended): a week before any night these cases use.
+const FROM_NIGHT = showNightOf(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
   admin = await adminSession(app)
+  overrideConfig(app, 'AUTO_CLOSE_FROM_NIGHT', FROM_NIGHT)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -72,6 +77,32 @@ async function mailboxSubjectFor(recipient: string): Promise<string | undefined>
 
 // Well past its own 24-hour window however long the suite takes to run.
 const OLD_NIGHT = showNightOf(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000))
+
+// At cutover the import brings years of performances with no report, and none of them may be
+// frozen and mailed by the sweep (E-125 criterion 1 as amended).
+describe.skipIf(skip !== null)('imported history is never closed automatically (criterion 1 as amended)', () => {
+  test('a performance before the first night is left alone', async () => {
+    const IMPORTED_NIGHT = showNightOf(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { night: IMPORTED_NIGHT, suffix: `auto-close-imported-${crypto.randomUUID().slice(0, 8)}` }))
+
+    await runCloseTask()
+
+    expect(read('SELECT id FROM night_reports WHERE performance_id = ?', performanceId)).toHaveLength(0)
+  })
+
+  test('with no first night set, nothing closes itself', async () => {
+    const { performanceId } = withBatch(runner => tonightsPerformance(runner, { night: OLD_NIGHT, suffix: `auto-close-unset-${crypto.randomUUID().slice(0, 8)}` }))
+    clearConfigOverride(app, 'AUTO_CLOSE_FROM_NIGHT')
+    try {
+      await runCloseTask()
+    }
+    finally {
+      overrideConfig(app, 'AUTO_CLOSE_FROM_NIGHT', FROM_NIGHT)
+    }
+
+    expect(read('SELECT id FROM night_reports WHERE performance_id = ?', performanceId)).toHaveLength(0)
+  })
+})
 
 describe.skipIf(skip !== null)('auto-close within 24 hours (criteria 1, 2, 4)', () => {
   test('an unclosed performance freezes itself as SYSTEM, with no signatory', async () => {

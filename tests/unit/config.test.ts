@@ -10,6 +10,7 @@ import type { Permission } from '#shared/utils/roles'
 // The keys the workshop register proposes no value for (0019). They ship unset, and the
 // features needing them wait rather than guessing. Typed, so a typo here is a build error.
 const UNSET: ConfigKey[] = [
+  'AUTO_CLOSE_FROM_NIGHT',
   'FIRST_AID_MODULE',
   'MEMBERSHIP_PURCHASE_URL',
   'NIGHT_REPORT_ROLES',
@@ -43,6 +44,16 @@ describe('configuration surface (0012, 0019)', () => {
 
     expect(schema.safeParse(ids(90)).success).toBe(true)
     expect(schema.safeParse(ids(91)).success).toBe(false)
+  })
+
+  // Imported history never closes itself: the sweep waits for the first night the new system ran
+  // for real, set at cutover (E-125 criterion 1 as amended).
+  test('the automatic close starts from a named show night, and ships with none', () => {
+    expect(hasDefault('AUTO_CLOSE_FROM_NIGHT')).toBe(false)
+    expect(isEnforced('AUTO_CLOSE_FROM_NIGHT')).toBe(true)
+    expect(CONFIG_KEYS.AUTO_CLOSE_FROM_NIGHT.schema.safeParse('2026-10-26').success).toBe(true)
+    expect(CONFIG_KEYS.AUTO_CLOSE_FROM_NIGHT.schema.safeParse('26 October').success).toBe(false)
+    expect(CONFIG_KEYS.AUTO_CLOSE_FROM_NIGHT.schema.safeParse('2026-02-30').success).toBe(false)
   })
 
   test('retention ships disarmed', () => {

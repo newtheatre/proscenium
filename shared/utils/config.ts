@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { NOTIFICATION_TOPICS } from './notifications'
 import { MODULE_ID } from './training'
 import { ROLES } from './roles'
+import { isShowNight } from './show-night'
 import type { Role } from './roles'
 import type { NotificationTopic } from './senders'
 
@@ -679,6 +680,13 @@ export const CONFIG_KEYS = {
 
   // Module E: show night
 
+  // The night after the old estate's last performance, set at cutover: imported history has no
+  // report and never will, so nothing before it is closed and mailed by the sweep (E-125).
+  AUTO_CLOSE_FROM_NIGHT: {
+    schema: z.string().refine(isShowNight, 'A show night is written YYYY-MM-DD, such as 2026-10-26'),
+    workshop: 'people-and-communications',
+    describes: 'The first show night whose unsigned reports close themselves after 24 hours: the night after the old estate\'s last performance, so every night from it onwards ran on the new system; not merely the first new-system night, since a show kept on the old system for its whole run can perform after that. When in doubt, choose the later night: too late leaves a few new nights to sign off by hand; too early mails imported ones. Until it is set, nothing closes itself.',
+  },
   // Roles, not addresses: a grant lapses at the year end, so last year's officers stop receiving
   // the report without anybody editing this (E-124 criterion 3, 0009, issue 1356).
   NIGHT_REPORT_ROLES: {
@@ -870,6 +878,7 @@ export const ENFORCED_KEYS = [
   'VERIFY_RESEND_ATTEMPTS',
   'VERIFY_RESEND_WINDOW_MINUTES',
   'NIGHT_REPORT_ROLES',
+  'AUTO_CLOSE_FROM_NIGHT',
 ] as const satisfies readonly ConfigKey[]
 
 export function isEnforced(key: ConfigKey): boolean {

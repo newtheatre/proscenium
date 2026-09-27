@@ -1,8 +1,20 @@
 import { describe, expect, test } from 'bun:test'
-import { autoCloseDeadline } from '#server/utils/night-auto-close'
+import { autoCloseDeadline, autoCloseFrom } from '#server/utils/night-auto-close'
 import { showNightBounds } from '#shared/utils/show-night'
 
 // The 24-hour cut is a show-night boundary, not a wall-clock day (0014): pure, no database.
+
+// The sweep reaches back no further than the first night the new system ran, so imported history
+// is never frozen and mailed at cutover; with no night named, nothing closes itself (0019).
+describe('autoCloseFrom (criterion 1 as amended)', () => {
+  test('the named night\'s own 04:00 start, in seconds', () => {
+    expect(autoCloseFrom('2026-10-26')).toBe(Math.floor(showNightBounds('2026-10-26').from.getTime() / 1000))
+  })
+
+  test('no night named is no automatic close at all', () => {
+    expect(autoCloseFrom(null)).toBeNull()
+  })
+})
 
 describe('autoCloseDeadline (criterion 1)', () => {
   test('the deadline is 24 hours after the night\'s own end, not the performance\'s start', () => {

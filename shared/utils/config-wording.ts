@@ -115,6 +115,7 @@ const HEADINGS: Record<ConfigKey, string> = {
   BACKUP_DRILL_INTERVAL_DAYS: 'Restore drill due every',
   HEALTH_ALERT_WINDOW_MINUTES: 'Unhealthy before the IT Manager is told',
   NIGHT_REPORT_ROLES: 'Roles sent the night report',
+  AUTO_CLOSE_FROM_NIGHT: 'Nights close themselves from',
 }
 
 export function configHeading(key: string): string {

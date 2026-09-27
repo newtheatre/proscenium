@@ -96,7 +96,12 @@ automated tests; two consecutive green migration rehearsals.**
   follow the show's system, so no single night ever splits across two records.
 - The first shows of the season run on the old system with the new door screen and till
   operated in shadow alongside, reconciling both records each night (at least three nights).
-- Shows from the week of 26 October run authoritatively on the new system.
+- Shows from the week of 26 October run authoritatively on the new system. The night after the
+  old estate's last performance is set as `AUTO_CLOSE_FROM_NIGHT` under Settings, which is what
+  arms the 24-hour automatic close (E-125): not merely the first new-system night, since a show
+  kept on the old system for its whole run can perform after that. Imported and shadowed nights
+  before it are never closed or mailed. When in doubt, choose the later night: too late leaves a
+  few new nights to sign off by hand; too early mails imported ones.
 - **31 October: final import from frozen exports; the old estate goes read-only on 1 November.**
 - Rollback: the read-only old estate can be re-armed within a day for the remainder of the
   season if a cutover-blocking defect appears.
