@@ -160,6 +160,13 @@ describe('what the pass card says a pass covers (D-126)', () => {
   test('a product with nothing named on it yet says so rather than claiming everything', () => {
     expect(saysPassCoverage('season-26-27', 0)).toBe('No shows yet')
   })
+
+  // The same name the pass types screen gives the list (issue 1323), never a bare verb.
+  test('the card labels the line "Covered shows"', async () => {
+    const source = await Bun.file('app/components/DoorResults.vue').text()
+    expect(source).toMatch(/<dt[^>]*>\s*Covered shows\s*<\/dt>/)
+    expect(source).not.toMatch(/<dt[^>]*>\s*Covers\s*<\/dt>/)
+  })
 })
 
 describe('what the card says about tonight, which is what the volunteer reads before admitting', () => {
