@@ -1,5 +1,5 @@
 import { boardEntries, boardWindowBounds, boardWindowQuery } from '#shared/utils/rota-board'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import type { RosterOpening, RosterOpeningShiftRow, RosterPerformanceRow, RosterShiftRow } from '#server/utils/rota'
 
 // Every non-cancelled shift on the nights the window names, whole rather than paged (E-107
@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const window = await getValidatedQueryOrThrow(event, boardWindowQuery)
   const bounds = boardWindowBounds(window)
   // The approvals queue: claims to confirm from tonight's show night on, whatever the window.
-  const tonight = Math.floor(showNightBounds(currentShowNight()).from.getTime() / 1000)
+  const tonight = showNightOpensAt(currentShowNight())
   const scope = window.waiting ? { waitingFrom: tonight } : bounds
 
   const [performances, shifts, openings, openingShifts, [claims]] = await Promise.all([

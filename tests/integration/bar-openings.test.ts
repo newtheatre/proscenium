@@ -21,7 +21,7 @@ import {
 } from '#server/utils/bar-openings'
 import { replaceTemplateStatements } from '#server/utils/rota'
 import { auditEntry, changes } from '#shared/utils/audit'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
@@ -33,7 +33,7 @@ import type { SQL } from 'drizzle-orm'
 // naming no performance and no show (E-130, 0077).
 
 const NIGHT = currentShowNight()
-const NIGHT_START = Math.floor(showNightBounds(NIGHT).from.getTime() / 1000)
+const NIGHT_START = showNightOpensAt(NIGHT)
 // 18:00 to 23:00 on the night, measured from its own 04:00 start (0014).
 const OPENS_AT = NIGHT_START + 14 * 3600
 const CLOSES_AT = NIGHT_START + 19 * 3600

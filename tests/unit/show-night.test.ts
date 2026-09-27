@@ -223,8 +223,9 @@ describe('one definition, no second implementation (E-110 criterion 1, 0014)', (
   async function sources(): Promise<[string, string][]> {
     const found: [string, string][] = []
     for (const dir of SOURCE) {
+      // Posix separators, since the paths are compared with ones written that way.
       for (const file of new Bun.Glob('**/*.{ts,vue}').scanSync({ cwd: dir, onlyFiles: true })) {
-        found.push([`${dir}/${file}`, await Bun.file(`${dir}/${file}`).text()])
+        found.push([`${dir}/${file.replaceAll('\\', '/')}`, await Bun.file(`${dir}/${file}`).text()])
       }
     }
     return found
@@ -242,9 +243,20 @@ describe('one definition, no second implementation (E-110 criterion 1, 0014)', (
     expect([...owners.keys()].sort()).toEqual(['SHOW_NIGHT_START_HOUR', 'currentShowNight', 'isShowNight', 'showNightBounds', 'showNightOf', 'showNightOpensAt', 'showNightStartOf'])
   })
 
+  // Any read of the bounds' `from` off the call itself, through one level of nesting, whatever
+  // converts it; destructuring the bounds and reading `to` are not this.
+  const READS_FROM = /showNightBounds\((?:[^()]|\([^()]*\))*\)\s*\.from\b/
+
+  test('the scan below catches the opening second however it is spelled', () => {
+    expect(READS_FROM.test('Math.floor(showNightBounds(showNightOf(now)).from.getTime() / 1000)')).toBe(true)
+    expect(READS_FROM.test('seconds(showNightBounds(night).from)')).toBe(true)
+    expect(READS_FROM.test('showNightBounds(night).to.getTime()')).toBe(false)
+    expect(READS_FROM.test('const { from, to } = showNightBounds(showNightOf(at))')).toBe(false)
+  })
+
   test('nothing else works the opening second out from the bounds', async () => {
     const inline = (await sources())
-      .filter(([path, source]) => path !== 'shared/utils/show-night.ts' && /showNightBounds\([^)]*\)\.from\.getTime\(\)/.test(source))
+      .filter(([path, source]) => path !== 'shared/utils/show-night.ts' && READS_FROM.test(source))
       .map(([path]) => path)
     expect(inline).toEqual([])
   })

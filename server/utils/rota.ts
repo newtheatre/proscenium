@@ -8,7 +8,7 @@ import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { onShiftAt } from '#shared/utils/night-authority'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
-import { currentShowNight, showNightBounds, showNightOf, showNightStartOf } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds, showNightOf, showNightOpensAt, showNightStartOf } from '#shared/utils/show-night'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ListClause } from './list-filters'
 import type { AuditRow } from '#shared/utils/audit'
@@ -300,7 +300,7 @@ export function stampUnstampedStatement(venueId: string, from: number, defaults:
 // Tonight is still tonight's work, so a stamp reaches from its 04:00 (0014, E-110).
 export function stampWindow(): { night: string, from: number } {
   const night = currentShowNight()
-  const from = Math.floor(showNightBounds(night).from.getTime() / 1000)
+  const from = showNightOpensAt(night)
   return { night, from }
 }
 

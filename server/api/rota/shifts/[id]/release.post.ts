@@ -1,7 +1,7 @@
 import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
 import { releaseRefusal, saysShiftRole } from '#shared/utils/rota'
-import { showNightBounds } from '#shared/utils/show-night'
+import { showNightOpensAt } from '#shared/utils/show-night'
 
 // Release a shift you hold, back to OPEN, up to the start of its show night (E-107 criterion 1).
 export default defineEventHandler(async (event) => {
@@ -17,8 +17,7 @@ export default defineEventHandler(async (event) => {
 
   // Authority itself expires at 04:00 (E-111), and release is the same boundary: past it the
   // shift is the night's business, not a change a holder can still make from home.
-  const cutoff = showNightBounds(performanceNight(held.startsAt)).from.getTime()
-  if (Date.now() >= cutoff) {
+  if (Date.now() / 1000 >= showNightOpensAt(performanceNight(held.startsAt))) {
     throw createError({ statusCode: 409, statusMessage: 'That show night has already begun, so the shift can no longer be released' })
   }
 

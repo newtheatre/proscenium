@@ -5,7 +5,7 @@ import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import { daysAfter } from '#shared/utils/membership'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -28,7 +28,7 @@ const fohPassword = generatePassword()
 // A week out rather than tonight: the open-slot list and a member's own rota both filter on the
 // clock, so an opening that has already run would drop out of a suite running late in the evening.
 const night = daysAfter(currentShowNight(), 7)
-const nightStart = Math.floor(showNightBounds(night).from.getTime() / 1000)
+const nightStart = showNightOpensAt(night)
 
 interface Opening { openingId: string, venueId: string, label: string, status: string }
 interface Slot { slotId: string, openingId: string, slot: number, status: string, holderName: string | null }
@@ -88,7 +88,7 @@ afterAll(async () => {
 
 // 18:00 to 23:00 on the night asked for, a week out unless a test says otherwise.
 function plan(label: string, as: string, on = night): Promise<Response> {
-  const from = Math.floor(showNightBounds(on).from.getTime() / 1000)
+  const from = showNightOpensAt(on)
   return request(app, 'POST', '/api/rota/openings', {
     venueId,
     night: on,

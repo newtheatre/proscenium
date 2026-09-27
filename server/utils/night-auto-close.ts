@@ -10,7 +10,7 @@ import { claimNotification, notify } from './notify'
 import { performanceNight } from './performances'
 import { render } from './templates'
 import { auditEntry } from '#shared/utils/audit'
-import { showNightBounds } from '#shared/utils/show-night'
+import { showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
 import type { H3Event } from 'h3'
 import type { SQL } from 'drizzle-orm'
 
@@ -33,7 +33,7 @@ export function unclosedCandidatesQuery(now: number, from: number): SQL {
 // That night's 04:00 start, or null with no night named: an unset key closes nothing, never
 // everything the import brought in (0019).
 export function autoCloseFrom(fromNight: string | null): number | null {
-  return fromNight === null ? null : Math.floor(showNightBounds(fromNight).from.getTime() / 1000)
+  return fromNight === null ? null : showNightOpensAt(fromNight)
 }
 
 export interface DuePerformance { performanceId: string, venueId: string, night: string }

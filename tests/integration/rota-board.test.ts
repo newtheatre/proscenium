@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { rosterOpeningShiftsQuery, rosterOpeningsQuery, rosterPerformancesQuery, rosterShiftsQuery, waitingClaimsQuery } from '#server/utils/rota'
 import { daysAfter } from '#shared/utils/membership'
 import { boardWindowBounds } from '#shared/utils/rota-board'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -140,7 +140,7 @@ describe('a card knows its venue, whether we run it, and whether it has or can t
 // A bar opening on the board (E-130 criterion 8, issue 1216): the same window, read by its own
 // scope, because an opening names no performance (0077).
 function barOpening(database: TestDatabase, id: string, night: string, status = 'PLANNED'): void {
-  const opensAt = Math.floor(showNightBounds(night).from.getTime() / 1000) + 18 * 3600
+  const opensAt = showNightOpensAt(night) + 18 * 3600
   database.batch([[
     'INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
     id, 'venue-a', night, `Opening ${id}`, opensAt, opensAt + 5 * 3600, status,
@@ -228,7 +228,7 @@ describe('the board reads bar openings in the same window (E-130 criterion 8)', 
 // E-105 criterion 2: the approvals queue is the board's waiting filter, every claim from tonight's
 // show night on whatever the window, with its count (0014).
 describe('the board\'s waiting filter is the approvals queue', () => {
-  const from = Math.floor(showNightBounds(tonight).from.getTime() / 1000)
+  const from = showNightOpensAt(tonight)
   const WAITING = { waitingFrom: from }
 
   function claims(database: TestDatabase): void {

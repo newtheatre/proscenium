@@ -52,10 +52,15 @@ export function showNightBounds(night: string): { from: Date, to: Date } {
   }
 }
 
+// The second a night opens, 04:00 London on its own day, in epoch seconds (0014).
+export function showNightOpensAt(night: string): number {
+  return Math.floor(showNightBounds(night).from.getTime() / 1000)
+}
+
 // The 04:00 that began the show night an instant falls in, in epoch seconds: a shift is that
 // night's work until the next 04:00, not until its curtain (0014).
 export function showNightStartOf(at: number): number {
-  return Math.floor(showNightBounds(showNightOf(new Date(at * 1000))).from.getTime() / 1000)
+  return showNightOpensAt(showNightOf(new Date(at * 1000)))
 }
 
 // Tonight, from the runtime clock. The runtime is UTC, and this is the only place a night is

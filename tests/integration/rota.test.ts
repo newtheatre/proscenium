@@ -26,7 +26,7 @@ import { venueInUseQuery } from '#server/utils/venues'
 import { auditEntry } from '#shared/utils/audit'
 import { daysAfter } from '#shared/utils/membership'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { OpenShiftFilters, OpenShiftRow } from '#server/utils/rota'
@@ -1598,7 +1598,7 @@ describe('onShiftTonight reads tonight\'s confirmed shifts and their windows, an
 // A venue's first template left the imported diary unstamped until somebody found "Stamp the
 // diary"; saving one now stamps what was never stamped, and nothing else (issue 1319, E-101 criterion 3).
 describe('saving a template stamps the future performances never stamped before (issue 1319)', () => {
-  const fromTonight = (): number => Math.floor(showNightBounds(currentShowNight()).from.getTime() / 1000)
+  const fromTonight = (): number => showNightOpensAt(currentShowNight())
 
   test('a never-stamped performance is stamped; one holding any shift and one already past are left alone', async () => {
     await withDatabase(async (database) => {

@@ -870,6 +870,8 @@ boundary is a constant in that file, never a configuration key.
 | --- | --- |
 | `showNightOf(at: Date): string` | Which night an instant belongs to. A performance's night is `showNightOf(curtain)`, so a late show ending at 01:00 is one night. |
 | `showNightBounds(night: string): { from, to }` | The instants a night runs between: `from` inclusive, `to` exclusive, both 04:00 London. The night the clocks change is a real 23 or 25 hours. A malformed label throws. |
+| `showNightOpensAt(night: string): number` | The second a night opens, `from` in epoch seconds, which is what a query's `starts_at >=` compares against. No site reads `from` off `showNightBounds(...)` inline. A malformed label throws. |
+| `showNightStartOf(at: number): number` | The second the night an instant (in epoch seconds) falls in opened. |
 | `currentShowNight(): string` | Tonight, from the runtime clock. The only place a night is read off the clock rather than off a stored instant. |
 | `isShowNight(value: string): boolean` | Whether a string is a real night label, for validating a `night` query parameter. |
 

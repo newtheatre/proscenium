@@ -1,6 +1,6 @@
 import { fromLondonWallClock, londonWeekday } from './london'
 import { daysAfter } from './membership'
-import { showNightBounds, showNightOf } from './show-night'
+import { showNightBounds, showNightOf, showNightOpensAt } from './show-night'
 
 // The rota page's week chips and night grouping (issue 1335). A week is Monday's night to Sunday's, and
 // a night runs 04:00 to 04:00, so a matinee and the evening share one and 00:30 is the night before (0014).
@@ -39,7 +39,7 @@ export function rotaWeekSpan(week: RotaWeek, tonight: string): NightSpan {
 export function rotaNightBounds(span: NightSpan): { from?: number, to?: number } {
   const seconds = (at: Date): number => Math.floor(at.getTime() / 1000)
   return {
-    from: span.from === undefined ? undefined : seconds(showNightBounds(span.from).from),
+    from: span.from === undefined ? undefined : showNightOpensAt(span.from),
     to: span.to === undefined ? undefined : seconds(showNightBounds(span.to).to) - 1,
   }
 }
