@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
-// Everything in shared/utils shares one auto-import namespace, and server/utils joins it on the
-// server. Nuxt does not refuse a clash: it keeps whichever name it saw first and drops the other,
-// warning where nobody reads.
+// shared/utils shares one auto-import namespace, and server/utils joins it on the server. A clash is
+// not refused: whichever name was seen first is kept, with a warning where nobody reads.
 
 const EXPORT = /^export\s+(?:async\s+)?(?:interface|type|function|const|class)\s+(\w+)/gm
 
@@ -28,8 +27,8 @@ describe('one name, one meaning (auto-imports)', () => {
     expect(await clashesIn(['shared/utils'])).toEqual([])
   })
 
-  // A route auto-importing a name two server files both export gets whichever Nitro kept, which
-  // is how the bar report's comps query and the till close's could have been swapped unseen.
+  // A route auto-importing a name two server files both export gets whichever one Nitro kept,
+  // with no error to say it was the wrong one.
   test('no two files across server/utils and shared/utils export the same name', async () => {
     expect(await clashesIn(['server/utils', 'shared/utils'])).toEqual([])
   })
