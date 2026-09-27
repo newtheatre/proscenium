@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { can, manageRoomsEstate, memberOrGrace } from '#shared/utils/abilities'
 import { BOOKING_NO_MEMBERSHIP } from '#shared/utils/booking-policy'
-import { TIERS, describePurpose } from '#shared/utils/bookings'
+import { TIERS, nameOrPurpose } from '#shared/utils/bookings'
 import { FREQUENCIES, saysRecurrence } from '#shared/utils/series'
 import { overCapacity } from '#shared/utils/rooms'
 import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
@@ -144,7 +144,7 @@ const recurrence = computed(() => ({
 function seriesBody(skip: string[]): Record<string, unknown> {
   return {
     roomId: state.roomId,
-    title: named(),
+    title: nameOrPurpose(state.title, state.purpose),
     attendees: state.attendees ?? null,
     tier: state.tier,
     purpose: state.purpose,
@@ -224,11 +224,6 @@ const { data: rooms } = await useAsyncData(
 const room = computed(() => rooms.value.find(one => one.id === state.roomId))
 
 // What was just made, said on the screen it lands on (C-105 criterion 7).
-// The name is optional, so a booking left unnamed is called by what the room is for (issue 1338).
-function named(): string {
-  return state.title.trim() || describePurpose(state.purpose)
-}
-
 function made(): string {
   return `${room.value?.name ?? 'The room'}, ${saysDayLong(state.day)} from ${state.from} to ${state.to}`
 }
@@ -308,7 +303,7 @@ async function book(event: FormSubmitEvent<BookingForm>): Promise<void> {
       method: 'POST',
       body: {
         roomId: event.data.roomId,
-        title: named(),
+        title: nameOrPurpose(state.title, state.purpose),
         startsAt: instantOf(event.data.day, event.data.from),
         endsAt: instantOf(event.data.day, event.data.to),
         attendees: event.data.attendees ?? null,
@@ -345,7 +340,7 @@ async function ask(): Promise<void> {
       method: 'POST',
       body: {
         roomId: state.roomId,
-        title: named(),
+        title: nameOrPurpose(state.title, state.purpose),
         startsAt: instantOf(state.day, state.from),
         endsAt: instantOf(state.day, state.to),
         attendees: state.attendees ?? null,

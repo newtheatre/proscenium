@@ -41,6 +41,24 @@ describe('what is needed before anybody will answer', () => {
     expect(earliestAskDay(new Date('2027-03-25T12:00:00Z'), 3, HOLIDAYS)).toBe('2027-04-01')
   })
 
+  // The day on the screen is one the server accepts: Thursday has three working days, Wednesday two.
+  test('the earliest day passes the notice and the day before does not', () => {
+    expect(judgeExternal(span(3), CONTEXT).map(one => one.reason)).not.toContain('SHORT_NOTICE')
+    expect(judgeExternal(span(2), CONTEXT).map(one => one.reason)).toContain('SHORT_NOTICE')
+  })
+
+  // Wednesday 20 December 2028 with the holidays known only to Boxing Day: Friday 22 is counted
+  // and short, but the day that would be enough is past what anybody can count.
+  test('past the bank holidays\' reach no earliest day is named, here or on the screen', () => {
+    const now = new Date('2028-12-20T12:00:00Z')
+    const shortOfTheList = { ...CONTEXT, now, holidays: ['2028-12-25', '2028-12-26'] }
+    const friday = { startsAt: new Date('2028-12-22T18:00:00Z'), endsAt: new Date('2028-12-22T20:00:00Z') }
+
+    const refusal = judgeExternal(friday, shortOfTheList).find(one => one.reason === 'SHORT_NOTICE')
+    expect(refusal?.says).toEndWith('Weekends and bank holidays do not count.')
+    expect(earliestAskDay(now, 3, shortOfTheList.holidays)).toBeNull()
+  })
+
   test('beyond the horizon is refused', () => {
     expect(judgeExternal(span(200), CONTEXT).map(one => one.reason)).toContain('BEYOND_HORIZON')
   })

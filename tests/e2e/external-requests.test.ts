@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { saysDayLong } from '#shared/utils/when'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -139,7 +140,7 @@ describe.skipIf(skip !== null)('the earliest day a union room can be asked for',
     }, member.cookie)
     expect(refused.status).toBe(422)
     const body = await refused.json() as { data: { failures: { reason: string, says: string }[] } }
-    expect(body.data.failures.find(one => one.reason === 'SHORT_NOTICE')?.says).toContain('The earliest day you can ask for is')
+    expect(body.data.failures.find(one => one.reason === 'SHORT_NOTICE')?.says).toContain(`The earliest day you can ask for is ${saysDayLong(policy.externalEarliestDay!)}.`)
   })
 })
 

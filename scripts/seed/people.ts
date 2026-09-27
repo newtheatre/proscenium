@@ -146,7 +146,7 @@ export async function seedPeople(target: SeedTarget, options: PeopleOptions): Pr
     people.byEmail.set(persona.email, seeded)
     people.order.push(seeded)
 
-    const membership = persona.membership ? membershipRow(seeded.id, persona.membership, now) : null
+    const membership = membershipRow(seeded.id, persona.membership ?? 'NONE', now)
     if (membership) target.batch([membership])
 
     if (persona.role) {

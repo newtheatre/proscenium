@@ -136,6 +136,14 @@ describe('the seed fills the screens', () => {
     expect(counts('users WHERE id NOT IN (SELECT user_id FROM memberships)')).toBeGreaterThan(0)
   })
 
+  // Issue 1338: the room forms' pictures are taken as the one persona holding a current term.
+  test('the booker persona holds a current membership, and the ordinary member none', () => {
+    const current = (email: string): number => counts(`memberships m JOIN users u ON u.id = m.user_id
+      WHERE u.email = '${email}' AND m.expires_on > date('now') AND m.confirmed_at IS NOT NULL`)
+    expect(current('dev-booker@e2e.newtheatre.org.uk')).toBeGreaterThanOrEqual(1)
+    expect(current('dev-member@e2e.newtheatre.org.uk')).toBe(0)
+  })
+
   test('the awkward account states exist', () => {
     expect(counts('users WHERE password IS NULL AND anonymised_at IS NULL')).toBeGreaterThan(0)
     expect(counts('users WHERE anonymised_at IS NOT NULL')).toBeGreaterThan(0)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { can, memberOrGrace } from '#shared/utils/abilities'
-import { describePurpose } from '#shared/utils/bookings'
+import { nameOrPurpose } from '#shared/utils/bookings'
 import { EXTERNAL_NO_MEMBERSHIP } from '#shared/utils/external-requests'
 import { fromLondonWallClock } from '#shared/utils/london'
 import { saysDayLong } from '#shared/utils/when'
@@ -53,9 +53,6 @@ const { data: rules } = await useAsyncData(
   { default: () => ({ purposes: [] as string[], externalEarliestDay: null }) },
 )
 
-// Said before the day is chosen rather than after it is refused (issue 1338, C-121).
-const earliestDay = computed(() => rules.value.externalEarliestDay)
-
 // A purpose off the query string is a suggestion, and it only lands if the vocabulary still holds
 // it: an unknown one would be sent and refused, or worse, warned about against nothing.
 if (rules.value.purposes.includes(String(route.query.purpose ?? ''))) {
@@ -89,7 +86,7 @@ async function ask(event: FormSubmitEvent<ExternalForm>): Promise<void> {
     const answer = await $fetch<{ warning: string | null }>('/api/rooms/external-requests', {
       method: 'POST',
       body: {
-        title: event.data.title || describePurpose(event.data.purpose),
+        title: nameOrPurpose(event.data.title, event.data.purpose),
         purpose: event.data.purpose,
         attendees: event.data.attendees ?? null,
         startsAt: instantOf(event.data.day, event.data.from),
@@ -200,11 +197,11 @@ useSeoMeta({ title: 'Book a room not listed here' })
           label="Day"
           name="day"
           required
-          :description="earliestDay ? `The earliest day you can ask for is ${saysDayLong(earliestDay)}.` : undefined"
+          :description="rules.externalEarliestDay ? `The earliest day you can ask for is ${saysDayLong(rules.externalEarliestDay)}.` : undefined"
         >
           <DateField
             v-model="state.day"
-            :min="earliestDay ?? undefined"
+            :min="rules.externalEarliestDay ?? undefined"
             data-test="external-day"
           />
         </UFormField>

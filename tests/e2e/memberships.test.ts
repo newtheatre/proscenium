@@ -232,7 +232,7 @@ describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)'
     return londonDay(at)
   }
 
-  test('every member screen renders for a lapsed member, who is refused only at the write path', async () => {
+  test('every member screen renders for a lapsed member, none hidden or redirected (0040)', async () => {
     const lapsed = await registerMember(app, 'no-membership', password)
 
     // Navigation is not filtered by membership, and no membership middleware exists (0040).
