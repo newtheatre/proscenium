@@ -138,6 +138,37 @@ describe.skipIf(skip !== null)('a signed-in person\'s own bookings (issue 1332)'
       view.close()
     }
   }, CASE_TIMEOUT_MS)
+
+  // Opening one booking sets an hour-long cookie that /qr then shows, so the rest must stay in reach.
+  test('with one booking open, /qr still lists the others', async () => {
+    const first = await bookableShow()
+    const second = await bookableShow()
+    const password = generatePassword()
+    const member = await registerMember(app, 'booker', password)
+    const book = async (show: { performanceId: string, ticketTypeId: string }): Promise<string> => {
+      const booked = await send('POST', '/api/reservations', { performanceId: show.performanceId, lines: [{ ticketTypeId: show.ticketTypeId, quantity: 1 }] }, member.cookie)
+      return (await booked.json() as { reference: string }).reference
+    }
+    const firstReference = await book(first)
+    const secondReference = await book(second)
+
+    const listed = await send('GET', '/api/account/bookings', undefined, member.cookie)
+    const { bookings } = await listed.json() as { bookings: { reference: string, url: string }[] }
+    const firstUrl = bookings.find(one => one.reference === firstReference)!.url
+
+    const view = await signedInView(member, password)
+    try {
+      await visit(view, `${app.baseURL}${firstUrl}`, '[data-test="booking-found"]')
+      await visit(view, `${app.baseURL}/qr`, '[data-test="qr-own-bookings"]')
+      expect(await textOf(view, '[data-test="booking-found"]')).toContain(firstReference)
+      const others = await textOf(view, '[data-test="qr-own-bookings"]')
+      expect(others).toContain(secondReference)
+      expect(others).not.toContain(firstReference)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('a signed-in holder shows their pass from their account (issue 1332)', () => {

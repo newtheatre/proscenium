@@ -295,6 +295,7 @@ describe('a member reads their own bookings still to come (issue 1332)', () => {
     await withDatabase((database) => {
       const tonight = tonightsPerformance(database, { suffix: 'tonight' })
       const earlier = tonightsPerformance(database, { suffix: 'earlier', night: '2026-01-10' })
+      const later = tonightsPerformance(database, { suffix: 'later', night: '2030-06-10' })
       user(database, 'u-1', 'one@example.invalid')
       user(database, 'u-2', 'two@example.invalid')
       database.batch([
@@ -303,10 +304,12 @@ describe('a member reads their own bookings still to come (issue 1332)', () => {
         ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)', 'r-gone', 'GONEAA', tonight.performanceId, 'u-1', 'CANCELLED', 'WEB'],
         ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)', 'r-past', 'PASTAA', earlier.performanceId, 'u-1', 'COLLECTED', 'WEB'],
         ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)', 'r-other', 'OTHRAA', tonight.performanceId, 'u-2', 'PENDING', 'WEB'],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)', 'r-later', 'LATRAA', later.performanceId, 'u-1', 'PENDING', 'WEB'],
       ])
 
+      // Unsorted on purpose: tonight's two by reference, then the later night, pins the ORDER BY.
       const found = read<{ reference: string, showTitle: string }>(database, ownBookingsQuery('u-1', tonight.startsAt - 3_600, 10))
-      expect(found.map(row => row.reference).sort()).toEqual(['HELDAA', 'PAIDAA'])
+      expect(found.map(row => row.reference)).toEqual(['HELDAA', 'PAIDAA', 'LATRAA'])
       expect(found[0]?.showTitle).toBe('A Test Show')
       expect(read(database, ownBookingsQuery('u-1', tonight.startsAt - 3_600, 1))).toHaveLength(1)
     })
