@@ -1,14 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
-import { decisionPredicate, savePredicate } from '#server/utils/access-profiles'
+import { decisionPredicate, overdueTombstone, savePredicate } from '#server/utils/access-profiles'
 import { auditIfChanged } from '#server/utils/audit'
 import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// Issue 1383, 0003: an officer's decision and a member's save are each conditional on the row they
-// read, on the statement itself, so the other's write landing in between refuses it.
+// Issue 1383, 0003: an officer's decision, a member's save and the tombstone sweep are each
+// conditional on the row they read, on the statement itself, so a write landing in between refuses it.
 
 const NOW = 1_800_000_000
 
@@ -131,6 +131,73 @@ describe('a member\'s save lands only on the declaration it read (0003)', () => 
       declared(database, 'u-saver', 'c1', 'iv-read')
       expect(save(database, 'u-saver', 'PENDING', 'iv-read')).toHaveLength(1)
       expect(rows(database, `SELECT id FROM audit_log WHERE action = 'access-profile.updated' AND target = ?`, 'user:u-saver')).toHaveLength(1)
+    }
+    finally {
+      database.close()
+    }
+  })
+})
+
+// A tombstone past its days, then the member declares again after the sweep read it: the DELETE
+// as sweepWithdrawnAccessProfiles runs it, then its purge entry, which lands only if it applied.
+function purge(database: TestDatabase, userId: string, cutoff: number): unknown[] {
+  const gone = run(database, sql`
+    DELETE FROM access_profiles WHERE user_id = ${userId} AND ${overdueTombstone(cutoff)}
+    RETURNING user_id AS userId
+  `)
+  run(database, auditIfChanged(auditEntry({ actorId: null, action: 'access-profile.tombstone.purged', target: `user:${userId}` })))
+  return gone
+}
+
+describe('the sweep purges only a profile still withdrawn when it deletes (D-127 criterion 5, 0003)', () => {
+  const CUTOFF = NOW - 60
+
+  function withdrawn(database: TestDatabase, userId: string): void {
+    declared(database, userId, 'c1', 'iv1')
+    database.batch([['UPDATE access_profiles SET status = ?, withdrawn_at = ?, consent_foh_at = NULL WHERE user_id = ?',
+      'WITHDRAWN', CUTOFF - 3600, userId]])
+  }
+
+  const purged = (database: TestDatabase, userId: string): unknown[] =>
+    rows(database, `SELECT id FROM audit_log WHERE action = 'access-profile.tombstone.purged' AND target = ?`, `user:${userId}`)
+
+  test('a profile declared again after the sweep read it survives, and no purge is recorded', async () => {
+    const database = await createTestDatabase()
+    try {
+      withdrawn(database, 'u-back')
+      expect(run(database, sql`SELECT user_id FROM access_profiles WHERE ${overdueTombstone(CUTOFF)}`)).toHaveLength(1)
+
+      database.batch([['UPDATE access_profiles SET status = ?, withdrawn_at = NULL, encrypted_payload = ?, encryption_iv = ?, updated_at = ? WHERE user_id = ?',
+        'PENDING', 'c2', 'iv2', NOW, 'u-back']])
+
+      expect(purge(database, 'u-back', CUTOFF)).toEqual([])
+      expect(rows<{ status: string }>(database, 'SELECT status FROM access_profiles WHERE user_id = ?', 'u-back')).toEqual([{ status: 'PENDING' }])
+      expect(purged(database, 'u-back')).toEqual([])
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('a tombstone still withdrawn is purged and recorded once', async () => {
+    const database = await createTestDatabase()
+    try {
+      withdrawn(database, 'u-gone')
+      expect(purge(database, 'u-gone', CUTOFF)).toHaveLength(1)
+      expect(rows(database, 'SELECT user_id FROM access_profiles WHERE user_id = ?', 'u-gone')).toEqual([])
+      expect(purged(database, 'u-gone')).toHaveLength(1)
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('a tombstone not yet past its days is left alone', async () => {
+    const database = await createTestDatabase()
+    try {
+      withdrawn(database, 'u-recent')
+      expect(purge(database, 'u-recent', CUTOFF - 7200)).toEqual([])
+      expect(purged(database, 'u-recent')).toEqual([])
     }
     finally {
       database.close()
