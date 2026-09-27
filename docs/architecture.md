@@ -525,6 +525,9 @@ Reading the table:
   inserted is there (a bar opening, a tab void's ledger entry). A write that changed nothing
   logs nothing, and the route refuses or says so (a walk-in answers `added: false`), except where
   the end state is what was asked, such as removing an authenticator app that is not there.
+  Two room writes spell the shape out in `server/utils/room-writes.ts`, for detail only the batch
+  knows: a bump's entry, on `changes() = 1`, names the booking and the offer it wrote, and a
+  term's cancel is counted first, under the two cancels' own predicates, since it is two statements.
 
 ## Console list filters (K-129, 0032)
 
