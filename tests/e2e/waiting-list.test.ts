@@ -106,7 +106,7 @@ function entriesFor(performanceId: string): { id: string, status: string }[] {
 }
 
 describe.skipIf(skip !== null)('a join is committed only alongside a link the joiner holds (criterion 1)', () => {
-  test('the answer says the letter went, and the letter carries the leave link', async () => {
+  test('the answer says the letter went, and the letter carries the entry link', async () => {
     const { performanceId } = await bookableShow()
     const email = `waiter-${crypto.randomUUID().slice(0, 8)}@example.invalid`
 
@@ -125,7 +125,8 @@ describe.skipIf(skip !== null)('a join is committed only alongside a link the jo
 
     const letter = (await letters(app)).find(text => text.includes(email))
     expect(letter).toBeDefined()
-    expect(letter).toContain('/waiting-list/leave/')
+    expect(letter).toContain('/waiting-list/entry/')
+    expect(letter).not.toContain('/waiting-list/leave/')
   }, CASE_TIMEOUT_MS)
 
   test('a second join on the same address is refused and writes nothing more', async () => {
@@ -150,7 +151,7 @@ describe.skipIf(skip !== null)('a claimed offer opens the booking it made (crite
     }, '')).status).toBe(200)
     expect(await (await send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`)).json()).toEqual({ offered: 1 })
 
-    const letter = (await letters(app)).find(text => text.includes(email) && text.includes('/waiting-list/entry/')) ?? ''
+    const letter = (await letters(app)).find(text => text.includes(email)) ?? ''
     const entryUrl = letter.match(/https?:\/\/\S*\/waiting-list\/entry\/\S+/)?.[0]
     expect(entryUrl).toBeDefined()
 
@@ -169,41 +170,54 @@ describe.skipIf(skip !== null)('a claimed offer opens the booking it made (crite
   }, CASE_TIMEOUT_MS)
 })
 
-describe.skipIf(skip !== null)('leaving with a link that no longer works says so (criterion 4)', () => {
+describe.skipIf(skip !== null)('every email opens the entry page, and leaving goes through it (criterion 4)', () => {
   test('the remove route refuses an unknown token', async () => {
     const answered = await send('POST', '/api/waiting-list/not-a-real-token/remove', {}, '')
     expect(answered.status).toBe(404)
   }, CASE_TIMEOUT_MS)
 
-  test('the leave page shows a notice rather than nothing at all', async () => {
-    const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/waiting-list/leave/not-a-real-token`, '[data-test="waiting-list-leave-page"]')
-
-    await click(view, '[data-test="waiting-list-leave-confirm"]')
-    await waitFor(view, `document.querySelector('[data-test="waiting-list-leave-notice"]')`)
-    expect(await textOf(view, '[data-test="waiting-list-leave-notice"]')).toContain('no longer valid')
-  }, CASE_TIMEOUT_MS)
-
-  test('a real link leaves the list, and using it again still says so', async () => {
+  // Issue 1340: an email sent before the change still carries /leave/, which now opens the entry.
+  test('an old leave link redirects to the entry page, which names the show, the night and the party', async () => {
     const { performanceId } = await bookableShow()
-    const email = `leaver-${crypto.randomUUID().slice(0, 8)}@example.invalid`
-
-    const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/waiting-list/${performanceId}`, '[data-test="waiting-list-join-page"]')
-    await fill(view, '[data-test="waiting-list-guest-name"]', 'Ada Leaver')
-    await fill(view, '[data-test="waiting-list-guest-email"]', email)
-    await click(view, '[data-test="waiting-list-submit"]')
-    await waitFor(view, `document.querySelector('[data-test="waiting-list-joined"]')`)
+    const email = `old-link-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
+      performanceId, partySize: 2, guest: { name: 'Ada Oldlink', email },
+    }, '')).status).toBe(200)
 
     const letter = (await letters(app)).find(text => text.includes(email)) ?? ''
-    const leaveUrl = letter.match(/https?:\/\/\S*\/waiting-list\/leave\/\S+/)?.[0]
-    expect(leaveUrl).toBeDefined()
+    const token = letter.match(/\/waiting-list\/entry\/(\S+)/)?.[1]
+    expect(token).toBeDefined()
 
-    await visit(view, leaveUrl!, '[data-test="waiting-list-leave-page"]')
-    await click(view, '[data-test="waiting-list-leave-confirm"]')
-    await waitFor(view, `document.querySelector('[data-test="waiting-list-left"]')`)
+    const redirected = await fetch(`${app.baseURL}/waiting-list/leave/${token}`, { redirect: 'manual' })
+    expect(redirected.status).toBe(301)
+    expect(new URL(redirected.headers.get('location') ?? '', app.baseURL).pathname).toBe(`/waiting-list/entry/${token}`)
 
-    expect(entriesFor(performanceId)[0]?.status).toBe('REMOVED')
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/waiting-list/leave/${token}`, '[data-test="waiting-list-waiting"]')
+      const says = await textOf(view, '[data-test="waiting-list-entry-page"]')
+      expect(says).toContain('The Cherry Orchard')
+      expect(says).toMatch(/\d{1,2}\s\w+\sat\s\d{2}:\d{2}/)
+      expect(says).toContain('2 seats')
+      expect(entriesFor(performanceId)[0]?.status).toBe('WAITING')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // The 301 and the entry page's not-found answer together: a link that no longer resolves says so.
+  test('an old leave link with an unknown token ends on a page that says so', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await view.navigate(`${app.baseURL}/waiting-list/leave/not-a-real-token`)
+      await waitFor(view, `document.querySelector('[data-test="error-ways"]')`)
+      expect(await view.evaluate<string>('location.pathname')).toBe('/waiting-list/entry/not-a-real-token')
+      expect(await textOf(view, 'main')).toContain('There is nothing here')
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })
 
@@ -250,7 +264,7 @@ describe.skipIf(skip !== null)('the join screen names what it is a list for (cri
 })
 
 describe.skipIf(skip !== null)('leaving is asked about first (criterion 4)', () => {
-  test('the leave button on the entry page opens a named confirmation, and backing out leaves the entry alone', async () => {
+  test('leaving opens a named confirmation, backing out leaves the entry alone, and once left it offers what is on', async () => {
     const { performanceId } = await bookableShow()
     const email = `asked-${crypto.randomUUID().slice(0, 8)}@example.invalid`
 
@@ -281,6 +295,12 @@ describe.skipIf(skip !== null)('leaving is asked about first (criterion 4)', () 
       await click(view, '[data-test="confirm-leave-waiting-list-verb"]')
       await waitFor(view, `document.querySelector('[data-test="waiting-list-removed"]')`)
       expect(entriesFor(performanceId)[0]?.status).toBe('REMOVED')
+      expect(await view.evaluate<string | null>(`document.querySelector('[data-test="waiting-list-whats-on"]')?.getAttribute('href') ?? null`)).toBe('/whats-on')
+
+      // Issue 1340: opening the link again says the list was left, and offers the same way on.
+      await visit(view, entryUrl!, '[data-test="waiting-list-settled"]')
+      expect(await textOf(view, '[data-test="waiting-list-settled"]')).toContain('You already left this waiting list')
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="waiting-list-whats-on"]') !== null`)).toBe(true)
     }
     finally {
       view.close()

@@ -101,7 +101,7 @@ useSeoMeta({
         variant="subtle"
         icon="i-lucide-clock"
         title="You are on the list"
-        description="We will email you the moment seats free up, in the order people joined. Every email carries a link to leave the list."
+        description="We will email you the moment seats free up, in the order people joined. Every email links to your entry, where you can leave the list."
       />
       <UAlert
         v-else

@@ -361,6 +361,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['waiting-list.removed'],
     via: ['server/utils/waiting-list.ts'],
   },
+  { route: 'server/routes/waiting-list/leave/[token].get.ts', exempt: 'answers 301 to the entry page for an older email\'s link; nothing is written' },
   {
     route: 'server/api/box-office/desk/performances/[id]/waiting-list/offer.post.ts',
     actions: ['waiting-list.offered'],

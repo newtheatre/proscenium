@@ -981,10 +981,11 @@ again at that exact moment. A failed write (capacity gone in the interim) reopen
 past the online cut-off since nothing could be offered from it; `GET
 /api/waiting-list/[token]` shows the entry's state and, while an offer stands, the ticket types it
 may be claimed against; `POST /api/waiting-list/[token]/claim` claims; `POST
-/api/waiting-list/[token]/remove` leaves the list, accepted at any time except once claimed, and
-the same link every waiting-list email carries. The desk's own view, `GET
-/api/box-office/desk/performances/[id]/waiting-list`, is the length and next entries (criterion
-5); `POST .../waiting-list/offer` runs the identical offering rule on demand.
+/api/waiting-list/[token]/remove` leaves the list, accepted at any time except once claimed, from
+the entry page `/waiting-list/entry/[token]` that every waiting-list email links to (issue 1340);
+`/waiting-list/leave/[token]`, which older emails carry, redirects there with a 301. The desk's
+own view, `GET /api/box-office/desk/performances/[id]/waiting-list`, is the length and next
+entries (criterion 5); `POST .../waiting-list/offer` runs the identical offering rule on demand.
 
 **Purging (criterion 4).** `waiting-list:purge` (daily) deletes every entry for a performance
 once its whole show night has ended (0014), not merely after curtain: `showNightBounds()` decides

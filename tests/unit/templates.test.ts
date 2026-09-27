@@ -33,8 +33,7 @@ const EVERYTHING: TemplateContext = {
   trainingUrl: 'https://newtheatre.org.uk/training',
   registerUrl: 'https://newtheatre.org.uk/training/manage/register/1',
   rolesUrl: 'https://newtheatre.org.uk/people/accounts',
-  claimUrl: 'https://newtheatre.org.uk/waiting-list/entry/tok',
-  removeUrl: 'https://newtheatre.org.uk/waiting-list/leave/tok',
+  entryUrl: 'https://newtheatre.org.uk/waiting-list/entry/tok',
   imageUrl: 'https://newtheatre.org.uk/qr/r-1.sig/image.png',
   expiresAt: new Date('2026-10-02T18:30:00Z'),
   method: 'Google',
@@ -479,6 +478,21 @@ describe('the waiting-list offer agrees in number (item 7)', () => {
       expect(flat(part)).not.toContain('held for you')
     }
   })
+})
+
+// Issue 1340: the entry page names the show, the night and the party and leaves through a named
+// confirmation, so every waiting-list email opens it, never a bare leave page.
+describe('every waiting-list email opens the entry page (D-113 criterion 4)', () => {
+  for (const name of ['waiting-list-joined', 'waiting-list-offered'] as const) {
+    test(`${name} links the entry page for leaving, and no leave page`, () => {
+      const { html, text } = render(name, { ...EVERYTHING, partySize: 2 })
+      for (const part of [html, text]) {
+        expect(part).toContain('https://newtheatre.org.uk/waiting-list/entry/tok')
+        expect(part).not.toContain('/waiting-list/leave/')
+        expect(flat(part)).toContain('Leave the waiting list')
+      }
+    })
+  }
 })
 
 describe('ordinal (item 7)', () => {
