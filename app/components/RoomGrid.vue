@@ -226,9 +226,10 @@ function labelOf(column: GridColumn, minutes: number): string {
       {{ tapping ? 'Now tap where it ends.' : 'Tap where the booking starts, then tap where it ends.' }}
     </p>
 
-    <!-- Its own scroll box, so the room names can stay pinned at its top down a long day (issue 1346). -->
+    <!-- Its own scroll box, so the room names stay pinned along its top and the times down its left
+      (issue 1346); the scroll padding keeps a focused slot out from under either. -->
     <div
-      class="max-h-[75vh] scroll-pt-20 overflow-auto"
+      class="max-h-[75vh] scroll-pt-20 scroll-pl-16 overflow-auto"
       data-test="grid-scroll"
       @pointerup="dragging = null"
       @pointerleave="dragging = null"
@@ -240,7 +241,7 @@ function labelOf(column: GridColumn, minutes: number): string {
           gridTemplateColumns: `4rem repeat(${columns.length}, minmax(4.5rem, 1fr))`,
         }"
       >
-        <div class="sticky top-0 z-10 bg-default p-2 text-xs text-muted">
+        <div class="sticky top-0 left-0 z-20 bg-default p-2 text-xs text-muted">
           Time
         </div>
         <div
@@ -255,7 +256,7 @@ function labelOf(column: GridColumn, minutes: number): string {
           v-for="slot in slots"
           :key="slot.minutes"
         >
-          <div class="bg-default px-2 py-1 text-right text-xs text-muted">
+          <div class="sticky left-0 z-10 bg-default px-2 py-1 text-right text-xs text-muted">
             <span v-if="slot.minutes % 60 === 0">{{ slot.label }}</span>
           </div>
           <button
