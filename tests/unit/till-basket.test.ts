@@ -3,6 +3,7 @@ import { computed, effectScope, nextTick, ref } from 'vue'
 import { useTillBasket } from '#composables/useTillBasket'
 import type { TillBasketDeps } from '#composables/useTillBasket'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
+import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import type { PricedBasket, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
 
 // F-103, F-104, F-106: what a tap puts in the basket, what a charge submits, and what an
@@ -182,6 +183,61 @@ describe('what a tap on a tile does depends on the product\'s sizes (F-103 crite
     basket.chooseOption('opt-1', 'Tonic')
     expect(basket.basket.value).toHaveLength(1)
     expect(basket.basket.value[0]!.choiceItemName).toBe('Tonic')
+    scope.stop()
+  })
+})
+
+// Issue 1311: the bar under the thumb says what a tap added, and Undo takes back that one press,
+// so a mis-tap is corrected without opening the basket.
+describe('the tap just made is named, and Undo takes back exactly that one (F-103, K-102)', () => {
+  test('a second tap on a line is undone to one, and the line stays', () => {
+    const { basket, scope } = setup()
+    basket.tapVariant('Lager', aVariant())
+    basket.tapVariant('Lager', aVariant())
+    expect(basket.lastAdded.value?.said).toBe('Lager, Pint')
+    basket.undoLastAdded()
+    expect(basket.basket.value[0]!.qty).toBe(1)
+    expect(basket.lastAdded.value).toBeNull()
+    scope.stop()
+  })
+
+  test('a new line is undone out of the basket, its choice named', () => {
+    const { basket, scope } = setup()
+    const withChoice = aVariant({ choice: { id: 'choice-1', name: 'Mixer', options: [{ id: 'opt-1', itemName: 'Tonic' }] } })
+    basket.tapVariant('Gin', withChoice)
+    basket.chooseOption('opt-1', 'Tonic')
+    expect(basket.lastAdded.value?.said).toBe('Gin, Pint, Tonic')
+    basket.undoLastAdded()
+    expect(basket.basket.value).toHaveLength(0)
+    scope.stop()
+  })
+
+  test('a tap the cap refuses added nothing, so there is nothing to undo', () => {
+    const { basket, scope } = setup()
+    basket.tapVariant('Lager', aVariant())
+    basket.basket.value[0]!.qty = MAX_BASKET_LINE_QTY
+    basket.lastAdded.value = null
+    basket.tapVariant('Lager', aVariant())
+    expect(basket.lastAdded.value).toBeNull()
+    scope.stop()
+  })
+
+  test('Undo after the line was removed another way changes nothing', () => {
+    const { basket, scope } = setup()
+    basket.tapVariant('Lager', aVariant())
+    basket.tapVariant('Wine', aVariant({ id: 'variant-2', label: 'Small' }))
+    basket.removeLine(basket.basket.value[1]!)
+    basket.undoLastAdded()
+    expect(basket.basket.value.map(line => line.qty)).toEqual([1])
+    expect(basket.lastAdded.value).toBeNull()
+    scope.stop()
+  })
+
+  test('a fresh sale forgets the last tap', () => {
+    const { basket, scope } = setup()
+    basket.tapVariant('Lager', aVariant())
+    basket.resetBasket()
+    expect(basket.lastAdded.value).toBeNull()
     scope.stop()
   })
 })

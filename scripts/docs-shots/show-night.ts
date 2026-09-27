@@ -83,6 +83,23 @@ export const showNight: Shot[] = [
     ],
   },
   {
+    name: 'show-night/till-basket',
+    persona: bar,
+    url: '/tonight/till',
+    marker: '[data-test="till-panes"]',
+    width: PHONE_WIDTH,
+    // One unrestricted drink in, answering a size or a mixer if asked, then the sheet off the bar.
+    after: '[...document.querySelectorAll(\'button[data-test^="product-"]\')].find(tile => !tile.querySelector(\'[data-test^="restricted-mark-"]\'))?.click(); '
+      + 'setTimeout(() => document.querySelector(\'[data-test="size-sheet"] [data-test^="variant-"]:not([disabled])\')?.click(), 250); '
+      + 'setTimeout(() => document.querySelector(\'[data-test^="choice-option-"]\')?.click(), 500); '
+      + 'setTimeout(() => document.querySelector(\'[data-test="basket-summary-open"]\')?.click(), 750)',
+    annotations: [
+      { selector: '[data-test="basket-sheet"] [data-test^="line-plus-"]', label: 'One more, one fewer' },
+      { selector: '[data-test="basket-sheet"] [data-test="basket-total"]', label: 'Total' },
+      { selector: '[data-test="basket-sheet-close"]', label: 'Back' },
+    ],
+  },
+  {
     name: 'show-night/till-comp',
     persona: bar,
     url: '/tonight/till',

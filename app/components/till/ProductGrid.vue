@@ -82,60 +82,57 @@ function priceLine(product: SaleProduct): string {
         {{ category.name }}
       </h2>
       <div class="mb-4 grid grid-cols-2 gap-2">
-        <!-- The allergen affordance sits under the name rather than beside it: at 360 pixels a
-             48 pixel button in the header took a third of the tile's width (F-107 criterion 1). -->
+        <!-- One row of controls: the allergen button sits in the tile's corner beside the product,
+             not under it, so a tile is no taller than its name and price (F-107.1, issue 1311). -->
         <div
           v-for="product in productsIn(category.id)"
           :key="product.id"
-          class="flex flex-col rounded-lg border border-default p-2"
+          class="relative rounded-lg border border-default"
+          :data-test="`tile-${product.id}`"
         >
           <UButton
             color="neutral"
             variant="ghost"
-            class="min-h-12 grow justify-start p-1 text-left"
+            class="min-h-12 w-full justify-start py-1.5 ps-2 pe-12 text-left"
             :disabled="productBlocked(product)"
             :data-test="`product-${product.id}`"
             @click="tapProduct(product)"
           >
             <span class="flex flex-col items-start gap-0.5">
               <span class="text-sm font-medium">{{ product.name }}</span>
-              <span class="text-xs text-muted">{{ priceLine(product) }}</span>
-              <!-- Carried by the word, never by the colour alone (K-101 criterion 3, F-106
-                   criterion 6). -->
-              <UBadge
-                v-if="product.ageRestricted"
-                color="warning"
-                variant="subtle"
-                size="sm"
-                icon="i-lucide-id-card"
-                label="Check ID"
-                :data-test="`restricted-mark-${product.id}`"
-              />
-              <!-- Advice read when the catalogue loaded, not a live count (F-128 criterion 8). -->
-              <UBadge
-                v-if="productOutOfStock(product)"
-                color="neutral"
-                variant="subtle"
-                size="sm"
-                icon="i-lucide-package-x"
-                label="Out of stock"
-                :data-test="`out-of-stock-${product.id}`"
-              />
+              <span class="flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                <span>{{ priceLine(product) }}</span>
+                <!-- Carried by the word, never by the colour alone (K-101 criterion 3, F-106
+                     criterion 6). -->
+                <span
+                  v-if="product.ageRestricted"
+                  class="inline-flex items-center gap-0.5 font-medium text-warning"
+                  :data-test="`restricted-mark-${product.id}`"
+                ><UIcon
+                  name="i-lucide-id-card"
+                  class="size-3.5"
+                />ID</span>
+                <!-- Advice read when the catalogue loaded, not a live count (F-128 criterion 8). -->
+                <span
+                  v-if="productOutOfStock(product)"
+                  class="inline-flex items-center gap-0.5"
+                  :data-test="`out-of-stock-${product.id}`"
+                ><UIcon
+                  name="i-lucide-package-x"
+                  class="size-3.5"
+                />Out of stock</span>
+              </span>
             </span>
           </UButton>
           <UButton
-            size="xs"
             color="neutral"
             variant="ghost"
             icon="i-lucide-info"
-            block
-            class="min-h-12 justify-start p-1 text-xs"
+            class="absolute end-0 top-0 size-12 justify-center"
             :aria-label="`Allergens for ${product.name}`"
             :data-test="`allergen-${product.id}`"
             @click="emit('openAllergens', { name: product.name, state: product.allergenState, note: product.allergenNote })"
-          >
-            Allergens
-          </UButton>
+          />
         </div>
       </div>
     </div>

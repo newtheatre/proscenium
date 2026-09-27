@@ -30,6 +30,8 @@ const props = defineProps<{
   pricing: boolean
   ticketsPence: number
   walkUpsPence: number
+  // In the sheet off the summary bar, whose own title already says Basket (issue 1311).
+  sheet?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -50,10 +52,14 @@ function productFor(line: BasketLine): SaleProduct | undefined {
 
 <template>
   <div
-    class="space-y-3 border-t border-default pt-4"
+    class="space-y-3"
+    :class="{ 'border-t border-default pt-4': !sheet }"
     data-test="basket"
   >
-    <h2 class="text-sm font-semibold text-muted">
+    <h2
+      v-if="!sheet"
+      class="text-sm font-semibold text-muted"
+    >
       Basket
     </h2>
     <!-- Ticket money beside the drinks, one basket (F-122 criterion 3). -->
