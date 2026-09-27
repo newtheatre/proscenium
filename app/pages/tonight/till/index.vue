@@ -119,6 +119,8 @@ const {
   tapProduct,
   tapVariant,
   chooseOption,
+  lastAdded,
+  undoLastAdded,
   incrementLine,
   decrementLine,
   removeLine,
@@ -162,6 +164,27 @@ const {
 const basketItemCount = computed(() => basket.value.reduce((sum, line) => sum + line.qty, 0)
   + ticketLines.value.length
   + walkUpLines.value.reduce((sum, line) => sum + line.quantity, 0))
+
+// The basket as a sheet off that bar, so a check or a correction never scrolls past the grid; it
+// shuts when there is nothing left in it (issue 1311, K-102 criterion 3).
+const basketSheetOpen = ref(false)
+watch(basketEmpty, (empty) => {
+  if (empty) basketSheetOpen.value = false
+})
+
+// Long enough to read and reach Undo; the count comes back after, and the sheet corrects the rest.
+const ADDED_SHOWN_MS = 4000
+let addedTimer: ReturnType<typeof setTimeout> | undefined
+watch(lastAdded, (added) => {
+  clearTimeout(addedTimer)
+  if (!added) return
+  addedTimer = setTimeout(() => {
+    lastAdded.value = null
+  }, ADDED_SHOWN_MS)
+})
+onBeforeUnmount(() => clearTimeout(addedTimer))
+// A line a Challenge 25 refusal already took back out has nothing left to undo.
+const added = computed(() => (lastAdded.value && basket.value.some(line => line.id === lastAdded.value!.lineId) ? lastAdded.value : null))
 
 const route = useRoute()
 // Read once, as the claim is taken on mount; dropped from the address so a reload asks nothing.
@@ -487,6 +510,31 @@ watch(basket, () => {
 // Opening the note never leaves the sale: this is a modal over the basket, never a navigation, so
 // what was tapped in is still there on return (F-107 criterion 2).
 const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], note: string | null } | null>(null)
+
+// One basket drawn in two places, under the grid and in the sheet, so the two never disagree.
+const basketBindings = computed(() => ({
+  ticketLines: ticketLines.value,
+  walkUpLines: walkUpLines.value,
+  basket: basket.value,
+  products: products.value,
+  lineAmount,
+  removeBooking,
+  removeWalkUp,
+  decrementLine,
+  incrementLine,
+  removeLine,
+  discounts: discounts.data.value?.discounts ?? [],
+  tabHolders: tabHolders.data.value?.holders ?? [],
+  hasTicketMoney: hasTicketMoney.value,
+  chargeFailure: chargeFailure.value,
+  retrySumup: retryOffered.value && sumupAvailable.value && !sumup.pending.value && !charging.value,
+  priceFailure: priceFailure.value,
+  priced: priced.value,
+  grandTotalPence: grandTotalPence.value,
+  pricing: pricing.value,
+  ticketsPence: ticketsPence.value,
+  walkUpsPence: walkUpsPence.value,
+}))
 </script>
 
 <template>
@@ -746,27 +794,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               v-if="!basketEmpty"
               v-model:selected-discount-id="selectedDiscountId"
               v-model:selected-tab-holder-id="selectedTabHolderId"
-              :ticket-lines="ticketLines"
-              :walk-up-lines="walkUpLines"
-              :basket="basket"
-              :products="products"
-              :line-amount="lineAmount"
-              :remove-booking="removeBooking"
-              :remove-walk-up="removeWalkUp"
-              :decrement-line="decrementLine"
-              :increment-line="incrementLine"
-              :remove-line="removeLine"
-              :discounts="discounts.data.value?.discounts ?? []"
-              :tab-holders="tabHolders.data.value?.holders ?? []"
-              :has-ticket-money="hasTicketMoney"
-              :charge-failure="chargeFailure"
-              :retry-sumup="retryOffered && sumupAvailable && !sumup.pending.value && !charging"
-              :price-failure="priceFailure"
-              :priced="priced"
-              :grand-total-pence="grandTotalPence"
-              :pricing="pricing"
-              :tickets-pence="ticketsPence"
-              :walk-ups-pence="walkUpsPence"
+              v-bind="basketBindings"
               @open-allergens="allergenOpen = $event"
               @retry-sumup="() => chargeOnSumUp()"
             />
@@ -893,7 +921,25 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             data-test="till-offline"
           >No connection. Charging waits for it.</span>
           <template v-else>
-            <span v-if="!basketEmpty">{{ plural(basketItemCount, 'item') }}</span>
+            <!-- The press just made, named for a few seconds with its Undo (issue 1311). -->
+            <span
+              v-if="added"
+              class="flex min-w-0 items-center gap-1"
+              data-test="basket-added"
+            >
+              <span class="truncate">Added: {{ added.said }}</span>
+              <UButton
+                size="sm"
+                color="primary"
+                variant="link"
+                class="min-h-12 shrink-0 font-semibold"
+                data-test="basket-added-undo"
+                @click="undoLastAdded"
+              >
+                Undo
+              </UButton>
+            </span>
+            <span v-else-if="!basketEmpty">{{ plural(basketItemCount, 'item') }}</span>
             <UButton
               v-if="compRequestId === null && compEligible"
               size="sm"
@@ -904,7 +950,8 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
               data-test="till-comp-chip"
               @click="openCompModal"
             >
-              Ask for a comp
+              <!-- Its icon alone while a press is named, so the one row still fits a phone. -->
+              <span :class="{ 'sr-only': added }">Ask for a comp</span>
             </UButton>
             <UButton
               v-else-if="compRequestId !== null"
@@ -918,10 +965,19 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
             >
               {{ compDeclined ? 'Comp declined' : compLapsed ? 'Comp lapsed' : compCanGive ? 'Give the comp' : compGiven ? 'Comp given' : 'Comp pending…' }}
             </UButton>
-            <span
+            <UButton
               v-if="!basketEmpty"
-              data-test="basket-summary-total"
-            >{{ grandTotalPence !== null && !pricing ? saysMoney(grandTotalPence) : 'Pricing…' }}</span>
+              size="sm"
+              color="neutral"
+              variant="subtle"
+              class="min-h-12 shrink-0"
+              trailing-icon="i-lucide-chevron-up"
+              data-test="basket-summary-open"
+              @click="basketSheetOpen = true"
+            >
+              <span class="sr-only">Open the basket, {{ plural(basketItemCount, 'item') }}, </span>
+              <span data-test="basket-summary-total">{{ grandTotalPence !== null && !pricing ? saysMoney(grandTotalPence) : 'Pricing…' }}</span>
+            </UButton>
           </template>
         </div>
         <!-- Offline, the buttons stay where the thumb expects them, disabled, with the line
@@ -985,6 +1041,36 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
         />
       </template>
     </NightScreen>
+
+    <UDrawer
+      v-model:open="basketSheetOpen"
+      title="Basket"
+      description="Change a line, add a discount, or close this to charge."
+    >
+      <template #body>
+        <div data-test="basket-sheet">
+          <TillBasket
+            v-if="!basketEmpty"
+            v-model:selected-discount-id="selectedDiscountId"
+            v-model:selected-tab-holder-id="selectedTabHolderId"
+            v-bind="basketBindings"
+            sheet
+            @open-allergens="allergenOpen = $event"
+            @retry-sumup="() => { basketSheetOpen = false; chargeOnSumUp() }"
+          />
+          <UButton
+            block
+            color="neutral"
+            variant="subtle"
+            class="mt-4 min-h-12"
+            data-test="basket-sheet-close"
+            @click="basketSheetOpen = false"
+          >
+            {{ CONFIRM_BACK_LABEL }}
+          </UButton>
+        </div>
+      </template>
+    </UDrawer>
 
     <TillAllergenModal
       :allergen-open="allergenOpen"

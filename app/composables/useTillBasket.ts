@@ -59,12 +59,22 @@ export function useTillBasket(deps: TillBasketDeps) {
 
   const basket = ref<BasketLine[]>([])
 
+  // The press just made, for the bar under the thumb to name with an Undo (issue 1311); null once
+  // it is undone, or when the press added nothing because the line was already at the cap.
+  const lastAdded = ref<{ lineId: string, said: string } | null>(null)
+
   function addLine(productName: string, variant: SaleVariant, choiceItemId: string | null, choiceItemName: string | null): void {
     const existing = basket.value.find(line => line.variantId === variant.id && line.choiceItemId === choiceItemId)
-    if (existing) existing.qty = Math.min(existing.qty + 1, MAX_BASKET_LINE_QTY)
+    const said = [productName, variant.label, choiceItemName].filter(Boolean).join(', ')
+    if (existing) {
+      const before = existing.qty
+      existing.qty = Math.min(existing.qty + 1, MAX_BASKET_LINE_QTY)
+      lastAdded.value = existing.qty > before ? { lineId: existing.id, said } : null
+    }
     else {
+      const id = crypto.randomUUID()
       basket.value.push({
-        id: crypto.randomUUID(),
+        id,
         variantId: variant.id,
         productName,
         variantLabel: variant.label,
@@ -72,8 +82,15 @@ export function useTillBasket(deps: TillBasketDeps) {
         choiceItemName,
         qty: 1,
       })
+      lastAdded.value = { lineId: id, said }
     }
     askIfRestricted(productName, { variantId: variant.id, choiceItemId })
+  }
+
+  function undoLastAdded(): void {
+    const line = basket.value.find(entry => entry.id === lastAdded.value?.lineId)
+    lastAdded.value = null
+    if (line) decrementLine(line)
   }
 
   // Before the drink is poured, not at the charge (F-106 criterion 6). A sale that already
@@ -278,6 +295,7 @@ export function useTillBasket(deps: TillBasketDeps) {
 
   function resetBasket(): void {
     basket.value = []
+    lastAdded.value = null
     priced.value = null
     passedAgeCheck.value = null
     askingAgeCheckFor.value = null
@@ -292,6 +310,8 @@ export function useTillBasket(deps: TillBasketDeps) {
     tapProduct,
     tapVariant,
     chooseOption,
+    lastAdded,
+    undoLastAdded,
     incrementLine,
     decrementLine,
     removeLine,

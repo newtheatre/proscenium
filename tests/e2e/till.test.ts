@@ -853,8 +853,8 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
     view.close()
   }, 120_000)
 
-  // Issue 1311: the basket was drawn after every tile, so checking or correcting it meant scrolling
-  // past the grid and back; the bar under the thumb opens it as a sheet instead.
+  // Issue 1311: the bar under the thumb opens the basket as a sheet, so checking or correcting it
+  // never means scrolling past the grid and back.
   test('the summary bar opens the basket as a sheet, and a line changed there changes the total', async () => {
     const { view, productId } = await atTheTill()
     await click(view, `[data-test="product-${productId}"]`)
@@ -877,7 +877,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
   }, 120_000)
 
   // A tile is the name, the price, a small ID mark and a corner allergen control: one row of
-  // controls, where a Check ID chip and a full-width Allergens button used to double its height.
+  // controls, so a tile is no taller than two thumb targets (issue 1311).
   test('a tile keeps its allergen control in the corner, on the same row as the product', async () => {
     const { view, productId } = await atTheTill()
     const measured = await view.evaluate<{ tile: number, sameRow: boolean, inside: boolean }>(`(() => {
