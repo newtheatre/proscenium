@@ -9,6 +9,7 @@ import {
   roleExpiryClaimFor,
 } from '#shared/utils/role-expiry'
 import { saysRole } from '#shared/utils/roles'
+import { pruneLapsedStatements } from './role-prune'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { H3Event } from 'h3'
 
@@ -223,26 +224,8 @@ async function sendDigests(
 // Criterion 4. Housekeeping, and it changes no behaviour: the grant stopped granting anything the
 // moment it expired, and the trail keeps what the row said.
 async function pruneLapsed(at: Date, pruneDays: number, run: RoleLapseRun): Promise<void> {
-  const cutoff = lapsedBefore(Math.floor(at.getTime() / 1000), pruneDays)
-
-  const gone = await db.delete(schema.roleGrants)
-    .where(and(isNotNull(schema.roleGrants.expiresAt), lte(schema.roleGrants.expiresAt, cutoff)))
-    .returning({
-      userId: schema.roleGrants.userId,
-      role: schema.roleGrants.role,
-      expiresAt: schema.roleGrants.expiresAt,
-    })
-
-  for (const batch of chunked(gone, GRANTS_PER_BATCH)) {
-    const statements: BatchItem<'sqlite'>[] = batch.map(grant => db.insert(schema.auditLog).values(auditEntry({
-      actorId: null,
-      action: 'role.pruned',
-      target: `user:${grant.userId}`,
-      detail: { role: grant.role, expiresAt: grant.expiresAt },
-    })))
-    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
-  }
-
+  const { audit, prune } = pruneLapsedStatements(lapsedBefore(Math.floor(at.getTime() / 1000), pruneDays))
+  const [, gone] = await db.batch([db.run(audit), db.all<{ id: string }>(prune)])
   run.pruned = gone.length
 }
 
