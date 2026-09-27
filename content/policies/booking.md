@@ -24,10 +24,12 @@ or earlier if the performance says so; after that, tickets are on the door.
 
 ## Changing your mind
 
-Cancelling a booking you have not paid for is free: {{REFUND_UNPAID_CANCELLATION_FREE}}.
+Cancelling a booking you have not paid for is free, since no money has moved: cancel it yourself
+from the booking's own page, the link in your confirmation email, before the performance starts.
+A booking made with a pass is cancelled at the box office instead.
 
-Refunding a booking you have already paid for needs a manager: {{REFUND_PAID_REQUIRES_MANAGER}}.
-Refunds are handled in person, at the desk, as payments are.
+A refund of a booking you have already paid for is made in person at the box office, as payments
+are. Bring your booking reference.
 
 ## Membership
 

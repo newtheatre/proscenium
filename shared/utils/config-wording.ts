@@ -16,7 +16,6 @@ const HEADINGS: Record<ConfigKey, string> = {
   WAITING_LIST_OFFER_WINDOW_MINUTES: 'Waiting-list offer stands for',
   WAITING_LIST_OFFER_BATCH_CAP: 'Waiting-list offers per run',
   WAITING_LIST_PURGE_BATCH_CAP: 'Waiting-list entries purged per run',
-  REFUND_UNPAID_CANCELLATION_FREE: 'Free cancellation of an unpaid booking',
   REFUND_PAID_REQUIRES_MANAGER: 'A paid refund needs a manager',
   LISTING_LIMITED_THRESHOLD_PERCENT: 'Tickets shown as limited below',
   COMP_REQUEST_EXPIRY_MINUTES: 'Comp request lapses after',

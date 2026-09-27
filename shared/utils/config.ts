@@ -84,12 +84,6 @@ export const CONFIG_KEYS = {
     workshop: 'money-and-box-office',
     describes: 'The most waiting-list entries one purge run may delete after their performance ends.',
   },
-  REFUND_UNPAID_CANCELLATION_FREE: {
-    schema: z.boolean(),
-    default: true,
-    workshop: 'money-and-box-office',
-    describes: 'Whether a customer may cancel an unpaid booking themselves at no charge.',
-  },
   REFUND_PAID_REQUIRES_MANAGER: {
     schema: z.boolean(),
     default: true,
