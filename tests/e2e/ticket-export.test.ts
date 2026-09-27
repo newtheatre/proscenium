@@ -18,7 +18,7 @@ let app: AppUnderTest
 let admin: TestMember
 let boxOffice: TestMember
 let boxOfficePassword: string
-let front: TestMember
+let committee: TestMember
 let performanceId: string
 
 beforeAll(async () => {
@@ -27,9 +27,9 @@ beforeAll(async () => {
   admin = await adminSession(app)
   boxOfficePassword = generatePassword()
   boxOffice = await registerMember(app, 'export-box-office', boxOfficePassword)
-  front = await registerMember(app, 'export-front', generatePassword())
+  committee = await registerMember(app, 'export-committee', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: front.id, role: 'COMMITTEE' }, admin.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -79,7 +79,7 @@ describe.skipIf(skip !== null)('who may export tickets (D-129 criterion 3, ticke
   })
 
   test('the committee role cannot: this is a box office duty, not a general one', async () => {
-    const answered = await send('GET', '/api/admin/tickets/export', undefined, front.cookie)
+    const answered = await send('GET', '/api/admin/tickets/export', undefined, committee.cookie)
     expect(answered.status).toBe(403)
   })
 })

@@ -6,6 +6,7 @@ import { PERSONAS, PERSONA_PASSWORD } from '../../shared/utils/personas'
 import { PROTECTED_ROLE, defaultRoleExpiry } from '../../shared/utils/roles'
 import { boundFromSQL, holds, insert, seedId } from './statements'
 import type { BoundStatement, SeedTarget } from './statements'
+import type { Role } from '../../shared/utils/roles'
 
 // Obviously synthetic and stable across runs, so a re-run adopts the account it made last time
 // rather than leaving a second one beside it. A subdomain of ours, which registration accepts.
@@ -26,7 +27,7 @@ export interface SeedPerson {
   disabled?: true
   // No password at all, which is what guest checkout leaves behind (A-116).
   guest?: true
-  roles?: { role: string, when: 'CURRENT' | 'EXPIRING' | 'LAPSED' | 'FOREVER' }[]
+  roles?: { role: Role, when: 'CURRENT' | 'EXPIRING' | 'LAPSED' | 'FOREVER' }[]
 }
 
 // Named so nobody mistakes one for a member, and spread across the states rather than clustered:

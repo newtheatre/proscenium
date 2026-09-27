@@ -23,15 +23,10 @@ function execMigration(raw: Database, sql: string): void {
   }
 }
 
-async function retirementTag(): Promise<{ tags: string[], cutoff: number }> {
+async function withRetired(seed: (raw: Database) => void, check: (raw: Database) => void): Promise<void> {
   const tags = await journalTags()
   const cutoff = tags.findIndex(tag => tag.endsWith(RETIRE_NAME))
   if (cutoff === -1) throw new Error(`no migration ending ${RETIRE_NAME} is in the journal`)
-  return { tags, cutoff }
-}
-
-async function withRetired(seed: (raw: Database) => void, check: (raw: Database) => void): Promise<void> {
-  const { tags, cutoff } = await retirementTag()
   const raw = new Database(':memory:')
   try {
     raw.exec('PRAGMA foreign_keys = ON;')
