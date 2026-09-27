@@ -7,32 +7,19 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const input = await readValidatedBodyOrThrow(event, body)
 
-  const [held] = await db.select({ id: schema.fellowships.id, revokedAt: schema.fellowships.revokedAt })
+  const [held] = await db.select({ id: schema.fellowships.id, userId: schema.fellowships.userId, revokedAt: schema.fellowships.revokedAt })
     .from(schema.fellowships).where(eq(schema.fellowships.id, id)).limit(1)
   if (!held) throw noSuch('fellowship')
   if (held.revokedAt !== null) throw createError({ statusCode: 409, statusMessage: 'That fellowship is already revoked' })
 
-  const [fellow] = await db.select({ userId: schema.fellowships.userId })
-    .from(schema.fellowships).where(eq(schema.fellowships.id, id)).limit(1)
+  const entry = auditEntry({ actorId: resolved.account.id, action: 'fellowship.revoked', target: `fellowship:${id}`, detail: { fellowship: id } })
+  const revoke = revokeFellowshipStatement(id, resolved.account.id, input.reason, Math.floor(Date.now() / 1000))
 
-  await db.batch([
-    // The award, the date and the citation stand: what a revocation adds is a second fact, not a
-    // correction to the first.
-    db.update(schema.fellowships).set({
-      revokedAt: Math.floor(Date.now() / 1000),
-      revokedBy: resolved.account.id,
-      revocationReason: input.reason,
-    }).where(eq(schema.fellowships.id, id)),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'fellowship.revoked',
-      target: `fellowship:${id}`,
-      detail: { fellowship: id },
-    })),
-    // Stops future admissions; every one already taken stands, since it is a fact this write
-    // never touches (D-130 criterion 4).
-    cancelFellowshipPassStatement(fellow!.userId),
-  ])
+  // The read above only words the refusal; the write's own predicate decides a race (0003). The pass
+  // cancel follows behind the revocation's own trail row, so a lost race cancels nothing (0049).
+  const revoked = await auditedWrite(db.all<{ id: string }>(revoke), entry, db.run(cancelFellowshipPassStatement(held.userId, entry.id)))
+
+  if (!revoked) throw createError({ statusCode: 409, statusMessage: 'That fellowship is already revoked' })
 
   return { ok: true }
 })

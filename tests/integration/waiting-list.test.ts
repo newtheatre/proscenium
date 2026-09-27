@@ -1,14 +1,17 @@
 import { describe, expect, test } from 'bun:test'
+import { auditIfChanged } from '#server/utils/audit'
 import {
   claimEntryStatement,
   expiredOffersQuery,
   joinEntryStatement,
   lapseOfferStatement,
+  nameClaimedReservationStatement,
   nextWaitingEntriesQuery,
   offerEntryStatement,
   purgeCandidatesQuery,
   removeEntryStatement,
 } from '#server/utils/waiting-list'
+import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -167,6 +170,61 @@ describe('a claim is race-safe: one freed ticket is never claimed twice (criteri
         'w-1', seeded.performanceId, 'u-1', 1, 'OFFERED', seeded.startsAt - 10_000, seeded.startsAt - 5_000,
       ]])
       expect(statement(database, claimEntryStatement('w-1', seeded.startsAt - 4_000)).changes).toBe(0)
+    })
+  })
+})
+
+// 0049: each change's trail row runs straight after it and lands only if it applied, so a lost
+// offer or a claim naming an entry no longer CLAIMED leaves no row.
+describe('an offer and a claim each record themselves only when they applied (0049)', () => {
+  const trail = (database: TestDatabase, action: string): { detail: string | null }[] =>
+    rows(database, 'SELECT detail FROM audit_log WHERE action = ? AND target = ?', action, 'waiting-list-entry:w-1')
+
+  test('offering the same entry twice leaves one trail row', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      join(database, 'w-1', seeded.performanceId, 'u-1')
+      for (let attempt = 0; attempt < 2; attempt++) {
+        statement(database, offerEntryStatement('w-1', seeded.startsAt - 10_000, seeded.startsAt - 5_000))
+        statement(database, auditIfChanged(auditEntry({ actorId: null, action: 'waiting-list.offered', target: 'waiting-list-entry:w-1' })))
+      }
+      expect(trail(database, 'waiting-list.offered')).toHaveLength(1)
+    })
+  })
+
+  test('a CLAIMED entry names its booking once, with one trail row naming it', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      database.batch([
+        ['INSERT INTO waiting_list (id, performance_id, user_id, party_size, status, offered_at, offer_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'w-1', seeded.performanceId, 'u-1', 1, 'CLAIMED', seeded.startsAt - 10_000, seeded.startsAt - 5_000],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-1', 'CLAIM1', seeded.performanceId, 'u-1', 'PENDING', 'WEB'],
+      ])
+      const named = statement(database, nameClaimedReservationStatement('w-1', 'r-1'))
+      statement(database, auditIfChanged(auditEntry({ actorId: 'u-1', action: 'waiting-list.claimed', target: 'waiting-list-entry:w-1', detail: { reservationId: 'r-1' } })))
+
+      expect(named.changes).toBe(1)
+      expect(rows(database, 'SELECT claimed_reservation_id AS id FROM waiting_list WHERE id = ?', 'w-1')[0]).toEqual({ id: 'r-1' })
+      expect(trail(database, 'waiting-list.claimed').map(row => JSON.parse(row.detail ?? '{}'))).toEqual([{ reservationId: 'r-1' }])
+    })
+  })
+
+  test('an entry no longer CLAIMED is not named, and no trail row is written', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      database.batch([
+        ['INSERT INTO waiting_list (id, performance_id, user_id, party_size, status, offered_at, offer_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'w-1', seeded.performanceId, 'u-1', 1, 'OFFERED', seeded.startsAt - 10_000, seeded.startsAt - 5_000],
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          'r-1', 'CLAIM1', seeded.performanceId, 'u-1', 'PENDING', 'WEB'],
+      ])
+      const named = statement(database, nameClaimedReservationStatement('w-1', 'r-1'))
+      statement(database, auditIfChanged(auditEntry({ actorId: 'u-1', action: 'waiting-list.claimed', target: 'waiting-list-entry:w-1', detail: { reservationId: 'r-1' } })))
+
+      expect(named.changes).toBe(0)
+      expect(rows(database, 'SELECT claimed_reservation_id AS id FROM waiting_list WHERE id = ?', 'w-1')[0]).toEqual({ id: null })
+      expect(trail(database, 'waiting-list.claimed')).toEqual([])
     })
   })
 })

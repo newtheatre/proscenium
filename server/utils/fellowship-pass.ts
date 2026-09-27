@@ -6,6 +6,7 @@ import { auditEntry } from '#shared/utils/audit'
 import { generatePassReference } from '#shared/utils/passes'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { AuditRow } from '#shared/utils/audit'
+import type { SQL } from 'drizzle-orm'
 
 // D-130: the lifetime entitlement a fellowship carries (0023). `slug = 'fellowship'` is what
 // server/utils/pass-redemption.ts reads to cover every show and mask the type name.
@@ -90,12 +91,23 @@ export async function fellowshipPassStatements(userId: string, actorId: string |
   }
 }
 
-// D-130 criterion 4: revocation stops future admissions and rewrites nothing already taken. The
-// pass itself is what `passAdmissionAllows` reads, so cancelling it is the whole mechanism.
-export function cancelFellowshipPassStatement(userId: string): BatchItem<'sqlite'> {
-  return db.run(sql`
+// A revocation is a second fact beside the award, never a correction to it (A-127 criterion 4).
+// `revoked_at IS NULL` rides the write, so of two officers revoking at once the second changes nothing.
+export function revokeFellowshipStatement(id: string, actorId: string, reason: string, at: number): SQL {
+  return sql`
+    UPDATE fellowships SET revoked_at = ${at}, revoked_by = ${actorId}, revocation_reason = ${reason}
+    WHERE id = ${id} AND revoked_at IS NULL
+    RETURNING id
+  `
+}
+
+// D-130 criterion 4: revocation stops future admissions and rewrites nothing already taken. Gated
+// on the revocation's own trail row, so a revocation that lost a race cancels nothing (0049).
+export function cancelFellowshipPassStatement(userId: string, auditId: string): SQL {
+  return sql`
     UPDATE passes SET status = 'CANCELLED', updated_at = unixepoch()
     WHERE user_id = ${userId} AND status = 'ACTIVE'
       AND pass_type_id = (SELECT id FROM pass_types WHERE slug = 'fellowship')
-  `)
+      AND EXISTS (SELECT 1 FROM audit_log WHERE id = ${auditId})
+  `
 }
