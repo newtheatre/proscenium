@@ -27,9 +27,9 @@ interface Listing { items: Entry[], total: number }
 const request = useRequestFetch()
 const toast = useToast()
 
-const syncedAt = ref<Date | null>(null)
+const syncedAt = ref<number | null>(null)
 const failure = ref<string | null>(null)
-const busy = ref(true)
+const busy = ref(false)
 const items = ref<Entry[]>([])
 // What tonight's log is scoped to, resolved once on load: none of BAR, DOOR or DUTY_MANAGER is
 // asked to name a performance, so the first role that resolves says which ones are running.
@@ -45,20 +45,30 @@ const refusal = ref<string | null>(null)
 const nightAuthority = useNightAuthority()
 const offersReview = computed(() => nightAuthority.value.roles.includes('DUTY_MANAGER'))
 
+interface Covered { performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }
+type AuthorityRead = { kind: 'READ', resolved: Covered } | { kind: 'FAILED', failure: string, refused: boolean }
+
 // One question for any of tonight's roles: the server tries a shift before a bypass and answers a
 // refusal about the caller's own position, never the last role's (E-111).
-async function resolveAuthority(): Promise<void> {
+async function readAuthority(): Promise<AuthorityRead> {
   try {
-    const resolved = await request<{ performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }>('/api/tonight/authority')
-    performanceIds.value = resolved.performanceIds
-    performances.value = resolved.performances ?? []
-    authorityFailure.value = null
-    refusal.value = null
+    return { kind: 'READ', resolved: await request<Covered>('/api/tonight/authority') }
   }
   catch (refused) {
-    authorityFailure.value = refusalText(refused)
-    refusal.value = refusalStatus(refused) === 403 ? authorityFailure.value : null
+    return { kind: 'FAILED', failure: refusalText(refused), refused: refusalStatus(refused) === 403 }
   }
+}
+
+function applyAuthority(answered: AuthorityRead): void {
+  if (answered.kind === 'FAILED') {
+    authorityFailure.value = answered.failure
+    refusal.value = answered.refused ? answered.failure : null
+    return
+  }
+  performanceIds.value = answered.resolved.performanceIds
+  performances.value = answered.resolved.performances ?? []
+  authorityFailure.value = null
+  refusal.value = null
 }
 
 interface TeamSlot { shiftId: string, role: NightRole, filled: boolean, claimed: boolean, name: string | null, phone: string | null }
@@ -67,34 +77,58 @@ const team = ref<TeamSlot[]>([])
 
 // Best effort: a roster that will not load is a contacts block that says so, never a screen that
 // refuses to show the log behind it.
-async function loadTeam(): Promise<void> {
+async function readTeam(): Promise<TeamSlot[]> {
   try {
     const answered = await request<{ performances: { team: TeamSlot[] }[] }>('/api/tonight/team')
-    team.value = contactRoster(answered.performances.flatMap(performance => performance.team))
+    return contactRoster(answered.performances.flatMap(performance => performance.team))
   }
-  catch { team.value = [] }
+  catch {
+    return []
+  }
+}
+
+type LogRead = { kind: 'READ', items: Entry[], at: number } | { kind: 'FAILED', failure: string }
+
+async function readLog(): Promise<LogRead> {
+  try {
+    return { kind: 'READ', items: (await request<Listing>('/api/tonight/incidents', { query: { pageSize: 100 } })).items, at: Date.now() }
+  }
+  catch (refused) {
+    return { kind: 'FAILED', failure: refusalText(refused) }
+  }
+}
+
+function applyLog(answered: LogRead): void {
+  if (answered.kind === 'FAILED') {
+    failure.value = answered.failure
+    return
+  }
+  failure.value = null
+  items.value = answered.items
+  syncedAt.value = answered.at
 }
 
 async function load(): Promise<void> {
   busy.value = true
-  failure.value = null
   try {
-    const listed = await request<Listing>('/api/tonight/incidents', { query: { pageSize: 100 } })
-    items.value = listed.items
-    syncedAt.value = new Date()
-  }
-  catch (refused) {
-    failure.value = refusalText(refused)
+    applyLog(await readLog())
   }
   finally {
     busy.value = false
   }
 }
 
-onMounted(async () => {
-  await resolveAuthority()
-  await Promise.all([load(), loadTeam()])
+// In the served page, so the team, the log or the refusal is what a phone paints first: none of
+// the three waits on another's answer (issue 1521).
+const { data: served } = await useAsyncData('tonight-incidents', async () => {
+  const [authority, log, roster] = await Promise.all([readAuthority(), readLog(), readTeam()])
+  return { authority, log, roster }
 })
+if (served.value) {
+  applyAuthority(served.value.authority)
+  applyLog(served.value.log)
+  team.value = served.value.roster
+}
 
 const performanceOptions = computed(() => performanceIds.value.map((id) => {
   const named = performances.value.find(one => one.id === id)

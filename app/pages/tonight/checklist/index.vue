@@ -11,11 +11,11 @@ useSeoMeta({ title: 'Checklist' })
 const route = useRoute()
 const request = useRequestFetch()
 
-const syncedAt = ref<Date | null>(null)
+const syncedAt = ref<number | null>(null)
 const failure = ref<string | null>(null)
 // Refused outright: one card, and nothing left to tick (issue 1304).
 const refusal = ref<string | null>(null)
-const busy = ref(true)
+const busy = ref(false)
 const items = ref<ChecklistEntry[]>([])
 // Read from the server on every load: Sign off and close on the night report is what closes it
 // (issue 1315), and this screen only says so.
@@ -38,40 +38,63 @@ const choices = computed(() => authority.value.performances.map(one => ({
 })))
 const ambiguous = ref(false)
 
-async function load(): Promise<void> {
-  busy.value = true
-  failure.value = null
+type ChecklistRead
+  = { kind: 'READ', listed: TonightChecklist, at: number }
+    | { kind: 'AMBIGUOUS' }
+    | { kind: 'REFUSED', refusal: string }
+    | { kind: 'FAILED', failure: string }
+
+async function read(): Promise<ChecklistRead> {
   try {
     const listed = await request<TonightChecklist>(
       '/api/tonight/checklist',
       { query: performanceId.value ? { performanceId: performanceId.value } : {} },
     )
-    performanceId.value = listed.performanceId
-    items.value = listed.items
-    close.value = listed.close
-    till.value = listed.till
-    ambiguous.value = false
-    refusal.value = null
-    syncedAt.value = new Date()
+    return { kind: 'READ', listed, at: Date.now() }
   }
   catch (refused) {
     // More than one house is running and nothing named one: the switcher is the answer, not a
     // refusal with nothing to tap (issue 1150 item 4).
-    if (!performanceId.value && refusalStatus(refused) === 400) ambiguous.value = true
-    else if (refusalStatus(refused) === 403) refusal.value = refusalText(refused)
-    else failure.value = refusalText(refused)
+    if (!performanceId.value && refusalStatus(refused) === 400) return { kind: 'AMBIGUOUS' }
+    if (refusalStatus(refused) === 403) return { kind: 'REFUSED', refusal: refusalText(refused) }
+    return { kind: 'FAILED', failure: refusalText(refused) }
+  }
+}
+
+function apply(answered: ChecklistRead): void {
+  failure.value = null
+  if (answered.kind === 'AMBIGUOUS') ambiguous.value = true
+  else if (answered.kind === 'REFUSED') refusal.value = answered.refusal
+  else if (answered.kind === 'FAILED') failure.value = answered.failure
+  else {
+    performanceId.value = answered.listed.performanceId
+    items.value = answered.listed.items
+    close.value = answered.listed.close
+    till.value = answered.listed.till
+    ambiguous.value = false
+    refusal.value = null
+    syncedAt.value = answered.at
+  }
+}
+
+async function load(): Promise<void> {
+  busy.value = true
+  try {
+    apply(await read())
   }
   finally {
     busy.value = false
   }
 }
 
+// In the served page, so the list, the switcher or the refusal is what a phone paints first.
+const { data: served } = await useAsyncData('tonight-checklist', read)
+if (served.value) apply(served.value)
+
 function choose(chosen: string): void {
   performanceId.value = chosen
   load()
 }
-
-onMounted(load)
 
 const preItems = computed(() => items.value.filter(item => item.phase === 'PRE'))
 const postItems = computed(() => items.value.filter(item => item.phase === 'POST'))

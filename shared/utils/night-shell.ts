@@ -40,3 +40,11 @@ export function nightHintShows(state: { empty: boolean, seenBefore: boolean }): 
 export function nightHintSeenKey(title: string): string {
   return `nnt-night-hint:${title}`
 }
+
+// When the show-night shell asks which of tonight's roles the viewer holds (issue 1521): always on
+// the server, and on the way in from another layout; hydrating, the served answer stands.
+export function asksNightAuthority(move: { to: unknown, from: unknown, server: boolean, hydrating: boolean }): boolean {
+  if (move.to !== 'tonight') return false
+  if (move.server) return true
+  return !move.hydrating && move.from !== 'tonight'
+}

@@ -20,34 +20,62 @@ const authorityFailure = ref<string | null>(null)
 const refusal = ref<string | null>(null)
 const performances = ref<CoveredPerformance[]>([])
 const performanceId = ref('')
-const syncedAt = ref<Date | null>(null)
-const busy = ref(true)
+const syncedAt = ref<number | null>(null)
 
-async function resolveAuthority(): Promise<void> {
-  busy.value = true
+type AuthorityRead = { kind: 'READ', resolved: Authority, at: number } | { kind: 'FAILED', failure: string, refused: boolean, at: number }
+
+async function readAuthority(): Promise<AuthorityRead> {
   try {
-    const resolved = await request<Authority>('/api/tonight/authority', { query: { role: 'DOOR' } })
-    performances.value = resolved.performances
-    // The house running now, never whichever id sorted first: a matinee ticket refused at an
-    // evening the volunteer never chose is the bug this closes (issue 901).
-    performanceId.value = (resolved.performances.find(one => one.active) ?? resolved.performances[0])?.id ?? ''
-    authorised.value = true
-    authorityFailure.value = null
-    refusal.value = null
+    return { kind: 'READ', resolved: await request<Authority>('/api/tonight/authority', { query: { role: 'DOOR' } }), at: Date.now() }
   }
   catch (refused) {
-    authorised.value = false
-    authorityFailure.value = refusalText(refused)
-    // Refused outright: one card, and no field or Check left to press (issue 1304).
-    refusal.value = refusalStatus(refused) === 403 ? authorityFailure.value : null
-  }
-  finally {
-    syncedAt.value = new Date()
-    busy.value = false
+    return { kind: 'FAILED', failure: refusalText(refused), refused: refusalStatus(refused) === 403, at: Date.now() }
   }
 }
 
-onMounted(resolveAuthority)
+function applyAuthority(answered: AuthorityRead): void {
+  syncedAt.value = answered.at
+  if (answered.kind === 'FAILED') {
+    authorised.value = false
+    authorityFailure.value = answered.failure
+    // Refused outright: one card, and no field or Check left to press (issue 1304).
+    refusal.value = answered.refused ? answered.failure : null
+    return
+  }
+  performances.value = answered.resolved.performances
+  // The house running now, never whichever id sorted first: a matinee ticket refused at an
+  // evening the volunteer never chose is the bug this closes (issue 901).
+  performanceId.value = (answered.resolved.performances.find(one => one.active) ?? answered.resolved.performances[0])?.id ?? ''
+  authorised.value = true
+  authorityFailure.value = null
+  refusal.value = null
+}
+
+// The house under the camera for whoever holds the door, not only the duty manager: in, sold, seats
+// left, the latecomer rule and the intervals (issue 1307). Best effort, never in the door's way.
+const houses = ref<HouseView[]>([])
+const strip = computed(() => houses.value.find(one => one.performanceId === performanceId.value) ?? null)
+
+// Null when the house could not be read: the strip is a courtesy, and a door that cannot read the
+// house still admits, so the last strip stays.
+async function readHouse(): Promise<HouseView[] | null> {
+  try {
+    return (await request<{ performances: HouseView[] }>('/api/tonight/house')).performances
+  }
+  catch {
+    return null
+  }
+}
+
+// In the served page, so the field or the refusal is what a phone paints first (issue 1521).
+const { data: served } = await useAsyncData('tonight-door', async () => {
+  const [authority, house] = await Promise.all([readAuthority(), readHouse()])
+  return { authority, house }
+})
+if (served.value) {
+  applyAuthority(served.value.authority)
+  if (served.value.house) houses.value = served.value.house
+}
 
 const performanceOptions = computed(() => performances.value.map(one => ({
   label: saysPerformanceChoice(one),
@@ -239,24 +267,15 @@ function admitFoundPass(reference: string, holderName: string): Promise<void> {
   return oneAtATime(() => scanPass(reference, holderName).catch(refused => showRefusal(refused, reference)))
 }
 
-// The house under the camera for whoever holds the door, not only the duty manager: in, sold, seats
-// left, the latecomer rule and the intervals (issue 1307). Best effort, never in the door's way.
 const HOUSE_POLL_MS = 20_000
-const houses = ref<HouseView[]>([])
-const strip = computed(() => houses.value.find(one => one.performanceId === performanceId.value) ?? null)
 let houseTimer: ReturnType<typeof setInterval> | undefined
 
 async function loadHouse(): Promise<void> {
-  try {
-    houses.value = (await $fetch<{ performances: HouseView[] }>('/api/tonight/house')).performances
-  }
-  catch {
-    // The strip is a courtesy: a door that cannot read the house still admits.
-  }
+  const read = await readHouse()
+  if (read) houses.value = read
 }
 
 onMounted(() => {
-  loadHouse()
   houseTimer = setInterval(loadHouse, HOUSE_POLL_MS)
 })
 onBeforeUnmount(() => {
@@ -270,7 +289,6 @@ onBeforeUnmount(() => {
     :refused="refusal"
     hint="Scan the code, or type the reference or a name. Refused? Send them to the bar."
     :stale="syncedAt"
-    :busy="busy"
     data-test="door-screen"
   >
     <div

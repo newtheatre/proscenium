@@ -42,36 +42,47 @@ export interface NightAuthority {
 }
 
 export function useNightAuthority(): Ref<NightAuthority> {
-  return useState<NightAuthority>('nnt-night-authority', () => ({ roles: [], via: null, performances: [], known: false, refusal: null }))
+  return useState<NightAuthority>('nnt-night-authority', unknownNightAuthority)
+}
+
+function unknownNightAuthority(): NightAuthority {
+  return { roles: [], via: null, performances: [], known: false, refusal: null }
 }
 
 // Which of tonight's roles the viewer actually holds, asked of the server rather than read from a
 // standing grant (0009, 0044). Hiding a tile is never the enforcement: every route guards itself.
-export function resolveNightAuthority(): void {
+export async function resolveNightAuthority(): Promise<void> {
   const request = useRequestFetch()
   const resolved = useNightAuthority()
+  const { account, refresh } = useAccount()
+
+  // Signed out, every role answers 401, which says nothing; the phone's snapshot is checked first,
+  // as `signed-in` does, since a session may have begun since it was read.
+  if (import.meta.client && !account.value.signedIn) await refresh().catch(() => undefined)
+  if (!account.value.signedIn) {
+    resolved.value = unknownNightAuthority()
+    return
+  }
 
   // A role check is a read, so it records no officer bypass however often a screen makes it (0098).
-  onMounted(async () => {
-    const answers = await Promise.allSettled(NIGHT_ROLES.map(async (role) => {
-      const answered = await request<{ via: NightAuthorityVia, performances: NightPerformance[] }>('/api/tonight/authority', { query: { role } })
-      return { role, via: answered.via, performances: answered.performances }
-    }))
+  const answers = await Promise.allSettled(NIGHT_ROLES.map(async (role) => {
+    const answered = await request<{ via: NightAuthorityVia, performances: NightPerformance[] }>('/api/tonight/authority', { query: { role } })
+    return { role, via: answered.via, performances: answered.performances }
+  }))
 
-    const held = answers.flatMap(answer => answer.status === 'fulfilled' ? [answer.value] : [])
-    const known = answers.some(answer => answer.status === 'fulfilled' || refusalStatus(answer.reason) === 403)
-    // Asked with no role, the server ranks the three refusals and names the most specific (issue 1411).
-    const said = held.length === 0 && known
-      ? await request('/api/tonight/authority').then(() => null, (refused: unknown) => refusalText(refused))
-      : null
-    // A shift is the ordinary way in, so it wins the badge wherever the viewer holds both; a duty
-    // manager covering the door is on their own shift, so cover reads as a shift too (0095).
-    resolved.value = {
-      roles: held.map(one => one.role),
-      via: held.some(one => one.via !== 'OFFICER') ? 'SHIFT' : (held.length > 0 ? 'OFFICER' : null),
-      performances: held[0]?.performances ?? [],
-      known,
-      refusal: hubRefusal(said),
-    }
-  })
+  const held = answers.flatMap(answer => answer.status === 'fulfilled' ? [answer.value] : [])
+  const known = answers.some(answer => answer.status === 'fulfilled' || refusalStatus(answer.reason) === 403)
+  // Asked with no role, the server ranks the three refusals and names the most specific (issue 1411).
+  const said = held.length === 0 && known
+    ? await request('/api/tonight/authority').then(() => null, (refused: unknown) => refusalText(refused))
+    : null
+  // A shift is the ordinary way in, so it wins the badge wherever the viewer holds both; a duty
+  // manager covering the door is on their own shift, so cover reads as a shift too (0095).
+  resolved.value = {
+    roles: held.map(one => one.role),
+    via: held.some(one => one.via !== 'OFFICER') ? 'SHIFT' : (held.length > 0 ? 'OFFICER' : null),
+    performances: held[0]?.performances ?? [],
+    known,
+    refusal: hubRefusal(said),
+  }
 }

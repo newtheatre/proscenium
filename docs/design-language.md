@@ -177,17 +177,23 @@ Eleven rules follow:
    or, before any house is open, tonight's first, so no page draws a heading of its own. The hub at
    `/tonight` is the night's destinations, one `NightTile` card each: each tile appears where the
    viewer's own resolved authority opens it (`hubTiles()`), the viewer's own job first and in gold,
-   the rest in the order a night taps them, Emergency always and last and red. Until the roles are
-   known, or with no signal, every tile shows, since each screen guards itself; with no role at all
-   the hub is one card and My rota. The duty manager's comp requests wait on the hub too, as
-   `NightCompQueue` under Waiting on you (issue 1304). Nothing that ends the night is pinned before
-   the curtain, on any screen: after it the duty manager's own job is the night report, which leads
-   the hub, is what the glance pins, and pins Sign off and close itself (`curtainIsDown()`, issue
-   1315). A titled block is `NightBlock`, a single number is `NightKpi`, a checklist row is
-   `NightChecklistItems` (Tick, and a quiet "Can't do this?" line for the exception), an overlay is
-   `NightSheet` with `NightChoices` for its choices (rule 11) and the matinee-day picker is
-   `NightPerformanceSwitcher`, one row per house stacked, never a sideways scroll; none of the seven
-   is in the expressive kit, and all seven are show-night only.
+   the rest in the order a night taps them, Emergency always and last and red. Where no role could be
+   answered, signed out or with no signal, every tile shows, since each screen guards itself; with no
+   role at all the hub is one card and My rota. A show-night screen is served as the viewer will use
+   it: the shell resolves the viewer's roles in `app/middleware/night-authority.global.ts` before any
+   screen is set up, on the server and on the way in from another layout, and each screen reads its
+   first data through `useAsyncData` with `useRequestFetch()`, so no tile, control or badge is
+   drawn and then taken away, or added once the page has painted (issue 1521, K-102 criterion 5).
+   Polling stays on the client, and a clock-dependent choice (the running house, doors open, the
+   curtain) is judged by the read's own moment until the page has mounted. The duty manager's comp
+   requests wait on the hub too, as `NightCompQueue` under Waiting on you (issue 1304). Nothing that
+   ends the night is pinned before the curtain, on any screen: after it the duty manager's own job
+   is the night report, which leads the hub, is what the glance pins, and pins Sign off and close
+   itself (`curtainIsDown()`, issue 1315). A titled block is `NightBlock`, a single number is
+   `NightKpi`, a checklist row is `NightChecklistItems` (Tick, and a quiet "Can't do this?" line for
+   the exception), an overlay is `NightSheet` with `NightChoices` for its choices (rule 11) and the
+   matinee-day picker is `NightPerformanceSwitcher`, one row per house stacked, never a sideways
+   scroll; none of the seven is in the expressive kit, and all seven are show-night only.
 4. **The show-night screens are phone-first and work offline.** They cache their night on open
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
    looks right on a desk monitor is wrong for the surface it is on. Every control on one clears

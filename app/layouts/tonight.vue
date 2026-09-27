@@ -13,9 +13,9 @@ const atTheHub = computed(() => route.path === '/tonight')
 
 const header = useNightHeader()
 const authority = useNightAuthority()
+// Resolved before the first screen draws (`middleware/night-authority.global.ts`), so the served
+// page carries the badge, and the running house below, already filled in (issue 1521).
 const badge = computed(() => onShiftLabel(authority.value.via, account.value.user?.name))
-
-resolveNightAuthority()
 
 // On the body rather than the subtree, so a modal teleported out of it inherits the shell's
 // target floor too (docs/design-language.md rule 4).
@@ -64,7 +64,7 @@ onMounted(async () => {
           data-test="night-back"
         />
         <!-- The screen inside fills these in, and a layout renders before its page does on the
-           server, so the first paint is the default and the mismatch is the design (Vue 3.5). -->
+           server, so the first paint is the running house and the mismatch is the design (Vue 3.5). -->
         <div
           class="min-w-0 grow"
           data-allow-mismatch

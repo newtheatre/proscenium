@@ -1023,6 +1023,16 @@ namespace does not call the guard. Beside the ids it answers with
 `activePerformanceId()`'s own answer, so a picker names a show and a curtain rather than a database
 id and a screen opening cold starts on the house running now (E-127 criterion 2).
 
+The show-night shell asks it once for each role from `app/middleware/night-authority.global.ts`,
+awaited before any screen is set up, into the shared `useNightAuthority()` state: on the server,
+so the served page draws the hub's tiles, the on-shift badge and the running house already, and on
+the client only on the way in from another layout. Hydrating, the server's answer arrives in the
+payload and nothing is asked again (`asksNightAuthority()` in `shared/utils/night-shell.ts`, issue
+1521). A signed-out viewer is not asked about at all, since every role would answer 401, which says
+nothing. The screens that need a role's own answer (the door's covered houses, the duty manager's
+houses on the audience message, the unscoped answer the log and the register read) still ask for it
+themselves, in the same served read as their first data.
+
 ## The door (D-126, E-127, E-129)
 
 `/tonight/door` is door mode and nothing else: admit or redirect, with no price, no email address
@@ -1343,8 +1353,9 @@ withdrawing it takes effect on the screen's next poll rather than the holder's n
 The screen polls every 20 seconds while open (criterion 3, an interpretation: the criterion
 names the behaviour and not a number). A poll that fails leaves the last-fetched values on
 screen and turns `NightStale` amber rather than clearing anything, because a spinner is
-exactly what criterion 3 refuses; only the very first load shows one, before there is anything
-stale to fall back to. A caller `requireNightAuthority` refuses is shown the hub's own fallback
+exactly what criterion 3 refuses. The first read rides the served page (`useAsyncData` with
+`useRequestFetch()`), so not even the first load shows one; every later read, and the staleness it
+leaves, goes through `hubHouseAfter()` in `shared/utils/night-hub.ts` (issue 1521). A caller `requireNightAuthority` refuses is shown the hub's own fallback
 links instead of a failure banner, which is how `/tonight` still serves a DOOR or BAR shift
 holder who is not tonight's duty manager. Content warnings, the latecomer policy and the age
 guidance are read straight from `showWarnings()` and the show row, the same source the public

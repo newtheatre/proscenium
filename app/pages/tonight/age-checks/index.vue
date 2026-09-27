@@ -28,9 +28,9 @@ interface CoveredPerformance { id: string, showTitle: string, startsAt: number, 
 const request = useRequestFetch()
 const toast = useToast()
 
-const syncedAt = ref<Date | null>(null)
+const syncedAt = ref<number | null>(null)
 const failure = ref<string | null>(null)
-const busy = ref(true)
+const busy = ref(false)
 const items = ref<Entry[]>([])
 // Whether anything running tonight authorises the register at all (0009's own limit, not a
 // property of an entry: the row's own `performanceId` may still be null either way).
@@ -40,42 +40,72 @@ const authorityFailure = ref<string | null>(null)
 const refusal = ref<string | null>(null)
 const performances = ref<CoveredPerformance[]>([])
 
+type AuthorityRead = { kind: 'READ', performances: CoveredPerformance[] } | { kind: 'FAILED', failure: string, refused: boolean }
+
 // One question for any of tonight's roles: the server tries a shift before a bypass and answers a
 // refusal about the caller's own position, never the last role's (E-111).
-async function resolveAuthority(): Promise<void> {
+async function readAuthority(): Promise<AuthorityRead> {
   try {
-    const resolved = await request<{ performances: CoveredPerformance[] }>('/api/tonight/authority')
-    performances.value = resolved.performances
-    authorised.value = true
-    authorityFailure.value = null
-    refusal.value = null
+    return { kind: 'READ', performances: (await request<{ performances: CoveredPerformance[] }>('/api/tonight/authority')).performances }
   }
   catch (refused) {
-    authorityFailure.value = refusalText(refused)
-    refusal.value = refusalStatus(refused) === 403 ? authorityFailure.value : null
+    return { kind: 'FAILED', failure: refusalText(refused), refused: refusalStatus(refused) === 403 }
   }
+}
+
+function applyAuthority(answered: AuthorityRead): void {
+  if (answered.kind === 'FAILED') {
+    authorityFailure.value = answered.failure
+    refusal.value = answered.refused ? answered.failure : null
+    return
+  }
+  performances.value = answered.performances
+  authorised.value = true
+  authorityFailure.value = null
+  refusal.value = null
+}
+
+type RegisterRead = { kind: 'READ', items: Entry[], at: number } | { kind: 'FAILED', failure: string }
+
+async function readRegister(): Promise<RegisterRead> {
+  try {
+    return { kind: 'READ', items: (await request<Listing>('/api/tonight/age-checks', { query: { pageSize: 100 } })).items, at: Date.now() }
+  }
+  catch (refused) {
+    return { kind: 'FAILED', failure: refusalText(refused) }
+  }
+}
+
+function applyRegister(answered: RegisterRead): void {
+  if (answered.kind === 'FAILED') {
+    failure.value = answered.failure
+    return
+  }
+  failure.value = null
+  items.value = answered.items
+  syncedAt.value = answered.at
 }
 
 async function load(): Promise<void> {
   busy.value = true
-  failure.value = null
   try {
-    const listed = await request<Listing>('/api/tonight/age-checks', { query: { pageSize: 100 } })
-    items.value = listed.items
-    syncedAt.value = new Date()
-  }
-  catch (refused) {
-    failure.value = refusalText(refused)
+    applyRegister(await readRegister())
   }
   finally {
     busy.value = false
   }
 }
 
-onMounted(async () => {
-  await resolveAuthority()
-  await load()
+// In the served page, so the register or the refusal is what a phone paints first, and the form
+// below opens on the house running now (issue 1521).
+const { data: served } = await useAsyncData('tonight-age-checks', async () => {
+  const [authority, register] = await Promise.all([readAuthority(), readRegister()])
+  return { authority, register }
 })
+if (served.value) {
+  applyAuthority(served.value.authority)
+  applyRegister(served.value.register)
+}
 
 const performanceOptions = computed(() => [
   { label: 'No performance (checked outside a show)', value: '' },

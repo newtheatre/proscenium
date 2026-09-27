@@ -109,8 +109,9 @@ they are pressed on a night: **Door**, **Till**, **Tonight at a glance**, **Chec
 report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, **Message tonight's
 audience** (the duty manager's), and **Emergency**, always there and always last. While a stocktake
 is open, a bar shift also sees **Stocktake** straight after **Till**, to count into it (see
-[Stocktakes](/docs/bar/stocktakes#counting-on-a-bar-shift)). Until the phone knows your roles, or
-with no signal, every tile shows, and each screen still checks for itself. The **Checklist** tile
+[Stocktakes](/docs/bar/stocktakes#counting-on-a-bar-shift)). The hub opens already knowing your
+roles, so the tiles you see first are the ones that stay. Only if the server could not say (signed
+out, or no signal on the way in) does every tile show, and each screen still checks for itself. The **Checklist** tile
 says what is left on it: **3 pre-show items left** before the house opens, **2 post-show items
 left** after, **All ticked** when nothing is outstanding. On a matinee day the **Tonight at a
 glance**, **Checklist**, **Night report** and **Contacts and incidents** tiles carry the house you
