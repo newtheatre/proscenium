@@ -3,6 +3,7 @@ import type * as z from 'zod'
 import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
 import { SAYS_BEFORE_YOU_COME } from '#shared/utils/content-warnings'
 import { qrStatusDisplay, reservationResendForm, saysExchangeNight } from '#shared/utils/reservations'
+import type { OwnBookingListing } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 
@@ -65,35 +66,31 @@ async function loadBooking(): Promise<void> {
   outcome.value = 'found'
 }
 
-// The exchanged cookie names the booking; a missing or spent one is an invitation to resend,
-// never a dead end (D-108 criterion 2 sits next to criterion 4 for exactly this reason).
-interface OwnBooking {
-  reference: string
-  showTitle: string
-  venueName: string
-  when: string
-  state: string
-  url: string
+// A signed-in visitor sees their own bookings whatever the cookie holds: under the one it opened,
+// or in place of asking for a reference the account already knows (issue 1332).
+const { account } = useAccount()
+const ownBookings = ref<OwnBookingListing[] | null>(null)
+const otherBookings = computed(() => ownBookings.value?.filter(own => own.reference !== booking.value?.reference) ?? [])
+
+async function loadOwnBookings(): Promise<void> {
+  if (!account.value.signedIn) return
+  ownBookings.value = await $fetch<{ bookings: OwnBookingListing[] }>('/api/account/bookings')
+    .then(answer => answer.bookings)
+    .catch(() => null)
 }
 
-// A signed-in visitor with no booking open is shown their own, rather than asked for a reference
-// and an address the account already knows (issue 1332).
-const { account } = useAccount()
-const ownBookings = ref<OwnBooking[] | null>(null)
-
+// The exchanged cookie names the booking; a missing or spent one is an invitation to resend,
+// never a dead end (D-108 criterion 2 sits next to criterion 4 for exactly this reason).
 onMounted(async () => {
   made.value = null
+  const own = loadOwnBookings()
   try {
     await loadBooking()
   }
   catch {
     outcome.value = 'resend'
-    if (account.value.signedIn) {
-      ownBookings.value = await $fetch<{ bookings: OwnBooking[] }>('/api/account/bookings')
-        .then(answer => answer.bookings)
-        .catch(() => null)
-    }
   }
+  await own
 })
 
 async function resend(payload: FormSubmitEvent<z.output<typeof reservationResendForm>>): Promise<void> {
@@ -149,7 +146,7 @@ async function saveEdit(): Promise<void> {
     await $fetch('/api/qr/tickets', { method: 'PUT', body: { lines, reference: booking.value?.reference } })
     editing.value = false
     justMade.value = null
-    await loadBooking()
+    await Promise.all([loadBooking(), loadOwnBookings()])
   }
   catch (error) {
     editFailure.value = refusalText(error)
@@ -170,7 +167,7 @@ async function cancelBooking(): Promise<void> {
     await $fetch('/api/qr/cancel', { method: 'POST', body: { reference: booking.value?.reference } })
     cancelConfirming.value = false
     justMade.value = null
-    await loadBooking()
+    await Promise.all([loadBooking(), loadOwnBookings()])
   }
   catch (error) {
     cancelFailure.value = refusalText(error)
@@ -213,7 +210,7 @@ async function submitExchange(): Promise<void> {
     await $fetch('/api/qr/exchange', { method: 'POST', body: { performanceId: exchangeChoice.value, reference: booking.value?.reference } })
     exchanging.value = false
     justMade.value = null
-    await loadBooking()
+    await Promise.all([loadBooking(), loadOwnBookings()])
   }
   catch (error) {
     exchangeFailure.value = refusalText(error)
@@ -466,6 +463,14 @@ useSeoMeta({ title: 'Your booking' })
           </div>
         </div>
 
+        <OwnBookings
+          v-if="otherBookings.length > 0"
+          :bookings="otherBookings"
+          heading="Your other bookings"
+          level="h2"
+          class="border-t border-default pt-4"
+        />
+
         <ConfirmModal
           v-model:open="cancelConfirming"
           name="cancel-booking"
@@ -495,35 +500,15 @@ useSeoMeta({ title: 'Your booking' })
         data-test="qr-resend"
         class="space-y-4"
       >
-        <div
+        <OwnBookings
           v-if="ownBookings"
-          class="space-y-3 border-b border-default pb-4"
-          data-test="qr-own-bookings"
+          :bookings="ownBookings"
+          heading="Your bookings"
+          level="h1"
+          class="border-b border-default pb-4"
         >
-          <h1 class="nnt-headline text-xl">
-            Your bookings
-          </h1>
-          <ul
-            v-if="ownBookings.length > 0"
-            class="space-y-2"
-          >
-            <li
-              v-for="own in ownBookings"
-              :key="own.reference"
-            >
-              <!-- A plain link: the booking's address is a server route that sets its cookie, which
-                   an in-app navigation would never reach (issue 1329). -->
-              <a
-                :href="own.url"
-                class="flex min-h-11 flex-col justify-center rounded-lg border border-default px-3 py-2 hover:border-primary"
-              >
-                <span class="font-medium">{{ own.showTitle }}</span>
-                <span class="text-sm text-muted">{{ own.when }} · {{ own.venueName }} · {{ own.state }} · {{ own.reference }}</span>
-              </a>
-            </li>
-          </ul>
           <p
-            v-else
+            v-if="ownBookings.length === 0"
             class="text-sm text-muted"
           >
             You have no bookings still to come. <NuxtLink
@@ -537,7 +522,7 @@ useSeoMeta({ title: 'Your booking' })
               class="underline"
             >Passes</NuxtLink>.
           </p>
-        </div>
+        </OwnBookings>
 
         <div class="space-y-2">
           <component

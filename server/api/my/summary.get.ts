@@ -1,8 +1,8 @@
 import { ownBookingsFrom } from '#shared/utils/reservations'
 import type { MyShiftRow } from '#server/utils/rota'
 
-// The one request `/my` makes (K-127 criterion 1): eight endpoints' worth of reading composed
-// here instead, so a tile never fans out on its own.
+// The one request `/my` makes (K-127 criterion 1): every tile's reading composed here, so a tile
+// never fans out on its own.
 export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
   const now = new Date()

@@ -106,6 +106,18 @@ export function passRedemptionRefusal(pass: PassRedemptionState, now: number): s
   return null
 }
 
+export interface PassQrState {
+  status: string
+  passTypeStatus: string
+  validUntil: number
+}
+
+// An ACTIVE pass not past its end date: one the door would refuse as cancelled, expired or
+// archived is not offered to be shown. The dates count too, since nothing sets EXPIRED (issue 1332).
+export function showsPassQr(pass: PassQrState, now: number): boolean {
+  return pass.status === 'ACTIVE' && pass.passTypeStatus !== 'CLOSED' && now <= pass.validUntil
+}
+
 // D-126: the door reads a pass the same way a desk search reads a reservation, by its own
 // no-look-alike reference, never a QR token scheme built for the holder's own phone.
 export const doorPassScanForm = z.strictObject({

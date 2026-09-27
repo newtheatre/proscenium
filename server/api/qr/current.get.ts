@@ -1,6 +1,5 @@
 import { formatLondon } from '#shared/utils/london'
-import { nothingToCollect } from '#shared/utils/reservations'
-import { saysPrice } from '#shared/utils/ticket-types'
+import { saysTotalDue } from '#shared/utils/reservations'
 
 // The booking the exchanged cookie names, read live (D-108 criteria 1, 4). The cookie is the
 // only credential this route asks for; no account session is required.
@@ -34,7 +33,7 @@ export default defineEventHandler(async (event) => {
     // The page offers no change, exchange or cancel on a pass booking (issue 1390).
     passBooking: reservation.passBooking === 1,
     when: formatLondon(new Date(reservation.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
-    totalDue: reservation.status === 'PENDING' && !nothingToCollect(reservation.holdExpiresAt, reservation.totalPence) ? saysPrice(reservation.totalPence) : null,
+    totalDue: saysTotalDue(reservation.status, reservation.holdExpiresAt, reservation.totalPence),
     qrSvg: qrSvgBase64(url),
     lines: ticketLines,
     exchangedTo: reservation.exchangedToShowTitle && reservation.exchangedToStartsAt

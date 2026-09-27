@@ -1039,8 +1039,9 @@ resolves against the other's route even if the two id spaces collided. `GET /pas
 exchanges it for a cookie exactly as `/qr/[token]` does; `GET /api/passes/current` and `/passes`
 read the pass live from that cookie. The email (`pass-issued` template) carries the same QR
 inline. `GET /api/account/passes` is the signed-in view: held passes and the caller's own
-requests, regardless of channel; each active pass carries its QR, built from the same token, so
-it can be shown at the door without the email (issue 1332).
+requests, regardless of channel; a pass the door would admit carries its QR, built from the same
+token, so it can be shown at the door without the email (issue 1332). `showsPassQr()` decides
+that from the status, the type's status and `valid_until`, since nothing sets `EXPIRED`.
 
 ### pass_admissions  APPEND-ONLY
 `id` PK · `pass_id` restrict · `performance_id` restrict · `ticket_id` UNIQUE restrict ·

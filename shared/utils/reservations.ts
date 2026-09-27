@@ -3,6 +3,7 @@ import { saysClock, saysWhen } from './when'
 import { saysRole } from './roles'
 import { showNightBounds, showNightOf } from './show-night'
 import { plural } from './text'
+import { saysPrice } from './ticket-types'
 
 // The booking flow (D-104): a guest or a signed-in account holds seats online, the box office
 // takes payment in person, and nothing here ever moves money (0005).
@@ -238,6 +239,23 @@ export function ownBookingsFrom(now: Date): number {
 // a free one included, is a hold the box office still collects before it releases (D-106).
 export function nothingToCollect(holdExpiresAt: number | null, totalPence: number): boolean {
   return holdExpiresAt === null && totalPence === 0
+}
+
+// What is due at the desk, or null when nothing is: the booking page and the account's own list
+// word a booking from this one rule (issue 1332).
+export function saysTotalDue(status: string, holdExpiresAt: number | null, totalPence: number): string | null {
+  return status === 'PENDING' && !nothingToCollect(holdExpiresAt, totalPence) ? saysPrice(totalPence) : null
+}
+
+// One row of a signed-in person's own bookings (issue 1332): `url` is the link route that sets the
+// booking's cookie, so it is followed as a plain link, never an in-app navigation.
+export interface OwnBookingListing {
+  reference: string
+  showTitle: string
+  venueName: string
+  when: string
+  state: string
+  url: string
 }
 
 // What the QR page (and eventually the door, D-126) says for each state a reservation can be

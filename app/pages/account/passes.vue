@@ -19,7 +19,7 @@ interface HeldPass {
   priceLabel: string
   pricePaid: number
   status: PassStatus
-  // Only while it admits: a cancelled or expired pass is not offered to be shown (issue 1332).
+  // Null for a pass the door would refuse as cancelled, expired or archived (issue 1332).
   qrSvg: string | null
 }
 
