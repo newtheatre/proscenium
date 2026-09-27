@@ -100,6 +100,8 @@ describe('the sweeps carry on past a refused erasure, and only a refusal', () =>
     const source = await Bun.file('server/utils/erasure.ts').text()
     expect(source).toMatch(/export async function eraseEach\(/)
     expect(source).toMatch(/if \(!isError\(error\) \|\| error\.statusCode !== 409\) throw error\s*refused \+= 1/)
+    // The loser of a race is answered alreadyErased, which is neither an erasure nor a refusal.
+    expect(source).toMatch(/if \(\(await eraseAccount\(id, null\)\)\.erased\) erased \+= 1/)
   })
 
   test('the digest reports what was refused', async () => {
