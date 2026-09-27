@@ -14,35 +14,26 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: saysNoSuch('show') })
   }
 
-  // The slug predicate rides the INSERT, so two officers naming the same address at once produce
-  // one product and a refusal rather than a constraint error (0003, 0006).
-  const created = await db.all<{ id: string }>(sql`
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'pass-type.created',
+    target: `pass-type:${id}`,
+    detail: { name: input.name, slug: input.slug, prices: input.prices, showCount: showIds.length },
+  })
+
+  // The slug predicate rides the INSERT, so a clash is a refusal, not a constraint error (0003, 0006);
+  // the prices and shows follow in its batch, gated on its entry having landed (0049).
+  const created = await auditedWrite(db.all<{ id: string }>(sql`
     INSERT INTO pass_types (id, slug, name, description, valid_from, valid_until, sales_open_at, sales_close_at, max_issued, status)
     SELECT ${id}, ${input.slug}, ${input.name}, ${input.description ?? null}, ${input.validFrom},
            ${input.validUntil}, ${input.salesOpenAt ?? null}, ${input.salesCloseAt ?? null}, ${input.maxIssued ?? null}, 'DRAFT'
     WHERE NOT EXISTS (SELECT 1 FROM pass_types WHERE slug = ${input.slug})
     RETURNING id
-  `)
+  `), entry, ...newPassTypeChildren(id, input.prices, showIds, entry).map(statement => db.run(statement)))
 
-  if (created.length === 0) {
+  if (!created) {
     throw createError({ statusCode: 409, statusMessage: `A pass already has the address ${input.slug}` })
   }
-
-  await db.batch([
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'pass-type.created',
-      target: `pass-type:${id}`,
-      detail: { name: input.name, slug: input.slug, prices: input.prices, showCount: showIds.length },
-    })),
-    ...input.prices.map(price => db.insert(schema.passTypePrices).values({
-      id: newId(),
-      passTypeId: id,
-      label: price.label,
-      price: price.price,
-    })),
-    ...showIds.map(showId => db.insert(schema.passTypeShows).values({ id: newId(), passTypeId: id, showId })),
-  ])
 
   return { ok: true, id }
 })

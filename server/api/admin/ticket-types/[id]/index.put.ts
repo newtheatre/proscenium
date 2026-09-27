@@ -25,25 +25,6 @@ export default defineEventHandler(async (event) => {
     || descriptionChanged
     || input.activeByDefault !== held.activeByDefault
 
-  // The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
-  // moment refuses rather than reaching the unique index (0003, 0006).
-  const updated = await db.all<{ id: string }>(sql`
-    UPDATE ticket_types
-    SET name = ${input.name},
-        description = ${description},
-        price = ${input.price},
-        active_by_default = ${input.activeByDefault ? 1 : 0}
-    WHERE id = ${id}
-      AND NOT EXISTS (SELECT 1 FROM ticket_types WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
-    RETURNING id
-  `)
-
-  if (updated.length === 0) {
-    const taken = await ticketTypeNamed(input.name, id)
-    if (!taken) throw noSuch('ticket type')
-    throw createError({ statusCode: 409, statusMessage: `A ticket type is already called ${taken.name}` })
-  }
-
   // The base price is a column and a ticket keeps the price it sold at (D-120 criterion 3), so
   // the before and after live in the trail rather than in a superseding row.
   const entries = [
@@ -71,7 +52,24 @@ export default defineEventHandler(async (event) => {
       : []),
   ]
 
-  if (entries.length > 0) await db.insert(schema.auditLog).values(entries)
+  // The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
+  // moment refuses rather than reaching the unique index (0003, 0006); its entries ride it (0049).
+  const updated = await auditedWrite(db.all<{ id: string }>(sql`
+    UPDATE ticket_types
+    SET name = ${input.name},
+        description = ${description},
+        price = ${input.price},
+        active_by_default = ${input.activeByDefault ? 1 : 0}
+    WHERE id = ${id}
+      AND NOT EXISTS (SELECT 1 FROM ticket_types WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
+    RETURNING id
+  `), entries)
+
+  if (!updated) {
+    const taken = await ticketTypeNamed(input.name, id)
+    if (!taken) throw noSuch('ticket type')
+    throw createError({ statusCode: 409, statusMessage: `A ticket type is already called ${taken.name}` })
+  }
 
   return { ok: true }
 })

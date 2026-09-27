@@ -10,20 +10,13 @@ export default defineEventHandler(async (event) => {
 
   // The predicate rides the INSERT, so two officers naming the same thing at once produce one
   // type and a refusal rather than a constraint error (0003, 0006).
-  const created = await db.all<{ id: string }>(sql`
+  const created = await auditedWrite(db.all<{ id: string }>(sql`
     INSERT INTO ticket_types (id, name, description, price, kind, access_kind, restricted_to, archived, active_by_default)
     SELECT ${id}, ${input.name}, ${input.description ?? null}, ${input.price}, 'SINGLE',
            ${input.accessKind ?? null}, ${input.restrictedTo ?? null}, 0, ${input.activeByDefault ? 1 : 0}
     WHERE NOT EXISTS (SELECT 1 FROM ticket_types WHERE name = ${input.name} COLLATE NOCASE)
     RETURNING id
-  `)
-
-  if (created.length === 0) {
-    const taken = await ticketTypeNamed(input.name)
-    throw createError({ statusCode: 409, statusMessage: `A ticket type is already called ${taken?.name ?? input.name}` })
-  }
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  `), auditEntry({
     actorId: resolved.account.id,
     action: 'ticket-type.created',
     target: `ticket-type:${id}`,
@@ -32,6 +25,11 @@ export default defineEventHandler(async (event) => {
       accessKind: input.accessKind ?? null, restrictedTo: input.restrictedTo ?? null,
     },
   }))
+
+  if (!created) {
+    const taken = await ticketTypeNamed(input.name)
+    throw createError({ statusCode: 409, statusMessage: `A ticket type is already called ${taken?.name ?? input.name}` })
+  }
 
   return { ok: true, id }
 })

@@ -24,8 +24,8 @@ export default defineEventHandler(async (event) => {
   }))
 
   // The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
-  // moment refuses rather than reaching the unique index (0003, 0006).
-  const [updated] = await db.batch([db.all<{ id: string }>(sql`
+  // moment refuses rather than reaching the unique index (0003, 0006); its entry rides it (0049).
+  const updated = await auditedWrite(db.all<{ id: string }>(sql`
     UPDATE venues
     SET name = ${input.name},
         address = ${address},
@@ -36,15 +36,7 @@ export default defineEventHandler(async (event) => {
     WHERE id = ${id}
       AND NOT EXISTS (SELECT 1 FROM venues WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
     RETURNING id
-  `), db.run(templateAudit), db.run(templateDrop)])
-
-  if (updated.length === 0) {
-    const taken = await venueNamed(input.name, id)
-    if (!taken) throw noSuch('venue')
-    throw createError({ statusCode: 409, statusMessage: `A venue is already called ${taken.name}` })
-  }
-
-  await db.insert(schema.auditLog).values(auditEntry({
+  `), auditEntry({
     actorId: resolved.account.id,
     action: 'venue.updated',
     target: `venue:${id}`,
@@ -54,7 +46,13 @@ export default defineEventHandler(async (event) => {
       isExternal: [held.isExternal, input.isExternal],
       roomId: [held.roomId, roomId],
     }),
-  }))
+  }), db.run(templateAudit), db.run(templateDrop))
+
+  if (!updated) {
+    const taken = await venueNamed(input.name, id)
+    if (!taken) throw noSuch('venue')
+    throw createError({ statusCode: 409, statusMessage: `A venue is already called ${taken.name}` })
+  }
 
   return { ok: true }
 })
