@@ -17,16 +17,18 @@ export default defineEventHandler(async (event) => {
   if (slots === 0) throw createError({ statusCode: 409, statusMessage: noBarSlotsRefusal(venue.name) })
 
   const openingId = newId()
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'bar-opening.created',
+    target: `bar-opening:${openingId}`,
+    detail: { venueId: input.venueId, night: input.night, label: input.label },
+  })
   const [, stamped] = await withOpeningConstraints(() => db.batch([
     db.all<{ id: string }>(createOpeningStatement(openingId, input, resolved.account.id)),
     // The staffing lands in the same batch as the opening, so an opening never exists unstaffed.
     db.all<{ id: string }>(stampOpeningShiftsStatement(openingId)),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'bar-opening.created',
-      target: `bar-opening:${openingId}`,
-      detail: { venueId: input.venueId, night: input.night, label: input.label },
-    })),
+    // Logged only if the opening was written, so the refusal below leaves no trail behind it (0049).
+    db.run(auditIfRow(entry, 'bar_openings', openingId)),
   ]))
 
   // Both statements are conditional on the same bar row, so a template emptied between the read

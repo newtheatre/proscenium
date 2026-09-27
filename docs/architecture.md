@@ -515,6 +515,16 @@ Reading the table:
   exports `constraintRefusal(table, error)`, anchored to the two real D1 error shapes. Each
   module keeps its own `ConstraintRefusal[]` table beside the write path it guards, and calls the
   shared function; there is no central list to append to (0047).
+- A conditional write's audit row rides the write's own batch and only what it changed (0049),
+  through one of four shapes in `server/utils/audit.ts`. `auditedWrite(write, entry)` batches
+  the write with `auditIfChanged(entry)`, an insert conditioned on `changes() = 1`, and answers
+  whether it applied; `auditIfChanged` goes directly after the write when the batch holds more.
+  `auditWhere(entry, condition)` writes under any condition and answers with the row it wrote:
+  first in a batch, under a guard every write in it shares, it says whether the whole batch
+  applied (the ticket edit). `auditIfRow(entry, table, id)` writes only if the row a batch just
+  inserted is there (a bar opening, a tab void's ledger entry). A write that changed nothing
+  logs nothing, and the route refuses or says so (a walk-in answers `added: false`), except where
+  the end state is what was asked, such as removing an authenticator app that is not there.
 
 ## Console list filters (K-129, 0032)
 

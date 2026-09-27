@@ -1,6 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { localPath } from '#shared/utils/local-path'
 import { landingAfterSignIn } from '#shared/utils/night-authority'
+import { afterLostGoogleClaim } from '#shared/utils/google-sign-in'
 import type { CandidateAccount } from '#shared/utils/google-sign-in'
 
 function candidate(row: { id: string, googleSub: string | null, disabled: boolean, anonymisedAt: number | null } | undefined): CandidateAccount | null {
@@ -54,17 +55,23 @@ export default defineOAuthGoogleEventHandler({
       ])
     }
     else if (outcome.action !== 'sign-in') {
-      // Claiming marks the account verified: Google has proven the address (A-104).
-      await db.batch([
+      // Claiming marks the account verified: Google has proven the address (A-104). Logged only if
+      // this callback took the claim; a second callback that lost signs in only as the same identity.
+      const claimed = await auditedWrite(
         db.update(schema.users)
           .set({ googleSub: identity.sub, verified: true, pendingGoogleEmail: null, googleLinkedAt: now })
-          .where(and(eq(schema.users.id, userId), isNull(schema.users.googleSub))),
-        db.insert(schema.auditLog).values(auditEntry({
+          .where(and(eq(schema.users.id, userId), isNull(schema.users.googleSub)))
+          .returning({ id: schema.users.id }),
+        auditEntry({
           actorId: userId,
           action: outcome.action === 'claim-pending' ? 'account.google.claimed.pending' : 'account.google.claimed',
           target: `user:${userId}`,
-        })),
-      ])
+        }),
+      )
+      if (!claimed) {
+        const [current] = await db.select({ googleSub: schema.users.googleSub }).from(schema.users).where(eq(schema.users.id, userId)).limit(1)
+        if (afterLostGoogleClaim(current?.googleSub ?? null, identity.sub) === 'REFUSE') return sendRedirect(event, '/sign-in?refused=linked-elsewhere')
+      }
     }
 
     const account = await findById(userId)

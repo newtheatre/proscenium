@@ -29,20 +29,25 @@ export default defineEventHandler(async (event) => {
   const { night, from } = stampWindow()
   const defaults = await shiftOffsetDefaults(event)
 
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: held.length === 0 ? 'shift-template.created' : 'shift-template.updated',
+    target: `venue:${venueId}`,
+    detail: { ...changes({ slots: [said(held), said(input.slots)] }), stampedFrom: night },
+  })
+
   // In the same batch, after the template rows, so a first template never leaves the imported
   // diary unstamped until somebody finds "Stamp the diary" (issue 1319).
   const results = await withShiftConstraints(() => db.batch([
     db.run(cleared),
     ...written.map(statement => db.run(statement)),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: held.length === 0 ? 'shift-template.created' : 'shift-template.updated',
-      target: `venue:${venueId}`,
-      detail: { ...changes({ slots: [said(held), said(input.slots)] }), stampedFrom: night },
-    })),
+    // Under the slots' own condition, so a venue made external meanwhile logs no template (0049).
+    db.all<{ id: string }>(auditWhere(entry, templateVenueIsOurs(venueId))),
     db.all<{ id: string }>(stampUnstampedStatement(venueId, from, defaults)),
   ]))
+  const logged = results.at(-2) as { id: string }[]
   const stamped = results.at(-1) as { id: string }[]
+  if (logged.length === 0) throw createError({ statusCode: 409, statusMessage: externalVenueTemplateRefusal({ ...venue, isExternal: true })! })
 
   return { ok: true, slots: orderedSlots(input.slots), stamped: stamped.length }
 })
