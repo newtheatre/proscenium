@@ -589,7 +589,8 @@ describe('a figure column lines its header up with its figures', () => {
     expect(offenders).toEqual([])
   })
 
-  // The figure columns that once took no shape at all, so their headers and figures sat left.
+  // Pinned by name: nothing in a column's source marks it as figures, so no scan finds one left
+  // unshaped (0032, K-101).
   test('a price or a quantity column takes a figure shape', async () => {
     const figures: [string, string][] = [
       ['app/pages/bar/categories.vue', `'Price'`],
@@ -600,22 +601,15 @@ describe('a figure column lines its header up with its figures', () => {
     ]
     for (const [path, header] of figures) {
       const metas = columnMetas(await Bun.file(path).text()).filter(one => one.header === header).map(one => one.meta)
-      expect({ path, header, metas }).toEqual({ path, header, metas: [expect.stringMatching(/^RIGHT_ALIGNED/)] })
+      expect({ path, header, metas }).toEqual({ path, header, metas: [expect.stringMatching(/^RIGHT_ALIGNED(?:_HIDE_BELOW_SM)?$/)] })
     }
   })
 
   // Rule 6 for actions too: a column of row actions takes the one shape, never a copy of it.
-  test('a column of row actions takes ACTIONS_COLUMN rather than writing its own', async () => {
-    const offenders = (await tables()).flatMap(file => columnMetas(file.source)
-      .filter(({ header, meta }) => header.includes('ACTIONS_HEADER') && RIGHT_CELLS.test(meta))
+  test('a column of row actions takes ACTIONS_COLUMN', async () => {
+    const offenders = (await tables()).flatMap(file => [...file.source.matchAll(/header:\s*ACTIONS_HEADER\b(?!,\s*meta:\s*ACTIONS_COLUMN\b)/g)]
       .map(() => file.path))
     expect(offenders).toEqual([])
-  })
-
-  test('a column of row actions never takes a figure shape', async () => {
-    const offenders = (await tables()).filter(file => columnMetas(file.source)
-      .some(({ header, meta }) => header.includes('ACTIONS_HEADER') && /RIGHT_ALIGNED|font-mono/.test(meta)))
-    expect(offenders.map(file => file.path)).toEqual([])
   })
 
   // Rule 6: no screen writes a shape out again, and one built from another's parts is written out.
