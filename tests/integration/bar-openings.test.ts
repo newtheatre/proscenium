@@ -13,6 +13,7 @@ import {
   declineOpeningShiftStatement,
   myOpeningShiftsQuery,
   openOpeningShiftsQuery,
+  releaseOpeningShiftStatement,
   removeOpeningShiftStatement,
   stampOpeningShiftsStatement,
   unconfirmOpeningShiftStatement,
@@ -564,6 +565,35 @@ describe('a member\'s own opening slots stay on their rota through the night (E-
       const listed = (at: number): unknown[] => run(database, myOpeningShiftsQuery('one', at))
       expect(listed(CLOSES_AT + 3600)).toHaveLength(1)
       expect(listed(NIGHT_START + 24 * 3600 + 60)).toHaveLength(0)
+    })
+  })
+})
+
+// E-107 criterion 1: a holder releases their own slot up to the start of its show night, and the
+// cut-off rides the write, read from the opening's own night rather than the caller's say-so.
+describe('a holder releases their own slot until the night begins (E-107 criterion 1)', () => {
+  test('before the night starts the release applies, and the slot names nobody again', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      person(database, 'one')
+      const [slot] = slotsOn(database, openingId)
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))
+
+      expect(run(database, releaseOpeningShiftStatement(slot!.id, 'one', NIGHT_START - 60))).toHaveLength(1)
+      expect(slotsOn(database, openingId)[0]).toMatchObject({ user_id: null, status: 'OPEN' })
+    })
+  })
+
+  test('from the 04:00 start of its night on, the release is refused and the holder keeps the slot', async () => {
+    await withDatabase(async (database) => {
+      const { openingId } = opening(database)
+      person(database, 'one')
+      const [slot] = slotsOn(database, openingId)
+      run(database, claimOpeningShiftStatement(slot!.id, 'one', 'CONFIRMED'))
+
+      expect(run(database, releaseOpeningShiftStatement(slot!.id, 'one', NIGHT_START))).toHaveLength(0)
+      expect(run(database, releaseOpeningShiftStatement(slot!.id, 'one', CLOSES_AT + 3600))).toHaveLength(0)
+      expect(slotsOn(database, openingId)[0]).toMatchObject({ user_id: 'one', status: 'CONFIRMED' })
     })
   })
 })

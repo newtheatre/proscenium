@@ -434,4 +434,33 @@ describe.skipIf(skip !== null)('a queued claim is confirmed or declined (E-130 c
       await setAutoConfirm(true)
     }
   }, 120_000)
+
+// E-107 criterion 1: a holder gives a slot back up to the start of its show night, and no later;
+// past that it is the night's business, as it is for a shift.
+describe.skipIf(skip !== null)('a holder releases their own slot until its night begins (E-107 criterion 1)', () => {
+  test('a slot a week out is released, and one tonight is refused, naming why', async () => {
+    const tonight = currentShowNight()
+    const tonightStart = Math.floor(showNightBounds(tonight).from.getTime() / 1000)
+    const planned = async (label: string, on: string, from: number): Promise<Slot> => {
+      const answered = await request(app, 'POST', '/api/rota/openings', {
+        venueId, night: on, label, startsAt: from + 14 * 3600, endsAt: from + 19 * 3600,
+      }, foh.cookie)
+      expect(answered.status).toBe(200)
+      const { items, slots } = await listing(foh.cookie)
+      const opening = items.find(one => one.label === label)!
+      const slot = slots.find(one => one.openingId === opening.openingId)!
+      expect((await request(app, 'POST', `/api/rota/openings/shifts/${slot.slotId}/claim`, {}, member.cookie)).status).toBe(200)
+      return slot
+    }
+
+    const later = await planned('A release next week', night, nightStart)
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${later.slotId}/release`, {}, member.cookie)).status).toBe(200)
+
+    const now = await planned('A release tonight', tonight, tonightStart)
+    const refused = await request(app, 'POST', `/api/rota/openings/shifts/${now.slotId}/release`, {}, member.cookie)
+    expect(refused.status).toBe(409)
+    expect(await message(refused)).toContain('already begun')
+    const held = (await listing(foh.cookie)).slots.find(one => one.slotId === now.slotId)!
+    expect(held.holderName).not.toBeNull()
+  })
 })
