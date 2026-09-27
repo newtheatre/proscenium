@@ -14,9 +14,6 @@ const request = computed(() => props.summary.passes.request)
     title="Passes"
     to="/account/passes"
     label="See passes"
-    :empty="!pass && !request"
-    empty-title="No pass"
-    empty-label="See passes"
   >
     <template v-if="pass">
       <p class="font-semibold">

@@ -7,23 +7,18 @@ defineProps<{ summary: MySummary }>()
 
 <template>
   <!-- The booking opens through its link route, which sets the cookie the booking page reads, so
-       it is a plain link rather than an in-app one (issue 1332, as issue 1329 found). -->
+       the card loads it rather than routing in the app (issue 1332, as issue 1329 found). -->
   <MyTile
     title="Tickets"
-    :to="summary.ticket ? '/qr' : '/whats-on'"
-    label="See all your bookings"
-    :empty="!summary.ticket"
-    empty-title="No bookings to come"
-    empty-label="See what is on"
+    :to="summary.ticket?.url ?? '/qr'"
+    :label="`Open booking ${summary.ticket?.reference ?? ''}`"
+    external
   >
-    <a
-      v-if="summary.ticket"
-      :href="summary.ticket.url"
-      class="block"
-    >
-      <span class="block font-semibold">{{ summary.ticket.showTitle }}</span>
-      <span class="block text-sm text-muted">{{ saysWhen(summary.ticket.startsAt) }} · {{ summary.ticket.venueName }}</span>
-      <span class="mt-2 block text-sm font-medium text-primary">Open booking {{ summary.ticket.reference }}</span>
-    </a>
+    <p class="font-semibold">
+      {{ summary.ticket?.showTitle }}
+    </p>
+    <p class="text-sm text-muted">
+      {{ summary.ticket && saysWhen(summary.ticket.startsAt) }} · {{ summary.ticket?.venueName }}
+    </p>
   </MyTile>
 </template>

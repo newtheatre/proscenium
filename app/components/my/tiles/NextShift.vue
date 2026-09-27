@@ -29,32 +29,37 @@ const onThisShift = computed(() => props.summary.onShiftTonight && props.summary
     :to="summary.onShiftTonight ? '/tonight' : '/rota'"
     :label="summary.onShiftTonight ? 'Go to tonight' : 'See my rota'"
     :highlight="summary.onShiftTonight"
-    :empty="!summary.shift"
-    :empty-title="summary.onShiftTonight ? 'On shift at the bar tonight' : 'No shift claimed'"
-    :empty-label="summary.onShiftTonight ? 'Go to tonight' : 'See open shifts'"
     class="lg:col-span-2 sm:col-span-2"
   >
     <p
-      v-if="onThisShift"
-      class="mb-2 text-sm font-medium text-primary"
+      v-if="!summary.shift"
+      class="font-semibold"
     >
-      On shift tonight
+      On shift at the bar tonight
     </p>
-    <p class="font-semibold">
-      {{ summary.shift?.showTitle }}
-    </p>
-    <p class="text-sm text-muted">
-      {{ roleWords }} · {{ summary.shift?.venueName }}
-    </p>
-    <div class="mt-2 flex items-center gap-2">
-      <span class="text-sm">{{ summary.shift && saysWhen(summary.shift.startsAt) }}</span>
-      <UBadge
-        :color="badgeColor"
-        variant="subtle"
-        size="sm"
+    <template v-else>
+      <p
+        v-if="onThisShift"
+        class="mb-2 text-sm font-medium text-primary"
       >
-        {{ badgeLabel }}
-      </UBadge>
-    </div>
+        On shift tonight
+      </p>
+      <p class="font-semibold">
+        {{ summary.shift.showTitle }}
+      </p>
+      <p class="text-sm text-muted">
+        {{ roleWords }} · {{ summary.shift.venueName }}
+      </p>
+      <div class="mt-2 flex items-center gap-2">
+        <span class="text-sm">{{ saysWhen(summary.shift.startsAt) }}</span>
+        <UBadge
+          :color="badgeColor"
+          variant="subtle"
+          size="sm"
+        >
+          {{ badgeLabel }}
+        </UBadge>
+      </div>
+    </template>
   </MyTile>
 </template>

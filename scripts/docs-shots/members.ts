@@ -13,9 +13,9 @@ export const members: Shot[] = [
     marker: '[data-test="my-page"]',
     width: PHONE_WIDTH,
     annotations: [
-      { selector: '[data-test="my-tile-next-shift"]', label: 'Next shift' },
-      { selector: '[data-test="my-tile-membership"]', label: 'Membership' },
       { selector: '[data-test="my-tile-training"]', label: 'Training' },
+      { selector: '[data-test="my-tile-membership"]', label: 'Membership' },
+      { selector: '[data-test="my-things-to-do"]', label: 'Things you can do' },
     ],
   },
   {

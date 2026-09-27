@@ -10,8 +10,6 @@ defineProps<{ summary: MySummary }>()
     title="Recent notifications"
     to="/my/notifications"
     label="See all notifications"
-    :empty="summary.notifications.length === 0"
-    empty-title="Nothing new"
     class="lg:col-span-2 sm:col-span-2"
   >
     <ul class="flex flex-col gap-3">
@@ -19,13 +17,10 @@ defineProps<{ summary: MySummary }>()
         v-for="item in summary.notifications"
         :key="item.id"
       >
-        <component
-          :is="item.link ? 'ULink' : 'p'"
-          :to="item.link ?? undefined"
-          class="text-sm"
-        >
+        <!-- Words, not links: the whole tile is the link, and a link inside a link is two targets in one. -->
+        <p class="text-sm">
           {{ item.title }}
-        </component>
+        </p>
         <p class="text-xs text-muted">
           {{ saysWhen(item.createdAt) }}
         </p>

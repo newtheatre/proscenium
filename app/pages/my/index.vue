@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { orderMyTiles, saysMembershipSentence } from '#shared/utils/my-summary'
+import { MY_THINGS_TO_DO, saysMembershipSentence, splitMyTiles } from '#shared/utils/my-summary'
 import type { MySummary } from '#shared/utils/my-summary'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
@@ -28,9 +28,10 @@ const { data: summary, error, refresh } = await useAsyncData(
 
 const failure = useListFailure(error, 'Your overview could not be read.')
 
-// The order is a fact about the data, not about the template: what is soonest leads (K-127
-// criterion 6).
-const tiles = computed(() => orderMyTiles(summary.value))
+// The order is a fact about the data, not about the template: what is soonest leads, and a tile
+// with nothing behind it is a line on one list instead (K-127 criterion 6, issue 1153 item 3).
+const split = computed(() => splitMyTiles(summary.value))
+const things = computed(() => split.value.things.map(name => ({ name, ...MY_THINGS_TO_DO[name] })))
 
 const greeting = computed(() => {
   const name = account.value.user?.name
@@ -62,7 +63,7 @@ const greeting = computed(() => {
       :ui="{ base: 'gap-4 mt-6' }"
     >
       <template
-        v-for="tile in tiles"
+        v-for="tile in split.tiles"
         :key="tile"
       >
         <MyTilesNextShift
@@ -98,6 +99,29 @@ const greeting = computed(() => {
           :summary="summary"
         />
       </template>
+
+      <UPageCard
+        v-if="things.length"
+        title="Things you can do"
+        class="sm:col-span-2 lg:col-span-3"
+        data-test="my-things-to-do"
+      >
+        <ul class="divide-y divide-default">
+          <li
+            v-for="thing in things"
+            :key="thing.name"
+          >
+            <ULink
+              :to="thing.to"
+              class="flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2 text-sm"
+              :data-test="`my-thing-${thing.name}`"
+            >
+              <span class="text-default">{{ thing.says }}</span>
+              <span class="font-medium text-primary">{{ thing.label }}</span>
+            </ULink>
+          </li>
+        </ul>
+      </UPageCard>
     </UPageGrid>
   </UContainer>
 </template>

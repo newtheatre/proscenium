@@ -14,9 +14,6 @@ const progressLine = computed(() => `${held.value} of ${plural(available.value, 
     title="Training"
     to="/training"
     label="See my training"
-    :empty="held === 0 && available === 0 && !summary.training.nextStep"
-    empty-title="Nothing recorded yet"
-    empty-label="See what we teach"
     class="lg:row-span-2"
   >
     <p
