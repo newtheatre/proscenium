@@ -24,6 +24,8 @@ async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>
   }
 }
 
+const OFFSETS = { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }
+
 function seed(database: TestDatabase, status = 'PENDING_APPROVAL'): void {
   database.batch([
     ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-asker', 'asker@example.invalid', 'An Asker'],
@@ -56,6 +58,7 @@ function edit(over: Partial<EditInput> = {}): EditInput {
     reason: 'The get-in is that day.',
     restartClock: false,
     now: NOW,
+    offsets: OFFSETS,
     ...over,
   }
 }
@@ -156,7 +159,7 @@ describe('an edit racing an approval (C-109 criterion 3)', () => {
   test('approved first: the edit writes nothing and the booking stands as approved', async () => {
     await withDatabase((database) => {
       seed(database)
-      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW))).toBe(1)
+      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW, OFFSETS))).toBe(1)
       expect(run(database, editPendingStatement(edit({ startsAt: NOW + 20 * HOUR, endsAt: NOW + 22 * HOUR })))).toBe(0)
       expect(asked(database)).toMatchObject({ status: 'CONFIRMED', starts_at: NOW + 24 * HOUR })
     })
@@ -166,7 +169,7 @@ describe('an edit racing an approval (C-109 criterion 3)', () => {
     await withDatabase((database) => {
       seed(database)
       expect(run(database, editPendingStatement(edit({ startsAt: NOW + 20 * HOUR, endsAt: NOW + 22 * HOUR })))).toBe(1)
-      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW))).toBe(1)
+      expect(run(database, approveStatement('b-asked', 'u-officer', null, NOW, OFFSETS))).toBe(1)
       expect(asked(database)).toMatchObject({ status: 'CONFIRMED', starts_at: NOW + 20 * HOUR })
     })
   })
@@ -186,6 +189,29 @@ describe('an edit racing an approval (C-109 criterion 3)', () => {
         RETURNING id`)
       expect(won + claimed).toBe(1)
       expect(rows(database, `SELECT id FROM room_bookings WHERE room_id = 'r-studio' AND starts_at = ?`, free.startsAt)).toHaveLength(1)
+    })
+  })
+})
+
+// The closure race (0003): the route checks closures before the edit, and one made in between
+// must still stop it, so the closure predicates ride the UPDATE with the clash rule.
+describe('an edit racing a closure (C-114, issue 1347)', () => {
+  test('an edit into a span an officer closed after the check writes nothing', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      database.batch([['INSERT INTO room_blackouts (id, room_id, reason, starts_at, ends_at) VALUES (?, ?, ?, ?, ?)',
+        'bo-green', 'r-green', 'Repainting', NOW + 23 * HOUR, NOW + 27 * HOUR]])
+      expect(run(database, editPendingStatement(edit({ roomId: 'r-green' })))).toBe(0)
+      expect(asked(database).room_id).toBe('r-studio')
+    })
+  })
+
+  test('a closure elsewhere leaves the edit to land', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      database.batch([['INSERT INTO room_blackouts (id, room_id, reason, starts_at, ends_at) VALUES (?, ?, ?, ?, ?)',
+        'bo-studio', 'r-studio', 'Repainting', NOW + 23 * HOUR, NOW + 27 * HOUR]])
+      expect(run(database, editPendingStatement(edit({ roomId: 'r-green' })))).toBe(1)
     })
   })
 })

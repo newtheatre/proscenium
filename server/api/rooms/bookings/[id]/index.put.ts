@@ -1,5 +1,4 @@
 import { SERIES_EDIT_REFUSAL, bookingTier, maskConflicts, refusalToEdit } from '#shared/utils/bookings'
-import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { editDiff, editRequestForm, othersHeld, restartsTheClock } from '#shared/utils/requests'
 
@@ -39,14 +38,8 @@ export default defineEventHandler(async (event) => {
   const startsAt = Math.floor(new Date(input.startsAt).getTime() / 1000)
   const endsAt = Math.floor(new Date(input.endsAt).getTime() / 1000)
 
-  const shut = blackoutOver(await closuresAcross(event, startsAt, endsAt, room.id), room.id, { startsAt, endsAt })
-  if (shut) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: saysClosed(shut),
-      data: { failures: [{ reason: 'ROOM_CLOSED', says: saysClosed(shut) }], canRequest: false, blackout: shut },
-    })
-  }
+  const shut = await closedOver(event, room.id, startsAt, endsAt)
+  if (shut) throw shut
 
   const verdict = judge({ startsAt: new Date(startsAt * 1000), endsAt: new Date(endsAt * 1000) }, resolvePolicy(room, await estatePolicy(event)), room, {
     now,
@@ -79,7 +72,7 @@ export default defineEventHandler(async (event) => {
   const restartClock = restartsTheClock(booking, after)
 
   // Stays a request whatever the verdict: the approvers were asked, and an edit does not answer.
-  const edited = await editPending({ ...after, id, userId: account.id, restartClock, now: nowSeconds })
+  const edited = await editPending({ ...after, id, userId: account.id, restartClock, now: nowSeconds, offsets: await shiftOffsetDefaults(event) })
 
   if (!edited.won) {
     switch (edited.why) {
@@ -89,6 +82,9 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 409, statusMessage: 'That booking has already been decided' })
       case 'gone':
         throw createError({ statusCode: 410, statusMessage: 'That room is no longer bookable' })
+      case 'closed':
+        throw (await closedOver(event, after.roomId, after.startsAt, after.endsAt))
+          ?? createError({ statusCode: 409, statusMessage: 'Somebody already holds that slot, so your request is as it was' })
       case 'conflict':
         throw createError({
           statusCode: 409,

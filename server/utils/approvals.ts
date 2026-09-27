@@ -2,9 +2,12 @@ import { db, schema } from '@nuxthub/db'
 import { eq, inArray, sql } from 'drizzle-orm'
 // Named rather than auto-imported, because `tests/` typechecks this file under Bun (0055).
 import { conflictsWith } from './bookings'
+import { closedNow, roomOpenTerms } from './performance-closures'
 import { chunked, refusalToDecide } from '#shared/utils/approvals'
+import { lostWriteCause } from '#shared/utils/blackouts'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 import type { Conflict } from '#shared/utils/bookings'
+import type { ShiftOffsets } from '#shared/utils/rota-times'
 import type { SQL } from 'drizzle-orm'
 
 // Answering a request (C-109). The clash rule rides the approving write, so an approval that has
@@ -64,16 +67,16 @@ async function selectPending(where: ReturnType<typeof eq>): Promise<PendingRow[]
 
 // The whole predicate is on the statement: still waiting, room still bookable, and nothing
 // overlapping it in the room it is going into. A read then a write could be interleaved (0006).
-export async function approveOne(id: string, actorId: string, intoRoom: string | null, now: number): Promise<DecisionOutcome> {
-  const confirmed = await db.all<{ id: string }>(approveStatement(id, actorId, intoRoom, now))
+export async function approveOne(id: string, actorId: string, intoRoom: string | null, now: number, offsets: ShiftOffsets): Promise<DecisionOutcome> {
+  const confirmed = await db.all<{ id: string }>(approveStatement(id, actorId, intoRoom, now, offsets))
 
   // The alias is not usable in RETURNING, which is why the column is bare (SQLite).
   if (confirmed.length > 0) return { id, ok: true, status: 'CONFIRMED' }
-  return whyItFailed(id, intoRoom)
+  return whyItFailed(id, intoRoom, offsets)
 }
 
 // Built apart from its run so a test can race it against a member's edit on a real schema.
-export function approveStatement(id: string, actorId: string, intoRoom: string | null, now: number): SQL {
+export function approveStatement(id: string, actorId: string, intoRoom: string | null, now: number, offsets: ShiftOffsets): SQL {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
 
   return sql`
@@ -94,6 +97,7 @@ export function approveStatement(id: string, actorId: string, intoRoom: string |
           AND other.starts_at < target.ends_at
           AND other.ends_at > target.starts_at
       )
+      AND ${roomOpenTerms(sql`COALESCE(${intoRoom}, target.room_id)`, sql`target.starts_at`, sql`target.ends_at`, offsets)}
     RETURNING id
   `
 }
@@ -114,8 +118,9 @@ export async function rejectOne(id: string, actorId: string, reason: string, now
   return whyItFailed(id, null)
 }
 
-// Nothing written, disambiguated rather than guessed: gone, already answered, or beaten to it.
-async function whyItFailed(id: string, intoRoom: string | null): Promise<DecisionOutcome> {
+// Nothing written, disambiguated rather than guessed: gone, already answered, closed or beaten to it.
+// A rejection carries no closure predicate, so it reads none.
+async function whyItFailed(id: string, intoRoom: string | null, offsets?: ShiftOffsets): Promise<DecisionOutcome> {
   const [row] = await selectPending(eq(schema.roomBookings.id, id))
   if (!row) return { id, ok: false, why: 'missing', says: 'That request is no longer there' }
 
@@ -134,11 +139,10 @@ async function whyItFailed(id: string, intoRoom: string | null): Promise<Decisio
     return { id, ok: false, why: 'gone', says: 'That room is no longer bookable' }
   }
 
-  return {
-    id,
-    ok: false,
-    why: 'conflict',
-    says: 'Somebody took that slot while this was waiting',
-    conflicts: await conflictsWith({ roomId, startsAt: row.startsAt, endsAt: row.endsAt, exceptId: id }),
+  const closed = offsets !== undefined && await closedNow(roomId, row.startsAt, row.endsAt, offsets)
+  if (lostWriteCause({ roomLive: true, closed }) === 'closed') {
+    return { id, ok: false, why: 'closed', says: 'The room is closed for that span' }
   }
+  const conflicts = await conflictsWith({ roomId, startsAt: row.startsAt, endsAt: row.endsAt, exceptId: id })
+  return { id, ok: false, why: 'conflict', says: 'Somebody took that slot while this was waiting', conflicts }
 }

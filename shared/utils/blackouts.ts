@@ -24,6 +24,13 @@ export function blackoutOver(blackouts: Blackout[], roomId: string, span: Span):
   return blackouts.find(blackout => coversRoom(blackout, roomId) && overlaps(blackout, span))
 }
 
+// Why a write that wrote nothing wrote nothing, from what was read afterwards: a closure is named
+// only when one is found, and anything else is the clash it has always been (issue 1347).
+export function lostWriteCause(read: { roomLive: boolean, closed: boolean }): 'gone' | 'closed' | 'conflict' {
+  if (!read.roomLive) return 'gone'
+  return read.closed ? 'closed' : 'conflict'
+}
+
 // Shown rather than masked: a member turned away deserves to know it is a get-in and not a
 // mystery, which is the one deliberate exception to conflict masking (criterion 4, C-103).
 export function saysClosed(blackout: { reason: string }): string {

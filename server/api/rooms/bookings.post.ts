@@ -1,5 +1,4 @@
 import { bookingForm, bookingTier, maskConflicts } from '#shared/utils/bookings'
-import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { formatLondon } from '#shared/utils/london'
 
@@ -17,21 +16,13 @@ export default defineEventHandler(async (event) => {
   const startsAt = new Date(input.startsAt)
   const endsAt = new Date(input.endsAt)
   const now = new Date()
+  const from = Math.floor(startsAt.getTime() / 1000)
+  const to = Math.floor(endsAt.getTime() / 1000)
 
   // A closed room refuses before the policy is consulted, and says why rather than masking it:
   // the one deliberate exception to conflict masking (C-114 criterion 4).
-  const shut = blackoutOver(
-    await closuresAcross(event, Math.floor(startsAt.getTime() / 1000), Math.floor(endsAt.getTime() / 1000), room.id),
-    room.id,
-    { startsAt: Math.floor(startsAt.getTime() / 1000), endsAt: Math.floor(endsAt.getTime() / 1000) },
-  )
-  if (shut) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: saysClosed(shut),
-      data: { failures: [{ reason: 'ROOM_CLOSED', says: saysClosed(shut) }], canRequest: false, blackout: shut },
-    })
-  }
+  const shut = await closedOver(event, room.id, from, to)
+  if (shut) throw shut
 
   const estate = await estatePolicy(event)
   const policy = resolvePolicy(room, estate)
@@ -72,14 +63,18 @@ export default defineEventHandler(async (event) => {
     userId: account.id,
     title: input.title,
     attendees: input.attendees,
-    startsAt: Math.floor(startsAt.getTime() / 1000),
-    endsAt: Math.floor(endsAt.getTime() / 1000),
+    startsAt: from,
+    endsAt: to,
     tier,
     purpose,
     status: 'CONFIRMED',
     notes: input.notes,
+    offsets: await shiftOffsetDefaults(event),
   })
 
+  if (!claimed.won && claimed.why === 'closed') {
+    throw (await closedOver(event, room.id, from, to)) ?? createError({ statusCode: 409, statusMessage: 'Somebody booked that slot first' })
+  }
   if (!claimed.won && claimed.why === 'gone') {
     throw createError({ statusCode: 410, statusMessage: 'That room is no longer bookable' })
   }
@@ -115,8 +110,8 @@ export default defineEventHandler(async (event) => {
       id: claimed.id,
       title: input.title,
       room: room.name,
-      startsAt: Math.floor(startsAt.getTime() / 1000),
-      endsAt: Math.floor(endsAt.getTime() / 1000),
+      startsAt: from,
+      endsAt: to,
       status: 'CONFIRMED',
       updatedAt: Math.floor(Date.now() / 1000),
     })],

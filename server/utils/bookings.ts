@@ -3,11 +3,14 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { configValue } from './configuration'
 import { longestTerm } from './membership-claims'
+import { closedNow, roomOpenTerms } from './performance-closures'
+import { lostWriteCause } from '#shared/utils/blackouts'
 import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING), since D-113 reaches `hasCurrentMembership`.
 import { isCurrent, londonDay } from '#shared/utils/membership'
 import type { BookingStatus, Conflict } from '#shared/utils/bookings'
+import type { ShiftOffsets } from '#shared/utils/rota-times'
 import type { H3Event } from 'h3'
 import type { SQL } from 'drizzle-orm'
 
@@ -27,6 +30,8 @@ export interface ClaimInput {
   notes: string | null
   // Why an exception is being asked for. Null on an ordinary booking, required on a request.
   reason?: string | null
+  // The house's shift offsets, which set a performance's closure (0078, issue 1347).
+  offsets: ShiftOffsets
 }
 
 export type ClaimOutcome
@@ -35,16 +40,14 @@ export type ClaimOutcome
     | { won: false, why: 'gone' }
   // Somebody took it. 409, with what is in the way.
     | { won: false, why: 'conflict', conflicts: Conflict[] }
+  // Closed after the route checked, by an officer or a performance. 422, as the check refuses.
+    | { won: false, why: 'closed' }
 
 // The predicate rides the INSERT, so the check and the write are one statement and cannot be
-// interleaved. Half-open, so back-to-back bookings both succeed (criterion 5).
-export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
-  const id = newId()
+// interleaved: room live, nothing booked, nothing closed. Half-open, so back-to-back bookings fit.
+export function claimRoomSlotStatement(id: string, input: ClaimInput): SQL {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
-
-  // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
-  // coming back is the same signal claimToken uses to know it won (0003).
-  const claimed = await db.all<{ id: string }>(sql`
+  return sql`
     INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, reason)
     SELECT ${id}, ${input.roomId}, ${input.userId}, ${input.title}, ${input.attendees},
            ${input.startsAt}, ${input.endsAt}, ${input.tier}, ${input.purpose}, ${input.status}, ${input.notes},
@@ -57,12 +60,21 @@ export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
           AND starts_at < ${input.endsAt}
           AND ends_at > ${input.startsAt}
       )
+      AND ${roomOpenTerms(input.roomId, input.startsAt, input.endsAt, input.offsets)}
     RETURNING id
-  `)
+  `
+}
+
+export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
+  const id = newId()
+
+  // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
+  // coming back is the same signal claimToken uses to know it won (0003).
+  const claimed = await db.all<{ id: string }>(claimRoomSlotStatement(id, input))
 
   if (claimed.length > 0) return { won: true, id }
 
-  // Zero rows written, disambiguated rather than guessed: gone versus beaten (0003).
+  // Zero rows written, disambiguated rather than guessed: gone, closed or beaten (0003).
   return await whyItFailed(input)
 }
 
@@ -81,11 +93,12 @@ export interface EditInput {
   // Set by the route from restartsTheClock; the sweep measures both ages from created_at.
   restartClock: boolean
   now: number
+  offsets: ShiftOffsets
 }
 
 export type EditOutcome
   = | { won: true }
-    | { won: false, why: 'missing' | 'settled' | 'gone' }
+    | { won: false, why: 'missing' | 'settled' | 'gone' | 'closed' }
     | { won: false, why: 'conflict', conflicts: Conflict[] }
 
 // The claim's guarded twin for a request already held: owner, status and the clash rule all ride
@@ -118,6 +131,7 @@ export function editPendingStatement(input: EditInput): SQL {
           AND other.starts_at < ${input.endsAt}
           AND other.ends_at > ${input.startsAt}
       )
+      AND ${roomOpenTerms(input.roomId, input.startsAt, input.endsAt, input.offsets)}
     RETURNING id
   `
 }
@@ -130,7 +144,7 @@ export async function editPending(input: EditInput): Promise<EditOutcome> {
   const booking = await bookingFor(input.id)
   if (!booking || booking.userId !== input.userId) return { won: false, why: 'missing' }
   if (booking.status !== 'PENDING_APPROVAL') return { won: false, why: 'settled' }
-  return await whyItFailed({ roomId: input.roomId, startsAt: input.startsAt, endsAt: input.endsAt, exceptId: input.id })
+  return await whyItFailed({ roomId: input.roomId, startsAt: input.startsAt, endsAt: input.endsAt, exceptId: input.id, offsets: input.offsets })
 }
 
 // The morning sweep's writes, guarded on the age it read: an edit that restarted the clock since
@@ -153,13 +167,17 @@ export function chaseStatement(id: string, createdAt: number, now: number): SQL 
   `
 }
 
-async function whyItFailed(input: Parameters<typeof conflictsWith>[0]): Promise<Exclude<ClaimOutcome, { won: true }>> {
+async function whyItFailed(input: Parameters<typeof conflictsWith>[0] & { offsets: ShiftOffsets }): Promise<Exclude<ClaimOutcome, { won: true }>> {
   const [room] = await db.select({ id: schema.rooms.id })
     .from(schema.rooms)
     .where(and(eq(schema.rooms.id, input.roomId), eq(schema.rooms.isActive, true)))
     .limit(1)
 
-  if (!room) return { won: false, why: 'gone' }
+  const cause = lostWriteCause({
+    roomLive: Boolean(room),
+    closed: Boolean(room) && await closedNow(input.roomId, input.startsAt, input.endsAt, input.offsets),
+  })
+  if (cause === 'gone' || cause === 'closed') return { won: false, why: cause }
   return { won: false, why: 'conflict', conflicts: await conflictsWith(input) }
 }
 

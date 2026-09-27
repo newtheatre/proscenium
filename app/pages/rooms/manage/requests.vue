@@ -936,7 +936,7 @@ onMounted(loadRooms)
     <UModal
       :open="relisting !== null"
       title="Use one of our rooms instead"
-      description="This claims the room straight away, so it can fail if somebody else holds it for that span."
+      description="This claims the room straight away, so it can fail if somebody else holds it for that span or it is closed then."
       @update:open="relisting = null"
     >
       <template #body>

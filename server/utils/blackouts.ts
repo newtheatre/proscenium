@@ -43,6 +43,18 @@ export async function closuresAcross(event: H3Event | undefined, from: number, t
   return [...set, ...performed].sort((one, other) => one.startsAt - other.startsAt)
 }
 
+// The refusal for a room closed over a span, or null when it is open: the one shape every route's
+// check and every write that lost to a closure gives (C-114 criterion 4, issue 1347).
+export async function closedOver(event: H3Event | undefined, roomId: string, startsAt: number, endsAt: number): Promise<Error | null> {
+  const shut = blackoutOver(await closuresAcross(event, startsAt, endsAt, roomId), roomId, { startsAt, endsAt })
+  if (!shut) return null
+  return createError({
+    statusCode: 422,
+    statusMessage: saysClosed(shut),
+    data: { failures: [{ reason: 'ROOM_CLOSED', says: saysClosed(shut) }], canRequest: false, blackout: shut },
+  })
+}
+
 export interface Stranded {
   id: string
   userId: string

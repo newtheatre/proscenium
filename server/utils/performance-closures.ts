@@ -17,6 +17,13 @@ export interface PerformanceOnRoom extends PerformanceOnStage {
   listedTitle: string
 }
 
+// A performance's closure in SQL, `shiftWindow()`'s arithmetic with the house offsets, which the read
+// and the write predicate share so they cannot drift (0078).
+const closureStart = (offsets: ShiftOffsets): SQL =>
+  sql`coalesce(p.doors_at, p.starts_at) - ${offsets.startBeforeDoorsMinutes} * 60`
+const closureEnd = (offsets: ShiftOffsets): SQL =>
+  sql`p.starts_at + (coalesce(p.duration_minutes, 0) + p.interval_count * coalesce(p.interval_minutes, 0)) * 60 + ${offsets.endAfterEndMinutes} * 60`
+
 // Filtered on the window itself, `shiftWindow()`'s arithmetic in SQL as rota.ts stamps it, so no
 // doors time or offset puts a closure outside the read; binds the same values however full (0006).
 export function performancesOnRoomsQuery(from: number, to: number, offsets: ShiftOffsets, roomId?: string): SQL {
@@ -31,11 +38,33 @@ export function performancesOnRoomsQuery(from: number, to: number, offsets: Shif
     JOIN rooms r ON r.id = v.room_id
     JOIN shows s ON s.id = p.show_id
     WHERE ${room} AND p.status <> 'CANCELLED'
-      AND coalesce(p.doors_at, p.starts_at) - ${offsets.startBeforeDoorsMinutes} * 60 < ${to}
-      AND p.starts_at + (coalesce(p.duration_minutes, 0) + p.interval_count * coalesce(p.interval_minutes, 0)) * 60
-        + ${offsets.endAfterEndMinutes} * 60 >= ${from}
+      AND ${closureStart(offsets)} < ${to}
+      AND ${closureEnd(offsets)} >= ${from}
     ORDER BY p.starts_at
   `
+}
+
+// The room open over a span: no officer's closure of it or of every room, and no performance at
+// the venue it belongs to over its window. Values or column expressions, half-open like the clash rule.
+export function roomOpenTerms(roomId: string | SQL, startsAt: number | SQL, endsAt: number | SQL, offsets: ShiftOffsets): SQL {
+  return sql`NOT EXISTS (
+      SELECT 1 FROM room_blackouts b
+      WHERE (b.room_id = ${roomId} OR b.room_id IS NULL) AND b.starts_at < ${endsAt} AND b.ends_at > ${startsAt}
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM performances p
+      JOIN venues v ON v.id = p.venue_id
+      WHERE v.room_id = ${roomId} AND p.status <> 'CANCELLED'
+        AND ${closureStart(offsets)} < ${endsAt}
+        AND ${closureEnd(offsets)} > ${startsAt}
+    )`
+}
+
+// Whether a span is closed now, read by the same predicate the writes carry, so a write that wrote
+// nothing names a closure only when there is one (issue 1347).
+export async function closedNow(roomId: string, startsAt: number, endsAt: number, offsets: ShiftOffsets): Promise<boolean> {
+  const [row] = await db.all<{ open: number }>(sql`SELECT CASE WHEN ${roomOpenTerms(roomId, startsAt, endsAt, offsets)} THEN 1 ELSE 0 END AS open`)
+  return row?.open === 0
 }
 
 async function onRooms(event: H3Event | undefined, from: number, to: number, roomId?: string): Promise<{ rows: PerformanceOnRoom[], offsets: ShiftOffsets }> {

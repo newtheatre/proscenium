@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
+import { blackoutOver, lostWriteCause, saysClosed } from '#shared/utils/blackouts'
 import { performanceClosure } from '#shared/utils/performance-closures'
 
 // Issue 1347: a performance closes its venue's room over the performance's shift window (0043,
@@ -64,5 +64,21 @@ describe('the Closures screen lists them beside the ones an officer set', () => 
     const source = await Bun.file('app/pages/rooms/manage/closures.vue').text()
     expect(source).toContain('data-test="performance-closures"')
     expect(source).toContain('/api/admin/rooms/blackouts/performances')
+  })
+})
+
+// A write that wrote nothing names a closure only when one was read, never by elimination: a
+// clash cancelled before the re-read is still the 409 it was (issue 1347 follow-up).
+describe('why a write that wrote nothing wrote nothing', () => {
+  test('a retired room is gone, whatever else was read', () => {
+    expect(lostWriteCause({ roomLive: false, closed: true })).toBe('gone')
+  })
+
+  test('a closure read is closed', () => {
+    expect(lostWriteCause({ roomLive: true, closed: true })).toBe('closed')
+  })
+
+  test('no closure read is the clash it has always been, even with nothing left in the way', () => {
+    expect(lostWriteCause({ roomLive: true, closed: false })).toBe('conflict')
   })
 })

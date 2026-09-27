@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm'
 import { decisionForm } from '#shared/utils/approvals'
-import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { formatLondon } from '#shared/utils/london'
 import type { DecisionOutcome, PendingRow } from '#server/utils/approvals'
 import type { H3Event } from 'h3'
@@ -22,6 +21,7 @@ export default defineEventHandler(async (event) => {
   // Read before deciding, because a rejected row no longer says who asked for it or when.
   const before = new Map((await pendingByIds(input.ids)).map(row => [row.id, row]))
 
+  const offsets = await shiftOffsetDefaults(event)
   const outcomes: DecisionOutcome[] = []
   for (const id of input.ids) {
     const closed = input.action === 'APPROVE' ? await closedFor(event, before.get(id), input.roomId) : null
@@ -29,9 +29,12 @@ export default defineEventHandler(async (event) => {
       outcomes.push({ id, ok: false, why: 'closed', says: closed })
       continue
     }
-    outcomes.push(input.action === 'APPROVE'
-      ? await approveOne(id, account.id, input.roomId, now)
-      : await rejectOne(id, account.id, input.reason!, now))
+    const outcome = input.action === 'APPROVE'
+      ? await approveOne(id, account.id, input.roomId, now, offsets)
+      : await rejectOne(id, account.id, input.reason!, now)
+    // The approval carries the closures itself; one made since the check above names itself (0003).
+    if (!outcome.ok && outcome.why === 'closed') outcome.says = (await closedFor(event, before.get(id), input.roomId)) ?? outcome.says
+    outcomes.push(outcome)
   }
 
   const decided = outcomes.filter(outcome => outcome.ok)
@@ -102,8 +105,8 @@ async function tellRequesters(
 async function closedFor(event: H3Event, row: PendingRow | undefined, intoRoom: string | null): Promise<string | null> {
   if (!row) return null
   const roomId = intoRoom ?? row.roomId
-  const shut = blackoutOver(await closuresAcross(event, row.startsAt, row.endsAt, roomId), roomId, row)
-  return shut ? saysClosed(shut) : null
+  const shut = await closedOver(event, roomId, row.startsAt, row.endsAt)
+  return shut ? shut.message : null
 }
 
 async function roomName(id: string): Promise<string | null> {

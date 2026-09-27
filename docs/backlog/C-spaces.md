@@ -409,7 +409,7 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
 - Acceptance criteria:
   1. A request for one of our rooms can be moved to a room we do not manage. It **frees the slot it was holding**, which is the point: nothing about the new request holds one.
   2. Moving that way is **refused when there is no longer time to ask**, naming the date the form would have had to go in by. Converting on the day is the moment the member most needs telling that it cannot work.
-  3. A request for a room we do not manage can be moved into one of ours, chosen by the officer from those actually free for the span. This **claims a slot**, so it is a conditional write with the predicate on the statement and it refuses naming the room when somebody else has it.
+  3. A request for a room we do not manage can be moved into one of ours, chosen by the officer from those actually free for the span. This **claims a slot**, so it is a conditional write with the predicate on the statement and it refuses naming the room when somebody else has it, and refuses quoting the closure when the room is closed for the span (added 27 September 2026, issue 1347).
   4. Moving that way lands CONFIRMED if it passes the policy, and PENDING_APPROVAL if it does not. Choosing the room is not a licence to skip the rules.
   5. A moved row is superseded, never deleted: it goes to CANCELLED carrying a pointer to what replaced it, and **never reads as "Cancelled" anywhere**. A member seeing a live request marked withdrawn is the defect this criterion exists to prevent.
   6. Title, purpose, attendee count, times and notes cross. The reason a member gave for asking outside policy does not, because the other side never asks that question.
