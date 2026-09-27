@@ -119,12 +119,14 @@ export async function remindTomorrow(event: H3Event | undefined, at = new Date()
 }
 
 // What the operations dashboard reads: a send that failed or was suppressed, newest first.
-export async function recentDeliveryTrouble(limit = 20): Promise<{ id: string, type: string, status: string, error: string | null, who: string | null, at: number }[]> {
+export async function recentDeliveryTrouble(limit = 20): Promise<{ id: string, type: string, status: string, error: string | null, userId: string | null, who: string | null, at: number }[]> {
   return db.select({
     id: schema.notificationLog.id,
     type: schema.notificationLog.type,
     status: schema.notificationLog.status,
     error: schema.notificationLog.error,
+    // The overview links a person to their send history, for whoever may read it (issue 1358).
+    userId: schema.users.id,
     who: schema.users.name,
     at: schema.notificationLog.createdAt,
   })
