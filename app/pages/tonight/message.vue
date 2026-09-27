@@ -24,16 +24,9 @@ const handedOver = typeof route.query.performanceId === 'string' ? route.query.p
 const performanceId = ref<string | null>(null)
 const choices = computed(() => houses.value.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt })))
 
-type AuthorityRead = { kind: 'READ', houses: House[], at: number } | { kind: 'FAILED', failure: string, refused: boolean }
-
-async function readAuthority(): Promise<AuthorityRead> {
-  try {
-    const answered = await request<{ performances: House[] }>('/api/tonight/authority', { query: { role: 'DUTY_MANAGER' } })
-    return { kind: 'READ', houses: answered.performances, at: Date.now() }
-  }
-  catch (refused) {
-    return { kind: 'FAILED', failure: refusalText(refused), refused: refusalStatus(refused) === 403 }
-  }
+// Asked here rather than read from the shell's answer, so the houses are as of this visit (0078).
+function readAuthority(): Promise<SettledRead<{ performances: House[] }>> {
+  return settleRead(() => request<{ performances: House[] }>('/api/tonight/authority', { query: { role: 'DUTY_MANAGER' } }))
 }
 
 function chosenHouse(among: House[]): string | null {
@@ -45,49 +38,50 @@ const audienceOptions = NIGHT_AUDIENCES.map(value => ({ value, label: NIGHT_AUDI
 const count = ref<number | null>(null)
 // Its own line, so a count that failed says so and clears on the next one; `failure` is authority's.
 const countFailure = ref<string | null>(null)
+// Which house and audience the count on screen answers, so the served count is not asked twice.
+let countedFor: string | null = null
 
-type CountRead = { kind: 'READ', count: number } | { kind: 'FAILED', failure: string }
-
-async function readCount(house: string, whom: NightAudience): Promise<CountRead> {
-  try {
-    return { kind: 'READ', count: (await request<{ count: number }>('/api/tonight/message/audience', { query: { performanceId: house, audience: whom } })).count }
-  }
-  catch (refused) {
-    return { kind: 'FAILED', failure: refusalText(refused) }
-  }
+function readCount(house: string, whom: NightAudience): Promise<SettledRead<{ count: number }>> {
+  return settleRead(() => request<{ count: number }>('/api/tonight/message/audience', { query: { performanceId: house, audience: whom } }))
 }
 
-function applyCount(answered: CountRead | null): void {
-  count.value = answered?.kind === 'READ' ? answered.count : null
+function applyCount(answered: SettledRead<{ count: number }> | null, asked: string | null): void {
+  countedFor = asked
+  count.value = answered?.kind === 'READ' ? answered.value.count : null
   countFailure.value = answered?.kind === 'FAILED' ? answered.failure : null
 }
 
 // The count comes before the message (H-108 criterion 7), asked again whenever the house or the
 // audience changes, never cached.
 async function loadCount(): Promise<void> {
-  applyCount(null)
-  if (!performanceId.value || !audience.value) return
-  applyCount(await readCount(performanceId.value, audience.value))
+  const house = performanceId.value
+  const whom = audience.value
+  const asked = house && whom ? `${house}:${whom}` : null
+  if (asked !== null && asked === countedFor) return
+  applyCount(null, null)
+  if (!house || !whom) return
+  applyCount(await readCount(house, whom), asked)
 }
 
 // In the served page with the first count, so the form or the refusal is what a phone paints
 // first; the count waits on the house authority names (issue 1521).
-const { data: served } = await useAsyncData('tonight-message', async () => {
+const waiting = useServedRead('tonight-message', async () => {
   const authority = await readAuthority()
-  const house = authority.kind === 'READ' ? chosenHouse(authority.houses) : null
-  const counted = house && audience.value ? await readCount(house, audience.value) : null
+  const house = authority.kind === 'READ' ? chosenHouse(authority.value.performances) : null
+  const whom = audience.value
+  const counted = house && whom ? { asked: `${house}:${whom}`, read: await readCount(house, whom) } : null
   return { authority, counted }
+}, ({ authority, counted }) => {
+  refusal.value = refusalOf(authority)
+  if (authority.kind === 'FAILED') {
+    if (!authority.refused) failure.value = authority.failure
+    return
+  }
+  houses.value = authority.value.performances
+  syncedAt.value = authority.at
+  applyCount(counted?.read ?? null, counted?.asked ?? null)
+  performanceId.value = chosenHouse(authority.value.performances)
 })
-if (served.value?.authority.kind === 'READ') {
-  houses.value = served.value.authority.houses
-  performanceId.value = chosenHouse(served.value.authority.houses)
-  syncedAt.value = served.value.authority.at
-  applyCount(served.value.counted)
-}
-else if (served.value) {
-  if (served.value.authority.refused) refusal.value = served.value.authority.failure
-  else failure.value = served.value.authority.failure
-}
 
 watch([performanceId, audience], loadCount)
 
@@ -160,8 +154,11 @@ function startAnother(): void {
     :refused="refusal"
     hint="It goes at once to everyone you choose, whatever their preferences."
     :stale="syncedAt"
+    :busy="waiting"
   >
+    <!-- Nothing to write until authority has answered, since it may yet refuse this viewer. -->
     <div
+      v-if="!waiting"
       class="space-y-4"
       data-test="night-message"
     >
@@ -259,7 +256,10 @@ function startAnother(): void {
       </NightBlock>
     </div>
 
-    <template #actions>
+    <template
+      v-if="!waiting"
+      #actions
+    >
       <NightAction
         v-if="preview"
         :label="`Send to ${plural(preview.count, 'person', 'people')}`"

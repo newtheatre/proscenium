@@ -46,29 +46,22 @@ const nightAuthority = useNightAuthority()
 const offersReview = computed(() => nightAuthority.value.roles.includes('DUTY_MANAGER'))
 
 interface Covered { performanceIds: string[], performances?: { id: string, showTitle: string, startsAt: number }[] }
-type AuthorityRead = { kind: 'READ', resolved: Covered } | { kind: 'FAILED', failure: string, refused: boolean }
 
 // One question for any of tonight's roles: the server tries a shift before a bypass and answers a
 // refusal about the caller's own position, never the last role's (E-111).
-async function readAuthority(): Promise<AuthorityRead> {
-  try {
-    return { kind: 'READ', resolved: await request<Covered>('/api/tonight/authority') }
-  }
-  catch (refused) {
-    return { kind: 'FAILED', failure: refusalText(refused), refused: refusalStatus(refused) === 403 }
-  }
+function readAuthority(): Promise<SettledRead<Covered>> {
+  return settleRead(() => request<Covered>('/api/tonight/authority'))
 }
 
-function applyAuthority(answered: AuthorityRead): void {
+function applyAuthority(answered: SettledRead<Covered>): void {
+  refusal.value = refusalOf(answered)
   if (answered.kind === 'FAILED') {
     authorityFailure.value = answered.failure
-    refusal.value = answered.refused ? answered.failure : null
     return
   }
-  performanceIds.value = answered.resolved.performanceIds
-  performances.value = answered.resolved.performances ?? []
+  performanceIds.value = answered.value.performanceIds
+  performances.value = answered.value.performances ?? []
   authorityFailure.value = null
-  refusal.value = null
 }
 
 interface TeamSlot { shiftId: string, role: NightRole, filled: boolean, claimed: boolean, name: string | null, phone: string | null }
@@ -78,33 +71,21 @@ const team = ref<TeamSlot[]>([])
 // Best effort: a roster that will not load is a contacts block that says so, never a screen that
 // refuses to show the log behind it.
 async function readTeam(): Promise<TeamSlot[]> {
-  try {
-    const answered = await request<{ performances: { team: TeamSlot[] }[] }>('/api/tonight/team')
-    return contactRoster(answered.performances.flatMap(performance => performance.team))
-  }
-  catch {
-    return []
-  }
+  const read = await settleRead(() => request<{ performances: { team: TeamSlot[] }[] }>('/api/tonight/team'))
+  return read.kind === 'READ' ? contactRoster(read.value.performances.flatMap(performance => performance.team)) : []
 }
 
-type LogRead = { kind: 'READ', items: Entry[], at: number } | { kind: 'FAILED', failure: string }
-
-async function readLog(): Promise<LogRead> {
-  try {
-    return { kind: 'READ', items: (await request<Listing>('/api/tonight/incidents', { query: { pageSize: 100 } })).items, at: Date.now() }
-  }
-  catch (refused) {
-    return { kind: 'FAILED', failure: refusalText(refused) }
-  }
+function readLog(): Promise<SettledRead<Listing>> {
+  return settleRead(() => request<Listing>('/api/tonight/incidents', { query: { pageSize: 100 } }))
 }
 
-function applyLog(answered: LogRead): void {
+function applyLog(answered: SettledRead<Listing>): void {
   if (answered.kind === 'FAILED') {
     failure.value = answered.failure
     return
   }
   failure.value = null
-  items.value = answered.items
+  items.value = answered.value.items
   syncedAt.value = answered.at
 }
 
@@ -120,15 +101,14 @@ async function load(): Promise<void> {
 
 // In the served page, so the team, the log or the refusal is what a phone paints first: none of
 // the three waits on another's answer (issue 1521).
-const { data: served } = await useAsyncData('tonight-incidents', async () => {
+const waiting = useServedRead('tonight-incidents', async () => {
   const [authority, log, roster] = await Promise.all([readAuthority(), readLog(), readTeam()])
   return { authority, log, roster }
+}, (served) => {
+  applyAuthority(served.authority)
+  applyLog(served.log)
+  team.value = served.roster
 })
-if (served.value) {
-  applyAuthority(served.value.authority)
-  applyLog(served.value.log)
-  team.value = served.value.roster
-}
 
 const performanceOptions = computed(() => performanceIds.value.map((id) => {
   const named = performances.value.find(one => one.id === id)
@@ -243,9 +223,9 @@ async function submitCorrect(): Promise<void> {
       title="Contacts and incidents"
       :refused="refusal"
       hint="Every entry is timed, named and printed in the night report. A mistake is corrected with a new entry, never an edit."
-      :empty="!busy && items.length === 0"
+      :empty="!busy && !waiting && items.length === 0"
       :stale="syncedAt"
-      :busy="busy"
+      :busy="busy || waiting"
     >
       <div class="space-y-5">
         <section>
@@ -257,7 +237,7 @@ async function submitCorrect(): Promise<void> {
             data-test="tonight-team"
           >
             <p
-              v-if="team.length === 0"
+              v-if="!waiting && team.length === 0"
               class="text-sm text-muted"
             >
               Nobody is on the rota tonight yet.
@@ -327,7 +307,7 @@ async function submitCorrect(): Promise<void> {
             data-test="incidents-list"
           >
             <p
-              v-if="items.length === 0"
+              v-if="!waiting && items.length === 0"
               class="text-muted"
             >
               Nothing logged yet tonight.
@@ -377,7 +357,11 @@ async function submitCorrect(): Promise<void> {
         </section>
       </div>
 
-      <template #actions>
+      <!-- Nothing to log until authority has answered, since it may yet refuse this viewer. -->
+      <template
+        v-if="!waiting"
+        #actions
+      >
         <!-- One action for anything worth writing down, a near miss already chosen (issue 1317). -->
         <NightAction
           label="Log something"

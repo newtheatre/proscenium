@@ -55,34 +55,26 @@ let timer: ReturnType<typeof setInterval> | undefined
 // controls, and the access wording only at the door (issue 1307, D-127 criterion 3).
 const dutyManager = ref(false)
 
-// A refusal left undefined keeps the one on screen: only a 403 is a refusal (issue 1304).
+// The duty manager's read first; refused that, the same house read-only. Only a 403 on the read-only
+// read is a refusal, and a failure of the first leaves any refusal on screen as it was (issue 1304).
 type GlanceRead
   = { kind: 'READ', data: DutyManagerTonight, dutyManager: boolean, at: number }
     | { kind: 'FAILED', failure: string, refusal?: string | null, at: number }
 
 async function read(): Promise<GlanceRead> {
-  try {
-    return { kind: 'READ', data: await request<DutyManagerTonight>('/api/tonight/duty-manager', { query: { access: 1 } }), dutyManager: true, at: Date.now() }
-  }
-  catch (refused) {
-    // The last-fetched values stay on screen; NightStale says they are no longer current.
-    if (refusalStatus(refused) !== 403) return { kind: 'FAILED', failure: refusalText(refused), at: Date.now() }
-  }
-  try {
-    return { kind: 'READ', data: await request<DutyManagerTonight>('/api/tonight/house', { query: { access: 1 } }), dutyManager: false, at: Date.now() }
-  }
-  catch (refused) {
-    // No shift tonight at all: one card in place of the glance.
-    return { kind: 'FAILED', failure: refusalText(refused), refusal: refusalStatus(refused) === 403 ? refusalText(refused) : null, at: Date.now() }
-  }
+  const managing = await settleRead(() => request<DutyManagerTonight>('/api/tonight/duty-manager', { query: { access: 1 } }))
+  if (managing.kind === 'READ') return { kind: 'READ', data: managing.value, dutyManager: true, at: managing.at }
+  // The last-fetched values stay on screen; NightStale says they are no longer current.
+  if (!managing.refused) return { kind: 'FAILED', failure: managing.failure, at: managing.at }
+  const reading = await settleRead(() => request<DutyManagerTonight>('/api/tonight/house', { query: { access: 1 } }))
+  if (reading.kind === 'READ') return { kind: 'READ', data: reading.value, dutyManager: false, at: reading.at }
+  return { kind: 'FAILED', failure: reading.failure, refusal: reading.refused ? reading.failure : null, at: reading.at }
 }
 
-// The clock the house is judged by: the read's own moment, so the served page and the hydrating
-// phone agree on which house is running and whether its curtain is down.
-const now = ref(Date.now())
+const { now, stamp } = useNightClock()
 
 function apply(answered: GlanceRead): void {
-  now.value = answered.at
+  stamp(answered.at)
   if (answered.kind === 'FAILED') {
     failure.value = answered.failure
     if (answered.refusal !== undefined) refusal.value = answered.refusal
@@ -99,9 +91,8 @@ async function load(): Promise<void> {
   apply(await read())
 }
 
-// In the served page, so the duty manager's controls are there from the first paint, or never.
-const { data: served } = await useAsyncData('tonight-glance', read)
-if (served.value) apply(served.value)
+// The duty manager's controls are in the served page from the first paint, or never there at all.
+const waiting = useServedRead('tonight-glance', read, apply)
 
 const performances = computed(() => data.value?.performances ?? [])
 const activeId = computed(() => activePerformanceId(performances.value, now.value / 1000))
@@ -154,9 +145,7 @@ function hideCode(): void {
   boardCodeFailure.value = null
 }
 
-// The phone's own clock from here on; the served read already stands, so the first poll waits.
 onMounted(() => {
-  now.value = Date.now()
   timer = setInterval(load, POLL_MS)
 })
 onUnmounted(() => {
@@ -169,6 +158,7 @@ onUnmounted(() => {
     title="Tonight at a glance"
     :refused="refusal"
     :stale="syncedAt"
+    :busy="waiting"
   >
     <div class="space-y-4">
       <UAlert
@@ -428,7 +418,7 @@ onUnmounted(() => {
       </template>
 
       <p
-        v-if="performances.length === 0 && !failure"
+        v-if="!waiting && performances.length === 0 && !failure"
         class="text-muted"
       >
         Nothing running tonight.
@@ -452,6 +442,7 @@ onUnmounted(() => {
         icon="i-lucide-refresh-cw"
         color="neutral"
         variant="outline"
+        :loading="waiting"
         @press="load()"
       />
     </template>

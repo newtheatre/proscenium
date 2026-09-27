@@ -168,30 +168,35 @@ Eleven rules follow:
    varies widely in length (a diff, a free-text detail) shows a fixed number of badges plus a
    count of the rest, with the whole of it in the row's own expanded detail, rather than growing
    the row past its neighbours (0027).
-3. **The show-night shell carries one header, and the screens fill it in.** `app/layouts/tonight.vue`
-   draws the back arrow, a mono uppercase eyebrow, the show title, the "Thu 5 Nov 19:30 Main Hall"
-   line and the on-shift badge. A screen says what goes in it through `setNightEyebrow` (which
-   `NightScreen` calls with its own title) and `setNightSubject` (which the screens that know
-   tonight's show call), and a screen that names nothing still sits under the running house: the
-   shell fills the title and the line in from the performance `/api/tonight/authority` marks active,
-   or, before any house is open, tonight's first, so no page draws a heading of its own. The hub at
-   `/tonight` is the night's destinations, one `NightTile` card each: each tile appears where the
-   viewer's own resolved authority opens it (`hubTiles()`), the viewer's own job first and in gold,
-   the rest in the order a night taps them, Emergency always and last and red. Where no role could be
-   answered, signed out or with no signal, every tile shows, since each screen guards itself; with no
-   role at all the hub is one card and My rota. A show-night screen is served as the viewer will use
-   it: the shell resolves the viewer's roles in `app/middleware/night-authority.global.ts` before any
-   screen is set up, on the server and on the way in from another layout, and each screen reads its
-   first data through `useAsyncData` with `useRequestFetch()`, so no tile, control or badge is
-   drawn and then taken away, or added once the page has painted (issue 1521, K-102 criterion 5).
-   Polling stays on the client, and a clock-dependent choice (the running house, doors open, the
-   curtain) is judged by the read's own moment until the page has mounted. The duty manager's comp
-   requests wait on the hub too, as `NightCompQueue` under Waiting on you (issue 1304). Nothing that
-   ends the night is pinned before the curtain, on any screen: after it the duty manager's own job
-   is the night report, which leads the hub, is what the glance pins, and pins Sign off and close
-   itself (`curtainIsDown()`, issue 1315). A titled block is `NightBlock`, a single number is
-   `NightKpi`, a checklist row is `NightChecklistItems` (Tick, and a quiet "Can't do this?" line for
-   the exception), an overlay is `NightSheet` with `NightChoices` for its choices (rule 11) and the
+3. **The show-night shell carries one header, and the screens fill it in.**
+   `app/layouts/tonight.vue` draws the back arrow, a mono uppercase eyebrow, the show title, the
+   "Thu 5 Nov 19:30 Main Hall" line and the on-shift badge. A screen says what goes in it through
+   `setNightEyebrow` (which `NightScreen` calls with its own title) and `setNightSubject` (which the
+   screens that know tonight's show call), and a screen that names nothing still sits under the
+   running house: the shell fills the title and the line in from the performance
+   `/api/tonight/authority` marks active, or, before any house is open, tonight's first, so no page
+   draws a heading of its own. The hub at `/tonight` is the night's destinations, one `NightTile`
+   card each: each tile appears where the viewer's own resolved authority opens it (`hubTiles()`),
+   the viewer's own job first and in gold, the rest in the order a night taps them, Emergency always
+   and last and red. Where no role could be answered, signed out or with no signal, every tile
+   shows, since each screen guards itself; with no role at all the hub is one card and My rota. A
+   show-night screen is served as the viewer will use it, and a phone is never held on the network
+   to get there: the shell's middleware (`app/middleware/night-authority.global.ts`) awaits the
+   viewer's roles only while the server renders a `/tonight` screen, and asks them behind the page
+   on a phone arriving from another layout; each screen's first read goes through `useServedRead()`,
+   a lazy `useAsyncData` with `useRequestFetch()` that the server render waits for and a navigation
+   inside the shell does not, the screen saying Syncing and drawing nothing it may yet take away
+   until it lands. So the served page draws no tile, control or badge that is then taken away, or
+   added once it has painted (issue 1521, K-102 criterion 5). A page that only wears the shell, the
+   SumUp return or a session register, never waits on the roles. Polling stays on the client, and a
+   clock-dependent choice (the running house, doors open, the curtain) is judged by the read's own
+   moment until the page has mounted (`useNightClock()`). The duty manager's comp requests wait on
+   the hub too, as `NightCompQueue` under Waiting on you (issue 1304). Nothing that ends the night
+   is pinned before the curtain, on any screen: after it the duty manager's own job is the night
+   report, which leads the hub, is what the glance pins, and pins Sign off and close itself
+   (`curtainIsDown()`, issue 1315). A titled block is `NightBlock`, a single number is `NightKpi`, a
+   checklist row is `NightChecklistItems` (Tick, and a quiet "Can't do this?" line for the
+   exception), an overlay is `NightSheet` with `NightChoices` for its choices (rule 11) and the
    matinee-day picker is `NightPerformanceSwitcher`, one row per house stacked, never a sideways
    scroll; none of the seven is in the expressive kit, and all seven are show-night only.
 4. **The show-night screens are phone-first and work offline.** They cache their night on open

@@ -109,14 +109,15 @@ they are pressed on a night: **Door**, **Till**, **Tonight at a glance**, **Chec
 report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, **Message tonight's
 audience** (the duty manager's), and **Emergency**, always there and always last. While a stocktake
 is open, a bar shift also sees **Stocktake** straight after **Till**, to count into it (see
-[Stocktakes](/docs/bar/stocktakes#counting-on-a-bar-shift)). The hub opens already knowing your
-roles, so the tiles you see first are the ones that stay. Only if the server could not say (signed
-out, or no signal on the way in) does every tile show, and each screen still checks for itself. The **Checklist** tile
-says what is left on it: **3 pre-show items left** before the house opens, **2 post-show items
-left** after, **All ticked** when nothing is outstanding. On a matinee day the **Tonight at a
-glance**, **Checklist**, **Night report** and **Contacts and incidents** tiles carry the house you
-chose on the switcher, so each opens on it. The line at the foot of the hub is the rule the whole
-night runs on: the door never sells tickets; unpaid and walk-up customers go to the bar.
+[Stocktakes](/docs/bar/stocktakes#counting-on-a-bar-shift)). Opened from a link or a bookmark, the
+hub already knows your roles, so the tiles you see first are the ones that stay. Arriving from
+elsewhere on the site, it shows every tile for a moment until the phone hears back, and with no
+signal it keeps showing them all; each screen still checks for itself. The **Checklist** tile says
+what is left on it: **3 pre-show items left** before the house opens, **2 post-show items left**
+after, **All ticked** when nothing is outstanding. On a matinee day the **Tonight at a glance**,
+**Checklist**, **Night report** and **Contacts and incidents** tiles carry the house you chose on
+the switcher, so each opens on it. The line at the foot of the hub is the rule the whole night runs
+on: the door never sells tickets; unpaid and walk-up customers go to the bar.
 
 The duty manager also sees **Waiting on you** above the tiles whenever a comp request is
 waiting, with its value, who asked and **Approve** or **Decline**, the same queue

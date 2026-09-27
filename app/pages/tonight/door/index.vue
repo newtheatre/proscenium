@@ -22,18 +22,13 @@ const performances = ref<CoveredPerformance[]>([])
 const performanceId = ref('')
 const syncedAt = ref<number | null>(null)
 
-type AuthorityRead = { kind: 'READ', resolved: Authority, at: number } | { kind: 'FAILED', failure: string, refused: boolean, at: number }
-
-async function readAuthority(): Promise<AuthorityRead> {
-  try {
-    return { kind: 'READ', resolved: await request<Authority>('/api/tonight/authority', { query: { role: 'DOOR' } }), at: Date.now() }
-  }
-  catch (refused) {
-    return { kind: 'FAILED', failure: refusalText(refused), refused: refusalStatus(refused) === 403, at: Date.now() }
-  }
+// Asked here rather than read from the shell's answer: a shift opens only inside its own window, so
+// the door's authority is as of this visit, never of when the shell was entered (0078, E-111).
+function readAuthority(): Promise<SettledRead<Authority>> {
+  return settleRead(() => request<Authority>('/api/tonight/authority', { query: { role: 'DOOR' } }))
 }
 
-function applyAuthority(answered: AuthorityRead): void {
+function applyAuthority(answered: SettledRead<Authority>): void {
   syncedAt.value = answered.at
   if (answered.kind === 'FAILED') {
     authorised.value = false
@@ -42,10 +37,10 @@ function applyAuthority(answered: AuthorityRead): void {
     refusal.value = answered.refused ? answered.failure : null
     return
   }
-  performances.value = answered.resolved.performances
+  performances.value = answered.value.performances
   // The house running now, never whichever id sorted first: a matinee ticket refused at an
   // evening the volunteer never chose is the bug this closes (issue 901).
-  performanceId.value = (answered.resolved.performances.find(one => one.active) ?? answered.resolved.performances[0])?.id ?? ''
+  performanceId.value = (answered.value.performances.find(one => one.active) ?? answered.value.performances[0])?.id ?? ''
   authorised.value = true
   authorityFailure.value = null
   refusal.value = null
@@ -59,23 +54,18 @@ const strip = computed(() => houses.value.find(one => one.performanceId === perf
 // Null when the house could not be read: the strip is a courtesy, and a door that cannot read the
 // house still admits, so the last strip stays.
 async function readHouse(): Promise<HouseView[] | null> {
-  try {
-    return (await request<{ performances: HouseView[] }>('/api/tonight/house')).performances
-  }
-  catch {
-    return null
-  }
+  const read = await settleRead(() => request<{ performances: HouseView[] }>('/api/tonight/house'))
+  return read.kind === 'READ' ? read.value.performances : null
 }
 
 // In the served page, so the field or the refusal is what a phone paints first (issue 1521).
-const { data: served } = await useAsyncData('tonight-door', async () => {
+const waiting = useServedRead('tonight-door', async () => {
   const [authority, house] = await Promise.all([readAuthority(), readHouse()])
   return { authority, house }
+}, (served) => {
+  applyAuthority(served.authority)
+  if (served.house) houses.value = served.house
 })
-if (served.value) {
-  applyAuthority(served.value.authority)
-  if (served.value.house) houses.value = served.value.house
-}
 
 const performanceOptions = computed(() => performances.value.map(one => ({
   label: saysPerformanceChoice(one),
@@ -289,6 +279,7 @@ onBeforeUnmount(() => {
     :refused="refusal"
     hint="Scan the code, or type the reference or a name. Refused? Send them to the bar."
     :stale="syncedAt"
+    :busy="waiting"
     data-test="door-screen"
   >
     <div

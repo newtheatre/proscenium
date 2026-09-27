@@ -28,7 +28,8 @@ const chosenId = ref<string | null>(null)
 
 let timer: ReturnType<typeof setInterval> | undefined
 
-// The shell resolves this ahead of any screen, on the server and on the way in (issue 1521).
+// Resolved before a served `/tonight` render; on a phone arriving from elsewhere it lands after the
+// first paint, and every tile shows until it does (issue 1304, issue 1521).
 const authority = useNightAuthority()
 const dutyManager = computed(() => authority.value.roles.includes('DUTY_MANAGER'))
 // A count open for tonight's bar shift to take (decision 0099), asked only of somebody on the bar
@@ -36,35 +37,23 @@ const dutyManager = computed(() => authority.value.roles.includes('DUTY_MANAGER'
 const onTheBar = computed(() => authority.value.known && authority.value.roles.includes('BAR'))
 
 async function readHouse(): Promise<HubHouseRead<HouseTonight>> {
-  try {
-    // The house is every role's to read, so a door or bar shift sees the numbers too (issue 1307).
-    return { kind: 'READ', house: await request<HouseTonight>('/api/tonight/house') }
-  }
-  catch (refused) {
-    return hubHouseRefused(refusalStatus(refused), refusalText(refused, ''))
-  }
+  // The house is every role's to read, so a door or bar shift sees the numbers too (issue 1307).
+  const read = await settleRead(() => request<HouseTonight>('/api/tonight/house'), '')
+  return read.kind === 'READ' ? { kind: 'READ', house: read.value } : hubHouseRefused(read.status, read.failure)
 }
 
 // The duty manager's alone to read: any other shift would be refused on every poll. Best-effort,
 // since E-114 criterion 6 is a warning and never blocks the house numbers above it.
 async function readChecklist(): Promise<ChecklistEntry[] | null> {
   if (!dutyManager.value) return null
-  try {
-    return (await request<TonightChecklist>('/api/tonight/checklist')).items
-  }
-  catch {
-    return null
-  }
+  const read = await settleRead(() => request<TonightChecklist>('/api/tonight/checklist'))
+  return read.kind === 'READ' ? read.value.items : null
 }
 
 async function readStocktake(): Promise<boolean> {
   if (!onTheBar.value) return false
-  try {
-    return (await request<{ stocktake: unknown }>('/api/admin/bar/stocktakes/open')).stocktake !== null
-  }
-  catch {
-    return false
-  }
+  const read = await settleRead(() => request<{ stocktake: unknown }>('/api/admin/bar/stocktakes/open'))
+  return read.kind === 'READ' && read.value.stocktake !== null
 }
 
 interface HubRead { house: HubHouseRead<HouseTonight>, checklist: ChecklistEntry[] | null, stocktakeOpen: boolean, at: number }
@@ -80,20 +69,25 @@ const shown = ref<HubHouseState<HouseTonight>>({ ...NO_HUB_HOUSE })
 // A null read keeps what the banner last had.
 const checklist = ref<ChecklistEntry[]>([])
 const stocktakeOpen = ref(false)
-// The clock the house is judged by: the read's own moment, so the served page and the hydrating
-// phone agree on which house is running, doors open and the curtain down.
-const now = ref(Date.now())
+const { now, stamp } = useNightClock()
 
 function apply(read: HubRead): void {
   shown.value = hubHouseAfter(shown.value, read.house, read.at)
   if (read.checklist) checklist.value = read.checklist
   stocktakeOpen.value = read.stocktakeOpen
-  now.value = read.at
+  stamp(read.at)
 }
 
-// In the served page, so the first paint is the house and the tiles this viewer will use.
-const { data: served } = await useAsyncData('tonight-hub', readHub)
-if (served.value) apply(served.value)
+const waiting = useServedRead('tonight-hub', readHub, apply)
+
+// Roles that land after the first read, on a phone arriving from elsewhere, need not wait a poll.
+watch(dutyManager, async (holds) => {
+  const items = holds ? await readChecklist() : null
+  if (items) checklist.value = items
+})
+watch(onTheBar, async (holds) => {
+  if (holds) stocktakeOpen.value = await readStocktake()
+})
 
 const performances = computed(() => shown.value.house?.performances ?? [])
 
@@ -153,9 +147,8 @@ async function poll(): Promise<void> {
   apply(await readHub())
 }
 
-// The phone's own clock from here on; the served read already stands, so the first poll waits.
+// The first read is the served one, or the one under way, so the first poll waits its turn.
 onMounted(() => {
-  now.value = Date.now()
   timer = setInterval(poll, POLL_MS)
 })
 onUnmounted(() => {
@@ -166,7 +159,10 @@ onUnmounted(() => {
 <template>
   <div class="mx-auto w-full max-w-md space-y-4">
     <div class="flex justify-end">
-      <NightStale :at="shown.syncedAt" />
+      <NightStale
+        :at="shown.syncedAt"
+        :busy="waiting"
+      />
     </div>
 
     <UAlert

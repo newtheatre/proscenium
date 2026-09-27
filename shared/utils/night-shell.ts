@@ -41,10 +41,15 @@ export function nightHintSeenKey(title: string): string {
   return `nnt-night-hint:${title}`
 }
 
-// When the show-night shell asks which of tonight's roles the viewer holds (issue 1521): always on
-// the server, and on the way in from another layout; hydrating, the served answer stands.
-export function asksNightAuthority(move: { to: unknown, from: unknown, server: boolean, hydrating: boolean }): boolean {
-  if (move.to !== 'tonight') return false
-  if (move.server) return true
-  return !move.hydrating && move.from !== 'tonight'
+export type NightAuthorityAsk = 'await' | 'background' | 'skip'
+
+// Awaited only while the server renders a `/tonight` screen; a phone is never held on the network,
+// and a page that merely wears the shell (a payment return, a register) never waits on it (issue 1521).
+export function asksNightAuthority(move: { to: unknown, from: unknown, path: string, server: boolean, hydrating: boolean }): NightAuthorityAsk {
+  if (move.to !== 'tonight') return 'skip'
+  const screen = move.path === '/tonight' || move.path.startsWith('/tonight/')
+  if (move.server) return screen ? 'await' : 'skip'
+  // Hydrating a screen the server already answered for; anything else asks behind the page.
+  if (move.hydrating) return screen ? 'skip' : 'background'
+  return move.from === 'tonight' ? 'skip' : 'background'
 }

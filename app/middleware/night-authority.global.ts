@@ -1,10 +1,11 @@
 import { asksNightAuthority } from '#shared/utils/night-shell'
 
-// The shell's roles are asked before its first screen draws, so the served page already draws by
-// them and hydration has nothing to redraw (issue 1521); within the shell, the answer stands.
+// The shell's roles, awaited while the server renders a `/tonight` screen so the served page draws
+// by them, and asked behind the page on a phone, where poor signal must never hold a navigation.
 export default defineNuxtRouteMiddleware(async (to, from) => {
   const nuxtApp = useNuxtApp()
   const hydrating = nuxtApp.isHydrating === true && nuxtApp.payload.serverRendered === true
-  if (!asksNightAuthority({ to: to.meta.layout, from: from.meta.layout, server: import.meta.server, hydrating })) return
-  await resolveNightAuthority()
+  const ask = asksNightAuthority({ to: to.meta.layout, from: from.meta.layout, path: to.path, server: import.meta.server, hydrating })
+  if (ask === 'await') await resolveNightAuthority()
+  else if (ask === 'background') void resolveNightAuthority()
 })

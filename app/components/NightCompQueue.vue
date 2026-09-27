@@ -56,8 +56,7 @@ async function refresh(): Promise<void> {
 
 // In the served page, so a waiting ask is there from the first paint rather than pushing the
 // screen down once it arrives (issue 1521).
-const { data: served } = await useAsyncData(`night-comp-queue-${props.testId}`, () => readComps(props.performanceId))
-apply(served.value ?? null)
+useServedRead(`night-comp-queue-${props.testId}`, () => readComps(props.performanceId), apply)
 
 const pendingComps = computed(() => [
   ...(ticketComps.value ?? []).map(one => ({ queue: 'TICKET' as const, request: one, priced: null })),

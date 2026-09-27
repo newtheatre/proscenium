@@ -40,49 +40,34 @@ const authorityFailure = ref<string | null>(null)
 const refusal = ref<string | null>(null)
 const performances = ref<CoveredPerformance[]>([])
 
-type AuthorityRead = { kind: 'READ', performances: CoveredPerformance[] } | { kind: 'FAILED', failure: string, refused: boolean }
-
 // One question for any of tonight's roles: the server tries a shift before a bypass and answers a
 // refusal about the caller's own position, never the last role's (E-111).
-async function readAuthority(): Promise<AuthorityRead> {
-  try {
-    return { kind: 'READ', performances: (await request<{ performances: CoveredPerformance[] }>('/api/tonight/authority')).performances }
-  }
-  catch (refused) {
-    return { kind: 'FAILED', failure: refusalText(refused), refused: refusalStatus(refused) === 403 }
-  }
+function readAuthority(): Promise<SettledRead<{ performances: CoveredPerformance[] }>> {
+  return settleRead(() => request<{ performances: CoveredPerformance[] }>('/api/tonight/authority'))
 }
 
-function applyAuthority(answered: AuthorityRead): void {
+function applyAuthority(answered: SettledRead<{ performances: CoveredPerformance[] }>): void {
+  refusal.value = refusalOf(answered)
   if (answered.kind === 'FAILED') {
     authorityFailure.value = answered.failure
-    refusal.value = answered.refused ? answered.failure : null
     return
   }
-  performances.value = answered.performances
+  performances.value = answered.value.performances
   authorised.value = true
   authorityFailure.value = null
-  refusal.value = null
 }
 
-type RegisterRead = { kind: 'READ', items: Entry[], at: number } | { kind: 'FAILED', failure: string }
-
-async function readRegister(): Promise<RegisterRead> {
-  try {
-    return { kind: 'READ', items: (await request<Listing>('/api/tonight/age-checks', { query: { pageSize: 100 } })).items, at: Date.now() }
-  }
-  catch (refused) {
-    return { kind: 'FAILED', failure: refusalText(refused) }
-  }
+function readRegister(): Promise<SettledRead<Listing>> {
+  return settleRead(() => request<Listing>('/api/tonight/age-checks', { query: { pageSize: 100 } }))
 }
 
-function applyRegister(answered: RegisterRead): void {
+function applyRegister(answered: SettledRead<Listing>): void {
   if (answered.kind === 'FAILED') {
     failure.value = answered.failure
     return
   }
   failure.value = null
-  items.value = answered.items
+  items.value = answered.value.items
   syncedAt.value = answered.at
 }
 
@@ -96,16 +81,14 @@ async function load(): Promise<void> {
   }
 }
 
-// In the served page, so the register or the refusal is what a phone paints first, and the form
-// below opens on the house running now (issue 1521).
-const { data: served } = await useAsyncData('tonight-age-checks', async () => {
+// In the served page, so the register or the refusal is what a phone paints first (issue 1521).
+const waiting = useServedRead('tonight-age-checks', async () => {
   const [authority, register] = await Promise.all([readAuthority(), readRegister()])
   return { authority, register }
+}, (served) => {
+  applyAuthority(served.authority)
+  applyRegister(served.register)
 })
-if (served.value) {
-  applyAuthority(served.value.authority)
-  applyRegister(served.value.register)
-}
 
 const performanceOptions = computed(() => [
   { label: 'No performance (checked outside a show)', value: '' },
@@ -255,9 +238,9 @@ async function submitCorrect(): Promise<void> {
       title="Challenge 25 register"
       :refused="refusal"
       hint="Every entry stays visible once filed. A mistake is corrected with a new entry, never an edit."
-      :empty="!busy && items.length === 0"
+      :empty="!busy && !waiting && items.length === 0"
       :stale="syncedAt"
-      :busy="busy"
+      :busy="busy || waiting"
     >
       <UAlert
         v-if="failure"
@@ -268,7 +251,7 @@ async function submitCorrect(): Promise<void> {
       />
 
       <UAlert
-        v-else-if="!authorised"
+        v-else-if="!authorised && !waiting"
         data-test="age-checks-authority-failure"
         color="warning"
         variant="subtle"
@@ -281,7 +264,7 @@ async function submitCorrect(): Promise<void> {
         data-test="age-checks-list"
       >
         <p
-          v-if="items.length === 0"
+          v-if="!waiting && items.length === 0"
           class="text-muted"
         >
           Nothing logged yet tonight.
@@ -322,7 +305,11 @@ async function submitCorrect(): Promise<void> {
         </div>
       </div>
 
-      <template #actions>
+      <!-- Nothing to log until authority has answered, since it may yet refuse this viewer. -->
+      <template
+        v-if="!waiting"
+        #actions
+      >
         <NightAction
           label="Log a check"
           icon="i-lucide-id-card"

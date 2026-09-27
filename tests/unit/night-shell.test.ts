@@ -261,33 +261,48 @@ describe('the show-night shell stands on the visible viewport (K-102, design-lan
 // Issue 1521: the hub served every tile, then pruned them once the roles came back after mount. The
 // roles are asked before the first screen draws, and a screen's first data rides the served page.
 describe('a show-night screen is served as the viewer will use it (issue 1521)', () => {
-  const move = (to: unknown, from: unknown, server: boolean, hydrating: boolean): boolean =>
-    asksNightAuthority({ to, from, server, hydrating })
+  const move = (to: unknown, from: unknown, path: string, server: boolean, hydrating: boolean): string =>
+    asksNightAuthority({ to, from, path, server, hydrating })
 
-  test('the server always asks, so the served page carries the viewer\'s roles', () => {
-    expect(move('tonight', undefined, true, false)).toBe(true)
-    expect(move('tonight', 'tonight', true, false)).toBe(true)
+  test('the server waits for the roles on a /tonight screen, so the served page carries them', () => {
+    expect(move('tonight', undefined, '/tonight', true, false)).toBe('await')
+    expect(move('tonight', undefined, '/tonight/door', true, false)).toBe('await')
   })
 
-  test('hydrating, the phone takes the server\'s answer and asks nothing again', () => {
-    expect(move('tonight', undefined, false, true)).toBe(false)
+  test('a page that only wears the shell never holds its render on them', () => {
+    expect(move('tonight', undefined, '/pay/return/abc', true, false)).toBe('skip')
+    expect(move('tonight', undefined, '/training/sessions/s1/register', true, false)).toBe('skip')
+    expect(move('tonight', undefined, '/tonightly', true, false)).toBe('skip')
   })
 
-  test('coming in from another layout asks before the screen draws; moving within the shell keeps it', () => {
-    expect(move('tonight', 'member', false, false)).toBe(true)
-    expect(move('tonight', undefined, false, false)).toBe(true)
-    expect(move('tonight', 'tonight', false, false)).toBe(false)
+  test('hydrating, a /tonight screen keeps the server\'s answer, and a page that only wears the shell asks behind itself', () => {
+    expect(move('tonight', undefined, '/tonight', false, true)).toBe('skip')
+    expect(move('tonight', undefined, '/pay/return/abc', false, true)).toBe('background')
+  })
+
+  test('a phone arriving from another layout asks behind the page and is never held; within the shell the answer stands', () => {
+    expect(move('tonight', 'member', '/tonight', false, false)).toBe('background')
+    expect(move('tonight', undefined, '/tonight/glance', false, false)).toBe('background')
+    expect(move('tonight', 'tonight', '/tonight/door', false, false)).toBe('skip')
   })
 
   test('nothing outside the shell asks', () => {
-    expect(move('member', 'tonight', true, false)).toBe(false)
-    expect(move(undefined, undefined, false, false)).toBe(false)
+    expect(move('member', 'tonight', '/my', true, false)).toBe('skip')
+    expect(move(undefined, undefined, '/', false, false)).toBe('skip')
   })
 
-  test('the roles are asked by a route middleware, never from a mount the server does not run', async () => {
-    expect(await Bun.file('app/middleware/night-authority.global.ts').exists()).toBe(true)
+  test('the roles are asked by a route middleware that awaits only when told to, never from a mount', async () => {
+    const middleware = await read('app/middleware/night-authority.global.ts')
+    expect(middleware).toContain('if (ask === \'await\') await resolveNightAuthority()')
+    expect(middleware).toContain('void resolveNightAuthority()')
     expect(await read('app/composables/useNightShell.ts')).not.toContain('onMounted')
     expect(await read(LAYOUT)).not.toContain('resolveNightAuthority()')
+  })
+
+  test('the first read is lazy on a phone, so a navigation inside the shell is never held on the network', async () => {
+    const served = await read('app/composables/useServedRead.ts')
+    expect(served).toContain('{ lazy: true }')
+    expect(served).toContain('onServerPrefetch(')
   })
 
   const SERVED = [
@@ -302,7 +317,17 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     'app/components/NightCompQueue.vue',
   ]
 
-  test.each(SERVED)('%s reads its first data while the server renders', async (path) => {
-    expect(await read(path)).toContain('await useAsyncData(')
+  test.each(SERVED)('%s reads its first data while the server renders, and holds no navigation for it', async (path) => {
+    const source = await read(path)
+    expect(source).toContain('useServedRead(')
+    expect(source).not.toContain('await useAsyncData(')
+  })
+
+  test('the hub and the glance judge the running house by one clock', async () => {
+    for (const path of ['app/pages/tonight/index.vue', 'app/pages/tonight/glance.vue']) {
+      const source = await read(path)
+      expect(`${path}: ${source.includes('useNightClock()')}`).toBe(`${path}: true`)
+      expect(`${path}: ${source.includes('Date.now() / 1000')}`).toBe(`${path}: false`)
+    }
   })
 })

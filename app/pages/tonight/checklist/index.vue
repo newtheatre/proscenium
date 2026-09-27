@@ -38,43 +38,42 @@ const choices = computed(() => authority.value.performances.map(one => ({
 })))
 const ambiguous = ref(false)
 
-type ChecklistRead
-  = { kind: 'READ', listed: TonightChecklist, at: number }
-    | { kind: 'AMBIGUOUS' }
-    | { kind: 'REFUSED', refusal: string }
-    | { kind: 'FAILED', failure: string }
+// Whether the read named a house decides what a 400 means: with none named, more than one is running.
+interface ChecklistRead { named: boolean, settled: SettledRead<TonightChecklist> }
 
 async function read(): Promise<ChecklistRead> {
-  try {
-    const listed = await request<TonightChecklist>(
-      '/api/tonight/checklist',
-      { query: performanceId.value ? { performanceId: performanceId.value } : {} },
-    )
-    return { kind: 'READ', listed, at: Date.now() }
-  }
-  catch (refused) {
-    // More than one house is running and nothing named one: the switcher is the answer, not a
-    // refusal with nothing to tap (issue 1150 item 4).
-    if (!performanceId.value && refusalStatus(refused) === 400) return { kind: 'AMBIGUOUS' }
-    if (refusalStatus(refused) === 403) return { kind: 'REFUSED', refusal: refusalText(refused) }
-    return { kind: 'FAILED', failure: refusalText(refused) }
-  }
+  const named = performanceId.value
+  const settled = await settleRead(() => request<TonightChecklist>(
+    '/api/tonight/checklist',
+    { query: named ? { performanceId: named } : {} },
+  ))
+  return { named: named !== null, settled }
 }
 
-function apply(answered: ChecklistRead): void {
+// Each outcome says both whether the switcher shows and whether the refusal does, so a house chosen
+// after either never leaves the other on screen beside it.
+function apply({ named, settled }: ChecklistRead): void {
   failure.value = null
-  if (answered.kind === 'AMBIGUOUS') ambiguous.value = true
-  else if (answered.kind === 'REFUSED') refusal.value = answered.refusal
-  else if (answered.kind === 'FAILED') failure.value = answered.failure
-  else {
-    performanceId.value = answered.listed.performanceId
-    items.value = answered.listed.items
-    close.value = answered.listed.close
-    till.value = answered.listed.till
+  if (settled.kind === 'READ') {
+    performanceId.value = settled.value.performanceId
+    items.value = settled.value.items
+    close.value = settled.value.close
+    till.value = settled.value.till
     ambiguous.value = false
     refusal.value = null
-    syncedAt.value = answered.at
+    syncedAt.value = settled.at
   }
+  // More than one house is running and nothing named one: the switcher is the answer, not a
+  // refusal with nothing to tap (issue 1150 item 4).
+  else if (!named && settled.status === 400) {
+    ambiguous.value = true
+    refusal.value = null
+  }
+  else if (settled.refused) {
+    refusal.value = settled.failure
+    ambiguous.value = false
+  }
+  else failure.value = settled.failure
 }
 
 async function load(): Promise<void> {
@@ -88,8 +87,7 @@ async function load(): Promise<void> {
 }
 
 // In the served page, so the list, the switcher or the refusal is what a phone paints first.
-const { data: served } = await useAsyncData('tonight-checklist', read)
-if (served.value) apply(served.value)
+const waiting = useServedRead('tonight-checklist', read, apply)
 
 function choose(chosen: string): void {
   performanceId.value = chosen
@@ -108,9 +106,9 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
     title="Checklist"
     :refused="refusal"
     hint="Tick each item, or say why it cannot be done tonight. The night closes from the night report."
-    :empty="!busy && items.length === 0"
+    :empty="!busy && !waiting && items.length === 0"
     :stale="syncedAt"
-    :busy="busy"
+    :busy="busy || waiting"
   >
     <UAlert
       v-if="failure"
@@ -137,7 +135,7 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
     </div>
 
     <div
-      v-else
+      v-else-if="!waiting"
       class="space-y-6"
       data-test="checklist-list"
     >
