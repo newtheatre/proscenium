@@ -4,6 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { showNightOf } from '#shared/utils/show-night'
 import { chooseAction, click, fill, fillDate, fillNumber, fillTime, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -95,6 +96,7 @@ interface ListedShow {
   soldTickets: number
   capacity: number
   posterUrl: string | null
+  seasonId: string | null
 }
 
 interface ListedPerformance {
@@ -555,6 +557,46 @@ describe.skipIf(skip !== null)('a performance may hand its ticketing to an exter
       externalBookingUrl: 'the box office',
     })
     expect(answered.status).toBe(400)
+  })
+})
+
+// D-131 criterion 2, trimmed by issue 1352: a show with no season takes its first night's.
+describe.skipIf(skip !== null)('a show takes the season its first performance falls in', () => {
+  const nightOf = (at: number): string => showNightOf(new Date(at * 1000))
+
+  async function seasonAround(at: number): Promise<{ id: string, name: string }> {
+    const name = named('Autumn')
+    const answered = await send('POST', '/api/admin/reference-data/seasons', {
+      name,
+      startsOn: nightOf(at - 2 * 86_400),
+      endsOn: nightOf(at + 2 * 86_400),
+    })
+    expect(answered.status).toBe(200)
+    return { id: (await answered.json() as { id: string }).id, name }
+  }
+
+  test('adding the first performance fills the season, and the trail says where from', async () => {
+    const curtain = nextWeek(30 * 24)
+    const season = await seasonAround(curtain)
+    const id = await newShow()
+    await addPerformance(id, { startsAt: curtain })
+
+    expect((await detail(id)).show.seasonId).toBe(season.id)
+    const entry = trail<{ detail: { changes: { seasonId: { from: null, to: string } }, filledFrom: string } }>('show.updated', `show:${id}`)
+    expect(entry?.detail.changes.seasonId).toEqual({ from: null, to: season.id })
+    expect(entry?.detail.filledFrom).toBe(nightOf(curtain))
+  })
+
+  test('a season that overlaps another is saved, and the answer names the one it overlaps', async () => {
+    const curtain = nextWeek(60 * 24)
+    const first = await seasonAround(curtain)
+    const answered = await send('POST', '/api/admin/reference-data/seasons', {
+      name: named('StuFF'),
+      startsOn: nightOf(curtain),
+      endsOn: nightOf(curtain + 10 * 86_400),
+    })
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { overlaps: string[] }).overlaps).toEqual([first.name])
   })
 })
 

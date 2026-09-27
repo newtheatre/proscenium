@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { emergencyCardComplete, emergencyCardForm } from '#shared/utils/venue-emergency'
+import { cardAddressDraft, emergencyCardComplete, emergencyCardForm } from '#shared/utils/venue-emergency'
 
 // E-113's pure validation. What the database holds is proved against the real migrations in
 // `tests/integration/venue-emergency.test.ts`.
@@ -69,5 +69,21 @@ describe('what counts as a card the committee has actually filed', () => {
     expect(emergencyCardComplete({ address: null, assemblyPoint: 'The car park' })).toBe(false)
     expect(emergencyCardComplete({ address: filled.address, assemblyPoint: null })).toBe(false)
     expect(emergencyCardComplete(null)).toBe(false)
+  })
+})
+
+// The card's own address is the one read to 999; the venue's address for audiences only
+// prefills it before the card has one (issue 1352).
+describe('the address to read to 999 starts from the venue, once', () => {
+  test('a venue with no card yet offers its address for audiences', () => {
+    expect(cardAddressDraft(null, 'Cherry Tree Hill, Nottingham NG7 2RD')).toBe('Cherry Tree Hill, Nottingham NG7 2RD')
+  })
+
+  test('once the card has its own, the venue\'s is never offered again', () => {
+    expect(cardAddressDraft('Stage door, Cherry Tree Hill', 'Cherry Tree Hill, Nottingham NG7 2RD')).toBe('Stage door, Cherry Tree Hill')
+  })
+
+  test('with neither, the field is empty', () => {
+    expect(cardAddressDraft(null, null)).toBe('')
   })
 })

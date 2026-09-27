@@ -158,4 +158,22 @@ describe('the committee overview (criterion 1)', () => {
       expect(found.find(row => row.venueId === b.id)?.assemblyPoint).toBe('B car park')
     })
   })
+
+  // Issue 1352: the card's address is prefilled once from the venue's address for audiences.
+  test('each row carries the venue\'s address for audiences beside the card\'s own', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const carded = testVenue(database, { suffix: 'carded' })
+      const bare = testVenue(database, { suffix: 'bare' })
+      database.batch([
+        ['UPDATE venues SET address = ? WHERE id = ?', 'Cherry Tree Hill, Nottingham NG7 2RD', carded.id],
+        ['UPDATE venues SET address = ? WHERE id = ?', 'University Park, Nottingham NG7 2RD', bare.id],
+      ])
+      run(database, recordCardStatement(carded.id, card({ address: 'Stage door, Cherry Tree Hill' }), officer, 'vei-c').statement)
+
+      const found = run(database, currentCardsQuery(everyCard(), 25, 0)) as { venueId: string, address: string | null, venueAddress: string | null }[]
+      expect(found.find(row => row.venueId === carded.id)).toMatchObject({ address: 'Stage door, Cherry Tree Hill', venueAddress: 'Cherry Tree Hill, Nottingham NG7 2RD' })
+      expect(found.find(row => row.venueId === bare.id)).toMatchObject({ address: null, venueAddress: 'University Park, Nottingham NG7 2RD' })
+    })
+  })
 })
