@@ -146,8 +146,9 @@ export async function seedPeople(target: SeedTarget, options: PeopleOptions): Pr
     people.byEmail.set(persona.email, seeded)
     people.order.push(seeded)
 
+    // Before erasure, so it is scrubbed as a real member's is, and never written onto a tombstone.
     const membership = membershipRow(seeded.id, persona.membership ?? 'NONE', now)
-    if (membership) target.batch([membership])
+    if (membership && !isTombstone(target, seeded.id)) target.batch([membership])
 
     if (persona.role) {
       target.batch([insert('role_grants', {

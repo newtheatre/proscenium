@@ -110,7 +110,8 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
       // A database seeded before the factor was added to this branch still holds this persona
       // without one (#927): a held persona needs it just as much as a freshly made one.
       if (persona.shape === 'full') await confirmSecondFactor(existing.id)
-      if (persona.membership === 'CURRENT') await ensureCurrentMembership(existing.id)
+      // Nothing is written back onto a tombstone (0011): its term was made before it was erased.
+      if (persona.membership === 'CURRENT' && persona.shape !== 'tombstone') await ensureCurrentMembership(existing.id)
       continue
     }
 
@@ -137,8 +138,9 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
     // Confirmed outright: a privileged role needs a second factor (A-112), and re-enrolling one
     // by hand every reseed is exactly what this file exists to save (K-124 criterion 1).
     if (persona.shape === 'full') await confirmSecondFactor(id)
-    if (persona.shape === 'tombstone') await eraseAccount(id, null)
+    // The term first, so erasure scrubs it as it would a real member's (0011).
     if (persona.membership === 'CURRENT') await ensureCurrentMembership(id)
+    if (persona.shape === 'tombstone') await eraseAccount(id, null)
   }
 
   const { mkdir, writeFile } = await import('node:fs/promises')
