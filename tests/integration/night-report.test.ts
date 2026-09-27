@@ -12,7 +12,8 @@ import {
   reportTakingsQuery,
 } from '#server/utils/night-report'
 import { cardSalesQuery } from '#server/utils/reconciliation'
-import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { unpaidSeatsSubquery } from '#server/utils/capacity'
+import { boundStatement, createTestDatabase, rows, sql } from '#tests/helpers/database'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -47,6 +48,12 @@ function reserve(database: TestDatabase, id: string, performanceId: string, stat
     id, id.toUpperCase().slice(0, 6), performanceId, status, source]])
 }
 
+// A seat on a booking: the report counts seats, as sold does, never bookings (issue 1326's rule).
+function seat(database: TestDatabase, id: string, reservationId: string, performanceId: string, refundedAt: number | null = null): void {
+  database.batch([['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source, refunded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    id, reservationId, performanceId, 'tt-standard', 900, 'BASE', refundedAt]])
+}
+
 function entry(database: TestDatabase, id: string, source: string, tender: string): void {
   database.batch([['INSERT INTO ledger_entries (id, london_day, source, tender, total_pence) VALUES (?, ?, ?, ?, 0)',
     id, '2026-09-10', source, tender]])
@@ -64,12 +71,35 @@ describe('attendance (criterion 1)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       reserve(database, 'r-admitted', tonight.performanceId, 'DOOR', 'WEB')
+      seat(database, 't-admitted', 'r-admitted', tonight.performanceId)
       reserve(database, 'r-no-show', tonight.performanceId, 'NO_SHOW', 'WEB')
+      seat(database, 't-no-show', 'r-no-show', tonight.performanceId)
       reserve(database, 'r-walk-up', tonight.performanceId, 'DOOR', 'DOOR')
+      seat(database, 't-walk-up', 'r-walk-up', tonight.performanceId)
 
       const [row] = read<{ sold: number, admitted: number, noShows: number, walkUps: number }>(
         database, reportAttendanceQuery(tonight.performanceId))
       expect(row).toMatchObject({ admitted: 2, noShows: 1, walkUps: 1 })
+    })
+  })
+
+  // Every figure counts seats, as sold does, so a party is its size on every line and "sold"
+  // less "admitted" is people, never people less bookings.
+  test('a party counts every seat it holds on every line, and a refunded seat on none', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      reserve(database, 'r-party', tonight.performanceId, 'DOOR', 'WEB')
+      for (const id of ['t-party-1', 't-party-2', 't-party-3']) seat(database, id, 'r-party', tonight.performanceId)
+      seat(database, 't-party-refunded', 'r-party', tonight.performanceId, 1_000)
+      reserve(database, 'r-walk-ups', tonight.performanceId, 'DOOR', 'DOOR')
+      for (const id of ['t-walk-up-1', 't-walk-up-2']) seat(database, id, 'r-walk-ups', tonight.performanceId)
+      seat(database, 't-walk-up-refunded', 'r-walk-ups', tonight.performanceId, 1_000)
+      reserve(database, 'r-absent', tonight.performanceId, 'COLLECTED', 'WEB')
+      for (const id of ['t-absent-1', 't-absent-2']) seat(database, id, 'r-absent', tonight.performanceId)
+
+      const [row] = read<{ sold: number, admitted: number, noShows: number, walkUps: number }>(
+        database, reportAttendanceQuery(tonight.performanceId))
+      expect(row).toMatchObject({ sold: 7, admitted: 5, noShows: 2, walkUps: 2 })
     })
   })
 
@@ -78,18 +108,46 @@ describe('attendance (criterion 1)', () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
       reserve(database, 'r-admitted', tonight.performanceId, 'DOOR', 'WEB')
+      seat(database, 't-admitted', 'r-admitted', tonight.performanceId)
       reserve(database, 'r-paid-absent', tonight.performanceId, 'COLLECTED', 'WEB')
       reserve(database, 'r-refunded', tonight.performanceId, 'COLLECTED', 'WEB')
       reserve(database, 'r-unpaid', tonight.performanceId, 'PENDING', 'WEB')
-      database.batch([
-        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
-          't-paid-absent', 'r-paid-absent', tonight.performanceId, 'tt-standard', 900, 'BASE'],
-        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source, refunded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          't-refunded', 'r-refunded', tonight.performanceId, 'tt-standard', 900, 'BASE', 1_000],
-      ])
+      seat(database, 't-paid-absent', 'r-paid-absent', tonight.performanceId)
+      seat(database, 't-refunded', 'r-refunded', tonight.performanceId, 1_000)
 
       const [row] = read<{ admitted: number, noShows: number }>(database, reportAttendanceQuery(tonight.performanceId))
       expect(row).toMatchObject({ admitted: 1, noShows: 1 })
+    })
+  })
+
+  // A self-served pass booking owes nothing and stays PENDING (issue 1390); unused at close, its
+  // seat is a no-show, so sold is in, plus no-shows, plus the unpaid seats still held.
+  test('a pass seat nobody used is a no-show, and at close the lines add up to sold', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      person(database, 'holder')
+      reserve(database, 'r-in', tonight.performanceId, 'DOOR', 'WEB')
+      seat(database, 't-in', 'r-in', tonight.performanceId)
+      reserve(database, 'r-absent', tonight.performanceId, 'COLLECTED', 'WEB')
+      seat(database, 't-absent', 'r-absent', tonight.performanceId)
+      reserve(database, 'r-unpaid', tonight.performanceId, 'PENDING', 'WEB')
+      seat(database, 't-unpaid', 'r-unpaid', tonight.performanceId)
+      reserve(database, 'r-pass', tonight.performanceId, 'PENDING', 'WEB')
+      seat(database, 't-pass', 'r-pass', tonight.performanceId)
+      database.batch([
+        ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until) VALUES (?, ?, ?, ?, ?)',
+          'pt-1', 'season', 'Season pass', 1_000, 2_000],
+        ['INSERT INTO pass_type_prices (id, pass_type_id, label, price) VALUES (?, ?, ?, 0)', 'price-1', 'pt-1', 'Standard'],
+        ['INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, issued_by) VALUES (?, ?, ?, ?, ?, 0, ?)',
+          'pass-1', 'PASS01', 'pt-1', 'price-1', 'holder', 'holder'],
+        ['INSERT INTO pass_admissions (id, pass_id, performance_id, ticket_id) VALUES (?, ?, ?, ?)',
+          'admission-1', 'pass-1', tonight.performanceId, 't-pass'],
+      ])
+
+      const [row] = read<{ sold: number, admitted: number, noShows: number }>(database, reportAttendanceQuery(tonight.performanceId))
+      expect(row).toMatchObject({ sold: 4, admitted: 1, noShows: 2 })
+      const [unpaid] = read<{ seats: number }>(database, sql`SELECT ${unpaidSeatsSubquery(sql`${tonight.performanceId}`)} AS seats`)
+      expect(row!.sold).toBe(row!.admitted + row!.noShows + unpaid!.seats)
     })
   })
 
@@ -99,6 +157,7 @@ describe('attendance (criterion 1)', () => {
       const tonight = tonightsPerformance(database)
       person(database, 'holder')
       reserve(database, 'r-paid', tonight.performanceId, 'DOOR', 'WEB')
+      seat(database, 't-paid', 'r-paid', tonight.performanceId)
       reserve(database, 'r-pass', tonight.performanceId, 'DOOR', 'WEB')
       database.batch([
         ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, 0, ?)',
@@ -110,11 +169,21 @@ describe('attendance (criterion 1)', () => {
           'pass-1', 'PASS01', 'pt-1', 'price-1', 'holder', 'holder'],
         ['INSERT INTO pass_admissions (id, pass_id, performance_id, ticket_id) VALUES (?, ?, ?, ?)',
           'admission-1', 'pass-1', tonight.performanceId, 't-pass'],
+        // A Fellow's admission whose seat was refunded counts on no line, the Fellowship's included.
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source, refunded_at) VALUES (?, ?, ?, ?, 0, ?, ?)',
+          't-fellow', 'r-pass', tonight.performanceId, 'tt-standard', 'BASE', 1_000],
+        ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until) VALUES (?, ?, ?, ?, ?)',
+          'pt-fellowship', 'fellowship', 'Fellowship', 1_000, 2_000],
+        ['INSERT INTO pass_type_prices (id, pass_type_id, label, price) VALUES (?, ?, ?, 0)', 'price-fellowship', 'pt-fellowship', 'Fellow'],
+        ['INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, issued_by) VALUES (?, ?, ?, ?, ?, 0, ?)',
+          'pass-2', 'PASS02', 'pt-fellowship', 'price-fellowship', 'holder', 'holder'],
+        ['INSERT INTO pass_admissions (id, pass_id, performance_id, ticket_id) VALUES (?, ?, ?, ?)',
+          'admission-2', 'pass-2', tonight.performanceId, 't-fellow'],
       ])
 
-      const [row] = read<{ admitted: number, passAdmissions: number }>(
+      const [row] = read<{ admitted: number, passAdmissions: number, fellowshipAdmissions: number }>(
         database, reportAttendanceQuery(tonight.performanceId))
-      expect(row).toMatchObject({ admitted: 2, passAdmissions: 1 })
+      expect(row).toMatchObject({ admitted: 2, passAdmissions: 1, fellowshipAdmissions: 0 })
     })
   })
 })

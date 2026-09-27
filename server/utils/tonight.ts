@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { heldSeatsSubquery } from './capacity'
+import { admittedSeatsSubquery, heldSeatsSubquery } from './capacity'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { SHIFT_ROLES } from '#shared/utils/rota'
 import { showNightBounds } from '#shared/utils/show-night'
@@ -19,13 +19,13 @@ export interface TonightHouse {
   remaining: number | null
 }
 
-// "Sold" rides `heldSeatsSubquery`, never a bare row count (D-105 criterion 2). `admitted` is
-// `reservations.status = 'DOOR'`, which nothing writes until D-126 builds the door scan.
+// Both figures are seats, never bookings (D-105 criterion 2), so "to come" (sold less in) is
+// people still expected: the desk's own rule (D-114 criterion 7).
 export function tonightHouseQuery(performanceId: string): SQL {
   return sql`
     SELECT
       ${heldSeatsSubquery(sql`${performanceId}`)} AS sold,
-      (SELECT count(*) FROM reservations WHERE performance_id = ${performanceId} AND status = 'DOOR') AS admitted
+      ${admittedSeatsSubquery(sql`${performanceId}`)} AS admitted
   `
 }
 

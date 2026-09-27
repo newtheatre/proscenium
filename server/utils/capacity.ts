@@ -93,6 +93,31 @@ export function admittedSeatsSubquery(performanceId: SQL): SQL {
   )`
 }
 
+// The admitted share of the night's walk-ups: seats through the door on a door-source booking,
+// which the night report counts beside "in" without counting a walk-up sold but not yet in (D-126).
+export function admittedWalkUpSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND r.status = 'DOOR'
+      AND r.source = 'DOOR'
+  )`
+}
+
+// Seats owing nothing, never admitted and not refunded: a no-show, derived and never written, so it
+// falls as the door admits people (issue 1296). A pass seat owes nothing though it stays PENDING.
+export function noShowSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} t
+    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
+    WHERE t.performance_id = ${performanceId}
+      AND t.refunded_at IS NULL
+      AND (r.status IN ('NO_SHOW', 'COLLECTED') OR (r.status = 'PENDING' AND ${ticketOnPass(sql`t.id`)}))
+  )`
+}
+
 // Seats for a booking made on the night (a desk or till sale, or a pass admitted on the spot),
 // known by the booking's source rather than by its status, and still held.
 export function walkUpSeatsSubquery(performanceId: SQL): SQL {

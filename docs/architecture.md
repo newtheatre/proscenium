@@ -1257,8 +1257,10 @@ query builders, each bound to one performance id and nothing that grows with a t
 `tonightPerformanceQuery` for the show and its warnings. "Sold" rides `heldSeatsSubquery` from
 `server/utils/capacity.ts`, never a second count of `tickets`, which
 `tests/unit/capacity-guard.test.ts` refuses outright (D-105 criterion 2); "admitted" is
-`reservations.status = 'DOOR'`, set by a pass scan (D-126) or an ordinary ticket scan (E-127
-criterion 3) at `/tonight/door`, both below.
+`admittedSeatsSubquery`, the unrefunded seats on a booking whose status is `DOOR`, set by a pass
+scan (D-126) or an ordinary ticket scan (E-127 criterion 3) at `/tonight/door`, both below. Both
+count seats, so the glance's "to come" is people still expected, the desk's own rule (D-114
+criterion 7). The night report's attendance counts seats the same way on every line.
 
 `GET /api/tonight/house` (issue 1307) is the same performance view for any of tonight's three
 roles, through `requireAnyNightAuthority()` and `tonightView()` in `server/utils/tonight-house.ts`,
@@ -1757,7 +1759,7 @@ real SQL:
 
 | Section | Reads | Note |
 | --- | --- | --- |
-| Attendance | `reservations` | Sold rides `heldSeatsSubquery` (D-105); admitted is `status = 'DOOR'`, a walk-up the same status with `source = 'DOOR'`, a no-show a booking paid, never admitted and still holding an unrefunded ticket (`COLLECTED` at compile time, derived and never written, so sold and a later refund are untouched; issue 1296) or one the old estate imported as `NO_SHOW`. |
+| Attendance | `reservations`, `tickets`, `pass_admissions`, `passes`, `pass_types` | Every line counts unrefunded seats, as sold does (issue 1326): sold rides `heldSeatsSubquery` (D-105), in `admittedSeatsSubquery`, walk-ups `admittedWalkUpSeatsSubquery` (admitted seats on a door-source booking), no-shows `noShowSeatsSubquery` (unrefunded seats on a `COLLECTED` booking at compile time, or on a self-served pass booking nobody admitted, derived and never written, issue 1296, or on one the old estate imported as `NO_SHOW`). Pass and Fellowship admissions are unrefunded seats on an admitted booking with a pass admission, subsets of in. At close, sold is in, plus no-shows, plus the unpaid seats still held. |
 | Takings | `ledger_entries`, `ledger_lines` | Grouped by tender, summed from `ll.amount_pence` on the lines matched to this performance, never `le.total_pence`, which can span more than one performance or product in a single entry. A reversal's negative line nets against what it reverses in the same sum; nothing is filtered by `void_of_entry_id`, which marks a tab-charge reversal, not something to exclude (0031). |
 | Incidents | `incidents`, `incident_severity_config`, `incident_followup_closures` | The full chain, each flagged with its follow-up requirement and closure state whichever way it sits. Closes the known-issues gap E-116 criterion 4 left open. |
 | Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |
@@ -1845,7 +1847,8 @@ the refusal itself when authority lists no house to choose. The screen asks `GET
 so an officer standing in is told before signing that the sign-off records as such (0044),
 whatever shift they hold elsewhere. The staffing bypass lines are the night's, shown above the
 slots and never beside one, because the audit entries they read name no shift; a report frozen
-before 0098 carries only the duty manager's flag, and the screen still shows it.
+before 0098 carries only the duty manager's flag, and the screen still shows it, and one frozen
+before issue 1326's seat rule reached the night report counts in, no-shows and walk-ups by booking.
 
 ## The programme (build-order contract d, 0043)
 

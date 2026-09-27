@@ -90,6 +90,22 @@ describe('the house numbers (E-112 criterion 1)', () => {
     })
   })
 
+  // Seats on both sides, so "to come" (sold less in) is people still expected, never people less
+  // bookings (issue 1326's rule for the desk, held on the hub too).
+  test('a party of three through the door is three in, as it is three sold; a refunded seat is neither', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      reserve(database, 'r-party', tonight.performanceId, 'DOOR')
+      for (const id of ['t-party-1', 't-party-2', 't-party-3']) ticket(database, id, tonight.performanceId, 'r-party')
+      ticket(database, 't-party-refunded', tonight.performanceId, 'r-party', true)
+      reserve(database, 'r-coming', tonight.performanceId, 'COLLECTED')
+      for (const id of ['t-coming-1', 't-coming-2']) ticket(database, id, tonight.performanceId, 'r-coming')
+
+      const [row] = read<{ sold: number, admitted: number }>(database, tonightHouseQuery(tonight.performanceId))
+      expect(row).toMatchObject({ sold: 5, admitted: 3 })
+    })
+  })
+
   test('a refunded ticket and an expired hold neither count', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
