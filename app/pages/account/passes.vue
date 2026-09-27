@@ -69,20 +69,41 @@ async function requestPass(passTypeId: string): Promise<void> {
   }
 }
 
-async function withdrawRequest(passTypeId: string, requestId: string): Promise<void> {
-  requesting.value = passTypeId
-  requestFailure.value = null
+// Withdrawing removes the request, so it is asked about first (K-123, 0032); a refusal reads in
+// the dialogue, not behind it.
+const withdrawalAsked = ref<{ requestId: string, name: string } | null>(null)
+const confirmingWithdrawal = computed({
+  get: () => withdrawalAsked.value !== null,
+  set: (open) => {
+    if (!open) withdrawalAsked.value = null
+  },
+})
+const withdrawing = ref(false)
+const withdrawFailure = ref<string | null>(null)
+
+function askWithdraw(type: SellablePassType): void {
+  if (!type.openRequestId) return
+  withdrawFailure.value = null
+  withdrawalAsked.value = { requestId: type.openRequestId, name: type.name }
+}
+
+async function withdrawRequest(): Promise<void> {
+  const asked = withdrawalAsked.value
+  if (!asked) return
+  withdrawing.value = true
+  withdrawFailure.value = null
   try {
-    await $fetch(`/api/account/passes/requests/${requestId}`, { method: 'DELETE' })
+    await $fetch(`/api/account/passes/requests/${asked.requestId}`, { method: 'DELETE' })
+    withdrawalAsked.value = null
     toast.add({ title: 'Request withdrawn', icon: 'i-lucide-check', color: 'neutral' })
     await refresh()
   }
   catch (error) {
-    requestFailure.value = refusalText(error)
+    withdrawFailure.value = refusalText(error)
     await refresh()
   }
   finally {
-    requesting.value = null
+    withdrawing.value = false
   }
 }
 
@@ -103,7 +124,7 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
   >
     <UPageHeader
       title="Passes"
-      description="Passes you hold, and any you have asked for and not yet paid for at the box office desk."
+      description="Passes you hold, and any you have asked for that are waiting to be paid for at the box office desk."
       :ui="MEMBER_PAGE_HEADER"
     />
 
@@ -242,9 +263,8 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
                 size="sm"
                 color="neutral"
                 variant="subtle"
-                :loading="requesting === type.id"
                 :data-test="`account-pass-withdraw-${type.id}`"
-                @click="withdrawRequest(type.id, type.openRequestId)"
+                @click="askWithdraw(type)"
               >
                 Withdraw
               </UButton>
@@ -268,5 +288,16 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
         </ul>
       </UCard>
     </div>
+
+    <ConfirmModal
+      v-model:open="confirmingWithdrawal"
+      name="withdraw-pass-request"
+      :title="`Withdraw your request for ${withdrawalAsked?.name ?? 'this pass'}`"
+      verb="Withdraw the request"
+      consequence="The box office desk no longer sees it. You can ask for the pass again afterwards."
+      :loading="withdrawing"
+      :failure="withdrawFailure"
+      @confirm="withdrawRequest"
+    />
   </UContainer>
 </template>
