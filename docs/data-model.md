@@ -366,7 +366,9 @@ Wave 0 contract does not list them.
 `id` PK · `venue_id` → venues restrict · `address` · `assembly_point` · `exits` ·
 `isolation_points` · `first_aid_kit` · `defibrillator` · `first_aiders` · `fire_panel` ·
 `what3words` · `notes` (free text, safe: describes the building, never a person) ·
-`updated_by` → users restrict · `updated_at`. Every column is nullable, `address` included,
+`first_call_name` · `first_call_phone` (who to ring before 999, such as estates security at a
+campus venue; both or neither, enforced by the form, since a two-column CHECK would rebuild the
+table; 0106) · `updated_by` → users restrict · `updated_at`. Every column is nullable, `address` included,
 because the versions filed before migration 0100 predate it and an append-only table cannot be
 rewritten to fill them in; the form requires it instead, and a venue only counts as filed once
 its latest version carries one (issue 902). The committee overview (`currentCardsQuery()`) also

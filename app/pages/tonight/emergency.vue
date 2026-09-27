@@ -3,8 +3,8 @@ import { saysWhenLong } from '#shared/utils/when'
 import { nightCacheKey } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
-import { emergencyCardsFor, saysFirstAiders } from '#shared/utils/venue-emergency'
-import type { FirstAider } from '#shared/utils/venue-emergency'
+import { EMERGENCY_SERVICES, emergencyCallHref, emergencyCalls, emergencyCardsFor, firstCallOf, saysFirstAiders } from '#shared/utils/venue-emergency'
+import type { EmergencyCall, FirstAider } from '#shared/utils/venue-emergency'
 
 definePageMeta({ layout: 'tonight', middleware: 'signed-in', docs: '/docs/tonight/emergency' })
 useSeoMeta({ title: 'Emergency card' })
@@ -22,6 +22,8 @@ interface Card {
   firePanel: string | null
   what3words: string | null
   notes: string | null
+  firstCallName: string | null
+  firstCallPhone: string | null
   updatedAt: number | null
   firstAidersTonight: FirstAider[] | null
   // Null: the reader is not on tonight's team at this venue, so no number is theirs (A-114).
@@ -48,6 +50,12 @@ const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emerg
 // this request, the other as old as the last successful one. Its numbers are only its fetcher's.
 const cards = computed(() => emergencyCardsFor(cache.data.value ?? served.value, account.value.user?.id ?? null))
 const asOfAt = computed(() => cache.data.value ? cache.cachedAt.value : Date.now())
+
+// Every venue keeps 999, beneath whoever its card rings first (issue 1519, 0106).
+const calls = computed(() => emergencyCalls(cards.value ?? []))
+
+// A tap names the call and its number; only the sheet's own button dials (0106).
+const confirming = ref<EmergencyCall | null>(null)
 
 function asOf(at: number): string {
   return saysWhenLong(at)
@@ -106,7 +114,7 @@ function isolation(one: Card): string[] {
             data-test="emergency-999"
           >
             <h3 class="mb-3 font-mono text-xs tracking-[0.2em] text-error uppercase">
-              Read to 999
+              Read to {{ firstCallOf(card).name }}
             </h3>
             <p
               v-if="card.address"
@@ -132,17 +140,20 @@ function isolation(one: Card): string[] {
             </p>
           </section>
 
-          <!-- The order to ring in, on the card rather than in anybody's head: 999 is pinned under
-               the thumb and this says who follows it (E-113, issue 1150 item 14). -->
+          <!-- The order to ring in, on the card rather than in anybody's head: the first call is
+               pinned under the thumb and this says who follows it (E-113, issue 1150 item 14). -->
           <section
             class="rounded-xl bg-elevated p-4"
             data-test="emergency-duty-manager"
           >
             <h3 class="mb-2 font-semibold">
-              After 999
+              After {{ firstCallOf(card).name }}
             </h3>
-            <p class="text-lg">
-              Call 999 first, then tell the duty manager.
+            <p
+              class="text-lg"
+              data-test="emergency-order"
+            >
+              Call {{ firstCallOf(card).name }} first, then tell the duty manager.
             </p>
             <ul
               v-if="card.dutyManagers?.length"
@@ -267,11 +278,37 @@ function isolation(one: Card): string[] {
 
     <template #actions>
       <NightAction
-        label="Call 999"
+        v-for="(call, index) in calls"
+        :key="call.phone"
+        :label="`Call ${call.name}`"
         icon="i-lucide-phone-call"
         color="error"
-        to="tel:999"
+        :variant="index === 0 ? 'solid' : 'outline'"
+        :data-test="`emergency-call-${emergencyCallHref(call).slice(4)}`"
+        @press="confirming = call"
       />
     </template>
+
+    <NightSheet
+      :open="confirming !== null"
+      :title="confirming ? `Call ${confirming.name}?` : ''"
+      :primary="confirming ? `Call ${confirming.phone}` : undefined"
+      primary-color="error"
+      :primary-to="confirming ? emergencyCallHref(confirming) : undefined"
+      primary-test-id="emergency-call-now"
+      @update:open="confirming = null"
+      @primary="confirming = null"
+    >
+      <p
+        v-if="confirming"
+        class="text-lg"
+        data-test="emergency-call-says"
+      >
+        {{ confirming.phone === EMERGENCY_SERVICES.phone
+          ? 'This rings 999 from the phone you are holding.'
+          : `This rings ${confirming.name} on ${confirming.phone} from the phone you are holding.` }}
+        Have the address on the card ready to read.
+      </p>
+    </NightSheet>
   </NightScreen>
 </template>

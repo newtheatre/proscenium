@@ -24,6 +24,8 @@ interface VenueCard {
   firePanel: string | null
   what3words: string | null
   notes: string | null
+  firstCallName: string | null
+  firstCallPhone: string | null
   updatedByName: string | null
   updatedAt: number | null
   venueAddress: string | null
@@ -65,6 +67,8 @@ interface FormState {
   firePanel: string
   what3words: string
   notes: string
+  firstCallName: string
+  firstCallPhone: string
 }
 
 const editing = ref<VenueCard | null>(null)
@@ -72,6 +76,7 @@ const open = ref(false)
 const state = reactive<FormState>({
   address: '', assemblyPoint: '', exits: '', isolationPoints: '',
   firstAidKit: '', defibrillator: '', firstAiders: '', firePanel: '', what3words: '', notes: '',
+  firstCallName: '', firstCallPhone: '',
 })
 
 function edit(venue: VenueCard): void {
@@ -87,6 +92,8 @@ function edit(venue: VenueCard): void {
     firePanel: venue.firePanel ?? '',
     what3words: venue.what3words ?? '',
     notes: venue.notes ?? '',
+    firstCallName: venue.firstCallName ?? '',
+    firstCallPhone: venue.firstCallPhone ?? '',
   })
   failure.value = null
   open.value = true
@@ -244,13 +251,39 @@ const columns: TableColumn<VenueCard>[] = [
 
           <UFormField
             label="Address to read to 999"
-            description="Read aloud to a 999 call handler, the postcode included. A new card starts from the venue's address for audiences."
+            description="Read aloud to a 999 call handler, or to whoever the card rings first, the postcode included. A new card starts from the venue's address for audiences."
           >
             <UTextarea
               v-model="state.address"
               :rows="3"
               class="w-full"
               data-test="field-address"
+            />
+          </UFormField>
+
+          <!-- Estates security on campus (issue 1519, 0106): blank leaves the card ringing 999. -->
+          <UFormField
+            label="Ring first"
+            hint="Optional"
+            description="Who to call before 999, such as estates security at a campus venue. Leave both blank to call 999 first."
+          >
+            <UInput
+              v-model="state.firstCallName"
+              class="w-full"
+              data-test="field-first-call-name"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Their number"
+            hint="Optional"
+            description="As you would dial it, spaces allowed. The card keeps Call 999 beneath it."
+          >
+            <UInput
+              v-model="state.firstCallPhone"
+              type="tel"
+              class="w-full"
+              data-test="field-first-call-phone"
             />
           </UFormField>
 

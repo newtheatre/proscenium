@@ -10,6 +10,9 @@ const NOTES_LIMIT = 2000
 
 const field = () => z.string().trim().max(FIELD_LIMIT).nullish().transform(value => value?.trim() || null)
 
+// Written as dialled, so the telephone link is the number with its spaces taken out.
+const DIALLABLE = /^\+?[\d ]{3,20}$/
+
 // The one line a volunteer reads aloud to a 999 handler, so a card without it is not a card
 // (issue 902). Everything else on the form stays optional.
 export const emergencyCardForm = z.object({
@@ -23,6 +26,12 @@ export const emergencyCardForm = z.object({
   firePanel: field(),
   what3words: z.string().trim().max(100).nullish().transform(value => value?.trim() || null),
   notes: z.string().trim().max(NOTES_LIMIT).nullish().transform(value => value?.trim() || null),
+  firstCallName: z.string().trim().max(80).nullish().transform(value => value?.trim() || null),
+  firstCallPhone: z.string().trim().nullish().transform(value => value?.trim() || null)
+    .refine(value => value === null || DIALLABLE.test(value), 'the number to ring first is digits and spaces, with a plus in front if it needs one'),
+}).refine(card => (card.firstCallName === null) === (card.firstCallPhone === null), {
+  message: 'who to ring first needs both a name and a number, or neither',
+  path: ['firstCallPhone'],
 })
 
 export type EmergencyCardInput = z.output<typeof emergencyCardForm>
@@ -70,4 +79,27 @@ export function saysFirstAiders(tonight: readonly FirstAider[] | null, filed: st
     return `${one.firstName} (${jobs.join(', ')})`
   })
   return [`First aiders tonight: ${named.join(', ')}`]
+}
+
+// Who the screen offers to ring (issue 1519, 0106): a card's own first call, else 999.
+export interface EmergencyCall { name: string, phone: string }
+
+export const EMERGENCY_SERVICES: EmergencyCall = { name: '999', phone: '999' }
+
+export interface FirstCall { firstCallName: string | null, firstCallPhone: string | null }
+
+export function firstCallOf(card: FirstCall): EmergencyCall {
+  return card.firstCallName && card.firstCallPhone ? { name: card.firstCallName, phone: card.firstCallPhone } : EMERGENCY_SERVICES
+}
+
+const digits = (phone: string): string => phone.replace(/\s+/g, '')
+
+// Each first call once by number in card order, then 999, which every venue keeps (0106).
+export function emergencyCalls(cards: readonly FirstCall[]): EmergencyCall[] {
+  const calls = [...cards.filter(card => card.firstCallName && card.firstCallPhone).map(firstCallOf), EMERGENCY_SERVICES]
+  return calls.filter((call, index) => calls.findIndex(one => digits(one.phone) === digits(call.phone)) === index)
+}
+
+export function emergencyCallHref(call: EmergencyCall): string {
+  return `tel:${digits(call.phone)}`
 }
