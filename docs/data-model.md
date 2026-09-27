@@ -1334,6 +1334,8 @@ simultaneous claims settle to one winner and one member holds one slot on an ope
 A holder's own release (`releaseOpeningShiftStatement()`) applies only while the opening's
 `night` is later than the current show night, the predicate riding the `UPDATE`, so a slot is
 given back up to 04:00 on its day and not after, as a shift is (E-107 criterion 1, 0014).
+A release within `SHIFT_RELEASE_NOTICE_HOURS` of the opening notifies `rotaOfficers()` at once
+with `shift.released`, labelled by the opening, as a shift's does (criterion 2).
 A planned opening's staffing changes one-off after stamping without touching the template: an
 added slot takes the next number after the opening's highest, and only an `OPEN` slot on a
 `PLANNED` opening that keeps another slot is deleted, the predicate riding the `DELETE` so a
