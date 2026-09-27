@@ -137,6 +137,8 @@ const figures = computed(() => (data.value
               <ULink
                 v-if="mayDrillDown"
                 :to="figure.to"
+                class="underline underline-offset-4"
+                :data-test="`${figure.test}-link`"
                 :aria-label="`${figure.label}: ${saysMoney(figure.pence)}, open what it is made of`"
               >
                 {{ saysMoney(figure.pence) }}
