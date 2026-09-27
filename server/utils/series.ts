@@ -4,7 +4,8 @@ import { LIVE_EXTERNAL } from '#shared/utils/external-requests'
 import type { Conflict } from '#shared/utils/bookings'
 import type { Occurrence, Recurrence } from '#shared/utils/series'
 import type { Failure } from '#shared/utils/booking-policy'
-import { seriesAuditStatement, seriesClaimStatement } from './room-writes'
+import { auditIfRow } from './audit'
+import { seriesClaimStatement } from './room-writes'
 import type { SeriesClaim } from './room-writes'
 import type { AuditRow } from '#shared/utils/audit'
 
@@ -94,7 +95,8 @@ export async function writeSeries(write: SeriesWrite, entry: AuditRow): Promise<
     db.run(seriesRow),
     ...claims.map(claim => db.run(claim)),
     db.run(assertion),
-    db.run(seriesAuditStatement(write.seriesId, entry)),
+    // Last, after the assertion, so the audit stands or falls with the series (0035, 0049).
+    db.run(auditIfRow(entry, 'room_series', write.seriesId)),
   ] as unknown as Parameters<typeof db.batch>[0])
 
   return { ids }

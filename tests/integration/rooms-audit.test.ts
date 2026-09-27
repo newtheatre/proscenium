@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { approveStatement, rejectStatement } from '#server/utils/approvals'
-import { auditIfChanged } from '#server/utils/audit'
+import { auditIfChanged, auditIfRow } from '#server/utils/audit'
 import { claimRoomSlotStatement, editPendingStatement, lapseStatement } from '#server/utils/bookings'
-import { bumpStatements, seriesAuditStatement, seriesCancelStatements } from '#server/utils/room-writes'
+import { bumpStatements, seriesCancelStatements } from '#server/utils/room-writes'
 import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { ClaimInput, EditInput } from '#server/utils/bookings'
@@ -170,10 +170,10 @@ describe('a bump is all or nothing, and audited with what it actually did', () =
 describe('a series is audited in its own batch', () => {
   test('the audit follows the series row', async () => {
     await withDatabase((database) => {
-      run(database, seriesAuditStatement('s-absent', entry('room.series.booked', 'series:s-absent')))
+      run(database, auditIfRow(entry('room.series.booked', 'series:s-absent'), 'room_series', 's-absent'))
       database.batch([[`INSERT INTO room_series (id, user_id, room_id, title, frequency, starts_on, clock_from, clock_to, occurrences)
         VALUES ('s-term', 'u-member', 'r-studio', 'Rehearsal', 'WEEKLY', '2027-01-04', '18:00', '20:00', 1)`]])
-      run(database, seriesAuditStatement('s-term', entry('room.series.booked', 'series:s-term')))
+      run(database, auditIfRow(entry('room.series.booked', 'series:s-term'), 'room_series', 's-term'))
       expect(audits(database, 'room.series.booked').map(one => one.target)).toEqual(['series:s-term'])
     })
   })

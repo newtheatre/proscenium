@@ -122,16 +122,6 @@ export function seriesClaimStatement(id: string, write: SeriesClaim, one: Occurr
   `
 }
 
-// Last in the series' batch, after its completeness assertion, so the two stand or fall together
-// (0035, 0049).
-export function seriesAuditStatement(seriesId: string, entry: AuditRow): SQL {
-  return sql`
-    INSERT INTO audit_log (id, actor_id, action, target, detail)
-    SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${detailOf(entry)}
-    WHERE EXISTS (SELECT 1 FROM room_series WHERE id = ${seriesId})
-  `
-}
-
 // A term's cancel changes any number of rows in two tables, so its one audit row counts them
 // first, in the same batch and under the same predicates as the cancels after it (0049, C-111).
 export function seriesCancelStatements(seriesId: string, userId: string, now: number, entry: AuditRow): { audit: SQL, ours: SQL, theirs: SQL } {
