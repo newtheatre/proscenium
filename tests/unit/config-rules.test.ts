@@ -3,6 +3,8 @@ import { CONFIG_KEYS, CONFIG_KEY_NAMES, ENFORCED_KEYS, PRIVILEGED_FLOOR, hasDefa
 import { configChangeDetail } from '#shared/utils/config-audit'
 import { DAY_OF_YEAR_KEYS, configProblem } from '#shared/utils/config-rules'
 import { isRecordable } from '#shared/utils/audit'
+import { unsetAsNull } from '#server/utils/configuration'
+import { createError } from 'h3'
 import type { ConfigKey } from '#shared/utils/config'
 
 const shipped = (key: ConfigKey): unknown =>
@@ -109,12 +111,30 @@ describe('which settings the system actually enforces', () => {
   test('the enforced list is exactly what the server reads', async () => {
     const read = new Set<string>()
     for await (const text of source) {
-      for (const [, key] of (await text).matchAll(/configValue\((?:event|undefined), '([A-Z0-9_]+)'\)/g)) {
+      for (const [, key] of (await text).matchAll(/configValue(?:OrUnset)?\((?:event|undefined), '([A-Z0-9_]+)'\)/g)) {
         read.add(key!)
       }
     }
 
     expect([...read].sort()).toEqual([...ENFORCED_KEYS].sort())
+  })
+})
+
+// A key with no default may honestly be unset, and only that answer reads as unset: a failed read
+// must throw, or a broken database looks like a quiet night (0019).
+describe('an unset key, and nothing else, reads as unset', () => {
+  test('the unset refusal is null; any other failure is thrown on', () => {
+    expect(unsetAsNull(createError({ statusCode: 503, statusMessage: 'A setting this needs is empty' }))).toBeNull()
+    expect(() => unsetAsNull(new Error('D1_ERROR: no such table: config'))).toThrow('D1_ERROR')
+    expect(() => unsetAsNull(createError({ statusCode: 500 }))).toThrow()
+  })
+
+  test('the two keys read that way go through the one helper, with no catch of their own', async () => {
+    for (const path of ['server/utils/night-auto-close.ts', 'server/utils/night-signoff.ts']) {
+      const source = await Bun.file(path).text()
+      expect(`${path}: ${source.includes('configValueOrUnset(')}`).toBe(`${path}: true`)
+      expect(`${path}: ${/configValue\([^)]*\)\.catch\(/.test(source)}`).toBe(`${path}: false`)
+    }
   })
 })
 

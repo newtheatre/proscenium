@@ -5,7 +5,7 @@ import { auditedWrite } from './audit'
 import { boardResetRecipients, venueName } from './backstage'
 import { compileNightReport } from './night-report'
 import { distributeReport, reportForPerformance, signOffStatement } from './night-signoff'
-import { configValue } from './configuration'
+import { configValueOrUnset } from './configuration'
 import { claimNotification, notify } from './notify'
 import { performanceNight } from './performances'
 import { render } from './templates'
@@ -47,12 +47,9 @@ export function autoCloseDeadline(startsAt: number): { night: string, deadline: 
 
 export async function performancesDueAutoClose(at: Date = new Date()): Promise<DuePerformance[]> {
   const now = Math.floor(at.getTime() / 1000)
-  // Unset closes nothing and warns, the nudge to set it; only the unset refusal (503) is caught,
-  // so a failed read throws rather than looking like a quiet night.
-  const from = autoCloseFrom(await configValue(undefined, 'AUTO_CLOSE_FROM_NIGHT').catch((error: unknown) => {
-    if ((error as { statusCode?: number }).statusCode === 503) return null
-    throw error
-  }))
+  // Unset closes nothing and warns, the nudge to set it; a failed read throws rather than looking
+  // like a quiet night.
+  const from = autoCloseFrom(await configValueOrUnset(undefined, 'AUTO_CLOSE_FROM_NIGHT'))
   if (from === null) {
     console.warn('configuration: AUTO_CLOSE_FROM_NIGHT is unset; nights:close closes nothing')
     return []
