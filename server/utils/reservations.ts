@@ -478,6 +478,9 @@ export interface EditReservationTicketsInput {
   additions: (TicketToWrite & { ticketTypeId: string })[]
   removals: TicketTypeCount[]
   desiredTotal: number
+  // What the request read, which the additions and removals were worked out from: a booking that
+  // no longer holds exactly these lines refuses the edit rather than taking it twice.
+  linesAsRead: TicketTypeCount[]
   // The booker themselves: self-service has no officer to name (`self: true`, shared/utils/audit-actions.ts).
   actorId: string | null
 }
@@ -486,15 +489,34 @@ export interface EditReservationTicketsResult {
   applied: boolean
 }
 
-// One guard for every line and the audit written first under it, against the *desired total*:
-// no line moves it, so the audit row says whether the whole edit applied (D-110 criterion 2, 0049).
+// True while the booking holds exactly `lines`: every type it holds at the count read, and the
+// same total, so no type read is missing. One CASE arm per type read, never an id list (0003).
+export function ticketLinesStill(reservationId: string, lines: TicketTypeCount[]): SQL {
+  const readCount = lines.length === 0
+    ? sql`-1`
+    : sql`CASE held.ticket_type_id ${sql.join(lines.map(line => sql`WHEN ${line.ticketTypeId} THEN ${line.quantity}`), sql` `)} ELSE -1 END`
+  const total = lines.reduce((sum, line) => sum + line.quantity, 0)
+  return sql`(
+    NOT EXISTS (
+      SELECT 1 FROM (
+        SELECT ticket_type_id, count(*) AS n FROM tickets
+        WHERE reservation_id = ${reservationId} AND refunded_at IS NULL GROUP BY ticket_type_id
+      ) held WHERE held.n <> ${readCount}
+    )
+    AND (SELECT count(*) FROM tickets WHERE reservation_id = ${reservationId} AND refunded_at IS NULL) = ${total}
+  )`
+}
+
+// The audit goes first under the one guard (room, pending, the lines as read); every other write
+// keys to that row, as the first line to move changes what was read (D-110 criterion 2, 0049).
 export function editTicketsStatements(input: EditReservationTicketsInput, entry: AuditRow): [SQL, ...SQL[]] {
-  const guard = sql`${capacityAllows(input.performanceId, input.capacity, input.desiredTotal, input.reservationId)} AND ${reservationIsPending(input.reservationId)}`
+  const guard = sql`${capacityAllows(input.performanceId, input.capacity, input.desiredTotal, input.reservationId)} AND ${reservationIsPending(input.reservationId)} AND ${ticketLinesStill(input.reservationId, input.linesAsRead)}`
+  const applied = sql`EXISTS (SELECT 1 FROM audit_log WHERE id = ${entry.id})`
   return [
     auditWhere(entry, guard),
-    sql`UPDATE reservations SET updated_at = unixepoch() WHERE id = ${input.reservationId} AND status = 'PENDING'`,
-    ...ticketAdditionQueries(input.additions, guard),
-    ...ticketRemovalQueries(input.reservationId, input.removals, guard),
+    sql`UPDATE reservations SET updated_at = unixepoch() WHERE id = ${input.reservationId} AND status = 'PENDING' AND ${applied}`,
+    ...ticketAdditionQueries(input.additions, applied),
+    ...ticketRemovalQueries(input.reservationId, input.removals, applied),
   ]
 }
 

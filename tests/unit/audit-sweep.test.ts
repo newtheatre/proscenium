@@ -45,7 +45,11 @@ describe('every site audits through the write, never beside it', () => {
   // A refused edit re-reads the booking, so capacity is blamed only while it is still pending (0049).
   test('3. a refused ticket edit says why from the booking as it now stands', async () => {
     const route = await source('server/api/qr/tickets.put.ts')
-    expect(route).toContain('now?.status === \'PENDING\' ? \'This performance no longer has room for that change\' : \'This booking can no longer be changed here\'')
+    const refusal = route.slice(route.indexOf('async function editRefusal('))
+    expect(refusal).toContain('now?.status !== \'PENDING\'')
+    // A booking that moved since the read is named before room is blamed (a double submit).
+    expect(refusal).toContain('sameTicketLines(asRead, await currentTicketLines(reservationId))')
+    expect(route).toContain('editRefusal(reservationId, current, \'This performance no longer has room for that change\')')
   })
 
   test('the walk-in logs only through the write that took, the first or the rejoin', async () => {

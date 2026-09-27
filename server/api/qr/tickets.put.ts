@@ -1,5 +1,6 @@
 import { saleRefusal } from '#shared/utils/programme'
-import { belowMinimumTicketsReason, overCapReason, reservationEditForm, ticketEditDelta } from '#shared/utils/reservations'
+import { belowMinimumTicketsReason, overCapReason, reservationEditForm, sameTicketLines, ticketEditDelta } from '#shared/utils/reservations'
+import type { TicketTypeCount } from '#shared/utils/reservations'
 
 // Self-service edit while unpaid (D-110 criterion 1). The QR cookie is the only credential asked
 // for: a guest booker has no session, and a signed-in booker's own cookie works identically.
@@ -57,14 +58,11 @@ export default defineEventHandler(async (event) => {
       additions,
       removals: delta.removals,
       desiredTotal: delta.desiredTotal,
+      linesAsRead: current,
       actorId: reservation.userId,
     })
 
-    if (!result.applied) {
-      // Capacity is to blame only while the booking is still pending; collected or lapsed, it is closed.
-      const now = await reservationCurrentState(reservationId)
-      throw createError({ statusCode: 409, statusMessage: now?.status === 'PENDING' ? 'This performance no longer has room for that change' : 'This booking can no longer be changed here' })
-    }
+    if (!result.applied) throw await editRefusal(reservationId, current, 'This performance no longer has room for that change')
   }
   else if (delta.removals.length > 0) {
     const result = await editReservationTickets({
@@ -74,14 +72,24 @@ export default defineEventHandler(async (event) => {
       additions: [],
       removals: delta.removals,
       desiredTotal: delta.desiredTotal,
+      linesAsRead: current,
       actorId: reservation.userId,
     })
 
-    if (!result.applied) {
-      throw createError({ statusCode: 409, statusMessage: 'This booking can no longer be changed here' })
-    }
+    if (!result.applied) throw await editRefusal(reservationId, current, 'This booking can no longer be changed here')
   }
 
   const state = await reservationCurrentState(reservationId)
   return { status: state?.status ?? 'PENDING', totalPence: state?.totalPence ?? 0 }
 })
+
+// Why an edit that did not apply was refused, most specific first: a booking no longer pending,
+// then one whose tickets changed since this request read them (a second tab, a double submit).
+async function editRefusal(reservationId: string, asRead: TicketTypeCount[], otherwise: string): Promise<Error> {
+  const now = await reservationCurrentState(reservationId)
+  if (now?.status !== 'PENDING') return createError({ statusCode: 409, statusMessage: 'This booking can no longer be changed here' })
+  if (!sameTicketLines(asRead, await currentTicketLines(reservationId))) {
+    return createError({ statusCode: 409, statusMessage: 'This booking changed while you were editing it. Look at it again, then make your change.' })
+  }
+  return createError({ statusCode: 409, statusMessage: otherwise })
+}

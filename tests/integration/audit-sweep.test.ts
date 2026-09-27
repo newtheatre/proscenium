@@ -156,6 +156,7 @@ describe('a ticket edit on a booking no longer pending logs nothing and is not a
       additions: [{ id: 't3', reservationId: 'r1', performanceId, ticketTypeId: 'tt-concession', pricePaid: 700, priceSource: 'BASE' }],
       removals: [{ ticketTypeId: 'tt-standard', quantity: 1 }],
       desiredTotal: 2,
+      linesAsRead: [{ ticketTypeId: 'tt-standard', quantity: 2 }],
       actorId: null,
     }, entry('reservation.tickets-changed', 'reservation:r1')))
   }

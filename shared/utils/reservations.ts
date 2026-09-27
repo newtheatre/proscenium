@@ -185,6 +185,13 @@ export function ticketEditDelta(current: TicketTypeCount[], desired: TicketTypeC
   return { additions, removals, desiredTotal: desired.reduce((total, line) => total + line.quantity, 0) }
 }
 
+// Whether two readings of a booking's tickets hold the same counts of each type, in any order: an
+// edit refused while they still agree was refused for room, not because the booking moved.
+export function sameTicketLines(one: TicketTypeCount[], other: TicketTypeCount[]): boolean {
+  const moved = ticketEditDelta(one, other)
+  return moved.additions.length === 0 && moved.removals.length === 0
+}
+
 // Criterion 2: a reservation with nothing left is a cancellation, not an edit.
 export function belowMinimumTicketsReason(desiredTotal: number): string | null {
   if (desiredTotal >= 1) return null
