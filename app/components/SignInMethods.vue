@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { saysDay } from '#shared/utils/when'
-import { refusalToAddPassword } from '#shared/utils/sign-in-methods'
+import { refusalToAddPassword, securityNextStep } from '#shared/utils/sign-in-methods'
 import type { SignInMethod } from '#shared/utils/sign-in-methods'
 
 // What this account can sign in with. A removal the server would refuse is never offered: the
 // listing carries `removable`, so the screen and the endpoint agree (A-113).
 
+// Whether an authenticator a role needs comes first, so a passkey waits its turn; null until the
+// page knows, so a passkey is never offered first and then taken away (issue 1344).
+const props = defineProps<{ authenticatorFirst: boolean | null }>()
+
+// A change of way in can change whether a role's authenticator is needed, so the page re-reads.
+const emit = defineEmits<{ changed: [] }>()
+
 const toast = useToast()
-const { account, refresh: refreshAccount } = useAccount()
+const { account } = useAccount()
 const methods = ref<SignInMethod[]>([])
 const loading = ref(true)
 const working = ref('')
@@ -43,34 +50,6 @@ function retryAfterReauthentication(): void {
   if (action) void action()
 }
 
-const changing = ref(false)
-const wantedEmail = ref('')
-
-async function changeEmail(): Promise<void> {
-  changing.value = true
-  try {
-    const answer = await $fetch<{ message: string }>('/api/account/email', {
-      method: 'PUT',
-      body: { email: wantedEmail.value },
-    })
-    wantedEmail.value = ''
-    toast.add({ title: answer.message, icon: 'i-lucide-mail', color: 'success' })
-    await refreshAccount()
-  }
-  catch (error) {
-    if (needsReauthentication(error)) {
-      pending.value = changeEmail
-      reauthenticating.value = true
-    }
-    else {
-      toast.add({ title: refusalText(error), color: 'error' })
-    }
-  }
-  finally {
-    changing.value = false
-  }
-}
-
 // 0008: a Workspace address holds no password by any path, so the field is not offered on one.
 const passwordRefusal = computed(() => refusalToAddPassword({ email: account.value.user?.email ?? '' }))
 const wantedPassword = ref('')
@@ -86,6 +65,7 @@ async function setPassword(): Promise<void> {
     wantedPassword.value = ''
     toast.add({ title: answer.added ? 'Password added' : 'Password changed', icon: 'i-lucide-key-round', color: 'success' })
     await load()
+    emit('changed')
   }
   catch (error) {
     if (needsReauthentication(error)) {
@@ -104,6 +84,15 @@ async function setPassword(): Promise<void> {
 const { register, isSupported } = useWebAuthn({ registerEndpoint: '/api/auth/passkey/register' })
 const enrolling = ref(false)
 
+// The passkey is this viewer's next step unless a role's authenticator comes first (issue 1344).
+const ready = computed(() => !loading.value && props.authenticatorFirst !== null)
+const passkeyNext = computed(() => ready.value && securityNextStep({
+  authenticatorRequired: props.authenticatorFirst === true,
+  authenticatorConfirmed: false,
+  passkeySupported: isSupported.value,
+  holdsPasskey: methods.value.some(method => method.kind === 'passkey'),
+}) === 'passkey')
+
 async function addPasskey(): Promise<void> {
   enrolling.value = true
   try {
@@ -112,6 +101,7 @@ async function addPasskey(): Promise<void> {
     await register({ userName: account.value.user?.email ?? '', displayName: account.value.user?.name })
     toast.add({ title: 'Passkey added', icon: 'i-lucide-fingerprint', color: 'success' })
     await load()
+    emit('changed')
   }
   catch (error) {
     if (needsReauthentication(error)) {
@@ -150,6 +140,7 @@ async function remove(method: SignInMethod): Promise<void> {
     removing.value = null
     toast.add({ title: `${method.label} removed`, icon: 'i-lucide-check', color: 'success' })
     await load()
+    emit('changed')
   }
   catch (error) {
     if (needsReauthentication(error)) {
@@ -174,7 +165,7 @@ onMounted(load)
 
 <template>
   <UPageCard
-    title="How you sign in"
+    title="Ways in"
     description="We never remove your last way in. Add another before taking one away."
   >
     <div
@@ -233,90 +224,79 @@ onMounted(load)
       </li>
     </ul>
 
-    <template #footer>
-      <div class="space-y-4">
-        <!-- The address is said above the field, never as its placeholder: a placeholder made an
-             empty field look filled, so nobody could tell what had been typed (issue 1152 item 1). -->
-        <p class="text-sm text-muted">
-          You sign in as <span data-test="current-email">{{ account.user?.email }}</span>.
-        </p>
-        <UFormField
-          label="New email address"
-          name="email"
-          description="Changing it signs out your other devices and asks the new address to confirm itself."
-        >
-          <div class="flex flex-wrap items-center gap-2">
-            <UInput
-              v-model="wantedEmail"
-              type="email"
-              class="w-full sm:w-80"
-              data-test="new-email"
-            />
-            <UButton
-              color="neutral"
-              variant="subtle"
-              :disabled="!wantedEmail"
-              :loading="changing"
-              data-test="change-email"
-              @click="changeEmail"
-            >
-              Change the address
-            </UButton>
-          </div>
-        </UFormField>
+    <!-- In the default slot, not #footer: a UPageCard footer draws above it, putting the forms before the ways in. -->
+    <div class="mt-6 space-y-4">
+      <UFormField
+        v-if="passwordRefusal === null"
+        label="Password"
+        name="password"
+        description="Add one, or replace the one you have."
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <UInput
+            v-model="wantedPassword"
+            type="password"
+            placeholder="New password"
+            class="w-full sm:w-80"
+            data-test="new-password"
+          />
+          <UButton
+            color="neutral"
+            variant="subtle"
+            :disabled="!wantedPassword"
+            :loading="settingPassword"
+            data-test="set-password"
+            @click="setPassword"
+          >
+            Save the password
+          </UButton>
+        </div>
+      </UFormField>
+      <p
+        v-else
+        class="text-sm text-muted"
+      >
+        Theatre addresses sign in with Google and cannot hold a password.
+      </p>
 
-        <UFormField
-          v-if="passwordRefusal === null"
-          label="Password"
-          name="password"
-          description="Add one, or replace the one you have."
-        >
-          <div class="flex flex-wrap items-center gap-2">
-            <UInput
-              v-model="wantedPassword"
-              type="password"
-              placeholder="New password"
-              class="w-full sm:w-80"
-              data-test="new-password"
-            />
-            <UButton
-              color="neutral"
-              variant="subtle"
-              :disabled="!wantedPassword"
-              :loading="settingPassword"
-              data-test="set-password"
-              @click="setPassword"
-            >
-              Save the password
-            </UButton>
-          </div>
-        </UFormField>
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          Theatre addresses sign in with Google and cannot hold a password.
-        </p>
+      <UButton
+        v-if="ready && isSupported && !passkeyNext"
+        icon="i-lucide-fingerprint"
+        color="neutral"
+        variant="subtle"
+        :loading="enrolling"
+        data-test="add-passkey"
+        @click="addPasskey"
+      >
+        Add a passkey
+      </UButton>
+      <p
+        v-else-if="ready && !isSupported"
+        class="text-sm text-muted"
+      >
+        This browser cannot hold a passkey.
+      </p>
+    </div>
+  </UPageCard>
 
-        <UButton
-          v-if="isSupported"
-          icon="i-lucide-fingerprint"
-          color="neutral"
-          variant="subtle"
-          :loading="enrolling"
-          data-test="add-passkey"
-          @click="addPasskey"
-        >
-          Add a passkey
-        </UButton>
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          This browser cannot hold a passkey.
-        </p>
-      </div>
-    </template>
+  <UPageCard
+    v-if="passkeyNext"
+    class="mt-6"
+    title="Add a passkey"
+    description="Sign in with your fingerprint, your face or your screen lock: nothing to type, and nothing anybody can steal from you or from us."
+    highlight
+    data-test="next-step"
+  >
+    <div>
+      <UButton
+        icon="i-lucide-fingerprint"
+        :loading="enrolling"
+        data-test="add-passkey"
+        @click="addPasskey"
+      >
+        Add a passkey
+      </UButton>
+    </div>
   </UPageCard>
 
   <ConfirmModal

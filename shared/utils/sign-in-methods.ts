@@ -91,3 +91,20 @@ export function refusalToAddPassword(account: { email: string }): string | null 
     ? 'That address signs in with Google and cannot hold a password'
     : null
 }
+
+export type SecurityStep = 'authenticator' | 'passkey'
+
+export interface SecurityStanding {
+  authenticatorRequired: boolean
+  authenticatorConfirmed: boolean
+  passkeySupported: boolean
+  holdsPasskey: boolean
+}
+
+// The one step the security page puts first (issue 1344): an authenticator a role needs before
+// anything (A-112), then a passkey where the browser can hold one and none is held (A-105).
+export function securityNextStep(standing: SecurityStanding): SecurityStep | null {
+  if (standing.authenticatorRequired && !standing.authenticatorConfirmed) return 'authenticator'
+  if (standing.passkeySupported && !standing.holdsPasskey) return 'passkey'
+  return null
+}

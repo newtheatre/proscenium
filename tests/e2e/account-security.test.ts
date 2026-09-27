@@ -247,4 +247,76 @@ describe.skipIf(skip !== null)('managing a second factor on the account (A-109, 
   }, CASE_TIMEOUT_MS)
 })
 
+// Whether the first element comes before the second in the page, which is the order a reader meets them.
+const before = (first: string, second: string): string =>
+  `Boolean(document.querySelector(${JSON.stringify(first)})?.compareDocumentPosition(document.querySelector(${JSON.stringify(second)})) & Node.DOCUMENT_POSITION_FOLLOWING)`
+
+describe.skipIf(skip !== null)('the security page leads with the viewer\'s next step (issue 1344)', () => {
+  test('it is headed as the settings list names it, the ways in first and your data at the foot', async () => {
+    const { view } = await registerAndSignIn('ordered')
+    try {
+      await visit(view, `${app.baseURL}/account/security`, '[data-test="methods"]')
+      // The authenticator card is a second read, so it may land after the list.
+      await waitFor(view, 'document.querySelector(\'[data-test="begin"]\')')
+      expect(await textOf(view, '[data-test="account-security-page"] h1')).toBe('Security')
+      expect(await view.evaluate<boolean>(before('[data-test="methods"]', '[data-test="new-password"]'))).toBe(true)
+      expect(await view.evaluate<boolean>(before('[data-test="methods"]', '[data-test="begin"]'))).toBe(true)
+      expect(await view.evaluate<boolean>(before('[data-test="begin"]', '[data-test="export"]'))).toBe(true)
+      expect(await view.evaluate<boolean>(before('[data-test="new-password"]', '[data-test="close-account"]'))).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a privileged password account is asked for the authenticator its role needs, straight after the ways in', async () => {
+    const { email, view } = await registerAndSignIn('asked')
+    try {
+      expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', email, app.databaseFile]).exitCode).toBe(0)
+      await visit(view, `${app.baseURL}/account/security`, '[data-test="next-step"]')
+      expect(await textOf(view, '[data-test="next-step"]')).toContain('Your role needs an authenticator app')
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="next-step"] [data-test="begin"]'))`)).toBe(true)
+      expect(await view.evaluate<boolean>(before('[data-test="methods"]', '[data-test="next-step"]'))).toBe(true)
+      expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="next-step"]')?.innerText.includes('Add a passkey')`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('anybody else whose browser can hold a passkey is offered one as the next step', async () => {
+    const { view } = await registerAndSignIn('passkey-next')
+    try {
+      await visit(view, `${app.baseURL}/account/security`, '[data-test="methods"]')
+      if (await view.evaluate<boolean>('typeof window.PublicKeyCredential === "function"')) {
+        await waitFor(view, 'document.querySelector(\'[data-test="next-step"]\')')
+        expect(await textOf(view, '[data-test="next-step"]')).toContain('Add a passkey')
+        expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="next-step"] [data-test="add-passkey"]'))`)).toBe(true)
+      }
+      else {
+        expect(await view.evaluate<boolean>(`document.querySelector('[data-test="next-step"]') === null`)).toBe(true)
+      }
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the address is changed from Profile, not from here', async () => {
+    const { view } = await registerAndSignIn('email-on-profile')
+    try {
+      await visit(view, `${app.baseURL}/account/security`, '[data-test="methods"]')
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="new-email"]') === null`)).toBe(true)
+      await visit(view, `${app.baseURL}/account/profile`, '[data-test="profile-form"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="new-email"]\')')
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="change-email"]'))`)).toBe(true)
+      // Outside the profile form, so Enter in the address cannot submit the profile.
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="profile-form"] [data-test="new-email"]') === null`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
