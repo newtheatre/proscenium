@@ -6,6 +6,7 @@ import { boundStatement, createTestDatabase, rows, sql } from '#tests/helpers/da
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { PerformanceReference } from '#server/utils/programme'
 import type { TestDatabase } from '#tests/helpers/database'
+import type { TonightsPerformance } from '#tests/helpers/programme'
 import type { SQL } from 'drizzle-orm'
 
 // A count correlated into a caller's query aliases its own tables privately, so a caller whose own
@@ -29,7 +30,7 @@ function read(database: TestDatabase, statement: SQL): number {
 
 // Two houses side by side, each with its own booking at the door and a seat per pass admission,
 // the second house holding more of everything so a count that reads both is caught.
-function twoHouses(database: TestDatabase): { mine: ReturnType<typeof tonightsPerformance>, other: ReturnType<typeof tonightsPerformance> } {
+function twoHouses(database: TestDatabase): { mine: TonightsPerformance, other: TonightsPerformance } {
   const mine = tonightsPerformance(database, { suffix: 'mine' })
   const other = tonightsPerformance(database, { suffix: 'other' })
   database.batch([
@@ -65,7 +66,7 @@ describe('the night report\'s pass counts read only the caller\'s house (E-123, 
     ['Fellowship admissions', fellowshipAdmittedSeatsSubquery, 1],
   ]
 
-  test.each(COUNTS)('%s: bound, and through a caller\'s own r, t, a or p', async (_, count, expected) => {
+  test.each(COUNTS)('%s: bound, and through a caller\'s own r, t, a, p or pt', async (_, count, expected) => {
     await withDatabase((database) => {
       const { mine } = twoHouses(database)
       expect(read(database, sql`SELECT ${count(sql`${mine.performanceId}`)} AS n`)).toBe(expected)
@@ -73,6 +74,7 @@ describe('the night report\'s pass counts read only the caller\'s house (E-123, 
       expect(read(database, sql`SELECT ${count(sql`t.performance_id`)} AS n FROM tickets t WHERE t.id = 't-mine-0'`)).toBe(expected)
       expect(read(database, sql`SELECT ${count(sql`a.performance_id`)} AS n FROM pass_admissions a WHERE a.id = 'admission-mine-0'`)).toBe(expected)
       expect(read(database, sql`SELECT ${count(sql`p.id`)} AS n FROM performances p WHERE p.id = ${mine.performanceId}`)).toBe(expected)
+      expect(read(database, sql`SELECT ${count(sql`pt.id`)} AS n FROM performances pt WHERE pt.id = ${mine.performanceId}`)).toBe(expected)
     })
   })
 })
