@@ -660,10 +660,11 @@ an attachment is never retried because the attachment was the caller's and is no
 `notify()` ran. A suppression is terminal and never enters the sweep: the predicate is `FAILED`
 alone, and retrying a muted topic would send the thing a member switched off.
 
-`notifyAddress()` is the way to send to a configured address rather than an account (E-124's night
-report recipients). It logs a row with no `user_id`, carries the recipient inside the retry payload
-because no account will resolve one next time, and is retried exactly like any other send, judged
-on its address alone. It still needs a registered type.
+`notifyAddress()` is the way to send to a configured address rather than an account. Nothing calls
+it since issue 1356 made every night report recipient an account's address. It logs a row with no
+`user_id`, carries the recipient inside the retry payload because no account will resolve one
+next time, and is retried exactly like any other send, judged on its address alone. It still
+needs a registered type.
 
 The prune deletes from `notification_log` and nothing else. Nothing in that table is kept
 indefinitely, which is what makes age the whole rule here; the backstage board's own purge is the
@@ -1724,13 +1725,15 @@ role named in `NIGHT_REPORT_ROLES` (unset until a workshop confirms it), read by
 `reportRoleHoldersQuery()` at the moment the report goes, plus the closer's own address,
 deduplicated, one `sendRaw()` per recipient and one `night_report_deliveries` row per attempt,
 `SENT` or `FAILED` (criterion 4). Roles rather than addresses since issue 1356: a grant lapses at
-the committee year end (0009), so the report follows the post without anybody editing a list, and
-an erased or disabled account is not written to. `sendRaw()` is `notify.ts`'s one sanctioned
-raw-address path, so a standing recipient's own topic preferences do not hold the report back. Automatic retry until delivered
-and the operations-dashboard surfacing criterion 4 also asks for are H-105 and H-106's own scope,
-not this route's: H-105 has since shipped `notifyAddress()` for exactly this shape of send, but
-this file predates it and is not yet wired to it (`docs/known-issues.md`), so a failed send here
-stops after the one attempt, recorded as `FAILED` rather than retried.
+the committee year end (0009), so the report follows the post without anybody editing a list.
+The holders are read through `holdsLiveGrant()` (`server/utils/roles-register.ts`), the same
+fragment the tab holders and an announcement's role holders use, so an erased or disabled
+account, or one nobody has signed into yet (0088), is not written to. `sendRaw()` is
+`notify.ts`'s one sanctioned raw-address path, so a standing recipient's own topic preferences do
+not hold the report back. Automatic retry until delivered and the operations-dashboard surfacing
+criterion 4 also asks for are H-105 and H-106's own scope, not this route's: distribution is not
+yet wired to `notify()` (`docs/known-issues.md`), so a failed send here stops after the one
+attempt, recorded as `FAILED` rather than retried.
 
 An addendum (`POST /api/admin/night-reports/addenda`) is not shift-scoped: a correction can be found
 days after the night ends, when nobody holds a live shift on it any more, so the guard is the

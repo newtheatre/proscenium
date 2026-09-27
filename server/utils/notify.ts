@@ -340,15 +340,15 @@ async function resendToAddress(event: H3Event | undefined, id: string, type: Mes
 
 export interface AddressedNotification {
   type: string
-  // A configured operational address rather than an account: a night report's recipient list,
-  // for instance. No preference and no verification apply, because there is nobody to ask.
+  // A configured operational address rather than an account. No preference and no verification
+  // apply, because there is nobody to ask.
   to: string
   context: TemplateContext
   claim?: string
 }
 
 // Sends to a configured address, logging a row with no `user_id` that the retry sweep drives
-// exactly like any other. The one path for a recipient the system holds no account for (E-124).
+// exactly like any other: the one path for a recipient with no account behind it (H-105).
 export async function notifyAddress(event: H3Event | undefined, notification: AddressedNotification): Promise<Status> {
   const type = messageType(notification.type)
   const logged = { userId: null, type: notification.type, channel: 'EMAIL' as Channel, claim: notification.claim }
@@ -500,8 +500,8 @@ export interface RawMessage {
   text: string
 }
 
-// For a recipient with no account behind it, such as a committee-configured address (E-124):
-// `notification_log`'s shape assumes a user on every row, so the caller logs its own outcome.
+// A raw send that logs nothing: the night report records each outcome on its own delivery row
+// (E-124), so a caller of this keeps its own record rather than `notification_log`'s.
 export async function sendRaw(event: H3Event | undefined, message: RawMessage): Promise<{ ok: true } | { ok: false, error: string }> {
   try {
     await transportFor(event).send({

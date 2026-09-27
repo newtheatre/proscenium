@@ -147,15 +147,20 @@ describe('whom a member asks about a role not open yet (issue 1318)', () => {
     database.batch([['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', `${userId}-${role}`, userId, role, expiresAt]])
   }
 
-  test('a live Front of House Manager is named; a lapsed one, a disabled one and another role are not', async () => {
+  // Pending is not holding (0088): an account nobody has signed into yet is nobody to ask.
+  test('a live Front of House Manager is named; a lapsed, disabled or pending one and another role are not', async () => {
     await withDatabase((database) => {
       const now = Math.floor(Date.now() / 1000)
-      for (const id of ['live', 'lapsed', 'disabled', 'treasurer']) person(database, id)
+      for (const id of ['live', 'lapsed', 'disabled', 'treasurer', 'pending']) person(database, id)
       grant(database, 'live', 'FOH_MANAGER', now + 86_400)
       grant(database, 'lapsed', 'FOH_MANAGER', now - 86_400)
       grant(database, 'disabled', 'FOH_MANAGER', null)
       grant(database, 'treasurer', 'TREASURER', null)
-      database.batch([['UPDATE users SET disabled = 1 WHERE id = ?', 'disabled']])
+      grant(database, 'pending', 'FOH_MANAGER', null)
+      database.batch([
+        ['UPDATE users SET disabled = 1 WHERE id = ?', 'disabled'],
+        ['UPDATE users SET last_login_at = ? WHERE id IN (?, ?, ?, ?)', now - 60, 'live', 'lapsed', 'disabled', 'treasurer'],
+      ])
 
       expect(run(database, fohManagersQuery(now)).map(row => row.name)).toEqual(['Someone live'])
     })

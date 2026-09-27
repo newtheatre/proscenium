@@ -376,7 +376,8 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
      Amended 27 September 2026 (issue 1356): the recipients are chosen by role, not by address.
      The report goes to every account holding a live grant of a named role when it is sent, plus
      the closer, so a role that changes hands at the committee year end moves the report with it
-     and nobody edits a list of addresses. An erased or disabled account is not written to.
+     and nobody edits a list of addresses. An erased or disabled account, or one nobody has
+     signed into yet (0088), is not written to.
   4. Failed sends retry automatically and surface on the operations dashboard until delivered; the report row records each distribution outcome.
   5. A frozen report is immutable; a later correction is an addendum entry linked to the report and distributed the same way.
 - Source: Prompt Book E-5; audit PR-10 (uniquely-keyed snapshot and email carry).

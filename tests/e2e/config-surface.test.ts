@@ -131,8 +131,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
     }
   })
 
-  // Audit detail carries identifiers and never people, so a recipients list is hashed (0011, 0024).
-  // Issue 1356: the night report names roles, which identify nobody, so no address is stored here.
+  // A role identifies nobody, so the night report's roles are audited as themselves (0024, issue 1356).
   test('the night report goes to roles, taking no address, audited with the roles', async () => {
     try {
       expect((await send('PUT', '/api/admin/config/NIGHT_REPORT_ROLES', { value: ['duty@newtheatre.org.uk'] }, cookie)).status).toBe(400)
@@ -155,6 +154,8 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect((await send('PUT', '/api/admin/config/BAR_AUTHORISED_TAB_HOLDERS', { value: [someone!.id] }, cookie)).status).toBe(200)
       expect((await settingFor('BAR_AUTHORISED_TAB_HOLDERS')).people).toEqual([{ id: someone!.id, name: bystander.name }])
       expect(auditFor('BAR_AUTHORISED_TAB_HOLDERS')!.detail).not.toContain(bystander.name)
+      expect(auditFor('BAR_AUTHORISED_TAB_HOLDERS')!.detail).not.toContain(someone!.id)
+      expect(JSON.parse(auditFor('BAR_AUTHORISED_TAB_HOLDERS')!.detail)).toMatchObject({ redacted: true })
       expect((await settingFor('BAR_TAB_CAP_PENCE')).people).toBeNull()
     }
     finally {

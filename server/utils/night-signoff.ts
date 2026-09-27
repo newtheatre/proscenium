@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { configValue } from './configuration'
 import { sendRaw } from './notify'
+import { holdsLiveGrant } from './roles-register'
 import type { NightReport } from './night-report'
 import type { NightAuthorityVia } from '#shared/utils/night-authority'
 import type { SQL } from 'drizzle-orm'
@@ -105,18 +106,12 @@ function deliveryStatement(input: { id: string, reportId: string, addendumId: st
   `
 }
 
-// Whoever holds a named role at the moment the report goes, so a grant lapsed at the year end sends
-// nothing (E-124 criterion 3, 0009). The roles are one JSON parameter, never an expanded list (0006).
+// Whoever holds a named role when the report goes, on an account somebody uses: a grant lapsed at
+// the year end, or on an account nobody has claimed, sends nothing (E-124 criterion 3, 0009, 0088).
 export function reportRoleHoldersQuery(roles: readonly string[], now: number): SQL {
   return sql`
     SELECT u.email AS email FROM users u
-    WHERE u.anonymised_at IS NULL AND u.disabled = 0
-      AND EXISTS (
-        SELECT 1 FROM role_grants rg
-        WHERE rg.user_id = u.id
-          AND rg.role IN (SELECT value FROM json_each(${JSON.stringify(roles)}))
-          AND (rg.expires_at IS NULL OR rg.expires_at > ${now})
-      )
+    WHERE ${holdsLiveGrant(sql`u.id`, roles, now)}
     ORDER BY u.email
   `
 }
@@ -124,13 +119,7 @@ export function reportRoleHoldersQuery(roles: readonly string[], now: number): S
 // Ships unset until a workshop confirms it (0019): distribution to the standing roles is then
 // simply empty, rather than an unset key blocking the freeze itself.
 async function configuredRecipients(event: H3Event | undefined): Promise<string[]> {
-  let roles: string[]
-  try {
-    roles = await configValue(event, 'NIGHT_REPORT_ROLES')
-  }
-  catch {
-    return []
-  }
+  const roles = await configValue(event, 'NIGHT_REPORT_ROLES').catch(() => [])
   if (!roles.length) return []
   const holders = await db.all<{ email: string }>(reportRoleHoldersQuery(roles, Math.floor(Date.now() / 1000)))
   return holders.map(holder => holder.email)

@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { configValue } from './configuration'
 import { notify } from './notify'
+import { holdsLiveGrant } from './roles-register'
 import { render } from './templates'
 import { auditEntry } from '#shared/utils/audit'
 import { londonDay } from '#shared/utils/membership'
@@ -17,8 +18,8 @@ import type { Rendered } from '#server/utils/templates'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
-// Admin fan-out (H-108). Each audience is its own small query rather than a shared predicate
-// imported from `directory.ts`, kept self-contained for the Bun graph (CONTRIBUTING).
+// Admin fan-out (H-108). Each audience is its own small query; the role holders share
+// `roles-register.ts`'s live-grant fragment with the tab holders and the night report.
 
 // Anonymised excluded at the query layer in every branch (H-107 criterion 2): a fan-out cannot
 // enumerate one even by a caller's mistake, because the row is never in the result at all.
@@ -37,16 +38,13 @@ export function allCurrentMembersQuery(today: string, graceDays: number): SQL {
   `
 }
 
+// A holder is a live grant on an account somebody uses: pending is not holding (0088).
 export function roleHoldersQuery(role: string, nowEpoch: number): SQL {
   return sql`
     SELECT u.id AS id
     FROM users u
     WHERE u.anonymised_at IS NULL
-      AND EXISTS (
-        SELECT 1 FROM role_grants rg
-        WHERE rg.user_id = u.id AND rg.role = ${role}
-          AND (rg.expires_at IS NULL OR rg.expires_at > ${nowEpoch})
-      )
+      AND ${holdsLiveGrant(sql`u.id`, [role], nowEpoch)}
   `
 }
 

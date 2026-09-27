@@ -21,12 +21,12 @@ async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>
 
 function people(database: TestDatabase): void {
   database.batch([
-    ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-named', 'named@example.invalid', 'Named Person'],
-    ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-committee', 'committee@example.invalid', 'Committee Member'],
-    ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-lapsed', 'lapsed@example.invalid', 'Lapsed Member'],
-    ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-permanent', 'permanent@example.invalid', 'Permanent Member'],
-    ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-other-role', 'other@example.invalid', 'Other Role'],
-    ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-nobody', 'nobody@example.invalid', 'Nobody'],
+    ['INSERT INTO users (id, email, name, verified, last_login_at) VALUES (?, ?, ?, 1, ?)', 'u-named', 'named@example.invalid', 'Named Person', NOW - DAY],
+    ['INSERT INTO users (id, email, name, verified, last_login_at) VALUES (?, ?, ?, 1, ?)', 'u-committee', 'committee@example.invalid', 'Committee Member', NOW - DAY],
+    ['INSERT INTO users (id, email, name, verified, last_login_at) VALUES (?, ?, ?, 1, ?)', 'u-lapsed', 'lapsed@example.invalid', 'Lapsed Member', NOW - DAY],
+    ['INSERT INTO users (id, email, name, verified, last_login_at) VALUES (?, ?, ?, 1, ?)', 'u-permanent', 'permanent@example.invalid', 'Permanent Member', NOW - DAY],
+    ['INSERT INTO users (id, email, name, verified, last_login_at) VALUES (?, ?, ?, 1, ?)', 'u-other-role', 'other@example.invalid', 'Other Role', NOW - DAY],
+    ['INSERT INTO users (id, email, name, verified, last_login_at) VALUES (?, ?, ?, 1, ?)', 'u-nobody', 'nobody@example.invalid', 'Nobody', NOW - DAY],
     ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-live', 'u-committee', 'COMMITTEE', NOW + 30 * DAY],
     ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-lapsed', 'u-lapsed', 'COMMITTEE', NOW - DAY],
     ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, NULL)', 'g-permanent', 'u-permanent', 'COMMITTEE'],
@@ -79,6 +79,14 @@ describe('who a charge to a tab is refused for (F-108 criterion 1, issue 1264)',
     people(database)
     database.batch([['UPDATE users SET disabled = 1 WHERE id IN (?, ?)', 'u-named', 'u-committee']])
     expect(holders(database, ['u-named'], ['COMMITTEE'])).toEqual(['u-permanent'])
+  }))
+
+  // Pending is not holding (0088): a grant on an account nobody has claimed extends no credit.
+  test('a role held by an account nobody has signed into yet authorises nobody', () => withDatabase((database) => {
+    people(database)
+    database.batch([['UPDATE users SET last_login_at = NULL WHERE id = ?', 'u-committee']])
+    expect(holders(database, [], ['COMMITTEE'], 'u-committee')).toEqual([])
+    expect(holders(database, [], ['COMMITTEE'], 'u-permanent')).toEqual(['u-permanent'])
   }))
 
   test('the till lists both kinds together, once each and by name', () => withDatabase((database) => {

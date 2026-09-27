@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { configValue } from '#server/utils/configuration'
+import { holdsLiveGrant } from '#server/utils/roles-register'
 import { tabBalanceQuery } from '#server/utils/tab-settlement'
 import type { H3Event } from 'h3'
 import type { SQL } from 'drizzle-orm'
@@ -8,8 +9,8 @@ import type { SQL } from 'drizzle-orm'
 // Who may charge to a tab, and what they already owe (F-108). The charge and its write are
 // `server/utils/sale.ts`'s; who may wave a charge past the cap is `bar-authority.ts`'s.
 
-// Named people, or anybody holding a live grant of a named role (F-108 criterion 1, 0009). Each
-// list is one JSON parameter and the grants a subquery, never an expanded id list (0003, 0006).
+// Named people, or anybody holding a live grant of a named role on an account they use (F-108
+// criterion 1, 0009, 0088). Each list is one JSON parameter, never an expanded id list (0003, 0006).
 export function authorisedTabHoldersQuery(ids: readonly string[], roles: readonly string[], now: number, only?: string): SQL {
   return sql`
     SELECT u.id, u.name FROM users u
@@ -18,12 +19,7 @@ export function authorisedTabHoldersQuery(ids: readonly string[], roles: readonl
       ${only === undefined ? sql`` : sql`AND u.id = ${only}`}
       AND (
         u.id IN (SELECT value FROM json_each(${JSON.stringify(ids)}))
-        OR EXISTS (
-          SELECT 1 FROM role_grants rg
-          WHERE rg.user_id = u.id
-            AND rg.role IN (SELECT value FROM json_each(${JSON.stringify(roles)}))
-            AND (rg.expires_at IS NULL OR rg.expires_at > ${now})
-        )
+        OR ${holdsLiveGrant(sql`u.id`, roles, now)}
       )
     ORDER BY u.name COLLATE NOCASE
   `

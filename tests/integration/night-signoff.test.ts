@@ -281,28 +281,35 @@ describe('reportRoleHoldersQuery', () => {
   const addresses = (database: TestDatabase, roles: string[]): string[] =>
     run(database, reportRoleHoldersQuery(roles, NOW)).map(row => row.email as string)
 
+  // Somebody who has signed in: an account nobody has claimed yet holds nothing (0088).
+  function holder(database: TestDatabase, id: string): string {
+    person(database, id)
+    database.batch([['UPDATE users SET last_login_at = ? WHERE id = ?', NOW - 60, id]])
+    return id
+  }
+
   test('reaches every live holder of a named role, and nobody holding another', async () => {
     await withDatabase((database) => {
-      grant(database, person(database, 'foh'), 'FOH_MANAGER')
-      grant(database, person(database, 'safety'), 'SAFETY_OFFICER')
-      grant(database, person(database, 'bar'), 'BAR_MANAGER')
-      expect(addresses(database, ['FOH_MANAGER', 'SAFETY_OFFICER']).sort())
+      grant(database, holder(database, 'foh'), 'FOH_MANAGER')
+      grant(database, holder(database, 'safety'), 'SAFETY_OFFICER')
+      grant(database, holder(database, 'bar'), 'BAR_MANAGER')
+      expect(addresses(database, ['FOH_MANAGER', 'SAFETY_OFFICER']))
         .toEqual(['foh@e2e.newtheatre.org.uk', 'safety@e2e.newtheatre.org.uk'])
     })
   })
 
   test('a grant that has lapsed reaches nobody', async () => {
     await withDatabase((database) => {
-      grant(database, person(database, 'last-year'), 'FOH_MANAGER', NOW - 3600)
-      grant(database, person(database, 'this-year'), 'FOH_MANAGER', NOW + 3600)
+      grant(database, holder(database, 'last-year'), 'FOH_MANAGER', NOW - 3600)
+      grant(database, holder(database, 'this-year'), 'FOH_MANAGER', NOW + 3600)
       expect(addresses(database, ['FOH_MANAGER'])).toEqual(['this-year@e2e.newtheatre.org.uk'])
     })
   })
 
   test('an erased or disabled holder is not written to', async () => {
     await withDatabase((database) => {
-      grant(database, person(database, 'erased'), 'SAFETY_OFFICER')
-      grant(database, person(database, 'disabled'), 'SAFETY_OFFICER')
+      grant(database, holder(database, 'erased'), 'SAFETY_OFFICER')
+      grant(database, holder(database, 'disabled'), 'SAFETY_OFFICER')
       database.batch([
         ['UPDATE users SET anonymised_at = ? WHERE id = ?', NOW, 'erased'],
         ['UPDATE users SET disabled = 1 WHERE id = ?', 'disabled'],
@@ -311,9 +318,18 @@ describe('reportRoleHoldersQuery', () => {
     })
   })
 
+  // A grant made to a typed address before anybody claimed it must not mail the report there.
+  test('a holder nobody has signed into yet is not written to', async () => {
+    await withDatabase((database) => {
+      grant(database, person(database, 'pending'), 'SAFETY_OFFICER')
+      grant(database, holder(database, 'claimed'), 'SAFETY_OFFICER')
+      expect(addresses(database, ['SAFETY_OFFICER'])).toEqual(['claimed@e2e.newtheatre.org.uk'])
+    })
+  })
+
   test('somebody holding two named roles is written to once, and no roles reach nobody', async () => {
     await withDatabase((database) => {
-      const both = person(database, 'both')
+      const both = holder(database, 'both')
       grant(database, both, 'FOH_MANAGER')
       grant(database, both, 'SAFETY_OFFICER')
       expect(addresses(database, ['FOH_MANAGER', 'SAFETY_OFFICER'])).toEqual(['both@e2e.newtheatre.org.uk'])

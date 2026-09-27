@@ -95,8 +95,9 @@ decision does not block the gate, it ships the default.
 
 The proposed values are shipped in `shared/utils/config.ts`, one validated key each, and a workshop
 amending one is a settings change rather than a release (0012, 0019). One row above has no
-proposed value: the night report roles, which ship unset until a session confirms them (0019). Retention is the reverse case: its periods and caps carry values, but no session has
-proposed a warning cadence, so `RETENTION_WARNING_DAYS` and `RETENTION_FINAL_WARNING_DAYS` ship
+proposed value: the night report roles, which ship unset until a session confirms them (0019).
+Retention is the reverse case: its periods and caps carry values, but no session has proposed a
+warning cadence, so `RETENTION_WARNING_DAYS` and `RETENTION_FINAL_WARNING_DAYS` ship
 unset and the sweep refuses to run until the IT Manager sets them (A-126). The performance
 reminder is the third case: it has a proposed value but ships unset until a session confirms it,
 because the story it serves (H-205) is V2 and a figure nobody has confirmed should not start
