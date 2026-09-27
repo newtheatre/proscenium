@@ -106,7 +106,7 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
     title="Checklist"
     :refused="refusal"
     hint="Tick each item, or say why it cannot be done tonight. The night closes from the night report."
-    :empty="items.length === 0"
+    :empty="!busy && items.length === 0"
     :stale="syncedAt"
     :busy="busy"
   >

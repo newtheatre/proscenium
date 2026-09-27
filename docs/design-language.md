@@ -154,7 +154,7 @@ consequences list. The sidebar carries fifty-four, which is why each group split
 and Set-up first (0082): search finds a screen whose name you already know, and the sections are
 what make an unfamiliar one findable at all.
 
-Nine rules follow:
+Eleven rules follow:
 
 1. **A permanently dark region is marked `dark`.** The public header and footer are stage black
    in both colour modes. That is one class on the subtree, after which every semantic token
@@ -279,8 +279,9 @@ Nine rules follow:
 11. **A show-night overlay is a sheet, not the desk modal.** `NightSheet` rises from the foot of
     the phone with its title and nothing else above the work: no description, no corner cross to
     aim for. A choice is `NightChoices`, tiles of 48 pixels two across, never a dropdown; the focus
-    opens on the first choice, or the first field where there is none; the primary is full width
-    in the footer with Back beneath it. A choice that is itself the action, such as the right call
+    opens on the first choice, or the body's first field where there is none, and on Back where
+    there is neither, so Enter never fires a reset or an approval unasked; the primary is full
+    width in the footer with Back beneath it. A choice that is itself the action, such as the right call
     on the backstage board, needs no primary. The incident log is one sheet, Log something, whose
     kind is a choice with Near miss chosen already. `tests/unit/night-sheet.test.ts` holds the
     rule for every overlay the show-night screens own (issue 1317, K-102). The till's own dialogues

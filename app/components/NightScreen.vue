@@ -21,16 +21,14 @@ setNightEyebrow(() => props.title)
 // takes away; a phone that cannot remember shows it every time (issue 1317).
 const seenBefore = ref(true)
 onMounted(() => {
-  const key = nightHintSeenKey(props.title)
-  try {
-    seenBefore.value = localStorage.getItem(key) !== null
-    localStorage.setItem(key, '1')
-  }
-  catch {
-    seenBefore.value = false
-  }
+  seenBefore.value = !firstUseOnDevice(nightHintSeenKey(props.title))
 })
 const showsHint = computed(() => Boolean(props.hint) && nightHintShows({ empty: props.empty ?? false, seenBefore: seenBefore.value }))
+// Remembered once drawn on a screen that loaded for this viewer, so a refusal or a failed first
+// load never uses the hint up.
+watch(() => showsHint.value && !props.refused && props.stale != null, (drawn) => {
+  if (drawn) rememberHint(nightHintSeenKey(props.title))
+})
 </script>
 
 <template>

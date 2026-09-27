@@ -124,3 +124,23 @@ export async function primeNightCache<T>(key: NightCacheKey, load: () => T | Pro
     return false
   }
 }
+
+// Whether a screen's first-use hint is still to be seen on this device; a device that refuses
+// storage is always new, so it shows the hint every time (issue 1317).
+export function firstUseOnDevice(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === null
+  }
+  catch {
+    return true
+  }
+}
+
+export function rememberHint(key: string): void {
+  try {
+    localStorage.setItem(key, '1')
+  }
+  catch {
+    // Nothing to remember it in: the hint shows again next time, which is the safe side.
+  }
+}

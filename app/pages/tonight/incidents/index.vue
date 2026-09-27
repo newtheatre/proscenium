@@ -209,7 +209,7 @@ async function submitCorrect(): Promise<void> {
       title="Contacts and incidents"
       :refused="refusal"
       hint="Every entry is timed, named and printed in the night report. A mistake is corrected with a new entry, never an edit."
-      :empty="items.length === 0"
+      :empty="!busy && items.length === 0"
       :stale="syncedAt"
       :busy="busy"
     >

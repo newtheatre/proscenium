@@ -55,7 +55,7 @@ describe('a night overlay is a sheet, not the desk modal (issue 1317, K-102)', (
     expect(source).toContain('[data-slot="body"] :is(input, textarea, select, button)')
     expect(source).toContain('[data-sheet-back]')
     expect(source).toMatch(/<UButton[^>]*data-sheet-back[^>]*>\s*\{\{ CONFIRM_BACK_LABEL \}\}/)
-    expect(source).not.toContain("querySelector<HTMLElement>('input, textarea, select, button')")
+    expect(source).not.toContain('querySelector<HTMLElement>(\'input, textarea, select, button\')')
   })
 
   test('a choice is a 48 pixel tile', async () => {

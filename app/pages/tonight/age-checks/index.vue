@@ -83,10 +83,10 @@ const performanceOptions = computed(() => [
 ])
 
 interface FormState {
-  performanceId: string
+  performanceId: string | null
   outcome: AgeCheckOutcome
-  idType: IdType | undefined
-  reason: RefusalReason | undefined
+  idType: IdType | null
+  reason: RefusalReason | null
   description: string
   product: string
   notes: string
@@ -95,8 +95,8 @@ interface FormState {
 const blankForm = (): FormState => ({
   performanceId: (performances.value.find(one => one.active) ?? performances.value[0])?.id ?? '',
   outcome: 'ACCEPTED',
-  idType: undefined,
-  reason: undefined,
+  idType: null,
+  reason: null,
   description: '',
   product: '',
   notes: '',
@@ -113,10 +113,11 @@ const saving = ref(false)
 
 // Picking a side clears the other one, so a value the form has stopped asking about is never
 // still sitting in it when the write goes (E-118 criterion 1). Visibly over 25 asks for neither.
-function chooseOutcome(form: { outcome: AgeCheckOutcome, idType: IdType | undefined, reason: RefusalReason | undefined }, outcome: AgeCheckOutcome): void {
+function chooseOutcome(form: { outcome: AgeCheckOutcome, idType: IdType | null, reason: RefusalReason | null }, outcome: AgeCheckOutcome | null): void {
+  if (!outcome) return
   form.outcome = outcome
-  if (outcome !== 'ACCEPTED') form.idType = undefined
-  if (outcome !== 'REFUSED') form.reason = undefined
+  if (outcome !== 'ACCEPTED') form.idType = null
+  if (outcome !== 'REFUSED') form.reason = null
 }
 
 // What the entry says under its description: the ID, the reason, or that no ID was asked for.
@@ -128,8 +129,8 @@ function saysBasis(entry: { outcome: AgeCheckOutcome, idType: IdType | null, rea
 
 const logReady = computed(() => ageCheckReady({
   outcome: logForm.outcome,
-  idType: logForm.idType ?? null,
-  reason: logForm.reason ?? null,
+  idType: logForm.idType,
+  reason: logForm.reason,
   description: logForm.description,
 }))
 
@@ -172,14 +173,14 @@ async function submitLog(): Promise<void> {
 
 const correcting = ref<Entry | null>(null)
 const correctForm = reactive<Omit<FormState, 'performanceId'>>({
-  outcome: 'ACCEPTED', idType: undefined, reason: undefined, description: '', product: '', notes: '',
+  outcome: 'ACCEPTED', idType: null, reason: null, description: '', product: '', notes: '',
 })
 const correctFailure = ref<string | null>(null)
 
 const correctReady = computed(() => ageCheckReady({
   outcome: correctForm.outcome,
-  idType: correctForm.idType ?? null,
-  reason: correctForm.reason ?? null,
+  idType: correctForm.idType,
+  reason: correctForm.reason,
   description: correctForm.description,
 }))
 
@@ -187,8 +188,8 @@ function openCorrect(entry: Entry): void {
   correcting.value = entry
   Object.assign(correctForm, {
     outcome: entry.outcome,
-    idType: entry.idType ?? undefined,
-    reason: entry.reason ?? undefined,
+    idType: entry.idType,
+    reason: entry.reason,
     description: entry.description,
     product: entry.product ?? '',
     notes: entry.notes ?? '',
@@ -224,7 +225,7 @@ async function submitCorrect(): Promise<void> {
       title="Challenge 25 register"
       :refused="refusal"
       hint="Every entry stays visible once filed. A mistake is corrected with a new entry, never an edit."
-      :empty="items.length === 0"
+      :empty="!busy && items.length === 0"
       :stale="syncedAt"
       :busy="busy"
     >
@@ -327,65 +328,30 @@ async function submitCorrect(): Promise<void> {
 
         <!-- The routine check is two taps and a sentence: the outcome, the ID, who you saw.
              Everything the register does not need every time folds away (E-118 criterion 1). -->
-        <UFormField label="Outcome">
-          <div
-            class="grid grid-cols-3 gap-2"
-            data-test="log-outcome"
-          >
-            <UButton
-              v-for="option in outcomeOptions"
-              :key="option.value"
-              :color="logForm.outcome === option.value ? 'primary' : 'neutral'"
-              :variant="logForm.outcome === option.value ? 'solid' : 'subtle'"
-              size="lg"
-              class="min-h-12 justify-center font-semibold"
-              :data-test="`log-outcome-${option.value}`"
-              @click="chooseOutcome(logForm, option.value)"
-            >
-              {{ option.label }}
-            </UButton>
-          </div>
-        </UFormField>
+        <NightChoices
+          :model-value="logForm.outcome"
+          label="Outcome"
+          :options="outcomeOptions"
+          :columns="3"
+          test-id="log-outcome"
+          @update:model-value="chooseOutcome(logForm, $event)"
+        />
 
-        <UFormField
-          v-if="logForm.outcome !== 'NOT_REQUIRED'"
-          :label="logForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'"
-        >
-          <div
-            v-if="logForm.outcome === 'ACCEPTED'"
-            class="grid grid-cols-2 gap-2"
-            data-test="log-id-type"
-          >
-            <UButton
-              v-for="option in idTypeOptions"
-              :key="option.value"
-              :color="logForm.idType === option.value ? 'primary' : 'neutral'"
-              :variant="logForm.idType === option.value ? 'solid' : 'subtle'"
-              class="min-h-12 justify-center"
-              :data-test="`log-id-type-${option.value}`"
-              @click="logForm.idType = option.value"
-            >
-              {{ option.label }}
-            </UButton>
-          </div>
-          <div
-            v-else
-            class="grid gap-2"
-            data-test="log-reason"
-          >
-            <UButton
-              v-for="option in reasonOptions"
-              :key="option.value"
-              :color="logForm.reason === option.value ? 'primary' : 'neutral'"
-              :variant="logForm.reason === option.value ? 'solid' : 'subtle'"
-              class="min-h-12 justify-center"
-              :data-test="`log-reason-${option.value}`"
-              @click="logForm.reason = option.value"
-            >
-              {{ option.label }}
-            </UButton>
-          </div>
-        </UFormField>
+        <NightChoices
+          v-if="logForm.outcome === 'ACCEPTED'"
+          v-model="logForm.idType"
+          label="ID shown"
+          :options="idTypeOptions"
+          test-id="log-id-type"
+        />
+        <NightChoices
+          v-else-if="logForm.outcome === 'REFUSED'"
+          v-model="logForm.reason"
+          label="Why refused"
+          :options="reasonOptions"
+          :columns="1"
+          test-id="log-reason"
+        />
 
         <UFormField
           label="Who you checked"
@@ -414,18 +380,14 @@ async function submitCorrect(): Promise<void> {
 
           <template #content>
             <div class="space-y-4 pt-4">
-              <UFormField
+              <NightChoices
                 v-if="performances.length > 0"
+                v-model="logForm.performanceId"
                 label="Performance"
-              >
-                <USelect
-                  v-model="logForm.performanceId"
-                  :items="performanceOptions"
-                  size="xl"
-                  class="w-full"
-                  data-test="log-performance"
-                />
-              </UFormField>
+                :options="performanceOptions"
+                :columns="1"
+                test-id="log-performance"
+              />
 
               <UFormField label="Product">
                 <UInput
@@ -473,65 +435,30 @@ async function submitCorrect(): Promise<void> {
           :description="correctFailure"
         />
 
-        <UFormField label="Outcome">
-          <div
-            class="grid grid-cols-3 gap-2"
-            data-test="correct-outcome"
-          >
-            <UButton
-              v-for="option in outcomeOptions"
-              :key="option.value"
-              :color="correctForm.outcome === option.value ? 'primary' : 'neutral'"
-              :variant="correctForm.outcome === option.value ? 'solid' : 'subtle'"
-              size="lg"
-              class="min-h-12 justify-center font-semibold"
-              :data-test="`correct-outcome-${option.value}`"
-              @click="chooseOutcome(correctForm, option.value)"
-            >
-              {{ option.label }}
-            </UButton>
-          </div>
-        </UFormField>
+        <NightChoices
+          :model-value="correctForm.outcome"
+          label="Outcome"
+          :options="outcomeOptions"
+          :columns="3"
+          test-id="correct-outcome"
+          @update:model-value="chooseOutcome(correctForm, $event)"
+        />
 
-        <UFormField
-          v-if="correctForm.outcome !== 'NOT_REQUIRED'"
-          :label="correctForm.outcome === 'ACCEPTED' ? 'ID shown' : 'Why refused'"
-        >
-          <div
-            v-if="correctForm.outcome === 'ACCEPTED'"
-            class="grid grid-cols-2 gap-2"
-            data-test="correct-id-type"
-          >
-            <UButton
-              v-for="option in idTypeOptions"
-              :key="option.value"
-              :color="correctForm.idType === option.value ? 'primary' : 'neutral'"
-              :variant="correctForm.idType === option.value ? 'solid' : 'subtle'"
-              class="min-h-12 justify-center"
-              :data-test="`correct-id-type-${option.value}`"
-              @click="correctForm.idType = option.value"
-            >
-              {{ option.label }}
-            </UButton>
-          </div>
-          <div
-            v-else
-            class="grid gap-2"
-            data-test="correct-reason"
-          >
-            <UButton
-              v-for="option in reasonOptions"
-              :key="option.value"
-              :color="correctForm.reason === option.value ? 'primary' : 'neutral'"
-              :variant="correctForm.reason === option.value ? 'solid' : 'subtle'"
-              class="min-h-12 justify-center"
-              :data-test="`correct-reason-${option.value}`"
-              @click="correctForm.reason = option.value"
-            >
-              {{ option.label }}
-            </UButton>
-          </div>
-        </UFormField>
+        <NightChoices
+          v-if="correctForm.outcome === 'ACCEPTED'"
+          v-model="correctForm.idType"
+          label="ID shown"
+          :options="idTypeOptions"
+          test-id="correct-id-type"
+        />
+        <NightChoices
+          v-else-if="correctForm.outcome === 'REFUSED'"
+          v-model="correctForm.reason"
+          label="Why refused"
+          :options="reasonOptions"
+          :columns="1"
+          test-id="correct-reason"
+        />
 
         <UFormField
           label="Who you checked"
