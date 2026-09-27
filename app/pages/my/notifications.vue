@@ -14,7 +14,7 @@ interface InboxItem {
 
 const request = useRequestFetch()
 
-// Everything we sent, newest first, whatever the email settings say (H-102 criterion 6, issue 1345).
+// Newest first, and holding whatever an email setting could have silenced (H-102 criterion 6, issue 1345).
 const { data, status, error, refresh } = await useAsyncData(
   'my-notifications',
   () => request<{ items: InboxItem[] }>('/api/account/inbox'),
@@ -35,7 +35,7 @@ useSeoMeta({ title: 'Notifications' })
   >
     <UPageHeader
       title="Notifications"
-      description="Everything we have sent you, newest first. It all lands here even when its email is switched off."
+      description="Notifications we send you here, newest first. Anything an email setting can switch off lands here too, so switching one off never loses it."
       :links="SETTINGS"
       :ui="MEMBER_PAGE_HEADER"
     />
@@ -63,8 +63,8 @@ useSeoMeta({ title: 'Notifications' })
       class="mt-8 text-sm text-muted"
       data-test="inbox-empty"
     >
-      Nothing has come in. A booking, a shift or a training session you sign up to sends its news
-      here.
+      Nothing has come in. News about your room bookings, shifts and training lands here, and so do
+      committee announcements.
     </p>
 
     <ul

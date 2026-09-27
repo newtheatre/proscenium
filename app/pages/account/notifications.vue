@@ -46,7 +46,7 @@ useSeoMeta({ title: 'Email settings' })
   <AccountSettings
     data-test="account-notifications-page"
     title="Email settings"
-    description="Which of these we email you about. Everything lands in your notifications on My NNT whatever you choose, and tickets, receipts, security emails and safety notices always arrive by email."
+    description="We email you about the topics switched on here; each still lands in your notifications on My NNT whatever you choose, and tickets, receipts, security emails and safety notices always arrive by email."
   >
     <UPageCard>
       <div
