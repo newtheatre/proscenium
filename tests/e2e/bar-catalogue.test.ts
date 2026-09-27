@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { sellsWithoutCheckId } from '#shared/utils/bar'
+import { poursRestrictedSwitchedOff } from '#shared/utils/bar'
 import { chooseAction, click, fill, fillNumber, menuOptions, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -399,11 +399,11 @@ describe.skipIf(skip !== null)('a product pouring restricted stock asks for Chec
     return { productId, itemId, itemName, name, categoryId }
   }
 
-  test('the list names each product that pours restricted stock without Check ID, and what it pours', async () => {
+  test('the list names each product that pours restricted stock with Age restricted off, and what it pours', async () => {
     const wine = await aWinePouredUnrestricted()
-    const listed = await listing<ListedProduct & { restrictedPours: string[] }>('/api/admin/bar/products', '&withoutCheckId=true')
+    const listed = await listing<ListedProduct & { restrictedPours: string[] }>('/api/admin/bar/products', '&poursRestrictedSwitchedOff=true')
     expect(listed.find(product => product.id === wine.productId)?.restrictedPours).toEqual([wine.itemName])
-    expect(listed.every(sellsWithoutCheckId)).toBe(true)
+    expect(listed.every(poursRestrictedSwitchedOff)).toBe(true)
   })
 
   test('an edit leaving it unrestricted is refused naming the stocked item; switching it on clears it', async () => {
@@ -421,7 +421,7 @@ describe.skipIf(skip !== null)('a product pouring restricted stock asks for Chec
       categoryId: wine.categoryId,
       ageRestricted: true,
     })).status).toBe(200)
-    const listed = await listing<ListedProduct>('/api/admin/bar/products', '&withoutCheckId=true')
+    const listed = await listing<ListedProduct>('/api/admin/bar/products', '&poursRestrictedSwitchedOff=true')
     expect(listed.some(product => product.id === wine.productId)).toBe(false)
   })
 
@@ -433,7 +433,7 @@ describe.skipIf(skip !== null)('a product pouring restricted stock asks for Chec
       containerMl: 750,
       ageRestricted: false,
     })).status).toBe(200)
-    const listed = await listing<ListedProduct>('/api/admin/bar/products', '&withoutCheckId=true')
+    const listed = await listing<ListedProduct>('/api/admin/bar/products', '&poursRestrictedSwitchedOff=true')
     expect(listed.some(product => product.id === wine.productId)).toBe(false)
   })
 })
