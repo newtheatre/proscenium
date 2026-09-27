@@ -152,6 +152,26 @@ describe.skipIf(skip !== null)('reverting (criterion 3)', () => {
     expect(answered.status).toBe(409)
   })
 
+  // Criterion 6: a revert writes a value as a save does, so a flagged key asks the same of it.
+  test('reverting a flagged key needs the same typed confirmation as saving it', async () => {
+    const floor = CONFIG_KEYS.PRIVILEGED_ROLES.default
+    try {
+      await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: [...floor, 'COMMITTEE'], confirmation: 'PRIVILEGED_ROLES' })
+      await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: [...floor], confirmation: 'PRIVILEGED_ROLES' })
+
+      const unconfirmed = await send('POST', '/api/admin/config/PRIVILEGED_ROLES/revert')
+      expect(unconfirmed.status).toBe(400)
+      expect((await unconfirmed.json() as { statusMessage: string }).statusMessage).toContain('"PRIVILEGED_ROLES"')
+
+      const reverted = await send('POST', '/api/admin/config/PRIVILEGED_ROLES/revert', { confirmation: 'PRIVILEGED_ROLES' })
+      expect(reverted.status).toBe(200)
+      expect((await reverted.json() as { value: string[] }).value).toContain('COMMITTEE')
+    }
+    finally {
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
+    }
+  })
+
   test('reverting needs config.write, the same as saving', async () => {
     const bystander = await registerMember(app, 'bystander', generatePassword())
     const answered = await send('POST', '/api/admin/config/HOLD_RELEASE_BATCH_CAP/revert', undefined, bystander.cookie)

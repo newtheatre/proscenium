@@ -123,6 +123,10 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
      request, and not a setting. As a setting, one plain save could empty it and take every
      preview and typed confirmation with it. The list is refund policy, retention arming and the
      roles that need a second factor.
+  6. Added 27 September 2026 (the review of issue 1357): reverting a wide-blast-radius setting
+     shows the same preview and asks for the same typed confirmation as saving it. A revert
+     writes a value like a save does, so it can arm retention or add a second-factor role just
+     as a save can. Reverting any other setting stays one action with nothing more to ask.
 - Source: Prompt Book J-3, A-5 (retention arming); audit SD-12 (dry-run sweep awaiting an explicit arming)
 
 ## J-106: The health endpoint

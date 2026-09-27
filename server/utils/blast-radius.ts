@@ -1,7 +1,10 @@
 import { db, schema } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { createError } from 'h3'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING, 0055).
+import { confirmationOptions } from '#shared/utils/blast-radius'
+import { isWideBlastRadius } from '#shared/utils/config'
 import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
 import { privilegedWithoutFactor } from './directory'
 import { dueForAnonymisation } from './retention-candidates'
@@ -73,4 +76,14 @@ const PREVIEWS: Partial<Record<ConfigKey, (event: H3Event | undefined) => Promis
 export async function blastRadiusPreview(event: H3Event | undefined, key: ConfigKey): Promise<BlastRadiusPreview | null> {
   const preview = PREVIEWS[key]
   return preview ? preview(event) : null
+}
+
+// A flagged key's write needs its preview echoed back first, by a save or a revert alike: the
+// text is validated, never a checkbox (J-105 criteria 1, 2 and 6).
+export async function requireBlastRadiusConfirmation(event: H3Event, key: ConfigKey, confirmation: string | undefined): Promise<void> {
+  if (!isWideBlastRadius(key)) return
+  const expected = confirmationOptions(key, await blastRadiusPreview(event, key))
+  if (!expected.includes(confirmation ?? '')) {
+    throw createError({ statusCode: 400, statusMessage: `Type ${expected.map(value => `"${value}"`).join(' or ')} to confirm this change.` })
+  }
 }

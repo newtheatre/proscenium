@@ -180,9 +180,10 @@ async function save(setting: Setting, value: unknown, confirmation?: string): Pr
   }
 }
 
-// A flagged save previews its blast radius before anything is asked to confirm (J-105 criterion
-// 1): the modal opens on a loading preview rather than waiting to show the typed-echo field.
+// A flagged save or revert previews its blast radius before anything is asked to confirm (J-105
+// criteria 1 and 6): the modal opens on a loading preview rather than waiting to show the echo.
 const confirming = ref<Setting | null>(null)
+const confirmingRevert = ref(false)
 const pendingValue = ref<unknown>(null)
 const confirmationText = ref('')
 const preview = ref<BlastRadiusPreview | null>(null)
@@ -191,13 +192,9 @@ const previewLoading = ref(false)
 const confirmOptions = computed(() => confirming.value ? confirmationOptions(confirming.value.key, preview.value) : [])
 const confirmationValid = computed(() => confirmOptions.value.includes(confirmationText.value.trim()))
 
-async function attemptSave(setting: Setting, value: unknown): Promise<void> {
-  if (!setting.wideBlastRadius) {
-    await save(setting, value)
-    return
-  }
-
+async function askToConfirm(setting: Setting, value: unknown, isRevert: boolean): Promise<void> {
   confirming.value = setting
+  confirmingRevert.value = isRevert
   pendingValue.value = value
   confirmationText.value = ''
   preview.value = null
@@ -213,24 +210,42 @@ async function attemptSave(setting: Setting, value: unknown): Promise<void> {
   }
 }
 
+async function attemptSave(setting: Setting, value: unknown): Promise<void> {
+  if (!setting.wideBlastRadius) {
+    await save(setting, value)
+    return
+  }
+  await askToConfirm(setting, value, false)
+}
+
 async function confirmSave(): Promise<void> {
   if (!confirming.value || !confirmationValid.value) return
   const setting = confirming.value
-  await save(setting, pendingValue.value, confirmationText.value.trim())
+  const typed = confirmationText.value.trim()
+  if (confirmingRevert.value) await revertNow(setting, typed)
+  else await save(setting, pendingValue.value, typed)
   confirming.value = null
 }
 
 const reverting = ref('')
 
-// One action, no second confirmation: undoing carries none of a new change's own uncertainty
-// about what is about to happen (J-105 criterion 3).
+// One action for an ordinary setting. A flagged one asks what its save asks, since a revert can
+// arm what a save would (J-105 criteria 3 and 6).
 async function revert(setting: Setting): Promise<void> {
+  if (setting.wideBlastRadius) {
+    await askToConfirm(setting, null, true)
+    return
+  }
+  await revertNow(setting)
+}
+
+async function revertNow(setting: Setting, confirmation?: string): Promise<void> {
   reverting.value = setting.key
   failure.value = null
   notices[setting.key] = ''
 
   try {
-    await $fetch(`/api/admin/config/${setting.key}/revert`, { method: 'POST' })
+    await $fetch(`/api/admin/config/${setting.key}/revert`, { method: 'POST', body: { confirmation } })
     await load()
     notices[setting.key] = 'Reverted'
   }
@@ -676,11 +691,11 @@ onMounted(async () => {
         <UButton
           color="warning"
           :disabled="!confirmationValid"
-          :loading="Boolean(confirming) && saving === confirming!.key"
+          :loading="Boolean(confirming) && (saving === confirming!.key || reverting === confirming!.key)"
           data-test="blast-radius-confirm"
           @click="confirmSave"
         >
-          Save anyway
+          {{ confirmingRevert ? 'Revert anyway' : 'Save anyway' }}
         </UButton>
       </template>
     </UModal>
