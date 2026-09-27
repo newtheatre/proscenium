@@ -646,7 +646,10 @@ Five topics, two switchable channels, one row per person per topic, and a row on
 member has chosen. An absent row means the configured default
 (`NOTIFICATION_EMAIL_DEFAULT_TOPICS`, `NOTIFICATION_PUSH_DEFAULT_TOPICS`), which is why nothing is
 seeded at registration: a workshop changing a default still reaches everybody who never chose.
-The screen is `/account/notifications` and shows every cell with its default beside it.
+The settings screen is `/account/notifications`, one email switch per topic: push is not offered
+while nothing delivers it (H-104 criterion 7), and a default is not labelled, since the switch
+shows the value in force. The inbox is its own page, `/my/notifications`, read through
+`GET /api/account/inbox` (issue 1345).
 
 ### Retries (H-105, 0056)
 

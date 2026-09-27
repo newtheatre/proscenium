@@ -304,7 +304,8 @@ export const ACCOUNT_NAV: NavEntry[] = [
   { label: 'Access requirements', icon: 'i-lucide-accessibility', to: '/account/access', ability: signedIn },
   // Shortened from "Sign-in and security": truncated in the settings aside at 1280 (issue 921).
   { label: 'Security', icon: 'i-lucide-shield', to: '/account/security', ability: signedIn },
-  { label: 'Notifications', icon: 'i-lucide-bell', to: '/account/notifications', ability: signedIn },
+  // In-app always arrives, so this page only chooses what is emailed; the inbox is /my/notifications.
+  { label: 'Email settings', icon: 'i-lucide-mail', to: '/account/notifications', ability: signedIn },
 ]
 
 // The account menu is the only place all four shells are reachable from each other, because it is

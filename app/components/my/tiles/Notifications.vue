@@ -8,7 +8,7 @@ defineProps<{ summary: MySummary }>()
 <template>
   <MyTile
     title="Recent notifications"
-    to="/account/notifications"
+    to="/my/notifications"
     label="See all notifications"
     :empty="summary.notifications.length === 0"
     empty-title="Nothing new"

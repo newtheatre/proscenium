@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { saysWhen } from '#shared/utils/when'
 import { TOPIC_DESCRIPTIONS, TOPIC_LABELS } from '#shared/utils/notifications'
 import type { NotificationTopic } from '#shared/utils/senders'
 
@@ -9,41 +8,26 @@ interface Cell {
   topic: NotificationTopic
   email: boolean
   push: boolean
-  stored: boolean
-  emailDefault: boolean
-  pushDefault: boolean
-}
-
-interface InboxItem {
-  id: string
-  type: string
-  title: string
-  body: string | null
-  link: string | null
-  createdAt: number
 }
 
 const toast = useToast()
 const loading = ref(true)
 const saving = ref('')
 const topics = ref<Cell[]>([])
-const inbox = ref<InboxItem[]>([])
 
 async function load(): Promise<void> {
   loading.value = true
-  const answer = await $fetch<{ topics: Cell[], inbox: InboxItem[] }>('/api/account/notifications')
+  const answer = await $fetch<{ topics: Cell[] }>('/api/account/notifications')
   topics.value = answer.topics
-  inbox.value = answer.inbox
   loading.value = false
 }
 
-async function save(cell: Cell, channel: 'email' | 'push', wanted: boolean): Promise<void> {
-  saving.value = `${cell.topic}-${channel}`
-  const body = { topic: cell.topic, email: cell.email, push: cell.push, [channel]: wanted }
+// The switch is the confirmation: a saved change raises nothing of its own (H-104 criterion 7).
+async function save(cell: Cell, wanted: boolean): Promise<void> {
+  saving.value = cell.topic
   try {
-    await $fetch('/api/account/notifications', { method: 'PUT', body })
-    cell[channel] = wanted
-    cell.stored = true
+    await $fetch('/api/account/notifications', { method: 'PUT', body: { topic: cell.topic, email: wanted, push: cell.push } })
+    cell.email = wanted
   }
   catch (error) {
     toast.add({ title: refusalText(error), color: 'error' })
@@ -53,20 +37,16 @@ async function save(cell: Cell, channel: 'email' | 'push', wanted: boolean): Pro
   }
 }
 
-function saysDefault(on: boolean): string {
-  return on ? 'On by default' : 'Off by default'
-}
-
 onMounted(load)
 
-useSeoMeta({ title: 'Notifications' })
+useSeoMeta({ title: 'Email settings' })
 </script>
 
 <template>
   <AccountSettings
     data-test="account-notifications-page"
-    title="Notifications"
-    description="Choose what we tell you about, by topic. Each switch saves as you set it. Tickets, receipts, security emails and safety notices always arrive."
+    title="Email settings"
+    description="Which of these we email you about. Everything lands in your notifications on My NNT whatever you choose, and tickets, receipts, security emails and safety notices always arrive by email."
   >
     <UPageCard>
       <div
@@ -77,105 +57,32 @@ useSeoMeta({ title: 'Notifications' })
           name="i-lucide-loader-circle"
           class="animate-spin"
         />
-        <span>Reading your preferences.</span>
+        <span>Reading your settings.</span>
       </div>
 
       <div
         v-else
-        class="space-y-6"
+        class="space-y-5"
         data-test="preference-matrix"
       >
-        <div
+        <USwitch
           v-for="cell in topics"
           :key="cell.topic"
-          class="space-y-2 border-b border-default pb-5 last:border-0 last:pb-0"
-          :data-test="`topic-${cell.topic}`"
-        >
-          <div class="flex flex-wrap items-baseline gap-x-3">
-            <h3 class="text-base font-semibold">
-              {{ TOPIC_LABELS[cell.topic] }}
-            </h3>
-            <UBadge
-              v-if="!cell.stored"
-              variant="subtle"
-              color="neutral"
-              size="sm"
-              :data-test="`default-${cell.topic}`"
-            >
-              Using the default
-            </UBadge>
-          </div>
-          <p class="text-sm text-muted">
-            {{ TOPIC_DESCRIPTIONS[cell.topic] }}
-          </p>
+          :model-value="cell.email"
+          :label="TOPIC_LABELS[cell.topic]"
+          :description="TOPIC_DESCRIPTIONS[cell.topic]"
+          :loading="saving === cell.topic"
+          :data-test="`email-${cell.topic}`"
+          @update:model-value="value => save(cell, value)"
+        />
 
-          <div class="flex flex-wrap items-center gap-x-8 gap-y-2 pt-1">
-            <USwitch
-              :model-value="cell.email"
-              label="Email"
-              :description="saysDefault(cell.emailDefault)"
-              :loading="saving === `${cell.topic}-email`"
-              :data-test="`email-${cell.topic}`"
-              @update:model-value="value => save(cell, 'email', value)"
-            />
-            <div class="text-sm text-muted">
-              <span class="font-medium text-default">In-app</span>
-              <span :data-test="`inbox-${cell.topic}`"> always on</span>
-            </div>
-          </div>
-        </div>
+        <ULink
+          to="/my/notifications"
+          class="block text-sm"
+        >
+          See your notifications
+        </ULink>
       </div>
-    </UPageCard>
-
-    <UPageCard
-      class="mt-6"
-      title="Recent notifications"
-      description="Everything we sent you that a setting above could have silenced lands here as well. Switching email off never loses a notification."
-      data-test="inbox"
-    >
-      <p
-        v-if="inbox.length === 0"
-        class="text-sm text-muted"
-        data-test="inbox-empty"
-      >
-        Nothing has come in. Anything we send you lands here, and the settings above choose
-        what that is.
-      </p>
-
-      <ul
-        v-else
-        class="divide-y divide-default text-sm"
-      >
-        <li
-          v-for="item in inbox"
-          :key="item.id"
-          class="py-3"
-          data-test="inbox-item"
-        >
-          <div class="flex flex-wrap items-baseline gap-x-3">
-            <ULink
-              v-if="item.link"
-              :to="item.link"
-              class="font-medium"
-            >
-              {{ item.title }}
-            </ULink>
-            <span
-              v-else
-              class="font-medium"
-            >{{ item.title }}</span>
-            <span class="ms-auto text-xs text-muted">
-              {{ saysWhen(item.createdAt) }}
-            </span>
-          </div>
-          <p
-            v-if="item.body"
-            class="mt-1 whitespace-pre-line text-muted"
-          >
-            {{ item.body }}
-          </p>
-        </li>
-      </ul>
     </UPageCard>
   </AccountSettings>
 </template>

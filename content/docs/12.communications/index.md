@@ -3,7 +3,7 @@ title: Communications
 description: Sending an announcement to an audience, and reading what went out and what could not.
 module: Communications
 audience: committee
-updatedOn: 2026-09-22
+updatedOn: 2026-09-27
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -49,13 +49,12 @@ binding refuses any other sender.
 
 ## What a member controls
 
-A member's own screen is **Notifications** in the My NNT strip (`/account/notifications`). It
-shows five topics, Bookings, Shifts, Training, Room bookings and Committee announcements, each
-with an email switch and a push switch, and says beside each whether the configured default is
-on or off. In-app is always on: every message a preference could silence still lands in the
-member's recent messages, so switching email off never loses one. Tickets, receipts, security
-emails and safety notices are transactional and have no switch at all. Push is recorded but
-nothing delivers it yet; the switch is a subscription for the day it does.
+A member's own settings are **Email settings** among their account settings
+(`/account/notifications`): one email switch for each of five topics, Bookings, Shifts, Training,
+Room bookings and Committee announcements. In-app is always on: everything a setting could
+silence still lands in the member's **Notifications** under My NNT (`/my/notifications`), so
+switching email off never loses one. Tickets, receipts, security emails and safety notices are
+transactional and have no switch at all. Push is not offered, since nothing delivers it yet.
 
 ## Related pages
 
