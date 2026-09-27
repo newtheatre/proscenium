@@ -132,6 +132,15 @@ export async function passRequestById(id: string): Promise<PassRequestRow | unde
   return row
 }
 
+// The buyer's one open request for a type, if any: the partial unique index allows no second
+// (issue 1331), so a desk sale picking the buyer by name can settle it as the request list does.
+export async function openPassRequestFor(userId: string, passTypeId: string): Promise<string | undefined> {
+  const [row] = await db.all<{ id: string }>(sql`
+    SELECT id AS id FROM pass_requests WHERE user_id = ${userId} AND pass_type_id = ${passTypeId} AND status = 'PENDING'
+  `)
+  return row?.id
+}
+
 export interface HeldPass {
   id: string
   reference: string

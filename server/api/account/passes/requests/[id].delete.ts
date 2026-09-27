@@ -9,7 +9,13 @@ export default defineEventHandler(async (event) => {
 
   const withdrawn = await withdrawPassRequest(request, account.id)
   if (!withdrawn) {
-    throw createError({ statusCode: 409, statusMessage: 'This request has already been settled at the box office desk.' })
+    // Read after the refusal, not before: the desk may have fulfilled it between the two.
+    const now = await passRequestById(id)
+    if (!now) throw noSuch('pass request')
+    throw createError({
+      statusCode: 409,
+      statusMessage: now.status === 'FULFILLED' ? 'This request has already been settled at the box office desk' : 'This request has already lapsed',
+    })
   }
 
   return { ok: true }

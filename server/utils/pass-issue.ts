@@ -115,17 +115,8 @@ export function requestPassStatement(id: string, passTypeId: string, userId: str
 export async function requestPass(passTypeId: string, userId: string): Promise<{ id: string, requested: boolean }> {
   const id = newId()
   const entry = auditEntry({ actorId: userId, action: 'pass.request.created', target: `pass-type:${passTypeId}` })
-
-  const [inserted] = await db.batch([
-    db.all<{ id: string }>(requestPassStatement(id, passTypeId, userId)),
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${entry.detail !== null ? JSON.stringify(entry.detail) : null}
-      WHERE EXISTS (SELECT 1 FROM pass_requests WHERE id = ${id})
-    `),
-  ])
-
-  return { id, requested: inserted.length > 0 }
+  const requested = await auditedWrite(db.all<{ id: string }>(requestPassStatement(id, passTypeId, userId)), entry)
+  return { id, requested }
 }
 
 // Only the member's own request, and only while it is still open: one the desk has fulfilled is a
