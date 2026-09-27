@@ -36,8 +36,8 @@ const writes = computed(() => can(useViewer().value, manageRoomsEstate))
 const closing = ref(false)
 const removing = ref<Closure | null>(null)
 const working = ref(false)
-// No room is chosen for the officer: a closure cannot be undone, and every room was one slip away
-// when it was the default (issue 1353).
+// No room is chosen for the officer: a closure cannot be undone, and a default of every room
+// is one slip from closing the building (issue 1353).
 const form = reactive({
   roomId: '',
   reason: '',
@@ -94,32 +94,45 @@ const span = computed(() => (form.day && endsOn.value >= form.day
   ? closureSpan({ day: form.day, untilDay: endsOn.value, from: form.from, to: form.to, wholeDays: wholeDays.value })
   : null))
 
-const ready = computed(() => Boolean(
-  form.roomId && form.reason.trim() && span.value && span.value.endsAt > span.value.startsAt))
-
 const chosenName = computed(() => {
   if (!form.roomId) return null
   if (form.roomId === EVERY_ROOM) return 'every room'
   return rooms.value.find(one => one.id === form.roomId)?.name ?? 'the room'
 })
 
-// Counted by the same read the close makes, and again whenever the room or the span moves.
+// Counted by the same read the close makes, and again whenever the room or the span moves; a
+// count overtaken by a newer one is dropped, whether it answers or fails.
 const cancels = ref<number | null>(null)
-watch([() => form.roomId, span], async ([roomId, when]) => {
+const counting = ref(false)
+const countFailure = ref<string | null>(null)
+watch([() => form.roomId, span], async ([roomId, when], _, onCleanup) => {
   cancels.value = null
+  countFailure.value = null
   if (!roomId || !when || when.endsAt <= when.startsAt) return
+  let stale = false
+  onCleanup(() => {
+    stale = true
+  })
+  counting.value = true
   try {
     const answer = await $fetch<{ count: number }>('/api/admin/rooms/blackouts/stranded', {
       query: { ...(roomId === EVERY_ROOM ? {} : { roomId }), ...when },
     })
-    if (roomId === form.roomId && when === span.value) cancels.value = answer.count
+    if (!stale) cancels.value = answer.count
   }
-  catch {
-    cancels.value = null
+  catch (error) {
+    if (!stale) countFailure.value = `What closing would cancel could not be counted: ${refusalText(error)}`
+  }
+  finally {
+    if (!stale) counting.value = false
   }
 })
 
 const closeLabel = computed(() => closeButtonLabel(chosenName.value, cancels.value))
+
+// The count is part of being ready: nothing is closed that has not said what it cancels first.
+const ready = computed(() => Boolean(
+  form.roomId && form.reason.trim() && span.value && span.value.endsAt > span.value.startsAt && cancels.value !== null))
 
 async function close(): Promise<void> {
   working.value = true
@@ -375,6 +388,14 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
           variant="subtle"
           :description="failure.message"
         />
+        <UAlert
+          v-if="countFailure"
+          data-test="close-count-failure"
+          class="mb-4"
+          color="warning"
+          variant="subtle"
+          :description="countFailure"
+        />
         <div class="space-y-4">
           <UFormField
             label="Which room"
@@ -468,7 +489,7 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
       <template #footer>
         <UButton
           color="error"
-          :loading="working"
+          :loading="working || counting"
           :disabled="!ready"
           data-test="close-submit"
           @click="close"

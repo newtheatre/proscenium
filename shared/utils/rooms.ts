@@ -71,8 +71,8 @@ export const roomHoursForm = z.object({
 
 export type RoomHours = z.output<typeof roomHoursForm>
 
-// Hours are chosen as a pattern before any one day, because a room with none recorded is open
-// whenever, and a seven-row list of switches read as seven closed days (issue 1353).
+// Hours are chosen as a pattern before any one day: a room with none recorded is open whenever,
+// and seven switches left off would read as seven closed days (issue 1353).
 export const HOURS_MODES = ['ALWAYS', 'WEEKDAYS', 'EACH_DAY'] as const
 export type HoursMode = (typeof HOURS_MODES)[number]
 

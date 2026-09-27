@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lt, or, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm'
 import { CANCELLABLE } from '#shared/utils/bookings'
 import { formatLondon } from '#shared/utils/london'
 import { blackoutsList } from '#shared/utils/blackouts-list'
@@ -67,7 +67,8 @@ export async function bookingsUnder(blackout: { roomId: string | null, startsAt:
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))
     .where(and(
       blackout.roomId ? eq(schema.roomBookings.roomId, blackout.roomId) : undefined,
-      sql`${schema.roomBookings.status} IN ('CONFIRMED', 'PENDING_APPROVAL')`,
+      // The statuses the close cancels, so the count before it and the close cannot drift.
+      inArray(schema.roomBookings.status, [...CANCELLABLE]),
       sql`${schema.roomBookings.startsAt} < ${blackout.endsAt}`,
       sql`${schema.roomBookings.endsAt} > ${blackout.startsAt}`,
     ))

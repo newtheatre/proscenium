@@ -1,14 +1,13 @@
 import { z } from 'zod'
 import { overlaps } from './bookings'
-import { formatLondon, fromLondonWallClock } from './london'
-import { daysAfter } from './membership'
+import { formatLondon, fromLondonWallClock, startOfLondonDay, startOfLondonDayAfter } from './london'
+import { plural } from './text'
 import type { Span } from './bookings'
 
 // A room shut for a reason everybody can read (C-114). The old app had no way to say a room was
 // closed, so members booked into a get-in and found out on the night (RM-6).
 
 export const BLACKOUT_REASON_LIMIT = 200
-export const EVERY_ROOM = null
 
 export interface Blackout extends Span {
   id: string
@@ -48,7 +47,7 @@ export function closeButtonLabel(room: string | null, cancels: number | null): s
   if (room === null) return 'Choose a room to close'
   if (cancels === null) return `Close ${room}`
   if (cancels === 0) return `Close ${room}: cancels nothing`
-  return `Close ${room}: cancels ${cancels} ${cancels === 1 ? 'booking' : 'bookings'}`
+  return `Close ${room}: cancels ${plural(cancels, 'booking')}`
 }
 
 // A get-in over several days means the days, not nine to six on each of them.
@@ -66,7 +65,7 @@ export function closureSpan(draft: ClosureDraft): { startsAt: string, endsAt: st
     return fromLondonWallClock(year!, month!, date!, hour!, minute!).toISOString()
   }
   return draft.wholeDays
-    ? { startsAt: at(draft.day, '00:00'), endsAt: at(daysAfter(draft.untilDay, 1), '00:00') }
+    ? { startsAt: startOfLondonDay(draft.day).toISOString(), endsAt: startOfLondonDayAfter(draft.untilDay, 1).toISOString() }
     : { startsAt: at(draft.day, draft.from), endsAt: at(draft.untilDay, draft.to) }
 }
 
@@ -90,4 +89,7 @@ export const strandedQuery = z.object({
   roomId: z.string().min(1, 'Say which room you mean').max(64).optional(),
   startsAt: instant,
   endsAt: instant,
+}).refine(span => new Date(span.endsAt) > new Date(span.startsAt), {
+  path: ['endsAt'],
+  message: 'A blackout ends after it starts',
 })

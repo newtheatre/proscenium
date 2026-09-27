@@ -507,4 +507,21 @@ describe.skipIf(skip !== null)('counting before closing (criteria 3 and 5, issue
     const room = await makeRoom()
     expect((await stranded(room, span(53), member.cookie)).status).toBe(403)
   })
+
+  test('the count is what the close then cancels', async () => {
+    const room = await makeRoom()
+    await book(room, span(54))
+    await book(room, span(54, 17))
+    const counted = await (await stranded(room, span(54, 12, 8))).json() as { count: number }
+    const closed = await (await closeRoom(room, span(54, 12, 8))).json() as { cancelled: number }
+    expect(counted.count).toBe(2)
+    expect(closed.cancelled).toBe(counted.count)
+  })
+
+  // The close refuses a span that runs backwards, so the count does too rather than answer for it.
+  test('a backwards span is refused, as the close refuses it', async () => {
+    const room = await makeRoom()
+    const when = span(55)
+    expect((await stranded(room, { startsAt: when.endsAt, endsAt: when.startsAt })).status).toBe(400)
+  })
 })

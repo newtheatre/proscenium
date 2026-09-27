@@ -77,6 +77,9 @@ describe('the screens', () => {
     expect(source).toContain('/api/admin/rooms/blackouts/stranded')
     expect(source).toContain('data-test="close-whole-days"')
     expect(source).toContain('route.query.close')
+    // Not ready until counted: the close cannot be pressed before it has said what it cancels.
+    expect(source).toMatch(/const ready = computed\([\s\S]{0,200}cancels\.value !== null/)
+    expect(source).toContain('data-test="close-count-failure"')
     expect(await Bun.file(ROOMS).text()).toContain('/rooms/manage/closures?close=')
   })
 

@@ -125,7 +125,7 @@ function edit(room: Room | null): void {
   open.value = true
 }
 
-// Setting each day starts from the pattern already chosen, so switching loses nothing typed.
+// Set each day starts afresh from the pattern last chosen, Always open giving every day at its times.
 function chooseMode(mode: HoursMode): void {
   if (mode === 'EACH_DAY' && hoursMode.value !== 'EACH_DAY') {
     hours.value = blankHours()
