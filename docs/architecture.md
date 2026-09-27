@@ -251,7 +251,10 @@ becomes interactive.
   `night.manage`. The `canWorkTonight` ability reads the same function, and gates the account
   menu's first entry and `MY_NAV`'s Tonight entry; `onShiftTonight` alone shows the 48px
   `OnShiftBar` on public and member pages, and `landingAfterSignIn` sends a sign-in with no `next`
-  to `/tonight` (0094). It also carries `keepsBarTab`, which both resolvers derive from
+  to `/tonight` (0094). Google's round trip keeps the `next` and a reassertion in the
+  `nnt-after-google` and `nnt-reauth` cookies, set by `server/middleware/google-return.ts` on the
+  first leg (`googleRoundTripStart`); a first leg that asks for neither deletes them, so an
+  attempt abandoned inside their ten minutes cannot steer a later sign-in. The session also carries `keepsBarTab`, which both resolvers derive from
   `keepsBarTab()` (`server/utils/tab-holders.ts`): an authorised tab holder
   (`BAR_AUTHORISED_TAB_HOLDERS`, or a live grant of a `BAR_AUTHORISED_TAB_ROLES` role) or anybody
   with an outstanding tab balance, read live per request (0009, F-108, F-109). `keepBarTab` gates
