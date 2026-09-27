@@ -1,8 +1,8 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
-import { auditWhere, auditedWrite } from './audit'
-import { capacityAllows, heldSeatsQuery, passBookingColumn, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
+import { auditWhere, auditedWrite, entryLanded } from './audit'
+import { capacityAllows, heldSeatsForReservation, heldSeatsQuery, passBookingColumn, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
 import { configValue } from './configuration'
 import { admittedAtColumn } from './door-search'
 import { auditEntry } from '#shared/utils/audit'
@@ -490,7 +490,7 @@ export interface EditReservationTicketsResult {
 }
 
 // True while the booking holds exactly `lines`: every type it holds at the count read, and the
-// same total, so no type read is missing. One CASE arm per type read, never an id list (0003).
+// party the size read (the held-seat count, under the pending guard), so no type read is missing.
 export function ticketLinesStill(reservationId: string, lines: TicketTypeCount[]): SQL {
   const readCount = lines.length === 0
     ? sql`-1`
@@ -503,7 +503,7 @@ export function ticketLinesStill(reservationId: string, lines: TicketTypeCount[]
         WHERE reservation_id = ${reservationId} AND refunded_at IS NULL GROUP BY ticket_type_id
       ) held WHERE held.n <> ${readCount}
     )
-    AND (SELECT count(*) FROM tickets WHERE reservation_id = ${reservationId} AND refunded_at IS NULL) = ${total}
+    AND ${heldSeatsForReservation(sql`${reservationId}`)} = ${total}
   )`
 }
 
@@ -511,10 +511,10 @@ export function ticketLinesStill(reservationId: string, lines: TicketTypeCount[]
 // keys to that row, as the first line to move changes what was read (D-110 criterion 2, 0049).
 export function editTicketsStatements(input: EditReservationTicketsInput, entry: AuditRow): [SQL, ...SQL[]] {
   const guard = sql`${capacityAllows(input.performanceId, input.capacity, input.desiredTotal, input.reservationId)} AND ${reservationIsPending(input.reservationId)} AND ${ticketLinesStill(input.reservationId, input.linesAsRead)}`
-  const applied = sql`EXISTS (SELECT 1 FROM audit_log WHERE id = ${entry.id})`
+  const applied = entryLanded(entry)
   return [
     auditWhere(entry, guard),
-    sql`UPDATE reservations SET updated_at = unixepoch() WHERE id = ${input.reservationId} AND status = 'PENDING' AND ${applied}`,
+    sql`UPDATE reservations SET updated_at = unixepoch() WHERE id = ${input.reservationId} AND ${applied}`,
     ...ticketAdditionQueries(input.additions, applied),
     ...ticketRemovalQueries(input.reservationId, input.removals, applied),
   ]

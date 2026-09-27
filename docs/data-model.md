@@ -898,18 +898,21 @@ changes, since its admission is append-only and unique per pass and performance 
 out of the desk's **Unpaid** pill; the desk's collect route refuses one, since it owes nothing.
 Editing sends desired totals per type, the same line shape a fresh booking uses
 (`reservationEditForm`); `ticketEditDelta()` (pure, `shared/utils/reservations.ts`) turns that into
-additions and removals against what is currently held. Every added and removed line, in the same
-request, shares one guard computed once (`capacityAllows` against the *desired total*, not the
-delta, `AND` a fresh `status = 'PENDING'` check): capacity is asked for the shape the booking ends
-up in, and a short house refuses the whole edit, decreases included, not just the increase that
-would not fit (criterion 2). A desired total under one ticket is refused before anything is
+additions and removals against what is currently held. The edit's audit row is written first,
+under one guard: `capacityAllows` against the *desired total*, not the delta; the booking still
+`PENDING`; and `ticketLinesStill()`, the booking holding exactly the lines the request read.
+Every added and removed line, and the `updated_at` stamp, is gated on `entryLanded()`, that row
+having been written, since the first line to move changes what the guard read. So capacity is
+asked for the shape the booking ends up in, a short house refuses the whole edit, decreases
+included, not just the increase that would not fit (criterion 2), and a double-submitted or stale
+edit changes nothing and is refused 409 "This booking changed while you were editing it…". A desired total under one ticket is refused before anything is
 written; cancel is the route for emptying a booking. Cancelling reuses `cancelled_by = 'CUSTOMER'`,
 the same column D-114's desk flow already checks, sets `hold_expires_at` to `NULL` and is refused
 once the performance has started (criterion 3) or once anything but `PENDING` has been reached
 (criterion 4: a collected booking's `/qr` page offers only a refund note, since D-116 owns the
 actual refund). Both routes read the reservation back afterwards rather than trusting their own
-statements, since the guard is identical everywhere and either the whole request landed or none
-of it did.
+statements, since every write keys to the one audit row and either the whole request landed or
+none of it did.
 
 **Exchange to another performance of the same show, while unpaid (D-111).** `GET
 /api/qr/exchange-options` lists the show's other on-sale performances, the same honest
