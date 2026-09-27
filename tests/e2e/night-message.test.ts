@@ -74,8 +74,8 @@ function holding(performanceId: string, userId: string, reference: string): void
     `t-${reference}`, `r-${reference}`, performanceId, 'tt-standard', 900, 'BASE')
 }
 
-const message = (performanceId: string, audience: string): Record<string, string> =>
-  ({ performanceId, audience, subject: 'Doors at 19:15 tonight', body: 'A late get-in: the house opens a quarter of an hour late.' })
+const message = (performanceId: string, audience: string, draftKey: string = crypto.randomUUID()): Record<string, string> =>
+  ({ performanceId, audience, subject: 'Doors at 19:15 tonight', body: 'A late get-in: the house opens a quarter of an hour late.', draftKey })
 
 describe.skipIf(skip !== null)('tonight\'s duty manager messages tonight\'s audience (0101)', () => {
   test('ticket holders are counted, then told at once, and the send is recorded', async () => {
@@ -104,6 +104,28 @@ describe.skipIf(skip !== null)('tonight\'s duty manager messages tonight\'s audi
 
     const [audit] = read<{ actor_id: string, detail: string }>(`SELECT actor_id, detail FROM audit_log WHERE action = 'comms.announcement.sent' AND actor_id = ?`, dm.id)
     expect(JSON.parse(audit!.detail)).toMatchObject({ audienceKind: 'PERFORMANCE_TICKET_HOLDERS', performanceId, recipientCount: 2, safetyNotice: true, via: 'SHIFT' })
+  })
+
+  // A dropped connection after the fan-out leaves nothing to check but Send again (0048).
+  test('the same draft sent twice reaches each person once, and the second says so', async () => {
+    const dm = await registerMember(app, 'message-twice-dm', generatePassword())
+    const holder = await registerMember(app, 'message-twice-holder', generatePassword())
+    const performanceId = house('message-twice')
+    shift(performanceId, 'DUTY_MANAGER', dm.id)
+    holding(performanceId, holder.id, 'MSGT01')
+    const draftKey = crypto.randomUUID()
+
+    const first = await send('POST', '/api/tonight/message', message(performanceId, 'TICKET_HOLDERS', draftKey), dm.cookie)
+    expect(await first.json()).toEqual({ count: 1 })
+    const again = await send('POST', '/api/tonight/message', message(performanceId, 'TICKET_HOLDERS', draftKey), dm.cookie)
+    expect(await again.json()).toEqual({ count: 0 })
+
+    expect(read(`SELECT id FROM notification_log WHERE type = 'admin.ticket-holders.safety-notice' AND user_id = ?`, holder.id)).toHaveLength(1)
+    const audits = read<{ detail: string }>(`SELECT detail FROM audit_log WHERE action = 'comms.announcement.sent' AND actor_id = ? ORDER BY created_at`, dm.id)
+    expect(audits.map(row => (JSON.parse(row.detail) as { recipientCount: number }).recipientCount)).toEqual([1, 0])
+
+    const edited = await send('POST', '/api/tonight/message', message(performanceId, 'TICKET_HOLDERS'), dm.cookie)
+    expect(await edited.json()).toEqual({ count: 1 })
   })
 
   test('the rota is that performance\'s team, told at once', async () => {

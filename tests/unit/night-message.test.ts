@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { sendTimingOptions, sendsNowByDefault } from '#shared/utils/announcements'
-import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS, nightMessageForm, nightMessageType } from '#shared/utils/night-message'
+import { defaultSendTiming, sendTimingOptions, sendsNowByDefault } from '#shared/utils/announcements'
+import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS, nightMessageClaim, nightMessageForm, nightMessageType, saysNightMessageSent } from '#shared/utils/night-message'
 import { showNightBounds } from '#shared/utils/show-night'
 
 // Issue 1327, decision 0101: tonight's duty manager messages tonight's audience from the show-night
@@ -19,9 +19,11 @@ describe('tonight\'s audience is one performance\'s ticket holders or its rota (
     expect(nightMessageType('ROTA')).toBe('admin.safety-notice')
   })
 
-  test('the form names a performance, an audience, a subject and a message', () => {
-    const good = { performanceId: 'p-1', audience: 'TICKET_HOLDERS', subject: 'Doors at 19:15', body: 'A late get-in.' }
+  test('the form names a performance, an audience, a subject, a message and the draft it sends', () => {
+    const good = { performanceId: 'p-1', audience: 'TICKET_HOLDERS', subject: 'Doors at 19:15', body: 'A late get-in.', draftKey: '0b6c1f4e-6f1a-4f0e-9d5e-2f8a7c3b1d90' }
     expect(nightMessageForm.safeParse(good).success).toBe(true)
+    expect(nightMessageForm.safeParse({ ...good, draftKey: undefined }).success).toBe(false)
+    expect(nightMessageForm.safeParse({ ...good, draftKey: 'not-a-key' }).success).toBe(false)
     expect(nightMessageForm.safeParse({ ...good, performanceId: '' }).success).toBe(false)
     expect(nightMessageForm.safeParse({ ...good, audience: 'ALL_CURRENT_MEMBERS' }).success).toBe(false)
     expect(nightMessageForm.safeParse({ ...good, subject: ' ' }).success).toBe(false)
@@ -29,19 +31,59 @@ describe('tonight\'s audience is one performance\'s ticket holders or its rota (
   })
 })
 
+// A draft is sent once to each person, however often the button is pressed after a dropped
+// connection: each recipient's copy is claimed under the draft's own key (0048).
+describe('tonight\'s message reaches each person once per draft (0101, 0048)', () => {
+  test('the claim names the draft and the person', () => {
+    expect(nightMessageClaim('draft-1', 'user-1')).toBe('night-message:draft-1:user-1')
+  })
+
+  test('a second press says who it reached, and that everyone else already had it', () => {
+    expect(saysNightMessageSent(3)).toBe('Sent to 3 people')
+    expect(saysNightMessageSent(1)).toBe('Sent to 1 person')
+    expect(saysNightMessageSent(0)).toBe('Everyone in this audience already has it')
+  })
+
+  test('the page sends its draft key, and a changed draft is a new one', async () => {
+    const source = await read('app/pages/tonight/message.vue')
+    expect(source).toContain('draftKey: draftKey.value')
+    expect(source.match(/draftKey\.value = crypto\.randomUUID\(\)/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(source).not.toContain('Look in the send log')
+  })
+})
+
 describe('the announce composer says when a message goes (issue 1327)', () => {
-  test('to ticket holders: now, or with their booking messages inside the digest window', () => {
+  test('to ticket holders: now, or with their booking messages in the next digest', () => {
     expect(sendTimingOptions(true, 60)).toEqual([
       { value: 'NOW', label: 'Send now to everyone holding a ticket', description: 'Reaches every ticket holder at once, whatever their bookings preference.' },
-      { value: 'WITH_DIGEST', label: 'Send with their booking messages, within 60 minutes', description: 'Honours each ticket holder\'s bookings preference.' },
+      { value: 'WITH_DIGEST', label: 'Send with their booking messages, in the next digest, about 60 minutes from now', description: 'Honours each ticket holder\'s bookings preference.' },
     ])
   })
 
   test('to members: now, or with their committee announcements', () => {
     expect(sendTimingOptions(false, 45).map(option => option.label)).toEqual([
       'Send now to everyone in this audience',
-      'Send with their committee announcements, within 45 minutes',
+      'Send with their committee announcements, in the next digest, about 45 minutes from now',
     ])
+  })
+
+  // Send now is a preference-ignoring type, so it is never left standing for an audience it was
+  // not chosen for: the timing follows the selection, both ways.
+  test('the timing starts on now for tonight\'s performance and on the digest for anything else', () => {
+    const night = '2026-10-17'
+    const curtain = Math.floor(showNightBounds(night).from.getTime() / 1000) + 15.5 * 3600
+    const during = new Date((curtain - 3600) * 1000)
+    expect(defaultSendTiming(curtain, during)).toBe('NOW')
+    expect(defaultSendTiming(curtain + 86_400, during)).toBe('WITH_DIGEST')
+    expect(defaultSendTiming(null, during)).toBe('WITH_DIGEST')
+  })
+
+  test('the composer resets the timing on every change of performance, and on starting again', async () => {
+    const source = await read('app/pages/comms/announce.vue')
+    expect(source.match(/timing\.value = defaultTiming\(\)/g)?.length).toBe(2)
+    expect(source).toContain('defaultSendTiming(')
+    expect(source).not.toContain('timing.value = \'NOW\'')
+    expect(source).not.toContain('timing.value = \'WITH_DIGEST\'')
   })
 
   test('before the window is known the choice still stands, naming the digest instead', () => {
@@ -60,7 +102,6 @@ describe('the announce composer says when a message goes (issue 1327)', () => {
   test('the composer offers the choice in those words, where the tick box was', async () => {
     const source = await read('app/pages/comms/announce.vue')
     expect(source).toContain('sendTimingOptions(')
-    expect(source).toContain('sendsNowByDefault(')
     expect(source).not.toContain('This is a safety notice')
   })
 })
