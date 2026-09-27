@@ -511,8 +511,7 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
       await pickOption(view, '[data-test="module-department"]', department)
       await pickOption(view, '[data-test="module-kind"]', 'Certification')
       await pickOption(view, '[data-test="module-expiry"]', 'Ends with the academic year')
-      await pickOption(view, '[data-test="module-status"]', 'Active')
-      await click(view, '[data-test="module-submit"]')
+      await click(view, '[data-test="module-publish"]')
 
       await waitFor(view, `document.body.innerText.includes(${JSON.stringify(id)})`, 30_000)
 
@@ -534,6 +533,34 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
       status: 'ACTIVE',
       description: 'What the desk does, and how not to break it.',
     })
+  }, CASE_TIMEOUT_MS)
+
+  // Issue 1354: publishing is the button pressed, not a status chosen from a list beforehand.
+  test('a new module saved as a draft stays a draft, in the department the list was filtered to', async () => {
+    const department = await addDepartment()
+    const view = await signedInView()
+    const id = `DRAFT-${suffix()}`
+
+    try {
+      await visit(view, `${app.baseURL}/training/manage?department=is:${department}`, '[data-test="modules-table"]')
+      await click(view, '[data-test="add-module"]')
+      await waitFor(view, `document.querySelector('[data-test="module-id"]')`, 30_000)
+      expect(await textOf(view, '[data-test="module-department"]')).toContain(department)
+
+      await fill(view, '[data-test="module-id"]', id)
+      await fill(view, '[data-test="module-name"]', 'Still being written')
+      await click(view, '[data-test="module-draft"]')
+      await settle(view, id)
+    }
+    finally {
+      view.close()
+    }
+
+    expect(read<{ status: string, department: string }>('SELECT status, department FROM modules WHERE id = ?', id))
+      .toEqual({ status: 'DRAFT', department })
+    // Whether a module was published when it was added is on the trail.
+    const created = read<{ detail: string }>(`SELECT detail FROM audit_log WHERE action = 'module.created' AND target = ?`, `module:${id}`)
+    expect(JSON.parse(created!.detail).status).toBe('DRAFT')
   }, CASE_TIMEOUT_MS)
 
   test('a brief is not offered what a brief cannot have', async () => {
@@ -564,8 +591,7 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
         )).toBe(false)
       }
 
-      await pickOption(view, '[data-test="module-status"]', 'Active')
-      await click(view, '[data-test="module-submit"]')
+      await click(view, '[data-test="module-publish"]')
       await settle(view, id)
     }
     finally {
@@ -674,8 +700,7 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
       await waitFor(view, `document.querySelector('[data-test="module-external-evidence"]')`, 30_000)
 
       await fill(view, '[data-test="module-external-evidence"]', 'A current first aid at work certificate')
-      await pickOption(view, '[data-test="module-status"]', 'Active')
-      await click(view, '[data-test="module-submit"]')
+      await click(view, '[data-test="module-publish"]')
       await settle(view, id)
     }
     finally {

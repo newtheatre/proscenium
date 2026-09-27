@@ -27,9 +27,11 @@ const { data: everyModule, refresh: refreshCandidates } = await useAsyncData(
 const table = ref<{ refresh: () => Promise<void> } | null>(null)
 const open = ref(false)
 const editing = ref<CatalogueModule | null>(null)
+const startsIn = ref<string | null>(null)
 
-function add(): void {
+function add(department: string | null): void {
   editing.value = null
+  startsIn.value = department
   open.value = true
 }
 
@@ -61,6 +63,7 @@ async function saved(): Promise<void> {
       :module="editing"
       :departments="departments.items"
       :candidates="everyModule.items"
+      :department="startsIn"
       @saved="saved"
     />
   </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { describeExpiry, saysDeliveryMode, saysKind, saysLifecycle } from '#shared/utils/training'
+import { departmentFromFilter, describeExpiry, saysDeliveryMode, saysKind, saysLifecycle } from '#shared/utils/training'
 import { trainingModulesList } from '#shared/utils/training-modules-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { FilterOption } from '#shared/utils/list-filters'
@@ -40,7 +40,7 @@ interface Department { code: string, name: string }
 interface Listing { items: CatalogueModule[], total: number, pageSize: number, pages: number }
 
 const props = defineProps<{ departments: Department[] }>()
-const emit = defineEmits<{ add: [], edit: [module: CatalogueModule] }>()
+const emit = defineEmits<{ add: [department: string | null], edit: [module: CatalogueModule] }>()
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
@@ -173,7 +173,7 @@ const columns: TableColumn<CatalogueModule>[] = [
           data-test="add-module"
           icon="i-lucide-plus"
           :disabled="departments.length === 0"
-          @click="emit('add')"
+          @click="emit('add', departmentFromFilter(conditions, departments.map(one => one.code)))"
         >
           Add a module
         </UButton>
