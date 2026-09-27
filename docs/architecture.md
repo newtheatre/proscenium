@@ -1719,12 +1719,14 @@ own predicate, `WHERE NOT EXISTS`, so two concurrent sign-offs for the same perf
 exactly one row and the loser reads 409, the same race-safety a checklist or till close already
 carries.
 
-Distribution is `distributeReport()`: the configured standing list
-(`NIGHT_REPORT_RECIPIENTS`, unset until a workshop confirms it) plus the closer's own address,
+Distribution is `distributeReport()`: the addresses of every account holding a live grant of a
+role named in `NIGHT_REPORT_ROLES` (unset until a workshop confirms it), read by
+`reportRoleHoldersQuery()` at the moment the report goes, plus the closer's own address,
 deduplicated, one `sendRaw()` per recipient and one `night_report_deliveries` row per attempt,
-`SENT` or `FAILED` (criterion 4). `sendRaw()` is `notify.ts`'s one sanctioned raw-address path:
-the standing list is committee configuration, not necessarily an account, so this bypasses
-`notify()`'s per-user preference and topic machinery entirely. Automatic retry until delivered
+`SENT` or `FAILED` (criterion 4). Roles rather than addresses since issue 1356: a grant lapses at
+the committee year end (0009), so the report follows the post without anybody editing a list, and
+an erased or disabled account is not written to. `sendRaw()` is `notify.ts`'s one sanctioned
+raw-address path, so a standing recipient's own topic preferences do not hold the report back. Automatic retry until delivered
 and the operations-dashboard surfacing criterion 4 also asks for are H-105 and H-106's own scope,
 not this route's: H-105 has since shipped `notifyAddress()` for exactly this shape of send, but
 this file predates it and is not yet wired to it (`docs/known-issues.md`), so a failed send here

@@ -373,6 +373,10 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   1. Sign-off requires the E-114 checklist gate; the duty manager adds a closing note and signs, and the report freezes into an append-only row uniquely keyed to the performance, so a second report for the same night is impossible.
   2. Sign-off is available only under live shift authority (E-111); an officer closing instead of the duty manager is recorded and flagged as such.
   3. On freeze the report emails the configured recipients plus the closer; the recipient list is committee configuration.
+     Amended 27 September 2026 (issue 1356): the recipients are chosen by role, not by address.
+     The report goes to every account holding a live grant of a named role when it is sent, plus
+     the closer, so a role that changes hands at the committee year end moves the report with it
+     and nobody edits a list of addresses. An erased or disabled account is not written to.
   4. Failed sends retry automatically and surface on the operations dashboard until delivered; the report row records each distribution outcome.
   5. A frozen report is immutable; a later correction is an addendum entry linked to the report and distributed the same way.
 - Source: Prompt Book E-5; audit PR-10 (uniquely-keyed snapshot and email carry).

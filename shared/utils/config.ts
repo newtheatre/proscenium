@@ -685,11 +685,12 @@ export const CONFIG_KEYS = {
 
   // Module E: show night
 
-  NIGHT_REPORT_RECIPIENTS: {
-    schema: z.array(z.string().email('Enter a real email address')),
+  // Roles, not addresses: a grant lapses at the year end, so last year's officers stop receiving
+  // the report without anybody editing this (E-124 criterion 3, 0009, issue 1356).
+  NIGHT_REPORT_ROLES: {
+    schema: z.array(z.enum(ROLES)),
     workshop: 'people-and-communications',
-    sensitive: true,
-    describes: 'Standing recipients of the end-of-night report. The list is confirmed in the workshop.',
+    describes: 'Roles whose holders are emailed every end-of-night report, alongside whoever closed the night. Read when the report goes, so a grant that has lapsed receives nothing. The roles are confirmed in the workshop.',
   },
 
   // Which training module gates each shift role, as the committee named them (issue 1318). Null
@@ -867,7 +868,7 @@ export const ENFORCED_KEYS = [
   'UNVERIFIED_EXPIRY_CAP',
   'VERIFY_RESEND_ATTEMPTS',
   'VERIFY_RESEND_WINDOW_MINUTES',
-  'NIGHT_REPORT_RECIPIENTS',
+  'NIGHT_REPORT_ROLES',
 ] as const satisfies readonly ConfigKey[]
 
 export function isEnforced(key: ConfigKey): boolean {
@@ -896,7 +897,7 @@ export function plannedFor(key: ConfigKey): { story: string, issue: number } | n
 // Said rather than guessed from a key's name: the screen picks people and roles for exactly these,
 // and the settings list names the people (J-104 criterion 2).
 export const PEOPLE_KEYS = ['BAR_AUTHORISED_TAB_HOLDERS'] as const satisfies readonly ConfigKey[]
-export const ROLE_KEYS = ['BAR_AUTHORISED_TAB_ROLES', 'PRIVILEGED_ROLES'] as const satisfies readonly ConfigKey[]
+export const ROLE_KEYS = ['BAR_AUTHORISED_TAB_ROLES', 'PRIVILEGED_ROLES', 'NIGHT_REPORT_ROLES'] as const satisfies readonly ConfigKey[]
 
 export function holdsPeople(key: string): boolean {
   return (PEOPLE_KEYS as readonly string[]).includes(key)

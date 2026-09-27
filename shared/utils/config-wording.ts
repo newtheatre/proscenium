@@ -114,7 +114,7 @@ const HEADINGS: Record<ConfigKey, string> = {
   RETENTION_WARNING_CAP: 'Retention warnings per run',
   BACKUP_DRILL_INTERVAL_DAYS: 'Restore drill due every',
   HEALTH_ALERT_WINDOW_MINUTES: 'Unhealthy before the IT Manager is told',
-  NIGHT_REPORT_RECIPIENTS: 'Night report recipients',
+  NIGHT_REPORT_ROLES: 'Roles sent the night report',
 }
 
 export function configHeading(key: string): string {

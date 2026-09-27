@@ -105,15 +105,35 @@ function deliveryStatement(input: { id: string, reportId: string, addendumId: st
   `
 }
 
-// Ships unset until a workshop confirms it (0019): distribution to the standing list is then
+// Whoever holds a named role at the moment the report goes, so a grant lapsed at the year end sends
+// nothing (E-124 criterion 3, 0009). The roles are one JSON parameter, never an expanded list (0006).
+export function reportRoleHoldersQuery(roles: readonly string[], now: number): SQL {
+  return sql`
+    SELECT u.email AS email FROM users u
+    WHERE u.anonymised_at IS NULL AND u.disabled = 0
+      AND EXISTS (
+        SELECT 1 FROM role_grants rg
+        WHERE rg.user_id = u.id
+          AND rg.role IN (SELECT value FROM json_each(${JSON.stringify(roles)}))
+          AND (rg.expires_at IS NULL OR rg.expires_at > ${now})
+      )
+    ORDER BY u.email
+  `
+}
+
+// Ships unset until a workshop confirms it (0019): distribution to the standing roles is then
 // simply empty, rather than an unset key blocking the freeze itself.
 async function configuredRecipients(event: H3Event | undefined): Promise<string[]> {
+  let roles: string[]
   try {
-    return await configValue(event, 'NIGHT_REPORT_RECIPIENTS')
+    roles = await configValue(event, 'NIGHT_REPORT_ROLES')
   }
   catch {
     return []
   }
+  if (!roles.length) return []
+  const holders = await db.all<{ email: string }>(reportRoleHoldersQuery(roles, Math.floor(Date.now() / 1000)))
+  return holders.map(holder => holder.email)
 }
 
 // One best-effort send per recipient, each outcome its own row (criterion 4's "records each
