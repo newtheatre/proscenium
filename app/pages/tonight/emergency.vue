@@ -4,7 +4,7 @@ import { nightCacheKey } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
 import { telHref } from '#shared/utils/tonight'
-import { EMERGENCY_SERVICES, emergencyCalls, emergencyCardsFor, firstCallOf, saysFirstAiders } from '#shared/utils/venue-emergency'
+import { emergencyCalls, emergencyCardsFor, firstCallOf, saysCall, saysFirstAiders } from '#shared/utils/venue-emergency'
 import type { FirstAider, PinnedCall } from '#shared/utils/venue-emergency'
 
 definePageMeta({ layout: 'tonight', middleware: 'signed-in', docs: '/docs/tonight/emergency' })
@@ -49,8 +49,7 @@ const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emerg
 
 // The served copy until the device has something of its own, then the device's: one is as old as
 // this request, the other as old as the last successful one. Its numbers are only its fetcher's.
-const cards = computed(() => emergencyCardsFor(cache.data.value ?? served.value, account.value.user?.id ?? null)
-  ?.map(card => ({ ...card, firstCall: firstCallOf(card).name })) ?? null)
+const cards = computed(() => emergencyCardsFor(cache.data.value ?? served.value, account.value.user?.id ?? null))
 const asOfAt = computed(() => cache.data.value ? cache.cachedAt.value : Date.now())
 
 // Every venue keeps 999, beside whoever its card rings first (issue 1519, 0106).
@@ -66,6 +65,8 @@ function confirm(event: MouseEvent, call: PinnedCall): void {
   confirming.value = call
   confirmOpen.value = true
 }
+
+const firstCallName = (card: Card): string => firstCallOf(card).name
 
 function asOf(at: number): string {
   return saysWhenLong(at)
@@ -124,7 +125,7 @@ function isolation(one: Card): string[] {
             data-test="emergency-999"
           >
             <h3 class="mb-3 font-mono text-xs tracking-[0.2em] text-error uppercase">
-              Read to {{ card.firstCall }}
+              Read to {{ firstCallName(card) }}
             </h3>
             <p
               v-if="card.address"
@@ -157,13 +158,13 @@ function isolation(one: Card): string[] {
             data-test="emergency-duty-manager"
           >
             <h3 class="mb-2 font-semibold">
-              After {{ card.firstCall }}
+              After {{ firstCallName(card) }}
             </h3>
             <p
               class="text-lg"
               data-test="emergency-order"
             >
-              Call {{ card.firstCall }} first, then tell the duty manager.
+              Call {{ firstCallName(card) }} first, then tell the duty manager.
             </p>
             <ul
               v-if="card.dutyManagers?.length"
@@ -315,10 +316,7 @@ function isolation(one: Card): string[] {
         class="text-lg"
         data-test="emergency-call-says"
       >
-        {{ confirming.digits === EMERGENCY_SERVICES.phone
-          ? 'This rings 999 from the phone you are holding.'
-          : `This rings ${confirming.name} on ${confirming.phone} from the phone you are holding.` }}
-        Have the address on the card ready to read.
+        {{ saysCall(confirming) }}
       </p>
     </NightSheet>
   </NightScreen>

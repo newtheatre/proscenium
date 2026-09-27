@@ -9,7 +9,7 @@ import type { ShiftRole } from './rota'
 const FIELD_LIMIT = 1000
 const NOTES_LIMIT = 2000
 
-const field = () => z.string().trim().max(FIELD_LIMIT).nullish().transform(value => value?.trim() || null)
+const field = (max = FIELD_LIMIT) => z.string().trim().max(max).nullish().transform(value => value?.trim() || null)
 
 // Written as dialled, and counted in digits: a space is not a digit a phone can connect on.
 const DIALLABLE = /^\+?[\d ]+$/
@@ -28,11 +28,11 @@ export const emergencyCardForm = z.object({
   defibrillator: field(),
   firstAiders: field(),
   firePanel: field(),
-  what3words: z.string().trim().max(100).nullish().transform(value => value?.trim() || null),
-  notes: z.string().trim().max(NOTES_LIMIT).nullish().transform(value => value?.trim() || null),
-  firstCallName: z.string().trim().max(80).nullish().transform(value => value?.trim() || null),
-  firstCallPhone: z.string().trim().nullish().transform(value => value?.trim() || null)
-    .refine(value => value === null || (DIALLABLE.test(value) && dialled(value).length >= 3 && dialled(value).length <= 15), 'the number to ring first is digits and spaces, with a plus in front if it needs one')
+  what3words: field(100),
+  notes: field(NOTES_LIMIT),
+  firstCallName: field(80),
+  firstCallPhone: field(40)
+    .refine(value => value === null || (DIALLABLE.test(value) && /^\d{3,15}$/.test(dialled(value))), 'the number to ring first is digits and spaces, with a plus in front if it needs one')
     .refine(value => value === null || !EMERGENCY_NUMBERS.has(dialled(value)), 'the number to ring first is who you call before 999, so it cannot be 999 itself'),
 }).refine(card => (card.firstCallName === null) === (card.firstCallPhone === null), {
   message: 'who to ring first needs both a name and a number, or neither',
@@ -103,13 +103,21 @@ export interface PinnedCall extends EmergencyCall { label: string, href: string,
 // first call that is not every venue's names the venues it is for (0106).
 export function emergencyCalls(cards: readonly (FirstCall & { venueName: string })[]): PinnedCall[] {
   const calls = new Map<string, EmergencyCall & { venues: string[] }>()
-  for (const card of [...cards, { firstCallName: null, firstCallPhone: null, venueName: '' }]) {
+  for (const card of cards) {
     const call = firstCallOf(card)
-    const held = calls.get(dialled(call.phone)) ?? { ...call, venues: [] }
-    calls.set(dialled(call.phone), { ...held, venues: card.venueName ? [...held.venues, card.venueName] : held.venues })
+    const digits = dialled(call.phone)
+    if (!calls.has(digits)) calls.set(digits, { ...call, venues: [] })
+    calls.get(digits)!.venues.push(card.venueName)
   }
+  if (!calls.has(EMERGENCY_SERVICES.phone)) calls.set(EMERGENCY_SERVICES.phone, { ...EMERGENCY_SERVICES, venues: [] })
   return [...calls.entries()].map(([digits, call]) => {
-    const some = digits !== EMERGENCY_SERVICES.phone && cards.length > 1 && call.venues.length < cards.length
+    const some = digits !== EMERGENCY_SERVICES.phone && call.venues.length < cards.length
     return { name: call.name, phone: call.phone, label: some ? `Call ${call.name} (${call.venues.join(', ')})` : `Call ${call.name}`, href: telHref(call.phone), digits }
   })
+}
+
+// What the confirmation sheet says before anything dials (0106).
+export function saysCall(call: PinnedCall): string {
+  const rings = call.digits === EMERGENCY_SERVICES.phone ? 'This rings 999' : `This rings ${call.name} on ${call.phone}`
+  return `${rings} from the phone you are holding. Have the address on the card ready to read.`
 }

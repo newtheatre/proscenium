@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { EMERGENCY_SERVICES, cardAddressDraft, emergencyCalls, emergencyCardComplete, emergencyCardForm, firstCallOf } from '#shared/utils/venue-emergency'
+import { EMERGENCY_SERVICES, cardAddressDraft, emergencyCalls, emergencyCardComplete, emergencyCardForm, firstCallOf, saysCall } from '#shared/utils/venue-emergency'
 
 // E-113's pure validation. What the database holds is proved against the real migrations in
 // `tests/integration/venue-emergency.test.ts`.
@@ -169,6 +169,12 @@ describe('who the screen rings, and in what order (issue 1519)', () => {
     const [first, last] = emergencyCalls([at('Studio', { firstCallName: 'Security', firstCallPhone: '+44 115 951 8888' })])
     expect(first).toMatchObject({ href: 'tel:+441159518888', digits: '441159518888' })
     expect(last).toMatchObject({ href: 'tel:999', digits: '999' })
+  })
+
+  test('the sheet names who and the number before anything dials', () => {
+    const [first, last] = emergencyCalls([at('Studio', security)])
+    expect(saysCall(first!)).toBe('This rings University Security on 0115 951 8888 from the phone you are holding. Have the address on the card ready to read.')
+    expect(saysCall(last!)).toBe('This rings 999 from the phone you are holding. Have the address on the card ready to read.')
   })
 })
 
