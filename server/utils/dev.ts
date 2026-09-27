@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 // The writer's own constant, so the tools cannot read a path the centre stopped writing to.
 import { MAILBOX } from './mailbox'
+import { daysAfter, londonDay } from '#shared/utils/membership'
 import { PERSONAS, PERSONA_PASSWORD, PERSONA_TOTP_SECRET } from '#shared/utils/personas'
 import { PROTECTED_ROLE } from '#shared/utils/roles'
 
@@ -117,6 +118,18 @@ export async function seedPersonas(): Promise<{ made: number, held: number }> {
     // by hand every reseed is exactly what this file exists to save (K-124 criterion 1).
     if (persona.shape === 'full') await confirmSecondFactor(id)
     if (persona.shape === 'tombstone') await eraseAccount(id, null)
+    // The same term `bun run seed` gives a current member: begun two months ago, ten months to run.
+    if (persona.membership === 'CURRENT') {
+      const today = londonDay(new Date())
+      await db.insert(schema.memberships).values({
+        id: newId(),
+        userId: id,
+        startsOn: daysAfter(today, -60),
+        expiresOn: daysAfter(today, 300),
+        source: 'MANUAL',
+        confirmedAt: Math.floor(Date.now() / 1000),
+      })
+    }
   }
 
   const { mkdir, writeFile } = await import('node:fs/promises')

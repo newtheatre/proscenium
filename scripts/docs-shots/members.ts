@@ -2,6 +2,8 @@ import { CONSOLE_WIDTH, PHONE_WIDTH } from './types'
 import type { Shot } from './types'
 
 const persona = 'dev-member@e2e.newtheatre.org.uk'
+// The room forms refuse before they are filled in without a membership, which dev-member lacks.
+const booker = 'dev-booker@e2e.newtheatre.org.uk'
 
 export const members: Shot[] = [
   {
@@ -67,7 +69,7 @@ export const members: Shot[] = [
   },
   {
     name: 'members/book-a-room',
-    persona,
+    persona: booker,
     url: '/rooms/book',
     marker: '[data-test="booking-form"]',
     width: PHONE_WIDTH,
@@ -93,7 +95,7 @@ export const members: Shot[] = [
   },
   {
     name: 'members/other-rooms',
-    persona,
+    persona: booker,
     url: '/rooms/external',
     marker: '[data-test="external-warning"]',
     width: PHONE_WIDTH,
