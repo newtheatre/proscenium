@@ -91,6 +91,23 @@ describe('a walk-in already on the register logs nothing', () => {
     })
   })
 
+  test('somebody who withdrew walks back in through the rejoin, and is logged once', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      person(database, 'u-back')
+      batch(database, [signUpStatement('a1', 's1', 'u-back', 1_800_000_000)])
+      database.batch([['UPDATE session_attendees SET status = ? WHERE id = ?', 'CANCELLED', 'a1']])
+
+      const added = entry('session.attendee.added', 'session:s1')
+      const [walkedIn] = batch(database, [walkInStatement('a2', 's1', 'u-back', 1_800_000_100), auditIfChanged(added)])
+      const [rejoined] = batch(database, [walkInRejoinStatement('s1', 'u-back', 1_800_000_100), auditIfChanged(added)])
+
+      expect(walkedIn).toHaveLength(0)
+      expect(rejoined).toHaveLength(1)
+      expect(logged(database, 'session.attendee.added')).toBe(1)
+    })
+  })
+
   test('somebody new walks in and is logged once', async () => {
     await withDatabase((database) => {
       seed(database)
@@ -215,6 +232,19 @@ describe('a bar opening that was not created logs nothing', () => {
       expect(logged(database, 'bar-opening.created')).toBe(0)
     })
   })
+
+  test('a venue with a bar row: the opening is written and logged once', async () => {
+    await withDatabase((database) => {
+      const venue = testVenue(database, { suffix: 'wet' })
+      person(database, 'officer')
+      database.batch([[`INSERT INTO shift_templates (id, venue_id, role, "count", updated_by, updated_at) VALUES ('t1', ?, 'BAR', 2, 'officer', unixepoch())`, venue.id]])
+      batch(database, [
+        createOpeningStatement('o2', { venueId: venue.id, night: '2026-10-17', label: 'Society social', startsAt: 1_792_000_000, endsAt: 1_792_010_000 }, 'officer'),
+        auditIfRow(entry('bar-opening.created', 'bar-opening:o2'), 'bar_openings', 'o2'),
+      ])
+      expect(logged(database, 'bar-opening.created')).toBe(1)
+    })
+  })
 })
 
 // 9. A template written for a venue made external meanwhile writes no slot and logs none (E-101).
@@ -243,14 +273,13 @@ describe('removing an authenticator app nobody set up logs nothing', () => {
       person(database, 'u-plain')
       person(database, 'u-factor')
       database.batch([['INSERT INTO totp_secrets (user_id, secret) VALUES (?, ?)', 'u-factor', 'SECRETSECRET']])
-      const remove = (userId: string): unknown[][] => batch(database, [
-        sql`DELETE FROM totp_secrets WHERE user_id = ${userId}`,
-        auditWhere(entry('mfa.removed', `user:${userId}`), sql`changes() = 1`),
-      ])
+      const remove = (userId: string): number => {
+        batch(database, [sql`DELETE FROM totp_secrets WHERE user_id = ${userId}`, auditIfChanged(entry('mfa.removed', `user:${userId}`))])
+        return logged(database, 'mfa.removed')
+      }
 
-      expect(remove('u-plain').at(-1)).toHaveLength(0)
-      expect(remove('u-factor').at(-1)).toHaveLength(1)
-      expect(logged(database, 'mfa.removed')).toBe(1)
+      expect(remove('u-plain')).toBe(0)
+      expect(remove('u-factor')).toBe(1)
     })
   })
 })

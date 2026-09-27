@@ -19,7 +19,7 @@ describe('every site audits through the write, never beside it', () => {
     ['7. a performance on or off sale', 'server/api/admin/performances/[id]/sale.post.ts', 'auditedWrite(db.all<{ id: string }>(performanceSaleStatement('],
     ['8. planning a bar opening', 'server/api/rota/openings/index.post.ts', 'auditIfRow(entry, \'bar_openings\', openingId)'],
     ['9. a venue\'s shift template', 'server/api/admin/rota/templates/[venueId]/index.put.ts', 'auditWhere(entry, templateVenueIsOurs(venueId))'],
-    ['10. removing the authenticator app', 'server/api/account/mfa/index.delete.ts', 'auditWhere(entry, sql`changes() = 1`)'],
+    ['10. removing the authenticator app', 'server/api/account/mfa/index.delete.ts', 'db.run(auditIfChanged(entry))'],
   ]
 
   test.each(SITES)('%s', async (_, path, shape) => {
@@ -34,6 +34,18 @@ describe('every site audits through the write, never beside it', () => {
     expect(route).toContain('const claimed = await auditedWrite(')
     expect(route).toContain('afterLostGoogleClaim(current?.googleSub ?? null, identity.sub)')
     expect(route.match(/action: outcome\.action === 'claim-pending'/g)).toHaveLength(1)
+  })
+
+  test('8. the opening\'s audit follows the insert it checks', async () => {
+    const route = await source('server/api/rota/openings/index.post.ts')
+    expect(route.indexOf('createOpeningStatement(openingId')).toBeGreaterThan(-1)
+    expect(route.indexOf('auditIfRow(entry, \'bar_openings\', openingId)')).toBeGreaterThan(route.indexOf('createOpeningStatement(openingId'))
+  })
+
+  // A refused edit re-reads the booking, so capacity is blamed only while it is still pending (0049).
+  test('3. a refused ticket edit says why from the booking as it now stands', async () => {
+    const route = await source('server/api/qr/tickets.put.ts')
+    expect(route).toContain('now?.status === \'PENDING\' ? \'This performance no longer has room for that change\' : \'This booking can no longer be changed here\'')
   })
 
   test('the walk-in logs only through the write that took, the first or the rejoin', async () => {
@@ -52,6 +64,9 @@ describe('every site audits through the write, never beside it', () => {
     const voiding = body(await source('server/utils/tab-settlement.ts'), 'voidTabCharge')
     expect(voiding).toContain('auditIfRow(entry, \'ledger_entries\', posted.id)')
     expect(voiding).not.toContain('db.insert(schema.auditLog)')
+    // After the entry it checks, or it never logs and nothing fails to say so (0049).
+    expect(voiding.indexOf('[...posted.statements]')).toBeGreaterThan(-1)
+    expect(voiding.indexOf('auditIfRow(entry, \'ledger_entries\', posted.id)')).toBeGreaterThan(voiding.indexOf('[...posted.statements]'))
   })
 
   test('5. an erasure logs only if it anonymised the account, and says when it did not', async () => {
