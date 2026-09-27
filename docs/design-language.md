@@ -173,8 +173,8 @@ Nine rules follow:
    line and the on-shift badge. A screen says what goes in it through `setNightEyebrow` (which
    `NightScreen` calls with its own title) and `setNightSubject` (which the screens that know
    tonight's show call), and a screen that names nothing still sits under the running house: the
-shell fills the title and the line in from the performance `/api/tonight/authority` marks active,
-or, before any house is open, tonight's first, so no page draws a heading of its own. The hub at
+   shell fills the title and the line in from the performance `/api/tonight/authority` marks active,
+   or, before any house is open, tonight's first, so no page draws a heading of its own. The hub at
    `/tonight` is the night's destinations, one `NightTile` card each: each tile appears where the
    viewer's own resolved authority opens it (`hubTiles()`), the viewer's own job first and in gold,
    the rest in the order a night taps them, Emergency always and last and red. Until the roles are

@@ -72,6 +72,7 @@ async function load(): Promise<void> {
     close.value = listed.close
     till.value = listed.till
     ambiguous.value = false
+    refusal.value = null
     syncedAt.value = new Date()
   }
   catch (refused) {

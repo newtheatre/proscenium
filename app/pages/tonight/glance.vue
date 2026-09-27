@@ -62,6 +62,7 @@ async function load(): Promise<void> {
     dutyManager.value = true
     syncedAt.value = new Date()
     failure.value = null
+    refusal.value = null
   }
   catch (refused) {
     if (refusalStatus(refused) === 403) {
@@ -82,6 +83,7 @@ async function loadReadOnly(): Promise<void> {
     dutyManager.value = false
     syncedAt.value = new Date()
     failure.value = null
+    refusal.value = null
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -139,13 +141,9 @@ function hideCode(): void {
   boardCodeFailure.value = null
 }
 
-async function refresh(): Promise<void> {
-  await load()
-}
-
 onMounted(() => {
-  refresh()
-  timer = setInterval(refresh, POLL_MS)
+  load()
+  timer = setInterval(load, POLL_MS)
 })
 onUnmounted(() => {
   if (timer) clearInterval(timer)
@@ -453,7 +451,7 @@ onUnmounted(() => {
         color="neutral"
         variant="outline"
         :loading="!asked"
-        @press="refresh()"
+        @press="load()"
       />
     </template>
   </NightScreen>

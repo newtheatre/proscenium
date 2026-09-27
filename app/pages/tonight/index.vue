@@ -30,19 +30,30 @@ const stale = ref(false)
 const staleReason = ref('')
 const asked = ref(false)
 
-const authority = useNightAuthority()
 const chosenId = ref<string | null>(null)
 
 let timer: ReturnType<typeof setInterval> | undefined
+
+const authority = useNightAuthority()
+const dutyManager = computed(() => authority.value.roles.includes('DUTY_MANAGER'))
+
+// The duty manager's alone to read: any other shift would be refused on every poll. Best-effort,
+// since E-114 criterion 6 is a warning and never blocks the house numbers above it.
+async function loadChecklist(): Promise<void> {
+  if (!dutyManager.value) return
+  try {
+    checklist.value = (await request<{ items: ChecklistEntry[] }>('/api/tonight/checklist')).items
+  }
+  catch {
+    // The banner keeps what it last read.
+  }
+}
 
 // Neither fetch depends on the other's answer, so they run together. The checklist one still
 // runs before house open, so its banner has data the instant `houseOpen` turns true.
 async function load(): Promise<void> {
   // The house is every role's to read, so a door or bar shift sees the numbers too (issue 1307).
-  const [houseFetch, checklistFetch] = await Promise.allSettled([
-    request<HouseTonight>('/api/tonight/house'),
-    request<{ items: ChecklistEntry[] }>('/api/tonight/checklist'),
-  ])
+  const [houseFetch] = await Promise.allSettled([request<HouseTonight>('/api/tonight/house'), loadChecklist()])
 
   if (houseFetch.status === 'fulfilled') {
     data.value = houseFetch.value
@@ -64,12 +75,13 @@ async function load(): Promise<void> {
     }
   }
 
-  // Best-effort: a screen that cannot reach the checklist still shows the rest (E-114 criterion 6
-  // is a warning, not a blocker of the house numbers above it).
-  if (checklistFetch.status === 'fulfilled') checklist.value = checklistFetch.value.items
-
   asked.value = true
 }
+
+// The roles arrive after the first load, so the duty manager's banner need not wait for a poll.
+watch(dutyManager, (holds) => {
+  if (holds) loadChecklist()
+})
 
 const performances = computed(() => data.value?.performances ?? [])
 
@@ -101,16 +113,16 @@ const scoped = (to: string): string => selectedId.value ? `${to}?performanceId=$
 const tiles = computed(() => hubTiles(authority.value.known ? authority.value.roles : null))
 const noRole = computed(() => authority.value.known && authority.value.roles.length === 0)
 
-const HUB_TILES: Record<HubTileId, { label: string, hint: string, icon: string, to: string, scoped: boolean, testId: string }> = {
-  'door': { label: 'Door', hint: 'QR · ref · name', icon: 'i-lucide-scan-line', to: '/tonight/door', scoped: false, testId: 'door' },
-  'till': { label: 'Till', hint: 'Bar sales', icon: 'i-lucide-store', to: '/tonight/till', scoped: false, testId: 'till' },
-  'glance': { label: 'Tonight at a glance', hint: 'Numbers · show info', icon: 'i-lucide-gauge', to: '/tonight/glance', scoped: true, testId: 'glance' },
-  'checklist': { label: 'Checklist', hint: '', icon: 'i-lucide-list-checks', to: '/tonight/checklist', scoped: true, testId: 'checklist' },
-  'report': { label: 'Night report', hint: 'Read · sign off', icon: 'i-lucide-file-signature', to: '/tonight/report', scoped: true, testId: 'report' },
-  'age-checks': { label: 'Challenge 25', hint: 'Log a check · register', icon: 'i-lucide-id-card', to: '/tonight/age-checks', scoped: false, testId: 'age-checks' },
-  'backstage': { label: 'Backstage', hint: 'House open · clearance', icon: 'i-lucide-messages-square', to: '/tonight/board', scoped: false, testId: 'backstage' },
-  'contacts': { label: 'Contacts and incidents', hint: 'Who\'s on · log', icon: 'i-lucide-phone', to: '/tonight/incidents', scoped: true, testId: 'contacts' },
-  'emergency': { label: 'Emergency', hint: 'Evac · first aid · 999', icon: 'i-lucide-siren', to: '/tonight/emergency', scoped: false, testId: 'emergency' },
+const HUB_TILES: Record<HubTileId, { label: string, hint: string, icon: string, to: string, scoped: boolean }> = {
+  'door': { label: 'Door', hint: 'QR · ref · name', icon: 'i-lucide-scan-line', to: '/tonight/door', scoped: false },
+  'till': { label: 'Till', hint: 'Bar sales', icon: 'i-lucide-store', to: '/tonight/till', scoped: false },
+  'glance': { label: 'Tonight at a glance', hint: 'Numbers · show info', icon: 'i-lucide-gauge', to: '/tonight/glance', scoped: true },
+  'checklist': { label: 'Checklist', hint: '', icon: 'i-lucide-list-checks', to: '/tonight/checklist', scoped: true },
+  'report': { label: 'Night report', hint: 'Read · sign off', icon: 'i-lucide-file-signature', to: '/tonight/report', scoped: true },
+  'age-checks': { label: 'Challenge 25', hint: 'Log a check · register', icon: 'i-lucide-id-card', to: '/tonight/age-checks', scoped: false },
+  'backstage': { label: 'Backstage', hint: 'House open · clearance', icon: 'i-lucide-messages-square', to: '/tonight/board', scoped: false },
+  'contacts': { label: 'Contacts and incidents', hint: 'Who\'s on · log', icon: 'i-lucide-phone', to: '/tonight/incidents', scoped: true },
+  'emergency': { label: 'Emergency', hint: 'Evac · first aid · 999', icon: 'i-lucide-siren', to: '/tonight/emergency', scoped: false },
 }
 
 onMounted(() => {
@@ -180,7 +192,7 @@ onUnmounted(() => {
 
     <!-- The duty manager's comps wait here too, since an ask lapses in minutes (issue 1304). -->
     <NightCompQueue
-      v-if="authority.roles.includes('DUTY_MANAGER')"
+      v-if="dutyManager"
       title="Waiting on you"
       test-id="hub-waiting-on-you"
       :performance-id="selectedId"
@@ -193,8 +205,11 @@ onUnmounted(() => {
       class="space-y-3 rounded-xl bg-elevated p-4 ring-1 ring-default"
       data-test="hub-no-role"
     >
-      <p class="font-semibold">
-        You are not on shift tonight.
+      <p
+        class="font-semibold"
+        data-test="hub-no-role-says"
+      >
+        {{ authority.refusal ?? 'You are not on shift tonight.' }}
       </p>
       <p class="text-sm text-muted">
         Your shifts, and the ones still open, are on your rota.
@@ -225,7 +240,7 @@ onUnmounted(() => {
         :icon="HUB_TILES[tile.id].icon"
         :tone="tile.id === 'emergency' ? 'danger' : tile.gold ? 'gold' : 'neutral'"
         :to="HUB_TILES[tile.id].scoped ? scoped(HUB_TILES[tile.id].to) : HUB_TILES[tile.id].to"
-        :data-test="`tile-${HUB_TILES[tile.id].testId}`"
+        :data-test="`tile-${tile.id}`"
       />
     </div>
     <p class="pt-2 text-center text-sm text-muted">

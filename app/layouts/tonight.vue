@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nightCacheKey } from '#shared/utils/night-cache'
-import { nightHeaderLine, onShiftLabel, runningPerformance } from '#shared/utils/night-hub'
+import { nightHeaderLine, onShiftLabel } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
 
 // A phone held in a foyer is not a dashboard: a plain dark subtree, big targets, nothing that
@@ -21,10 +21,10 @@ resolveNightAuthority()
 // target floor too (docs/design-language.md rule 4).
 useHead({ bodyAttrs: { class: 'nnt-night' } })
 
-// A screen that names no show still sits on one: the house running now, or tonight's first before
-// any is (issue 1304); a screen that knows better (the hub, the glance) overrides it.
+// A screen that names no show still sits on one: whichever house is running now fills the header
+// in, and a screen that knows better (the hub, the glance) overrides it.
 setNightFallbackSubject(() => {
-  const running = runningPerformance(authority.value.performances)
+  const running = authority.value.performances.find(performance => performance.active)
   if (!running) return null
   return { title: running.showTitle, meta: nightHeaderLine(running.startsAt, running.venueName) }
 })

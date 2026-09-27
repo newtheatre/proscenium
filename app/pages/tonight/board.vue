@@ -43,6 +43,7 @@ async function load(): Promise<void> {
     milestoneTypes.value = answered.milestoneTypes
     syncedAt.value = new Date()
     failure.value = null
+    refusal.value = null
   }
   catch (error) {
     failure.value = refusalText(error)

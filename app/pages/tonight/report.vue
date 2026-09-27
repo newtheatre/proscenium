@@ -77,6 +77,7 @@ async function load(): Promise<void> {
     report.value = read
     performanceId.value = read.performanceId
     ambiguous.value = false
+    refusal.value = null
     syncedAt.value = new Date()
   }
   catch (refused) {

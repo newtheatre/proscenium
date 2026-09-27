@@ -40,10 +40,15 @@ which is how the committee sees a rota that is not being kept; looking at a scre
   confirmed shift on that performance yourself.
 - **"You are not on shift tonight."** on the hub: no role tonight opens any of the screens, so the
   hub shows **Emergency** and one card with **My rota**, where your shifts and the open ones are.
+  Where you do hold something tonight that does not open a screen yet, such as a shift whose hours
+  have not started or a claim not yet confirmed, the card says that instead, in the words below.
 - **"Your door shift tonight is claimed, not confirmed yet: the Front of House Manager confirms
   it on the rota"** (or the same for a bar or duty manager shift): you claimed the shift, and it
   is waiting for an officer. A claim opens nothing until it is confirmed; ask the Front of House
   Manager to confirm it on the rota board.
+- **"Your shift opens this from 18:30 to 23:00, and it is outside those hours"**: your shift is
+  confirmed, and it opens its screens only between those times. Come back then; until then the
+  hub's card says the same.
 - **"Nothing is running tonight, so there is nothing to take charge of"**: no performance at
   any venue tonight, or the only one is cancelled. Check the programme.
 - **"Show-night tools open for tonight only, and that night has ended"**: the screen was open

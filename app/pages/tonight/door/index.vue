@@ -33,6 +33,7 @@ async function resolveAuthority(): Promise<void> {
     performanceId.value = (resolved.performances.find(one => one.active) ?? resolved.performances[0])?.id ?? ''
     authorised.value = true
     authorityFailure.value = null
+    refusal.value = null
   }
   catch (refused) {
     authorised.value = false

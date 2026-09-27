@@ -1,5 +1,6 @@
 import { DEFAULT_EYEBROW, bindNightEyebrow, bindNightFallbackSubject, bindNightSubject } from './useNightHeader'
 import { NIGHT_ROLES } from '#shared/utils/night-authority'
+import { hubRefusal } from '#shared/utils/refusals'
 import type { NightHeaderState, NightSubject } from './useNightHeader'
 import type { NightAuthorityVia, NightRole } from '#shared/utils/night-authority'
 
@@ -36,10 +37,12 @@ export interface NightAuthority {
   // Whether any role had a definite answer for a signed-in viewer: until one does, signed out, or
   // with no signal, `roles` is not yet known and a screen drawing by role draws all (issue 1304).
   known: boolean
+  // Refused every role for a reason more specific than no shift: what the hub says instead.
+  refusal: string | null
 }
 
 export function useNightAuthority(): Ref<NightAuthority> {
-  return useState<NightAuthority>('nnt-night-authority', () => ({ roles: [], via: null, performances: [], known: false }))
+  return useState<NightAuthority>('nnt-night-authority', () => ({ roles: [], via: null, performances: [], known: false, refusal: null }))
 }
 
 // Which of tonight's roles the viewer actually holds, asked of the server rather than read from a
@@ -56,13 +59,19 @@ export function resolveNightAuthority(): void {
     }))
 
     const held = answers.flatMap(answer => answer.status === 'fulfilled' ? [answer.value] : [])
+    const known = answers.some(answer => answer.status === 'fulfilled' || refusalStatus(answer.reason) === 403)
+    // Asked with no role, the server ranks the three refusals and names the most specific (issue 1411).
+    const said = held.length === 0 && known
+      ? await request('/api/tonight/authority').then(() => null, (refused: unknown) => refusalText(refused))
+      : null
     // A shift is the ordinary way in, so it wins the badge wherever the viewer holds both; a duty
     // manager covering the door is on their own shift, so cover reads as a shift too (0095).
     resolved.value = {
       roles: held.map(one => one.role),
       via: held.some(one => one.via !== 'OFFICER') ? 'SHIFT' : (held.length > 0 ? 'OFFICER' : null),
       performances: held[0]?.performances ?? [],
-      known: answers.some(answer => answer.status === 'fulfilled' || refusalStatus(answer.reason) === 403),
+      known,
+      refusal: hubRefusal(said),
     }
   })
 }

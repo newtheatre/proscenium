@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { hubTiles, runningPerformance, whoCanHelpTonight } from '#shared/utils/night-hub'
-import { rolesThatReach, saysScreenIsFor } from '#shared/utils/refusals'
-import { viewProgramme } from '#shared/utils/abilities'
+import { hubTiles, whoCanHelpTonight } from '#shared/utils/night-hub'
+import { NIGHT_ROLES, claimedShiftRefusal, nightAuthorityRefusal, outsideWindowRefusal } from '#shared/utils/night-authority'
+import { hubRefusal, rolesThatReach, saysScreenIsFor } from '#shared/utils/refusals'
+import { viewAccounts, viewProgramme } from '#shared/utils/abilities'
 
 // Issue 1304: the hub is shaped by the viewer's own job, a refused screen says who can help, and a
 // signed-in refusal names the role that opens the screen.
@@ -41,22 +42,22 @@ describe('the hub shows the tiles the viewer\'s own authority opens (E-112 crite
   })
 })
 
-describe('the header falls back to the running show (issue 1304)', () => {
-  const performances = [
-    { id: 'matinee', active: false, startsAt: 100 },
-    { id: 'evening', active: true, startsAt: 200 },
-  ]
-
-  test('the house whose doors are open now', () => {
-    expect(runningPerformance(performances)?.id).toBe('evening')
+// Refused every role, the hub says the most specific reason the server ranked, not "not on shift".
+describe('the hub keeps a refusal that says more than no shift (issue 1304, issue 1303)', () => {
+  test('a door shift outside its window sees its hours', () => {
+    const said = outsideWindowRefusal('18:30 to 23:00').statusMessage
+    expect(hubRefusal(said)).toBe(said)
   })
 
-  test('before any house is open, tonight\'s first', () => {
-    expect(runningPerformance(performances.map(one => ({ ...one, active: false })))?.id).toBe('matinee')
+  test('a claim not yet confirmed says who confirms it', () => {
+    const said = claimedShiftRefusal('DOOR').statusMessage
+    expect(hubRefusal(said)).toBe(said)
   })
 
-  test('nothing tonight names nothing', () => {
-    expect(runningPerformance([])).toBeNull()
+  test('no shift of any kind leaves the hub\'s own line', () => {
+    for (const role of NIGHT_ROLES) expect(hubRefusal(nightAuthorityRefusal(role).statusMessage)).toBeNull()
+    expect(hubRefusal(nightAuthorityRefusal('DOOR', { firstName: 'Rowan' }).statusMessage)).toBeNull()
+    expect(hubRefusal(null)).toBeNull()
   })
 })
 
@@ -76,13 +77,13 @@ describe('a refused screen names who can help tonight (issue 1304)', () => {
 
 describe('a signed-in refusal names the role that opens the screen (issue 1304, K-133)', () => {
   test('the desk is the Front of House Manager\'s, never the IT Manager\'s to explain', () => {
-    const roles = rolesThatReach(viewProgramme)
-    expect(roles).toContain('FOH_MANAGER')
+    expect(rolesThatReach(viewProgramme)).toEqual(['FOH_MANAGER'])
+    expect(rolesThatReach(viewAccounts)).not.toContain('ADMIN')
     expect(saysScreenIsFor(['FOH_MANAGER'])).toBe('This screen is for the Front of House Manager.')
   })
 
   test('two or more roles are joined in words, and none says so plainly', () => {
     expect(saysScreenIsFor(['FOH_MANAGER', 'TREASURER'])).toBe('This screen is for the Front of House Manager or the Treasurer.')
-    expect(saysScreenIsFor([])).toBe('Your account does not open this screen.')
+    expect(saysScreenIsFor([])).toBe('Your account does not open this screen')
   })
 })

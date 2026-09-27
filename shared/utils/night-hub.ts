@@ -177,12 +177,6 @@ export function hubTiles(roles: readonly NightRole[] | null): { id: HubTileId, g
   return own ? [{ id: own, gold: true }, ...rest] : rest
 }
 
-// The header's show on a screen that names none: the house whose doors are open now, or before
-// any is, tonight's first (issue 1304).
-export function runningPerformance<T extends { active: boolean }>(performances: readonly T[]): T | null {
-  return performances.find(one => one.active) ?? performances[0] ?? null
-}
-
 // Who a refused volunteer turns to: tonight's duty manager, by first name where the rota has one.
 export function whoCanHelpTonight(team: readonly { role: string, filled: boolean, name: string | null }[] | null): string {
   const first = firstNameOf(team?.find(member => member.role === 'DUTY_MANAGER' && member.filled)?.name)

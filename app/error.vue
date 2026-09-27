@@ -12,10 +12,6 @@ const SAYS: Record<number, { title: string, says: string }> = {
     title: 'Your sign-in has ended',
     says: 'Sign in again to carry on',
   },
-  403: {
-    title: 'That is not yours to open',
-    says: 'Your account does not open this screen.',
-  },
   404: {
     title: 'There is nothing here',
     says: 'The page you asked for does not exist. It may have moved.',
@@ -34,8 +30,9 @@ const shown = computed(() => {
     }
   }
   // A signed-in refusal names who the screen is for, never the IT Manager (issue 1304, K-133).
-  if (props.error.statusCode === 403 && forRoles.value) {
-    return { title: 'That is not yours to open', says: `${saysScreenIsFor(forRoles.value)} Ask them if you need something from it.` }
+  if (props.error.statusCode === 403) {
+    const says = forRoles.value ? `${saysScreenIsFor(forRoles.value)} Ask them if you need something from it.` : saysScreenIsFor([])
+    return { title: 'That is not yours to open', says }
   }
   return SAYS[props.error.statusCode ?? 0] ?? {
     title: 'Something went wrong',

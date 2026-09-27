@@ -36,6 +36,8 @@ const items = ref<Entry[]>([])
 // property of an entry: the row's own `performanceId` may still be null either way).
 const authorised = ref(false)
 const authorityFailure = ref<string | null>(null)
+// A 403 alone is a refusal: a dropped connection or a lapsed session keeps the screen (issue 1304).
+const refusal = ref<string | null>(null)
 const performances = ref<CoveredPerformance[]>([])
 
 // One question for any of tonight's roles: the server tries a shift before a bypass and answers a
@@ -46,9 +48,11 @@ async function resolveAuthority(): Promise<void> {
     performances.value = resolved.performances
     authorised.value = true
     authorityFailure.value = null
+    refusal.value = null
   }
   catch (refused) {
     authorityFailure.value = refusalText(refused)
+    refusal.value = refusalStatus(refused) === 403 ? authorityFailure.value : null
   }
 }
 
@@ -218,7 +222,7 @@ async function submitCorrect(): Promise<void> {
   <div>
     <NightScreen
       title="Challenge 25 register"
-      :refused="authorityFailure"
+      :refused="refusal"
       hint="Every entry stays visible once filed. A mistake is corrected with a new entry, never an edit."
       :stale="syncedAt"
       :busy="busy"

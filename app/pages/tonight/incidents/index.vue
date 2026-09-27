@@ -38,6 +38,8 @@ const performanceIds = ref<string[]>([])
 // resolve a performance the route did not label.
 const performances = ref<{ id: string, showTitle: string, startsAt: number }[]>([])
 const authorityFailure = ref<string | null>(null)
+// A 403 alone is a refusal: a dropped connection or a lapsed session keeps the screen (issue 1304).
+const refusal = ref<string | null>(null)
 // The review route takes a duty manager and nobody else (E-114 criterion 3), so the action follows
 // the layout's own check of that role, asked of the server and never a standing grant (0044).
 const nightAuthority = useNightAuthority()
@@ -51,9 +53,11 @@ async function resolveAuthority(): Promise<void> {
     performanceIds.value = resolved.performanceIds
     performances.value = resolved.performances ?? []
     authorityFailure.value = null
+    refusal.value = null
   }
   catch (refused) {
     authorityFailure.value = refusalText(refused)
+    refusal.value = refusalStatus(refused) === 403 ? authorityFailure.value : null
   }
 }
 
@@ -223,7 +227,7 @@ async function submitCorrect(): Promise<void> {
   <div>
     <NightScreen
       title="Contacts and incidents"
-      :refused="authorityFailure"
+      :refused="refusal"
       :stale="syncedAt"
       :busy="busy"
     >
