@@ -83,6 +83,8 @@ const figures = computed(() => (data.value
       </template>
     </AdminToolbar>
 
+    <MoneyNightsNeedingYou />
+
     <UAlert
       v-if="summaryFailure"
       data-test="summary-failure"

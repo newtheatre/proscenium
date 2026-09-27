@@ -7,7 +7,7 @@ import { newId } from './accounts'
 import { nightReconciliation } from './reconciliation'
 import { saysMoney } from '#shared/utils/bar'
 import { FIRST_RECONCILED_NIGHT, currentShowNight, showNightBounds, showNightOf } from '#shared/utils/show-night'
-import type { ExpectedByKind, NightExpected, OutstandingNight, RecordZReadingInput, ZReading } from '#shared/utils/night-reconciliation'
+import type { ExpectedByKind, NightExpected, OutstandingNight, RecordZReadingInput, ZReading, ZReadingWrite } from '#shared/utils/night-reconciliation'
 import type { SQL } from 'drizzle-orm'
 
 // I-104's own whole-night figure, built from F-118's `nightReconciliation` rather than a second
@@ -168,14 +168,31 @@ export async function nightsWithOpenVariance(): Promise<OutstandingNight[]> {
 
 export interface PreparedZReading {
   id: string
+  readerPence: number
   expectedPence: number
   variancePence: number
   statement: SQL
 }
 
+// A write-off records the figure of the reading it resolves, never a retyped one: a different
+// figure is a correction, and is refused as one (criterion 4, issue 1360).
+export function resolvedReaderPence(input: RecordZReadingInput, superseded: { readerPence: number } | null): number {
+  if (!input.writtenOff) {
+    if (input.readerPence === undefined) throw createError({ statusCode: 400, statusMessage: 'Give the figure the reader shows' })
+    return input.readerPence
+  }
+  if (!superseded) {
+    throw createError({ statusCode: 400, statusMessage: 'A write-off names the variance it resolves: record or reload the night\'s reading first' })
+  }
+  if (input.readerPence !== undefined && input.readerPence !== superseded.readerPence) {
+    throw createError({ statusCode: 400, statusMessage: 'A write-off accepts the reading as it stands. To change the figure, correct the reading instead' })
+  }
+  return superseded.readerPence
+}
+
 // Pure, so `tests/` builds a statement with no database (`close.post.ts`'s own split). Guarded
 // on the write, not read-then-written (0049): a racing duplicate insert inserts nothing.
-export function zReadingStatement(input: RecordZReadingInput, actorId: string, expectedPence: number, id = newId()): PreparedZReading {
+export function zReadingStatement(input: ZReadingWrite, actorId: string, expectedPence: number, id = newId()): PreparedZReading {
   const variancePence = input.readerPence - expectedPence
 
   if (variancePence !== 0 && !input.note) {
@@ -209,12 +226,17 @@ export function zReadingStatement(input: RecordZReadingInput, actorId: string, e
         RETURNING id
       `
 
-  return { id, expectedPence, variancePence, statement }
+  return { id, readerPence: input.readerPence, expectedPence, variancePence, statement }
 }
 
 // Recomputed here, never trusted from an earlier preview read: the ledger may have gained a sale
 // between opening the reconciliation screen and pressing confirm (0005, matching F-118's close).
 export async function prepareZReading(input: RecordZReadingInput, actorId: string, id = newId()): Promise<PreparedZReading> {
-  const expected = await nightExpected(input.night)
-  return zReadingStatement(input, actorId, expected.expectedPence, id)
+  const [expected, history] = await Promise.all([
+    nightExpected(input.night),
+    input.writtenOff ? readingHistory(input.night) : Promise.resolve([]),
+  ])
+  const superseded = history.find(reading => reading.id === input.supersedesId) ?? null
+  const readerPence = resolvedReaderPence(input, superseded)
+  return zReadingStatement({ ...input, readerPence }, actorId, expected.expectedPence, id)
 }

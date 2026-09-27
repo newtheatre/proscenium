@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
     target: `z-reading:${input.night}`,
     detail: {
       night: input.night,
-      readerPence: input.readerPence,
+      readerPence: prepared.readerPence,
       expectedPence: prepared.expectedPence,
       variancePence: prepared.variancePence,
       writtenOff: input.writtenOff,
