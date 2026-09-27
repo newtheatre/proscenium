@@ -133,7 +133,7 @@ const columns: TableColumn<VenueCard>[] = [
   },
   {
     id: 'address',
-    header: 'Address',
+    header: 'Address to read to 999',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
     cell: ({ row }) => row.original.address ?? 'Not filed',
   },

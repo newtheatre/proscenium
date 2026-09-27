@@ -103,8 +103,8 @@ export async function seasonOverlaps(startsOn: string, endsOn: string, exceptId:
 
 export interface SeasonFill { showId: string, startsAt: number, actorId: string, auditId: string }
 
-// A show with no season takes the current one its first live night falls in (D-131 criterion 2).
-// A night in two seasons, warned but allowed, takes the one that began later.
+// A show with no season takes the current one a night falls in, unless an earlier live night
+// exists; once set, nothing here changes it (D-131 criterion 2). Two seasons: the later-begun.
 export function fillSeasonStatements(fill: SeasonFill): SQL[] {
   const night = performanceNight(fill.startsAt)
   const season = sql`
@@ -112,22 +112,22 @@ export function fillSeasonStatements(fill: SeasonFill): SQL[] {
     WHERE se.archived = 0 AND se.starts_on <= ${night} AND se.ends_on >= ${night}
     ORDER BY se.starts_on DESC, se.name COLLATE NOCASE LIMIT 1
   `
-  const unseasoned = sql`
-    shows.id = ${fill.showId} AND shows.season_id IS NULL AND EXISTS (${season})
-    AND NOT EXISTS (
-      SELECT 1 FROM performances p
-      WHERE p.show_id = shows.id AND p.status <> 'CANCELLED' AND p.starts_at < ${fill.startsAt}
-    )
-  `
-  // The trail reads the same predicate before the update changes it, inside the caller's batch.
   return [
     sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${fill.auditId}, ${fill.actorId}, 'show.updated', 'show:' || shows.id,
-             json_object('changes', json_object('seasonId', json_object('from', NULL, 'to', (${season}))), 'filledFrom', ${night})
-      FROM shows WHERE ${unseasoned}
+      UPDATE shows SET season_id = (${season}), updated_at = unixepoch()
+      WHERE id = ${fill.showId} AND season_id IS NULL AND EXISTS (${season})
+        AND NOT EXISTS (
+          SELECT 1 FROM performances p
+          WHERE p.show_id = shows.id AND p.status <> 'CANCELLED' AND p.starts_at < ${fill.startsAt}
+        )
     `,
-    sql`UPDATE shows SET season_id = (${season}), updated_at = unixepoch() WHERE ${unseasoned}`,
+    // 0049: written only if the update above changed the show.
+    sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${fill.auditId}, ${fill.actorId}, 'show.updated', 'show:' || id,
+             json_object('changes', json_object('seasonId', json_object('from', NULL, 'to', season_id)), 'filledFrom', ${night})
+      FROM shows WHERE id = ${fill.showId} AND changes() = 1
+    `,
   ]
 }
 

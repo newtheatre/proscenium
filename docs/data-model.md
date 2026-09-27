@@ -391,11 +391,12 @@ unknown one, and `GET /api/admin/finance/seasons` lists every row, retired ones 
 `finance.read` or `finance.summary`. Seasons should not overlap, since a day in two seasons counts
 in both; that is guidance, not a constraint: an add or an edit answers `overlaps`, the names of
 the unretired seasons sharing a day with it (`seasonOverlapsQuery()`), and the Seasons page
-names them. A show with no season takes one when its first live performance is added:
-`fillSeasonStatements()` (`server/utils/seasons.ts`), in the same batch as the performance, sets
-`shows.season_id` to the unretired season holding that performance's night (0014), the later
-starting one if two do, and writes a `show.updated` audit row with `filledFrom`, the night. A show
-whose season was chosen by hand, or that already has an earlier live performance, is left alone.
+names them. A show with no season takes the season a performance's night falls in when that
+performance is added, unless the show already has an earlier live performance; once it has a
+season, no performance changes it, even one on an earlier night. `fillSeasonStatements()`
+(`server/utils/seasons.ts`), in the same batch as the performance, sets `shows.season_id` to the
+unretired season holding that night (0014), the later starting one if two do, and then writes a
+`show.updated` audit row with `filledFrom`, the night, only if that update changed the show (0049).
 The public What's on heading
 names a season too (`headlineSeasonQuery()`, `server/utils/whats-on.ts`, carried as `season` on
 `GET /api/whats-on`): the unretired row tonight's show night (0014) falls in, else the next to
@@ -525,7 +526,7 @@ for the two that read and `ticketing.write` for the rest:
 | `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. |
 | `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. `cascadePerformances` takes DRAFT performances on sale in the same batch; CANCELLED ones are skipped by predicate. `coverPassTypeIds` adds the show to each named pass in the same batch, with a `pass-type.shows.updated` audit row wherever the row went in (0049); a pass not among `coveringPasses` is a 409 naming it and nothing is published, and one already covering is left alone (D-123 criterion 4, issue 1323). |
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
-| `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6). |
+| `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6). A show with no season and no earlier live performance takes the unretired season this night falls in, in the same batch, audited as `show.updated` with `filledFrom` (D-131 criterion 2). |
 | `POST /api/admin/shows/[id]/runs` | Adds a run: `venueId`, the running time and intervals once, and `nights` (each a curtain and optional doors, one to 31, each curtain once). Every night is written DRAFT and stamped from its venue's template in one batch, each with its own `performance.created` row, or none is: a missing running time at a venue we run, a retired venue or a night with doors after its curtain refuses the whole run (D-132 criterion 10). A show with no season and no earlier live performance takes the unretired season the run's earliest night falls in, in the same batch, audited once as `show.updated` (D-131 criterion 2). |
 | `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). |
 | `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |

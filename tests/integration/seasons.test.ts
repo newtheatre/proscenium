@@ -258,6 +258,27 @@ describe('a show\'s season fills from its first performance (issue 1352)', () =>
     })
   })
 
+  // Once a show has a season nothing here moves it, whichever night is added first; the trail
+  // records the one fill that happened.
+  for (const order of [['october', 'august'], ['august', 'october']] as const) {
+    test(`two nights added ${order.join(' then ')}: the first added sets the season, once`, async () => {
+      await withDatabase((database) => {
+        season(database, { id: 'fringe', name: 'Fringe 2026', starts_on: '2026-08-01', ends_on: '2026-08-31' })
+        season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10' })
+        show(database)
+        const nights = { october: at('2026-10-14T18:30:00Z'), august: at('2026-08-15T18:30:00Z') }
+        order.forEach((which, index) => {
+          performance(database, `p-${which}`, nights[which])
+          fill(database, nights[which], `audit-${index + 1}`)
+        })
+
+        expect(seasonOf(database)).toBe(order[0] === 'october' ? 'autumn' : 'fringe')
+        const written = rows<{ id: string }>(database, `SELECT id FROM audit_log WHERE action = 'show.updated' AND target = 'show:show-1'`)
+        expect(written).toEqual([{ id: 'audit-1' }])
+      })
+    })
+  }
+
   test('a retired season is never taken, and a night in no season leaves the show without one', async () => {
     await withDatabase((database) => {
       season(database, { id: 'autumn', name: 'Autumn 2026', starts_on: '2026-09-20', ends_on: '2026-12-10', archived: 1 })

@@ -221,8 +221,8 @@ const columns: TableColumn<AdminSeason>[] = [
     />
 
     <p class="text-sm text-muted">
-      The theatre's seasons: Autumn, Spring, StuFF and the Fringe. A show takes the season its first
-      performance falls in, unless its Details tab names another.
+      The theatre's seasons (Autumn, Spring, StuFF and the Fringe), each show taking the one its
+      first performance falls in unless its Details tab names another.
     </p>
 
     <AdminToolbar
