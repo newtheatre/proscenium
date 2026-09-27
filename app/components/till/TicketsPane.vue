@@ -217,19 +217,21 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
       <p class="mt-4 text-xs text-muted">
         Their name and email are optional. With them, the booking's QR is emailed; without, the pass on screen is theirs to photograph.
       </p>
-      <div class="mt-2 grid gap-2 sm:grid-cols-2">
-        <UInput
-          v-model="walkUpGuestName"
-          placeholder="Name"
-          data-test="walk-up-name"
-        />
-        <UInput
-          v-model="walkUpGuestEmail"
-          type="email"
-          autocapitalize="off"
-          placeholder="Email"
-          data-test="walk-up-email"
-        />
+      <div class="@container mt-2">
+        <div class="grid gap-2 @sm:grid-cols-2">
+          <UInput
+            v-model="walkUpGuestName"
+            placeholder="Name"
+            data-test="walk-up-name"
+          />
+          <UInput
+            v-model="walkUpGuestEmail"
+            type="email"
+            autocapitalize="off"
+            placeholder="Email"
+            data-test="walk-up-email"
+          />
+        </div>
       </div>
       <p
         v-if="walkUpGuestIncomplete"
