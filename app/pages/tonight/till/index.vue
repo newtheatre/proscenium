@@ -715,6 +715,7 @@ const basketBindings = computed(() => ({
           :resolving="resolving"
           :open-attempts="openAttempts"
           :time-of="timeOf"
+          :venue-id="venueId"
           @check-again="checkAttempt"
           @resolve="resolveAttempt"
         />

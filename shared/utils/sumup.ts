@@ -153,6 +153,10 @@ export interface SumupAttemptView {
   id: string
   kind: SumupAttemptKind
   status: SumupAttemptStatus
+  // Every bar's charges are listed at every till, one reader serving them all (issue 1308), so a
+  // row says which bar started it.
+  venueId: string
+  venueName: string
   createdAt: number
   createdByName: string | null
   expectedTotalPence: number

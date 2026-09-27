@@ -13,6 +13,8 @@ defineProps<{
   resolving: boolean
   openAttempts: SumupAttemptView[]
   timeOf: (at: number) => string
+  // This till's own bar: a listed charge another bar started says which, since all share a reader.
+  venueId: string | null
 }>()
 
 const emit = defineEmits<{
@@ -119,6 +121,10 @@ const listedNote = (id: string): string | null => listedNotes.value[id]?.trim() 
     >
       <p class="text-sm">
         <span class="font-semibold">{{ saysMoney(attempt.expectedTotalPence) }}</span>
+        <span
+          v-if="venueId && attempt.venueId !== venueId"
+          :data-test="`sumup-open-bar-${attempt.id}`"
+        > · {{ attempt.venueName }}</span>
         · {{ timeOf(attempt.createdAt) }}<span v-if="attempt.createdByName"> · {{ attempt.createdByName }}</span>
         · {{ saysAttemptStatus(attempt.status, attempt.kind) }}
       </p>
