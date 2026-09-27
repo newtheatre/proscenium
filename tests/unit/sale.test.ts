@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, saleForm, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
+import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
 import type { SaleProduct } from '#shared/utils/sale'
 
 const aLine = { variantId: 'var-1', qty: 1 }
@@ -215,5 +215,13 @@ describe('a restricted line is named as poured (F-106 criteria 3, 6)', () => {
       { productName: 'Gin', choiceItemName: null },
       { productName: 'Cola', choiceItemName: 'Rum' },
     ])).toBe('Cola with Rum, Gin')
+  })
+
+  test('the names come as a list too, for a refusal that says need or needs', () => {
+    expect(pouredNames([
+      { productName: 'Cola', choiceItemName: 'Rum' },
+      { productName: 'Cola', choiceItemName: 'Rum' },
+      { productName: 'Gin', choiceItemName: null },
+    ])).toEqual(['Cola with Rum', 'Gin'])
   })
 })
