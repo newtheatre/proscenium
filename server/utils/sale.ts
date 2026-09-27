@@ -73,6 +73,7 @@ interface ComponentRow {
   choiceGroupId: string | null
   choiceGroupName: string | null
   qty: number
+  choiceOptional: number | null
 }
 
 interface OptionRow {
@@ -147,6 +148,7 @@ export async function activeVariantsWithChoices(on: string): Promise<Resolvable>
       options: options
         .filter(option => option.choiceGroupId === component.choiceGroupId)
         .map(option => ({ id: option.id, itemName: option.itemName, ageRestricted: restrictedItems.has(option.itemId) })),
+      optional: component.choiceOptional === 1,
     })
   }
   const optionById = new Map(options.map(option => [option.id, option]))
@@ -228,8 +230,8 @@ interface ResolvedLine {
   amountPence: number
 }
 
-// One basket line checked against what the till may actually sell (variant active and priced,
-// choice required and valid); the chosen option depletes at its own quantity (F-113 criterion 2).
+// A basket line checked against what the till may sell; the chosen option depletes at its own
+// quantity (F-113.2), and an optional choice answered with none depletes nothing (issue 1314).
 function resolveLines(lines: BasketLineInput[], { variants, optionById }: Resolvable): ResolvedLine[] {
   return lines.map((line) => {
     const variant = variants.get(line.variantId)
@@ -241,7 +243,8 @@ function resolveLines(lines: BasketLineInput[], { variants, optionById }: Resolv
     let choiceItemName: string | null = null
     let ageRestricted = variant.ageRestricted
     const depletion = [...variant.recipe]
-    if (variant.choice) {
+    const answeredNone = variant.choice?.optional === true && !line.choiceItemId
+    if (variant.choice && !answeredNone) {
       const chosen = variant.choice.options.find(option => option.id === line.choiceItemId)
       const option = chosen ? optionById.get(chosen.id) : undefined
       if (!chosen || !option) {

@@ -126,8 +126,10 @@ export function useTillBasket(deps: TillBasketDeps) {
     addLine(productName, variant, null, null)
   }
 
-  function chooseOption(optionId: string, optionName: string): void {
+  // A null option is the answer of none, which only an optional choice takes (issue 1314).
+  function chooseOption(optionId: string | null, optionName: string | null): void {
     if (!choosing.value) return
+    if (optionId === null && !choosing.value.choice.optional) return
     addLine(choosing.value.productName, choosing.value.variant, optionId, optionName)
     choosing.value = null
   }

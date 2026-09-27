@@ -496,9 +496,10 @@ export function everPricedColumn(alias: string): SQL {
   return sql`(SELECT EXISTS (SELECT 1 FROM variant_prices WHERE variant_id = ${sql.raw(alias)}.id))`
 }
 
-interface ComponentRow extends Omit<VariantComponent, 'includedInPrice'> {
+interface ComponentRow extends Omit<VariantComponent, 'includedInPrice' | 'choiceOptional'> {
   variantId: string
   includedInPrice: number
+  choiceOptional: number | null
 }
 
 const VARIANT_COLUMNS = sql`
@@ -523,7 +524,7 @@ export function componentsQuery(scope: SQL, withStock = false): SQL {
     SELECT c.id AS id, c.variant_id AS variantId, c.item_id AS itemId, i.name AS itemName, i.unit AS unit,
            ${stock}
            c.choice_group_id AS choiceGroupId, g.name AS choiceGroupName,
-           c.qty AS qty, c.included_in_price AS includedInPrice
+           c.qty AS qty, c.included_in_price AS includedInPrice, c.choice_optional AS choiceOptional
     FROM variant_components c
     LEFT JOIN bar_items i ON i.id = c.item_id
     LEFT JOIN choice_groups g ON g.id = c.choice_group_id
@@ -543,6 +544,7 @@ const readComponent = (row: ComponentRow): VariantComponent => ({
   choiceGroupName: row.choiceGroupName,
   qty: row.qty,
   includedInPrice: row.includedInPrice === 1,
+  choiceOptional: row.choiceOptional === 1,
 })
 
 function withComponents(variants: VariantRow[], components: ComponentRow[]): ProductVariant[] {

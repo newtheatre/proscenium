@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
-import { categoriesShown, productBlocked, productOutOfStock, sizeBlocked, sizeOutOfStock } from '#shared/utils/sale'
+import { categoriesShown, productBlocked, productOutOfStock, saysNoChoice, sizeBlocked, sizeOutOfStock } from '#shared/utils/sale'
 import { plural } from '#shared/utils/text'
 import type { SaleCategory, SaleChoice, SaleProduct, SaleVariant } from '#shared/utils/sale'
 
@@ -14,7 +14,7 @@ const props = defineProps<{
   choosing: { productName: string, variant: SaleVariant, choice: SaleChoice } | null
   tapProduct: (product: SaleProduct) => void
   tapVariant: (productName: string, variant: SaleVariant) => void
-  chooseOption: (optionId: string, optionName: string) => void
+  chooseOption: (optionId: string | null, optionName: string | null) => void
 }>()
 
 const emit = defineEmits<{
@@ -190,7 +190,7 @@ function priceLine(product: SaleProduct): string {
     <UModal
       :open="choosing !== null"
       :title="choosing ? choosing.choice.name : ''"
-      description="Pick one, at no extra charge"
+      :description="choosing?.choice.optional ? 'Pick one, or none, at no extra charge' : 'Pick one, at no extra charge'"
       @update:open="emit('closeChoosing')"
     >
       <template #body>
@@ -215,6 +215,17 @@ function priceLine(product: SaleProduct): string {
               >Out of stock</span>
             </span>
           </UButton>
+          <!-- A spirit served neat pours no mixer, so it is rung up with none (issue 1314). -->
+          <UButton
+            v-if="choosing?.choice.optional"
+            color="neutral"
+            variant="outline"
+            class="min-h-12"
+            data-test="choice-none"
+            @click="chooseOption(null, null)"
+          >
+            {{ saysNoChoice(choosing.choice) }}
+          </UButton>
         </div>
         <p
           v-if="choosing?.choice.options.some(sizeOutOfStock)"
@@ -222,6 +233,17 @@ function priceLine(product: SaleProduct): string {
         >
           {{ STOCK_AS_LOADED }}
         </p>
+        <div class="mt-2 flex justify-end">
+          <UButton
+            color="neutral"
+            variant="ghost"
+            class="min-h-12"
+            data-test="choice-back"
+            @click="emit('closeChoosing')"
+          >
+            {{ CONFIRM_BACK_LABEL }}
+          </UButton>
+        </div>
       </template>
     </UModal>
   </div>

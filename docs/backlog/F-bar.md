@@ -316,8 +316,12 @@ Open questions:
      one stocked bottle item, and a spirit as Single or Double.
   2. Depletion quantities are stated in the stocked item's real units, validated positive, and
      independent of price: a Double may deplete twice a Single without costing twice as much.
+     Amended 27 September 2026 (issue 1314): the one answer not a positive quantity is the none of
+     an optional choice, which depletes nothing from the group.
   3. A variant may attach a choice group (a mixer): the chosen option depletes its own stocked item
-     at the option's stated quantity, in addition to the variant's own depletion.
+     at the option's stated quantity, in addition to the variant's own depletion. Amended
+     27 September 2026 (issue 1314): the attachment may be optional, so the till offers "No mixer"
+     (a spirit neat), which depletes the variant's own recipe and nothing from the group.
   4. No container size is ever stored on the product itself; sizes live only on variants, which
      retires the old estate's damaged container semantics by construction.
   5. A variant that has sold cannot be deleted; retiring it hides it from the till without touching

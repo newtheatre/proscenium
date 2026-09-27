@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { STOCK_COUNTED_QUERY, checkIdHeld, pourSizesColumn, pouredAllergensQuery, pouredByColumn, readPouredBy, readRestrictedPours, readTillServings, restrictedPoursColumn, retireItemStatements, servingsAvailableQuery, tillServingsQuery, poursRestrictedSwitchedOffPredicate } from '#server/utils/bar-linkage'
 import type { TillServings, TillServingsRow } from '#server/utils/bar-linkage'
+import { deriveAllergens } from '#shared/utils/bar'
+import type { PouredAllergen } from '#shared/utils/bar'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows, sql } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -557,6 +559,21 @@ describe('a product reads its allergens from the stock it pours (issue 1348)', (
       expect(poured(database).filter(row => row.productId === 'prod-crisps')).toEqual([
         { productId: 'prod-crisps', itemName: 'Crisps', state: 'UNKNOWN', note: null },
       ])
+    })
+  })
+
+  // Issue 1314: "No mixer" pours nothing, yet the product's one answer still covers every mixer
+  // it may be served with, so a neat serve never makes an unanswered mixer read as clean.
+  test('an optional choice still answers for each of its options', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      database.batch([
+        [`UPDATE bar_items SET allergen_state = 'NONE' WHERE id = 'item-gin'`],
+        ['UPDATE variant_components SET choice_optional = 1 WHERE id = ?', 'c-3'],
+      ])
+      const gin = poured(database).filter(row => row.productId === 'prod-gin')
+      expect(gin.map(row => [row.itemName, row.state])).toEqual([['Gin', 'NONE'], ['Tonic', 'UNKNOWN']])
+      expect(deriveAllergens(gin as PouredAllergen[], { state: 'UNKNOWN', note: null }).state).toBe('UNKNOWN')
     })
   })
 

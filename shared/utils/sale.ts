@@ -159,6 +159,14 @@ export interface SaleChoice {
   id: string
   name: string
   options: SaleChoiceOption[]
+  // The size may be served with none of it, a spirit neat (issue 1314); absent on a catalogue the
+  // device held from earlier, which reads as required.
+  optional?: boolean
+}
+
+// The answer that pours no choice, in the choice's own words (F-112 criterion 2 as amended).
+export function saysNoChoice(choice: Pick<SaleChoice, 'name'>): string {
+  return `No ${choice.name.toLowerCase()}`
 }
 
 // What on-hand supports of a size, as the catalogue was read: advice, since the device may hold

@@ -442,12 +442,13 @@ export const choiceGroupForm = z.object({
   { message: 'A stocked item appears once per choice group, at the quantity a choice uses', path: ['options'] },
 )
 
-// Attaches or clears a variant's one choice group. `includedInPrice` is the free mixer (0017):
-// meaningless with no group attached, so it is dropped rather than validated when clearing.
+// Attaches or clears a variant's one choice group. `includedInPrice` is the free mixer (0017) and
+// `optional` a size served without one (issue 1314); both are dropped when clearing.
 export const variantChoiceForm = z.object({
   choiceGroupId: z.string().trim().min(1, 'Say which choice group you mean').nullable(),
   qty: z.number().int().positive('A depletion is a quantity of something').max(MAX_MOVEMENT_QTY).default(1),
   includedInPrice: z.boolean().default(false),
+  optional: z.boolean().default(false),
 })
 
 // A civil date, the Europe/London day a price takes effect on: a past one already applies, a
@@ -606,6 +607,8 @@ export interface VariantComponent {
   choiceGroupName: string | null
   qty: number
   includedInPrice: boolean
+  // A choice row the size may be served without, a spirit neat (issue 1314); false on an item row.
+  choiceOptional: boolean
 }
 
 export interface ChoiceGroupOption {

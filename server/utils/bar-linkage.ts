@@ -156,8 +156,8 @@ function servingsOfRow(alias: 'c' | 'g' | 'o'): SQL {
 }
 const poured = servingsOfRow('c')
 
-// The tightest component decides, and a choice is as good as its best-stocked option, since the
-// customer picks one. A size that depletes nothing answers null rather than nought (F-128).
+// The tightest component decides; a choice counts its best-stocked option, or nothing if optional
+// (issue 1314). A size that depletes nothing answers null rather than nought (F-128).
 function servingsQuery(products: SQL): SQL {
   const chosen = sql`(
     SELECT max(${servingsOfRow('g')})
@@ -166,7 +166,7 @@ function servingsQuery(products: SQL): SQL {
   return sql`
     SELECT v.id AS variantId, v.label AS label,
            (
-             SELECT min(CASE WHEN c.item_id IS NOT NULL THEN ${poured} ELSE coalesce(${chosen}, 0) END)
+             SELECT min(CASE WHEN c.item_id IS NOT NULL THEN ${poured} WHEN c.choice_optional = 1 THEN NULL ELSE coalesce(${chosen}, 0) END)
              FROM variant_components c WHERE c.variant_id = v.id
            ) AS servings
     FROM product_variants v
