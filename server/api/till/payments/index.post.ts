@@ -1,5 +1,6 @@
 import { startAttemptForm } from '#shared/utils/sumup'
 import { londonDayOf } from '#shared/utils/ledger'
+import { needsTheReader } from '#shared/utils/sale'
 
 // Start a card charge (F-124 criteria 1, 2; 0096): cross-checked and held on an attempt row, and
 // nothing posts until it is answered, by the SumUp app or by the person at the reader.
@@ -31,6 +32,15 @@ export default defineEventHandler(async (event) => {
   // The cross-check hands back the house it resolved, so the attempt pins the one the basket was
   // built against rather than resolving again minutes later when it is answered (F-126).
   const { performanceId } = await priceSaleForAttempt(input, londonDayOf(new Date()), scope)
+
+  // Checked after the cross-check, so a figure that is wrong is refused as wrong: a right figure
+  // of nought is written at once by the sale route, and never asks a reader for nothing (0096).
+  if (!needsTheReader({ tabHolderId: null, expectedTotalPence: input.expectedTotalPence })) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'There is nothing for the reader to take on this basket, so no card charge was started. Charge it again from the till.',
+    })
+  }
 
   const id = await startAttempt({
     kind,

@@ -278,6 +278,20 @@ describe.skipIf(skip !== null)('a typed charge records nothing until the reader 
     expect(ledgerCounts()).toEqual(before)
   })
 
+  // 0096's other half: a basket with nothing left to take is written at once, so no attempt ever
+  // asks the reader, or the SumUp app, for nought (the review of #1375).
+  test('a charge with nothing for the reader to take is refused before any attempt is written', async () => {
+    const { venueId } = programme('typed-nothing-to-take')
+    const { variantId } = await aSellableProduct({ ageRestricted: true })
+    await openTill(venueId)
+
+    const refusedOutright = { outcome: 'REFUSED', reason: 'NO_ID_SHOWN', description: 'Declined to show ID' }
+    const started = await startTypedCharge(app, { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 0, ageCheck: refusedOutright }, barManager.cookie)
+    expect(started.status).toBe(409)
+    expect(await message(started)).toContain('nothing for the reader to take')
+    expect(query<{ n: number }>(app, 'SELECT count(*) AS n FROM sumup_attempts WHERE venue_id = ?', venueId)!.n).toBe(0)
+  })
+
   test('an unanswered typed charge holds the close until somebody answers it', async () => {
     const { venueId } = programme('typed-close')
     const { variantId } = await aSellableProduct()
