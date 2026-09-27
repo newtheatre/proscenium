@@ -37,8 +37,8 @@ export function checkIdRefusal(product: { name: string, ageRestricted: boolean }
 }
 
 // The row the tidy-up list holds (switch off, restricted stock poured), read the way
-// withoutCheckIdPredicate reads it on the server.
-export const sellsWithoutCheckId = (product: Pick<BarProduct, 'ageRestricted' | 'restrictedPours'>): boolean =>
+// poursRestrictedSwitchedOffPredicate reads it on the server.
+export const poursRestrictedSwitchedOff = (product: Pick<BarProduct, 'ageRestricted' | 'restrictedPours'>): boolean =>
   !product.ageRestricted && product.restrictedPours.length > 0
 
 export interface RegisterFlag {

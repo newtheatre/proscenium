@@ -516,7 +516,7 @@ function seedStock(target: SeedTarget, items: Map<string, string>, keeper: strin
       item_id: items.get('crisps')!,
       qty: -6,
       kind: 'ADJUST',
-      reason: 'OUT_OF_DATE',
+      reason: 'COUNT_CORRECTION',
       actor_id: keeper,
       created_at: now - 4 * DAY,
     }))

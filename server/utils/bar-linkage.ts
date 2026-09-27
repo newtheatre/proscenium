@@ -34,8 +34,8 @@ export function pouredByColumn(alias: string): SQL {
   )`
 }
 
-// The quantities poured from an item by a live size of a product still on the catalogue, directly
-// or as a choice, once each (issue 1350). A column over the row, binding nothing (0006).
+// The quantities poured from an item by a live size of a product on the till, directly or as a
+// choice, once each: the products Poured by names (issue 1350). Binds nothing per row (0006).
 export function pourSizesColumn(alias: string): SQL {
   const item = sql.raw(`${alias}.id`)
   // A component names an item or a choice group, never both, so one pass covers either (0017).
@@ -44,7 +44,7 @@ export function pourSizesColumn(alias: string): SQL {
       SELECT DISTINCT coalesce(g.qty, c.qty) AS qty
       FROM variant_components c
       JOIN product_variants v ON v.id = c.variant_id AND v.status = 'ACTIVE'
-      JOIN bar_products p ON p.id = v.product_id AND p.status <> 'RETIRED'
+      JOIN bar_products p ON p.id = v.product_id AND p.status = 'ACTIVE'
       LEFT JOIN choice_group_items g ON g.choice_group_id = c.choice_group_id AND g.item_id = ${item}
       WHERE c.item_id = ${item} OR g.item_id IS NOT NULL
       ORDER BY qty
@@ -91,9 +91,9 @@ export function restrictedPoursColumn(alias: string): SQL {
 
 export const readRestrictedPours = (value: string | null): string[] => readJsonArray(value)
 
-// The Bar Manager's correction list: any product left unrestricted that pours restricted stock.
+// The Bar Manager's tidy-up list: any product left unrestricted that pours restricted stock.
 // Hidden and retired count, since either goes back on the till with one press.
-export function withoutCheckIdPredicate(alias: string): SQL {
+export function poursRestrictedSwitchedOffPredicate(alias: string): SQL {
   return sql`(${sql.raw(alias)}.age_restricted = 0 AND EXISTS (${restrictedPoured(sql.raw(`${alias}.id`))}))`
 }
 

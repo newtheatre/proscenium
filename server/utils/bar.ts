@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { pourSizesColumn, pouredByColumn, readPourSizes, readPouredBy, readRestrictedPours, restrictedPoursColumn, withoutCheckIdPredicate } from './bar-linkage'
+import { pourSizesColumn, pouredByColumn, readPourSizes, readPouredBy, readRestrictedPours, restrictedPoursColumn, poursRestrictedSwitchedOffPredicate } from './bar-linkage'
 import type { SQL } from 'drizzle-orm'
 import { SERVING_KINDS, effectivePriceRow } from '#shared/utils/bar'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
@@ -361,7 +361,7 @@ export function productsClause(query: ListQuery): ListClause {
     search: [sql`p.name`],
     fields: {
       retired: yesNo(sql`p.status = 'RETIRED'`),
-      withoutCheckId: yesNo(withoutCheckIdPredicate('p')),
+      poursRestrictedSwitchedOff: yesNo(poursRestrictedSwitchedOffPredicate('p')),
     },
   })
 }
