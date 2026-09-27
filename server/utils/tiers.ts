@@ -120,22 +120,16 @@ export function nearestTo(displaced: Displaced, candidates: Alternative[]): Alte
 export async function performBump(input: BumpWrite & { displaced: Displaced }, entry: AuditRow): Promise<{ won: boolean, replacementId: string | null, offeredId: string | null }> {
   const claimId = newId()
   const offerId = input.offer ? newId() : null
-  const statements = bumpStatements(input, claimId, offerId, entry).map(statement => db.run(statement))
+  const statements = bumpStatements(input, claimId, offerId, entry).map(statement => db.all(statement))
 
-  await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
-
-  // The claimant's booking is written only with the bump, so its being there is the bump's answer.
-  const written = async (id: string | null): Promise<boolean> => id !== null && (await db.select({ id: schema.roomBookings.id })
-    .from(schema.roomBookings)
-    .where(eq(schema.roomBookings.id, id))
-    .limit(1)).length > 0
-  const landed = await written(claimId)
-
-  // Offered only if the offer was written: a closure or a booking may have taken its slot since.
+  // The claimant's booking is written only with the bump, so its rows are the bump's answer; the
+  // offer's follow when there is one. Offered only if written: its slot may have gone since.
+  const [claim, offer] = await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
+  const won = (claim as unknown[]).length > 0
   return {
-    won: landed,
-    replacementId: landed ? claimId : null,
-    offeredId: await written(offerId) ? offerId : null,
+    won,
+    replacementId: won ? claimId : null,
+    offeredId: offerId !== null && (offer as unknown[]).length > 0 ? offerId : null,
   }
 }
 

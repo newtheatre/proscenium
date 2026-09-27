@@ -31,16 +31,20 @@ export default defineEventHandler(async (event) => {
 
   const now = Math.floor(Date.now() / 1000)
   const seriesId = input.scope === 'series' ? booking.seriesId : null
-  // A term's entry is given its count by the batch, which alone knows how many weeks went.
-  const entry = auditEntry({
-    actorId: account.id,
-    action: seriesId ? 'room.series.cancelled' : 'room.booking.cancelled',
-    target: seriesId ? `series:${seriesId}` : `booking:${id}`,
-    detail: { room: booking.roomId, was: booking.status, ...(seriesId ? {} : { cancelled: 1 }) },
-  })
   const cancelled = seriesId
-    ? await cancelSeries(seriesId, account.id, now, entry)
-    : await cancelOne(id, account.id, booking.seriesId, now, entry)
+    // A term's entry is given its count by the batch, which alone knows how many weeks went.
+    ? await cancelSeries(seriesId, account.id, now, auditEntry({
+        actorId: account.id,
+        action: 'room.series.cancelled',
+        target: `series:${seriesId}`,
+        detail: { room: booking.roomId, was: booking.status },
+      }))
+    : await cancelOne(id, account.id, booking.seriesId, now, auditEntry({
+        actorId: account.id,
+        action: 'room.booking.cancelled',
+        target: `booking:${id}`,
+        detail: { room: booking.roomId, was: booking.status, cancelled: 1 },
+      }))
 
   if (cancelled.length === 0) {
     throw createError({ statusCode: 409, statusMessage: 'That booking has already been decided' })

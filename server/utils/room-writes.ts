@@ -52,6 +52,7 @@ export function bumpStatements(write: BumpWrite, claimId: string, offerId: strin
       WHERE EXISTS (SELECT 1 FROM room_bookings WHERE id = ${displaced.id} AND status = 'CONFIRMED')
         AND ${clearOf(displaced.roomId, displaced.startsAt, displaced.endsAt, displaced.id)}
         AND ${roomOpenTerms(displaced.roomId, displaced.startsAt, displaced.endsAt, write.offsets)}
+      RETURNING id
     `,
   ]
 
@@ -66,6 +67,7 @@ export function bumpStatements(write: BumpWrite, claimId: string, offerId: strin
       WHERE ${claimed}
         AND ${clearOf(write.offer.roomId, write.offer.startsAt, write.offer.endsAt)}
         AND ${roomOpenTerms(write.offer.roomId, write.offer.startsAt, write.offer.endsAt, write.offsets)}
+      RETURNING id
     `)
   }
 

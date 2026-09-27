@@ -68,7 +68,7 @@ export function claimRoomSlotStatement(id: string, input: ClaimInput): SQL {
 }
 
 // The audit entry is built for the new id and batched with the claim, written only if it landed
-// (0049). Without one, the caller audits the claim in a batch of its own making.
+// (0049). Without one, the caller owns the claim's audit.
 export async function claimSlot(input: ClaimInput, audit?: (id: string) => AuditRow): Promise<ClaimOutcome> {
   const id = newId()
 
