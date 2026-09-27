@@ -38,18 +38,6 @@ export const rota: Shot[] = [
     ],
   },
   {
-    name: 'rota/approvals',
-    persona: foh,
-    url: '/rota/manage/approvals',
-    marker: '[data-test="approvals-table"]',
-    width: CONSOLE_WIDTH,
-    annotations: [
-      { selector: '[data-test="toolbar-search"]', label: 'Search' },
-      { selector: '[data-test="approvals-table"]', label: 'Waiting claims' },
-      { selector: '[data-test="approvals-total"]', label: 'Claims waiting' },
-    ],
-  },
-  {
     name: 'rota/board',
     persona: foh,
     url: '/rota/manage/shifts',

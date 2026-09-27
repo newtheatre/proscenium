@@ -25,11 +25,8 @@ reaches these screens: a confirmed shift opens the night's tools, and a role ope
   ::card{icon="i-lucide-clipboard-list" title="Shift templates" to="/docs/rota/shift-templates"}
   How each venue is staffed, stamped onto every performance, and which training module gates each role.
   ::
-  ::card{icon="i-lucide-check-check" title="Approvals" to="/docs/rota/approvals"}
-  Confirming or declining a member's claim when claims queue rather than confirm themselves.
-  ::
   ::card{icon="i-lucide-user-round-x" title="Rota board" to="/docs/rota/rota-board"}
-  The rota itself: assigning, confirming and standing down shifts, and the reminders that chase a gap.
+  The rota itself: assigning shifts, confirming and declining the claims waiting, standing down, and the reminders that chase a gap.
   ::
   ::card{icon="i-lucide-beer" title="Bar openings" to="/docs/rota/bar-openings"}
   Planning and staffing an evening with no performance: a hire, a society social, a get-in.
@@ -55,8 +52,8 @@ reaches these screens: a confirmed shift opens the night's tools, and a role ope
 
 1. A **venue** gets a shift template: one duty manager, so many door, so many bar.
 2. Adding a **performance** at that venue stamps one open shift per slot, the moment it exists.
-3. **Members** claim open shifts from **Rota**. A claim confirms itself, or waits for
-   [Approvals](/docs/rota/approvals), depending on a setting.
+3. **Members** claim open shifts from **Rota**. A claim confirms itself, or waits for an
+   officer on the [rota board](/docs/rota/rota-board#waiting-for-confirmation), depending on a setting.
 4. A **confirmed shift** is what opens the show-night screens that evening, and what the day-before
    reminder and the seven-day digest are counted against.
 5. An evening with **no performance** is planned on [Bar openings](/docs/rota/bar-openings)

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { rosterOpeningShiftsQuery, rosterOpeningsQuery, rosterPerformancesQuery, rosterShiftsQuery } from '#server/utils/rota'
+import { rosterOpeningShiftsQuery, rosterOpeningsQuery, rosterPerformancesQuery, rosterShiftsQuery, waitingClaimsQuery } from '#server/utils/rota'
 import { daysAfter } from '#shared/utils/membership'
 import { boardWindowBounds } from '#shared/utils/rota-board'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
@@ -221,6 +221,61 @@ describe('the board reads bar openings in the same window (E-130 criterion 8)', 
         expect(wide.length).toBe(narrow.length)
         expect(wide.length - 1).toBeLessThanOrEqual(MAX_BOUND_PARAMETERS)
       }
+    })
+  })
+})
+
+// E-105 criterion 2: the approvals queue is the board's waiting filter, every claim from tonight's
+// show night on whatever the window, with its count (0014).
+describe('the board\'s waiting filter is the approvals queue', () => {
+  const from = Math.floor(showNightBounds(tonight).from.getTime() / 1000)
+  const WAITING = { waitingFrom: from }
+
+  function claims(database: TestDatabase): void {
+    fourNights(database)
+    database.batch([
+      ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'claimant', 'claimant@example.invalid', 'Clara Claimant'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)', 'shift-past-claimed', 'performance-past', 'DOOR', 1, 'CLAIMED', 'claimant'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', 'shift-tonight-open', 'performance-tonight', 'DOOR', 1, 'OPEN'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)', 'shift-tonight-claimed', 'performance-tonight', 'BAR', 1, 'CLAIMED', 'claimant'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)', 'shift-later-claimed', 'performance-later', 'BAR', 1, 'CLAIMED', 'claimant'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)', 'shift-later-confirmed', 'performance-later', 'DOOR', 1, 'CONFIRMED', 'claimant'],
+    ])
+  }
+
+  test('every performance from tonight on holding a claim is read, beyond any window, and no other', async () => {
+    await withDatabase((database) => {
+      claims(database)
+      expect(run<{ performanceId: string }>(database, rosterPerformancesQuery(WAITING)).map(row => row.performanceId))
+        .toEqual(['performance-tonight', 'performance-later'])
+    })
+  })
+
+  // Nobody can staff a night that has gone, so its claim is not waiting on an officer.
+  test('a claim on a night already past is not read', async () => {
+    await withDatabase((database) => {
+      claims(database)
+      expect(run<{ performanceId: string }>(database, rosterPerformancesQuery(WAITING)).map(row => row.performanceId))
+        .not.toContain('performance-past')
+      expect(run<{ shiftId: string }>(database, rosterShiftsQuery(WAITING)).map(row => row.shiftId))
+        .not.toContain('shift-past-claimed')
+    })
+  })
+
+  test('its cards come whole, so the claim is read beside the shifts already filled', async () => {
+    await withDatabase((database) => {
+      claims(database)
+      expect(run<{ shiftId: string }>(database, rosterShiftsQuery(WAITING)).map(row => row.shiftId).sort())
+        .toEqual(['shift-later-claimed', 'shift-later-confirmed', 'shift-tonight-claimed', 'shift-tonight-open'])
+    })
+  })
+
+  test('the count is the claims waiting from tonight on, as the filter\'s label says it', async () => {
+    await withDatabase((database) => {
+      claims(database)
+      expect(run<{ waiting: number }>(database, waitingClaimsQuery(from))).toEqual([{ waiting: 2 }])
+      database.batch([['UPDATE performances SET status = ? WHERE id = ?', 'CANCELLED', 'performance-later']])
+      expect(run<{ waiting: number }>(database, waitingClaimsQuery(from))).toEqual([{ waiting: 1 }])
     })
   })
 })

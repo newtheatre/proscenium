@@ -1,5 +1,5 @@
-// The rota is one workflow spread across four sidebar entries, in this order (K-123 criterion
-// 12). Declared once, so a screen names the step after it without hard-coding a neighbour's path.
+// The rota is one workflow spread across three sidebar entries, in this order (K-123 criterion
+// 12); claims are confirmed on the board itself (issue 1365). Declared once for every screen.
 
 export interface RotaStep {
   key: string
@@ -13,7 +13,6 @@ export const ROTA_FLOW = [
   { key: 'templates', label: 'Shift templates', onward: 'Set the templates up', to: '/rota/manage/templates' },
   { key: 'board', label: 'Rota board', onward: 'Fill the rota', to: '/rota/manage/shifts' },
   { key: 'openings', label: 'Bar openings', onward: 'Plan the bar openings', to: '/rota/manage/openings' },
-  { key: 'approvals', label: 'Approvals', onward: 'Approve the claims', to: '/rota/manage/approvals' },
 ] as const satisfies readonly RotaStep[]
 
 export type RotaStepKey = (typeof ROTA_FLOW)[number]['key']

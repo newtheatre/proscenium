@@ -2,16 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import { filterQuerySchema, operatorsOf } from '#shared/utils/list-filters'
 import { checklistVenuesList } from '#shared/utils/checklist-venues-list'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
-import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { SHIFT_ROLES } from '#shared/utils/rota'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import {
-  countPendingApprovalsQuery,
   countVenueTemplatesQuery,
   countUnfilledShiftsQuery,
-  pendingApprovalsClause,
-  pendingApprovalsQuery,
   replaceTemplateStatements,
   unfilledShiftsClause,
   unfilledShiftsQuery,
@@ -26,7 +22,7 @@ import type { EmergencyCardInput } from '#shared/utils/venue-emergency'
 import type { FilterField } from '#shared/utils/list-filters'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// The rota module's five console lists, each through its own declaration (K-129 criteria 1, 5
+// The rota module's four console lists, each through its own declaration (K-129 criteria 1, 5
 // and 6). "Night" is the mechanism's own extension (0014): server/utils/list-filters.ts.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
@@ -63,21 +59,9 @@ function shift(database: TestDatabase, id: string, performanceId: string, role: 
     id, performanceId, role, options.slot ?? 1, status, userId]])
 }
 
-function claimedShift(database: TestDatabase, id: string, performanceId: string, role: string, userId: string): void {
-  database.batch([['INSERT INTO shifts (id, performance_id, role, slot, status, user_id, claimed_at) VALUES (?, ?, ?, 1, ?, ?, unixepoch())',
-    id, performanceId, role, 'CLAIMED', userId]])
-}
-
 const unfilledSchema = filterQuerySchema(unfilledShiftsList)
 const parseUnfilled = (raw: Record<string, string>) => {
   const result = unfilledSchema.safeParse(raw)
-  if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
-  return result.data
-}
-
-const approvalsSchema = filterQuerySchema(rotaApprovalsList)
-const parseApprovals = (raw: Record<string, string>) => {
-  const result = approvalsSchema.safeParse(raw)
   if (!result.success) throw new Error(result.error.issues.map(issue => issue.message).join('; '))
   return result.data
 }
@@ -200,55 +184,6 @@ describe('unfilled shifts (E-107, K-129)', () => {
       expect(found.map(row => row.role).sort()).toEqual(['BAR', 'DOOR'])
       const [total] = run(database, countUnfilledShiftsQuery(clause)) as { total: number }[]
       expect(total?.total).toBe(2)
-    })
-  })
-})
-
-describe('pending approvals (E-105, K-129)', () => {
-  test('every field the declaration names is answered', async () => {
-    await withDatabase((database) => {
-      const claimant = 'approvals-answered'
-      person(database, claimant)
-      const house = tonightsPerformance(database, { suffix: 'approvals-answered' })
-      claimedShift(database, `${house.performanceId}-DOOR-1`, house.performanceId, 'DOOR', claimant)
-
-      for (const field of rotaApprovalsList.fields as readonly FilterField[]) {
-        for (const operator of operatorsOf(field)) {
-          const value = field.options?.[0]?.value ?? '2026-01-01'
-          const raw = operator === 'empty' ? 'empty' : operator === 'between' ? `between:${value},${value}` : `${operator}:${value}`
-          const clause = pendingApprovalsClause(parseApprovals({ [field.key]: raw }))
-          expect(() => run(database, pendingApprovalsQuery(clause, 25, 0))).not.toThrow()
-        }
-      }
-    })
-  })
-
-  test('search covers the claimant and the show', async () => {
-    await withDatabase((database) => {
-      person(database, 'ivy')
-      const house = tonightsPerformance(database, { suffix: 'approvals-search' })
-      database.batch([['UPDATE users SET name = ? WHERE id = ?', 'Ivy Approver', 'ivy']])
-      claimedShift(database, `${house.performanceId}-DOOR-1`, house.performanceId, 'DOOR', 'ivy')
-
-      const clause = pendingApprovalsClause(parseApprovals({ search: 'Ivy' }))
-      expect(run(database, pendingApprovalsQuery(clause, 25, 0))).toHaveLength(1)
-      const miss = pendingApprovalsClause(parseApprovals({ search: 'Nobody' }))
-      expect(run(database, pendingApprovalsQuery(miss, 25, 0))).toHaveLength(0)
-    })
-  })
-
-  test('only claimed shifts wait, whatever else is asked', async () => {
-    await withDatabase((database) => {
-      person(database, 'jo')
-      const claimedHouse = tonightsPerformance(database, { suffix: 'approvals-claimed' })
-      const openHouse = tonightsPerformance(database, { suffix: 'approvals-open' })
-      claimedShift(database, `${claimedHouse.performanceId}-DOOR-1`, claimedHouse.performanceId, 'DOOR', 'jo')
-      shift(database, `${openHouse.performanceId}-DOOR-1`, openHouse.performanceId, 'DOOR', { status: 'OPEN' })
-
-      const clause = pendingApprovalsClause(parseApprovals({}))
-      expect(run(database, pendingApprovalsQuery(clause, 25, 0))).toHaveLength(1)
-      const [total] = run(database, countPendingApprovalsQuery(clause)) as { total: number }[]
-      expect(total?.total).toBe(1)
     })
   })
 })

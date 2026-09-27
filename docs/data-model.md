@@ -1242,8 +1242,9 @@ confirmed duty managers. UNIQUE (`performance_id`, `role`, `slot`) is what makes
 idempotent (E-102 criterion 2). Claims are conditional writes gated live on training records
 (E-1), and the same UPDATE's `NOT EXISTS` refuses a second shift on one performance for the
 same member (E-104). `SHIFT_CLAIM_AUTO_CONFIRM` decides whether a claim writes `CONFIRMED` or
-the queued `CLAIMED`; a queued claim is answered at `/rota/manage/approvals` under `rota.write`
-(E-105).
+the queued `CLAIMED`; a queued claim is answered on the rota board's waiting filter
+(`/rota/manage/shifts?waiting=true`, which `/rota/manage/approvals` forwards to) under
+`rota.write` (E-105).
 Cancelling a performance cancels its shifts in the same batch. A refused write reads back as
 a 409 through `shiftConstraintRefusal()`, never as a raw database error (E-106 criterion 3);
 SQLite names the columns for a unique index and the constraint name for a CHECK, so the

@@ -5,7 +5,6 @@ import { sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import { configValue } from './configuration'
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
-import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
@@ -679,9 +678,32 @@ const rosterScope = (bounds: BoardBounds): SQL => sql`
   ORDER BY p.starts_at
 `
 
+// The board's waiting filter, which is the approvals queue: every performance from the start of
+// tonight's show night on holding a claim still to confirm, whatever the window (E-105, 0014).
+const waitingScope = (from: number): SQL => sql`
+  SELECT p.id FROM performances p
+  WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${from}
+    AND EXISTS (SELECT 1 FROM shifts c WHERE c.performance_id = p.id AND c.status = 'CLAIMED')
+`
+
+// A claim on a night already past can no longer be staffed, so it waits on nobody.
+export interface WaitingScope { waitingFrom: number }
+export type RosterScope = BoardBounds | WaitingScope
+
+const scopeOf = (scope: RosterScope): SQL => 'waitingFrom' in scope ? waitingScope(scope.waitingFrom) : rosterScope(scope)
+
+// How many claims wait on the board's filter, which is the count its label carries.
+export function waitingClaimsQuery(from: number): SQL {
+  return sql`
+    SELECT count(*) AS waiting FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    WHERE s.status = 'CLAIMED' AND p.status <> 'CANCELLED' AND p.starts_at >= ${from}
+  `
+}
+
 // Bounded by a window of nights, not paged: the board reads every performance in the span whole,
 // the way `myShiftsQuery` bounds a member's own list (E-107 criterion 7, 0003).
-export function rosterPerformancesQuery(bounds: BoardBounds): SQL {
+export function rosterPerformancesQuery(scope: RosterScope): SQL {
   return sql`
     SELECT p.id AS performanceId, sh.title AS showTitle, v.id AS venueId, v.name AS venueName,
            p.starts_at AS startsAt, v.is_external AS isExternal, v.archived AS isRetired,
@@ -689,18 +711,18 @@ export function rosterPerformancesQuery(bounds: BoardBounds): SQL {
     FROM performances p
     JOIN shows sh ON sh.id = p.show_id
     JOIN venues v ON v.id = p.venue_id
-    WHERE p.id IN (${rosterScope(bounds)})
+    WHERE p.id IN (${scopeOf(scope)})
     ORDER BY p.starts_at
   `
 }
 
-export function rosterShiftsQuery(bounds: BoardBounds): SQL {
+export function rosterShiftsQuery(scope: RosterScope): SQL {
   return sql`
     SELECT s.performance_id AS performanceId, s.id AS shiftId, s.role AS role, s.slot AS slot,
            s.status AS status, u.name AS holderName
     FROM shifts s
     LEFT JOIN users u ON u.id = s.user_id
-    WHERE s.performance_id IN (${rosterScope(bounds)}) AND s.status <> 'CANCELLED'
+    WHERE s.performance_id IN (${scopeOf(scope)}) AND s.status <> 'CANCELLED'
     ORDER BY s.role, s.slot
   `
 }
@@ -748,59 +770,6 @@ export function rosterOpeningShiftsQuery(bounds: BoardBounds): SQL {
     LEFT JOIN users u ON u.id = s.user_id
     WHERE s.opening_id IN (${rosterOpeningScope(bounds)}) AND s.status <> 'CANCELLED'
     ORDER BY s.opening_id, s.slot
-  `
-}
-
-export interface PendingApprovalRow {
-  shiftId: string
-  role: ShiftRole
-  performanceId: string
-  venueName: string
-  showTitle: string
-  startsAt: number
-  userId: string
-  claimantName: string
-  claimedAt: number | null
-}
-
-// Search, a role and a night through the declaration (K-129); "claimed" is the base predicate
-// every approval shares, never something a reader could filter away.
-export function pendingApprovalsClause(query: ListQuery): ListClause {
-  const clause = whereFrom(rotaApprovalsList, query, {
-    column: rawColumn,
-    search: [sql`sh.title`, sql`u.name`],
-  })
-  const base = sql`s.status = 'CLAIMED'`
-  return { ...clause, where: clause.where ? sql`${base} AND (${clause.where})` : base }
-}
-
-// The FOH officer's approval list: every claim waiting on a decision, oldest performance first
-// by default (E-105 criterion 2).
-export function pendingApprovalsQuery(clause: ListClause, limit: number, offset: number): SQL {
-  return sql`
-    SELECT s.id AS shiftId, s.role AS role, p.id AS performanceId, p.starts_at AS startsAt,
-           v.name AS venueName, sh.title AS showTitle,
-           s.user_id AS userId, u.name AS claimantName, s.claimed_at AS claimedAt
-    FROM shifts s
-    JOIN performances p ON p.id = s.performance_id
-    JOIN venues v ON v.id = p.venue_id
-    JOIN shows sh ON sh.id = p.show_id
-    JOIN users u ON u.id = s.user_id
-    WHERE ${clause.where}
-    ORDER BY ${sql.join(clause.orderBy, sql`, `)}
-    LIMIT ${limit} OFFSET ${offset}
-  `
-}
-
-export function countPendingApprovalsQuery(clause: ListClause): SQL {
-  return sql`
-    SELECT count(*) AS total
-    FROM shifts s
-    JOIN performances p ON p.id = s.performance_id
-    JOIN venues v ON v.id = p.venue_id
-    JOIN shows sh ON sh.id = p.show_id
-    JOIN users u ON u.id = s.user_id
-    WHERE ${clause.where}
   `
 }
 

@@ -31,7 +31,6 @@ import { performancesList } from '#shared/utils/performances-list'
 import { roomBookingsList } from '#shared/utils/room-bookings-list'
 import { roomsList } from '#shared/utils/rooms-list'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
-import { rotaApprovalsList } from '#shared/utils/rota-approvals-list'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { sendLogList } from '#shared/utils/send-log-list'
 import { showsList } from '#shared/utils/shows-list'
@@ -42,7 +41,7 @@ import { utilisationList } from '#shared/utils/utilisation-list'
 import type { FilterField, ListSpec } from '#shared/utils/list-filters'
 
 // The rota module's five declarations, migrated alongside accounts and shows (K-129).
-const rotaLists = [unfilledShiftsList, rotaApprovalsList, rotaTemplatesList, checklistVenuesList, emergencyCardsList]
+const rotaLists = [unfilledShiftsList, rotaTemplatesList, checklistVenuesList, emergencyCardsList]
 // The bar module's declarations, migrated in the same pass (K-129).
 const barLists = [barCategoriesList, barProductsList, barItemsList, barMovementsList, stocktakesList]
 // The small-module pass: audit, backups, the send log, the register, the claims queue and the
