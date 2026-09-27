@@ -8,6 +8,7 @@ import {
   openVarianceQuery,
   periodBounds,
   revenueBySourceQuery,
+  revenueTotalQuery,
   seasonRangeQuery,
   seasonRefundsQuery,
 } from '#server/utils/season-dashboard'
@@ -174,6 +175,27 @@ describe('revenue by source (criterion 2)', () => {
       line(database, desk, 'WALK_UP', 900)
 
       expect(read(database, revenueBySourceQuery(0, 2000))).toEqual([])
+      expect(read(database, revenueTotalQuery(0, 2000))).toEqual([{ totalPence: 0 }])
+    })
+  })
+
+  // The table's total row is the ledger's own sum under the same predicate, in integer pence, so
+  // it equals its rows whatever they are, a refund included (0004).
+  test('the total is every card line in range, and equals the rows it heads', async () => {
+    await withDatabase(async (database) => {
+      const desk = entry(database, 'DESK', 'CARD', 1000, '2026-09-15')
+      line(database, desk, 'WALK_UP', 900)
+      const bar = entry(database, 'TILL', 'CARD', 1000, '2026-09-15')
+      line(database, bar, 'BAR_ITEM', 435)
+      const refund = entry(database, 'DESK', 'CARD', 1500, '2026-09-15')
+      line(database, refund, 'REFUND', -300)
+      const tab = entry(database, 'TILL', 'TAB', 1000, '2026-09-15')
+      line(database, tab, 'BAR_ITEM', 350)
+
+      const bySource = read<{ totalPence: number }>(database, revenueBySourceQuery(0, 2000))
+      const [total] = read<{ totalPence: number }>(database, revenueTotalQuery(0, 2000))
+      expect(total).toEqual({ totalPence: 1035 })
+      expect(bySource.reduce((sum, row) => sum + row.totalPence, 0)).toBe(total!.totalPence)
     })
   })
 })

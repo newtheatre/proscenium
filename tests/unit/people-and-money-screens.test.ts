@@ -207,3 +207,12 @@ describe('the period controls ask the question themselves (I-105 criterion 6)', 
     }
   })
 })
+
+// A table of amounts is read down to its total: the ledger's own sum, not one the page adds up.
+describe('revenue by source ends in a total row', () => {
+  test('the table footers a Total that reads the summary figure', async () => {
+    const source = await read(MONEY)
+    expect(source).toContain(`footer: () => h('span', { class: 'font-semibold' }, 'Total')`)
+    expect(source).toContain('saysMoney(data.value?.revenueTotalPence ?? 0)')
+  })
+})
