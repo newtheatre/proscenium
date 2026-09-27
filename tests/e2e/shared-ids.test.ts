@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { adminSession } from '#tests/helpers/accounts'
-import { click, openView, pickOption, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fillDate, openView, pickOption, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -76,6 +76,28 @@ describe.skipIf(skip !== null)('a group of controls gives each one its own id an
     }
   }, CASE_TIMEOUT_MS)
 
+  // The message shows once, under the condition; both dates it is about are marked invalid by it.
+  test('a range that runs backwards marks both of its dates invalid', async () => {
+    const view = await signedIn()
+    try {
+      await visit(view, `${app.baseURL}/admin/audit`, '[data-test="audit-table"]')
+      await click(view, '[data-test="toolbar-filters"]')
+      await waitFor(view, `document.querySelector('[data-test="filter-createdAt-operator"]')`)
+      await pickOption(view, '[data-test="filter-createdAt-operator"]', 'Between')
+      await waitFor(view, `document.querySelector('[data-test="filter-createdAt-to"]')`)
+      await fillDate(view, '[data-test="filter-createdAt-value"]', '2026-09-20')
+      await fillDate(view, '[data-test="filter-createdAt-to"]', '2026-09-10')
+
+      await waitFor(view, `document.querySelector('[data-test="console-filters"]').innerText.includes('Runs backwards')`)
+      const invalid = await view.evaluate<string>(`JSON.stringify(['value', 'to'].map(end =>
+        document.querySelector('[data-test="filter-createdAt-' + end + '"]')?.getAttribute('aria-invalid')))`)
+      expect(JSON.parse(invalid)).toEqual(['true', 'true'])
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('the module editor: each material link\'s words and address', async () => {
     const view = await signedIn()
     try {
@@ -86,8 +108,9 @@ describe.skipIf(skip !== null)('a group of controls gives each one its own id an
       await click(view, '[data-test="add-material"]')
       await waitFor(view, `document.querySelector('[data-test="material-url-1"]')`)
 
-      const found = await naming(view, '[data-test="module-form"]', '[data-test^="material-label-"], [data-test^="material-url-"]')
-      expectOwnNames(found, 4)
+      const found = await naming(view, '[data-test="module-form"]',
+        '[data-test^="material-label-"], [data-test^="material-url-"], [data-test^="remove-material-"]')
+      expectOwnNames(found, 6)
     }
     finally {
       view.close()
@@ -103,8 +126,15 @@ describe.skipIf(skip !== null)('a group of controls gives each one its own id an
       await click(view, '[data-test="pass-type-add-price"]')
       await waitFor(view, `document.querySelector('[data-test="pass-type-price-amount-1"]')`)
 
-      const found = await naming(view, '[data-test="pass-type-form"]', '[data-test^="pass-type-price-label-"], [data-test^="pass-type-price-amount-"]')
-      expectOwnNames(found, 4)
+      const found = await naming(view, '[data-test="pass-type-form"]',
+        '[data-test^="pass-type-price-label-"], [data-test^="pass-type-price-amount-"], [data-test^="pass-type-remove-price-"]')
+      expectOwnNames(found, 6)
+
+      // The hint under the legend is read with each price row's inputs, as the field's description was.
+      const described = await view.evaluate<string>(`JSON.stringify([...document.querySelectorAll(
+        '[data-test^="pass-type-price-label-"], [data-test^="pass-type-price-amount-"]')]
+        .map(input => document.getElementById(input.getAttribute('aria-describedby') ?? '')?.innerText.trim() ?? ''))`)
+      expect(new Set(JSON.parse(described) as string[])).toEqual(new Set(['At least one, each with its own label.']))
     }
     finally {
       view.close()

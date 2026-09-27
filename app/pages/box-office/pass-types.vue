@@ -98,6 +98,8 @@ const state = reactive({
 })
 
 const priceRows = ref<PriceRow[]>([{ label: '', pounds: 0 }])
+// The hint every price row's inputs are described by, as the field's description once was.
+const pricesHint = useId()
 
 function addPriceRow(): void {
   priceRows.value.push({ label: '', pounds: 0 })
@@ -497,10 +499,13 @@ const columns: TableColumn<PassType>[] = [
 
           <!-- Not a UFormField: every input inside one takes the field's id, so each price point's two would share it (K-101, issue 1333). -->
           <fieldset data-test="pass-type-prices">
-            <legend class="mb-1 text-sm font-medium text-default">
+            <legend class="text-sm font-medium text-default">
               Price points
             </legend>
-            <p class="mb-2 text-sm text-muted">
+            <p
+              :id="pricesHint"
+              class="mb-1 text-sm text-muted"
+            >
               At least one, each with its own label.
             </p>
             <div class="space-y-2">
@@ -514,6 +519,7 @@ const columns: TableColumn<PassType>[] = [
                   placeholder="Standard"
                   class="flex-1"
                   :aria-label="`Price point ${index + 1}: label`"
+                  :aria-describedby="pricesHint"
                   :data-test="`pass-type-price-label-${index}`"
                 />
                 <UInputNumber
@@ -523,13 +529,15 @@ const columns: TableColumn<PassType>[] = [
                   :format-options="{ style: 'currency', currency: 'GBP' }"
                   class="w-40"
                   :aria-label="`Price point ${index + 1}: price`"
+                  :aria-describedby="pricesHint"
                   :data-test="`pass-type-price-amount-${index}`"
                 />
                 <UButton
                   color="neutral"
                   variant="ghost"
                   icon="i-lucide-x"
-                  aria-label="Remove this price point"
+                  :aria-label="`Remove price point ${index + 1}`"
+                  :data-test="`pass-type-remove-price-${index}`"
                   :disabled="priceRows.length === 1"
                   @click="removePriceRow(index)"
                 />

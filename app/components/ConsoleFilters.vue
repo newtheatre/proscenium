@@ -135,9 +135,9 @@ const building = (field: FilterField): boolean => {
   return operator !== undefined && operator !== UNSET && operator !== 'empty'
 }
 
-// Every control inside one UFormField takes its id, so each past the first gets a field of its own,
-// with its own id and a name a screen reader says (K-101, as issue 1333 found).
-const OWN_FIELD = { labelWrapper: 'sr-only', container: 'mt-0' }
+// Every control inside one UFormField takes its id, so each past the first gets a field of its own
+// (K-101, issue 1333); a value's field repeats the condition's error hidden, to mark its control.
+const OWN_FIELD = { labelWrapper: 'sr-only', container: 'mt-0', error: 'hidden' }
 
 function valueLabel(field: FilterField, index: 0 | 1): string {
   if (index === 1) return `${field.label} to`
@@ -222,6 +222,7 @@ const directionItems = [
             v-if="field.kind === 'list' || isMenu(field)"
             :label="valueLabel(field, 0)"
             :ui="OWN_FIELD"
+            :error="issues[field.key]"
           >
             <USelect
               v-if="field.kind === 'list' && drafts[field.key]!.operator !== 'any'"
@@ -263,6 +264,7 @@ const directionItems = [
               v-if="drafts[field.key]!.operator === 'any' && drafts[field.key]!.values.length"
               :label="`${field.label} chosen`"
               :ui="OWN_FIELD"
+              :error="issues[field.key]"
             >
               <UInputTags
                 :model-value="drafts[field.key]!.values"
@@ -275,6 +277,7 @@ const directionItems = [
             <UFormField
               :label="valueLabel(field, 0)"
               :ui="OWN_FIELD"
+              :error="issues[field.key]"
             >
               <PersonPicker
                 v-if="field.kind === 'person'"
@@ -293,6 +296,7 @@ const directionItems = [
             <UFormField
               :label="valueLabel(field, 0)"
               :ui="OWN_FIELD"
+              :error="issues[field.key]"
             >
               <DateField
                 :model-value="drafts[field.key]!.values[0] || undefined"
@@ -304,6 +308,7 @@ const directionItems = [
               v-if="drafts[field.key]!.operator === 'between'"
               :label="valueLabel(field, 1)"
               :ui="OWN_FIELD"
+              :error="issues[field.key]"
             >
               <DateField
                 :model-value="drafts[field.key]!.values[1] || undefined"
@@ -318,6 +323,7 @@ const directionItems = [
             <UFormField
               :label="valueLabel(field, 0)"
               :ui="OWN_FIELD"
+              :error="issues[field.key]"
             >
               <UInputNumber
                 :model-value="drafts[field.key]!.values[0] ? Number(drafts[field.key]!.values[0]) : undefined"
@@ -331,6 +337,7 @@ const directionItems = [
               v-if="drafts[field.key]!.operator === 'between'"
               :label="valueLabel(field, 1)"
               :ui="OWN_FIELD"
+              :error="issues[field.key]"
             >
               <UInputNumber
                 :model-value="drafts[field.key]!.values[1] ? Number(drafts[field.key]!.values[1]) : undefined"

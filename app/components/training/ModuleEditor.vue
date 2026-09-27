@@ -472,6 +472,7 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
                 color="neutral"
                 variant="ghost"
                 :aria-label="`Remove material link ${index + 1}`"
+                :data-test="`remove-material-${index}`"
                 @click="state.materials.splice(index, 1)"
               />
             </div>
