@@ -126,6 +126,58 @@ describe('performanceReportsQuery reads attendance and staffing per performance 
     })
   })
 
+  // Issue 1296's derivation, which the night report already uses: a paid seat nobody admitted is
+  // a no-show whether or not anything marked it, and every figure counts seats, as sold does.
+  test('a paid seat never admitted is a no-show, and a party counts every seat on every line', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      const booker = person(database, 'booker')
+      const reservation = (id: string, status: string): [string, ...unknown[]] =>
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          id, id.toUpperCase().padEnd(6, 'X').slice(0, 6), seeded.performanceId, booker, status, 'WEB']
+      const seat = (id: string, reservationId: string, refundedAt: number | null = null): [string, ...unknown[]] =>
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source, refunded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          id, reservationId, seeded.performanceId, 'tt-standard', 900, 'BASE', refundedAt]
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        reservation('r-in', 'DOOR'),
+        seat('t-in-1', 'r-in'),
+        seat('t-in-2', 'r-in'),
+        seat('t-in-3', 'r-in'),
+        reservation('r-absent', 'COLLECTED'),
+        seat('t-absent-1', 'r-absent'),
+        seat('t-absent-2', 'r-absent'),
+        reservation('r-refunded', 'COLLECTED'),
+        seat('t-refunded', 'r-refunded', 1_000),
+      ])
+
+      const [found] = run<{ sold: number, admitted: number, noShows: number }>(
+        database, performanceReportsQuery(seeded.startsAt - 3600, seeded.startsAt + 3600, {}, 50, 0),
+      )
+      expect(found).toMatchObject({ sold: 5, admitted: 3, noShows: 2 })
+    })
+  })
+
+  // A claim waiting for an officer is nobody confirmed on the night: a gap, as an open slot is.
+  test('a claimed slot still waiting for confirmation is unfilled', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      const claimant = person(database, 'claimant')
+      const holder = person(database, 'holder')
+      database.batch([
+        ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+          'sh-claimed', seeded.performanceId, 'DOOR', 1, 'CLAIMED', claimant],
+        ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+          'sh-confirmed', seeded.performanceId, 'DUTY_MANAGER', 1, 'CONFIRMED', holder],
+      ])
+
+      const [found] = run<{ unfilledSlots: number }>(
+        database, performanceReportsQuery(seeded.startsAt - 3600, seeded.startsAt + 3600, {}, 50, 0),
+      )
+      expect(found?.unfilledSlots).toBe(1)
+    })
+  })
+
   test('an unfilled slot is counted, a confirmed one is not', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
