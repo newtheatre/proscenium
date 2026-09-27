@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { formatLondon, fromLondonWallClock, londonClock } from '#shared/utils/london'
-import { SERIES_EDIT_REFUSAL, describePurpose, saysBookingState } from '#shared/utils/bookings'
+import { SERIES_EDIT_REFUSAL, nameOrPurpose, saysBookingState } from '#shared/utils/bookings'
 import { saysExternalState } from '#shared/utils/external-requests'
 import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
 import type { FormSubmitEvent } from '@nuxt/ui'
@@ -206,7 +206,7 @@ const editScope = ref<'occurrence' | 'series' | undefined>()
 
 const editFields = z.object({
   roomId: z.string().min(1, 'Choose a room'),
-  title: z.string().trim().min(1, 'Say what the booking is for').max(200),
+  title: z.string().trim().max(200),
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a day'),
   from: z.string().regex(/^\d{2}:\d{2}$/, 'Choose a start time'),
   to: z.string().regex(/^\d{2}:\d{2}$/, 'Choose an end time'),
@@ -266,7 +266,7 @@ async function saveEdit(event: FormSubmitEvent<EditFields>): Promise<void> {
       method: 'PUT',
       body: {
         roomId: event.data.roomId,
-        title: event.data.title,
+        title: nameOrPurpose(event.data.title, event.data.purpose),
         startsAt: instantOf(event.data.day, event.data.from),
         endsAt: instantOf(event.data.day, event.data.to),
         attendees: event.data.attendees ?? null,
@@ -679,9 +679,22 @@ useSeoMeta({ title: 'My bookings' })
             </UFormField>
 
             <UFormField
-              label="What it is for"
-              name="title"
+              label="What the room is for"
+              name="purpose"
               required
+            >
+              <PurposeChips
+                v-model="draft.purpose"
+                :purposes="rules.purposes"
+                test-prefix="edit"
+              />
+            </UFormField>
+
+            <UFormField
+              label="A name for it"
+              name="title"
+              hint="Optional"
+              description="Shown to officers, and to nobody else looking at the calendar. Left empty, it is called by what the room is for."
             >
               <UInput
                 v-model="draft.title"
@@ -737,20 +750,6 @@ useSeoMeta({ title: 'My bookings' })
                 :min="1"
                 class="w-full"
                 data-test="edit-attendees"
-              />
-            </UFormField>
-
-            <UFormField
-              label="What the room is for"
-              name="purpose"
-              required
-            >
-              <USelect
-                v-model="draft.purpose"
-                :items="rules.purposes.map(purpose => ({ label: describePurpose(purpose), value: purpose }))"
-                value-key="value"
-                class="w-full"
-                data-test="edit-purpose"
               />
             </UFormField>
 
