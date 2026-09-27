@@ -235,7 +235,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       smpTxCodeTyped.value = ''
       const pending = sumup.pending.value
       if (pending && pending.id === id) {
-        waiting.value = { ...(waiting.value ?? { id, kind: pending.kind ?? 'SUMUP', status: answered.status, createdAt: 0, createdByName: null, expectedTotalPence: pending.totalPence, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }), status: answered.status, error: answered.error }
+        waiting.value = { ...(waiting.value ?? { id, kind: pending.kind ?? 'SUMUP', status: answered.status, venueId: venueId.value ?? '', venueName: '', createdAt: 0, createdByName: null, expectedTotalPence: pending.totalPence, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }), status: answered.status, error: answered.error }
         settleAttempt(answered.status, pending, answered.receipt ?? null)
       }
       else {

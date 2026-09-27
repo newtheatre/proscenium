@@ -72,6 +72,7 @@ interface AttemptRow {
   callbackAt: number | null
   entryId: string | null
   error: string | null
+  venueName: string
 }
 
 export function attemptByIdQuery(id: string): SQL {
@@ -93,6 +94,8 @@ export function view(row: AttemptRow): SumupAttemptView {
     id: row.id,
     kind: row.kind,
     status: row.status,
+    venueId: row.venueId,
+    venueName: row.venueName,
     createdAt: row.createdAt,
     createdByName: row.createdByName,
     expectedTotalPence: row.expectedTotalPence,
@@ -115,8 +118,8 @@ export async function unresolvedAttempts(night: string): Promise<SumupAttemptVie
 }
 
 export async function earlierUnresolvedAttempts(tonight: string): Promise<EarlierTillLeftOpen['attempts']> {
-  const rows = await db.all<AttemptRow & { venueName: string, sessionOpen: number }>(earlierUnresolvedAttemptsQuery(tonight))
-  return rows.map(row => ({ ...view(row), night: row.night, venueName: row.venueName, sessionOpen: Boolean(row.sessionOpen) }))
+  const rows = await db.all<AttemptRow & { sessionOpen: number }>(earlierUnresolvedAttemptsQuery(tonight))
+  return rows.map(row => ({ ...view(row), night: row.night, sessionOpen: Boolean(row.sessionOpen) }))
 }
 
 export function basketOf(row: AttemptRow): AttemptBasket {

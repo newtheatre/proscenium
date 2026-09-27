@@ -19,7 +19,7 @@ function aLine(): BasketLine {
 }
 
 function aView(id: string, status: Outcome): SumupAttemptView {
-  return { id, kind: 'SUMUP', status, createdAt: 0, createdByName: null, expectedTotalPence: 1000, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }
+  return { id, kind: 'SUMUP', status, venueId: 'venue-1', venueName: 'The House', createdAt: 0, createdByName: null, expectedTotalPence: 1000, smpTxCode: null, smpMessage: null, smpFailureCause: null, error: null, entryId: null, resolution: null }
 }
 
 interface SetupOptions {

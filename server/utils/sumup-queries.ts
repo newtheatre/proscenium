@@ -12,7 +12,7 @@ export const ATTEMPT_COLUMNS = sql`
   a.smp_tx_code AS smpTxCode, a.smp_message AS smpMessage, a.smp_failure_cause AS smpFailureCause,
   a.resolution AS resolution, a.resolved_by AS resolvedBy, a.resolved_at AS resolvedAt,
   a.resolution_note AS resolutionNote, a.callback_at AS callbackAt, a.entry_id AS entryId, a.error AS error,
-  coalesce(a.kind, 'SUMUP') AS kind
+  coalesce(a.kind, 'SUMUP') AS kind, (SELECT name FROM venues WHERE id = a.venue_id) AS venueName
 `
 
 // Any bar's hand-off whose money may still reach the one reader (F-124.6, issue 1308).
@@ -33,9 +33,9 @@ export const unresolvedBefore = (tonight: string): SQL => sql`a.night < ${tonigh
 // `sessionOpen` because recording the sale needs that night's till still open at that bar.
 export function earlierUnresolvedAttemptsQuery(tonight: string): SQL {
   return sql`
-    SELECT ${ATTEMPT_COLUMNS}, v.name AS venueName,
+    SELECT ${ATTEMPT_COLUMNS},
       EXISTS (SELECT 1 FROM till_sessions s WHERE s.venue_id = a.venue_id AND s.night = a.night AND s.closed_at IS NULL) AS sessionOpen
-    FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by JOIN venues v ON v.id = a.venue_id
+    FROM sumup_attempts a LEFT JOIN users u ON u.id = a.created_by
     WHERE ${unresolvedBefore(tonight)}
     ORDER BY a.night, a.created_at
   `

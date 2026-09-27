@@ -47,7 +47,7 @@ export interface TillVenueOption {
 export interface EarlierTillLeftOpen {
   sessions: (TillSession & { venueName: string })[]
   // `sessionOpen`: that night's till is still open at that bar, which recording the sale needs.
-  attempts: (SumupAttemptView & { night: string, venueName: string, sessionOpen: boolean })[]
+  attempts: (SumupAttemptView & { night: string, sessionOpen: boolean })[]
 }
 
 // The close-night checklist's reading of one venue's bar (E-114 criterion 3, issue 1316).
