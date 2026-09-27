@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ALLERGEN_STATES, productForm, says, saysRestricted, sellsWithoutCheckId } from '#shared/utils/bar'
+import { ALLERGEN_STATES, productForm, says, saysRestricted, poursRestrictedSwitchedOff } from '#shared/utils/bar'
 import { barProductsList } from '#shared/utils/bar-products-list'
 import { encodeCondition } from '#shared/utils/list-filters'
 import type { FilterCondition, FilterOption } from '#shared/utils/list-filters'
@@ -39,28 +39,28 @@ const { search, conditions, sort, page, query, active, filtered, set, setSort, c
 
 // The tidy-up list's size whatever the page shows: a product pouring restricted stock with its
 // switch off is the Bar Manager's to correct, though the till asks anyway (F-106, issue 1299).
-const WITHOUT_CHECK_ID: FilterCondition = { key: 'withoutCheckId', operator: 'is', values: ['true'] }
+const SWITCHED_OFF: FilterCondition = { key: 'poursRestrictedSwitchedOff', operator: 'is', values: ['true'] }
 
-const [{ data, status, error, refresh }, { data: unchecked, refresh: recount }] = await Promise.all([
+const [{ data, status, error, refresh }, { data: switchedOff, refresh: recount }] = await Promise.all([
   useAsyncData(
     'bar-products',
     () => request<Listing<BarProduct>>('/api/admin/bar/products', { query: query.value }),
     { watch: [query], default: noProducts },
   ),
   useAsyncData(
-    'bar-products-without-check-id',
+    'bar-products-switched-off',
     () => request<Listing<BarProduct>>('/api/admin/bar/products', {
-      query: { withoutCheckId: encodeCondition(WITHOUT_CHECK_ID), pageSize: 1 },
+      query: { poursRestrictedSwitchedOff: encodeCondition(SWITCHED_OFF), pageSize: 1 },
     }),
     { default: noProducts },
   ),
 ])
 
-const showingUnchecked = computed(() => conditions.value
-  .some(condition => condition.key === WITHOUT_CHECK_ID.key && condition.values[0] === 'true'))
+const showingSwitchedOff = computed(() => conditions.value
+  .some(condition => condition.key === SWITCHED_OFF.key && condition.values[0] === 'true'))
 
-function showUnchecked(): void {
-  set('withoutCheckId', WITHOUT_CHECK_ID)
+function showSwitchedOff(): void {
+  set('poursRestrictedSwitchedOff', SWITCHED_OFF)
 }
 
 const editing = ref<BarProduct | null>(null)
@@ -225,15 +225,15 @@ const columns: TableColumn<BarProduct>[] = [
         row.original.ageRestricted
           ? h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Age restricted')
           : null,
-        sellsWithoutCheckId(row.original)
-          ? h(UBadge, { 'color': 'error', 'variant': 'subtle', 'size': 'sm', 'data-test': `no-check-id-${row.original.id}` }, () => 'Age restricted off')
+        poursRestrictedSwitchedOff(row.original)
+          ? h(UBadge, { 'color': 'error', 'variant': 'subtle', 'size': 'sm', 'data-test': `age-restricted-off-${row.original.id}` }, () => 'Age restricted off')
           : null,
         row.original.staffedOnly
           ? h(UBadge, { color: 'neutral', variant: 'outline', size: 'sm' }, () => 'Staffed only')
           : null,
       ]),
       h('div', { class: 'text-xs text-muted' }, row.original.categoryName),
-      sellsWithoutCheckId(row.original)
+      poursRestrictedSwitchedOff(row.original)
         ? h('div', { class: 'text-xs text-error' }, `Pours ${saysRestricted(row.original.restrictedPours)}`)
         : null,
       // Below sm the allergens and sold columns are hidden: their content sits here instead,
@@ -332,14 +332,14 @@ const columns: TableColumn<BarProduct>[] = [
     />
 
     <UAlert
-      v-if="unchecked.total > 0 && !showingUnchecked"
+      v-if="switchedOff.total > 0 && !showingSwitchedOff"
       data-test="without-check-id"
       color="warning"
       variant="subtle"
       icon="i-lucide-id-card"
-      :title="`${plural(unchecked.total, 'product')} ${unchecked.total === 1 ? 'pours' : 'pour'} age-restricted stock with Age restricted off`"
+      :title="`${plural(switchedOff.total, 'product')} ${switchedOff.total === 1 ? 'pours' : 'pour'} age-restricted stock with Age restricted off`"
       description="The till asks for Check ID on them anyway. Edit each one so the list agrees, or switch the stocked item off on the stock register if it is not alcohol."
-      :actions="[{ label: 'Show them', color: 'warning', onClick: showUnchecked }]"
+      :actions="[{ label: 'Show them', color: 'warning', onClick: showSwitchedOff }]"
     />
 
     <p class="text-sm text-muted">

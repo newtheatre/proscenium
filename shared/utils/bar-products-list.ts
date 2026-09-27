@@ -20,7 +20,7 @@ export const barProductsList = {
     // The Bar Manager's tidy-up list: switched off though it pours restricted stock (issue 1299).
     // The till asks for Check ID on those anyway; this is the list reading true.
     {
-      key: 'withoutCheckId',
+      key: 'poursRestrictedSwitchedOff',
       label: 'Pours restricted stock, Age restricted off',
       kind: 'yes-no',
       negated: 'Age restricted wherever its stock is',
