@@ -1579,7 +1579,7 @@ offers the wings only theirs and `GET /api/tonight/board/messages` front of hous
 and `resolveCall()` refuses the other end's call on either `POST`, so front of house now posts
 milestones (House open, Ready to restart) beside the wings'; both feed the night report's timeline.
 `nextCall()` is each end's **Next call**, the next of its own milestones after its latest live one
-in the committee's order, and `correctableMilestone()` offers **Wrong call? Change it** on an end's
+in the committee's order, and `correctableMilestone()` offers **Change the call** on an end's
 own latest milestone until anybody calls another. `GET /api/board/messages` returns the venue's
 name, so a phone whose cookie still works reopens its board on reload rather than joining again as
 a second device.

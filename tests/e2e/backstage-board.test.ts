@@ -59,11 +59,12 @@ async function joinAs(label: string): Promise<{ deviceCookie: string, token: str
 }
 
 describe.skipIf(skip !== null)('milestone types and presets, committee configuration (E-121 criteria 1, 2)', () => {
-  test('the six named milestone types are already there', async () => {
+  // Issue 1313 adds front of house's Ready to restart beside the six the story named.
+  test('the named milestone types are already there', async () => {
     const listed = await send('GET', '/api/admin/backstage/milestone-types', undefined, foh.cookie)
     expect(listed.status).toBe(200)
     const { types } = await listed.json() as { types: { label: string }[] }
-    expect(types.map(type => type.label)).toEqual(['Clearance', 'House open', 'Curtain up', 'Interval', 'Restart', 'End'])
+    expect(types.map(type => type.label)).toEqual(['Clearance', 'House open', 'Curtain up', 'Interval', 'Ready to restart', 'Restart', 'End'])
   })
 
   test('the FOH officer can add, edit and retire a preset', async () => {
@@ -251,6 +252,28 @@ describe.skipIf(skip !== null)('front of house holds the other end of the board 
     const composedAt = Math.floor(Date.now() / 1000)
     expect((await send('POST', '/api/tonight/board/messages', { body: 'Nope', composedAt }, member.cookie)).status).toBe(403)
     expect((await send('POST', '/api/tonight/board/seen', { messageId: 'whatever' }, member.cookie)).status).toBe(403)
+  })
+
+  // Issue 1313: front of house changes its own milestone once, never the wings', and nobody else can.
+  test('front of house changes its own milestone once, never the wings\', under shift authority', async () => {
+    const composedAt = Math.floor(Date.now() / 1000)
+    const { types } = await (await send('GET', '/api/admin/backstage/milestone-types', undefined, foh.cookie)).json() as { types: { id: string, label: string }[] }
+    const byLabel = (label: string): string => types.find(type => type.label === label)!.id
+
+    const posted = await send('POST', '/api/tonight/board/messages', { milestoneTypeId: byLabel('House open'), composedAt }, foh.cookie)
+    const { id } = await posted.json() as { id: string }
+    const change = (entryId: string, label: string, as = foh.cookie): Promise<Response> =>
+      send('POST', `/api/tonight/board/messages/${entryId}/supersede`, { milestoneTypeId: byLabel(label), composedAt: composedAt + 10 }, as)
+
+    const member = await registerMember(app, 'board-change-outsider', generatePassword())
+    expect((await change(id, 'Ready to restart', member.cookie)).status).toBe(403)
+    expect((await change(id, 'Ready to restart')).status).toBe(200)
+    expect((await change(id, 'Ready to restart')).status).toBe(409)
+
+    const { deviceCookie } = await joinAs('Stage manager')
+    const wings = await request(app, 'POST', '/api/board/messages', { milestoneTypeId: byLabel('Clearance'), composedAt }, deviceCookie)
+    const { id: wingsId } = await wings.json() as { id: string }
+    expect((await change(wingsId, 'House open')).status).toBe(409)
   })
 })
 

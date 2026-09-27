@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BOARD_LABELS, boardJoinForm, correctableMilestone, nextCall } from '#shared/utils/backstage'
+import { BOARD_LABELS, boardJoinForm } from '#shared/utils/backstage'
 import type { BoardSide } from '#shared/utils/backstage'
 
 definePageMeta({ layout: 'backstage', docs: '/docs/tonight/backstage' })
@@ -82,6 +82,8 @@ function take(answered: BoardRead): void {
 }
 
 async function loadMessages(): Promise<void> {
+  // A config that failed while the phone had no signal is fetched again with the next poll.
+  if (milestoneTypes.value.length === 0 && presets.value.length === 0) loadConfig()
   try {
     take(await $fetch<BoardRead>('/api/board/messages'))
     boardFailure.value = null
@@ -91,15 +93,22 @@ async function loadMessages(): Promise<void> {
   }
 }
 
-// A refused cookie (revoked by a reset, or last night's) goes, and the form takes its place.
+// A refused cookie (401, revoked by a reset) goes and the form takes its place; a dropped
+// connection keeps the device and the board, and the poll tries again (criterion 6).
 async function resume(): Promise<void> {
   try {
     const answered = await $fetch<BoardRead>('/api/board/messages')
     take(answered)
     joined.value = { venueName: answered.venueName ?? 'Tonight\'s board' }
   }
-  catch {
-    deviceToken.value = null
+  catch (error) {
+    if (refusalStatus(error) === 401) {
+      deviceToken.value = null
+    }
+    else {
+      joined.value = { venueName: 'Tonight\'s board' }
+      boardFailure.value = refusalText(error)
+    }
   }
   finally {
     resuming.value = false
@@ -117,7 +126,6 @@ let timer: ReturnType<typeof setInterval> | undefined
 
 watch(joined, (value) => {
   if (!value || timer) return
-  loadConfig()
   loadMessages()
   timer = setInterval(loadMessages, POLL_MS)
 }, { immediate: true })
@@ -162,31 +170,6 @@ function postFreeText(): void {
   if (!body) return
   writeQueue.enqueue('free-text', { milestoneTypeId: null, presetId: null, body })
   freeText.value = ''
-}
-
-// The wings' own next call in the committee's order, and their latest milestone while nobody has
-// called another since, which is the one a mis-tap can still be changed on (issue 1313).
-const next = computed(() => nextCall(milestoneTypes.value, messages.value))
-const changeable = computed(() => correctableMilestone('BACKSTAGE', messages.value))
-const changing = ref(false)
-const changeFailure = ref<string | null>(null)
-
-async function changeTo(milestoneTypeId: string): Promise<void> {
-  const wrong = changeable.value
-  if (!wrong) return
-  changeFailure.value = null
-  try {
-    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
-    await $fetch<unknown>(`/api/board/messages/${wrong.id}/supersede`, {
-      method: 'POST',
-      body: { milestoneTypeId, composedAt: Math.floor(Date.now() / 1000) },
-    })
-    changing.value = false
-    await loadMessages()
-  }
-  catch (error) {
-    changeFailure.value = refusalText(error)
-  }
 }
 
 async function acknowledge(messageId: string): Promise<void> {
@@ -338,29 +321,15 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
           <span v-else>· not seen yet</span>
         </template>
 
-        <UButton
-          v-if="changeable"
-          color="neutral"
-          variant="link"
-          class="min-h-12"
-          data-test="board-change-call"
-          @click="changing = true"
-        >
-          Wrong call? Change it
-        </UButton>
-
-        <UButton
-          v-if="next"
+        <BoardCallChange
+          side="BACKSTAGE"
           color="primary"
-          size="xl"
-          block
-          icon="i-lucide-arrow-right"
-          class="min-h-14"
-          data-test="board-next-call"
-          @click="postMilestone(next.id)"
-        >
-          Next call: {{ next.label }}
-        </UButton>
+          :milestone-types="milestoneTypes"
+          :messages="messages"
+          :supersede-url="id => `/api/board/messages/${id}/supersede`"
+          @send="postMilestone"
+          @changed="loadMessages"
+        />
 
         <div
           v-if="milestoneTypes.length || presets.length"
@@ -426,40 +395,5 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
         </template>
       </BoardFeed>
     </div>
-
-    <UModal
-      v-model:open="changing"
-      title="Change the call"
-      :description="changeable ? `Sent as ${changeable.milestoneLabel}. Pick what it should have been.` : ''"
-    >
-      <template #body>
-        <div
-          class="space-y-3"
-          data-test="board-change-form"
-        >
-          <UAlert
-            v-if="changeFailure"
-            color="error"
-            variant="subtle"
-            :description="changeFailure"
-            data-test="board-change-failure"
-          />
-          <div class="grid grid-cols-2 gap-2">
-            <UButton
-              v-for="type in milestoneTypes.filter(one => one.id !== changeable?.milestoneTypeId)"
-              :key="type.id"
-              color="neutral"
-              variant="outline"
-              size="lg"
-              class="min-h-12"
-              :data-test="`board-change-to-${type.id}`"
-              @click="changeTo(type.id)"
-            >
-              {{ type.label }}
-            </UButton>
-          </div>
-        </div>
-      </template>
-    </UModal>
   </div>
 </template>

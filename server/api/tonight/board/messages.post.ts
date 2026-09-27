@@ -1,10 +1,10 @@
-import { fohMessageForm } from '#shared/utils/backstage'
+import { postMessageForm } from '#shared/utils/backstage'
 
 // Front of house's own end of the board: its own milestones, presets or free text, sent under
 // shift authority rather than a join code (E-121 criterion 7, issue 1313). Wording resolved here.
 export default defineEventHandler(async (event) => {
   const resolved = await requireNightAuthority(event, 'DUTY_MANAGER')
-  const input = await readValidatedBodyOrThrow(event, fohMessageForm)
+  const input = await readValidatedBodyOrThrow(event, postMessageForm)
 
   const call = await resolveCall('FOH', input)
   if ('refusal' in call) throw createError({ statusCode: 400, statusMessage: call.refusal })

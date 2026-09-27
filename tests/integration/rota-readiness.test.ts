@@ -119,10 +119,10 @@ describe('the board and the gating modules, read once each', () => {
   test('the board counts active presets and milestones, the seeded ones included', async () => {
     await withDatabase((database) => {
       const [board] = run(database, boardReadinessQuery())
-      expect(board).toEqual({ presets: 4, milestones: 6 })
+      expect(board).toEqual({ presets: 4, milestones: 7 })
 
       database.batch([['UPDATE backstage_presets SET active = 0 WHERE label = ?', 'Hold']])
-      expect(run(database, boardReadinessQuery())[0]).toEqual({ presets: 3, milestones: 6 })
+      expect(run(database, boardReadinessQuery())[0]).toEqual({ presets: 3, milestones: 7 })
     })
   })
 

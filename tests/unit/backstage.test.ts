@@ -14,7 +14,6 @@ import {
   currentBoardState,
   deriveBoardCode,
   deriveFohCredential,
-  fohMessageForm,
   liveBoardMessages,
   milestoneTypeForm,
   otherBoardSide,
@@ -227,18 +226,18 @@ describe('front of house sends exactly one of its own milestone, a preset or fre
   const composedAt = 1_795_000_000
 
   test('a milestone alone, a preset alone, or free text alone, is accepted', () => {
-    expect(fohMessageForm.safeParse({ milestoneTypeId: 'mt-house-open', composedAt }).success).toBe(true)
-    expect(fohMessageForm.safeParse({ presetId: 'preset-1', composedAt }).success).toBe(true)
-    expect(fohMessageForm.safeParse({ body: 'Two minutes on the bar queue', composedAt }).success).toBe(true)
+    expect(postMessageForm.safeParse({ milestoneTypeId: 'mt-house-open', composedAt }).success).toBe(true)
+    expect(postMessageForm.safeParse({ presetId: 'preset-1', composedAt }).success).toBe(true)
+    expect(postMessageForm.safeParse({ body: 'Two minutes on the bar queue', composedAt }).success).toBe(true)
   })
 
   test('both at once, or neither, is refused', () => {
-    expect(fohMessageForm.safeParse({ presetId: 'preset-1', body: 'And this', composedAt }).success).toBe(false)
-    expect(fohMessageForm.safeParse({ composedAt }).success).toBe(false)
+    expect(postMessageForm.safeParse({ presetId: 'preset-1', body: 'And this', composedAt }).success).toBe(false)
+    expect(postMessageForm.safeParse({ composedAt }).success).toBe(false)
   })
 
   test('free text over the limit is refused', () => {
-    expect(fohMessageForm.safeParse({ body: 'x'.repeat(FREE_TEXT_LIMIT + 1), composedAt }).success).toBe(false)
+    expect(postMessageForm.safeParse({ body: 'x'.repeat(FREE_TEXT_LIMIT + 1), composedAt }).success).toBe(false)
   })
 })
 
@@ -329,17 +328,17 @@ describe('what a refused send reads as (E-121 criterion 6)', () => {
   const presets = [{ id: 'p-clear', label: 'Clearance' }, { id: 'p-beginners', label: 'Beginners' }]
 
   test('a preset comes back as the preset it was', () => {
-    expect(saysQueuedSend(presets, { presetId: 'p-clear', body: null })).toBe('Clearance')
+    expect(saysQueuedSend(presets, { milestoneTypeId: null, presetId: 'p-clear', body: null })).toBe('Clearance')
   })
 
   test('free text comes back as what was typed', () => {
-    expect(saysQueuedSend(presets, { presetId: null, body: 'Hold the house' })).toBe('Hold the house')
+    expect(saysQueuedSend(presets, { milestoneTypeId: null, presetId: null, body: 'Hold the house' })).toBe('Hold the house')
   })
 
   // A preset retired between the tap and the drain is exactly why the send was refused, so its
   // row must still say something a person can act on.
   test('a preset nobody recognises still names a send rather than nothing', () => {
-    expect(saysQueuedSend(presets, { presetId: 'p-gone', body: null })).toBe('A call to backstage')
-    expect(saysQueuedSend(presets, { presetId: null, body: '  ' })).toBe('A call to backstage')
+    expect(saysQueuedSend(presets, { milestoneTypeId: null, presetId: 'p-gone', body: null })).toBe('A call to backstage')
+    expect(saysQueuedSend(presets, { milestoneTypeId: null, presetId: null, body: '  ' })).toBe('A call to backstage')
   })
 })

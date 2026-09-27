@@ -162,6 +162,18 @@ describe('the named milestone types are seeded, committee-configurable from ther
     })
   })
 
+  // 0119 seeds four presets; 0121 places each by what it says (issue 1313).
+  test('the four seeded presets each sit on their own end', async () => {
+    await withDatabase((database) => {
+      expect(run(database, presetsQuery(false)).map(row => [row.label, row.side])).toEqual([
+        ['Standby', 'FOH'],
+        ['Hold', 'FOH'],
+        ['Clear', 'FOH'],
+        ['Ambulance', 'BACKSTAGE'],
+      ])
+    })
+  })
+
   test('the committee can add another without a migration', async () => {
     await withDatabase((database) => {
       const officer = person(database, 'officer')

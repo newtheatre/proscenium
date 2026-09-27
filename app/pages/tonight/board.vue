@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { correctableMilestone, nextCall, saysQueuedSend } from '#shared/utils/backstage'
+import { saysQueuedSend } from '#shared/utils/backstage'
 import { groupedBoardCode } from '#shared/utils/night-hub'
 import type { BoardSide } from '#shared/utils/backstage'
 
@@ -108,39 +108,13 @@ function sendAgain(id: string, payload: QueuedMessage): void {
 }
 
 // A refused call reads as the milestone or preset it was, or the words typed (criterion 6).
-function saysRefused(payload: QueuedMessage): string {
-  return saysQueuedSend([...milestoneTypes.value, ...presets.value], { presetId: payload.milestoneTypeId ?? payload.presetId, body: payload.body })
-}
+const calls = computed(() => [...milestoneTypes.value, ...presets.value])
 
 function sendFreeText(): void {
   const body = freeText.value.trim()
   if (!body) return
   writeQueue.enqueue('free-text', { milestoneTypeId: null, presetId: null, body })
   freeText.value = ''
-}
-
-// Front of house's own next call and its own mis-tapped milestone (issue 1313), as on the wings'.
-const next = computed(() => nextCall(milestoneTypes.value, messages.value))
-const changeable = computed(() => correctableMilestone('FOH', messages.value))
-const changing = ref(false)
-const changeFailure = ref<string | null>(null)
-
-async function changeTo(milestoneTypeId: string): Promise<void> {
-  const wrong = changeable.value
-  if (!wrong) return
-  changeFailure.value = null
-  try {
-    // @ts-expect-error an options-carrying call has no working generic form yet (0053).
-    await $fetch<unknown>(`/api/tonight/board/messages/${wrong.id}/supersede`, {
-      method: 'POST',
-      body: { milestoneTypeId, composedAt: Math.floor(Date.now() / 1000) },
-    })
-    changing.value = false
-    await load()
-  }
-  catch (error) {
-    changeFailure.value = refusalText(error)
-  }
 }
 
 // Where the crew join, said with the code so both are read out together (issue 1313).
@@ -235,29 +209,15 @@ async function reset(): Promise<void> {
           </UButton>
         </template>
 
-        <UButton
-          v-if="changeable"
-          color="neutral"
-          variant="link"
-          class="min-h-12"
-          data-test="board-change-call"
-          @click="changing = true"
-        >
-          Wrong call? Change it
-        </UButton>
-
-        <UButton
-          v-if="next"
+        <BoardCallChange
+          side="FOH"
           color="secondary"
-          size="xl"
-          block
-          icon="i-lucide-arrow-right"
-          class="min-h-14"
-          data-test="board-next-call"
-          @click="sendMilestone(next.id)"
-        >
-          Next call: {{ next.label }}
-        </UButton>
+          :milestone-types="milestoneTypes"
+          :messages="messages"
+          :supersede-url="id => `/api/tonight/board/messages/${id}/supersede`"
+          @send="sendMilestone"
+          @changed="load"
+        />
 
         <section>
           <h2 class="mb-3 font-mono text-xs tracking-[0.2em] text-muted uppercase">
@@ -320,7 +280,7 @@ async function reset(): Promise<void> {
               :data-test="`board-rejected-${refused.id}`"
             >
               <p class="font-semibold">
-                {{ saysRefused(refused.payload) }}
+                {{ saysQueuedSend(calls, refused.payload) }}
               </p>
               <p class="text-sm">
                 Not sent. {{ refused.reason }}
@@ -434,41 +394,6 @@ async function reset(): Promise<void> {
         />
       </form>
     </template>
-
-    <UModal
-      v-model:open="changing"
-      title="Change the call"
-      :description="changeable ? `Sent as ${changeable.milestoneLabel}. Pick what it should have been.` : ''"
-    >
-      <template #body>
-        <div
-          class="space-y-3"
-          data-test="board-change-form"
-        >
-          <UAlert
-            v-if="changeFailure"
-            color="error"
-            variant="subtle"
-            :description="changeFailure"
-            data-test="board-change-failure"
-          />
-          <div class="grid grid-cols-2 gap-2">
-            <UButton
-              v-for="type in milestoneTypes.filter(one => one.id !== changeable?.milestoneTypeId)"
-              :key="type.id"
-              color="neutral"
-              variant="outline"
-              size="lg"
-              class="min-h-12"
-              :data-test="`board-change-to-${type.id}`"
-              @click="changeTo(type.id)"
-            >
-              {{ type.label }}
-            </UButton>
-          </div>
-        </div>
-      </template>
-    </UModal>
 
     <UModal
       v-model:open="confirmingReset"

@@ -368,12 +368,12 @@ export function retirePresetStatement(id: string, active: boolean, updatedBy: st
 
 // A milestone type or a preset, resolved server-side rather than trusted from the client: what
 // gets snapshotted onto the message is the committee's own current wording (criteria 1, 2).
-export async function milestoneCall(id: string): Promise<{ label: string, side: BoardSide } | undefined> {
+async function milestoneCall(id: string): Promise<{ label: string, side: BoardSide } | undefined> {
   const [row] = await db.all<{ label: string, side: BoardSide }>(sql`SELECT label AS label, coalesce(side, ${MILESTONE_DEFAULT_SIDE}) AS side FROM backstage_milestone_types WHERE id = ${id} AND active = 1`)
   return row
 }
 
-export async function presetCall(id: string): Promise<{ body: string, side: BoardSide } | undefined> {
+async function presetCall(id: string): Promise<{ body: string, side: BoardSide } | undefined> {
   const [row] = await db.all<{ body: string, side: BoardSide }>(sql`SELECT body AS body, coalesce(side, ${PRESET_DEFAULT_SIDE}) AS side FROM backstage_presets WHERE id = ${id} AND active = 1`)
   return row
 }

@@ -52,6 +52,8 @@ export type BoardJoinInput = z.output<typeof boardJoinForm>
 
 export const FREE_TEXT_LIMIT = 500
 
+// Either end sends the same three shapes; front of house's own milestones (House open, Ready to
+// restart) feed the night report's timeline beside the wings' (issue 1313, E-121 criterion 7).
 export const postMessageForm = z.object({
   milestoneTypeId: z.string().min(1, 'Say which milestone you mean').nullable().default(null),
   presetId: z.string().min(1, 'Say which preset you mean').nullable().default(null),
@@ -67,12 +69,6 @@ export const postMessageForm = z.object({
 )
 
 export type PostMessageInput = z.output<typeof postMessageForm>
-
-// Front of house sends the same three shapes: its own milestones (House open, Ready to restart)
-// feed the night report's timeline beside the wings' (issue 1313, E-121 criterion 7).
-export const fohMessageForm = postMessageForm
-
-export type FohMessageInput = z.output<typeof fohMessageForm>
 
 // Which end of the board a message came from, and which end makes a call: the wings are offered
 // only their own milestones and presets, front of house only its own (criterion 7, issue 1313).
@@ -100,13 +96,17 @@ export function liveBoardMessages<T extends { id: string, supersedesId: string |
   return messages.filter(message => !superseded.has(message.id))
 }
 
+// The latest by the device's own clock; the first wins a tie.
+const latestOf = <T extends { composedAt: number }>(messages: T[]): T | null =>
+  messages.reduce<T | null>((latest, message) => latest === null || message.composedAt > latest.composedAt ? message : latest, null)
+
 // The two lines the FOH screen leads with: each side's own last call. A night nobody has called
 // yet has neither, which is a state the screen says out loud rather than drawing empty.
 export function currentBoardState<T extends { side: BoardSide, composedAt: number }>(messages: T[]): { foh: T | null, backstage: T | null } {
-  const latestOf = (side: BoardSide): T | null => messages
-    .filter(message => message.side === side)
-    .reduce<T | null>((latest, message) => latest === null || message.composedAt > latest.composedAt ? message : latest, null)
-  return { foh: latestOf('FOH'), backstage: latestOf('BACKSTAGE') }
+  return {
+    foh: latestOf(messages.filter(message => message.side === 'FOH')),
+    backstage: latestOf(messages.filter(message => message.side === 'BACKSTAGE')),
+  }
 }
 
 // What either screen needs of a message to draw it: both ends carry more, neither needs it here.
@@ -129,21 +129,19 @@ export function boardStateFrom<T>(side: BoardSide, state: { foh: T | null, backs
   return side === 'FOH' ? { own: state.foh, other: state.backstage } : { own: state.backstage, other: state.foh }
 }
 
-// A send the queue refused, in the words it was typed in (E-121 criterion 6). The preset it
-// names may have been retired between the tap and the drain, which is why the fallback exists.
+// A send the queue refused, in the words it was typed in (E-121 criterion 6). The milestone or
+// preset it names may have been retired between the tap and the drain, hence the fallback.
 export function saysQueuedSend(
-  presets: readonly { id: string, label: string }[],
-  payload: { presetId: string | null, body: string | null },
+  calls: readonly { id: string, label: string }[],
+  payload: { milestoneTypeId: string | null, presetId: string | null, body: string | null },
 ): string {
-  const preset = payload.presetId ? presets.find(one => one.id === payload.presetId) : undefined
-  const said = preset?.label ?? (payload.body ?? '').trim()
+  const callId = payload.milestoneTypeId ?? payload.presetId
+  const call = callId ? calls.find(one => one.id === callId) : undefined
+  const said = call?.label ?? (payload.body ?? '').trim()
   return said || 'A call to backstage'
 }
 
 interface MilestoneCall { id: string, milestoneTypeId: string | null, supersedesId: string | null, composedAt: number }
-
-const latestOf = <T extends { composedAt: number }>(messages: T[]): T | null =>
-  messages.reduce<T | null>((latest, message) => latest === null || message.composedAt > latest.composedAt ? message : latest, null)
 
 // One tap for the call this end makes next: the one after its latest live milestone, in the
 // committee's order, or the first on a night nobody has called (issue 1313). None after the last.

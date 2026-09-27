@@ -49,8 +49,8 @@ export const backstageDevices = sqliteTable('backstage_devices', {
   index('backstage_devices_night').on(table.nightId),
 ])
 
-// Committee configuration: the fixed structured milestones a night moves through, defaulting to
-// the six the story names, extensible without a migration (E-121 criterion 1).
+// Committee configuration: the structured milestones a night moves through, seeded by migration
+// and extensible without one (E-121 criterion 1).
 export const backstageMilestoneTypes = sqliteTable('backstage_milestone_types', {
   id: id(),
   label: text('label').notNull(),
