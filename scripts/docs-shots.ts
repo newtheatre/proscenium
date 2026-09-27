@@ -142,6 +142,9 @@ for (const shot of selected) {
       await view.evaluate(`(() => { ${shot.after} })()`)
       await Bun.sleep(1200)
     }
+    // The dev server's DevTools float a timing badge over the foot of every page, covering whatever
+    // sits there, so it is taken off the page before the picture rather than off the server.
+    await view.evaluate(`(document.getElementById('nuxt-devtools-container')?.remove(), true)`)
     const { missing, offScreen } = await view.evaluate(overlay(shot)) as { missing: string[], offScreen: string[] }
     if (missing.length) throw new Error(`no element matches ${missing.join(', ')}`)
     if (offScreen.length) throw new Error(`off screen at this height: ${offScreen.join(', ')}`)

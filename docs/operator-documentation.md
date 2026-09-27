@@ -124,7 +124,9 @@ bun run docs:shots system     # one section, by name
 ```
 
 It needs a development server on port 3101, seeded (`bun run seed`, which writes
-`.data/personas.json`), and a Chrome or Chromium for `Bun.WebView`. The pictures are committed
+`.data/personas.json`), and a Chrome or Chromium for `Bun.WebView`. The development server's
+DevTools panel, with its timing badge, is taken off each page before the picture is taken, so
+no picture carries it. The pictures are committed
 under `public/images/docs/`, and the command is not part of the build. Re-run it for a section
 whenever its screens change, and commit the new pictures with the page. The picture folders keep
 the section names the shot manifests use, which are not always the section's address.
