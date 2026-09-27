@@ -229,6 +229,7 @@ Open questions:
      images nor SVG at all, so the code must be a real `https` PNG. The image route answers a
      forged or unknown token with the same 404, and the token is the credential the email
      already carries, so the route exposes nothing the link did not.
+     A pass booking's email says it owes nothing instead of UNPAID (D-125 criterion 4).
   3. The QR can be saved to Apple Wallet and Google Wallet from the email and from the booking
      page.
   4. Opening the QR link in a browser exchanges its signed token for a short-lived httpOnly
@@ -272,6 +273,7 @@ Open questions:
      the whole edit fails atomically if capacity is short.
   3. Self-cancel works while unpaid and before curtain-up; it records who cancelled (customer),
      frees capacity immediately and sends a confirmation email.
+     A pass booking is the exception: only the box office changes or cancels it (D-125 criterion 4).
   4. All unpaid changes are free, because no money has moved; after collection, the self-service
      surface offers only the refund policy text and the box office contact (D-116).
   5. The booking's QR is unchanged by any edit (D-108): it retrieves the booking's current
@@ -675,7 +677,11 @@ Open questions:
   3. Capacity still applies in full: a pass is entitlement, not a reserved seat, and redemption
      into a full house is refused with the waiting list offered.
   4. A redeemed ticket follows the ordinary lifecycle: it appears on the e-ticket, scans at the
-     door, and cancelling it frees both the capacity and that performance's redemption.
+     door, and cancelling it frees both the capacity and that performance's redemption. Amended
+     26 September 2026 (issue 1390): the booking it makes owes nothing and holds nothing, so its
+     page and email say so and the door admits it as paid; it is changed or cancelled only at the
+     box office, since the admission is append-only and unique per pass and performance, and
+     whether a cancel gives that performance's use back awaits a committee decision.
   5. Redemption writes a zero-value ledger line referencing the pass, so per-admission
      utilisation is queryable per product and per pass.
 - Source: Prompt Book D-7; audit PR-8 (UNIQUE(pass, performance) carried)

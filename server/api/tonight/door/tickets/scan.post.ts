@@ -1,4 +1,4 @@
-import { doorTicketOutcome, doorTicketScanForm } from '#shared/utils/reservations'
+import { doorTicketOutcome, doorTicketScanForm, nothingToCollect } from '#shared/utils/reservations'
 import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
 
@@ -23,6 +23,7 @@ export default defineEventHandler(async (event) => {
       ? { showTitle: reservation.exchangedToShowTitle, when: formatLondon(new Date(reservation.exchangedToStartsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }) }
       : null,
     reservation.admittedAt,
+    nothingToCollect(reservation.holdExpiresAt, reservation.totalPence),
   )
 
   // Tonight's own booking only: the agreed wording is for the person in front of the door (D-128 4).

@@ -143,6 +143,29 @@ describe.skipIf(skip !== null)('a ticket scanned against the wrong performance r
   }, CASE_TIMEOUT_MS)
 })
 
+// Issue 1390: a booking made with a pass holds nothing and owes nothing, and its page tells the
+// holder to show it at the door, so the door admits it rather than sending it to be paid.
+describe.skipIf(skip !== null)('a booking with nothing to collect admits (issue 1390)', () => {
+  test('a pending booking with no hold and nothing owed admits and reads DOOR afterwards', async () => {
+    const { matineeId } = houseWithTwoPerformances()
+    const { reference, id } = ticket(matineeId, 'PENDING', 0)
+
+    const scanned = await send('POST', '/api/tonight/door/tickets/scan', { reference, performanceId: matineeId })
+    expect(scanned.status).toBe(200)
+    expect((await scanned.json() as { decision: string }).decision).toBe('ADMIT')
+    expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', id)?.status).toBe('DOOR')
+  }, CASE_TIMEOUT_MS)
+
+  test('a free booking still holding seats is not waved through', async () => {
+    const { matineeId } = houseWithTwoPerformances()
+    const { reference, id } = ticket(matineeId, 'PENDING', 0)
+    write('UPDATE reservations SET hold_expires_at = ? WHERE id = ?', Math.floor(Date.now() / 1000) + 3_600, id)
+
+    const scanned = await send('POST', '/api/tonight/door/tickets/scan', { reference, performanceId: matineeId })
+    expect(scanned.status).toBe(409)
+  }, CASE_TIMEOUT_MS)
+})
+
 describe.skipIf(skip !== null)('an unpaid or cancelled ticket refuses distinctly (D-108 criterion 5)', () => {
   test('unpaid names the amount due rather than admitting', async () => {
     const { matineeId } = houseWithTwoPerformances()

@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
 import { auditedWrite } from './audit'
-import { capacityAllows, heldSeatsQuery, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
+import { capacityAllows, heldSeatsQuery, passBookingColumn, reservationIsPending, ticketAdditionQueries, ticketInsertQueries, ticketRemovalQueries } from './capacity'
 import { configValue } from './configuration'
 import { admittedAtColumn } from './door-search'
 import { auditEntry } from '#shared/utils/audit'
@@ -277,6 +277,7 @@ export interface ReservationCurrentState {
   startsAt: number
   totalPence: number
   holdExpiresAt: number | null
+  passBooking: number
   exchangedToShowTitle: string | null
   exchangedToStartsAt: number | null
 }
@@ -288,7 +289,7 @@ export function reservationCurrentStateQuery(id: string): SQL {
     SELECT r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
            s.title AS showTitle, p.starts_at AS startsAt,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
-           r.hold_expires_at AS holdExpiresAt,
+           r.hold_expires_at AS holdExpiresAt, ${passBookingColumn('r')} AS passBooking,
            xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
@@ -305,6 +306,12 @@ export async function reservationCurrentState(id: string): Promise<ReservationCu
   return row
 }
 
+// Read by the confirmation sender, so every path that sends one words a pass booking alike.
+export async function holdExpiresAtByReference(reference: string): Promise<number | null> {
+  const [row] = await db.all<{ holdExpiresAt: number | null }>(sql`SELECT hold_expires_at AS holdExpiresAt FROM reservations WHERE reference = ${reference}`)
+  return row?.holdExpiresAt ?? null
+}
+
 export interface DoorReservationRow {
   id: string
   reference: string
@@ -314,6 +321,7 @@ export interface DoorReservationRow {
   showTitle: string
   startsAt: number
   totalPence: number
+  holdExpiresAt: number | null
   exchangedToShowTitle: string | null
   exchangedToStartsAt: number | null
   admittedAt: number | null
@@ -326,6 +334,7 @@ export function reservationForDoorQuery(reference: string): SQL {
     SELECT r.id AS id, r.reference AS reference, r.status AS status, r.cancelled_by AS cancelledBy,
            r.performance_id AS performanceId, s.title AS showTitle, p.starts_at AS startsAt,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
+           r.hold_expires_at AS holdExpiresAt,
            xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt,
            ${admittedAtColumn('r')} AS admittedAt
     FROM reservations r
@@ -352,6 +361,8 @@ export interface SelfServiceReservation {
   showId: string
   showSlug: string
   startsAt: number
+  // SQLite answers the EXISTS as 0 or 1.
+  passBooking: number
 }
 
 // What every self-service write (D-110, D-111) needs to decide and price against: the
@@ -359,7 +370,8 @@ export interface SelfServiceReservation {
 export function selfServiceReservationQuery(id: string): SQL {
   return sql`
     SELECT r.id AS id, r.reference AS reference, r.status AS status, r.user_id AS userId, r.performance_id AS performanceId,
-           p.show_id AS showId, s.slug AS showSlug, p.starts_at AS startsAt
+           p.show_id AS showId, s.slug AS showSlug, p.starts_at AS startsAt,
+           ${passBookingColumn('r')} AS passBooking
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
     JOIN shows s ON s.id = p.show_id

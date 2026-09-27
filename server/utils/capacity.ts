@@ -52,8 +52,18 @@ export function heldSeatsColumn(alias: string): SQL {
   return heldSeatsSubquery(sql`${sql.raw(alias)}.id`)
 }
 
+// A ticket standing on a pass admission (D-125): it owes nothing, though its booking stays PENDING
+// (issue 1390). The one test every "made with a pass" and "still owes" reading shares.
+export function ticketOnPass(ticketId: SQL): SQL {
+  return sql`EXISTS (SELECT 1 FROM pass_admissions pa WHERE pa.ticket_id = ${ticketId})`
+}
+
+export function passBookingColumn(alias: string): SQL {
+  return sql`EXISTS (SELECT 1 FROM ${sql.raw(TICKETS)} pt WHERE pt.reservation_id = ${sql.raw(alias)}.id AND ${ticketOnPass(sql`pt.id`)})`
+}
+
 // Seats held but not yet paid for: a PENDING reservation is somebody coming who still owes the
-// desk, which is the queue D-132 criterion 2 names.
+// desk, which is the queue D-132 criterion 2 names. A pass seat owes nothing, so it is not one.
 export function unpaidSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
     SELECT count(*) FROM ${sql.raw(TICKETS)} t
@@ -61,6 +71,7 @@ export function unpaidSeatsSubquery(performanceId: SQL): SQL {
     WHERE t.performance_id = ${performanceId}
       AND t.refunded_at IS NULL
       AND r.status = 'PENDING'
+      AND NOT ${ticketOnPass(sql`t.id`)}
   )`
 }
 

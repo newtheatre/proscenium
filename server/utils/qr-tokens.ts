@@ -1,6 +1,6 @@
 import { selfServiceReservation } from './reservations'
 import { decodeQrToken, encodeQrToken } from '#shared/utils/qr-tokens'
-import { otherBookingReason } from '#shared/utils/reservations'
+import { otherBookingReason, passBookingReason } from '#shared/utils/reservations'
 import type { SelfServiceReservation } from './reservations'
 import type { H3Event } from 'h3'
 
@@ -93,11 +93,11 @@ export async function requireQrReservationId(event: H3Event): Promise<string> {
   return reservationId
 }
 
-// The cookie's booking, only when it is the one the page is showing: booking in another tab moves
-// the cookie, so a page naming another booking, or none, is refused (issue 1329).
+// The cookie's booking, only when it is the one the page is showing (issue 1329) and not a pass
+// booking, which the box office alone changes (issue 1390).
 export async function shownSelfServiceReservation(reservationId: string, showing: string | undefined): Promise<SelfServiceReservation | undefined> {
   const reservation = await selfServiceReservation(reservationId)
-  const other = reservation && otherBookingReason(showing, reservation.reference)
-  if (other) throw createError({ statusCode: 409, statusMessage: other })
+  const refusal = reservation && (otherBookingReason(showing, reservation.reference) ?? passBookingReason(reservation.passBooking === 1))
+  if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
   return reservation
 }

@@ -21,6 +21,7 @@ interface Booking {
   show: string
   // Null once the booking is no longer somebody coming
   guidance: { lines: string[], slug: string | null } | null
+  passBooking: boolean
   when: string
   totalDue: string | null
   qrSvg: string
@@ -312,7 +313,15 @@ useSeoMeta({ title: 'Your booking' })
         />
 
         <div
-          v-if="booking.status === 'PENDING' && !editing && !exchanging"
+          v-if="booking.status === 'PENDING' && booking.passBooking"
+          class="text-sm text-muted"
+          data-test="booking-pass-note"
+        >
+          Made with your pass. To change or cancel it, contact the box office.
+        </div>
+
+        <div
+          v-else-if="booking.status === 'PENDING' && !editing && !exchanging"
           class="flex flex-wrap gap-2 pt-2"
         >
           <UButton
