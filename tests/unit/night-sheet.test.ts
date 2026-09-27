@@ -10,7 +10,19 @@ const read = (path: string): Promise<string> => Bun.file(path).text()
 const SHEET = 'app/components/NightSheet.vue'
 const CHOICES = 'app/components/NightChoices.vue'
 
-// Every overlay the show-night screens own; the till's sit with the bar and follow on their own.
+// Every screen and component the show-night kit owns. The till's dialogues live in
+// app/components/till, the bar's to move, and stay outside the glob.
+function showNightFiles(): string[] {
+  return [
+    ...new Bun.Glob('pages/tonight/**/*.vue').scanSync({ cwd: 'app' }),
+    ...new Bun.Glob('components/{Night,Board}*.vue').scanSync({ cwd: 'app' }),
+  ].map(file => `app/${file.replaceAll('\\', '/')}`).sort()
+}
+
+// Any way of opening the desk's own overlay, not only its literal tag.
+const DESK_OVERLAY = /<(UModal|u-modal|ConfirmModal|USlideover)\b|useOverlay\(/
+
+// The overlays this pull request moved to the sheet, each of which must now draw one.
 const NIGHT_OVERLAYS = [
   'app/pages/tonight/incidents/index.vue',
   'app/pages/tonight/age-checks/index.vue',
@@ -37,18 +49,47 @@ describe('a night overlay is a sheet, not the desk modal (issue 1317, K-102)', (
     expect(await read(CHOICES)).toContain('data-sheet-first')
   })
 
+  // A sheet with nothing to choose must not open on its own primary, or Enter resets the board.
+  test('with no choice it falls back to a field in the body, then Back, never the footer primary', async () => {
+    const source = await read(SHEET)
+    expect(source).toContain('[data-slot="body"] :is(input, textarea, select, button)')
+    expect(source).toContain('[data-sheet-back]')
+    expect(source).toMatch(/<UButton[^>]*data-sheet-back[^>]*>\s*\{\{ CONFIRM_BACK_LABEL \}\}/)
+    expect(source).not.toContain("querySelector<HTMLElement>('input, textarea, select, button')")
+  })
+
   test('a choice is a 48 pixel tile', async () => {
     expect(await read(CHOICES)).toContain('min-h-12')
   })
 
-  test('no show-night screen still opens the desk modal', async () => {
+  test('no show-night screen or component opens the desk\'s overlay, by any name', async () => {
+    const files = showNightFiles()
+    expect(files).toContain('app/pages/tonight/door/index.vue')
+    expect(files).toContain('app/components/BoardCallChange.vue')
     const offenders: string[] = []
-    for (const path of NIGHT_OVERLAYS) {
-      const source = await read(path)
-      if (source.includes('<UModal')) offenders.push(path)
-      if (!source.includes('<NightSheet')) offenders.push(`${path} (no sheet)`)
+    for (const path of files) {
+      if (DESK_OVERLAY.test(await read(path))) offenders.push(path)
     }
     expect(offenders).toEqual([])
+  })
+
+  test('each overlay moved here draws the sheet', async () => {
+    const missing: string[] = []
+    for (const path of NIGHT_OVERLAYS) {
+      if (!(await read(path)).includes('<NightSheet')) missing.push(path)
+    }
+    expect(missing).toEqual([])
+  })
+
+  test('the pattern catches the other spellings of the desk overlay', () => {
+    for (const spelled of ['<UModal', '<u-modal', '<ConfirmModal', '<USlideover', 'useOverlay(']) expect(DESK_OVERLAY.test(spelled)).toBe(true)
+    expect(DESK_OVERLAY.test('<TillCloseModal')).toBe(false)
+  })
+
+  test('no sheet asks for a choice through a dropdown', async () => {
+    for (const path of ['app/pages/tonight/incidents/index.vue', 'app/pages/tonight/age-checks/index.vue']) {
+      expect(`${path}: ${(await read(path)).includes('<USelect')}`).toBe(`${path}: false`)
+    }
   })
 })
 
@@ -62,6 +103,24 @@ describe('a hint is for an empty or first-use screen (issue 1317, K-101)', () =>
   test('the screen frame reads it, and the incident log keeps no standing sentence', async () => {
     expect(await read('app/components/NightScreen.vue')).toContain('nightHintShows(')
     expect(await read('app/pages/tonight/incidents/index.vue')).not.toContain('Every entry is timed and named, and lands')
+  })
+
+  // Empty means loaded and empty: before the first load a screen is not empty, only unread.
+  test('a screen is empty only once its first load has come back with nothing', async () => {
+    for (const path of ['app/pages/tonight/incidents/index.vue', 'app/pages/tonight/age-checks/index.vue', 'app/pages/tonight/checklist/index.vue']) {
+      expect(`${path}: ${(await read(path)).includes(':empty="!busy && items.length === 0"')}`).toBe(`${path}: true`)
+    }
+  })
+
+  // A refused viewer, or a screen that never loaded, has not seen the hint and must see it later.
+  test('the hint is remembered only once it has been drawn on a synced, unrefused screen', async () => {
+    const screen = await read('app/components/NightScreen.vue')
+    expect(screen).not.toContain('localStorage')
+    expect(screen).toContain('firstUseOnDevice(')
+    expect(screen).toMatch(/watch\(\(\) => showsHint\.value && !props\.refused && props\.stale != null/)
+    const cache = await read('app/composables/useNightCache.ts')
+    expect(cache).toContain('export function firstUseOnDevice(')
+    expect(cache).toContain('export function rememberHint(')
   })
 })
 
