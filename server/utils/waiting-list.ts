@@ -309,6 +309,15 @@ export function claimEntryStatement(entryId: string, at: number): SQL {
   `
 }
 
+// The claim names its booking only while it still holds the entry (0049).
+export function nameClaimedReservationStatement(entryId: string, reservationId: string): SQL {
+  return sql`
+    UPDATE waiting_list SET claimed_reservation_id = ${reservationId}, updated_at = unixepoch()
+    WHERE id = ${entryId} AND status = 'CLAIMED'
+    RETURNING id
+  `
+}
+
 // Criterion 2 and 3: the claim, race-safe. `claimEntryStatement` is the arbiter of "claimed
 // twice"; always called from a route, so the event is real (`hasCurrentMembership` needs one).
 export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEntryForToken, input: ClaimWaitingListOfferInput): Promise<ClaimWaitingListOfferResult> {
@@ -369,11 +378,7 @@ export async function claimWaitingListOffer(event: H3Event, entry: WaitingListEn
 
   // The entry names its booking and the trail records the claim in one batch (0049). Nothing
   // moves a CLAIMED entry, so a miss here is a fault to see in the log, not a refusal.
-  const recorded = await auditedWrite(db.all<{ id: string }>(sql`
-    UPDATE waiting_list SET claimed_reservation_id = ${result.id}, updated_at = unixepoch()
-    WHERE id = ${entry.id} AND status = 'CLAIMED'
-    RETURNING id
-  `), auditEntry({
+  const recorded = await auditedWrite(db.all<{ id: string }>(nameClaimedReservationStatement(entry.id, result.id)), auditEntry({
     actorId: entry.userId,
     action: 'waiting-list.claimed',
     target: `waiting-list-entry:${entry.id}`,
