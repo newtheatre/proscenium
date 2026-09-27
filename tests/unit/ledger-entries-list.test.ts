@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { LINE_KINDS } from '#shared/utils/ledger'
-import { entriesHref, ledgerEntriesList, saysEntryWhat } from '#shared/utils/ledger-entries-list'
+import { entriesHref, ledgerEntriesList, saysEntryWhat, saysNoEntries } from '#shared/utils/ledger-entries-list'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 
 // Issue 1361: a ledger entry says what it was, is filtered and searched by it, and every money
@@ -55,5 +55,30 @@ describe('every dashboard figure drills down to its entries', () => {
     expect(entriesHref(range, { kind: 'REFUND', tender: 'CARD' })).toContain('tender=CARD&kind=REFUND')
     expect(entriesHref(range, { tender: 'COMP' })).toContain('tender=COMP')
     expect(entriesHref(range, { discounted: true })).toContain('discounted=true')
+  })
+})
+
+// The list always carries a day, so the day alone is a quiet day, never "no entry matches":
+// only a search or a filter beyond the range can be what matched nothing.
+describe('an empty list says what was asked', () => {
+  const day = { key: 'happenedAt', operator: 'is' as const, values: ['2026-09-27'] }
+
+  test('the range alone names the day or the days it covers', () => {
+    expect(saysNoEntries([day], false)).toBe('Nothing was posted to the ledger on Sun 27 Sept.')
+    expect(saysNoEntries([{ key: 'happenedAt', operator: 'between', values: ['2026-09-01', '2026-09-27'] }], false))
+      .toBe('Nothing was posted to the ledger between Tue 1 Sept and Sun 27 Sept.')
+    expect(saysNoEntries([{ key: 'happenedAt', operator: 'after', values: ['2026-09-01'] }], false))
+      .toBe('Nothing was posted to the ledger after Tue 1 Sept.')
+  })
+
+  test('a search or any other filter is what matched nothing', () => {
+    expect(saysNoEntries([day], true)).toBe('No entry matches that.')
+    expect(saysNoEntries([day, { key: 'tender', operator: 'is', values: ['CARD'] }], false)).toBe('No entry matches that.')
+  })
+
+  test('the screen reads it, not the filtered flag the default day always sets', async () => {
+    const source = await Bun.file('app/pages/money/entries.vue').text()
+    expect(source).toContain('saysNoEntries(conditions, ')
+    expect(source).not.toContain('filtered ?')
   })
 })
