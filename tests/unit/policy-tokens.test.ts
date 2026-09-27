@@ -3,6 +3,7 @@ import {
   formatPolicyValue,
   policyTokenProblem,
   policyValueFor,
+  repeatedUnitProblem,
   resolvePolicyTree,
   tokensInText,
   tokensInTree,
@@ -135,6 +136,25 @@ describe('which keys a public page may quote at all', () => {
   test('a stated but unenforced rule resolves and says it is not enforced', () => {
     expect(policyValueFor('DISCOUNT_CODES_ENABLED', { ...state, enforced: false, value: true }))
       .toEqual({ text: 'yes', enforced: false })
+  })
+})
+
+// A token whose value already renders with its unit reads "15 minutes minutes" when the prose
+// names the unit again, so CI refuses a unit word straight after one.
+describe('a unit is never said twice after a token', () => {
+  test('a unit word after a token that carries one is refused, naming the word', () => {
+    expect(repeatedUnitProblem('HOLD_RELEASE_MINUTES_BEFORE', ' minutes before curtain')).toContain('minutes')
+    expect(repeatedUnitProblem('ROOM_AUTO_APPROVE_NOTICE_HOURS', ' hours\' notice')).toContain('hours')
+    expect(repeatedUnitProblem('ACCESS_PROFILE_VALIDITY_MONTHS', ' month')).toContain('month')
+    expect(repeatedUnitProblem('LISTING_LIMITED_THRESHOLD_PERCENT', ' per cent or less')).toContain('per cent')
+    expect(repeatedUnitProblem('BAR_TAB_CAP_PENCE', ' pence')).toContain('pence')
+  })
+
+  test('other words after it, or a key with no unit of its own, pass', () => {
+    expect(repeatedUnitProblem('HOLD_RELEASE_MINUTES_BEFORE', ' before curtain')).toBeNull()
+    expect(repeatedUnitProblem('MEMBERSHIP_GRACE_DAYS', ' daylight')).toBeNull()
+    expect(repeatedUnitProblem('ROOM_ACTIVE_BOOKINGS_PER_MEMBER', ' days')).toBeNull()
+    expect(repeatedUnitProblem('PUBLIC_ORDER_SEAT_CAP', ' seats')).toBeNull()
   })
 })
 
