@@ -94,15 +94,14 @@ describe('deskSearchQuery scopes to one performance and matches reference or nam
   })
 })
 
-// The pills name the desk's own three states directly (Matt's ruling on #996): pending is
-// reserved and unpaid, collected is reserved and paid, door is a walk-up with no reservation.
-describe('the desk status pills filter on pending, collected and door', () => {
+// One pill per stored state (D-114 criterion 7): Unpaid is PENDING, Paid is COLLECTED, In is DOOR.
+describe('the desk status pills filter on unpaid, paid and in', () => {
   test('PENDING, COLLECTED and DOOR each answer a different subset of ALL', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'a@example.invalid', 'A Pending')
       user(database, 'u-2', 'b@example.invalid', 'B Collected')
-      user(database, 'u-3', 'c@example.invalid', 'C Walkup')
+      user(database, 'u-3', 'c@example.invalid', 'C In')
       reservation(database, 'r-1', seeded.performanceId, 'u-1', 'PENDING', 'AAA111')
       reservation(database, 'r-2', seeded.performanceId, 'u-2', 'COLLECTED', 'BBB222')
       reservation(database, 'r-3', seeded.performanceId, 'u-3', 'DOOR', 'CCC333')
@@ -118,17 +117,27 @@ describe('the desk status pills filter on pending, collected and door', () => {
   })
 })
 
-describe('deskSummaryQuery reads the five KPI tiles for one performance (D-132)', () => {
-  test('reserved is pending plus collected, door is its own figure, and unpaid owes what is still due', async () => {
+// The house in the night's words, counted in seats (D-114 criterion 7, issue 1326). Admission
+// sets DOOR on any booking, so a walk-up is known by its source and never by that status.
+describe('deskSummaryQuery reads the house in seats for one performance (D-114 criterion 7)', () => {
+  test('sold holds every seat, in the admitted ones, walk-ups the door-source ones, and unpaid owes what is due', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'a@example.invalid', 'A Pending')
       user(database, 'u-2', 'b@example.invalid', 'B Collected')
-      user(database, 'u-3', 'c@example.invalid', 'C Walkup')
+      user(database, 'u-3', 'c@example.invalid', 'C Booked And In')
+      user(database, 'u-4', 'd@example.invalid', 'D Walkup')
       reservation(database, 'r-1', seeded.performanceId, 'u-1', 'PENDING', 'AAA111')
       reservation(database, 'r-2', seeded.performanceId, 'u-2', 'COLLECTED', 'BBB222')
       reservation(database, 'r-3', seeded.performanceId, 'u-3', 'DOOR', 'CCC333')
+      reservation(database, 'r-4', seeded.performanceId, 'u-4', 'DOOR', 'DDD444')
+      reservation(database, 'r-5', seeded.performanceId, 'u-1', 'EXPIRED', 'EEE555')
+      reservation(database, 'r-6', seeded.performanceId, 'u-4', 'CANCELLED', 'FFF666')
+      reservation(database, 'r-7', seeded.performanceId, 'u-2', 'DOOR', 'GGG777')
       database.batch([
+        ['UPDATE reservations SET source = ? WHERE id = ?', 'DOOR', 'r-4'],
+        ['UPDATE reservations SET source = ? WHERE id = ?', 'DOOR', 'r-6'],
+        ['UPDATE reservations SET source = ? WHERE id = ?', 'DOOR', 'r-7'],
         ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
         ['INSERT INTO ticket_types (id, name, price, kind, access_kind) VALUES (?, ?, ?, ?, ?)', 'tt-access', 'Access', 0, 'SINGLE', 'ACCESS'],
         ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-pass', 'Pass admission', 0, 'PASS_ADMISSION'],
@@ -137,29 +146,38 @@ describe('deskSummaryQuery reads the five KPI tiles for one performance (D-132)'
       ticket(database, 't-2', 'r-2', seeded.performanceId, 'tt-standard', 900)
       ticket(database, 't-3', 'r-3', seeded.performanceId, 'tt-access', 0)
       ticket(database, 't-4', 'r-3', seeded.performanceId, 'tt-pass', 0)
+      ticket(database, 't-5', 'r-4', seeded.performanceId, 'tt-standard', 900)
+      ticket(database, 't-6', 'r-4', seeded.performanceId, 'tt-standard', 900)
+      ticket(database, 't-7', 'r-5', seeded.performanceId, 'tt-standard', 900)
+      // A refunded walk-up seat and a cancelled walk-up each pin one half of "still held".
+      ticket(database, 't-8', 'r-4', seeded.performanceId, 'tt-standard', 900)
+      database.batch([['UPDATE tickets SET refunded_at = unixepoch() WHERE id = ?', 't-8']])
+      ticket(database, 't-9', 'r-6', seeded.performanceId, 'tt-standard', 900)
+      // A pass holder admitted on the spot is a door-source booking, so it is a walk-up too.
+      ticket(database, 't-10', 'r-7', seeded.performanceId, 'tt-pass', 0)
 
       interface SummaryRow {
         capacity: number
-        reserved: number
-        collected: number
-        door: number
+        sold: number
+        admitted: number
+        walkUps: number
         unpaidCount: number
         unpaidOwedPence: number
         accessBookings: number
         passAdmissions: number
       }
       const [row] = read<SummaryRow>(database, deskSummaryQuery(seeded.performanceId))
-      // Reserved and door count tickets, not reservations: r-3's two tickets both count
-      // towards door, since neither was reserved ahead of the night.
+      // r-3 was booked ahead and admitted, so its two seats are in but are not walk-ups; r-4's two
+      // held seats and r-7's pass are both; the expired, cancelled and refunded hold no seat.
       expect(row).toMatchObject({
         capacity: 120,
-        reserved: 2,
-        collected: 1,
-        door: 2,
+        sold: 7,
+        admitted: 5,
+        walkUps: 3,
         unpaidCount: 1,
         unpaidOwedPence: 900,
         accessBookings: 1,
-        passAdmissions: 1,
+        passAdmissions: 2,
       })
     })
   })

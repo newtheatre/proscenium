@@ -1,11 +1,11 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { doorWordingFor } from './access-profiles'
-import { collectedSeatsSubquery, doorSeatsSubquery, heldAccessSeatsSubquery, heldSeatsOfKindSubquery, reservedSeatsSubquery, unpaidSeatsSubquery } from './capacity'
+import { admittedSeatsSubquery, heldAccessSeatsSubquery, heldSeatsOfKindSubquery, heldSeatsSubquery, unpaidSeatsSubquery, walkUpSeatsSubquery } from './capacity'
 import { configValue } from './configuration'
 import { pendingTicketCompRequestForReservation } from './ticket-comps'
 import { holdExpiresAt, looksLikeReference, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
-import type { DeskStatusFilter } from '#shared/utils/desk'
+import type { DeskHouse, DeskStatusFilter } from '#shared/utils/desk'
 import type { TicketTypeAccessKind } from '#shared/utils/ticket-types'
 import type { TicketCompRequest } from '#shared/utils/ticket-comps'
 import type { SQL } from 'drizzle-orm'
@@ -61,8 +61,7 @@ function searchPredicate(q: string | undefined): SQL {
   return sql` AND u.name LIKE ${contains(trimmed)} ESCAPE '\\'`
 }
 
-// The pills name the desk's own three states directly (Matt's ruling on #996): pending is
-// reserved and unpaid, collected is reserved and paid, door is a walk-up with no reservation.
+// One stored state per pill (D-114 criterion 7): unpaid, paid and not yet in, and in, a walk-up included.
 function statusPredicate(status: DeskStatusFilter): SQL {
   switch (status) {
     case 'PENDING': return sql` AND r.status = 'PENDING'`
@@ -157,28 +156,22 @@ export function deskTicketsQuery(reservationId: string): SQL {
   `
 }
 
-export interface DeskSummary {
-  capacity: number | null
-  reserved: number
-  collected: number
-  door: number
-  unpaidCount: number
-  unpaidOwedPence: number
+export interface DeskSummary extends DeskHouse {
   accessBookings: number
   passAdmissions: number
   reservationsReleaseAt: number
   onShift: string[]
 }
 
-// The five KPI tiles and the "Tonight" side card in one read, all scoped to the performance on
+// The house figures and the "Tonight" side card in one read, all scoped to the performance on
 // screen (D-114, D-132): a shift only ever needs to know about the house it is standing in front of.
 export function deskSummaryQuery(performanceId: string): SQL {
   return sql`
     SELECT p.starts_at AS startsAt, coalesce(p.capacity_override, v.capacity) AS capacity,
            p.hold_release_minutes_before AS holdReleaseMinutesBefore,
-           ${reservedSeatsSubquery(sql`p.id`)} AS reserved,
-           ${collectedSeatsSubquery(sql`p.id`)} AS collected,
-           ${doorSeatsSubquery(sql`p.id`)} AS door,
+           ${heldSeatsSubquery(sql`p.id`)} AS sold,
+           ${admittedSeatsSubquery(sql`p.id`)} AS admitted,
+           ${walkUpSeatsSubquery(sql`p.id`)} AS walkUps,
            ${unpaidSeatsSubquery(sql`p.id`)} AS unpaidCount,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t JOIN reservations r ON r.id = t.reservation_id
               WHERE t.performance_id = p.id AND t.refunded_at IS NULL AND r.status = 'PENDING') AS unpaidOwedPence,

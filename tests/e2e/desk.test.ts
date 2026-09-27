@@ -620,7 +620,10 @@ describe.skipIf(skip !== null)('selling a walk-up from the desk screen (D-115 cr
       await waitFor(view, `document.querySelector('[data-test="desk-walk-up-total"]')?.innerText.includes('£22.00')`, 15_000)
 
       await click(view, '[data-test="desk-walk-up-sell"]')
-      await waitFor(view, `document.querySelector('[data-test="desk-summary-door"]')?.innerText.includes('2')`, 30_000)
+      // Two seats sold at the desk are two walk-ups and two in (D-114 criterion 7, issue 1326).
+      await waitFor(view, `document.querySelector('[data-test="desk-summary-walk-ups"]')?.innerText.includes('2')`, 30_000)
+      expect(await textOf(view, '[data-test="desk-summary-in"]')).toContain('2')
+      expect(await textOf(view, '[data-test="desk-summary-sold"]')).toContain('2')
 
       const sold = queryAll<{ source: string, status: string }>(
         'SELECT source, status FROM reservations WHERE performance_id = ?', performanceId,
