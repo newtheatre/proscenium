@@ -32,7 +32,7 @@ without the buttons, and the request queue is not in their navigation at all.
   ::card{icon="i-lucide-construction" title="Closures" to="/docs/spaces/closures"}
   Shutting a room, or every room, for a stated reason, and what that does to bookings.
   ::
-  ::card{icon="i-lucide-map-pin" title="Students' Union rooms" to="/docs/spaces/other-rooms"}
+  ::card{icon="i-lucide-map-pin" title="Students' Union rooms" to="/docs/spaces/students-union-rooms"}
   The catalogue of rooms the Students' Union manages, and what we have learned about each one.
   ::
   ::card{icon="i-lucide-chart-column" title="Utilisation" to="/docs/spaces/utilisation"}
@@ -53,5 +53,5 @@ decides which room we get.
 
 - [Book a room](/docs/my-nnt/book-a-room)
 - [My room bookings](/docs/my-nnt/my-room-bookings)
-- [Ask for a Students' Union room](/docs/my-nnt/book-a-room-not-listed-here), the member's side of the catalogue
+- [Ask for a Students' Union room](/docs/my-nnt/ask-for-a-students-union-room), the member's side of the catalogue
 - [Roles and permissions](/docs/getting-started/roles-and-permissions)

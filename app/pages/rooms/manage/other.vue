@@ -8,7 +8,7 @@ import { SU_ROOMS } from '#shared/utils/external-requests'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 // The title is the one SU_ROOMS says; definePageMeta is extracted at build time and takes no import.
-definePageMeta({ layout: 'console', title: 'Students\' Union rooms', middleware: 'console', docs: '/docs/spaces/other-rooms' })
+definePageMeta({ layout: 'console', title: 'Students\' Union rooms', middleware: 'console', docs: '/docs/spaces/students-union-rooms' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

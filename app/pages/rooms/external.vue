@@ -7,7 +7,7 @@ import { saysDayLong } from '#shared/utils/when'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { z } from 'zod'
 
-definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/book-a-room-not-listed-here' })
+definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/ask-for-a-students-union-room' })
 
 interface Failure { reason: string, says: string }
 
