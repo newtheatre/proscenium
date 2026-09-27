@@ -17,16 +17,19 @@ export const RESERVATIONS = 'reservations'
 
 const holding = sql.raw(HOLDING_STATUSES.map(status => `'${status}'`).join(', '))
 
+// Every count in this file aliases its own tables privately: a bare `r` or `t` would capture a
+// caller's, which is how a party once read the whole house (#1295).
+
 // A ticket occupies a seat while its reservation still holds one and it has not been refunded.
 // `except` leaves one reservation's own seats out, which is what makes a whole order atomic below.
 export function heldSeatsSubquery(performanceId: SQL, except?: string): SQL {
-  const ours = except === undefined ? sql`` : sql` AND t.reservation_id <> ${except}`
+  const ours = except === undefined ? sql`` : sql` AND held_t.reservation_id <> ${except}`
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.status IN (${holding})${ours}
+    SELECT count(*) FROM ${sql.raw(TICKETS)} held_t
+    JOIN ${sql.raw(RESERVATIONS)} held_r ON held_r.id = held_t.reservation_id
+    WHERE held_t.performance_id = ${performanceId}
+      AND held_t.refunded_at IS NULL
+      AND held_r.status IN (${holding})${ours}
   )`
 }
 
@@ -35,7 +38,7 @@ export function heldSeatsQuery(performanceId: string): SQL {
 }
 
 // The same predicate correlated to one booking: its party, where a row count would call a refunded
-// seat somebody arriving. Its own aliases, so a caller's `r.id` binds to the caller's row (#1295).
+// seat somebody arriving.
 export function heldSeatsForReservation(reservationId: SQL): SQL {
   return sql`(
     SELECT count(*) FROM ${sql.raw(TICKETS)} party_t
@@ -55,23 +58,23 @@ export function heldSeatsColumn(alias: string): SQL {
 // A ticket standing on a pass admission (D-125): it owes nothing, though its booking stays PENDING
 // (issue 1390). The one test every "made with a pass" and "still owes" reading shares.
 export function ticketOnPass(ticketId: SQL): SQL {
-  return sql`EXISTS (SELECT 1 FROM pass_admissions pa WHERE pa.ticket_id = ${ticketId})`
+  return sql`EXISTS (SELECT 1 FROM pass_admissions pass_a WHERE pass_a.ticket_id = ${ticketId})`
 }
 
 export function passBookingColumn(alias: string): SQL {
-  return sql`EXISTS (SELECT 1 FROM ${sql.raw(TICKETS)} pt WHERE pt.reservation_id = ${sql.raw(alias)}.id AND ${ticketOnPass(sql`pt.id`)})`
+  return sql`EXISTS (SELECT 1 FROM ${sql.raw(TICKETS)} pass_t WHERE pass_t.reservation_id = ${sql.raw(alias)}.id AND ${ticketOnPass(sql`pass_t.id`)})`
 }
 
 // Seats held but not yet paid for: a PENDING reservation is somebody coming who still owes the
 // desk, which is the queue D-132 criterion 2 names. A pass seat owes nothing, so it is not one.
 export function unpaidSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.status = 'PENDING'
-      AND NOT ${ticketOnPass(sql`t.id`)}
+    SELECT count(*) FROM ${sql.raw(TICKETS)} unpaid_t
+    JOIN ${sql.raw(RESERVATIONS)} unpaid_r ON unpaid_r.id = unpaid_t.reservation_id
+    WHERE unpaid_t.performance_id = ${performanceId}
+      AND unpaid_t.refunded_at IS NULL
+      AND unpaid_r.status = 'PENDING'
+      AND NOT ${ticketOnPass(sql`unpaid_t.id`)}
   )`
 }
 
@@ -85,11 +88,11 @@ export function unpaidSeatsColumn(alias: string): SQL {
 // "in" and never a count of walk-ups (D-114 criterion 7, issue 1326).
 export function admittedSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.status = 'DOOR'
+    SELECT count(*) FROM ${sql.raw(TICKETS)} admitted_t
+    JOIN ${sql.raw(RESERVATIONS)} admitted_r ON admitted_r.id = admitted_t.reservation_id
+    WHERE admitted_t.performance_id = ${performanceId}
+      AND admitted_t.refunded_at IS NULL
+      AND admitted_r.status = 'DOOR'
   )`
 }
 
@@ -97,12 +100,12 @@ export function admittedSeatsSubquery(performanceId: SQL): SQL {
 // which the night report counts beside "in" without counting a walk-up sold but not yet in (D-126).
 export function admittedWalkUpSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.status = 'DOOR'
-      AND r.source = 'DOOR'
+    SELECT count(*) FROM ${sql.raw(TICKETS)} walkin_t
+    JOIN ${sql.raw(RESERVATIONS)} walkin_r ON walkin_r.id = walkin_t.reservation_id
+    WHERE walkin_t.performance_id = ${performanceId}
+      AND walkin_t.refunded_at IS NULL
+      AND walkin_r.status = 'DOOR'
+      AND walkin_r.source = 'DOOR'
   )`
 }
 
@@ -110,11 +113,11 @@ export function admittedWalkUpSeatsSubquery(performanceId: SQL): SQL {
 // falls as the door admits people (issue 1296). A pass seat owes nothing though it stays PENDING.
 export function noShowSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND (r.status IN ('NO_SHOW', 'COLLECTED') OR (r.status = 'PENDING' AND ${ticketOnPass(sql`t.id`)}))
+    SELECT count(*) FROM ${sql.raw(TICKETS)} noshow_t
+    JOIN ${sql.raw(RESERVATIONS)} noshow_r ON noshow_r.id = noshow_t.reservation_id
+    WHERE noshow_t.performance_id = ${performanceId}
+      AND noshow_t.refunded_at IS NULL
+      AND (noshow_r.status IN ('NO_SHOW', 'COLLECTED') OR (noshow_r.status = 'PENDING' AND ${ticketOnPass(sql`noshow_t.id`)}))
   )`
 }
 
@@ -122,12 +125,12 @@ export function noShowSeatsSubquery(performanceId: SQL): SQL {
 // known by the booking's source rather than by its status, and still held.
 export function walkUpSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.source = 'DOOR'
-      AND r.status IN (${holding})
+    SELECT count(*) FROM ${sql.raw(TICKETS)} walkup_t
+    JOIN ${sql.raw(RESERVATIONS)} walkup_r ON walkup_r.id = walkup_t.reservation_id
+    WHERE walkup_t.performance_id = ${performanceId}
+      AND walkup_t.refunded_at IS NULL
+      AND walkup_r.source = 'DOOR'
+      AND walkup_r.status IN (${holding})
   )`
 }
 
@@ -135,26 +138,26 @@ export function walkUpSeatsSubquery(performanceId: SQL): SQL {
 // until the same holding predicate the capacity rule uses says it is (D-105 criterion 2).
 export function heldSeatsOfKindSubquery(performanceId: SQL, kind: string): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    JOIN ticket_types tt ON tt.id = t.ticket_type_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.status IN (${holding})
-      AND tt.kind = ${kind}
+    SELECT count(*) FROM ${sql.raw(TICKETS)} kind_t
+    JOIN ${sql.raw(RESERVATIONS)} kind_r ON kind_r.id = kind_t.reservation_id
+    JOIN ticket_types kind_tt ON kind_tt.id = kind_t.ticket_type_id
+    WHERE kind_t.performance_id = ${performanceId}
+      AND kind_t.refunded_at IS NULL
+      AND kind_r.status IN (${holding})
+      AND kind_tt.kind = ${kind}
   )`
 }
 
 // Held seats whose type carries an access kind at all, whichever one (D-128).
 export function heldAccessSeatsSubquery(performanceId: SQL): SQL {
   return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} t
-    JOIN ${sql.raw(RESERVATIONS)} r ON r.id = t.reservation_id
-    JOIN ticket_types tt ON tt.id = t.ticket_type_id
-    WHERE t.performance_id = ${performanceId}
-      AND t.refunded_at IS NULL
-      AND r.status IN (${holding})
-      AND tt.access_kind IS NOT NULL
+    SELECT count(*) FROM ${sql.raw(TICKETS)} access_t
+    JOIN ${sql.raw(RESERVATIONS)} access_r ON access_r.id = access_t.reservation_id
+    JOIN ticket_types access_tt ON access_tt.id = access_t.ticket_type_id
+    WHERE access_t.performance_id = ${performanceId}
+      AND access_t.refunded_at IS NULL
+      AND access_r.status IN (${holding})
+      AND access_tt.access_kind IS NOT NULL
   )`
 }
 
@@ -162,8 +165,8 @@ export function heldAccessSeatsSubquery(performanceId: SQL): SQL {
 // id list read back from a result set (0006).
 export function showUnpaidSeatsColumn(alias: string): SQL {
   return sql`(
-    SELECT coalesce(sum(${unpaidSeatsSubquery(sql`sup.id`)}), 0)
-    FROM performances sup WHERE sup.show_id = ${sql.raw(alias)}.id
+    SELECT coalesce(sum(${unpaidSeatsSubquery(sql`show_p.id`)}), 0)
+    FROM performances show_p WHERE show_p.show_id = ${sql.raw(alias)}.id
   )`
 }
 
