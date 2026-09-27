@@ -3,7 +3,7 @@ import { officersWithoutRefundApprovalQuery, refundPreviewRoles, roleHoldersWith
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// J-105 criterion 1: REFUND_PAID_REQUIRES_MANAGER's own preview, against the real migrations.
+// J-105 criterion 1: the refund and second-factor role previews, against the real migrations.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()

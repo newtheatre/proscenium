@@ -83,6 +83,12 @@ describe('the settings screen reads as rules', () => {
     expect(await read(SETTINGS)).toContain(':fixed="roleFloor(setting.key)"')
     expect(await read('app/components/settings/RolesField.vue')).toMatch(/disabled: props\.fixed/)
   })
+
+  // A list stored below the floor would otherwise refuse every save with no way to put it right.
+  test('a floor role stored off the list can be ticked back, so the save that repairs it is possible', async () => {
+    expect(await read('app/components/settings/RolesField.vue'))
+      .toContain('disabled: props.fixed.includes(role) && model.value.includes(role)')
+  })
 })
 
 describe('the backups screen says where a restore happens (J-107 criterion 6)', () => {

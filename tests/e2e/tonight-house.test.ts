@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue, ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -38,15 +39,15 @@ function write(statement: string, ...parameters: unknown[]): void {
 const send = (method: string, path: string, body?: unknown, as = admin.cookie): Promise<Response> =>
   request(app, method, path, body, as)
 
-// The officer carries no authenticator; narrowing PRIVILEGED_ROLES for one request is the
-// shortcut tests/e2e/access-tickets.test.ts takes to reach the verification route.
+// The officer carries no authenticator. PRIVILEGED_ROLES is narrowed in the database for one
+// request, since the settings route refuses a list below its floor (A-112, issue 1357).
 async function withoutSecondFactor<T>(fn: () => Promise<T>): Promise<T> {
-  await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN'] })
+  overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
   try {
     return await fn()
   }
   finally {
-    await send('PUT', '/api/admin/config/PRIVILEGED_ROLES', { value: ['ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER'] })
+    clearConfigOverride(app, 'PRIVILEGED_ROLES')
   }
 }
 

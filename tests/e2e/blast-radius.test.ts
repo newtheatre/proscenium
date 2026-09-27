@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { CONFIG_KEYS } from '#shared/utils/config'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { clearConfigOverride } from '#tests/helpers/config'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -99,16 +100,6 @@ describe.skipIf(skip !== null)('saving a flagged key needs a typed confirmation 
 describe.skipIf(skip !== null)('the flag list and the second-factor roles', () => {
   const FLOOR = CONFIG_KEYS.PRIVILEGED_ROLES.default
 
-  function clear(key: string): void {
-    const database = new Database(app.databaseFile)
-    try {
-      database.query('DELETE FROM config WHERE key = ?').run(key)
-    }
-    finally {
-      database.close()
-    }
-  }
-
   test('the flag list is not a setting', async () => {
     expect((await send('PUT', '/api/admin/config/WIDE_BLAST_RADIUS_KEYS', { value: [] })).status).toBe(404)
     const settings = await (await send('GET', '/api/admin/config')).json() as { settings: { key: string, wideBlastRadius: boolean }[] }
@@ -129,7 +120,7 @@ describe.skipIf(skip !== null)('the flag list and the second-factor roles', () =
       expect(answered.status).toBe(200)
     }
     finally {
-      clear('PRIVILEGED_ROLES')
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
     }
   })
 

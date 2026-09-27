@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { CONFIG_KEYS, CONFIG_KEY_NAMES } from '#shared/utils/config'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
-import { overrideConfig } from '#tests/helpers/config'
+import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -84,16 +84,6 @@ function auditFor(key: string): { detail: string } | null {
   }
 }
 
-function clearOverride(key: string): void {
-  const database = new Database(app.databaseFile)
-  try {
-    database.query('DELETE FROM config WHERE key = ?').run(key)
-  }
-  finally {
-    database.close()
-  }
-}
-
 describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
   test('every key is listed with its default and whether it is enforced', async () => {
     const listed = await settings()
@@ -126,7 +116,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect(policy.minLength).toBe(raised)
     }
     finally {
-      clearOverride('PASSWORD_MIN_LENGTH')
+      clearConfigOverride(app, 'PASSWORD_MIN_LENGTH')
     }
   })
 
@@ -137,7 +127,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect(JSON.parse(entry!.detail)).toMatchObject({ key: 'BAR_TAB_CAP_PENCE', changes: { value: { from: 2000, to: 2500 } } })
     }
     finally {
-      clearOverride('REFUND_UNPAID_CANCELLATION_FREE')
+      clearConfigOverride(app, 'REFUND_UNPAID_CANCELLATION_FREE')
     }
   })
 
@@ -153,7 +143,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect((await settingFor('NIGHT_REPORT_RECIPIENTS')).value).toEqual(['duty@newtheatre.org.uk'])
     }
     finally {
-      clearOverride('NIGHT_REPORT_RECIPIENTS')
+      clearConfigOverride(app, 'NIGHT_REPORT_RECIPIENTS')
     }
   })
 
@@ -169,7 +159,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect((await settingFor('BAR_TAB_CAP_PENCE')).people).toBeNull()
     }
     finally {
-      clearOverride('BAR_AUTHORISED_TAB_HOLDERS')
+      clearConfigOverride(app, 'BAR_AUTHORISED_TAB_HOLDERS')
     }
   })
 
@@ -180,7 +170,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
       expect(JSON.parse(auditFor('BAR_AUTHORISED_TAB_ROLES')!.detail)).toMatchObject({ changes: { value: { from: [], to: ['COMMITTEE'] } } })
     }
     finally {
-      clearOverride('BAR_AUTHORISED_TAB_ROLES')
+      clearConfigOverride(app, 'BAR_AUTHORISED_TAB_ROLES')
     }
   })
 
@@ -296,8 +286,8 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       expect((await settingFor('REFUND_UNPAID_CANCELLATION_FREE')).value).toBe(false)
     }
     finally {
-      clearOverride('REFUND_UNPAID_CANCELLATION_FREE')
-      clearOverride('YEAR_START')
+      clearConfigOverride(app, 'REFUND_UNPAID_CANCELLATION_FREE')
+      clearConfigOverride(app, 'YEAR_START')
       view.close()
     }
   }, CASE_TIMEOUT_MS)
@@ -341,7 +331,7 @@ describe.skipIf(skip !== null)('the settings screen', () => {
       expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="bank-holiday-sync-now"]\'))')).toBe(false)
     }
     finally {
-      clearOverride('PRIVILEGED_ROLES')
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
       view.close()
     }
   }, CASE_TIMEOUT_MS)
