@@ -811,6 +811,96 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
   }, 120_000)
 })
 
+// Issue 1520: the show-night column is a phone's width at any window, but a line took its desk
+// layout from the window, and at a desk the item's name was crushed under its own count fields.
+describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is given (issue 1520)', () => {
+  interface Box { left: number, right: number, top: number, bottom: number }
+  interface LineLayout { name: Box, fields: Box, figures: Box, inputs: number[] }
+
+  // Room for a count of 1750, or the placeholder "Open, ml", without clipping either.
+  const USABLE_FIELD_PX = 96
+
+  // The name and the figures are measured by their text, which is what spills out of a crushed
+  // column; the fields by their box.
+  const layoutOf = (screen: Bun.WebView, itemId: string): Promise<LineLayout> => screen.evaluate<LineLayout>(`(() => {
+    const line = document.querySelector('[data-test="line-${itemId}"]')
+    const plain = rect => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom })
+    const text = element => { const range = document.createRange(); range.selectNodeContents(element); return plain(range.getBoundingClientRect()) }
+    return {
+      name: text(line.children[0]),
+      fields: plain(line.children[1].getBoundingClientRect()),
+      figures: text(line.children[2]),
+      inputs: [...line.children[1].querySelectorAll('input')].map(input => input.getBoundingClientRect().width),
+    }
+  })()`)
+
+  const overlaps = (a: Box, b: Box): boolean =>
+    a.right > a.left && b.right > b.left && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+
+  async function signedIn(width: number, height: number): Promise<Bun.WebView> {
+    const screen = await openSignedOutView(app.baseURL, { width, height })
+    await visit(screen, `${app.baseURL}/sign-in`)
+    await fill(screen, 'form input[type="email"]', barManager.email)
+    await fill(screen, 'form input[type="password"]', barPassword)
+    await click(screen, 'form button[type="submit"]')
+    await waitFor(screen, `document.querySelector('[data-test="account-menu"]')`)
+    return screen
+  }
+
+  test('on tonight\'s screen, at a desk and on a phone, no part of a line sits on another', async () => {
+    const uncounted = await anItem({ containerMl: 750 })
+    const counted = await anItem({ containerMl: 700 })
+    await deliver(counted.id, 2100)
+    const opened = await open()
+    expect((await count(opened.stocktake.id, [{ itemId: counted.id, counted: 1750 }])).status).toBe(200)
+
+    const screen = await signedIn(1280, 800)
+    try {
+      for (const [width, height] of [[1280, 800], [360, 740]] as const) {
+        await screen.resize(width, height)
+        await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${uncounted.id}"]`)
+        await waitFor(screen, `document.querySelector('[data-test="variance-${counted.id}"]')`)
+        for (const item of [uncounted, counted]) {
+          const line = await layoutOf(screen, item.id)
+          const at = `${width}px, ${item.name}`
+          expect(`${at}: name over fields ${overlaps(line.name, line.fields)}`).toBe(`${at}: name over fields false`)
+          expect(`${at}: name over figures ${overlaps(line.name, line.figures)}`).toBe(`${at}: name over figures false`)
+          expect(`${at}: fields over figures ${overlaps(line.fields, line.figures)}`).toBe(`${at}: fields over figures false`)
+          expect(line.inputs).toHaveLength(2)
+          for (const input of line.inputs) expect(input).toBeGreaterThanOrEqual(USABLE_FIELD_PX)
+        }
+      }
+    }
+    finally {
+      screen.close()
+    }
+    await apply(opened.stocktake.id)
+  }, 120_000)
+
+  // The console's column is wide at a desk, so there the line keeps its three columns side by side.
+  test('on the console at a desk, a line\'s name, fields and figures still share one row', async () => {
+    const item = await anItem({ containerMl: 700 })
+    await deliver(item.id, 2100)
+    const opened = await open()
+    expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 1750 }])).status).toBe(200)
+
+    const screen = await signedIn(1280, 800)
+    try {
+      await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      await waitFor(screen, `document.querySelector('[data-test="variance-${item.id}"]')`)
+      const line = await layoutOf(screen, item.id)
+      expect(line.fields.left).toBeGreaterThanOrEqual(line.name.right)
+      expect(line.figures.left).toBeGreaterThanOrEqual(line.fields.right)
+      expect(line.fields.top).toBeLessThan(line.name.bottom)
+      expect(line.figures.top).toBeLessThan(line.fields.bottom)
+    }
+    finally {
+      screen.close()
+    }
+    await apply(opened.stocktake.id)
+  }, 120_000)
+})
+
 describe.skipIf(skip !== null)('the suggested order list compares live on-hand to par (F-120)', () => {
   test('an item below par is listed with its shortfall, grouped by category', async () => {
     const category = named('Spirits')

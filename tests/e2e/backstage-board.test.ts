@@ -7,7 +7,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { LAST_NIGHTS_BOARD } from '#shared/utils/backstage'
 import { daysAfter } from '#shared/utils/membership'
 import { currentShowNight } from '#shared/utils/show-night'
-import { click, fill, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -337,6 +337,69 @@ describe.skipIf(skip !== null)('the wings read the board the way front of house 
     }
     finally {
       view.close()
+    }
+  }, 120_000)
+})
+
+// Issue 1520: both ends read the board in a column a phone wide at any window, so at a desk the
+// two ends stack as they do on a phone, rather than splitting a phone's width in two.
+describe.skipIf(skip !== null)('the current state fits the column it is given (issue 1520)', () => {
+  const FOH_CALL = 'Front of house clear for a while yet'
+  const WINGS_CALL = 'Standing by for the second half beginners'
+  const BOTH_CALLS = `['${FOH_CALL}', '${WINGS_CALL}'].every(call => document.querySelector('[data-test="board-current"]')?.innerText.includes(call))`
+  // The reading end's own call first, the other end's second.
+  const ENDS = `[...document.querySelector('[data-test="board-current"]').children].map(end => { const box = end.getBoundingClientRect(); return { left: box.left, right: box.right, top: box.top, bottom: box.bottom } })`
+
+  interface Box { left: number, right: number, top: number, bottom: number }
+
+  const stacked = ([own, other]: Box[]): void => {
+    expect(other!.top).toBeGreaterThanOrEqual(own!.bottom)
+    expect(other!.right - other!.left).toBeGreaterThanOrEqual(own!.right - own!.left)
+  }
+
+  test('at a desk, the duty manager and the wings both read the two ends stacked', async () => {
+    const password = generatePassword()
+    const manager = await registerMember(app, 'board-desk-dm', password)
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)')
+        .run('board-desk-dm-shift', 'performance-board-house', 'DUTY_MANAGER', manager.id, 'CONFIRMED')
+    }
+    finally {
+      database.close()
+    }
+    const composedAt = Math.floor(Date.now() / 1000)
+    expect((await send('POST', '/api/tonight/board/messages', { body: FOH_CALL, composedAt }, foh.cookie)).status).toBe(200)
+    const { deviceCookie } = await joinAs('Stage left desk')
+    expect((await request(app, 'POST', '/api/board/messages', { body: WINGS_CALL, composedAt }, deviceCookie)).status).toBe(200)
+    const { code } = await (await send('GET', '/api/tonight/board/code', undefined, foh.cookie)).json() as { code: string }
+
+    const wings = await openView({ width: 1280, height: 800 })
+    try {
+      await visit(wings, `${app.baseURL}/board`, '[data-test="board-join-form"]')
+      await fill(wings, '[data-test="board-code-input"]', code)
+      await fill(wings, '[data-test="board-label-input"]', 'Wide wings screen')
+      await click(wings, '[data-test="board-join-submit"]')
+      await waitFor(wings, BOTH_CALLS, 30_000)
+      stacked(await wings.evaluate<Box[]>(ENDS))
+    }
+    finally {
+      wings.close()
+    }
+
+    const desk = await openSignedOutView(app.baseURL, { width: 1280, height: 800 })
+    try {
+      await visit(desk, `${app.baseURL}/sign-in`)
+      await fill(desk, 'form input[type="email"]', manager.email)
+      await fill(desk, 'form input[type="password"]', password)
+      await click(desk, 'form button[type="submit"]')
+      await waitFor(desk, `document.querySelector('[data-test="account-menu"]')`)
+      await visit(desk, `${app.baseURL}/tonight/board`, '[data-test="board-current"]')
+      await waitFor(desk, BOTH_CALLS, 30_000)
+      stacked(await desk.evaluate<Box[]>(ENDS))
+    }
+    finally {
+      desk.close()
     }
   }, 120_000)
 })

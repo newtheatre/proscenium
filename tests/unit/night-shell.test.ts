@@ -16,6 +16,54 @@ const component = (name: string): Promise<string> => read(`app/components/${name
 // Anything that only exists under a pointer, or needs a second finger or a held press.
 const POINTER_ONLY = /\bhover:|group-hover:|@(mouseenter|mouseover|mouseleave|dblclick|contextmenu|touchstart|touchend)\b|v-on:(mouseenter|mouseover|contextmenu)/
 
+// A window-width variant, `sm:` to `2xl:` and their `max-` forms; `@md:` is a container's and passes.
+const VIEWPORT_VARIANT = /(?<![\w@-])(?:max-)?(?:sm|md|lg|xl|2xl):/
+
+// NightScreen's `max-w-md`, and Tailwind's container sizes, both in rem.
+const NIGHT_COLUMN_REM = 28
+const CONTAINER_REM: Record<string, number> = {
+  '3xs': 16, '2xs': 18, 'xs': 20, 'sm': 24, 'md': 28, 'lg': 32, 'xl': 36,
+  '2xl': 42, '3xl': 48, '4xl': 56, '5xl': 64, '6xl': 72, '7xl': 80,
+}
+
+const STOCKTAKE_COUNTS = 'app/components/stocktake/Counts.vue'
+// What the flexible first column keeps for the item's name once the fixed columns are paid for.
+const ROOM_FOR_A_NAME_REM = 10
+
+// Nuxt names a nested component by its folders then its file, dropping a repeated prefix.
+function componentFiles(): Map<string, string> {
+  const named = new Map<string, string>()
+  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/components', onlyFiles: true })) {
+    const parts = entry.replaceAll('\\', '/').replace(/\.vue$/, '').split('/')
+    const file = parts.pop()!
+    const prefix = parts.map(part => part.split('-').map(word => word[0]!.toUpperCase() + word.slice(1)).join('')).join('')
+    named.set(file.startsWith(prefix) ? file : `${prefix}${file}`, `app/components/${entry.replaceAll('\\', '/')}`)
+  }
+  return named
+}
+
+// Every file drawn inside the tonight layout's column: the layout, each page on it, and every
+// component those reach by tag.
+async function tonightTree(): Promise<string[]> {
+  const named = componentFiles()
+  const queue = [LAYOUT]
+  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/pages', onlyFiles: true })) {
+    const path = `app/pages/${entry.replaceAll('\\', '/')}`
+    if (/layout:\s*'tonight'/.test(await read(path))) queue.push(path)
+  }
+  const seen = new Set<string>()
+  while (queue.length > 0) {
+    const file = queue.pop()!
+    if (seen.has(file)) continue
+    seen.add(file)
+    const source = await read(file)
+    for (const [name, path] of named) {
+      if (new RegExp(`<(?:Lazy)?${name}[\\s/>]`).test(source)) queue.push(path)
+    }
+  }
+  return [...seen].sort()
+}
+
 describe('the stale label (K-102, "last synced HH:MM")', () => {
   test('is London wall-clock time in summer', () => {
     expect(lastSyncedLabel(new Date('2026-07-15T18:42:00Z'))).toBe('Last synced 19:42')
@@ -106,6 +154,37 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     }
     expect(offenders).toEqual([])
     expect(await component('NightScreen')).toMatch(/\bmax-w-/)
+  })
+
+  // Issue 1520: the column is capped at any window width, so `sm:` fired on a desk while the column
+  // was still a phone's, and a stocktake line's three columns crushed the item's name to nothing.
+  test('inside the capped column, a layout keys to its container and never to the window', async () => {
+    const files = await tonightTree()
+    expect(files).toContain(STOCKTAKE_COUNTS)
+    const offenders: string[] = []
+    for (const file of files) {
+      const source = await read(file)
+      source.split('\n').forEach((line, index) => {
+        if (VIEWPORT_VARIANT.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`)
+      })
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('a stocktake line takes its three columns only where its container holds them', async () => {
+    const source = await read(STOCKTAKE_COUNTS)
+    expect(source).toMatch(/class="@container\b/)
+    const line = source.match(/class="([^"]*@[\w-]+:grid-cols-[^"]*)"/)?.[1] ?? ''
+    const grid = line.match(/@([\w-]+):grid-cols-\[minmax\(0,1fr\)((?:_minmax\(0,[\d.]+rem\))+)\]/)
+    expect(grid).not.toBeNull()
+    const [, size, fixed] = grid!
+    const fixedRem = [...fixed!.matchAll(/([\d.]+)rem/g)].reduce((sum, [, rem]) => sum + Number(rem), 0)
+    const gaps = fixed!.split('_').length - 1
+    // Tailwind spacing is a quarter rem a step; the list's border is a pixel each side.
+    const step = (utility: string): number => Number(line.match(new RegExp(`(?:^|\\s)${utility}-(\\d+)(?:\\s|$)`))?.[1] ?? 0) / 4
+    const needed = fixedRem + gaps * step('gap') + 2 * step('p') + 2 / 16 + ROOM_FOR_A_NAME_REM
+    expect(CONTAINER_REM[size!]).toBeGreaterThanOrEqual(needed)
+    expect(CONTAINER_REM[size!]).toBeGreaterThan(NIGHT_COLUMN_REM)
   })
 
   // The hub is the exception, and only the hub: it is the navigation rather than a screen with
