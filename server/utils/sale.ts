@@ -6,7 +6,7 @@ import { createError } from 'h3'
 import { PRODUCT_COLUMNS, choiceGroupOptionsQuery, componentsQuery, onHandOfItems, resolvedPriceColumns } from '#server/utils/bar'
 import { stockCounted, tillServings } from '#server/utils/bar-linkage'
 import { chunked } from '#shared/utils/approvals'
-import { NOT_ENOUGH_STOCK, checkIdFor, choiceWithStock, stockShortOf, variantStock } from '#shared/utils/sale'
+import { NOT_ENOUGH_STOCK, checkIdFor, choiceWithStock, pouredNames, saysPouredLines, stockShortOf, variantStock } from '#shared/utils/sale'
 import { ageCheckConstraintRefusal } from '#shared/utils/age-checks'
 import { discountedPence } from '#shared/utils/discounts'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
@@ -441,6 +441,18 @@ function collectionStatements(reservationId: string, actorId: string, totalPence
   ]
 }
 
+// No sale or comp takes a restricted line without an outcome on record first (F-106.1, F-106.5),
+// named as poured; a till holding a catalogue from before an item was switched on reads it again.
+function refuseWithoutAgeCheck(restricted: number[], priced: PricedLine[], ageCheck: InlineAgeCheckInput | null, verb: 'charged' | 'given'): void {
+  if (restricted.length === 0 || ageCheck) return
+  const names = pouredNames(restricted.map(index => priced[index]!))
+  throw createError({
+    statusCode: 409,
+    statusMessage: `${names.join(' and ')} ${names.length === 1 ? 'needs' : 'need'} a Challenge 25 outcome before this can be ${verb}`,
+    data: { ageCheckFor: names },
+  })
+}
+
 // A refused Challenge 25 outcome drops every restricted line rather than the whole basket: what
 // is left may still be sold, at its own, smaller total (F-106 criterion 3).
 function saleableAfterAgeCheck(
@@ -564,16 +576,7 @@ async function prepareSale(
   const ticketsPence = bookings.reduce((sum, booking) => sum + booking.owedPence, 0)
   const walkUpsPence = walkUps.reduce((sum, walkUp) => sum + walkUp.amountPence, 0)
 
-  // No route sells a restricted line without an outcome on record first (F-106 criteria 1, 5).
-  if (restricted.length > 0 && !ageCheck) {
-    const names = [...new Set(restricted.map(index => priced[index]!.productName))]
-    throw createError({
-      statusCode: 409,
-      statusMessage: `${names.join(' and ')} ${names.length === 1 ? 'needs' : 'need'} a Challenge 25 outcome before this can be charged`,
-      // A till holding a catalogue from before an item was switched on reads it again and asks.
-      data: { ageCheckFor: names },
-    })
-  }
+  refuseWithoutAgeCheck(restricted, priced, ageCheck, 'charged')
 
   const soldResolved = sold.map(index => resolved[index]!)
   const soldPriced = sold.map(index => priced[index]!)
@@ -869,7 +872,7 @@ function ageCheckStatements(
     idType: ageCheck.idType,
     reason: ageCheck.reason,
     description: ageCheck.description,
-    product: [...new Set(restricted.map(index => priced[index]!.productName))].join(', '),
+    product: saysPouredLines(restricted.map(index => priced[index]!)),
     notes: ageCheck.notes,
   }, id)
   const audit = db.insert(schema.auditLog).values(auditEntry({ actorId, action: 'age-check.logged', target: `age-check:${id}`, detail: { outcome: ageCheck.outcome } }))
@@ -915,14 +918,7 @@ export async function commitCompSale(
   const { resolved, priced } = await resolveSale(lines, on, null)
   const { restricted, sold } = saleableAfterAgeCheck(resolved, priced, ageCheck)
 
-  if (restricted.length > 0 && !ageCheck) {
-    const names = [...new Set(restricted.map(index => priced[index]!.productName))]
-    throw createError({
-      statusCode: 409,
-      statusMessage: `${names.join(' and ')} ${names.length === 1 ? 'needs' : 'need'} a Challenge 25 outcome before this can be given`,
-      data: { ageCheckFor: names },
-    })
-  }
+  refuseWithoutAgeCheck(restricted, priced, ageCheck, 'given')
 
   const soldResolved = sold.map(index => resolved[index]!)
   const soldPriced = sold.map(index => priced[index]!)

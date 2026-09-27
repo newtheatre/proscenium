@@ -3,6 +3,7 @@ import { computed, effectScope, nextTick, ref } from 'vue'
 import { useTillBasket } from '#composables/useTillBasket'
 import type { TillBasketDeps } from '#composables/useTillBasket'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
+import { AGE_CHECK_PRODUCT_MAX } from '#shared/utils/age-checks'
 import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import type { PricedBasket, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
 
@@ -527,8 +528,48 @@ describe('Check ID follows what the line pours, not the product switch alone (is
 
     basket.tapVariant('Cola', glass)
     basket.chooseOption('o-rum', 'Rum')
-    expect(basket.askingAgeCheckFor.value).toBe('Cola')
+    // Named as poured, so whoever asks for ID knows the rum is why (review of #1401).
+    expect(basket.askingAgeCheckFor.value).toBe('Cola with Rum')
     expect(basket.needsAgeCheck.value).toBe(true)
+    scope.stop()
+  })
+
+  test('a refusal names the line as poured, on the screen and in the register', async () => {
+    const glass = aVariant({
+      id: 'variant-glass',
+      label: 'Glass',
+      ageRestricted: false,
+      choice: { id: 'g-1', name: 'Mixer', options: [{ id: 'o-rum', itemName: 'Rum', ageRestricted: true }] },
+    })
+    const register = recorder()
+    const { basket, scope } = setup([aProduct({ id: 'p-cola', name: 'Cola', ageRestricted: true, variants: [glass] })], { recordAgeCheck: register.record })
+    basket.tapVariant('Cola', glass)
+    basket.chooseOption('o-rum', 'Rum')
+    await basket.refuseAgeCheck({ outcome: 'REFUSED', idType: null, reason: 'NO_ID_SHOWN', description: 'Declined to show ID', notes: null })
+    expect(basket.refusedLinesNote.value).toBe('ID refused. Not sold: Cola with Rum')
+    expect(register.recorded[0]?.product).toBe('Cola with Rum')
+    scope.stop()
+  })
+
+  // A long round named as poured can pass the register's cap, and a refused write loses the
+  // licence's record: the entry is held to the cap, and the screen keeps the whole list.
+  test('a refusal naming more than the register holds is written within its cap', async () => {
+    const long = 'x'.repeat(80)
+    const sizes = [1, 2, 3].map(n => aVariant({
+      id: `variant-${n}`,
+      label: 'Glass',
+      ageRestricted: false,
+      choice: { id: `g-${n}`, name: 'Mixer', options: [{ id: `o-${n}`, itemName: `${long} ${n}`, ageRestricted: true }] },
+    }))
+    const register = recorder()
+    const { basket, scope } = setup(sizes.map((size, n) => aProduct({ id: `p-${n}`, name: `Cola ${n}`, variants: [size] })), { recordAgeCheck: register.record })
+    for (const [n, size] of sizes.entries()) {
+      basket.tapVariant(`Cola ${n}`, size)
+      basket.chooseOption(size.choice!.options[0]!.id, size.choice!.options[0]!.itemName)
+    }
+    await basket.refuseAgeCheck({ outcome: 'REFUSED', idType: null, reason: 'NO_ID_SHOWN', description: 'Declined to show ID', notes: null })
+    expect(register.recorded[0]!.product!.length).toBeLessThanOrEqual(AGE_CHECK_PRODUCT_MAX)
+    expect(basket.refusedLinesNote.value!.length).toBeGreaterThan(AGE_CHECK_PRODUCT_MAX)
     scope.stop()
   })
 })

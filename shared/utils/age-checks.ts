@@ -77,10 +77,13 @@ export function ageCheckReady(form: OutcomeShape): boolean {
   return SHAPE_RULES.every(([rule]) => rule({ ...form, description: form.description.trim() }))
 }
 
+// What a register entry's product may hold; the till's refusal names its lines within it.
+export const AGE_CHECK_PRODUCT_MAX = 200
+
 export const ageCheckForm = shaped(z.object({
   performanceId: z.string().min(1, 'Say which performance you mean').nullish().transform(value => value ?? null),
   ...outcomeFields,
-  product: z.string().trim().max(200).nullish().transform(value => (value ?? '').trim() || null),
+  product: z.string().trim().max(AGE_CHECK_PRODUCT_MAX).nullish().transform(value => (value ?? '').trim() || null),
 }))
 
 export type AgeCheckInput = z.output<typeof ageCheckForm>
@@ -93,7 +96,7 @@ export type InlineAgeCheckInput = z.output<typeof inlineAgeCheckForm>
 
 export const supersedeForm = shaped(z.object({
   ...outcomeFields,
-  product: z.string().trim().max(200).nullish().transform(value => (value ?? '').trim() || null),
+  product: z.string().trim().max(AGE_CHECK_PRODUCT_MAX).nullish().transform(value => (value ?? '').trim() || null),
 }))
 
 // What a refused write reads as. SQLite names the columns for a unique index and the constraint

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, saleForm } from '#shared/utils/sale'
+import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
 import type { SaleProduct } from '#shared/utils/sale'
 
 const aLine = { variantId: 'var-1', qty: 1 }
@@ -199,5 +199,29 @@ describe('Check ID follows what a line pours (issue 1299)', () => {
 
   test('a size the catalogue does not hold asks nothing, and the server decides', () => {
     expect(lineNeedsCheckId([cola], { variantId: 'v-gone', choiceItemId: null })).toBe(false)
+  })
+})
+
+// The prompt and the register name what was poured, so a Cola asking for ID says the rum is why.
+describe('a restricted line is named as poured (F-106 criteria 3, 6)', () => {
+  test('a line with a choice names the product with it; one without names the product', () => {
+    expect(saysPouredLine({ productName: 'Cola', choiceItemName: 'Rum' })).toBe('Cola with Rum')
+    expect(saysPouredLine({ productName: 'Lager', choiceItemName: null })).toBe('Lager')
+  })
+
+  test('several lines are named once each, in the order poured', () => {
+    expect(saysPouredLines([
+      { productName: 'Cola', choiceItemName: 'Rum' },
+      { productName: 'Gin', choiceItemName: null },
+      { productName: 'Cola', choiceItemName: 'Rum' },
+    ])).toBe('Cola with Rum, Gin')
+  })
+
+  test('the names come as a list too, for a refusal that says need or needs', () => {
+    expect(pouredNames([
+      { productName: 'Cola', choiceItemName: 'Rum' },
+      { productName: 'Cola', choiceItemName: 'Rum' },
+      { productName: 'Gin', choiceItemName: null },
+    ])).toEqual(['Cola with Rum', 'Gin'])
   })
 })

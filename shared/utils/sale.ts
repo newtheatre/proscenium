@@ -92,6 +92,22 @@ export function checkIdFor(restrictedAnyway: boolean, pours: readonly string[], 
   return restrictedAnyway || pours.some(itemId => restrictedItems.has(itemId))
 }
 
+// A restricted line as poured, for the Challenge 25 prompt and the register: a Cola asking for ID
+// says the rum is why (F-106 criteria 3 and 6).
+type PouredLine = Pick<PricedLine, 'productName' | 'choiceItemName'>
+
+export function saysPouredLine(line: PouredLine): string {
+  return line.choiceItemName ? `${line.productName} with ${line.choiceItemName}` : line.productName
+}
+
+export function pouredNames(lines: readonly PouredLine[]): string[] {
+  return [...new Set(lines.map(saysPouredLine))]
+}
+
+export function saysPouredLines(lines: readonly PouredLine[]): string {
+  return pouredNames(lines).join(', ')
+}
+
 // One line's answer off the catalogue the till holds: its size, or the option chosen. The tile's
 // mark is any size's, so it is never the line's own answer.
 export function lineNeedsCheckId(products: readonly SaleProduct[], line: { variantId: string, choiceItemId: string | null }): boolean {
