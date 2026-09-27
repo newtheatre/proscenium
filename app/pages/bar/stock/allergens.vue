@@ -4,7 +4,7 @@ import type { AllergenState, StockItem } from '#shared/utils/bar'
 
 // The one review table (issue 1348): every live stocked item, unanswered first, answered in place.
 // A product takes its answer from what it pours, so each item is answered once, here.
-definePageMeta({ layout: 'console', title: 'Allergens', middleware: 'console', docs: '/docs/bar/stock#allergens' })
+definePageMeta({ layout: 'console', title: 'Allergens', middleware: 'console', docs: '/docs/bar/stock' })
 
 interface Listing { items: StockItem[], total: number, pageSize: number, pages: number }
 
@@ -79,8 +79,8 @@ const listingFailure = useListFailure(error, 'The stocked items could not be rea
     />
 
     <p class="text-sm text-muted">
-      Answer each stocked item once. Every product that pours it, directly or as a choice, gives the
-      same answer at the till, with anything the bar adds (a garnish) set on the product itself.
+      Answer each stocked item once, and every product that pours it gives that answer at the till,
+      with anything the bar adds, such as a garnish, set on the product itself.
     </p>
 
     <p
@@ -129,6 +129,7 @@ const listingFailure = useListFailure(error, 'The stocked items could not be rea
           :rows="2"
           class="w-full"
           :placeholder="drafts[item.id]!.state === 'RECORDED' ? 'What staff read out at the bar' : 'Anything worth saying, optional'"
+          :aria-label="`Allergen note for ${item.name}`"
           :data-test="`allergen-note-${item.id}`"
         />
 

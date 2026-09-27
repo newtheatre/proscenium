@@ -229,10 +229,11 @@ export function resolvedPriceColumns(categoryId: SQL, variantAlias: string, on: 
   }
 }
 
-// How many products still sell with no allergen answer, for the console overview (issue 1358).
-// The bar's own count: an answer moving onto the stocked item moves it here, and nowhere else.
+// How many stocked items still have no allergen answer, for the console overview (issue 1358):
+// the answer is the item's, and every product pouring it reads it (issue 1348).
 export function allergensUnansweredCount(): SQL {
-  return sql`(SELECT count(*) FROM bar_products WHERE status <> 'RETIRED' AND allergen_state = 'UNKNOWN')`
+  return sql`(SELECT count(*) FROM bar_items unanswered_i
+    WHERE unanswered_i.status = 'ACTIVE' AND ${itemAllergenState('unanswered_i')} = 'UNKNOWN')`
 }
 
 // On-hand is the sum of an item's movements, computed where it is asked for and stored nowhere
