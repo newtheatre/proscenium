@@ -4,6 +4,8 @@ import { LIVE_EXTERNAL } from '#shared/utils/external-requests'
 import type { Conflict } from '#shared/utils/bookings'
 import type { Occurrence, Recurrence } from '#shared/utils/series'
 import type { Failure } from '#shared/utils/booking-policy'
+import { seriesClaimStatement } from './room-writes'
+import type { SeriesClaim } from './room-writes'
 
 // Writing a whole series or none of it (C-110 criteria 2 and 3). D1 has no interactive
 // transaction, so the all-or-nothing shape is a batch and an assertion inside it (0035).
@@ -15,16 +17,7 @@ export interface OccurrenceRefusal {
   conflicts: Conflict[]
 }
 
-export interface SeriesWrite {
-  seriesId: string
-  userId: string
-  roomId: string
-  title: string
-  attendees: number | null
-  tier: string
-  purpose: string
-  notes: string | null
-  status: 'CONFIRMED' | 'PENDING_APPROVAL'
+export interface SeriesWrite extends SeriesClaim {
   recurrence: Recurrence
   occurrences: Occurrence[]
 }
@@ -70,11 +63,10 @@ export async function conflictsAcross(roomId: string, occurrences: Occurrence[])
   return found
 }
 
-// Every occurrence claimed under its own clash predicate, then an assertion they all landed: a
+// Every occurrence claimed under its own clash and closure predicates, then an assertion they all landed: a
 // short count re-inserts the series row onto its own primary key, failing the batch (0035).
 export async function writeSeries(write: SeriesWrite): Promise<{ ids: string[] }> {
   const ids = write.occurrences.map(() => newId())
-  const held = HOLDS_A_SLOT.map(status => sql`${status}`)
   const weekdays = write.recurrence.frequency === 'WEEKLY'
     ? [...write.recurrence.weekdays].sort((a, b) => a - b).join(',')
     : null
@@ -87,21 +79,7 @@ export async function writeSeries(write: SeriesWrite): Promise<{ ids: string[] }
            ${write.occurrences.length}, ${ids[0] ?? null}
   `
 
-  const claims = write.occurrences.map((one, at) => sql`
-    INSERT INTO room_bookings
-      (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, series_id, occurrence)
-    SELECT ${ids[at]}, ${write.roomId}, ${write.userId}, ${write.title}, ${write.attendees},
-           ${Math.floor(one.startsAt.getTime() / 1000)}, ${Math.floor(one.endsAt.getTime() / 1000)},
-           ${write.tier}, ${write.purpose}, ${write.status}, ${write.notes}, ${write.seriesId}, ${one.occurrence}
-    WHERE EXISTS (SELECT 1 FROM rooms WHERE id = ${write.roomId} AND is_active = 1)
-      AND NOT EXISTS (
-        SELECT 1 FROM room_bookings
-        WHERE room_id = ${write.roomId}
-          AND status IN (${sql.join(held, sql`, `)})
-          AND starts_at < ${Math.floor(one.endsAt.getTime() / 1000)}
-          AND ends_at > ${Math.floor(one.startsAt.getTime() / 1000)}
-      )
-  `)
+  const claims = write.occurrences.map((one, at) => seriesClaimStatement(ids[at]!, write, one))
 
   // Reached only when an occurrence was beaten to its slot between the check and the write.
   const assertion = sql`

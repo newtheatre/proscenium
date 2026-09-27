@@ -122,11 +122,34 @@ export default defineEventHandler(async (event) => {
       status,
       recurrence,
       occurrences,
+      offsets: await shiftOffsetDefaults(event),
     })
   }
   catch {
-    // The completeness assertion raised: a slot was claimed between the check and the write,
-    // and nothing was written (0035).
+    // The completeness assertion raised and nothing was written (0035): a closure made since the
+    // check refuses as the check would have, and anything else is a slot taken in between.
+    const closedSince = await closuresAcross(
+      event,
+      Math.floor(occurrences[0]!.startsAt.getTime() / 1000),
+      Math.floor(occurrences.at(-1)!.endsAt.getTime() / 1000),
+      room.id,
+    )
+    const closedWeeks = occurrences.flatMap((one) => {
+      const closed = blackoutOver(closedSince, room.id, {
+        startsAt: Math.floor(one.startsAt.getTime() / 1000),
+        endsAt: Math.floor(one.endsAt.getTime() / 1000),
+      })
+      return closed
+        ? [{ occurrence: one.occurrence, day: one.day, failures: [{ reason: 'ROOM_CLOSED' as const, says: saysClosed(closed) }], conflicts: [] }]
+        : []
+    })
+    if (closedWeeks.length > 0) {
+      throw createError({
+        statusCode: 422,
+        statusMessage: `${plural(closedWeeks.length, 'occurrence')} cannot be booked`,
+        data: { refusals: closedWeeks, total: occurrences.length },
+      })
+    }
     throw createError({
       statusCode: 409,
       statusMessage: 'Somebody booked one of those slots while this was being worked out',

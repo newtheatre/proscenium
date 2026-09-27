@@ -45,9 +45,19 @@ export default defineEventHandler(async (event) => {
     reason: input.reason,
     offer,
     now,
+    offsets: await shiftOffsetDefaults(event),
   })
 
+  // The bump carries the closures itself, so one made since the check above stops it (0003).
   if (!outcome.won) {
+    const closedSince = blackoutOver(await closuresAcross(event, displaced.startsAt, displaced.endsAt, displaced.roomId), displaced.roomId, displaced)
+    if (closedSince) {
+      throw createError({
+        statusCode: 422,
+        statusMessage: saysClosed(closedSince),
+        data: { failures: [{ reason: 'ROOM_CLOSED', says: saysClosed(closedSince) }] },
+      })
+    }
     throw createError({
       statusCode: 409,
       statusMessage: 'That booking changed while this was being worked out',

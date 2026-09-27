@@ -1,8 +1,9 @@
 import { and, asc, eq, gte, ne, sql } from 'drizzle-orm'
-import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 import { nearest } from '#shared/utils/tiers'
 import { closuresAcross } from './blackouts'
+import { bumpStatements } from './room-writes'
 import { blackoutOver } from '#shared/utils/blackouts'
+import type { BumpWrite } from './room-writes'
 import type { Alternative } from '#shared/utils/tiers'
 import type { H3Event } from 'h3'
 
@@ -115,63 +116,10 @@ export function nearestTo(displaced: Displaced, candidates: Alternative[]): Alte
 
 // The bump itself: the displaced booking becomes BUMPED and the claimant's takes the slot, in one
 // batch guarded on the status that was read (criteria 2 and 4).
-export async function performBump(input: {
-  displaced: Displaced
-  claimantId: string
-  title: string
-  tier: string
-  purpose: string
-  reason: string
-  offer: Alternative | undefined
-  now: number
-}): Promise<{ won: boolean, replacementId: string | null, offeredId: string | null }> {
+export async function performBump(input: BumpWrite & { displaced: Displaced }): Promise<{ won: boolean, replacementId: string | null, offeredId: string | null }> {
   const claimId = newId()
   const offerId = input.offer ? newId() : null
-  const held = HOLDS_A_SLOT.map(status => sql`${status}`)
-
-  const statements = [
-    // Guarded on CONFIRMED: a booking cancelled a moment ago is not there to be bumped.
-    db.run(sql`
-      UPDATE room_bookings
-      SET status = 'BUMPED', bumped_reason = ${input.reason}, bumped_to_booking_id = ${offerId},
-          updated_at = ${input.now}
-      WHERE id = ${input.displaced.id} AND status = 'CONFIRMED'
-    `),
-    // Written only if the bump landed, so a lost race leaves no booking behind.
-    db.run(sql`
-      INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status)
-      SELECT ${claimId}, ${input.displaced.roomId}, ${input.claimantId}, ${input.title},
-             ${input.displaced.attendees}, ${input.displaced.startsAt}, ${input.displaced.endsAt},
-             ${input.tier}, ${input.purpose}, 'CONFIRMED'
-      WHERE EXISTS (SELECT 1 FROM room_bookings WHERE id = ${input.displaced.id} AND status = 'BUMPED')
-        AND NOT EXISTS (
-          SELECT 1 FROM room_bookings
-          WHERE room_id = ${input.displaced.roomId}
-            AND status IN (${sql.join(held, sql`, `)})
-            AND starts_at < ${input.displaced.endsAt}
-            AND ends_at > ${input.displaced.startsAt}
-        )
-    `),
-  ]
-
-  // The replacement is held for them rather than merely suggested: an offer somebody else can
-  // book while the member reads their email is not an offer (criterion 3).
-  if (input.offer && offerId) {
-    statements.push(db.run(sql`
-      INSERT INTO room_bookings (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes)
-      SELECT ${offerId}, ${input.offer.roomId}, ${input.displaced.userId}, ${input.displaced.title},
-             ${input.displaced.attendees}, ${input.offer.startsAt}, ${input.offer.endsAt},
-             ${input.displaced.tier}, ${input.displaced.purpose}, 'CONFIRMED', 'Offered in place of a bumped booking'
-      WHERE EXISTS (SELECT 1 FROM room_bookings WHERE id = ${input.displaced.id} AND status = 'BUMPED')
-        AND NOT EXISTS (
-          SELECT 1 FROM room_bookings
-          WHERE room_id = ${input.offer.roomId}
-            AND status IN (${sql.join(held, sql`, `)})
-            AND starts_at < ${input.offer.endsAt}
-            AND ends_at > ${input.offer.startsAt}
-        )
-    `))
-  }
+  const statements = bumpStatements(input, claimId, offerId).map(statement => db.run(statement))
 
   await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
 

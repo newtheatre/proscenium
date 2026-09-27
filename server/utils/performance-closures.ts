@@ -39,8 +39,8 @@ export function performancesOnRoomsQuery(from: number, to: number, offsets: Shif
 }
 
 // The room open over a span: no officer's closure of it or of every room, and no performance at
-// the venue it belongs to over its window. Half-open, as the clash rule is (C-114, issue 1347).
-export function roomOpenTerms(roomId: string, startsAt: number, endsAt: number, offsets: ShiftOffsets): SQL {
+// the venue it belongs to over its window. Values or column expressions, half-open like the clash rule.
+export function roomOpenTerms(roomId: string | SQL, startsAt: number | SQL, endsAt: number | SQL, offsets: ShiftOffsets): SQL {
   return sql`NOT EXISTS (
       SELECT 1 FROM room_blackouts b
       WHERE (b.room_id = ${roomId} OR b.room_id IS NULL) AND b.starts_at < ${endsAt} AND b.ends_at > ${startsAt}
