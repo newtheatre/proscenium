@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { admittedSeatsSubquery, heldSeatsSubquery } from './capacity'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { SHIFT_ROLES } from '#shared/utils/rota'
+import { performanceEnd } from '#shared/utils/rota-times'
 import { showNightBounds } from '#shared/utils/show-night'
 import type { ConfirmedShiftScope } from './rota'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
@@ -262,4 +263,10 @@ export function tonightPerformanceQuery(performanceId: string): SQL {
 export async function tonightPerformance(performanceId: string): Promise<TonightPerformance | undefined> {
   const [row] = await db.all<TonightPerformance>(tonightPerformanceQuery(performanceId))
   return row
+}
+
+// When Sign off and close opens, for the report and the sign-off alike (issue 1315, 0078).
+export async function curtainDownAt(performanceId: string): Promise<number | null> {
+  const times = await tonightPerformance(performanceId)
+  return times ? performanceEnd(times) : null
 }
