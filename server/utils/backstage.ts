@@ -5,7 +5,7 @@ import { createError, getCookie } from 'h3'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { newId } from './accounts'
 import { performancesOnNight } from './performances'
-import { MAX_FAILED_ATTEMPTS, MESSAGE_RETENTION_DAYS, MILESTONE_DEFAULT_SIDE, PRESET_DEFAULT_SIDE, deriveBoardCode, deriveFohCredential, saysOtherEndsCall } from '#shared/utils/backstage'
+import { LAST_NIGHTS_BOARD, MAX_FAILED_ATTEMPTS, MESSAGE_RETENTION_DAYS, MILESTONE_DEFAULT_SIDE, PRESET_DEFAULT_SIDE, boardIsTonight, deriveBoardCode, deriveFohCredential, saysOtherEndsCall } from '#shared/utils/backstage'
 import type { BoardSide } from '#shared/utils/backstage'
 import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
 import type { SQL } from 'drizzle-orm'
@@ -123,13 +123,14 @@ export async function deviceByToken(token: string): Promise<DeviceHolder | undef
 export const DEVICE_TOKEN_COOKIE = 'nnt-backstage-token'
 
 // The board's own credential: no session, so a device proves itself with the cookie it was
-// handed on joining, refused the moment a reset has revoked it (E-121, E-122 criterion 1).
+// handed on joining, refused once its night ends or a reset has revoked it (E-121, E-122, 0014).
 export async function requireDevice(event: H3Event): Promise<DeviceHolder> {
   const token = getCookie(event, DEVICE_TOKEN_COOKIE)
   if (!token) throw createError({ statusCode: 401, statusMessage: 'Join the board first' })
 
   const device = await deviceByToken(token)
   if (!device) throw createError({ statusCode: 401, statusMessage: 'That device is not recognised' })
+  if (!boardIsTonight(device.night)) throw createError({ statusCode: 401, statusMessage: LAST_NIGHTS_BOARD })
   if (device.revokedAt !== null) throw createError({ statusCode: 401, statusMessage: 'The board was reset: join again with the new code' })
 
   return device

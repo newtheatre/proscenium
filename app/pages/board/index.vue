@@ -93,8 +93,8 @@ async function loadMessages(): Promise<void> {
   }
 }
 
-// A refused cookie (401, revoked by a reset) goes and the form takes its place; a dropped
-// connection keeps the device and the board, and the poll tries again (criterion 6).
+// A refused cookie (401: last night's, or revoked by a reset) goes and the form takes its place,
+// saying why; a dropped connection keeps the device and the board, and the poll tries again.
 async function resume(): Promise<void> {
   try {
     const answered = await $fetch<BoardRead>('/api/board/messages')
@@ -104,6 +104,7 @@ async function resume(): Promise<void> {
   catch (error) {
     if (refusalStatus(error) === 401) {
       deviceToken.value = null
+      failure.value = refusalText(error)
     }
     else {
       joined.value = { venueName: 'Tonight\'s board' }

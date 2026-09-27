@@ -1646,7 +1646,11 @@ a second device.
 `requireDevice()` is the board's own guard, `getCookie(event, 'nnt-backstage-token')` resolved
 against `backstage_devices` the same way a QR reservation cookie resolves against
 `requireQrReservationId()` (D-108): no session, so the cookie is the only credential there is. A
-revoked device (E-122) is refused at this one point rather than at every route that calls it.
+revoked device (E-122) is refused at this one point rather than at every route that calls it, and
+so is a device from another show night (issue 1312): `boardIsTonight()` compares the night the
+device joined with `showNightOf(now)`, so a phone joined at 23:00 stops working at 04:00 with
+"This board was for last night: join tonight's with the new code", checked before the reset,
+with nothing to revoke (0014). `/board` shows that reason above the join form.
 
 Only a milestone is ever corrected (`supersedeMessageStatement()`'s own predicate refuses
 anything else, and refuses a correction across ends: the correcting device's side must match the
