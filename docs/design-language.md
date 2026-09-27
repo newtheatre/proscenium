@@ -219,9 +219,12 @@ Eleven rules follow:
 6. **Every console list is a `UTable` with column definitions, and it stays usable below `sm`.**
    Table markup written by hand takes none of the shell's behaviour, so it arrives with no empty
    state, no loading state and no column rules; a list of rows on the console is a `UTable` or it
-   is a defect (K-123 criterion 9). A money column is right-aligned and mono through
-   `RIGHT_ALIGNED` and `saysMoney`. A column of row actions has a header, `ACTIONS_HEADER`
-   hiding the word where a visible one would read as noise, and an empty header is not a header.
+   is a defect (K-123 criterion 9). A money or quantity column is right-aligned and mono, its
+   header right-aligned over its figures, through `RIGHT_ALIGNED` (or
+   `RIGHT_ALIGNED_HIDE_BELOW_SM` where a phone drops it) and `saysMoney`; no screen writes that
+   shape out again. A column of row actions has a header, `ACTIONS_HEADER` hiding the word where
+   a visible one would read as noise, and an empty header is not a header; where it sits at the
+   row's end it takes `ACTIONS_COLUMN`, never a figure shape, so its buttons keep the body face.
    A row offers at most three actions in line, the primary one visible and the rest in a
    `UDropdownMenu` (K-123 criterion 10). A secondary column carries `app/utils/responsive-table.ts`'s
    `HIDE_BELOW_SM` class on both its header and cell, and its content moves into the primary

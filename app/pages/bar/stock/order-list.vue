@@ -57,8 +57,8 @@ const columns: TableColumn<OrderListRow>[] = [
     id: 'shortfall',
     header: 'Shortfall',
     // The one figure a supplier order actually needs, weighted against On hand and Par beside it.
-    meta: { class: { th: 'text-right', td: 'text-right whitespace-nowrap font-mono font-medium' } },
-    cell: ({ row }) => saysQuantity(row.original.shortfall, row.original.unit),
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => h('span', { class: 'font-medium' }, saysQuantity(row.original.shortfall, row.original.unit)),
   },
 ]
 </script>
