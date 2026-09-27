@@ -305,6 +305,48 @@ describe.skipIf(skip !== null)('a request is asked once, never for a pass held, 
     const row = query<{ status: string }>('SELECT status FROM pass_requests WHERE id = ?', requestId)
     expect(row?.status).toBe('PENDING')
   }, CASE_TIMEOUT_MS)
+
+  // Read again after the refusal, so the answer names what actually happened to the request.
+  test('withdrawing a request the desk has fulfilled, or one that lapsed, says which', async () => {
+    const { id: passTypeId, priceId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+    expect((await send('POST', '/api/box-office/desk/passes', {
+      passTypeId, passTypePriceId: priceId, userId: requester.id, expectedTotalPence: 4500, requestId,
+    })).status).toBe(200)
+
+    const settled = await send('DELETE', `/api/account/passes/requests/${requestId}`, undefined, requester.cookie)
+    expect(settled.status).toBe(409)
+    expect(await settled.text()).toContain('This request has already been settled at the box office desk')
+
+    const { id: otherTypeId } = await onSalePassType()
+    const lapsedId = crypto.randomUUID()
+    write('INSERT INTO pass_requests (id, pass_type_id, user_id, status) VALUES (?, ?, ?, ?)', lapsedId, otherTypeId, requester.id, 'EXPIRED')
+    const lapsed = await send('DELETE', `/api/account/passes/requests/${lapsedId}`, undefined, requester.cookie)
+    expect(lapsed.status).toBe(409)
+    expect(await lapsed.text()).toContain('This request has already lapsed')
+  }, CASE_TIMEOUT_MS)
+
+  // A desk sale that picks the buyer by name, not from the request list, still settles their request.
+  test('selling the pass to a member who asked for it fulfils their request, and the desk list drops them', async () => {
+    const { id: passTypeId, priceId } = await onSalePassType()
+    const requester = await registerMember(app, 'requester', generatePassword())
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+
+    expect((await send('POST', '/api/box-office/desk/passes', {
+      passTypeId, passTypePriceId: priceId, userId: requester.id, expectedTotalPence: 4500,
+    })).status).toBe(200)
+
+    const row = query<{ status: string, passId: string | null }>('SELECT status, pass_id AS passId FROM pass_requests WHERE id = ?', requestId)
+    expect(row?.status).toBe('FULFILLED')
+    expect(row?.passId).not.toBeNull()
+
+    const pending = await send('GET', `/api/box-office/desk/passes/${passTypeId}/requests`)
+    const { items } = await pending.json() as { items: { userId: string }[] }
+    expect(items.some(item => item.userId === requester.id)).toBe(false)
+  }, CASE_TIMEOUT_MS)
 })
 
 describe.skipIf(skip !== null)('a member views what they hold, and receives a scannable QR (criterion 5)', () => {
