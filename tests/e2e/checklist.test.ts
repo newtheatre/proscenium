@@ -435,4 +435,54 @@ describe.skipIf(skip !== null)('the checklist screen on a matinee day (E-127, is
   }, CASE_TIMEOUT_MS)
 })
 
+// Issue 1316: the checklist says whether the bar's till is closed, tonight's or one an earlier night
+// left, and ticks itself once it is; only the bar can close a till, so it never holds the close.
+describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterion 3)', () => {
+  test('the checklist reads tonight\'s till at its venue and an earlier night\'s at any bar, and names who closes them', async () => {
+    const dmPassword = generatePassword()
+    const dm = await registerMember(app, 'checklist-till-dm', dmPassword)
+    const barManager = await registerMember(app, 'checklist-till-bar', generatePassword())
+    await send('POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' })
+    const { venueId, performanceId } = (() => {
+      const database = new Database(app.databaseFile)
+      try {
+        return tonightsPerformance(sqliteTarget(database), { suffix: 'checklist-till-house' })
+      }
+      finally {
+        database.close()
+      }
+    })()
+    shift(performanceId, 'DUTY_MANAGER', dm.id)
+    const tillOf = async (): Promise<{ tonight: number, earlier: number, unanswered: number }> => {
+      const answered = await send('GET', `/api/tonight/checklist?performanceId=${performanceId}`, undefined, dm.cookie)
+      expect(answered.status).toBe(200)
+      return (await answered.json() as { till: { tonight: number, earlier: number, unanswered: number } }).till
+    }
+
+    expect(await tillOf()).toEqual({ tonight: 0, earlier: 0, unanswered: 0 })
+
+    const opened = await send('POST', '/api/till', { venueId }, barManager.cookie)
+    expect(opened.status).toBe(200)
+    write('INSERT INTO till_sessions (id, venue_id, night, opened_by, opened_at) VALUES (?, ?, ?, ?, 1000)',
+      `checklist-stale-${venueId}`, venueId, '2020-01-05', barManager.id)
+    expect(await tillOf()).toEqual({ tonight: 1, earlier: 1, unanswered: 0 })
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', dm.email)
+      await fill(view, 'form input[type="password"]', dmPassword)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await visit(view, `${app.baseURL}/tonight/checklist?performanceId=${performanceId}`, '[data-test="checklist-till"]')
+      const said = await view.evaluate<string>(`document.querySelector('[data-test="checklist-till"]').innerText`)
+      expect(said).toContain('Tonight\'s till is still open')
+      expect(said).toContain('Bar Manager')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

@@ -317,9 +317,9 @@ describe('every show-night route checks authority itself (E-111 criterion 5)', (
     expect(routes().length).toBeGreaterThan(0)
   })
 
-  // requireAnyNightAuthority is the multi-role form (E-118 criterion 4), closerFor the till close's
-  // and barAuthorityFor a till charge's answer (F-102.5); all four reach the same guard.
-  const GUARDS = ['requireNightAuthority(', 'requireAnyNightAuthority(', 'closerFor(', 'barAuthorityFor(']
+  // requireAnyNightAuthority is the multi-role form (E-118 criterion 4), closerFor the till close's,
+  // barAuthorityFor a till charge's answer and barOfficerFor its ended nights' half (F-102.5).
+  const GUARDS = ['requireNightAuthority(', 'requireAnyNightAuthority(', 'closerFor(', 'barAuthorityFor(', 'barOfficerFor(']
 
   // The one route that cannot resolve night authority, because it exists to answer the question
   // the guard asks when it refuses: which venue. It returns venue names and nothing else (0077).

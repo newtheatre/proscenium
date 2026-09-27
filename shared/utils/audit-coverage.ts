@@ -637,6 +637,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/walk-up-options.get.ts', exempt: 'reads what a walk-up may be sold as, writing nothing' },
   { route: 'server/api/till/payments/index.post.ts', actions: ['bar.sumup.started'], via: ['server/utils/sumup-attempts.ts'] },
   { route: 'server/api/till/payments/index.get.ts', exempt: 'reads tonight\'s unresolved SumUp hand-offs, writing nothing' },
+  { route: 'server/api/till/earlier.get.ts', exempt: 'reads the tills and card charges earlier nights left open, writing nothing' },
   { route: 'server/api/till/payments/[id]/index.get.ts', exempt: 'reads one hand-off\'s state for the till to poll, writing nothing' },
   {
     route: 'server/api/till/payments/[id]/complete.post.ts',

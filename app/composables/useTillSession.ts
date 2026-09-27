@@ -133,6 +133,8 @@ export function useTillSession() {
   }
 
   // The expected figure before anyone commits to closing (F-102 criterion 4, F-118 criterion 3).
+  // Tonight's session, or one an ended night left open that the Bar Manager chose (issue 1316).
+  const closing = ref<{ id: string, venueName: string, night: string } | null>(null)
   const closeModalOpen = ref(false)
   const reconciliation = ref<NightReconciliation | null>(null)
   const reconciliationLoading = ref(false)
@@ -155,13 +157,15 @@ export function useTillSession() {
   // retry after a refusal keeps the form mounted and dims it with refreshing instead.
   const refreshing = ref(false)
 
+  const closingId = computed(() => closing.value?.id ?? session.value?.id ?? null)
+
   async function refreshReconciliation(showLoadingScreen = false): Promise<void> {
-    if (!session.value) return
+    if (!closingId.value) return
     reconciliationFailure.value = null
     refreshing.value = true
     if (showLoadingScreen) reconciliationLoading.value = true
     try {
-      reconciliation.value = await request<NightReconciliation>(`/api/till/${session.value.id}/reconciliation`)
+      reconciliation.value = await request<NightReconciliation>(`/api/till/${closingId.value}/reconciliation`)
     }
     catch (refused) {
       reconciliationFailure.value = refusalText(refused)
@@ -172,8 +176,9 @@ export function useTillSession() {
     }
   }
 
-  async function openCloseModal(): Promise<void> {
-    if (!session.value) return
+  async function openCloseModal(earlier: { id: string, venueName: string, night: string } | null = null): Promise<void> {
+    closing.value = earlier
+    if (!closingId.value) return
     closeModalOpen.value = true
     reconciliation.value = null
     actualZPounds.value = undefined
@@ -181,28 +186,31 @@ export function useTillSession() {
     await refreshReconciliation(true)
   }
 
-  async function confirmClose(): Promise<void> {
-    if (!session.value) return
+  // Resolves to the session it closed, so the screen can drop an earlier one from its list.
+  async function confirmClose(): Promise<TillSession | null> {
+    if (!closingId.value) return null
     closingBusy.value = true
     closeFailure.value = null
     try {
       const closed = await request<{ session: TillSession }>('/api/till/close', {
         method: 'POST',
         body: {
-          id: session.value.id,
+          id: closingId.value,
           actualZPence: actualZPence.value,
           varianceNote: varianceNote.value.trim() || undefined,
         },
       })
-      session.value = closed.session
+      if (closed.session.id === session.value?.id) session.value = closed.session
       syncedAt.value = new Date()
       closeModalOpen.value = false
+      return closed.session
     }
     catch (refused) {
       closeFailure.value = refusalText(refused)
       // The server's own expected figure may have moved since the modal opened (a sale landed
       // elsewhere): refetch so the preview and the note field answer to the same figure it does.
       await refreshReconciliation()
+      return null
     }
     finally {
       closingBusy.value = false
@@ -230,6 +238,7 @@ export function useTillSession() {
     chooseVenue,
     load,
     open,
+    closing,
     closeModalOpen,
     reconciliation,
     reconciliationLoading,

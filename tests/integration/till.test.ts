@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { closeSessionStatement, openSessionForQuery, sessionByIdQuery, staleUnclosedSessionsQuery } from '#server/utils/till'
+import { closeSessionStatement, earlierOpenSessionsQuery, openSessionForQuery, sessionByIdQuery, tillLeftOpenQuery } from '#server/utils/till'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 import type { TillSession } from '#shared/utils/till'
@@ -312,9 +312,9 @@ describe('the query builders read what the write path wrote', () => {
     })
   })
 
-  // The checklist reads every unclosed session that is not tonight's, whatever venue it is at
-  // (F-102 criterion 5).
-  test('staleUnclosedSessionsQuery names every unclosed session from an earlier night, and none from tonight or already closed', async () => {
+  // The Bar Manager's list reads every unclosed session that is not tonight's, whatever venue it
+  // is at, each with its bar (F-102 criterion 5, issue 1316).
+  test('earlierOpenSessionsQuery names every unclosed session from an earlier night with its venue, and none from tonight or already closed', async () => {
     await withDatabase((database) => {
       const opener = person(database)
       const houseId = venue(database, '1')
@@ -324,8 +324,31 @@ describe('the query builders read what the write path wrote', () => {
         id: 't-closed', venue_id: studioId, night: '2026-09-02', opened_by: opener, closed_by: opener, closed_at: 9000, opened_at: 1000 })
       insert(database, 'till_sessions', { id: 't-tonight', venue_id: houseId, night: '2026-09-04', opened_by: opener, opened_at: 1000 })
 
-      const found = rows<TillSession>(database, ...boundStatement(database, staleUnclosedSessionsQuery('2026-09-04')))
-      expect(found.map(session => session.id)).toEqual(['t-stale'])
+      const found = rows<{ id: string, venueName: string, night: string }>(database, ...boundStatement(database, earlierOpenSessionsQuery('2026-09-04')))
+      expect(found).toEqual([expect.objectContaining({ id: 't-stale', venueName: 'The House 1', night: '2026-09-03' })])
+    })
+  })
+
+  // Issue 1316: the checklist reads its own venue's till tonight, and earlier nights at every bar,
+  // since a house not running tonight has no checklist to say so on and every bar shares the reader.
+  test('tillLeftOpenQuery counts this venue\'s till tonight, and earlier nights\' tills and charges at any bar', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const houseId = venue(database, '1')
+      const studioId = venue(database, '2')
+      insert(database, 'till_sessions', { id: 't-tonight', venue_id: houseId, night: '2026-09-04', opened_by: opener, opened_at: 1000 })
+      insert(database, 'till_sessions', { id: 't-studio-tonight', venue_id: studioId, night: '2026-09-04', opened_by: opener, opened_at: 1000 })
+      insert(database, 'till_sessions', { id: 't-stale', venue_id: houseId, night: '2026-09-03', opened_by: opener, opened_at: 1000 })
+      insert(database, 'till_sessions', { id: 't-elsewhere', venue_id: studioId, night: '2026-09-03', opened_by: opener, opened_at: 1000 })
+      const attempt = (id: string, sessionId: string, venueId: string, night: string, status: string): void => insert(database, 'sumup_attempts', {
+        id, till_session_id: sessionId, venue_id: venueId, night, created_by: opener, basket: '{}', expected_total_pence: 250, status,
+      })
+      attempt('att-stale', 't-stale', houseId, '2026-09-03', 'MISMATCH')
+      attempt('att-elsewhere', 't-elsewhere', studioId, '2026-09-03', 'MISMATCH')
+      attempt('att-tonight', 't-tonight', houseId, '2026-09-04', 'STARTED')
+
+      const [left] = rows<{ tonight: number, earlier: number, unanswered: number }>(database, ...boundStatement(database, tillLeftOpenQuery(houseId, '2026-09-04')))
+      expect(left).toEqual({ tonight: 1, earlier: 2, unanswered: 2 })
     })
   })
 })

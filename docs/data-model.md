@@ -1694,9 +1694,14 @@ corrected by a superseding `z_readings` row (`server/utils/night-reconciliation.
 second session for the same night, which `requireNightAuthority` refuses to open once the night
 has passed. The close still runs, since its own predicate reads
 `closed_at IS NULL`, and no other write path updates the table at all.
-A session left open past its night is F-102's own query (`staleUnclosedSessionsQuery`). E-114's
-checklist criterion 3 names only two system-verified checks; a stale till session is not a third
-one it added, so this query still has no screen reading it (`docs/known-issues.md`).
+A session left open past its night is F-102's own query (`earlierOpenSessionsQuery`), read by the
+Bar Manager's list on the till (`GET /api/till/earlier`, with the unresolved `sumup_attempts` of
+ended nights). The close-night checklist reads `tillLeftOpenQuery` as a derived line, **The till
+is closed**: its own venue's till tonight, and earlier nights' open tills and unresolved charges at
+every bar, since a house not running tonight has no checklist of its own and every bar shares the
+one reader. It is not a stored system check, since `checklist_items.system_check` is CHECK
+constrained to two values and widening it would rebuild the table; and it never holds the close,
+because only the bar can close a till (F-102 criterion 5, issue 1316).
 
 ### comp_requests
 `id` PK · `venue_id` → venues restrict · `night`, the same date CHECK `till_sessions.night`

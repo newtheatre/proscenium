@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
 import { closeBreakdown, readerExpectation, saysWhereItWasTaken } from '#shared/utils/reconciliation'
+import { saysDay } from '#shared/utils/when'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
 
 // What the till took, and what the reader shows (F-102 criterion 4, F-118 criteria 1 to 3):
@@ -14,6 +15,8 @@ const props = defineProps<{
   variancePreviewPence: number
   closeFailure: string | null
   closingBusy: boolean
+  // Named for a session an ended night left open, so nobody closes it thinking it is tonight's.
+  earlier?: { venueName: string, night: string } | null
 }>()
 const emit = defineEmits<{ confirm: [] }>()
 
@@ -30,13 +33,16 @@ const needsVarianceNote = computed(() => hasReading.value && props.variancePrevi
 const expected = computed(() => (props.reconciliation ? readerExpectation(props.reconciliation) : null))
 const where = computed(() => (expected.value ? saysWhereItWasTaken(expected.value) : ''))
 const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconciliation.bar) : []))
+const description = computed(() => (props.earlier
+  ? `${props.earlier.venueName}, ${saysDay(props.earlier.night)}: what the till took that night, and what the reader shows.`
+  : 'What the till took, and what the reader shows.'))
 </script>
 
 <template>
   <UModal
     v-model:open="open"
     title="Close till"
-    description="What the till took, and what the reader shows."
+    :description="description"
   >
     <template #body>
       <div
@@ -83,7 +89,7 @@ const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconc
           class="space-y-1 text-sm"
         >
           <p class="text-xs text-muted">
-            This bar tonight
+            {{ earlier ? 'This bar that night' : 'This bar tonight' }}
           </p>
           <dl class="space-y-1">
             <div

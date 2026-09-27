@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { saysPhase } from '#shared/utils/checklist'
+import { saysTillLeftOpen } from '#shared/utils/till'
 import type { Phase, SystemCheck } from '#shared/utils/checklist'
+import type { TillLeftOpen } from '#shared/utils/till'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/checklist' })
 useSeoMeta({ title: 'Checklist' })
@@ -37,6 +39,10 @@ const items = ref<Entry[]>([])
 // Read from the server on every load, never only from `closeNight()`'s own response: otherwise
 // a reload forgets the night is closed and re-enables the close action (E-114 follow-up).
 const close = ref<CloseInfo | null>(null)
+// Advisory: only the bar closes a till, so this line ticks itself and never holds the close
+// (F-102 criterion 5, issue 1316).
+const till = ref<TillLeftOpen | null>(null)
+const tillSaid = computed(() => (till.value ? saysTillLeftOpen(till.value) : null))
 // Carried on every write below. The hub and the glance hand the house over in the query, and on a
 // matinee day opened cold the switcher below is what names it (E-127 criterion 2).
 const performanceId = ref<string | null>(typeof route.query.performanceId === 'string' ? route.query.performanceId : null)
@@ -55,13 +61,14 @@ async function load(): Promise<void> {
   busy.value = true
   failure.value = null
   try {
-    const listed = await request<{ performanceId: string, items: Entry[], close: CloseInfo | null }>(
+    const listed = await request<{ performanceId: string, items: Entry[], close: CloseInfo | null, till: TillLeftOpen }>(
       '/api/tonight/checklist',
       { query: performanceId.value ? { performanceId: performanceId.value } : {} },
     )
     performanceId.value = listed.performanceId
     items.value = listed.items
     close.value = listed.close
+    till.value = listed.till
     ambiguous.value = false
     syncedAt.value = new Date()
   }
@@ -279,6 +286,27 @@ async function closeNight(): Promise<void> {
                   </UButton>
                 </template>
               </div>
+            </li>
+            <!-- Read from the bar's own sessions, never stamped: nothing to tick and no exception to
+                 take, since only the bar can close a till (F-102 criterion 5, issue 1316). -->
+            <li
+              v-if="phase === 'POST' && till"
+              class="flex items-start justify-between gap-2 rounded-lg border border-default p-3"
+              data-test="checklist-till"
+            >
+              <div class="min-w-0">
+                <p class="text-sm font-medium">
+                  The till is closed
+                </p>
+                <p class="text-xs text-muted">
+                  {{ tillSaid ?? 'Ticks itself: clear' }}
+                </p>
+              </div>
+              <UIcon
+                v-if="!tillSaid"
+                name="i-lucide-check"
+                class="size-5 shrink-0 text-success"
+              />
             </li>
           </ul>
         </section>

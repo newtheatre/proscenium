@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { recordPostedSaleStatement, stuckAttemptsQuery } from '#server/utils/sumup-queries'
+import { earlierUnresolvedAttemptsQuery, recordPostedSaleStatement, stuckAttemptsQuery } from '#server/utils/sumup-queries'
 import { tillBookingByIdQuery, tillBookingByReferenceQuery } from '#server/utils/till-bookings'
 import { SUMUP_STUCK_COMPLETING_MINUTES } from '#shared/utils/sumup'
 import { sql } from 'drizzle-orm'
@@ -322,6 +322,52 @@ describe('the recording rides the sale\'s own batch (F-124 criterion 5, F-105 cr
       expect(move(database, 'att-1', 'COMPLETING', 'MISMATCH')).toBe(1)
       saleBatch(database, 'entry-1')
       expect(state(database)).toEqual({ status: 'SUCCEEDED', entryId: 'entry-1' })
+    })
+  })
+})
+
+// Issue 1316: an earlier night's charge nobody answered, or one taken and not recorded, is listed
+// for the Bar Manager on the till, since no shift reaches back into that night (F-102 criterion 5).
+describe('what an earlier night left unanswered', () => {
+  test('earlier nights\' waiting and mismatched charges are listed; settled ones and tonight\'s are not', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const { venueId } = tonightsPerformance(database, { suffix: 'earlier' })
+      insert(database, 'till_sessions', { id: 't-1', venue_id: venueId, night: '2026-09-14', opened_by: opener, opened_at: 1000 })
+      const at = (id: string, night: string, status: string): void => insert(database, 'sumup_attempts', {
+        id, till_session_id: 't-1', venue_id: venueId, night, created_by: opener, basket: '{}', expected_total_pence: 250, status,
+      })
+      at('att-waiting', '2026-09-13', 'STARTED')
+      at('att-mismatch', '2026-09-12', 'MISMATCH')
+      at('att-settled', '2026-09-13', 'FAILED')
+      at('att-tonight', '2026-09-14', 'STARTED')
+
+      const found = read<{ id: string }>(database, earlierUnresolvedAttemptsQuery('2026-09-14')).map(row => row.id)
+      expect(found.sort()).toEqual(['att-mismatch', 'att-waiting'])
+    })
+  })
+
+  // Recording the sale needs that night's till open at that bar, so the till offers it only then
+  // (issue 1316; how a late charge lands once the till is closed waits on a decision).
+  test('each charge says whether its night\'s till is still open at its bar', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const { venueId } = tonightsPerformance(database, { suffix: 'earlier-open' })
+      insert(database, 'till_sessions', { id: 't-open', venue_id: venueId, night: '2026-09-12', opened_by: opener, opened_at: 1000 })
+      insert(database, 'till_sessions', {
+        id: 't-closed', venue_id: venueId, night: '2026-09-11', opened_by: opener, opened_at: 1000, closed_by: opener, closed_at: 2000,
+      })
+      const at = (id: string, sessionId: string, night: string): void => insert(database, 'sumup_attempts', {
+        id, till_session_id: sessionId, venue_id: venueId, night, created_by: opener, basket: '{}', expected_total_pence: 250, status: 'MISMATCH',
+      })
+      at('att-open', 't-open', '2026-09-12')
+      at('att-closed', 't-closed', '2026-09-11')
+
+      const found = read<{ id: string, sessionOpen: number }>(database, earlierUnresolvedAttemptsQuery('2026-09-14'))
+      expect(found.map(({ id, sessionOpen }) => ({ id, sessionOpen: Boolean(sessionOpen) }))).toEqual([
+        { id: 'att-closed', sessionOpen: false },
+        { id: 'att-open', sessionOpen: true },
+      ])
     })
   })
 })

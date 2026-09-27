@@ -39,9 +39,23 @@ const {
   closingBusy,
   closeFailure,
   variancePreviewPence,
+  closing,
   openCloseModal,
   confirmClose,
 } = useTillSession()
+
+// What ended nights left open, for the Bar Manager alone; a till closed from it leaves the list.
+const {
+  left: earlierLeft,
+  failure: earlierFailure,
+  answering: earlierAnswering,
+  notes: earlierNotes,
+  refresh: refreshEarlier,
+  answer: answerEarlier,
+} = useTillEarlier()
+async function confirmAnyClose(): Promise<void> {
+  if (await confirmClose()) await refreshEarlier()
+}
 
 // The catalogue, held on the device so venue Wi-Fi dropping mid-service never blanks the grid
 // (K-103).
@@ -484,6 +498,16 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
       :stale="session ? catalogue.cachedAt.value : syncedAt"
       :busy="busy || catalogue.pending.value"
     >
+      <TillEarlierNights
+        v-model:notes="earlierNotes"
+        class="mb-6"
+        :left="earlierLeft"
+        :failure="earlierFailure"
+        :answering="earlierAnswering"
+        @close="openCloseModal"
+        @answer="answerEarlier"
+      />
+
       <!-- The guard refuses a request naming no venue, and the answer to that is a tap rather
            than a refusal a volunteer has to decode (F-125, 0077). -->
       <div
@@ -541,7 +565,7 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
                criterion 2). -->
           <UDropdownMenu
             :items="[[
-              { label: 'Close till', icon: 'i-lucide-lock', onSelect: openCloseModal },
+              { label: 'Close till', icon: 'i-lucide-lock', onSelect: () => openCloseModal() },
               ...(usingDevice ? [{ label: 'Change bar', icon: 'i-lucide-map-pin', onSelect: changeVenue }] : []),
             ]]"
           >
@@ -1005,7 +1029,8 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
       :variance-preview-pence="variancePreviewPence"
       :close-failure="closeFailure"
       :closing-busy="closingBusy"
-      @confirm="confirmClose"
+      :earlier="closing"
+      @confirm="confirmAnyClose"
     />
   </div>
 </template>
