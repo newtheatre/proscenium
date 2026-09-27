@@ -77,13 +77,13 @@ describe('a movement is named before it is written', () => {
     expect(saysMovementAction({ kind: 'ADJUST', qty: 3, unit: 'ITEM', itemName: 'Crisps', adds: false })).toBe('Take 3 off Crisps')
   })
 
-  test('a write-off offers the sizes that pour the item, and the whole container once', () => {
-    expect(writeOffSizes({ unit: 'ML', containerMl: 750, pourSizes: [{ label: '175ml', qty: 175 }, { label: '125ml', qty: 125 }] }))
-      .toEqual([{ label: '125ml', qty: 125 }, { label: '175ml', qty: 175 }, { label: 'The whole container', qty: 750 }])
-    expect(writeOffSizes({ unit: 'ML', containerMl: 750, pourSizes: [{ label: 'Bottle', qty: 750 }] }))
-      .toEqual([{ label: 'Bottle', qty: 750 }])
-    expect(writeOffSizes({ unit: 'ITEM', containerMl: null, pourSizes: [{ label: 'Can', qty: 1 }] }))
-      .toEqual([{ label: 'Can', qty: 1 }])
+  test('a write-off offers the amounts poured from the item, and the whole container once', () => {
+    expect(writeOffSizes({ unit: 'ML', containerMl: 750, pourSizes: [175, 125] }))
+      .toEqual([{ label: '125 ml', qty: 125 }, { label: '175 ml', qty: 175 }, { label: 'The whole container, 750 ml', qty: 750 }])
+    expect(writeOffSizes({ unit: 'ML', containerMl: 750, pourSizes: [750] }))
+      .toEqual([{ label: '750 ml', qty: 750 }])
+    expect(writeOffSizes({ unit: 'ITEM', containerMl: null, pourSizes: [1] }))
+      .toEqual([{ label: '1', qty: 1 }])
   })
 })
 

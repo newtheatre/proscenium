@@ -84,7 +84,7 @@ async function reversalTarget(input: { kind: string, itemId: string, qty: number
   if (!REVERSIBLE_KINDS.includes(original.kind)) {
     throw createError({
       statusCode: 409,
-      statusMessage: `${says(original.kind)} stock comes back only with its money, by voiding the charge it belongs to, so it is never reversed here`,
+      statusMessage: `${says(original.kind)} stock comes back only with its money, so it is never reversed here: an unsettled tab charge is voided from its tab, which credits both`,
     })
   }
   if (original.itemId !== input.itemId || original.qty !== -input.qty) {

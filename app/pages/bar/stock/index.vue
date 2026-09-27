@@ -112,7 +112,7 @@ function edit(item: StockItem | null): void {
 // Each action opens on its own kind, so no default can write a movement nobody meant (issue 1350).
 function moveStock(item: StockItem, kind: HandEnteredKind): void {
   moving.value = item
-  Object.assign(movement, { kind, qty: kind === 'WASTAGE' ? 0 : 1, reason: undefined, adds: true })
+  Object.assign(movement, { kind, qty: 0, reason: undefined, adds: true })
   costPounds.value = undefined
 }
 
@@ -122,7 +122,10 @@ const MOVEMENT_TITLES: Record<HandEnteredKind, string> = {
   ADJUST: 'Adjust the count of',
 }
 
-const submitLabel = computed(() => (moving.value && movement.qty > 0
+// A cleared number field leaves the model undefined, which is no amount either.
+const hasAmount = computed(() => movement.qty > 0)
+
+const submitLabel = computed(() => (moving.value && hasAmount.value
   ? saysMovementAction({ kind: movement.kind, qty: movement.qty, unit: moving.value.unit, itemName: moving.value.name, adds: movement.adds })
   : 'Say how much first'))
 
@@ -659,27 +662,25 @@ const columns: TableColumn<StockItem>[] = [
             />
           </UFormField>
 
-          <div
+          <UFormField
             v-if="movement.kind === 'WASTAGE' && sizeChips.length > 0"
-            class="space-y-2"
+            label="How much"
           >
-            <p class="text-sm font-medium">
-              How much
-            </p>
             <div class="flex flex-wrap gap-2">
               <UButton
                 v-for="size in sizeChips"
                 :key="size.qty"
                 :color="movement.qty === size.qty ? 'primary' : 'neutral'"
                 :variant="movement.qty === size.qty ? 'solid' : 'subtle'"
+                :aria-pressed="movement.qty === size.qty"
                 class="min-h-12"
                 :data-test="`write-off-size-${size.qty}`"
                 @click="movement.qty = size.qty"
               >
-                {{ size.label }}, {{ saysQuantity(size.qty, moving!.unit) }}
+                {{ size.label }}
               </UButton>
             </div>
-          </div>
+          </UFormField>
 
           <UFormField
             label="Quantity"
@@ -710,19 +711,20 @@ const columns: TableColumn<StockItem>[] = [
             />
           </UFormField>
 
-          <div
+          <!-- Named reason, so a write-off pressed with none says why it did nothing (F-204). -->
+          <UFormField
             v-else-if="movement.kind === 'WASTAGE'"
-            class="space-y-2"
+            label="Why"
+            name="reason"
+            required
           >
-            <p class="text-sm font-medium">
-              Why
-            </p>
             <div class="flex flex-wrap gap-2">
               <UButton
                 v-for="reason in reasonOptions"
                 :key="reason.value"
                 :color="movement.reason === reason.value ? 'primary' : 'neutral'"
                 :variant="movement.reason === reason.value ? 'solid' : 'subtle'"
+                :aria-pressed="movement.reason === reason.value"
                 class="min-h-12"
                 :data-test="`write-off-reason-${reason.value}`"
                 @click="movement.reason = reason.value"
@@ -730,7 +732,7 @@ const columns: TableColumn<StockItem>[] = [
                 {{ reason.label }}
               </UButton>
             </div>
-          </div>
+          </UFormField>
 
           <UFormField
             v-else
@@ -755,7 +757,7 @@ const columns: TableColumn<StockItem>[] = [
           form="movement-form"
           :loading="saving"
           data-test="movement-submit"
-          :disabled="movement.qty <= 0"
+          :disabled="!hasAmount"
         >
           {{ submitLabel }}
         </UButton>

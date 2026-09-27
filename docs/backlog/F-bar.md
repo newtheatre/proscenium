@@ -356,9 +356,10 @@ Open questions:
      netting zero), stocktake adjustment (F-115) and void credit (F-109).
   4. Movements are append-only, trigger-enforced: no update or delete; a correction is a reversing
      movement referencing the original. Amended 26 September 2026 (issue 1350): only a movement
-     entered by hand (a delivery, wastage or adjustment) or a stocktake adjustment is reversed;
-     a sale or a comp keeps its money in the ledger, so its stock comes back only with a void of
-     that money, and the route refuses to reverse it.
+     entered by hand (a delivery, wastage or adjustment) or a stocktake adjustment is reversed by
+     hand; a sale or a comp keeps its money in the ledger, so the route refuses to reverse it.
+     Only an unsettled tab charge's void puts such stock back, with its money (F-109); a card or
+     cash sale, a comp or a settled charge puts none back by hand.
   5. Every movement stamps its actor (or system), timestamp and source document (delivery, sale
      line, stocktake), so any on-hand figure can be audited to its causes.
   6. Deliveries record cost, giving GP reporting (F-119) its cost basis. Amended 26 September

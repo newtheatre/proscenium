@@ -136,9 +136,9 @@ function aMovement(itemId: string, kind: 'SALE' | 'COMP' | 'STOCKTAKE', qty: num
   const database = new Database(app.databaseFile)
   try {
     const id = `mv-${crypto.randomUUID().slice(0, 12)}`
-    const document = kind === 'STOCKTAKE' ? ['stocktake_lines', `line-${id}`] : [null, null]
+    const [refTable, refId] = kind === 'STOCKTAKE' ? ['stocktake_lines', `line-${id}`] : [null, null]
     database.query('INSERT INTO stock_movements (id, item_id, qty, kind, ref_table, ref_id) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, itemId, qty, kind, document[0] ?? null, document[1] ?? null)
+      .run(id, itemId, qty, kind, refTable, refId)
     return id
   }
   finally {
@@ -976,6 +976,9 @@ describe.skipIf(skip !== null)('the screens', () => {
     await click(view, `[data-test="write-off-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
     await click(view, '[data-test="write-off-size-175"]')
+    // With no reason chosen the press says why it did nothing, rather than doing nothing silently.
+    await click(view, '[data-test="movement-submit"]')
+    await waitFor(view, `document.querySelector('[data-test="movement-form"]')?.textContent.includes('That needs a reason')`)
     await click(view, '[data-test="write-off-reason-SPILLAGE"]')
     await waitFor(view, `document.querySelector('[data-test="movement-submit"]')?.textContent.includes('Write off 175 ml of ${itemName}')`)
     await click(view, '[data-test="movement-submit"]')
