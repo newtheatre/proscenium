@@ -29,28 +29,25 @@ export default defineEventHandler(async (event) => {
       outcomes.push({ id, ok: false, why: 'closed', says: closed })
       continue
     }
+    const entry = auditEntry({
+      actorId: account.id,
+      action: input.action === 'APPROVE' ? 'room.request.approved' : 'room.request.rejected',
+      target: `booking:${id}`,
+      // The room it went into, never the reason the member gave for asking (0011).
+      detail: {
+        room: input.roomId ?? before.get(id)?.roomId ?? null,
+        ...(input.roomId ? { movedFrom: before.get(id)?.roomId ?? null } : {}),
+      },
+    })
     const outcome = input.action === 'APPROVE'
-      ? await approveOne(id, account.id, input.roomId, now, offsets)
-      : await rejectOne(id, account.id, input.reason!, now)
+      ? await approveOne(id, account.id, input.roomId, now, offsets, entry)
+      : await rejectOne(id, account.id, input.reason!, now, entry)
     // The approval carries the closures itself; one made since the check above names itself (0003).
     if (!outcome.ok && outcome.why === 'closed') outcome.says = (await closedFor(event, before.get(id), input.roomId)) ?? outcome.says
     outcomes.push(outcome)
   }
 
   const decided = outcomes.filter(outcome => outcome.ok)
-  if (decided.length > 0) {
-    await db.insert(schema.auditLog).values(decided.map(outcome => auditEntry({
-      actorId: account.id,
-      action: outcome.status === 'CONFIRMED' ? 'room.request.approved' : 'room.request.rejected',
-      target: `booking:${outcome.id}`,
-      // The room it went into, never the reason the member gave for asking (0011).
-      detail: {
-        room: input.roomId ?? before.get(outcome.id)?.roomId,
-        ...(input.roomId ? { movedFrom: before.get(outcome.id)?.roomId } : {}),
-      },
-    })))
-  }
-
   await tellRequesters(event, decided, before, input.action, input.reason, input.roomId)
 
   return {

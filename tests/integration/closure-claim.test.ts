@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { approveStatement } from '#server/utils/approvals'
 import { claimRoomSlotStatement } from '#server/utils/bookings'
 import { bumpStatements, seriesClaimStatement } from '#server/utils/room-writes'
+import { auditEntry } from '#shared/utils/audit'
 import { showNightBounds, showNightOf } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -58,6 +59,8 @@ function claim(database: TestDatabase, id: string, over: ClaimInput): boolean {
   database.raw.prepare(query).all(...parameters as never[])
   return rows<{ n: number }>(database, 'SELECT count(*) n FROM room_bookings WHERE id = ?', id)[0]!.n === 1
 }
+
+const bumped = () => auditEntry({ actorId: 'u-booker', action: 'room.booking.bumped', target: 'booking:b-standing', detail: { room: 'r-house' } })
 
 function closeRoom(database: TestDatabase, roomId: string | null, span: { startsAt: number, endsAt: number }): void {
   database.batch([['INSERT INTO room_blackouts (id, room_id, reason, starts_at, ends_at) VALUES (?, ?, ?, ?, ?)',
@@ -176,7 +179,7 @@ describe('every other write that places a booking holds the closures too', () =>
         offer: undefined,
         now: NOW_SECONDS,
         offsets: OFFSETS,
-      }, 'b-claimant', null)) write(database, statement)
+      }, 'b-claimant', null, bumped())) write(database, statement)
       expect(statusOf(database, 'b-standing')).toBe('CONFIRMED')
       expect(statusOf(database, 'b-claimant')).toBeUndefined()
     })
@@ -198,7 +201,7 @@ describe('every other write that places a booking holds the closures too', () =>
         offer: { roomId: 'r-studio', room: 'The Studio', capacity: null, ...AFTERNOON },
         now: NOW_SECONDS,
         offsets: OFFSETS,
-      }, 'b-claimant', 'b-offer')) write(database, statement)
+      }, 'b-claimant', 'b-offer', bumped())) write(database, statement)
       expect(statusOf(database, 'b-standing')).toBe('BUMPED')
       expect(statusOf(database, 'b-claimant')).toBe('CONFIRMED')
       expect(statusOf(database, 'b-offer')).toBeUndefined()

@@ -1986,9 +1986,13 @@ The displaced member is offered **the nearest equivalent slot, held for them rat
 suggested**: the same room first, then a room whose recorded capacity is at least equal, closest in
 time either side, skipping anything booked or closed. A room whose capacity nobody recorded is not
 offered against a room that has one, because it cannot be shown to be big enough. If nothing
-equivalent is free the bump still goes ahead and the message says so. The whole thing is one batch:
-the displaced row flips guarded on `CONFIRMED`, and both the claimant's booking and the offer are
-written only if that flip landed, so a lost race leaves nothing behind.
+equivalent is free the bump still goes ahead and the message says so. The whole thing is one batch
+(`bumpStatements()` in `server/utils/room-writes.ts`). The claimant's booking goes first, guarded on
+the displaced row still being `CONFIRMED`, its slot open and nothing else in it; the offer and the
+flip to `BUMPED` land only if that booking did, and the flip links only an offer that was written.
+So a lost race leaves nothing behind, and a booking is never `BUMPED` with nobody in its slot. The
+audit entry (`room.booking.bumped`) is the batch's last statement, written only if the flip applied
+(0049), and names the booking that replaced it and the offer actually held.
 `GET /api/admin/rooms/bookings` (`rooms.read`) is the officer's list of every member's bookings,
 the list a bump or a no-show starts from (C-115 criterion 6). It filters by its declaration
 (`shared/utils/room-bookings-list.ts`, K-129): `status`, `room`, `member`, `tier`, `startsAt`,
@@ -2008,8 +2012,9 @@ names what a non-nullable scrubbed column becomes instead (`scrubTo`).
 A member cancels through `POST /api/rooms/bookings/[id]/cancel`, which is **a status change and
 never a deletion**: no member-facing delete path exists at all, rather than one that refuses
 (C-112 criterion 2, audit RM-3). The write is guarded on the status it read, so two cancels racing
-leave one success. `CANCELLED`, `REJECTED` and `BUMPED` are terminal, and the row stays in the
-member's own list with its status (criterion 5).
+leave one success, and its audit entry is in the same batch, written only if the cancel applied
+(0049). `CANCELLED`, `REJECTED` and `BUMPED` are terminal, and the row stays in the member's own
+list with its status (criterion 5).
 A member changes a request through `PUT /api/rooms/bookings/[id]`, and only while it is
 `PENDING_APPROVAL` (C-108 criterion 4). The route re-runs the closure check and `judge()` in full,
 counting the member's other held bookings rather than this one against the cap, then writes through
@@ -2024,6 +2029,10 @@ change leaves both alone. Because `created_at` can now move, the sweep's lapse a
 `escalated_at IS NULL`, on the statement, so an edit landing between the sweep's read and its
 write leaves the restarted wait untouched. The audit entry (`room.request.edited`) carries the room, span, numbers,
 tier and purpose from and to, and only the names of any rewritten title, notes or reason (0011).
+**Every room write audits in its own batch**, never in a statement after it (0049): a booking or a
+request is audited with its claim, a change with its `UPDATE`, each decision with its own guarded
+write, a bump and a lapse likewise, each entry written only if its write applied (`changes() = 1`).
+A series is audited after its completeness assertion, and a term's cancel is audited first, below.
 Occupancy: `CONFIRMED` and `PENDING_APPROVAL` hold their slot; the clash rule is half-open
 and rides the write as a predicate. `server/utils/bookings.ts` is the only writer, and it is one
 guarded `INSERT ... SELECT ... WHERE NOT EXISTS ... RETURNING id`: a row returned is the win, and
@@ -2056,7 +2065,8 @@ approving write, so an approval beaten to the slot returns a conflict listing wh
 than confirming a double booking (criterion 3, audit RM-4). No statement's parameter count grows
 with the batch; the read that fetches the rows first chunks at 90 (0003). A zero-row write is
 disambiguated by one read into missing, already settled, room gone, or beaten, so a partly refused
-batch says which ones and why rather than reading as a success.
+batch says which ones and why rather than reading as a success. Each decision's audit entry is in
+that decision's own batch, so a batch failing part-way leaves every decision before it audited.
 `REJECTED`, `CANCELLED` and `BUMPED` are terminal for everyone, officers included: reopening is
 refused because the slot may already be somebody else's (criterion 5). An approval may move the
 booking into a different room, one at a time, and the clash rule is asserted against the room it is
@@ -2346,7 +2356,8 @@ its siblings (criterion 6). Occurrences carry `series_id` and `occurrence`, and 
 bookings for every other rule in the module (criterion 5).
 
 The write is one `db.batch`: the series row, then a guarded claim per occurrence, then a statement
-that fails the batch unless every claim landed (**0035**). A guarded `INSERT` matching nothing
+that fails the batch unless every claim landed (**0035**), then the audit entry, which therefore
+stands or falls with the series (0049). A guarded `INSERT` matching nothing
 writes no row and raises nothing, so without that assertion a series beaten to one slot would
 commit eleven of its twelve weeks silently.
 
@@ -2360,7 +2371,10 @@ no default, because a single button meaning either one week or a whole term is t
 story exists to remove (criterion 1). A series-scoped cancel covers every non-terminal occurrence
 in one predicate rather than an id list, so a term of any length is one statement (0003, 0006);
 already cancelled or rejected occurrences are untouched (criterion 2). One message names the weeks
-that went, never one per occurrence (criterion 5).
+that went, never one per occurrence (criterion 5). The term's one audit entry
+(`room.series.cancelled`) counts every week that went, ours and the Union's: it is written first in
+the cancel's batch, counting under the cancels' own predicates, and only if that count is above
+nought (`seriesCancelStatements()`, 0049), since `changes()` sees one statement and the cancel is two.
 
 Editing asks the same question and answers only one side of it: `PUT /api/rooms/bookings/[id]`
 changes one occurrence of a pending request, and refuses a body naming `scope: 'series'` with a

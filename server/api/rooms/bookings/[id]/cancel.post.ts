@@ -1,7 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { CANCELLABLE, cancelForm, refusalToCancel } from '#shared/utils/bookings'
-import { LIVE_EXTERNAL } from '#shared/utils/external-requests'
 import { formatLondon } from '#shared/utils/london'
+import type { AuditRow } from '#shared/utils/audit'
 
 // Cancel a booking you hold, or the series it belongs to.
 export default defineEventHandler(async (event) => {
@@ -30,20 +30,25 @@ export default defineEventHandler(async (event) => {
   }
 
   const now = Math.floor(Date.now() / 1000)
-  const cancelled = booking.seriesId && input.scope === 'series'
-    ? await cancelSeries(booking.seriesId, account.id, now)
-    : await cancelOne(id, account.id, booking.seriesId, now)
+  const seriesId = input.scope === 'series' ? booking.seriesId : null
+  const cancelled = seriesId
+    // A term's entry is given its count by the batch, which alone knows how many weeks went.
+    ? await cancelSeries(seriesId, account.id, now, auditEntry({
+        actorId: account.id,
+        action: 'room.series.cancelled',
+        target: `series:${seriesId}`,
+        detail: { room: booking.roomId, was: booking.status },
+      }))
+    : await cancelOne(id, account.id, booking.seriesId, now, auditEntry({
+        actorId: account.id,
+        action: 'room.booking.cancelled',
+        target: `booking:${id}`,
+        detail: { room: booking.roomId, was: booking.status, cancelled: 1 },
+      }))
 
   if (cancelled.length === 0) {
     throw createError({ statusCode: 409, statusMessage: 'That booking has already been decided' })
   }
-
-  await db.insert(schema.auditLog).values(auditEntry({
-    actorId: account.id,
-    action: input.scope === 'series' ? 'room.series.cancelled' : 'room.booking.cancelled',
-    target: input.scope === 'series' ? `series:${booking.seriesId}` : `booking:${id}`,
-    detail: { room: booking.roomId, was: booking.status, cancelled: cancelled.length },
-  }))
 
   await tell(event, account, booking, cancelled)
 
@@ -60,7 +65,7 @@ interface Cancelled { id: string, startsAt: number }
 
 // A status change, never a deletion, and guarded on the status it read: two cancels racing must
 // not both count as the one that freed the slot (0006, C-112 criterion 2).
-async function cancelOne(id: string, userId: string, seriesId: string | null, now: number): Promise<Cancelled[]> {
+async function cancelOne(id: string, userId: string, seriesId: string | null, now: number, entry: AuditRow): Promise<Cancelled[]> {
   const cancel = db.update(schema.roomBookings)
     .set({ status: 'CANCELLED', updatedAt: now })
     .where(and(
@@ -70,42 +75,29 @@ async function cancelOne(id: string, userId: string, seriesId: string | null, no
     ))
     .returning({ id: schema.roomBookings.id, startsAt: schema.roomBookings.startsAt })
 
-  if (!seriesId) return cancel
-
   // Cancelling the first week moves the head, and it moves in the same batch: a series read
   // between the two would name a week that is already gone (C-111 criterion 3).
-  const [cancelled] = await db.batch([cancel, promoteHead(seriesId, now)] as unknown as Parameters<typeof db.batch>[0])
+  const [cancelled] = await db.batch([
+    cancel,
+    db.run(auditIfChanged(entry)),
+    ...(seriesId ? [promoteHead(seriesId, now)] : []),
+  ] as unknown as Parameters<typeof db.batch>[0])
   return cancelled as Cancelled[]
 }
 
 // Every occurrence still standing, resolved by the statement rather than by an id list built from
 // a read: one predicate covers a term of any length (0003, 0006, C-111 criterion 2).
-async function cancelSeries(seriesId: string, userId: string, now: number): Promise<Cancelled[]> {
+async function cancelSeries(seriesId: string, userId: string, now: number, entry: AuditRow): Promise<Cancelled[]> {
   // Already decided occurrences are left exactly as they were, and the head follows what remains.
-  const cancel = db.update(schema.roomBookings)
-    .set({ status: 'CANCELLED', updatedAt: now })
-    .where(and(
-      eq(schema.roomBookings.seriesId, seriesId),
-      eq(schema.roomBookings.userId, userId),
-      inArray(schema.roomBookings.status, [...CANCELLABLE]),
-    ))
-    .returning({ id: schema.roomBookings.id, startsAt: schema.roomBookings.startsAt })
-
-  // A term may hold weeks in rooms we do not manage, and cancelling it means all of them: a week
-  // left waiting on somebody after the term is gone is a form nobody withdraws (C-124).
-  const alsoTheirs = db.update(schema.externalRequests)
-    .set({ status: 'CANCELLED', updatedAt: now })
-    .where(and(
-      eq(schema.externalRequests.seriesId, seriesId),
-      eq(schema.externalRequests.userId, userId),
-      inArray(schema.externalRequests.status, [...LIVE_EXTERNAL]),
-    ))
-    .returning({ id: schema.externalRequests.id, startsAt: schema.externalRequests.startsAt })
-
-  const [ours, theirs] = await db.batch(
-    [cancel, alsoTheirs, promoteHead(seriesId, now)] as unknown as Parameters<typeof db.batch>[0],
-  )
-  return [...(ours as Cancelled[]), ...(theirs as Cancelled[])].sort((a, b) => a.startsAt - b.startsAt)
+  // A term may hold weeks in rooms we do not manage, and cancelling it means all of them (C-124).
+  const { audit, ours, theirs } = seriesCancelStatements(seriesId, userId, now, entry)
+  const [, mine, others] = await db.batch([
+    db.run(audit),
+    db.all<Cancelled>(ours),
+    db.all<Cancelled>(theirs),
+    promoteHead(seriesId, now),
+  ] as unknown as Parameters<typeof db.batch>[0])
+  return [...(mine as Cancelled[]), ...(others as Cancelled[])].sort((a, b) => a.startsAt - b.startsAt)
 }
 
 // One message naming which weeks went, never one per occurrence (C-111 criterion 5).

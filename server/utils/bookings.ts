@@ -1,6 +1,7 @@
 import { db, schema } from '@nuxthub/db'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { newId } from './accounts'
+import { auditedWrite } from './audit'
 import { configValue } from './configuration'
 import { longestTerm } from './membership-claims'
 import { closedNow, roomOpenTerms } from './performance-closures'
@@ -9,6 +10,7 @@ import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING), since D-113 reaches `hasCurrentMembership`.
 import { isCurrent, londonDay } from '#shared/utils/membership'
+import type { AuditRow } from '#shared/utils/audit'
 import type { BookingStatus, Conflict } from '#shared/utils/bookings'
 import type { ShiftOffsets } from '#shared/utils/rota-times'
 import type { H3Event } from 'h3'
@@ -65,14 +67,17 @@ export function claimRoomSlotStatement(id: string, input: ClaimInput): SQL {
   `
 }
 
-export async function claimSlot(input: ClaimInput): Promise<ClaimOutcome> {
+// The audit entry is built for the new id and batched with the claim, written only if it landed
+// (0049). Without one, the caller owns the claim's audit.
+export async function claimSlot(input: ClaimInput, audit?: (id: string) => AuditRow): Promise<ClaimOutcome> {
   const id = newId()
 
   // RETURNING rather than a changes count: the driver's meta is not a shape to rely on, and a row
   // coming back is the same signal claimToken uses to know it won (0003).
-  const claimed = await db.all<{ id: string }>(claimRoomSlotStatement(id, input))
+  const write = db.all<{ id: string }>(claimRoomSlotStatement(id, input))
+  const claimed = audit ? await auditedWrite(write, audit(id)) : (await write).length > 0
 
-  if (claimed.length > 0) return { won: true, id }
+  if (claimed) return { won: true, id }
 
   // Zero rows written, disambiguated rather than guessed: gone, closed or beaten (0003).
   return await whyItFailed(input)
@@ -136,9 +141,8 @@ export function editPendingStatement(input: EditInput): SQL {
   `
 }
 
-export async function editPending(input: EditInput): Promise<EditOutcome> {
-  const edited = await db.all<{ id: string }>(editPendingStatement(input))
-  if (edited.length > 0) return { won: true }
+export async function editPending(input: EditInput, entry: AuditRow): Promise<EditOutcome> {
+  if (await auditedWrite(db.all<{ id: string }>(editPendingStatement(input)), entry)) return { won: true }
 
   // Nothing written, disambiguated rather than guessed, the way a lost claim is (0003).
   const booking = await bookingFor(input.id)
