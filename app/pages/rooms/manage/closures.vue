@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
-import { BLACKOUT_REASON_LIMIT, saysSpan } from '#shared/utils/blackouts'
+import { BLACKOUT_REASON_LIMIT, closeButtonLabel, closureSpan, saysSpan, wholeDaysByDefault } from '#shared/utils/blackouts'
 import { blackoutsList } from '#shared/utils/blackouts-list'
-import { fromLondonWallClock } from '#shared/utils/london'
 import type { ListedPerformanceClosure } from '#shared/utils/performance-closures'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -27,6 +26,7 @@ const EVERY_ROOM = 'all'
 interface Listing { items: Closure[], total: number }
 
 const request = useRequestFetch()
+const route = useRoute()
 const rooms = ref<{ id: string, name: string, isActive: boolean }[]>([])
 const failure = ref<ListFailure | null>(null)
 const toast = useToast()
@@ -36,8 +36,10 @@ const writes = computed(() => can(useViewer().value, manageRoomsEstate))
 const closing = ref(false)
 const removing = ref<Closure | null>(null)
 const working = ref(false)
+// No room is chosen for the officer: a closure cannot be undone, and every room was one slip away
+// when it was the default (issue 1353).
 const form = reactive({
-  roomId: EVERY_ROOM,
+  roomId: '',
   reason: '',
   day: '',
   untilDay: '',
@@ -79,17 +81,45 @@ async function loadRooms(): Promise<void> {
   rooms.value = (await $fetch<{ items: typeof rooms.value }>('/api/admin/rooms')).items
 }
 
-// The wall clock the officer typed, turned into the instant it names in London (0014).
-function instantOf(day: string, clock: string): string {
-  const [year, month, date] = day.split('-').map(Number)
-  const [hour, minute] = clock.split(':').map(Number)
-  return fromLondonWallClock(year!, month!, date!, hour!, minute!).toISOString()
-}
-
 const endsOn = computed(() => form.untilDay || form.day)
+
+// Whole days unless the officer says otherwise, once the closure runs past its first day.
+const wholeDaysChosen = ref<boolean | null>(null)
+const wholeDays = computed({
+  get: () => wholeDaysChosen.value ?? wholeDaysByDefault(form.day, endsOn.value),
+  set: (chosen: boolean) => { wholeDaysChosen.value = chosen },
+})
+
+const span = computed(() => (form.day && endsOn.value >= form.day
+  ? closureSpan({ day: form.day, untilDay: endsOn.value, from: form.from, to: form.to, wholeDays: wholeDays.value })
+  : null))
+
 const ready = computed(() => Boolean(
-  form.reason.trim() && form.day && endsOn.value >= form.day
-  && (endsOn.value > form.day || form.to > form.from)))
+  form.roomId && form.reason.trim() && span.value && span.value.endsAt > span.value.startsAt))
+
+const chosenName = computed(() => {
+  if (!form.roomId) return null
+  if (form.roomId === EVERY_ROOM) return 'every room'
+  return rooms.value.find(one => one.id === form.roomId)?.name ?? 'the room'
+})
+
+// Counted by the same read the close makes, and again whenever the room or the span moves.
+const cancels = ref<number | null>(null)
+watch([() => form.roomId, span], async ([roomId, when]) => {
+  cancels.value = null
+  if (!roomId || !when || when.endsAt <= when.startsAt) return
+  try {
+    const answer = await $fetch<{ count: number }>('/api/admin/rooms/blackouts/stranded', {
+      query: { ...(roomId === EVERY_ROOM ? {} : { roomId }), ...when },
+    })
+    if (roomId === form.roomId && when === span.value) cancels.value = answer.count
+  }
+  catch {
+    cancels.value = null
+  }
+})
+
+const closeLabel = computed(() => closeButtonLabel(chosenName.value, cancels.value))
 
 async function close(): Promise<void> {
   working.value = true
@@ -100,8 +130,7 @@ async function close(): Promise<void> {
       body: {
         roomId: form.roomId === EVERY_ROOM ? null : form.roomId,
         reason: form.reason,
-        startsAt: instantOf(form.day, form.from),
-        endsAt: instantOf(endsOn.value, form.to),
+        ...span.value!,
       },
     })
 
@@ -115,6 +144,8 @@ async function close(): Promise<void> {
     })
     closing.value = false
     form.reason = ''
+    form.roomId = ''
+    wholeDaysChosen.value = null
     await refresh()
   }
   catch (error) {
@@ -186,7 +217,15 @@ const columns: TableColumn<Closure>[] = [
   },
 ]
 
-onMounted(loadRooms)
+// Opened from a room's row on Rooms, with that room already chosen (issue 1353).
+onMounted(async () => {
+  await loadRooms()
+  const asked = String(route.query.close ?? '')
+  if (writes.value && rooms.value.some(one => one.id === asked && one.isActive)) {
+    form.roomId = asked
+    closing.value = true
+  }
+})
 
 // A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
 // is shown wherever the action was taken.
@@ -325,7 +364,7 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
     <UModal
       v-model:open="closing"
       title="Close a room"
-      description="Anything booked in the span is cancelled and its member told."
+      description="Anything booked in the span is cancelled and its member told. Reopening restores none of it, so the button counts it first."
     >
       <template #body>
         <UAlert
@@ -339,13 +378,15 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
         <div class="space-y-4">
           <UFormField
             label="Which room"
+            required
             help="Every room is what a building closure or a fire alarm test means."
           >
             <USelect
               v-model="form.roomId"
-              :items="[{ label: 'Every room', value: EVERY_ROOM },
-                       ...rooms.filter(one => one.isActive).map(one => ({ label: one.name, value: one.id }))]"
+              :items="[...rooms.filter(one => one.isActive).map(one => ({ label: one.name, value: one.id })),
+                       { label: 'Every room', value: EVERY_ROOM }]"
               value-key="value"
+              placeholder="Choose a room"
               class="w-full"
               data-test="close-room-id"
             />
@@ -387,7 +428,17 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
             </UFormField>
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
+          <USwitch
+            v-model="wholeDays"
+            label="Whole days"
+            description="From midnight on the first day to midnight after the last."
+            data-test="close-whole-days"
+          />
+
+          <div
+            v-if="!wholeDays"
+            class="grid gap-4 sm:grid-cols-2"
+          >
             <UFormField
               label="From"
               required
@@ -422,7 +473,7 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
           data-test="close-submit"
           @click="close"
         >
-          Close the room
+          {{ closeLabel }}
         </UButton>
         <UButton
           color="neutral"

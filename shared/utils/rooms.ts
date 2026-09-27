@@ -71,6 +71,38 @@ export const roomHoursForm = z.object({
 
 export type RoomHours = z.output<typeof roomHoursForm>
 
+// Hours are chosen as a pattern before any one day, because a room with none recorded is open
+// whenever, and a seven-row list of switches read as seven closed days (issue 1353).
+export const HOURS_MODES = ['ALWAYS', 'WEEKDAYS', 'EACH_DAY'] as const
+export type HoursMode = (typeof HOURS_MODES)[number]
+
+const MONDAY_TO_FRIDAY = [1, 2, 3, 4, 5]
+
+export function saysHoursMode(mode: HoursMode): string {
+  switch (mode) {
+    case 'ALWAYS': return 'Always open'
+    case 'WEEKDAYS': return 'Weekdays'
+    case 'EACH_DAY': return 'Set each day'
+    default: return mode satisfies never
+  }
+}
+
+export function hoursModeOf(hours: RoomHours[]): HoursMode {
+  if (hours.length === 0) return 'ALWAYS'
+  const [first] = hours
+  const weekdays = hours.length === MONDAY_TO_FRIDAY.length
+    && MONDAY_TO_FRIDAY.every(weekday => hours.some(day => day.weekday === weekday))
+    && hours.every(day => day.opens === first!.opens && day.closes === first!.closes)
+  return weekdays ? 'WEEKDAYS' : 'EACH_DAY'
+}
+
+// Set each day starts from every day open at the times given, for the officer to close some.
+export function hoursForMode(mode: HoursMode, opens: string, closes: string): RoomHours[] {
+  if (mode === 'ALWAYS') return []
+  const days = mode === 'WEEKDAYS' ? MONDAY_TO_FRIDAY : WEEKDAYS.map(day => day.index)
+  return days.map(weekday => ({ weekday, opens, closes }))
+}
+
 // No hours at all is a room with no restriction worth recording, which is most of them. Hours
 // once given are exhaustive: a weekday with no row is then a day the room is shut.
 export function unrestricted(hours: RoomHours[]): boolean {
