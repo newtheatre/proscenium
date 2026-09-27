@@ -249,6 +249,11 @@ describe('the members area and the account settings never overlap (K-127 criteri
     for (const to of ['/rooms', '/training']) expect(MY_NAV.find(entry => entry.to === to)?.exact).toBeUndefined()
   })
 
+  // In-app always arrives, so the only thing the page sets is the email (issue 1345).
+  test('the notification settings are named for what they set', () => {
+    expect(ACCOUNT_NAV.find(entry => entry.to === '/account/notifications')?.label).toBe('Email settings')
+  })
+
   test('ACCOUNT_NAV is exactly the four account routes, access requirements among them', () => {
     expect(ACCOUNT_NAV.map(entry => entry.to)).toEqual(['/account/profile', '/account/access', '/account/security', '/account/notifications'])
   })

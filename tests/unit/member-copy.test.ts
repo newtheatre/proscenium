@@ -186,7 +186,7 @@ describe('a member button is a verb and an object (copy-style section 8)', () =>
 // Each of these six said what was not there and stopped, naming nothing the reader could do
 // about it. The exact wording that stopped short is what this holds out.
 const STOPPED_SHORT: Record<string, string[]> = {
-  'app/pages/account/notifications.vue': ['Nothing yet.'],
+  'app/pages/my/notifications.vue': ['Nothing yet.'],
   'app/pages/account/passes.vue': ['You hold no passes yet.'],
   'app/pages/rota/index.vue': ['Nothing open right now.'],
   'app/pages/training/index.vue': ['Nothing yet.'],
