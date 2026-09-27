@@ -473,3 +473,55 @@ describe.skipIf(skip !== null)('reopening restores nothing (criterion 5)', () =>
     expect(entries).toContain('room.blackout.removed')
   })
 })
+
+// Issue 1353: reopening restores nothing (criterion 5), so the form counts what closing would
+// cancel before the officer presses anything, and the count itself cancels nothing.
+describe.skipIf(skip !== null)('counting before closing (criteria 3 and 5, issue 1353)', () => {
+  const stranded = (roomId: string | null, when: { startsAt: string, endsAt: string }, as = officer): Promise<Response> => {
+    const query = new URLSearchParams({ ...(roomId ? { roomId } : {}), ...when }).toString()
+    return send('GET', `/api/admin/rooms/blackouts/stranded?${query}`, null, as)
+  }
+
+  test('the count names what one room would lose, and leaves it booked', async () => {
+    const room = await makeRoom()
+    const booked = await book(room, span(50))
+    const { id } = await booked.json() as { id: string }
+
+    const answered = await stranded(room, span(50))
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toEqual({ count: 1 })
+    expect(read<{ status: string }>('SELECT status FROM room_bookings WHERE id = ?', id)?.status).toBe('CONFIRMED')
+
+    expect(await (await stranded(room, span(51))).json()).toEqual({ count: 0 })
+  })
+
+  test('with no room it counts across every room', async () => {
+    const one = await makeRoom()
+    const other = await makeRoom()
+    await book(one, span(52))
+    await book(other, span(52))
+    expect((await (await stranded(null, span(52))).json() as { count: number }).count).toBeGreaterThanOrEqual(2)
+  })
+
+  test('a member cannot ask', async () => {
+    const room = await makeRoom()
+    expect((await stranded(room, span(53), member.cookie)).status).toBe(403)
+  })
+
+  test('the count is what the close then cancels', async () => {
+    const room = await makeRoom()
+    await book(room, span(54))
+    await book(room, span(54, 17))
+    const counted = await (await stranded(room, span(54, 12, 8))).json() as { count: number }
+    const closed = await (await closeRoom(room, span(54, 12, 8))).json() as { cancelled: number }
+    expect(counted.count).toBe(2)
+    expect(closed.cancelled).toBe(counted.count)
+  })
+
+  // The close refuses a span that runs backwards, so the count does too rather than answer for it.
+  test('a backwards span is refused, as the close refuses it', async () => {
+    const room = await makeRoom()
+    const when = span(55)
+    expect((await stranded(room, { startsAt: when.endsAt, endsAt: when.startsAt })).status).toBe(400)
+  })
+})

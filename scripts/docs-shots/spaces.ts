@@ -61,8 +61,8 @@ export const spaces: Shot[] = [
       { selector: '[data-test="close-room-id"]', label: 'Which room' },
       { selector: '[data-test="close-reason"]', label: 'Why' },
       { selector: '[data-test="close-day"]', label: 'Day' },
-      { selector: '[data-test="close-from"]', label: 'From and until' },
-      { selector: '[data-test="close-submit"]', label: 'Close the room' },
+      { selector: '[data-test="close-whole-days"]', label: 'Whole days' },
+      { selector: '[data-test="close-submit"]', label: 'The close button' },
     ],
   },
   {

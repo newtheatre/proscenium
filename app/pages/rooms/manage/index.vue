@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
-import { ROOM_OVERRIDE_FLOORS, WEEKDAYS, minutesOpen, roomForm, saysOverrideFloor } from '#shared/utils/rooms'
+import { HOURS_MODES, ROOM_OVERRIDE_FLOORS, WEEKDAYS, hoursForMode, hoursModeOf, minutesOpen, roomForm, saysHoursMode, saysOverrideFloor } from '#shared/utils/rooms'
 import { roomsList } from '#shared/utils/rooms-list'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
-import type { RoomHours } from '#shared/utils/rooms'
+import type { HoursMode, RoomHours } from '#shared/utils/rooms'
 import type { z } from 'zod'
 
 definePageMeta({ layout: 'console', title: 'Rooms', middleware: 'console', docs: '/docs/spaces/rooms' })
@@ -90,6 +90,11 @@ const state = reactive({
 })
 const hours = ref<Record<number, { opens: string, closes: string, open: boolean }>>({})
 
+// Chosen as a pattern first: a room with no hours is open all day, and only "Set each day" shows a
+// row per day, so an unset room never reads as seven closed days (issue 1353).
+const hoursMode = ref<HoursMode>('ALWAYS')
+const pattern = reactive({ opens: '09:00', closes: '22:00' })
+
 function blankHours(): Record<number, { opens: string, closes: string, open: boolean }> {
   return Object.fromEntries(WEEKDAYS.map(day => [day.index, { opens: '09:00', closes: '22:00', open: false }]))
 }
@@ -115,17 +120,30 @@ function edit(room: Room | null): void {
   for (const day of room?.hours ?? []) {
     hours.value[day.weekday] = { opens: day.opens, closes: day.closes, open: true }
   }
+  hoursMode.value = hoursModeOf(room?.hours ?? [])
+  Object.assign(pattern, { opens: room?.hours[0]?.opens ?? '09:00', closes: room?.hours[0]?.closes ?? '22:00' })
   open.value = true
 }
 
+// Set each day starts afresh from the pattern last chosen, Always open giving every day at its times.
+function chooseMode(mode: HoursMode): void {
+  if (mode === 'EACH_DAY' && hoursMode.value !== 'EACH_DAY') {
+    hours.value = blankHours()
+    const from = hoursForMode(hoursMode.value === 'WEEKDAYS' ? 'WEEKDAYS' : 'EACH_DAY', pattern.opens, pattern.closes)
+    for (const day of from) hours.value[day.weekday] = { opens: day.opens, closes: day.closes, open: true }
+  }
+  hoursMode.value = mode
+}
+
+const chosenHours = computed<RoomHours[]>(() => (hoursMode.value === 'EACH_DAY'
+  ? WEEKDAYS
+      .filter(day => hours.value[day.index]?.open)
+      .map(day => ({ weekday: day.index, opens: hours.value[day.index]!.opens, closes: hours.value[day.index]!.closes }))
+  : hoursForMode(hoursMode.value, pattern.opens, pattern.closes)))
+
 async function save(event: FormSubmitEvent<z.output<typeof roomForm>>): Promise<void> {
   saving.value = true
-  const body = {
-    ...event.data,
-    hours: WEEKDAYS
-      .filter(day => hours.value[day.index]?.open)
-      .map(day => ({ weekday: day.index, opens: hours.value[day.index]!.opens, closes: hours.value[day.index]!.closes })),
-  }
+  const body = { ...event.data, hours: chosenHours.value }
   try {
     if (editing.value) await $fetch(`/api/admin/rooms/${editing.value.id}`, { method: 'PUT', body })
     else await $fetch('/api/admin/rooms', { method: 'POST', body })
@@ -170,7 +188,9 @@ async function retire(): Promise<void> {
   }
 }
 
-const openDaysCount = computed(() => WEEKDAYS.filter(day => hours.value[day.index]?.open).length)
+const hoursSummary = computed(() => (hoursMode.value === 'EACH_DAY'
+  ? plural(chosenHours.value.length, 'day')
+  : saysHoursMode(hoursMode.value).toLowerCase()))
 
 const OVERRIDES = ['minBookingMinutes', 'maxBookingHours', 'noticeHours', 'horizonWeeks', 'activeBookingsCap'] as const
 const overrideCount = computed(() => OVERRIDES.filter(field => state[field] !== undefined).length)
@@ -266,7 +286,7 @@ const columns: TableColumn<Room>[] = [
           </p>
           <p
             v-if="row.original.description"
-            class="text-sm text-muted"
+            class="text-sm text-muted whitespace-normal"
           >
             {{ row.original.description }}
           </p>
@@ -320,6 +340,16 @@ const columns: TableColumn<Room>[] = [
             @click="edit(row.original)"
           >
             Edit
+          </UButton>
+          <UButton
+            v-if="row.original.isActive"
+            size="sm"
+            color="neutral"
+            variant="ghost"
+            :to="`/rooms/manage/closures?close=${row.original.id}`"
+            :data-test="`close-room-${row.original.id}`"
+          >
+            Close for a spell
           </UButton>
           <UButton
             v-if="row.original.isActive"
@@ -401,47 +431,83 @@ const columns: TableColumn<Room>[] = [
               block
               class="justify-between"
             >
-              Opening hours ({{ openDaysCount === 0 ? 'always open' : plural(openDaysCount, 'day') }})
+              Opening hours ({{ hoursSummary }})
             </UButton>
 
             <template #content>
               <div class="space-y-3 pt-4">
-                <p class="text-sm text-muted">
-                  Leave every day closed and the room is open whenever, which is true of most
-                  rooms. Open one day and the rest become closed.
+                <URadioGroup
+                  :model-value="hoursMode"
+                  :items="HOURS_MODES.map(mode => ({ label: saysHoursMode(mode), value: mode }))"
+                  orientation="horizontal"
+                  data-test="hours-mode"
+                  @update:model-value="chooseMode($event as HoursMode)"
+                />
+
+                <p
+                  v-if="hoursMode === 'ALWAYS'"
+                  class="text-sm text-muted"
+                >
+                  Open all day, every day. Nothing is recorded, which is true of most rooms.
                 </p>
 
                 <div
-                  v-for="day in WEEKDAYS"
-                  :key="day.index"
+                  v-else-if="hoursMode === 'WEEKDAYS'"
                   class="flex flex-wrap items-center gap-3"
                 >
-                  <USwitch
-                    v-model="hours[day.index]!.open"
-                    :label="day.name"
-                    class="w-40"
-                    :data-test="`room-open-${day.index}`"
+                  <span class="text-sm">Monday to Friday, from</span>
+                  <UInput
+                    v-model="pattern.opens"
+                    type="time"
+                    aria-label="Weekdays open"
+                    data-test="room-weekdays-opens"
                   />
-                  <template v-if="hours[day.index]!.open">
-                    <UInput
-                      v-model="hours[day.index]!.opens"
-                      type="time"
-                      :aria-label="`${day.name} opens`"
-                      :data-test="`room-opens-${day.index}`"
-                    />
-                    <span class="text-sm text-muted">to</span>
-                    <UInput
-                      v-model="hours[day.index]!.closes"
-                      type="time"
-                      :aria-label="`${day.name} closes`"
-                      :data-test="`room-closes-${day.index}`"
-                    />
-                  </template>
-                  <span
-                    v-else
-                    class="text-sm text-muted"
-                  >Closed</span>
+                  <span class="text-sm">to</span>
+                  <UInput
+                    v-model="pattern.closes"
+                    type="time"
+                    aria-label="Weekdays close"
+                    data-test="room-weekdays-closes"
+                  />
+                  <span class="text-sm text-muted">Closed at weekends.</span>
                 </div>
+
+                <template v-else>
+                  <div
+                    v-for="day in WEEKDAYS"
+                    :key="day.index"
+                    class="flex flex-wrap items-center gap-3"
+                  >
+                    <USwitch
+                      v-model="hours[day.index]!.open"
+                      :label="day.name"
+                      class="w-40"
+                      :data-test="`room-open-${day.index}`"
+                    />
+                    <template v-if="hours[day.index]!.open">
+                      <UInput
+                        v-model="hours[day.index]!.opens"
+                        type="time"
+                        :aria-label="`${day.name} opens`"
+                        :data-test="`room-opens-${day.index}`"
+                      />
+                      <span class="text-sm text-muted">to</span>
+                      <UInput
+                        v-model="hours[day.index]!.closes"
+                        type="time"
+                        :aria-label="`${day.name} closes`"
+                        :data-test="`room-closes-${day.index}`"
+                      />
+                    </template>
+                    <span
+                      v-else
+                      class="text-sm text-muted"
+                    >Closed</span>
+                  </div>
+                  <p class="text-sm text-muted">
+                    A day switched off is closed all day.
+                  </p>
+                </template>
               </div>
             </template>
           </UCollapsible>
