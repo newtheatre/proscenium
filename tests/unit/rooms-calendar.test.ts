@@ -66,6 +66,15 @@ describe('the screens', () => {
     expect(await read('app/components/RoomGrid.vue')).toContain('sticky top-')
   })
 
+  // A phone scrolls a day of many rooms sideways too, so the times stay down its left edge, and
+  // the corner stays above both (issue 1346 follow-up).
+  test('the times stay down the left edge, and the corner above both', async () => {
+    const source = await read('app/components/RoomGrid.vue')
+    expect(source).toMatch(/class="sticky left-0 [^"]*"[^>]*>\s*<span v-if="slot\.minutes % 60 === 0">/)
+    expect(source).toMatch(/class="sticky top-0 left-0 z-20[^"]*"[^>]*>\s*Time/)
+    expect(source).toContain('scroll-pl-16')
+  })
+
   test('no member screen calls it a room not listed here, or one we do not manage', async () => {
     for (const path of ['app/pages/rooms/index.vue', 'app/pages/rooms/external.vue', 'app/pages/rooms/mine.vue']) {
       const source = await read(path)
