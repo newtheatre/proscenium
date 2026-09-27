@@ -9,6 +9,7 @@ import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { currentShowNight } from '#shared/utils/show-night'
 import { officerBypassTarget } from '#shared/utils/night-authority'
+import { NIGHT_TAP_TARGET_PX } from '#shared/utils/night-shell'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -849,6 +850,49 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
 
     await click(view, '[data-test="category-chip-all"]')
     await waitFor(view, `${tiles} === 2`)
+    view.close()
+  }, 120_000)
+
+  // Issue 1311: the basket was drawn after every tile, so checking or correcting it meant scrolling
+  // past the grid and back; the bar under the thumb opens it as a sheet instead.
+  test('the summary bar opens the basket as a sheet, and a line changed there changes the total', async () => {
+    const { view, productId } = await atTheTill()
+    await click(view, `[data-test="product-${productId}"]`)
+    await click(view, '[data-test="basket-summary-open"]')
+    await waitFor(view, `document.querySelector('[data-test="basket-sheet"] [data-test^="line-plus-"]')`)
+    await view.evaluate(`document.querySelector('[data-test="basket-sheet"] [data-test^="line-plus-"]').click()`)
+    await waitFor(view, `document.querySelector('[data-test="basket-sheet"] [data-test^="line-qty-"]').textContent.trim() === '2'`)
+    await waitFor(view, `document.querySelector('[data-test="basket-summary-total"]').textContent.includes('£6.00')`)
+    view.close()
+  }, 120_000)
+
+  test('a tap says what it added in the bar, and Undo takes it back', async () => {
+    const { view, productId } = await atTheTill()
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="basket-added"]')`)
+    expect(await textOf(view, '[data-test="basket-added"]')).toContain('Added: Variance')
+    await click(view, '[data-test="basket-added-undo"]')
+    await waitFor(view, `!document.querySelector('[data-test="basket"]')`)
+    view.close()
+  }, 120_000)
+
+  // A tile is the name, the price, a small ID mark and a corner allergen control: one row of
+  // controls, where a Check ID chip and a full-width Allergens button used to double its height.
+  test('a tile keeps its allergen control in the corner, on the same row as the product', async () => {
+    const { view, productId } = await atTheTill()
+    const measured = await view.evaluate<{ tile: number, sameRow: boolean, inside: boolean }>(`(() => {
+      const product = document.querySelector('[data-test="product-${productId}"]').getBoundingClientRect()
+      const allergen = document.querySelector('[data-test="allergen-${productId}"]').getBoundingClientRect()
+      const tile = document.querySelector('[data-test="tile-${productId}"]').getBoundingClientRect()
+      return {
+        tile: tile.height,
+        sameRow: allergen.top < product.bottom && allergen.bottom > product.top,
+        inside: allergen.right <= tile.right + 1 && allergen.top >= tile.top - 1,
+      }
+    })()`)
+    expect(measured.sameRow).toBe(true)
+    expect(measured.inside).toBe(true)
+    expect(measured.tile).toBeLessThan(2 * NIGHT_TAP_TARGET_PX)
     view.close()
   }, 120_000)
 
