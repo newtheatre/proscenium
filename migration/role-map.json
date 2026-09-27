@@ -5,7 +5,6 @@
   "proscenium:BOX_OFFICE": "FOH_MANAGER",
   "proscenium:COMMITTEE": "COMMITTEE",
   "proscenium:FOH_MANAGER": "FOH_MANAGER",
-  "proscenium:FRONT_OF_HOUSE": "FRONT_OF_HOUSE",
   "proscenium:MANAGER": "MANAGER",
   "rooms:ADMIN": "THEATRE_MANAGER",
   "ticketing:ADMIN": "ADMIN",

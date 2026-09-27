@@ -82,6 +82,8 @@ const CATALOGUE = {
   'role.pruned': { label: 'Lapsed role grant tidied away', module: 'identity' },
   // Written only by migration 0116, with no actor, when the box office role folded away (0090).
   'role.merged': { label: 'Role folded into another', module: 'identity' },
+  // Written only by migration 0127, with no actor, when front of house left the vocabulary (A-134).
+  'role.retired': { label: 'Retired role removed', module: 'identity' },
   // Written by scripts/grant-admin.ts, which is the one writer outside a request (K-122).
   'role.granted.bootstrap': { label: 'First administrator created', module: 'identity' },
 

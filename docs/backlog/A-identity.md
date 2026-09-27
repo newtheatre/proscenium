@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 32 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 33 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -719,6 +719,31 @@ Open questions for the committee:
   6. `/people/roles` lists one role for the post and counts each holder once.
 - Source: Issue #1211, decided by the IT Manager on 23 September 2026 (0090). The other pairings
   that issue's audit raised are still under review and are not part of this story.
+
+## A-134: Retire the Front of House role, which grants nothing
+
+- Role: Administrator
+- Phase: MVP
+- Story: As the IT Manager, I want a role that grants nothing gone from the vocabulary so that
+  the register and every grant menu offer only roles that do something.
+- Depends on: A-131, A-133
+- Acceptance criteria:
+  1. `FRONT_OF_HOUSE` is not a role. Granting it is refused as an unknown role, and it is not
+     offered on `/people/roles` or on an account's page. A stored grant naming it grants nothing,
+     and the register shows ten roles.
+  2. Existing `FRONT_OF_HOUSE` grants are removed in one migration. The role held no permission,
+     so nobody loses access: front of house work on a night comes from a confirmed shift (0009),
+     which the rota records whatever standing role a person holds.
+  3. Each removed grant writes a `role.retired` audit entry naming the role, the expiry it had and
+     whether it was permanent, with no actor and no free text (0011). A database with no such
+     grant writes none.
+  4. The import suggests no role for the old estate's `FRONT_OF_HOUSE`, so each such grant is
+     decided by hand or skipped. A recorded decision naming it is an exception rather than an
+     imported grant (0070).
+- Source: Issue #1211 point 7, from the MVP flow review of 25 September 2026: the role held
+  nothing, nothing read it, and it was one of eleven tiles on the register. It is retired the way
+  0090 retired `BOX_OFFICE`. The audit's points 5 and 6 belong to the role-vocabulary workshop and
+  are not part of this story.
 
 ## A-201: Import an SU membership list by hand
 

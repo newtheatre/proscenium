@@ -8,7 +8,6 @@ export const ROLES = [
   'THEATRE_MANAGER',
   'TRAINING_MANAGER',
   'FOH_MANAGER',
-  'FRONT_OF_HOUSE',
   'BAR_MANAGER',
   'ACCESSIBILITY_OFFICER',
   'SAFETY_OFFICER',
@@ -147,7 +146,6 @@ export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
   // One committee post: the programme, the rota, paid refunds and the stocktake on any day, and the
   // door and duty manager screens with no shift. The till is the bar manager's (0044, 0090, 0099, 0102).
   FOH_MANAGER: ['ticketing.read', 'ticketing.write', 'ticketing.export', 'money.refund', 'bar.stocktake', 'night.door', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read'],
-  FRONT_OF_HOUSE: [],
   // Owns the bar's catalogue and its stock, and opens the till without a bar shift. Nothing in
   // the old estate grants this role, so the import cannot reach it (0044, F-101 criterion 1).
   BAR_MANAGER: ['bar.read', 'bar.write', 'bar.stocktake', 'night.till'],
@@ -205,7 +203,6 @@ const ROLE_WORDING: Record<Role, string> = {
   THEATRE_MANAGER: 'Theatre Manager',
   TRAINING_MANAGER: 'Training Manager',
   FOH_MANAGER: 'Front of House Manager',
-  FRONT_OF_HOUSE: 'Front of House',
   BAR_MANAGER: 'Bar Manager',
   ACCESSIBILITY_OFFICER: 'Accessibility Officer',
   SAFETY_OFFICER: 'Safety Officer',
@@ -213,9 +210,10 @@ const ROLE_WORDING: Record<Role, string> = {
   COMMITTEE: 'Committee',
 }
 
-// Grantable no longer, but named by audit entries written before they were retired (0090).
+// Grantable no longer, but named by audit entries written before they were retired (0090, A-134).
 const RETIRED_ROLE_WORDING: Record<string, string> = {
   BOX_OFFICE: 'Box Office Manager',
+  FRONT_OF_HOUSE: 'Front of House',
 }
 
 // For a message a holder reads rather than a console filter. The vocabulary is provisional until

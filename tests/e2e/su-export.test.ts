@@ -15,16 +15,16 @@ const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 let admin: TestMember
 let treasurer: TestMember
-let front: TestMember
+let committee: TestMember
 
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
   admin = await adminSession(app)
   treasurer = await registerMember(app, 'export-treasurer', generatePassword())
-  front = await registerMember(app, 'export-front', generatePassword())
+  committee = await registerMember(app, 'export-committee', generatePassword())
   await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: front.id, role: 'FRONT_OF_HOUSE' }, admin.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -65,10 +65,10 @@ describe.skipIf(skip !== null)('who may configure a mapping (finance.write) and 
     expect((await send('GET', '/api/admin/finance/export?fromDay=2026-09-01&toDay=2026-09-30', undefined, treasurer.cookie)).status).toBe(200)
   })
 
-  test('front of house holds none of finance\'s permissions', async () => {
-    expect((await send('GET', '/api/admin/finance/nominal-mappings', undefined, front.cookie)).status).toBe(403)
-    expect((await send('POST', '/api/admin/finance/nominal-mappings', { kind: 'WALK_UP', source: 'DESK', nominalCode: '9999' }, front.cookie)).status).toBe(403)
-    expect((await send('GET', '/api/admin/finance/export?fromDay=2026-09-01&toDay=2026-09-30', undefined, front.cookie)).status).toBe(403)
+  test('the committee role holds none of finance\'s working permissions', async () => {
+    expect((await send('GET', '/api/admin/finance/nominal-mappings', undefined, committee.cookie)).status).toBe(403)
+    expect((await send('POST', '/api/admin/finance/nominal-mappings', { kind: 'WALK_UP', source: 'DESK', nominalCode: '9999' }, committee.cookie)).status).toBe(403)
+    expect((await send('GET', '/api/admin/finance/export?fromDay=2026-09-01&toDay=2026-09-30', undefined, committee.cookie)).status).toBe(403)
   })
 })
 
@@ -183,7 +183,7 @@ describe.skipIf(skip !== null)('the yearly return by name: a year or a season (c
     const answered = await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
     expect(answered.status).toBe(200)
     expect(await answered.json()).toEqual({ fromDay: '2011-08-01', toDay: '2012-07-31', rows: 1, closed: false })
-    expect((await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, front.cookie)).status).toBe(403)
+    expect((await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, committee.cookie)).status).toBe(403)
   })
 
   test('once the year is closed, two runs are byte-identical and both say closed', async () => {

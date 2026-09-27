@@ -335,7 +335,7 @@ describe.skipIf(skip !== null)('the audit screen (J-101 criterion 2, J-103)', ()
 
   test('an officer finds a grant they made, and the system entries look different', async () => {
     const member = await registerMember(app, 'onscreen', password, { signIn: false })
-    expect((await send('POST', '/api/admin/roles', { userId: member.id, role: 'FRONT_OF_HOUSE' }, cookie)).status).toBe(200)
+    expect((await send('POST', '/api/admin/roles', { userId: member.id, role: 'COMMITTEE' }, cookie)).status).toBe(200)
 
     const view = await signedInView()
     try {
